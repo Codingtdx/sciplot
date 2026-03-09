@@ -7,3 +7,4 @@ scipy
 statsmodels
 jupyterlab
 openpyxl
+PySide6

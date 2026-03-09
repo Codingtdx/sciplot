@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from make_plot import render_template
+import interactive_plot as wizard
+from make_plot import Recommendation, _resolve_render_options, inspect_input_file, list_sheet_names, preflight_render_request, render_template
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
 from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
@@ -496,6 +497,139 @@ def _assert_input_validation(base: Path) -> None:
         raise AssertionError("Replicate table with non-numeric values should not load successfully.")
 
 
+def _assert_inspection_and_preflight(
+    *,
+    freq_path: Path,
+    temp_path: Path,
+    relax_path: Path,
+    replicate_path: Path,
+    heatmap_path: Path,
+    tensile_path: Path,
+    ftir_path: Path,
+    wide_nmr_path: Path,
+) -> None:
+    if list_sheet_names(freq_path) != ["Sheet1"]:
+        raise AssertionError("Excel sheet listing should expose the default Sheet1 sheet.")
+
+    freq_inspection = inspect_input_file(freq_path)
+    if freq_inspection.model != "frequency_sweep":
+        raise AssertionError("Frequency export should be recognized as frequency_sweep.")
+    if freq_inspection.recommendation.template != "point_line":
+        raise AssertionError("Frequency export should recommend point_line.")
+    if (freq_inspection.recommendation.xscale, freq_inspection.recommendation.yscale) != ("log", "log"):
+        raise AssertionError("Frequency export should recommend log/log point_line.")
+    if len(freq_inspection.signals) < 2:
+        raise AssertionError("Frequency export should expose recommendation signals for the wizard.")
+    freq_options = _resolve_render_options(
+        template=freq_inspection.recommendation.template,
+        size=freq_inspection.recommendation.size,
+        xscale=freq_inspection.recommendation.xscale,
+        yscale=freq_inspection.recommendation.yscale,
+        reverse_x=bool(freq_inspection.recommendation.reverse_x),
+    )
+    freq_preflight = preflight_render_request("point_line", freq_path, 0, freq_options)
+    if freq_preflight.errors:
+        raise AssertionError(f"Frequency preflight should succeed, got: {freq_preflight.errors}")
+    if len(freq_preflight.output_filenames) != 4:
+        raise AssertionError("Frequency preflight should predict 4 PDF outputs.")
+
+    temp_inspection = inspect_input_file(temp_path)
+    if temp_inspection.model != "temperature_sweep":
+        raise AssertionError("Temperature export should be recognized as temperature_sweep.")
+    if temp_inspection.recommendation.size != "120x55":
+        raise AssertionError("Temperature export should recommend the 120x55 preset.")
+    if (temp_inspection.recommendation.xscale, temp_inspection.recommendation.yscale) != ("linear", "log"):
+        raise AssertionError("Temperature export should recommend linear/log point_line.")
+
+    relax_inspection = inspect_input_file(relax_path)
+    if relax_inspection.model != "stress_relaxation":
+        raise AssertionError("Relaxation export should be recognized as stress_relaxation.")
+    if (relax_inspection.recommendation.xscale, relax_inspection.recommendation.yscale) != ("log", "linear"):
+        raise AssertionError("Relaxation export should recommend log/linear point_line.")
+
+    replicate_inspection = inspect_input_file(replicate_path)
+    if replicate_inspection.model != "replicate_table":
+        raise AssertionError("Replicate table should be recognized as replicate_table.")
+    if replicate_inspection.recommendation.template != "box":
+        raise AssertionError("Replicate table should default to box.")
+    if len(replicate_inspection.signals) < 2:
+        raise AssertionError("Replicate table should expose recommendation signals for the wizard.")
+
+    heatmap_inspection = inspect_input_file(heatmap_path)
+    if heatmap_inspection.model != "heatmap_table":
+        raise AssertionError("Heatmap long table should be recognized as heatmap_table.")
+    if heatmap_inspection.recommendation.template != "heatmap":
+        raise AssertionError("Heatmap table should recommend heatmap.")
+    if len(heatmap_inspection.signals) < 2:
+        raise AssertionError("Heatmap inspection should expose recommendation signals for the wizard.")
+
+    ftir_inspection = inspect_input_file(ftir_path)
+    if ftir_inspection.recommendation.template != "stacked_curve":
+        raise AssertionError("FTIR-like curve table should recommend stacked_curve.")
+    if not ftir_inspection.recommendation.reverse_x:
+        raise AssertionError("FTIR-like curve table should recommend reverse_x.")
+
+    wide_nmr_inspection = inspect_input_file(wide_nmr_path)
+    if wide_nmr_inspection.recommendation.template != "segmented_stacked_curve":
+        raise AssertionError("wide_nmr sidecar should recommend segmented_stacked_curve.")
+    if len(wide_nmr_inspection.signals) < 2:
+        raise AssertionError("wide_nmr inspection should expose recommendation signals for the wizard.")
+    segmented_options = _resolve_render_options(
+        template="segmented_stacked_curve",
+        size=wide_nmr_inspection.recommendation.size,
+        reverse_x=bool(wide_nmr_inspection.recommendation.reverse_x),
+        baseline=wide_nmr_inspection.recommendation.baseline,
+        use_sidecar=wide_nmr_inspection.recommendation.use_sidecar,
+    )
+    segmented_preflight = preflight_render_request("segmented_stacked_curve", wide_nmr_path, 0, segmented_options)
+    if segmented_preflight.errors:
+        raise AssertionError(f"segmented_stacked_curve preflight should succeed with sidecar, got: {segmented_preflight.errors}")
+
+    missing_sidecar_options = _resolve_render_options(
+        template="segmented_stacked_curve",
+        size="60x110",
+        reverse_x=True,
+        baseline="linear_endpoints",
+        use_sidecar=True,
+    )
+    missing_sidecar_preflight = preflight_render_request("segmented_stacked_curve", tensile_path, 0, missing_sidecar_options)
+    if not missing_sidecar_preflight.errors:
+        raise AssertionError("segmented_stacked_curve preflight should fail when sidecar is required but missing.")
+    if "sidecar 配置文件" not in missing_sidecar_preflight.errors[0]:
+        raise AssertionError("Missing sidecar preflight error should be rewritten into user-facing Chinese copy.")
+
+
+def _assert_recent_defaults_state(base: Path) -> None:
+    original_state_path = wizard.STATE_PATH
+    try:
+        wizard.STATE_PATH = base / ".plot_wizard_state.json"
+        wizard._remember_defaults(
+            "heatmap",
+            {
+                "size": "120x55",
+                "show_colorbar": False,
+                "reverse_x": False,
+            },
+        )
+        recent = wizard._recent_defaults_for("heatmap")
+        if recent.get("size") != "120x55" or recent.get("show_colorbar") is not False:
+            raise AssertionError("Wizard should persist recent defaults per template.")
+
+        recommended = wizard._recommended_defaults(
+            "heatmap",
+            Recommendation(
+                template="heatmap",
+                reason="test",
+                size="60x55",
+                show_colorbar=True,
+            ),
+        )
+        if recommended.get("size") != "60x55" or recommended.get("show_colorbar") is not True:
+            raise AssertionError("Inspection recommendation should override saved recent defaults.")
+    finally:
+        wizard.STATE_PATH = original_state_path
+
+
 def _sorted_limits(bounds: tuple[float, float]) -> tuple[float, float]:
     return (min(bounds), max(bounds))
 
@@ -757,6 +891,17 @@ def main() -> int:
         _write_relaxation_xlsx(relax_path)
         _assert_normalization_rules()
         _assert_input_validation(base)
+        _assert_inspection_and_preflight(
+            freq_path=freq_path,
+            temp_path=temp_path,
+            relax_path=relax_path,
+            replicate_path=replicate_path,
+            heatmap_path=heatmap_path,
+            tensile_path=tensile_path,
+            ftir_path=ftir_path,
+            wide_nmr_path=wide_nmr_path,
+        )
+        _assert_recent_defaults_state(base)
 
         jobs = [
             ("bar", replicate_path, {}),

@@ -3,3 +3,4 @@ __pycache__/
 figures/
 .DS_Store
 plots/
+.plot_wizard_state.json

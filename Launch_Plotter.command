@@ -4,7 +4,8 @@ set -euo pipefail
 
 PROJECT_DIR="/Users/dongxutian/Documents/codegod"
 VENV_ACTIVATE="$PROJECT_DIR/.venv/bin/activate"
-SCRIPT_PATH="$PROJECT_DIR/interactive_plot.py"
+GUI_SCRIPT_PATH="$PROJECT_DIR/plot_wizard_gui.py"
+FALLBACK_SCRIPT_PATH="$PROJECT_DIR/interactive_plot.py"
 
 cd "$PROJECT_DIR"
 
@@ -15,15 +16,26 @@ if [[ ! -f "$VENV_ACTIVATE" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$SCRIPT_PATH" ]]; then
-  echo "Error: interactive plot script not found at $SCRIPT_PATH"
+if [[ ! -f "$GUI_SCRIPT_PATH" ]]; then
+  echo "Error: GUI plot script not found at $GUI_SCRIPT_PATH"
   echo "Press Enter to close..."
   read
   exit 1
 fi
 
 source "$VENV_ACTIVATE"
-python "$SCRIPT_PATH"
+if ! python "$GUI_SCRIPT_PATH"; then
+  echo
+  echo "GUI launch failed. Falling back to terminal wizard..."
+  if [[ -f "$FALLBACK_SCRIPT_PATH" ]]; then
+    python "$FALLBACK_SCRIPT_PATH"
+  else
+    echo "Fallback script not found at $FALLBACK_SCRIPT_PATH"
+    echo "Press Enter to close..."
+    read
+    exit 1
+  fi
+fi
 
 echo
 echo "Press Enter to close..."
