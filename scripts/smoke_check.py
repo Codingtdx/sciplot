@@ -1,0 +1,816 @@
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from make_plot import render_template
+from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
+from src.plotting import (
+    INSIDE_LEGEND_INSET_FRACTION,
+    _cap_visible_major_ticks,
+    _legend_candidates,
+    _place_legend_candidate,
+    compute_shared_curve_x_layout,
+    plot_bar,
+    plot_box,
+    plot_dsc,
+    plot_ftir,
+    plot_frequency_sweep,
+    plot_nmr,
+    plot_tensile_curve,
+    plot_violin,
+    plot_wide_nmr,
+    plot_xrd,
+)
+from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
+from src.text_normalization import normalize_label, normalize_unit
+from src.wide_nmr import load_wide_nmr_config
+from src.wide_nmr import (
+    WIDE_NMR_SPECTRUM_HEIGHT_MM,
+    WIDE_NMR_STRUCTURE_RESERVED_MM,
+    WIDE_NMR_TOTAL_HEIGHT_MM,
+    WIDE_NMR_WIDTH_MM,
+)
+
+
+def _write_curve_table(path: Path, x_label: str, y_label: str, x_unit: str, y_unit: str) -> None:
+    x = np.linspace(1, 10, 80)
+    y1 = np.sin(x / 2) + 2.0
+    y2 = np.cos(x / 3) + 3.2
+    rows = [
+        [x_label, y_label, x_label, y_label],
+        [x_unit, y_unit, x_unit, y_unit],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for xv, yv1, yv2 in zip(x, y1, y2):
+        rows.append([xv, yv1, xv, yv2])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_replicate_table(path: Path) -> None:
+    rows = [
+        ["Tensile modulus", "", "", ""],
+        ["Blend A", "Blend B", "Foam A", "Foam B"],
+        ["MPa", "MPa", "MPa", "MPa"],
+        [510.13, 567.91, 1544.41, 1556.47],
+        [501.10, 501.49, 1551.10, 1605.92],
+        [549.61, 549.61, 1567.26, 1581.81],
+        [549.54, 562.07, 1549.94, 1619.74],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_invalid_curve_table_missing_y(path: Path) -> None:
+    rows = [
+        ["Time", "Stress"],
+        ["s", "MPa"],
+        ["Sample A", "Sample A"],
+        [0, "bad"],
+        [1, "still bad"],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_invalid_curve_table_odd_columns(path: Path) -> None:
+    rows = [
+        ["Time", "Stress", "Time"],
+        ["s", "MPa", "s"],
+        ["Sample A", "Sample A", "Sample B"],
+        [0, 1.0, 0],
+        [1, 1.5, 1],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_invalid_replicate_table(path: Path) -> None:
+    rows = [
+        ["Tensile modulus", "", ""],
+        ["Blend A", "Blend B", "Blend C"],
+        ["MPa", "MPa", "MPa"],
+        [510.13, "bad", 620.4],
+        [501.10, "still bad", 618.2],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _gaussian(x: np.ndarray, center: float, width: float, amplitude: float) -> np.ndarray:
+    return amplitude * np.exp(-0.5 * ((x - center) / width) ** 2)
+
+
+def _write_stacked_curve_table(path: Path, *, template: str) -> None:
+    if template == "ftir":
+        x = np.linspace(4000, 600, 320)
+        y_label, x_label, x_unit, y_unit = "Transmittance", "Wavenumber", "cm-1", "%"
+        curves = [
+            82 - _gaussian(x, 3340, 120, 18) - _gaussian(x, 2920, 90, 9) - _gaussian(x, 1710, 45, 14),
+            79 - _gaussian(x, 3320, 130, 15) - _gaussian(x, 2960, 85, 8) - _gaussian(x, 1650, 50, 17),
+            77 - _gaussian(x, 3290, 115, 12) - _gaussian(x, 2870, 95, 7) - _gaussian(x, 1605, 55, 13),
+            75 - _gaussian(x, 3250, 140, 10) - _gaussian(x, 2850, 100, 6) - _gaussian(x, 1570, 60, 11),
+        ]
+    elif template == "nmr":
+        x = np.linspace(0, 10, 300)
+        y_label, x_label, x_unit, y_unit = "Intensity", "Chemical shift", "ppm", "a.u."
+        curves = [
+            _gaussian(x, 7.2, 0.12, 1.1) + _gaussian(x, 3.6, 0.10, 0.7) + _gaussian(x, 1.2, 0.08, 0.4) + 0.02 * x,
+            _gaussian(x, 7.0, 0.11, 1.0) + _gaussian(x, 3.3, 0.11, 0.8) + _gaussian(x, 1.0, 0.09, 0.5) + 0.015 * x,
+            _gaussian(x, 6.8, 0.10, 0.9) + _gaussian(x, 3.1, 0.12, 0.75) + _gaussian(x, 0.9, 0.10, 0.55) + 0.01 * x,
+            _gaussian(x, 6.5, 0.13, 0.85) + _gaussian(x, 2.9, 0.13, 0.7) + _gaussian(x, 0.8, 0.11, 0.6) + 0.008 * x,
+        ]
+    elif template == "xrd":
+        x = np.linspace(5, 45, 320)
+        y_label, x_label, x_unit, y_unit = "Intensity", "2theta", "°", "a.u."
+        curves = [
+            _gaussian(x, 12.4, 0.35, 1.4) + _gaussian(x, 21.8, 0.45, 1.0) + _gaussian(x, 28.9, 0.40, 0.8),
+            _gaussian(x, 12.9, 0.40, 1.2) + _gaussian(x, 22.4, 0.42, 0.95) + _gaussian(x, 29.6, 0.38, 0.9),
+            _gaussian(x, 13.2, 0.36, 1.1) + _gaussian(x, 23.1, 0.44, 0.9) + _gaussian(x, 30.4, 0.41, 0.85),
+            _gaussian(x, 13.6, 0.38, 1.0) + _gaussian(x, 23.8, 0.46, 0.88) + _gaussian(x, 31.2, 0.43, 0.8),
+        ]
+    elif template == "dsc":
+        x = np.linspace(30, 240, 320)
+        y_label, x_label, x_unit, y_unit = "Heat flow", "Temperature", "°C", "mW"
+        curves = [
+            0.002 * (x - 30) - _gaussian(x, 88, 8, 0.55) - _gaussian(x, 172, 12, 0.9),
+            0.0018 * (x - 30) - _gaussian(x, 95, 9, 0.45) - _gaussian(x, 180, 14, 0.8),
+            0.0016 * (x - 30) - _gaussian(x, 102, 10, 0.40) - _gaussian(x, 186, 13, 0.72),
+            0.0014 * (x - 30) - _gaussian(x, 108, 11, 0.36) - _gaussian(x, 193, 15, 0.68),
+        ]
+    else:
+        raise ValueError(f"Unsupported stacked template: {template}")
+
+    sample_names = [f"Sample {idx}" for idx in range(1, len(curves) + 1)]
+    axis_row: list[object] = []
+    unit_row: list[object] = []
+    sample_row: list[object] = []
+    for sample in sample_names:
+        axis_row.extend([x_label, y_label])
+        unit_row.extend([x_unit, y_unit])
+        sample_row.extend([sample, sample])
+
+    rows = [axis_row, unit_row, sample_row]
+    for row_idx in range(len(x)):
+        row: list[object] = []
+        for y in curves:
+            row.extend([float(x[row_idx]), float(y[row_idx])])
+        rows.append(row)
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_frequency_xlsx(path: Path) -> None:
+    x = np.logspace(-1, 2, 50)
+    rows = [
+        ["Angular Frequency", "Storage Modulus", "Loss Modulus", "Loss Factor", "Complex Viscosity"] * 2,
+        ["Sample A", "", "", "", "", "Sample B", "", "", "", ""],
+        ["rad/s", "Pa", "Pa", "", "mPa·s", "rad/s", "Pa", "Pa", "", "mPa·s"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                1.2e3 * value**0.25,
+                6.8e2 * value**0.18,
+                0.45 + 0.03 * np.log10(value + 1),
+                4.2e4 / value**0.55,
+                value,
+                1.5e3 * value**0.22,
+                7.2e2 * value**0.20,
+                0.52 + 0.025 * np.log10(value + 1),
+                4.8e4 / value**0.50,
+            ]
+        )
+    pd.DataFrame(rows).to_excel(path, header=False, index=False)
+
+
+def _write_temperature_xlsx(path: Path) -> None:
+    x = np.linspace(30, 220, 60)
+    rows = [
+        ["Temperature", "Storage Modulus", "Loss Modulus", "Loss Factor", "Complex Viscosity"] * 2,
+        ["Sample A", "", "", "", "", "Sample B", "", "", "", ""],
+        ["°C", "Pa", "Pa", "", "Pa·s", "°C", "Pa", "Pa", "", "Pa·s"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                3.2e6 * np.exp(-value / 150),
+                1.4e6 * np.exp(-value / 145),
+                0.42 + value / 600,
+                1.1e5 * np.exp(-value / 55),
+                value,
+                2.5e6 * np.exp(-value / 155),
+                1.0e6 * np.exp(-value / 150),
+                0.38 + value / 650,
+                9.0e4 * np.exp(-value / 60),
+            ]
+        )
+    pd.DataFrame(rows).to_excel(path, header=False, index=False)
+
+
+def _write_relaxation_xlsx(path: Path) -> None:
+    x = np.logspace(-1, 3, 70)
+    rows = [
+        ["Time", "Shear Strain", "Shear Stress", "σ/σ0"] * 2,
+        ["Sample A", "", "", "", "Sample B", "", "", ""],
+        ["[s]", "[%]", "[Pa]", "", "[s]", "[%]", "[Pa]", ""],
+    ]
+    for value in x:
+        stress_a = 1200 * np.exp(-np.log10(value + 1) / 1.5) + 120
+        stress_b = 1000 * np.exp(-np.log10(value + 1) / 1.7) + 100
+        rows.append([value, 1.0, stress_a, stress_a / 1320, value, 1.0, stress_b, stress_b / 1100])
+    pd.DataFrame(rows).to_excel(path, header=False, index=False)
+
+
+def _write_tga_curve_table(path: Path) -> None:
+    x = np.linspace(30, 700, 120)
+    rows = [
+        ["Temperature", "Weight", "Temperature", "Weight"],
+        ["°C", "%", "°C", "%"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                100 - 0.02 * value - 18 / (1 + np.exp(-(value - 360) / 18)),
+                value,
+                100 - 0.018 * value - 20 / (1 + np.exp(-(value - 390) / 22)),
+            ]
+        )
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_dma_curve_table(path: Path) -> None:
+    x = np.linspace(25, 220, 120)
+    rows = [
+        ["Temperature", "E'", "Temperature", "E'"],
+        ["°C", "MPa", "°C", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                3200 * np.exp(-value / 140) + 180,
+                value,
+                2800 * np.exp(-value / 150) + 220,
+            ]
+        )
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_heatmap_table(path: Path) -> None:
+    rows = [
+        ["X", "Y", "Z"],
+        ["Temperature", "Blend ratio", "Storage Modulus"],
+        ["°C", "%", "MPa"],
+    ]
+    temperatures = [30, 60, 90, 120]
+    ratios = ["0:1", "0.3:1", "0.6:1", "1:1"]
+    for ratio_index, ratio in enumerate(ratios):
+        for temp_index, temperature in enumerate(temperatures):
+            value = 1800 - temp_index * 220 + ratio_index * 140
+            rows.append([temperature, ratio, value])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+
+def _write_wide_nmr_bundle(path: Path) -> None:
+    x = np.linspace(3.7, 9.3, 2400)
+    sample_names = ["0:1", "0.1:1", "0.2:1", "0.3:1", "0.4:1", "0.5:1"]
+    curve_params = [
+        [(8.95, 0.010, 1.4), (8.45, 0.012, 1.1), (8.18, 0.010, 1.6), (8.08, 0.010, 1.4), (7.86, 0.013, 1.1), (7.58, 0.014, 0.9), (7.50, 0.014, 0.8), (4.06, 0.010, 2.6)],
+        [(8.94, 0.010, 1.2), (8.43, 0.012, 0.9), (8.19, 0.010, 1.2), (8.07, 0.010, 1.1), (7.85, 0.013, 1.0), (7.57, 0.014, 0.9), (7.49, 0.014, 0.7), (4.06, 0.010, 2.1)],
+        [(8.93, 0.010, 1.0), (8.44, 0.012, 0.8), (8.18, 0.010, 1.0), (8.06, 0.010, 0.95), (7.84, 0.013, 0.9), (7.56, 0.014, 0.85), (7.48, 0.014, 0.65), (4.06, 0.010, 1.8)],
+        [(8.92, 0.010, 0.8), (8.45, 0.012, 0.65), (8.19, 0.010, 0.82), (8.05, 0.010, 0.8), (7.83, 0.013, 0.8), (7.55, 0.014, 0.8), (7.47, 0.014, 0.62), (4.06, 0.010, 1.5)],
+        [(8.91, 0.010, 0.65), (8.46, 0.012, 0.52), (8.20, 0.010, 0.66), (8.04, 0.010, 0.65), (7.82, 0.013, 0.72), (7.54, 0.014, 0.74), (7.46, 0.014, 0.58), (4.06, 0.010, 1.2)],
+        [(8.90, 0.010, 0.52), (8.47, 0.012, 0.44), (8.21, 0.010, 0.54), (8.03, 0.010, 0.53), (7.81, 0.013, 0.64), (7.53, 0.014, 0.68), (7.45, 0.014, 0.54), (4.06, 0.010, 1.0)],
+    ]
+    rows = [
+        ["Chemical shift", "Intensity"] * len(sample_names),
+        ["ppm", "a.u."] * len(sample_names),
+        [item for sample in sample_names for item in (sample, sample)],
+    ]
+    for idx, x_value in enumerate(x):
+        row: list[float] = []
+        for series_peaks in curve_params:
+            y_value = 0.01 * np.sin(x_value * 2.5)
+            for center, width, amplitude in series_peaks:
+                y_value += _gaussian(np.array([x_value]), center, width, amplitude)[0]
+            row.extend([float(x_value), float(y_value)])
+        rows.append(row)
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+
+    sidecar = path.with_suffix(".wide_nmr.toml")
+    sidecar.write_text(
+        "\n".join(
+            [
+                'series_order = ["0:1", "0.1:1", "0.2:1", "0.3:1", "0.4:1", "0.5:1"]',
+                "",
+                "[series_labels]",
+                '"0:1" = "0:1"',
+                '"0.1:1" = "0.1:1"',
+                '"0.2:1" = "0.2:1"',
+                '"0.3:1" = "0.3:1"',
+                '"0.4:1" = "0.4:1"',
+                '"0.5:1" = "0.5:1"',
+                "",
+                "[layout]",
+                'label_side = "left"',
+                'panel_label = "b)"',
+                "segment_gap = 0.03",
+                "stack_floor_fraction = 0.28",
+                "stack_gap_fraction = 0.30",
+                "label_inset_fraction = 0.035",
+                "label_offset_pt = 3.0",
+                "",
+                "[[segments]]",
+                "x_min = 6.6",
+                "x_max = 9.2",
+                "width_ratio = 4.3",
+                "",
+                "[[segments]]",
+                "x_min = 3.85",
+                "x_max = 4.25",
+                "width_ratio = 1.25",
+                "",
+                "[[highlight_regions]]",
+                "x_min = 8.88",
+                "x_max = 8.99",
+                'label = "1"',
+                'color = "#d76659"',
+                "alpha = 0.18",
+                'series = ["0:1", "0.1:1"]',
+                'label_position = "bottom"',
+                "",
+                "[[highlight_regions]]",
+                "x_min = 8.39",
+                "x_max = 8.49",
+                'label = "2"',
+                'color = "#d76659"',
+                "alpha = 0.16",
+                'series = ["0:1", "0.1:1"]',
+                'label_position = "bottom"',
+                "",
+                "[[highlight_regions]]",
+                "x_min = 8.02",
+                "x_max = 8.22",
+                'label = "3"',
+                'color = "#9cbbe5"',
+                "alpha = 0.18",
+                'series = ["0.3:1", "0.4:1", "0.5:1"]',
+                "",
+                "[[highlight_regions]]",
+                "x_min = 7.74",
+                "x_max = 7.90",
+                'label = "4"',
+                'color = "#9cbbe5"',
+                "alpha = 0.16",
+                'series = ["0.3:1", "0.4:1", "0.5:1"]',
+                "",
+                "[[highlight_regions]]",
+                "x_min = 7.43",
+                "x_max = 7.63",
+                'label = "5"',
+                'color = "#9cbbe5"',
+                "alpha = 0.14",
+                'series = ["0.3:1", "0.4:1", "0.5:1"]',
+                "",
+                "[[highlight_regions]]",
+                "x_min = 4.00",
+                "x_max = 4.11",
+                'label = "0"',
+                'color = "#9cbbe5"',
+                "alpha = 0.18",
+                'series = ["0.2:1", "0.3:1", "0.4:1", "0.5:1"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _assert_stacked_layout(plot_fn, path: Path) -> None:
+    series_list = load_curve_table(path)
+    fig, ax = plot_fn(series_list)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    axes_bbox = ax.get_window_extent(renderer=renderer)
+
+    line_ymins = [float(np.nanmin(line.get_ydata())) for line in ax.lines if len(line.get_ydata())]
+    if not line_ymins:
+        raise AssertionError("Expected plotted lines for stacked layout check.")
+    if min(line_ymins) <= ax.get_ylim()[0]:
+        raise AssertionError("Lowest stacked curve is touching the x-axis boundary.")
+
+    if any(label.get_visible() for label in ax.get_yticklabels()):
+        raise AssertionError("Stacked spectral templates should hide y tick labels.")
+
+    if any(tick.tick1line.get_visible() or tick.tick2line.get_visible() for tick in ax.yaxis.get_major_ticks()):
+        raise AssertionError("Stacked spectral templates should hide y tick marks.")
+
+    label_texts = ax.texts
+    if len(label_texts) != len(series_list):
+        raise AssertionError("Expected one in-axes sample label per stacked spectral series.")
+
+    bboxes = [text.get_window_extent(renderer=renderer).expanded(1.01, 1.03) for text in label_texts]
+    if any(
+        bbox.x0 < axes_bbox.x0 or bbox.x1 > axes_bbox.x1 or bbox.y0 < axes_bbox.y0 or bbox.y1 > axes_bbox.y1
+        for bbox in bboxes
+    ):
+        raise AssertionError("Stacked spectral sample labels should stay inside the axes.")
+    for idx, bbox in enumerate(bboxes):
+        for other in bboxes[idx + 1 :]:
+            if bbox.overlaps(other):
+                raise AssertionError("Stacked spectral sample labels should not overlap each other.")
+
+    plt.close(fig)
+
+
+def _assert_normalization_rules() -> None:
+    expected_labels = {
+        "time": "Time",
+        "temperature": "Temperature",
+        "angular frequency": "ω",
+        "storage modulus": "G'",
+        "loss modulus": 'G"',
+        "count": "Counts",
+    }
+    for raw, expected in expected_labels.items():
+        actual = normalize_label(raw)
+        if actual != expected:
+            raise AssertionError(f"Label normalization drifted: {raw!r} -> {actual!r}, expected {expected!r}.")
+
+    expected_units = {
+        "rad/s": r"rad$\cdot$s$^{-1}$",
+        "mpa": "MPa",
+        "pa.s": r"Pa$\cdot$s",
+        "cm-1": r"cm$^{-1}$",
+        "[ppm]": "ppm",
+        "counts": "counts",
+    }
+    for raw, expected in expected_units.items():
+        actual = normalize_unit(raw)
+        if actual != expected:
+            raise AssertionError(f"Unit normalization drifted: {raw!r} -> {actual!r}, expected {expected!r}.")
+
+
+def _assert_input_validation(base: Path) -> None:
+    odd_curve = base / "invalid_curve_odd.csv"
+    missing_y_curve = base / "invalid_curve_missing_y.csv"
+    invalid_replicate = base / "invalid_replicate.csv"
+
+    _write_invalid_curve_table_odd_columns(odd_curve)
+    _write_invalid_curve_table_missing_y(missing_y_curve)
+    _write_invalid_replicate_table(invalid_replicate)
+
+    try:
+        load_curve_table(odd_curve)
+    except ValueError as exc:
+        if "X/Y pairs" not in str(exc):
+            raise AssertionError("Odd-column curve table should fail with an X/Y pair error.") from exc
+    else:
+        raise AssertionError("Odd-column curve table should not load successfully.")
+
+    try:
+        load_curve_table(missing_y_curve)
+    except ValueError as exc:
+        if "matching X/Y numeric data" not in str(exc):
+            raise AssertionError("Mismatched X/Y data should fail with a numeric pair error.") from exc
+    else:
+        raise AssertionError("Curve table with only one numeric side should not load successfully.")
+
+    try:
+        load_replicate_table(invalid_replicate)
+    except ValueError as exc:
+        if "no numeric replicate values" not in str(exc):
+            raise AssertionError("Invalid replicate columns should fail with a numeric replicate error.") from exc
+    else:
+        raise AssertionError("Replicate table with non-numeric values should not load successfully.")
+
+
+def _sorted_limits(bounds: tuple[float, float]) -> tuple[float, float]:
+    return (min(bounds), max(bounds))
+
+
+def _assert_curve_padding(plot_fn, series_list, *, expect_log_y: bool = False) -> None:
+    fig, ax = plot_fn(series_list)
+    fig.canvas.draw()
+
+    raw_x_min = min(float(series.data["x"].min()) for series in series_list)
+    raw_x_max = max(float(series.data["x"].max()) for series in series_list)
+    raw_y_min = min(float(series.data["y"].min()) for series in series_list)
+    raw_y_max = max(float(series.data["y"].max()) for series in series_list)
+    x_low, x_high = _sorted_limits(ax.get_xlim())
+    y_low, y_high = _sorted_limits(ax.get_ylim())
+
+    if not (x_low < raw_x_min and x_high > raw_x_max):
+        raise AssertionError("Curve x-axis was not padded beyond the raw data bounds.")
+    if not (y_low < raw_y_min and y_high > raw_y_max):
+        raise AssertionError("Curve y-axis was not padded beyond the raw data bounds.")
+
+    xticks = np.asarray(ax.get_xticks(), dtype=float)
+    xticks = xticks[np.isfinite(xticks)]
+    if xticks.size and (xticks.min() < raw_x_min or xticks.max() > raw_x_max):
+        raise AssertionError("Curve x-axis still shows ticks in the padding region.")
+
+    yticks = np.asarray(ax.get_yticks(), dtype=float)
+    yticks = yticks[np.isfinite(yticks)]
+    if yticks.size and yticks.min() < raw_y_min:
+        if expect_log_y:
+            raise AssertionError("Log y-axis should hide the bottom boundary tick when it falls below the raw data range.")
+        raise AssertionError("Curve y-axis should not show lower ticks below the raw data range.")
+
+    visible_y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+    visible_y_ticks = visible_y_ticks[np.isfinite(visible_y_ticks)]
+    if visible_y_ticks.size > 7:
+        raise AssertionError("Visible y-axis major ticks should be capped at 7 or fewer.")
+
+    plt.close(fig)
+
+
+def _assert_stat_plot_tick_cap(groups) -> None:
+    figures_axes = []
+    try:
+        for plot_fn in (plot_bar, plot_box, plot_violin):
+            fig, ax = plot_fn(groups)
+            fig.canvas.draw()
+            figures_axes.append((plot_fn.__name__, fig, ax))
+            visible_y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+            visible_y_ticks = visible_y_ticks[np.isfinite(visible_y_ticks)]
+            if visible_y_ticks.size > 7:
+                raise AssertionError(f"{plot_fn.__name__} should cap visible y-axis major ticks at 7 or fewer.")
+
+        name_to_ax = {name: ax for name, _, ax in figures_axes}
+        bar_ticks = np.asarray(name_to_ax["plot_bar"].get_yticks(), dtype=float)
+        bar_ticks = bar_ticks[np.isfinite(bar_ticks)]
+        if not np.any(np.isclose(bar_ticks, 0.0)):
+            raise AssertionError("Bar plot should retain 0 as a visible y-axis major tick.")
+        bar_low, _ = _sorted_limits(name_to_ax["plot_bar"].get_ylim())
+        if not np.isclose(bar_low, 0.0):
+            raise AssertionError("Bar plot should start its y-axis at 0.")
+
+        box_ylim = tuple(float(value) for value in name_to_ax["plot_box"].get_ylim())
+        violin_ylim = tuple(float(value) for value in name_to_ax["plot_violin"].get_ylim())
+        if not np.allclose(box_ylim, violin_ylim):
+            raise AssertionError("Box and violin plots should share the same adaptive y-axis range.")
+        box_low, _ = _sorted_limits(box_ylim)
+        if np.isclose(box_low, 0.0):
+            raise AssertionError("Box and violin plots should no longer be forced to start at 0.")
+    finally:
+        for _, fig, _ in figures_axes:
+            plt.close(fig)
+
+
+def _assert_major_tick_skip_every_other() -> None:
+    ticks = np.array([0, 1, 2, 3, 4, 5, 6], dtype=float)
+    kept = _cap_visible_major_ticks(ticks, scale="linear", max_major_ticks=7)
+    expected = np.array([0, 2, 4, 6], dtype=float)
+    if not np.array_equal(kept, expected):
+        raise AssertionError("Seven visible y-axis ticks should thin to every other tick using the locator result [::2].")
+
+
+def _assert_frequency_batch_sync(freq_path: Path) -> None:
+    metric_series = {
+        metric_name: _to_curve_series(series_list)
+        for metric_name, series_list in load_frequency_sweep_metrics(freq_path).items()
+    }
+    shared_x_layout = compute_shared_curve_x_layout(
+        [
+            series.data["x"].to_numpy(dtype=float)
+            for metric_name in ("storage_modulus", "loss_modulus", "loss_factor", "complex_viscosity")
+            for series in metric_series[metric_name]
+        ],
+        xscale="log",
+    )
+
+    xlims: list[tuple[float, float]] = []
+    xticks_list: list[np.ndarray] = []
+    right_insets: list[float] = []
+    top_bottom_insets: list[float] = []
+
+    for metric_name in ("storage_modulus", "loss_modulus", "loss_factor", "complex_viscosity"):
+        fig, ax = plot_frequency_sweep(
+            metric_series[metric_name],
+            xlim=shared_x_layout.display_bounds,
+            visible_xticks=shared_x_layout.visible_ticks,
+            legend_expand_axes="y",
+        )
+        fig.canvas.draw()
+        xlims.append(tuple(float(value) for value in ax.get_xlim()))
+        xticks_list.append(np.asarray(ax.get_xticks(), dtype=float))
+
+        legend = ax.get_legend()
+        if legend is None:
+            raise AssertionError("Frequency sweep should still render an inside legend.")
+        renderer = fig.canvas.get_renderer()
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        legend_bbox = legend.get_window_extent(renderer=renderer)
+        right_insets.append(min(abs(axes_bbox.x1 - legend_bbox.x1), abs(legend_bbox.x0 - axes_bbox.x0)) / axes_bbox.width)
+        top_bottom_insets.append(min(abs(axes_bbox.y1 - legend_bbox.y1), abs(legend_bbox.y0 - axes_bbox.y0)) / axes_bbox.height)
+        plt.close(fig)
+
+    if any(not np.allclose(bounds, xlims[0]) for bounds in xlims[1:]):
+        raise AssertionError("Frequency sweep batch should share identical x limits across all metrics.")
+    if any(not np.array_equal(ticks, xticks_list[0]) for ticks in xticks_list[1:]):
+        raise AssertionError("Frequency sweep batch should share identical visible x ticks across all metrics.")
+
+    inset_tolerance = 0.01
+    target_inset = INSIDE_LEGEND_INSET_FRACTION
+    if any(abs(inset - target_inset) > inset_tolerance for inset in right_insets + top_bottom_insets):
+        raise AssertionError("Frequency sweep legends are no longer anchored near the configured 2.5% inset.")
+
+
+def _assert_legend_candidate_insets() -> None:
+    fig, ax = plt.subplots()
+    try:
+        for idx in range(3):
+            ax.plot([0, 1, 2], [idx, idx + 0.3, idx + 0.1], label=f"S{idx + 1}")
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        tolerance = 0.002
+
+        for candidate in _legend_candidates():
+            legend = _place_legend_candidate(ax, candidate)
+            fig.canvas.draw()
+            legend_bbox = legend.get_window_extent(renderer=renderer)
+            if "left" in candidate[0]:
+                inset = (legend_bbox.x0 - axes_bbox.x0) / axes_bbox.width
+            else:
+                inset = (axes_bbox.x1 - legend_bbox.x1) / axes_bbox.width
+            if "upper" in candidate[0]:
+                vertical_inset = (axes_bbox.y1 - legend_bbox.y1) / axes_bbox.height
+            else:
+                vertical_inset = (legend_bbox.y0 - axes_bbox.y0) / axes_bbox.height
+
+            if abs(inset - INSIDE_LEGEND_INSET_FRACTION) > tolerance:
+                raise AssertionError("Legend horizontal inset drifted away from 2.5%.")
+            if abs(vertical_inset - INSIDE_LEGEND_INSET_FRACTION) > tolerance:
+                raise AssertionError("Legend vertical inset drifted away from 2.5%.")
+            legend.remove()
+    finally:
+        plt.close(fig)
+
+
+def _assert_wide_nmr_layout(bundle_path: Path) -> None:
+    config = load_wide_nmr_config(bundle_path)
+    series_list = load_curve_table(bundle_path)
+    fig, ax = plot_wide_nmr(series_list, config)
+    fig.canvas.draw()
+
+    width_mm = fig.get_size_inches()[0] * 25.4
+    height_mm = fig.get_size_inches()[1] * 25.4
+    if not np.isclose(width_mm, WIDE_NMR_WIDTH_MM, atol=0.2):
+        raise AssertionError("wide_nmr should render at 60 mm width.")
+    if not np.isclose(height_mm, WIDE_NMR_TOTAL_HEIGHT_MM, atol=0.2):
+        raise AssertionError("wide_nmr should render at 110 mm total height.")
+    if ax.get_ylabel():
+        raise AssertionError("wide_nmr should hide the y-axis label.")
+    if any(tick.label1.get_visible() for tick in ax.yaxis.get_major_ticks()):
+        raise AssertionError("wide_nmr should hide y tick labels.")
+    if ax.get_legend() is not None:
+        raise AssertionError("wide_nmr should not render a legend.")
+    if len(fig.axes) != 2:
+        raise AssertionError("wide_nmr review example should render two x-axis segments.")
+    highest_axis = max(axis.get_position().y1 for axis in fig.axes)
+    reserved_mm = (1.0 - highest_axis) * height_mm
+    if abs(reserved_mm - WIDE_NMR_STRUCTURE_RESERVED_MM) > 1.0:
+        raise AssertionError("wide_nmr should reserve about 18 mm at the top for structure placement.")
+    spectrum_mm = highest_axis * height_mm
+    if abs(spectrum_mm - WIDE_NMR_SPECTRUM_HEIGHT_MM) > 1.0:
+        raise AssertionError("wide_nmr lower spectrum region height drifted away from 92 mm.")
+
+    sample_names = {series.sample for series in series_list}
+    text_items = []
+    for axis in fig.axes:
+        text_items.extend([text for text in axis.texts if text.get_text() in sample_names])
+    if len(text_items) != len(series_list):
+        raise AssertionError("wide_nmr should render one in-axes sample label per series.")
+
+    renderer = fig.canvas.get_renderer()
+    bboxes = [text.get_window_extent(renderer=renderer).expanded(1.01, 1.03) for text in text_items]
+    for text, bbox in zip(text_items, bboxes):
+        axis = text.axes
+        axis_bbox = axis.get_window_extent(renderer=renderer)
+        if bbox.x0 < axis_bbox.x0 or bbox.x1 > axis_bbox.x1 or bbox.y0 < axis_bbox.y0 or bbox.y1 > axis_bbox.y1:
+            raise AssertionError("wide_nmr sample labels should stay inside the target axes.")
+    for idx, bbox in enumerate(bboxes):
+        for other in bboxes[idx + 1 :]:
+            if bbox.overlaps(other):
+                raise AssertionError("wide_nmr sample labels should not overlap each other.")
+    plt.close(fig)
+
+
+def _to_curve_series(series_list) -> list[CurveSeries]:
+    return [
+        CurveSeries(
+            sample=series.sample,
+            x_label=series.x_label,
+            y_label=series.y_label,
+            x_unit=series.x_unit,
+            y_unit=series.y_unit,
+            data=series.data,
+        )
+        for series in series_list
+    ]
+
+
+def main() -> int:
+    with tempfile.TemporaryDirectory(prefix="plot_smoke_") as tmp:
+        base = Path(tmp)
+        outputs = base / "outputs"
+
+        replicate_path = base / "replicate.csv"
+        tensile_path = base / "tensile.csv"
+        ftir_path = base / "ftir.csv"
+        nmr_path = base / "nmr.csv"
+        xrd_path = base / "xrd.csv"
+        dsc_path = base / "dsc.csv"
+        tga_path = base / "tga.csv"
+        dma_path = base / "dma.csv"
+        heatmap_path = base / "heatmap.csv"
+        wide_nmr_path = base / "wide_nmr.csv"
+        freq_path = base / "freq.xlsx"
+        temp_path = base / "temp.xlsx"
+        relax_path = base / "relax.xlsx"
+
+        _write_replicate_table(replicate_path)
+        _write_curve_table(tensile_path, "Strain", "Stress", "%", "MPa")
+        _write_stacked_curve_table(ftir_path, template="ftir")
+        _write_stacked_curve_table(nmr_path, template="nmr")
+        _write_stacked_curve_table(xrd_path, template="xrd")
+        _write_stacked_curve_table(dsc_path, template="dsc")
+        _write_tga_curve_table(tga_path)
+        _write_dma_curve_table(dma_path)
+        _write_heatmap_table(heatmap_path)
+        _write_wide_nmr_bundle(wide_nmr_path)
+        _write_frequency_xlsx(freq_path)
+        _write_temperature_xlsx(temp_path)
+        _write_relaxation_xlsx(relax_path)
+        _assert_normalization_rules()
+        _assert_input_validation(base)
+
+        jobs = [
+            ("bar", replicate_path, {}),
+            ("box", replicate_path, {}),
+            ("violin", replicate_path, {}),
+            ("point_line", freq_path, {"xscale": "log", "yscale": "log"}),
+            ("point_line", temp_path, {"yscale": "log"}),
+            ("point_line", relax_path, {"xscale": "log"}),
+            ("curve", tensile_path, {}),
+            ("scatter", tensile_path, {}),
+            ("stacked_curve", ftir_path, {"reverse_x": True}),
+            ("stacked_curve", nmr_path, {"reverse_x": True, "baseline": "linear_endpoints"}),
+            ("segmented_stacked_curve", wide_nmr_path, {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True}),
+            ("stacked_curve", xrd_path, {}),
+            ("stacked_curve", dsc_path, {"baseline": "linear_endpoints"}),
+            ("curve", tga_path, {}),
+            ("curve", dma_path, {}),
+            ("heatmap", heatmap_path, {}),
+        ]
+
+        for template, input_path, options in jobs:
+            rendered = render_template(template, input_path, outputs / template, **options)
+            for output in rendered:
+                if not output.exists():
+                    raise FileNotFoundError(f"Expected output was not created: {output}")
+                print(output)
+
+        _assert_stacked_layout(plot_ftir, ftir_path)
+        _assert_stacked_layout(plot_nmr, nmr_path)
+        _assert_stacked_layout(plot_xrd, xrd_path)
+        _assert_stacked_layout(plot_dsc, dsc_path)
+        _assert_wide_nmr_layout(wide_nmr_path)
+        tensile_series = load_curve_table(tensile_path)
+        _assert_curve_padding(plot_tensile_curve, tensile_series)
+        _assert_major_tick_skip_every_other()
+        _assert_stat_plot_tick_cap(load_replicate_table(replicate_path))
+        freq_series = _to_curve_series(load_frequency_sweep_metrics(freq_path)["storage_modulus"])
+        _assert_curve_padding(
+            plot_frequency_sweep,
+            freq_series,
+            expect_log_y=True,
+        )
+        temp_series = _to_curve_series(load_temperature_sweep_metrics(temp_path)["storage_modulus"])
+        _assert_curve_padding(
+            lambda series: plot_frequency_sweep(series, xscale="linear", yscale="log"),
+            temp_series,
+            expect_log_y=True,
+        )
+        _assert_frequency_batch_sync(freq_path)
+        _assert_legend_candidate_insets()
+
+    print("Smoke check passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

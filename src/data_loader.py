@@ -6,6 +6,8 @@ from typing import Any
 
 import pandas as pd
 
+from src.text_normalization import canonicalize_token, normalize_label, normalize_unit
+
 ENCODINGS_TO_TRY = (
     "utf-8",
     "utf-8-sig",
@@ -35,12 +37,82 @@ class ReplicateGroup:
     data: pd.Series
 
 
+@dataclass
+class HeatmapTable:
+    x_label: str
+    y_label: str
+    z_label: str
+    x_unit: str
+    y_unit: str
+    z_unit: str
+    data: pd.DataFrame
+
+
 def _normalize_text(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, float) and pd.isna(value):
         return ""
     return str(value).strip()
+
+
+def _has_content(value: Any) -> bool:
+    return _normalize_text(value) != ""
+
+
+def _row_has_content(row: pd.Series) -> bool:
+    return any(_has_content(value) for value in row.tolist())
+
+
+def _drop_fully_empty_columns(raw: pd.DataFrame) -> pd.DataFrame:
+    keep_columns = [index for index in raw.columns if _row_has_content(raw[index])]
+    if not keep_columns:
+        return raw.iloc[:, 0:0].copy()
+    return raw.loc[:, keep_columns].copy()
+
+
+def _ensure_minimum_rows(raw: pd.DataFrame, minimum_rows: int, *, table_name: str) -> None:
+    if raw.shape[0] < minimum_rows:
+        raise ValueError(f"{table_name} must include at least {minimum_rows} rows.")
+
+
+def _ensure_header_row_content(raw: pd.DataFrame, row_index: int, *, row_name: str, table_name: str) -> None:
+    if not _row_has_content(raw.iloc[row_index]):
+        raise ValueError(f"{table_name} is missing a valid {row_name}.")
+
+
+def _series_pair_has_any_data(pair: pd.DataFrame) -> bool:
+    return bool(pair.applymap(_has_content).to_numpy().any())
+
+
+def _coerce_numeric_pair(pair: pd.DataFrame, *, column_numbers: tuple[int, int], table_name: str) -> pd.DataFrame:
+    numeric_pair = pair.apply(pd.to_numeric, errors="coerce")
+    has_x_values = numeric_pair.iloc[:, 0].notna().any()
+    has_y_values = numeric_pair.iloc[:, 1].notna().any()
+    if has_x_values != has_y_values:
+        raise ValueError(
+            f"{table_name} columns {column_numbers[0]} and {column_numbers[1]} must contain matching X/Y numeric data."
+        )
+    if not has_x_values and not has_y_values:
+        if _series_pair_has_any_data(pair):
+            raise ValueError(
+                f"{table_name} columns {column_numbers[0]} and {column_numbers[1]} contain non-numeric values in the data region."
+            )
+        return numeric_pair.iloc[0:0].copy()
+    numeric_pair.columns = ["x", "y"]
+    numeric_pair = numeric_pair.dropna(how="all").dropna(subset=["x", "y"])
+    if numeric_pair.empty:
+        raise ValueError(
+            f"{table_name} columns {column_numbers[0]} and {column_numbers[1]} contain incomplete X/Y rows."
+        )
+    return numeric_pair.reset_index(drop=True)
+
+
+def _coerce_axis_series(values: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(values, errors="coerce")
+    if numeric.notna().all():
+        return numeric
+    return values.map(_normalize_text)
 
 
 def _read_delimited(path: Path, **kwargs: Any) -> pd.DataFrame:
@@ -82,11 +154,15 @@ def load_curve_table(
     Row 3: sample names repeated twice per series
     Row 4+: numeric data
     """
-    raw = read_raw_table(path, sheet_name=sheet_name)
-    if raw.shape[0] < start_row + 1:
-        raise ValueError("Curve table must include at least 4 rows.")
+    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    _ensure_minimum_rows(raw, start_row + 1, table_name="Curve table")
+    _ensure_header_row_content(raw, 0, row_name="axis label row", table_name="Curve table")
+    _ensure_header_row_content(raw, 1, row_name="unit row", table_name="Curve table")
+    _ensure_header_row_content(raw, 2, row_name="sample row", table_name="Curve table")
+    if raw.shape[1] == 0:
+        raise ValueError("Curve table does not contain any usable columns.")
     if raw.shape[1] % 2 != 0:
-        raise ValueError("Curve table must contain an even number of columns in X/Y pairs.")
+        raise ValueError("Curve table must contain an even number of columns arranged in X/Y pairs.")
 
     axis_row = raw.iloc[0]
     unit_row = raw.iloc[1]
@@ -95,10 +171,10 @@ def load_curve_table(
 
     series_list: list[CurveSeries] = []
     for col in range(0, raw.shape[1], 2):
-        x_label = _normalize_text(axis_row.iloc[col])
-        y_label = _normalize_text(axis_row.iloc[col + 1])
-        x_unit = _normalize_text(unit_row.iloc[col])
-        y_unit = _normalize_text(unit_row.iloc[col + 1])
+        x_label = normalize_label(_normalize_text(axis_row.iloc[col]))
+        y_label = normalize_label(_normalize_text(axis_row.iloc[col + 1]))
+        x_unit = normalize_unit(_normalize_text(unit_row.iloc[col]))
+        y_unit = normalize_unit(_normalize_text(unit_row.iloc[col + 1]))
         sample_x = _normalize_text(sample_row.iloc[col])
         sample_y = _normalize_text(sample_row.iloc[col + 1])
 
@@ -106,12 +182,18 @@ def load_curve_table(
             raise ValueError(
                 f"Sample names in columns {col + 1} and {col + 2} must match, got {sample_x!r} and {sample_y!r}."
             )
+        if not x_label or not y_label:
+            raise ValueError(
+                f"Curve table columns {col + 1} and {col + 2} are missing axis labels in row 1."
+            )
 
         sample_name = sample_x or sample_y or f"Sample_{col // 2 + 1}"
         pair = data_rows.iloc[:, [col, col + 1]].copy()
-        pair.columns = ["x", "y"]
-        pair = pair.apply(pd.to_numeric, errors="coerce").dropna(how="all")
-        pair = pair.dropna(subset=["x", "y"])
+        pair = _coerce_numeric_pair(
+            pair,
+            column_numbers=(col + 1, col + 2),
+            table_name="Curve table",
+        )
         if pair.empty:
             continue
 
@@ -140,27 +222,56 @@ def load_replicate_table(
     """
     Load a wide replicate table for boxplots or bar charts.
 
+    Supported formats:
+
+    New format
+    Row 1: shared value label in A1
+    Row 2: group or sample name per column
+    Row 3: value unit per column
+    Row 4+: replicate values
+
+    Legacy format
     Row 1: value label per column
     Row 2: value unit per column
     Row 3: group or sample name per column
     Row 4+: replicate values
     """
-    raw = read_raw_table(path, sheet_name=sheet_name)
-    if raw.shape[0] < start_row + 1:
-        raise ValueError("Replicate table must include at least 4 rows.")
+    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    _ensure_minimum_rows(raw, start_row + 1, table_name="Replicate table")
+    _ensure_header_row_content(raw, 0, row_name="value label row", table_name="Replicate table")
+    _ensure_header_row_content(raw, 1, row_name="group row", table_name="Replicate table")
+    _ensure_header_row_content(raw, 2, row_name="unit row", table_name="Replicate table")
+    if raw.shape[1] == 0:
+        raise ValueError("Replicate table does not contain any usable columns.")
 
     value_row = raw.iloc[0]
-    unit_row = raw.iloc[1]
-    group_row = raw.iloc[2]
+    first_row_values = [_normalize_text(value) for value in value_row.tolist()]
+    non_empty_first_row = [value for value in first_row_values if value]
+    use_shared_label_layout = len(non_empty_first_row) <= 1
+
+    if use_shared_label_layout:
+        shared_label = normalize_label(first_row_values[0])
+        if not shared_label:
+            raise ValueError("Replicate table is missing the shared y-axis label in cell A1.")
+        group_row = raw.iloc[1]
+        unit_row = raw.iloc[2]
+    else:
+        shared_label = ""
+        unit_row = raw.iloc[1]
+        group_row = raw.iloc[2]
+
     data_rows = raw.iloc[start_row:].reset_index(drop=True)
 
     groups: list[ReplicateGroup] = []
     for col in range(raw.shape[1]):
         group = _normalize_text(group_row.iloc[col]) or f"Group_{col + 1}"
-        value_label = _normalize_text(value_row.iloc[col]) or "Value"
-        value_unit = _normalize_text(unit_row.iloc[col])
+        value_label = shared_label or normalize_label(_normalize_text(value_row.iloc[col])) or "Value"
+        value_unit = normalize_unit(_normalize_text(unit_row.iloc[col]))
 
-        values = pd.to_numeric(data_rows.iloc[:, col], errors="coerce").dropna().reset_index(drop=True)
+        raw_values = data_rows.iloc[:, col]
+        values = pd.to_numeric(raw_values, errors="coerce").dropna().reset_index(drop=True)
+        if values.empty and any(_has_content(value) for value in raw_values.tolist()):
+            raise ValueError(f"Replicate table column {col + 1} contains no numeric replicate values.")
         if values.empty:
             continue
 
@@ -176,3 +287,62 @@ def load_replicate_table(
     if not groups:
         raise ValueError("No valid replicate columns found in the table.")
     return groups
+
+
+def load_heatmap_table(
+    path: str | Path,
+    *,
+    start_row: int = 3,
+    sheet_name: str | int = 0,
+) -> HeatmapTable:
+    """
+    Load an XYZ long-table heatmap input.
+
+    Row 1: semantic roles X, Y, Z
+    Row 2: display labels
+    Row 3: units
+    Row 4+: data rows
+    """
+    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    _ensure_minimum_rows(raw, start_row + 1, table_name="Heatmap table")
+    _ensure_header_row_content(raw, 0, row_name="role row", table_name="Heatmap table")
+    _ensure_header_row_content(raw, 1, row_name="label row", table_name="Heatmap table")
+    _ensure_header_row_content(raw, 2, row_name="unit row", table_name="Heatmap table")
+    if raw.shape[1] != 3:
+        raise ValueError("Heatmap table must contain exactly three columns: X, Y, Z.")
+
+    roles = [canonicalize_token(_normalize_text(value)) for value in raw.iloc[0].tolist()]
+    role_index: dict[str, int] = {}
+    for index, role in enumerate(roles):
+        if role in {"x", "y", "z"}:
+            role_index[role] = index
+    if set(role_index) != {"x", "y", "z"}:
+        raise ValueError("Heatmap table role row must contain exactly X, Y and Z.")
+
+    label_row = raw.iloc[1]
+    unit_row = raw.iloc[2]
+    data_rows = raw.iloc[start_row:].reset_index(drop=True)
+    data_columns = ["x", "y", "z"]
+    ordered = data_rows.iloc[:, [role_index["x"], role_index["y"], role_index["z"]]].copy()
+    ordered.columns = data_columns
+
+    ordered["z"] = pd.to_numeric(ordered["z"], errors="coerce")
+    ordered = ordered.dropna(subset=["z"])
+    if ordered.empty:
+        raise ValueError("Heatmap table does not contain any numeric Z values.")
+
+    ordered["x"] = _coerce_axis_series(ordered["x"])
+    ordered["y"] = _coerce_axis_series(ordered["y"])
+    ordered = ordered[ordered["x"].map(_has_content) & ordered["y"].map(_has_content)].reset_index(drop=True)
+    if ordered.empty:
+        raise ValueError("Heatmap table does not contain any valid X/Y coordinates.")
+
+    return HeatmapTable(
+        x_label=normalize_label(_normalize_text(label_row.iloc[role_index["x"]])) or "X",
+        y_label=normalize_label(_normalize_text(label_row.iloc[role_index["y"]])) or "Y",
+        z_label=normalize_label(_normalize_text(label_row.iloc[role_index["z"]])) or "Z",
+        x_unit=normalize_unit(_normalize_text(unit_row.iloc[role_index["x"]])),
+        y_unit=normalize_unit(_normalize_text(unit_row.iloc[role_index["y"]])),
+        z_unit=normalize_unit(_normalize_text(unit_row.iloc[role_index["z"]])),
+        data=ordered,
+    )
