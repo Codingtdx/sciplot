@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import subprocess
 import sys
 import traceback
 from dataclasses import asdict
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStackedWidget,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -178,6 +180,7 @@ class PlotWizardWindow(QMainWindow):
         self.current_preflight: Any | None = None
         self.current_rendered: list[RenderedPlot] = []
         self.current_preview_key: tuple[Any, ...] | None = None
+        self.last_output_dir: Path | None = None
         self.preview_token = 0
         self.preview_running = False
         self.preview_pending = False
@@ -190,6 +193,7 @@ class PlotWizardWindow(QMainWindow):
         self._apply_styles()
         self._apply_shadows()
         self._refresh_recent_files()
+        self._go_to_page("file")
         self._show_preview_message("右侧会在你选定文件和参数后自动出现实时预览。")
 
     def closeEvent(self, event) -> None:  # noqa: N802
@@ -219,7 +223,7 @@ class PlotWizardWindow(QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setStretchFactor(2, 1)
-        splitter.setSizes([250, 520, 700])
+        splitter.setSizes([210, 470, 860])
 
     def _build_toolbar(self) -> None:
         toolbar = QToolBar()
@@ -265,15 +269,17 @@ class PlotWizardWindow(QMainWindow):
         self.steps_list = QListWidget()
         self.steps_list.setObjectName("SidebarList")
         self.steps_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        for step in ("1. 文件", "2. 识别", "3. 选项", "4. 预检查", "5. 预览", "6. 导出"):
+        for step in ("1. 文件", "2. 识别", "3. 选项", "4. 检查", "5. 导出"):
             self.steps_list.addItem(QListWidgetItem(step))
         self.steps_list.setCurrentRow(0)
 
-        recent_title = QLabel("最近文件")
-        recent_title.setObjectName("CardTitle")
+        self.recent_toggle_button = QPushButton("显示最近文件")
+        self.recent_toggle_button.setCheckable(True)
+        self.recent_toggle_button.toggled.connect(self._toggle_recent_files)
         self.recent_list = QListWidget()
         self.recent_list.setObjectName("SidebarList")
         self.recent_list.itemActivated.connect(self._open_recent_file)
+        self.recent_list.hide()
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -283,41 +289,85 @@ class PlotWizardWindow(QMainWindow):
         layout.addSpacing(10)
         layout.addWidget(steps_title)
         layout.addWidget(self.steps_list, 1)
-        layout.addWidget(recent_title)
+        layout.addWidget(self.recent_toggle_button)
         layout.addWidget(self.recent_list, 2)
         return frame
 
     def _build_center_panel(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setObjectName("CenterScroll")
-
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(14)
 
+        self.center_title = QLabel("先拖入一个数据文件")
+        self.center_title.setObjectName("CenterHero")
+        self.center_subtitle = QLabel("程序会先识别输入模型，再给出一个推荐。你每一步只需要做一个决定。")
+        self.center_subtitle.setObjectName("MutedText")
+        self.center_subtitle.setWordWrap(True)
+        layout.addWidget(self.center_title)
+        layout.addWidget(self.center_subtitle)
+
+        self.center_stack = QStackedWidget()
+        layout.addWidget(self.center_stack, 1)
+
+        file_page = QWidget()
+        file_layout = QVBoxLayout(file_page)
+        file_layout.setContentsMargins(0, 0, 0, 0)
+        file_layout.setSpacing(14)
         self.drop_card = DropCard(self._choose_file)
         self.drop_card.fileDropped.connect(self._handle_dropped_path)
-        layout.addWidget(self.drop_card)
+        file_layout.addWidget(self.drop_card)
+        self.sheet_card, sheet_body = self._make_card("工作表")
+        self.sheet_hint = QLabel("如果文件包含多个 sheet，这里会先让你决定读哪一个。")
+        self.sheet_hint.setWordWrap(True)
+        self.sheet_combo = QComboBox()
+        self.sheet_combo.currentIndexChanged.connect(self._on_sheet_changed)
+        sheet_body.addWidget(self.sheet_hint)
+        sheet_body.addWidget(self.sheet_combo)
+        file_layout.addWidget(self.sheet_card)
+        file_layout.addStretch(1)
+        self.center_stack.addWidget(file_page)
 
+        recognition_page = QWidget()
+        recognition_layout = QVBoxLayout(recognition_page)
+        recognition_layout.setContentsMargins(0, 0, 0, 0)
+        recognition_layout.setSpacing(14)
         self.recognition_card, recognition_body = self._make_card("识别结果")
         self.model_value = QLabel("等待文件")
+        self.recommended_template_value = QLabel("—")
         self.reason_value = QLabel("程序会先识别输入模型，再给一个推荐。")
         self.reason_value.setWordWrap(True)
         self.signals_value = QLabel("—")
         self.signals_value.setWordWrap(True)
         recognition_body.addWidget(QLabel("输入模型"))
         recognition_body.addWidget(self.model_value)
+        recognition_body.addWidget(QLabel("推荐图类型"))
+        recognition_body.addWidget(self.recommended_template_value)
         recognition_body.addWidget(QLabel("推荐理由"))
         recognition_body.addWidget(self.reason_value)
         recognition_body.addWidget(QLabel("程序这样判断"))
         recognition_body.addWidget(self.signals_value)
-        layout.addWidget(self.recognition_card)
+        recognition_layout.addWidget(self.recognition_card)
+        recognition_actions = QHBoxLayout()
+        self.recognition_accept_button = QPushButton("采用推荐")
+        self.recognition_accept_button.clicked.connect(self._accept_recommendation)
+        self.recognition_tune_button = QPushButton("我想调参数")
+        self.recognition_tune_button.clicked.connect(lambda: self._go_to_page("options"))
+        self.recognition_sheet_button = QPushButton("重选 Sheet")
+        self.recognition_sheet_button.clicked.connect(lambda: self._go_to_page("file"))
+        recognition_actions.addWidget(self.recognition_accept_button)
+        recognition_actions.addWidget(self.recognition_tune_button)
+        recognition_actions.addWidget(self.recognition_sheet_button)
+        recognition_actions.addStretch(1)
+        recognition_layout.addLayout(recognition_actions)
+        recognition_layout.addStretch(1)
+        self.center_stack.addWidget(recognition_page)
 
+        options_page = QWidget()
+        options_layout = QVBoxLayout(options_page)
+        options_layout.setContentsMargins(0, 0, 0, 0)
+        options_layout.setSpacing(14)
         self.controls_card, controls_body = self._make_card("图形设置")
-        self.sheet_combo = QComboBox()
-        self.sheet_combo.currentIndexChanged.connect(self._on_sheet_changed)
         self.template_combo = QComboBox()
         for template, label in MENU_ITEMS:
             self.template_combo.addItem(f"{label} / {template}", userData=template)
@@ -342,7 +392,6 @@ class PlotWizardWindow(QMainWindow):
         self.use_sidecar_checkbox.stateChanged.connect(self._on_option_changed)
 
         self.option_rows: dict[str, QWidget] = {}
-        controls_body.addWidget(self._option_row("Sheet", self.sheet_combo, "sheet"))
         controls_body.addWidget(self._option_row("图类型", self.template_combo, "template"))
         controls_body.addWidget(self._option_row("尺寸", self.size_combo, "size"))
         controls_body.addWidget(self._option_row("x 轴", self.xscale_combo, "xscale"))
@@ -351,8 +400,23 @@ class PlotWizardWindow(QMainWindow):
         controls_body.addWidget(self._option_row("基线修正", self.baseline_combo, "baseline"))
         controls_body.addWidget(self._option_row("", self.show_colorbar_checkbox, "show_colorbar"))
         controls_body.addWidget(self._option_row("", self.use_sidecar_checkbox, "use_sidecar"))
-        layout.addWidget(self.controls_card)
+        options_layout.addWidget(self.controls_card)
+        options_actions = QHBoxLayout()
+        self.options_back_button = QPushButton("返回识别结果")
+        self.options_back_button.clicked.connect(lambda: self._go_to_page("recognition"))
+        self.options_continue_button = QPushButton("继续检查")
+        self.options_continue_button.clicked.connect(lambda: self._go_to_page("preflight"))
+        options_actions.addWidget(self.options_back_button)
+        options_actions.addWidget(self.options_continue_button)
+        options_actions.addStretch(1)
+        options_layout.addLayout(options_actions)
+        options_layout.addStretch(1)
+        self.center_stack.addWidget(options_page)
 
+        preflight_page = QWidget()
+        preflight_layout = QVBoxLayout(preflight_page)
+        preflight_layout.setContentsMargins(0, 0, 0, 0)
+        preflight_layout.setSpacing(14)
         self.preflight_card, preflight_body = self._make_card("预检查")
         self.preflight_status = QLabel("等待识别结果")
         self.preflight_status.setWordWrap(True)
@@ -360,7 +424,7 @@ class PlotWizardWindow(QMainWindow):
         self.preflight_details.setWordWrap(True)
         preflight_body.addWidget(self.preflight_status)
         preflight_body.addWidget(self.preflight_details)
-        layout.addWidget(self.preflight_card)
+        preflight_layout.addWidget(self.preflight_card)
 
         self.export_card, export_body = self._make_card("导出")
         self.output_mode_combo = QComboBox()
@@ -375,8 +439,20 @@ class PlotWizardWindow(QMainWindow):
         export_body.addWidget(self._option_row("输出模式", self.output_mode_combo, "output_mode"))
         export_body.addWidget(self.output_dir_label)
         export_body.addWidget(self.export_button, 0, Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.export_card)
+        preflight_layout.addWidget(self.export_card)
+        preflight_actions = QHBoxLayout()
+        self.preflight_back_button = QPushButton("返回调整")
+        self.preflight_back_button.clicked.connect(lambda: self._go_to_page("options"))
+        preflight_actions.addWidget(self.preflight_back_button)
+        preflight_actions.addStretch(1)
+        preflight_layout.addLayout(preflight_actions)
+        preflight_layout.addStretch(1)
+        self.center_stack.addWidget(preflight_page)
 
+        result_page = QWidget()
+        result_layout = QVBoxLayout(result_page)
+        result_layout.setContentsMargins(0, 0, 0, 0)
+        result_layout.setSpacing(14)
         self.result_card, result_body = self._make_card("结果")
         self.result_summary = QLabel("还没有导出。")
         self.result_summary.setWordWrap(True)
@@ -384,11 +460,35 @@ class PlotWizardWindow(QMainWindow):
         self.result_files.setObjectName("ResultFiles")
         result_body.addWidget(self.result_summary)
         result_body.addWidget(self.result_files)
-        layout.addWidget(self.result_card)
+        result_layout.addWidget(self.result_card)
+        result_actions = QHBoxLayout()
+        self.result_redo_button = QPushButton("用同一文件重画")
+        self.result_redo_button.clicked.connect(lambda: self._go_to_page("options"))
+        self.result_new_button = QPushButton("换一个文件")
+        self.result_new_button.clicked.connect(self._choose_file)
+        self.result_open_folder_button = QPushButton("打开输出目录")
+        self.result_open_folder_button.clicked.connect(self._open_last_output_dir)
+        self.result_open_folder_button.setEnabled(False)
+        self.result_close_button = QPushButton("退出")
+        self.result_close_button.clicked.connect(self.close)
+        result_actions.addWidget(self.result_redo_button)
+        result_actions.addWidget(self.result_new_button)
+        result_actions.addWidget(self.result_open_folder_button)
+        result_actions.addWidget(self.result_close_button)
+        result_actions.addStretch(1)
+        result_layout.addLayout(result_actions)
+        result_layout.addStretch(1)
+        self.center_stack.addWidget(result_page)
 
-        layout.addStretch(1)
-        scroll.setWidget(container)
-        return scroll
+        self.page_indices = {
+            "file": 0,
+            "recognition": 1,
+            "options": 2,
+            "preflight": 3,
+            "result": 4,
+        }
+        self.center_stack.setCurrentIndex(self.page_indices["file"])
+        return container
 
     def _build_preview_panel(self) -> QWidget:
         frame = QFrame()
@@ -535,6 +635,12 @@ class PlotWizardWindow(QMainWindow):
                 font-weight: 700;
                 color: #0f2537;
             }
+            QLabel#CenterHero {
+                font-size: 30px;
+                font-weight: 700;
+                color: #10283c;
+                padding-left: 6px;
+            }
             QLabel#PreviewTitle {
                 font-size: 20px;
                 font-weight: 700;
@@ -649,8 +755,28 @@ class PlotWizardWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, str(path))
             self.recent_list.addItem(item)
 
+    def _toggle_recent_files(self, checked: bool) -> None:
+        self.recent_list.setVisible(checked)
+        self.recent_toggle_button.setText("隐藏最近文件" if checked else "显示最近文件")
+
     def _set_step(self, row: int) -> None:
         self.steps_list.setCurrentRow(max(0, min(row, self.steps_list.count() - 1)))
+
+    def _go_to_page(self, page: str) -> None:
+        index = self.page_indices[page]
+        self.center_stack.setCurrentIndex(index)
+        titles = {
+            "file": ("先选一个文件", "你现在只需要决定读哪个文件、哪个 sheet。"),
+            "recognition": ("先看程序推荐", "程序已经识别了输入结构。先看结论，再决定是否接受。"),
+            "options": ("只改必要选项", "这里只放当前图真正有用的参数，不再把所有信息一次摊开。"),
+            "preflight": ("出图前检查一下", "这里会告诉你能不能直接出图，以及还需要注意什么。"),
+            "result": ("图已经画好了", "你现在可以继续重画、换文件，或者直接结束。"),
+        }
+        title, subtitle = titles[page]
+        self.center_title.setText(title)
+        self.center_subtitle.setText(subtitle)
+        step_map = {"file": 0, "recognition": 1, "options": 2, "preflight": 3, "result": 4}
+        self._set_step(step_map[page])
 
     def _show_preview_message(self, message: str) -> None:
         self.preview_selector.blockSignals(True)
@@ -692,6 +818,8 @@ class PlotWizardWindow(QMainWindow):
             self._show_error_dialog(f"无法打开文件：{exc}")
             return
 
+        self.last_output_dir = None
+        self.result_open_folder_button.setEnabled(False)
         self.current_input_path = input_path
         self.current_file_label.setText(f"当前文件：{input_path.name}")
         _remember_recent_file(input_path)
@@ -706,17 +834,21 @@ class PlotWizardWindow(QMainWindow):
             self.sheet_combo.addItem("0", userData=0)
             self.sheet_combo.setEnabled(False)
             self.current_sheet = 0
+            self.sheet_card.setVisible(False)
         else:
             names = list_sheet_names(self.current_input_path)
             if not names:
                 self.sheet_combo.addItem("0", userData=0)
                 self.sheet_combo.setEnabled(False)
                 self.current_sheet = 0
+                self.sheet_card.setVisible(False)
             else:
                 for index, name in enumerate(names):
                     self.sheet_combo.addItem(f"{index} · {name}", userData=index)
                 self.sheet_combo.setEnabled(True)
                 self.current_sheet = 0
+                self.sheet_card.setVisible(True)
+                self.sheet_hint.setText("检测到多个 sheet。先选一个再继续，程序会基于这个 sheet 给推荐。")
         self.sheet_combo.setCurrentIndex(0)
         self.sheet_combo.blockSignals(False)
         self.current_sheet_label.setText(f"当前 Sheet：{self.current_sheet}")
@@ -724,25 +856,30 @@ class PlotWizardWindow(QMainWindow):
     def _inspect_current_file(self) -> None:
         if self.current_input_path is None:
             return
-        self._set_step(1)
         try:
             inspection = inspect_input_file(self.current_input_path, self.current_sheet)
         except Exception as exc:
             self.current_inspection = None
             self.model_value.setText("无法识别")
+            self.recommended_template_value.setText("—")
             self.reason_value.setText(str(exc))
             self.signals_value.setText("请检查文件格式是否已整理到约定结构。")
             self.export_button.setEnabled(False)
+            self._go_to_page("file")
             self._show_preview_message("当前文件还没有通过识别，右侧暂不生成预览。")
             return
 
         self.current_inspection = inspection
         self.model_value.setText(inspection.model_label)
+        self.recommended_template_value.setText(
+            f"{TEMPLATE_LABELS.get(inspection.recommendation.template, inspection.recommendation.template)} / {inspection.recommendation.template}"
+        )
         self.reason_value.setText(inspection.recommendation.reason)
         self.signals_value.setText(_html_bullets(list(inspection.signals) + list(inspection.warnings)))
         defaults = terminal_wizard._recommended_defaults(inspection.recommendation.template, inspection.recommendation)
         self._apply_defaults_to_controls(inspection.recommendation.template, defaults)
         self._update_preflight_and_preview()
+        self._go_to_page("recognition")
 
     def _apply_defaults_to_controls(self, template: str, defaults: dict[str, Any]) -> None:
         self._applying_defaults = True
@@ -788,12 +925,18 @@ class PlotWizardWindow(QMainWindow):
         defaults = terminal_wizard._recommended_defaults(template, None)
         self._apply_defaults_to_controls(template, defaults)
         self._update_preflight_and_preview()
+        self._go_to_page("options")
 
     def _on_option_changed(self) -> None:
         if self._applying_defaults:
             return
         self._sync_option_visibility()
         self._update_preflight_and_preview()
+
+    def _accept_recommendation(self) -> None:
+        if self.current_inspection is None:
+            return
+        self._go_to_page("preflight")
 
     def _update_preflight_and_preview(self) -> None:
         if self.current_input_path is None:
@@ -1003,7 +1146,9 @@ class PlotWizardWindow(QMainWindow):
             self._show_error_dialog(f"导出失败：{exc}")
             return
 
-        self._set_step(5)
+        self._go_to_page("result")
+        self.last_output_dir = output_dir
+        self.result_open_folder_button.setEnabled(True)
         self.result_summary.setText(
             f"已导出 {len(outputs)} 个 PDF。\n图类型：{TEMPLATE_LABELS.get(template, template)} / {template}\n输出目录：{output_dir.resolve()}"
         )
@@ -1016,12 +1161,24 @@ class PlotWizardWindow(QMainWindow):
     def _show_error_dialog(self, message: str) -> None:
         self.result_summary.setText(message)
         self.preview_status_label.setText("发生错误")
+        if self.current_input_path is None:
+            self._go_to_page("file")
+        else:
+            self._go_to_page("preflight")
         self._show_preview_message(message)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         if self._preview_mode in {"fit_page", "fit_width"} and self.current_rendered:
             self._refresh_preview_image()
+
+    def _open_last_output_dir(self) -> None:
+        if self.last_output_dir is None:
+            return
+        try:
+            subprocess.run(["open", str(self.last_output_dir.resolve())], check=False)
+        except Exception as exc:  # pragma: no cover - GUI error path
+            self._show_error_dialog(f"无法打开输出目录：{exc}")
 
 
 def main() -> int:
