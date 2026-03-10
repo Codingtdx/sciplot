@@ -15,22 +15,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import FixedLocator, LogLocator
 
 from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup
-from src.plot_style import (
-    BOTTOM_MARGIN_MM,
-    FILL_ALPHA,
-    FONT_SIZE_PT,
-    LEFT_MARGIN_MM,
-    LINE_ALPHA,
-    LINE_WIDTH_PT,
-    MARKER_ALPHA,
-    MAX_FILL_ALPHA,
-    PANEL_HEIGHT_MM,
-    PANEL_WIDTH_MM,
-    RIGHT_MARGIN_MM,
-    TOP_MARGIN_MM,
-    create_panel_figure,
-    mm_to_inch,
-)
+from src import plot_style
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import (
     WIDE_NMR_SPECTRUM_HEIGHT_MM,
@@ -80,10 +65,10 @@ class CurveTemplate:
     yscale: str
     width_mm: float
     height_mm: float
-    left_margin_mm: float
-    right_margin_mm: float
-    bottom_margin_mm: float
-    top_margin_mm: float
+    left_margin_mm: float | None
+    right_margin_mm: float | None
+    bottom_margin_mm: float | None
+    top_margin_mm: float | None
     legend_mode: LegendMode = "inside_best"
     axis_mode: AxisMode = "auto"
     y_padding_top: float = 0.18
@@ -105,52 +90,52 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "frequency_sweep": CurveTemplate(
         xscale="log",
         yscale="log",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
     ),
     "temperature_sweep": CurveTemplate(
         xscale="linear",
         yscale="log",
         width_mm=120,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
     ),
     "stress_relaxation": CurveTemplate(
         xscale="log",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
     ),
     "tensile_curve": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
     ),
     "ftir": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         y_padding_top=0.08,
         y_padding_bottom=0.04,
         legend_mode="none",
@@ -163,12 +148,12 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "nmr": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         y_padding_top=0.08,
         y_padding_bottom=0.04,
         legend_mode="none",
@@ -182,12 +167,12 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "xrd": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         y_padding_top=0.08,
         y_padding_bottom=0.04,
         legend_mode="none",
@@ -199,12 +184,12 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "dsc": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         y_padding_top=0.08,
         y_padding_bottom=0.04,
         legend_mode="none",
@@ -217,23 +202,23 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "tga": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         show_markers=False,
     ),
     "dma": CurveTemplate(
         xscale="linear",
         yscale="linear",
-        width_mm=PANEL_WIDTH_MM,
-        height_mm=PANEL_HEIGHT_MM,
-        left_margin_mm=LEFT_MARGIN_MM,
-        right_margin_mm=RIGHT_MARGIN_MM,
-        bottom_margin_mm=BOTTOM_MARGIN_MM,
-        top_margin_mm=TOP_MARGIN_MM,
+        width_mm=plot_style.PANEL_WIDTH_MM,
+        height_mm=plot_style.PANEL_HEIGHT_MM,
+        left_margin_mm=None,
+        right_margin_mm=None,
+        bottom_margin_mm=None,
+        top_margin_mm=None,
         show_markers=False,
     ),
 }
@@ -260,6 +245,32 @@ def compute_group_positions(
     center_step = item_width + extra_gap * spacing_scale
     offsets = np.arange(num_groups, dtype=float) - (num_groups - 1) / 2
     return offsets * center_step
+
+
+def _resolved_panel_geometry(
+    *,
+    width_mm: float | None,
+    height_mm: float | None,
+    left_margin_mm: float | None,
+    right_margin_mm: float | None,
+    bottom_margin_mm: float | None,
+    top_margin_mm: float | None,
+) -> tuple[float, float, float | None, float | None, float | None, float | None]:
+    spacing = plot_style.current_spacing()
+    return (
+        spacing.panel_width_mm if width_mm is None else width_mm,
+        spacing.panel_height_mm if height_mm is None else height_mm,
+        spacing.left_margin_mm if left_margin_mm is None else left_margin_mm,
+        spacing.right_margin_mm if right_margin_mm is None else right_margin_mm,
+        spacing.bottom_margin_mm if bottom_margin_mm is None else bottom_margin_mm,
+        spacing.top_margin_mm if top_margin_mm is None else top_margin_mm,
+    )
+
+
+def _current_legend_inset(default: float | None = None) -> float:
+    if default is not None:
+        return default
+    return plot_style.current_spacing().legend_inset_fraction
 
 
 def _format_axis_label(label: str, unit: str) -> str:
@@ -566,6 +577,7 @@ def _prepare_stacked_layout(
     *,
     stack_floor_fraction: float,
     stack_gap_fraction: float,
+    step_scale: float = 1.0,
 ) -> StackedLayout:
     if len(series_list) <= 1:
         spans = [
@@ -588,8 +600,9 @@ def _prepare_stacked_layout(
         spans.append(span)
 
     max_span = max(spans) if spans else 1.0
-    floor = max_span * stack_floor_fraction
-    step = max_span * (1.0 + stack_gap_fraction)
+    scale = max(step_scale, 1.0)
+    floor = max_span * stack_floor_fraction * scale
+    step = max_span * (1.0 + stack_gap_fraction) * scale
 
     stacked: list[CurveSeries] = []
     for idx, (series, shifted, _) in enumerate(prepared):
@@ -598,6 +611,10 @@ def _prepare_stacked_layout(
         stacked.append(_clone_curve_series(series, final))
 
     return StackedLayout(stacked, floor, step, max_span)
+
+
+def _stack_retry_scales() -> tuple[float, ...]:
+    return (1.0, 1.15, 1.35, 1.65, 2.0, 2.45, 3.0)
 
 
 def _compute_x_limits(
@@ -687,7 +704,11 @@ def _compute_stacked_axis_limits(
     )
     y_min = min(float(arr.min()) for arr in y_arrays)
     y_max = max(float(arr.max()) for arr in y_arrays)
-    y_high = y_max + layout.max_span * max(y_padding_top, 0.08)
+    # Stacked spectra labels sit inside the axes, above their local curves.
+    # Leave dedicated headroom so the top label can fit without colliding with
+    # the highest trace or the top frame.
+    label_headroom = layout.max_span * 0.58
+    y_high = y_max + layout.max_span * max(y_padding_top, 0.08) + label_headroom
     return AxisLimits(
         xlim=xlim,
         ylim=(0.0, y_high),
@@ -776,7 +797,7 @@ def _style_categorical_ticklabels(ax: plt.Axes, labels: Sequence[str]) -> None:
         default=0,
     )
     has_unbreakable = any(" " not in label and len(label) > 12 for label in labels)
-    fontsize = FONT_SIZE_PT
+    fontsize = plot_style.current_typography().font_size_pt
     rotation = 0
     ha = "center"
 
@@ -977,7 +998,7 @@ def _place_series_edge_labels(
     labels: Sequence[str] | None = None,
     search_band_fraction: float = 0.06,
     fontsize: float = 6.0,
-) -> None:
+) -> bool:
     visual_side = _resolve_series_label_side(
         series_list,
         reverse_x,
@@ -993,11 +1014,11 @@ def _place_series_edge_labels(
     pixel_offset = _point_to_display_pixels(fig, label_offset_pt)
     all_points = [points for points in display_points if points.size]
     if not all_points:
-        return
+        return True
     all_curve_points = np.vstack(all_points)
     placed_bboxes = []
     label_texts = list(labels) if labels is not None else [series.sample for series in series_list]
-    candidate_offsets = inset_fraction + np.linspace(0.0, search_band_fraction, 7)
+    candidate_offsets = inset_fraction + np.linspace(0.0, search_band_fraction, 15)
 
     def _measure_text_bbox(label_text: str, color: tuple[float, float, float] | str):
         text = ax.text(
@@ -1072,7 +1093,7 @@ def _place_series_edge_labels(
         distance = np.hypot(dx, dy)
         inside = distance == 0
         if np.any(inside):
-            score += float(inside.sum()) * 400.0
+            score += 1_000_000 + float(inside.sum()) * 250.0
         near = distance < 7.0
         if np.any(near):
             score += float((7.0 - distance[near]).sum()) * 8.0
@@ -1114,7 +1135,7 @@ def _place_series_edge_labels(
         for candidate_x, candidate_offset in _candidate_x_positions(x):
             local_top = _series_local_display_top(x, y, candidate_x, bbox_width)
             base_bottom = max(local_top + pixel_offset, axes_bbox.y0 + label_gap)
-            for step in range(10):
+            for step in range(28):
                 candidate_bottom = base_bottom + step * (bbox_height * 0.55 + label_gap)
                 max_bottom = axes_bbox.y1 - label_gap - bbox_height
                 candidate_bottom = min(candidate_bottom, max_bottom)
@@ -1139,8 +1160,8 @@ def _place_series_edge_labels(
                 if best_choice is None or score < best_choice[0]:
                     best_choice = (score, candidate_x, data_y, bbox)
 
-        if best_choice is None:
-            continue
+        if best_choice is None or best_choice[0] >= 1_000_000:
+            return False
         _, best_x, best_y, final_bbox = best_choice
         final_text = ax.text(
             best_x,
@@ -1155,6 +1176,7 @@ def _place_series_edge_labels(
         )
         fig.canvas.draw()
         placed_bboxes.append(final_text.get_window_extent(renderer=renderer).expanded(1.02, 1.06))
+    return len(placed_bboxes) == len(label_records)
 
 
 def _legend_candidates(
@@ -1323,10 +1345,10 @@ def plot_curves(
     yscale: str = "linear",
     width_mm: float | None = None,
     height_mm: float | None = None,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     xlim: tuple[float | None, float | None] | None = None,
     ylim: tuple[float | None, float | None] | None = None,
     headroom_factor: float | None = None,
@@ -1334,7 +1356,7 @@ def plot_curves(
     y_padding_bottom: float = 0.06,
     show_markers: bool = True,
     marker_style_cycle: Sequence[str] | None = None,
-    marker_size: float = 3.0,
+    marker_size: float | None = None,
     marker_every: int | None = None,
     visible_xticks: Sequence[float] | None = None,
     reverse_x: bool = False,
@@ -1348,98 +1370,132 @@ def plot_curves(
     baseline_mode: str = "none",
     show_y_ticks: bool = True,
     legend_expand_axes: str = "xy",
-    legend_inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+    legend_inset_fraction: float | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_curve_series_input(series_list)
-    fig, ax = create_panel_figure(
-        width_mm=width_mm or PANEL_WIDTH_MM,
-        height_mm=height_mm or PANEL_HEIGHT_MM,
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
+        width_mm=width_mm,
+        height_mm=height_mm,
         left_margin_mm=left_margin_mm,
         right_margin_mm=right_margin_mm,
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
     )
-    palette = sns.color_palette("colorblind", n_colors=len(series_list))
-    markers = marker_style_cycle or MARKER_STYLE_CYCLE
-    normalized_series = _baseline_correct_series(series_list, baseline_mode=baseline_mode)
-    stacked_layout = (
-        _prepare_stacked_layout(
-            normalized_series,
-            stack_floor_fraction=stack_floor_fraction,
-            stack_gap_fraction=stack_gap_fraction,
-        )
-        if stack_mode != "none" and len(series_list) > 1
-        else None
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
     )
-    plotted_series = stacked_layout.series_list if stacked_layout is not None else normalized_series
+    palette = plot_style.get_categorical_palette(n_colors=len(series_list))
+    markers = marker_style_cycle or MARKER_STYLE_CYCLE
+    resolved_marker_size = stroke.marker_size_pt if marker_size is None else marker_size
+    normalized_series = _baseline_correct_series(series_list, baseline_mode=baseline_mode)
+    stacked_mode_enabled = stack_mode != "none" and len(series_list) > 1
+    stacked_layout = None
+    plotted_series = list(normalized_series)
+    limits: AxisLimits
+    label_success = True
+    retry_scales = _stack_retry_scales() if stacked_mode_enabled and series_label_mode == "edge" else (1.0,)
 
-    for idx, (color, series) in enumerate(zip(palette, plotted_series)):
-        markevery = marker_every if marker_every is not None else _infer_markevery(len(series.data))
-        line_color = to_rgba(color, LINE_ALPHA)
-        ax.plot(
-            series.data["x"],
-            series.data["y"],
-            label=series.sample,
-            color=line_color,
-            linewidth=LINE_WIDTH_PT,
-            marker=markers[idx % len(markers)] if show_markers else None,
-            markersize=marker_size,
-            markerfacecolor=color,
-            markeredgecolor=color,
-            markeredgewidth=0.5,
-            markevery=markevery,
+    for step_scale in retry_scales:
+        ax.cla()
+        stacked_layout = (
+            _prepare_stacked_layout(
+                normalized_series,
+                stack_floor_fraction=stack_floor_fraction,
+                stack_gap_fraction=stack_gap_fraction,
+                step_scale=step_scale,
+            )
+            if stacked_mode_enabled
+            else None
         )
+        plotted_series = stacked_layout.series_list if stacked_layout is not None else list(normalized_series)
 
-    if stacked_layout is not None:
-        limits = _compute_stacked_axis_limits(
-            stacked_layout,
-            xscale=xscale,
-            y_padding_top=y_padding_top,
-        )
-    else:
-        limits = compute_axis_limits(
-            [series.data["y"].to_numpy() for series in plotted_series],
-            kind="line",
-            axis_mode=axis_mode,
-            legend_mode=legend_mode,
-            x_values=[series.data["x"].to_numpy() for series in plotted_series],
-            xscale=xscale,
-            yscale=yscale,
-            headroom_factor=headroom_factor,
-            y_padding_top=y_padding_top,
-            y_padding_bottom=y_padding_bottom,
-        )
-    ax.set_xlim(*_merge_limits(limits.xlim, xlim))
-    ax.set_ylim(*_merge_limits(limits.ylim, ylim))
-    ax.set_xscale(xscale)
-    ax.set_yscale(yscale)
-    if yscale == "log":
-        ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0,), numticks=12))
-    if reverse_x:
-        ax.invert_xaxis()
+        for idx, (color, series) in enumerate(zip(palette, plotted_series)):
+            markevery = marker_every if marker_every is not None else _infer_markevery(len(series.data))
+            line_color = to_rgba(color, stroke.line_alpha)
+            ax.plot(
+                series.data["x"],
+                series.data["y"],
+                label=series.sample,
+                color=line_color,
+                linewidth=stroke.line_width_pt,
+                marker=markers[idx % len(markers)] if show_markers else None,
+                markersize=resolved_marker_size,
+                markerfacecolor=color,
+                markeredgecolor=color,
+                markeredgewidth=0.5,
+                markevery=markevery,
+            )
 
-    first = series_list[0]
-    ax.set_xlabel(_format_axis_label(first.x_label, first.x_unit))
-    ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
-    if not show_y_ticks:
-        ax.tick_params(axis="y", left=False, labelleft=False, which="both")
-        ax.spines["left"].set_visible(True)
-        ax.yaxis.set_label_coords(HIDDEN_Y_LABEL_X, 0.5)
-    if series_label_mode == "edge" and len(plotted_series) > 1:
-        _place_series_edge_labels(
-            ax,
-            plotted_series,
-            palette,
-            reverse_x=reverse_x,
-            side=series_label_side,
-            inset_fraction=label_track_inset_fraction,
-            label_offset_pt=label_offset_pt,
-        )
-    elif legend_mode == "inside_best":
+        if stacked_layout is not None:
+            limits = _compute_stacked_axis_limits(
+                stacked_layout,
+                xscale=xscale,
+                y_padding_top=y_padding_top,
+            )
+        else:
+            limits = compute_axis_limits(
+                [series.data["y"].to_numpy() for series in plotted_series],
+                kind="line",
+                axis_mode=axis_mode,
+                legend_mode=legend_mode,
+                x_values=[series.data["x"].to_numpy() for series in plotted_series],
+                xscale=xscale,
+                yscale=yscale,
+                headroom_factor=headroom_factor,
+                y_padding_top=y_padding_top,
+                y_padding_bottom=y_padding_bottom,
+            )
+        ax.set_xlim(*_merge_limits(limits.xlim, xlim))
+        ax.set_ylim(*_merge_limits(limits.ylim, ylim))
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)
+        if yscale == "log":
+            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0,), numticks=12))
+        if reverse_x:
+            ax.invert_xaxis()
+
+        first = series_list[0]
+        ax.set_xlabel(_format_axis_label(first.x_label, first.x_unit))
+        ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
+        if not show_y_ticks:
+            ax.tick_params(axis="y", left=False, labelleft=False, which="both")
+            ax.spines["left"].set_visible(True)
+            ax.yaxis.set_label_coords(HIDDEN_Y_LABEL_X, 0.5)
+        if series_label_mode == "edge" and len(plotted_series) > 1:
+            label_success = _place_series_edge_labels(
+                ax,
+                plotted_series,
+                palette,
+                reverse_x=reverse_x,
+                side=series_label_side,
+                inset_fraction=label_track_inset_fraction,
+                label_offset_pt=label_offset_pt,
+                search_band_fraction=0.18 if stacked_mode_enabled else 0.08,
+                fontsize=6.2 if stacked_mode_enabled else 6.0,
+            )
+        else:
+            label_success = True
+        if label_success:
+            break
+
+    if series_label_mode != "edge" and legend_mode == "inside_best":
         legend_kwargs, overlap_score = choose_legend_corner(
             ax,
             plotted_series,
-            inset_fraction=legend_inset_fraction,
+            inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
         _nudge_limits_for_legend(
             ax,
@@ -1452,10 +1508,10 @@ def plot_curves(
         legend_kwargs, _ = choose_legend_corner(
             ax,
             plotted_series,
-            inset_fraction=legend_inset_fraction,
+            inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
         ax.legend(**legend_kwargs)
-    elif legend_mode != "none":
+    elif series_label_mode != "edge" and legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
 
     if visible_xticks is not None:
@@ -1485,10 +1541,10 @@ def plot_scatter(
     yscale: str = "linear",
     width_mm: float | None = None,
     height_mm: float | None = None,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     xlim: tuple[float | None, float | None] | None = None,
     ylim: tuple[float | None, float | None] | None = None,
     headroom_factor: float | None = None,
@@ -1498,18 +1554,34 @@ def plot_scatter(
     visible_xticks: Sequence[float] | None = None,
     reverse_x: bool = False,
     legend_expand_axes: str = "xy",
-    legend_inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+    legend_inset_fraction: float | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_curve_series_input(series_list)
-    fig, ax = create_panel_figure(
-        width_mm=width_mm or PANEL_WIDTH_MM,
-        height_mm=height_mm or PANEL_HEIGHT_MM,
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
+        width_mm=width_mm,
+        height_mm=height_mm,
         left_margin_mm=left_margin_mm,
         right_margin_mm=right_margin_mm,
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
     )
-    palette = sns.color_palette("colorblind", n_colors=len(series_list))
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(series_list))
 
     for color, series in zip(palette, series_list):
         ax.scatter(
@@ -1518,7 +1590,7 @@ def plot_scatter(
             label=series.sample,
             color=color,
             s=marker_size,
-            alpha=MARKER_ALPHA,
+            alpha=stroke.marker_alpha,
             linewidths=0.0,
             zorder=2.5,
         )
@@ -1552,7 +1624,7 @@ def plot_scatter(
         legend_kwargs, overlap_score = choose_legend_corner(
             ax,
             series_list,
-            inset_fraction=legend_inset_fraction,
+            inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
         _nudge_limits_for_legend(
             ax,
@@ -1565,7 +1637,7 @@ def plot_scatter(
         legend_kwargs, _ = choose_legend_corner(
             ax,
             series_list,
-            inset_fraction=legend_inset_fraction,
+            inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
         ax.legend(**legend_kwargs)
     elif legend_mode != "none":
@@ -1843,7 +1915,7 @@ def _add_wide_nmr_highlights(
                         y_high - y_low,
                         facecolor=region.color,
                         edgecolor="none",
-                        alpha=min(region.alpha, MAX_FILL_ALPHA),
+                        alpha=min(region.alpha, plot_style.current_stroke().max_fill_alpha),
                         zorder=0.2,
                     )
                 )
@@ -1865,7 +1937,7 @@ def _add_wide_nmr_highlights(
                     color=region.color,
                     ha="center",
                     va=va,
-                    fontsize=7,
+                    fontsize=plot_style.current_typography().font_size_pt,
                     clip_on=False,
                     zorder=3,
                 )
@@ -1888,26 +1960,23 @@ def plot_wide_nmr(
     *,
     width_mm: float = WIDE_NMR_WIDTH_MM,
     height_mm: float = WIDE_NMR_TOTAL_HEIGHT_MM,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
     top_margin_mm: float = 0.0,
     structure_reserved_mm: float = WIDE_NMR_STRUCTURE_RESERVED_MM,
     reverse_x: bool = True,
     baseline_mode: str = "linear_endpoints",
 ) -> tuple[plt.Figure, plt.Axes]:
+    stroke = plot_style.current_stroke()
+    spacing = plot_style.current_spacing()
+    left_margin_mm = spacing.left_margin_mm if left_margin_mm is None else left_margin_mm
+    right_margin_mm = spacing.right_margin_mm if right_margin_mm is None else right_margin_mm
+    bottom_margin_mm = spacing.bottom_margin_mm if bottom_margin_mm is None else bottom_margin_mm
     raw_names, display_names, ordered_series = _prepare_wide_nmr_series(series_list, config)
     corrected_series = _baseline_correct_series(ordered_series, baseline_mode=baseline_mode)
-    stacked_layout = _prepare_stacked_layout(
-        corrected_series,
-        stack_floor_fraction=config.stack_floor_fraction,
-        stack_gap_fraction=config.stack_gap_fraction,
-    )
-    y_arrays = [series.data["y"].to_numpy(dtype=float) for series in stacked_layout.series_list]
-    y_max = max(float(np.nanmax(values)) for values in y_arrays)
-    y_high = y_max + stacked_layout.max_span * 0.18
 
-    fig = plt.figure(figsize=(mm_to_inch(width_mm), mm_to_inch(height_mm)), constrained_layout=False)
+    fig = plt.figure(figsize=(plot_style.mm_to_inch(width_mm), plot_style.mm_to_inch(height_mm)), constrained_layout=False)
     reserved_top_mm = structure_reserved_mm + top_margin_mm
     plot_body_height_mm = max(height_mm - bottom_margin_mm - reserved_top_mm, 1e-9)
     root_grid = fig.add_gridspec(
@@ -1931,57 +2000,72 @@ def plot_wide_nmr(
     for idx, segment in enumerate(config.segments):
         axis = fig.add_subplot(spectrum_grid[0, idx], sharey=axes[0] if axes else None)
         axes.append(axis)
-        for series in stacked_layout.series_list:
-            axis.plot(
-                series.data["x"],
-                series.data["y"],
-                color="black",
-                linewidth=LINE_WIDTH_PT,
-                zorder=2,
+    stacked_layout: StackedLayout | None = None
+    label_side = _resolve_wide_nmr_label_side(corrected_series, config)
+    for step_scale in _stack_retry_scales():
+        stacked_layout = _prepare_stacked_layout(
+            corrected_series,
+            stack_floor_fraction=config.stack_floor_fraction,
+            stack_gap_fraction=config.stack_gap_fraction,
+            step_scale=step_scale,
+        )
+        y_arrays = [series.data["y"].to_numpy(dtype=float) for series in stacked_layout.series_list]
+        y_max = max(float(np.nanmax(values)) for values in y_arrays)
+        y_high = y_max + stacked_layout.max_span * (0.18 + 0.58)
+
+        for axis, segment in zip(axes, config.segments):
+            axis.cla()
+            for series in stacked_layout.series_list:
+                axis.plot(
+                    series.data["x"],
+                    series.data["y"],
+                    color="black",
+                    linewidth=stroke.line_width_pt,
+                    zorder=2,
+                )
+
+            if reverse_x:
+                axis.set_xlim(segment.x_max, segment.x_min)
+            else:
+                axis.set_xlim(segment.x_min, segment.x_max)
+            axis.set_ylim(0.0, y_high)
+            axis.tick_params(axis="y", left=False, labelleft=False, which="both")
+            axis.spines["left"].set_visible(False)
+            axis.spines["top"].set_visible(False)
+            axis.spines["right"].set_visible(False)
+            seg_low = min(segment.x_min, segment.x_max)
+            seg_high = max(segment.x_min, segment.x_max)
+            _apply_axis_tick_filter(
+                axis.xaxis,
+                raw_bounds=(seg_low, seg_high),
+                display_bounds=(seg_low, seg_high),
+                scale="linear",
+                include_minor=False,
             )
 
-        if reverse_x:
-            axis.set_xlim(segment.x_max, segment.x_min)
-        else:
-            axis.set_xlim(segment.x_min, segment.x_max)
-        axis.set_ylim(0.0, y_high)
-        axis.tick_params(axis="y", left=False, labelleft=False, which="both")
-        axis.spines["left"].set_visible(False)
-        axis.spines["top"].set_visible(False)
-        axis.spines["right"].set_visible(False)
-        seg_low = min(segment.x_min, segment.x_max)
-        seg_high = max(segment.x_min, segment.x_max)
-        _apply_axis_tick_filter(
-            axis.xaxis,
-            raw_bounds=(seg_low, seg_high),
-            display_bounds=(seg_low, seg_high),
-            scale="linear",
-            include_minor=False,
+        _add_wide_nmr_highlights(
+            axes,
+            config.segments,
+            stacked_layout,
+            raw_names,
+            display_names,
+            config,
         )
 
-    _add_wide_nmr_highlights(
-        axes,
-        config.segments,
-        stacked_layout,
-        raw_names,
-        display_names,
-        config,
-    )
-
-    label_side = _resolve_wide_nmr_label_side(stacked_layout.series_list, config)
-    target_axis = axes[0] if label_side == "left" else axes[-1]
-    _place_series_edge_labels(
-        target_axis,
-        stacked_layout.series_list,
-        ["black"] * len(stacked_layout.series_list),
-        reverse_x=reverse_x,
-        side=label_side,
-        inset_fraction=config.label_inset_fraction,
-        label_offset_pt=config.label_offset_pt,
-        labels=display_names,
-        search_band_fraction=0.08,
-        fontsize=7.0,
-    )
+        target_axis = axes[0] if label_side == "left" else axes[-1]
+        if _place_series_edge_labels(
+            target_axis,
+            stacked_layout.series_list,
+            ["black"] * len(stacked_layout.series_list),
+            reverse_x=reverse_x,
+            side=label_side,
+            inset_fraction=config.label_inset_fraction,
+            label_offset_pt=config.label_offset_pt,
+            labels=display_names,
+            search_band_fraction=0.18,
+            fontsize=6.4,
+        ):
+            break
 
     for left_axis, right_axis in zip(axes[:-1], axes[1:]):
         _draw_wide_nmr_break_marks(left_axis, right_axis)
@@ -2018,12 +2102,12 @@ def plot_box(
     *,
     legend_mode: LegendMode = "outside",
     axis_mode: AxisMode = "auto",
-    width_mm: float = PANEL_WIDTH_MM,
-    height_mm: float = PANEL_HEIGHT_MM,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     box_width: float = 0.35,
     spacing_scale: float = 1.0,
     ylim: tuple[float, float] | None = None,
@@ -2032,15 +2116,31 @@ def plot_box(
     y_padding_bottom: float = 0.06,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_group_input(groups, chart_name="box plot")
-    fig, ax = create_panel_figure(
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
         width_mm=width_mm,
-        height_mm=height_mm,
         left_margin_mm=left_margin_mm,
+        height_mm=height_mm,
         right_margin_mm=right_margin_mm,
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
     )
-    palette = sns.color_palette("colorblind", n_colors=len(groups))
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(groups))
     values = [group.data.to_numpy() for group in groups]
     positions = compute_group_positions(len(groups), box_width, spacing_scale=spacing_scale)
     box = ax.boxplot(
@@ -2049,14 +2149,14 @@ def plot_box(
         positions=positions,
         patch_artist=True,
         widths=box_width,
-        medianprops={"color": "black", "linewidth": LINE_WIDTH_PT},
+        medianprops={"color": "black", "linewidth": stroke.line_width_pt},
         whiskerprops={"linewidth": 1.0},
         capprops={"linewidth": 1.0},
         boxprops={"linewidth": 1.0},
     )
     for patch, color in zip(box["boxes"], palette):
         patch.set_facecolor(color)
-        patch.set_alpha(min(FILL_ALPHA, MAX_FILL_ALPHA))
+        patch.set_alpha(min(stroke.fill_alpha, stroke.max_fill_alpha))
         patch.set_edgecolor(color)
 
     for pos, group, color in zip(positions, groups, palette):
@@ -2067,7 +2167,7 @@ def plot_box(
             if len(group.data) > 1
             else np.array([0.0])
         )
-        ax.scatter(x + jitter, group.data, color=color, alpha=MARKER_ALPHA, s=10, zorder=3)
+        ax.scatter(x + jitter, group.data, color=color, alpha=stroke.marker_alpha, s=10, zorder=3)
 
     limits = _compute_distribution_axis_limits(
         values,
@@ -2093,12 +2193,12 @@ def plot_bar(
     *,
     legend_mode: LegendMode = "outside",
     axis_mode: AxisMode = "auto_positive",
-    width_mm: float = PANEL_WIDTH_MM,
-    height_mm: float = PANEL_HEIGHT_MM,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     bar_width: float = 0.35,
     spacing_scale: float = 1.0,
     ylim: tuple[float, float] | None = None,
@@ -2107,7 +2207,15 @@ def plot_bar(
     y_padding_bottom: float = 0.02,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_group_input(groups, chart_name="bar plot")
-    fig, ax = create_panel_figure(
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
         width_mm=width_mm,
         height_mm=height_mm,
         left_margin_mm=left_margin_mm,
@@ -2115,7 +2223,15 @@ def plot_bar(
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
     )
-    palette = sns.color_palette("colorblind", n_colors=len(groups))
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(groups))
 
     means = np.array([group.data.mean() for group in groups], dtype=float)
     stds = np.array([group.data.std(ddof=1) if len(group.data) > 1 else 0.0 for group in groups], dtype=float)
@@ -2130,7 +2246,7 @@ def plot_bar(
         color=palette,
         edgecolor=palette,
         linewidth=1.0,
-        alpha=min(FILL_ALPHA, MAX_FILL_ALPHA),
+        alpha=min(stroke.fill_alpha, stroke.max_fill_alpha),
     )
     for bar, color in zip(bars, palette):
         bar.set_edgecolor(color)
@@ -2166,12 +2282,12 @@ def plot_violin(
     *,
     legend_mode: LegendMode = "outside",
     axis_mode: AxisMode = "auto",
-    width_mm: float = PANEL_WIDTH_MM,
-    height_mm: float = PANEL_HEIGHT_MM,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     violin_width: float = 0.42,
     spacing_scale: float = 1.0,
     ylim: tuple[float, float] | None = None,
@@ -2180,7 +2296,15 @@ def plot_violin(
     y_padding_bottom: float = 0.06,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_group_input(groups, chart_name="violin plot")
-    fig, ax = create_panel_figure(
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
         width_mm=width_mm,
         height_mm=height_mm,
         left_margin_mm=left_margin_mm,
@@ -2188,7 +2312,15 @@ def plot_violin(
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
     )
-    palette = sns.color_palette("colorblind", n_colors=len(groups))
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(groups))
     values = [group.data.to_numpy(dtype=float) for group in groups]
     positions = compute_group_positions(len(groups), violin_width, spacing_scale=spacing_scale)
     violin = ax.violinplot(
@@ -2202,11 +2334,11 @@ def plot_violin(
     for body, color in zip(violin["bodies"], palette):
         body.set_facecolor(color)
         body.set_edgecolor(color)
-        body.set_alpha(min(FILL_ALPHA, MAX_FILL_ALPHA))
+        body.set_alpha(min(stroke.fill_alpha, stroke.max_fill_alpha))
         body.set_linewidth(1.0)
     if "cmedians" in violin:
         violin["cmedians"].set_color("black")
-        violin["cmedians"].set_linewidth(LINE_WIDTH_PT)
+        violin["cmedians"].set_linewidth(stroke.line_width_pt)
 
     limits = _compute_distribution_axis_limits(
         values,
@@ -2231,21 +2363,36 @@ def plot_violin(
 def plot_heatmap(
     table: HeatmapTable,
     *,
-    width_mm: float = PANEL_WIDTH_MM,
-    height_mm: float = PANEL_HEIGHT_MM,
-    left_margin_mm: float = LEFT_MARGIN_MM,
-    right_margin_mm: float = RIGHT_MARGIN_MM,
-    bottom_margin_mm: float = BOTTOM_MARGIN_MM,
-    top_margin_mm: float = TOP_MARGIN_MM,
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
     show_colorbar: bool = True,
 ) -> tuple[plt.Figure, plt.Axes]:
-    fig, ax = create_panel_figure(
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
         width_mm=width_mm,
         height_mm=height_mm,
         left_margin_mm=left_margin_mm,
         right_margin_mm=right_margin_mm,
         bottom_margin_mm=bottom_margin_mm,
         top_margin_mm=top_margin_mm,
+    )
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
     )
 
     x_is_numeric = pd.api.types.is_numeric_dtype(table.data["x"])
@@ -2266,11 +2413,28 @@ def plot_heatmap(
         .reindex(index=y_order, columns=x_order)
     )
 
+    cax = None
+    if show_colorbar:
+        position = ax.get_position()
+        cbar_pad = min(0.012, position.width * 0.045)
+        cbar_width = min(0.028, position.width * 0.085)
+        heatmap_width = max(position.width - cbar_width - cbar_pad, position.width * 0.80)
+        ax.set_position([position.x0, position.y0, heatmap_width, position.height])
+        cax = fig.add_axes(
+            [
+                position.x0 + heatmap_width + cbar_pad,
+                position.y0,
+                cbar_width,
+                position.height,
+            ]
+        )
+
     heatmap = sns.heatmap(
         matrix,
         ax=ax,
-        cmap="crest",
+        cmap=plot_style.get_sequential_cmap(),
         cbar=show_colorbar,
+        cbar_ax=cax,
         linewidths=0.0,
     )
     ax.set_xlabel(_format_axis_label(table.x_label, table.x_unit))
@@ -2286,8 +2450,16 @@ def plot_heatmap(
     if show_colorbar and heatmap.collections:
         colorbar = heatmap.collections[0].colorbar
         if colorbar is not None:
-            colorbar.set_label(_format_axis_label(table.z_label, table.z_unit), fontsize=FONT_SIZE_PT)
+            colorbar.set_label(
+                _format_axis_label(table.z_label, table.z_unit),
+                fontsize=6.0,
+                labelpad=1.0,
+            )
             colorbar.ax.tick_params(labelsize=6)
+            colorbar.ax.yaxis.label.set_clip_on(False)
+            colorbar.ax.yaxis.label.set_rotation(90)
+            colorbar.ax.yaxis.set_label_position("right")
+            colorbar.ax.yaxis.set_label_coords(1.15, 0.5)
     return fig, ax
 
 

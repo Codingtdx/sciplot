@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import to_hex
 
 import sys
 
@@ -14,8 +15,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import interactive_plot as wizard
-from make_plot import Recommendation, _resolve_render_options, inspect_input_file, list_sheet_names, preflight_render_request, render_template
+from make_plot import (
+    Recommendation,
+    _resolve_render_options,
+    build_rendered_plots,
+    inspect_input_file,
+    list_sheet_names,
+    preflight_render_request,
+    render_template,
+)
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
+from src import plot_style
 from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
     _cap_visible_major_ticks,
@@ -27,6 +37,7 @@ from src.plotting import (
     plot_dsc,
     plot_ftir,
     plot_frequency_sweep,
+    plot_heatmap,
     plot_nmr,
     plot_tensile_curve,
     plot_violin,
@@ -432,6 +443,23 @@ def _assert_stacked_layout(plot_fn, path: Path) -> None:
             if bbox.overlaps(other):
                 raise AssertionError("Stacked spectral sample labels should not overlap each other.")
 
+    for bbox in bboxes:
+        for line in ax.lines:
+            x = np.asarray(line.get_xdata(), dtype=float)
+            y = np.asarray(line.get_ydata(), dtype=float)
+            valid = np.isfinite(x) & np.isfinite(y)
+            if valid.sum() == 0:
+                continue
+            points = ax.transData.transform(np.column_stack([x[valid], y[valid]]))
+            inside = (
+                (points[:, 0] >= bbox.x0)
+                & (points[:, 0] <= bbox.x1)
+                & (points[:, 1] >= bbox.y0)
+                & (points[:, 1] <= bbox.y1)
+            )
+            if np.any(inside):
+                raise AssertionError("Stacked spectral sample labels should not overlap plotted curves.")
+
     plt.close(fig)
 
 
@@ -711,6 +739,77 @@ def _assert_major_tick_skip_every_other() -> None:
         raise AssertionError("Seven visible y-axis ticks should thin to every other tick using the locator result [::2].")
 
 
+def _assert_style_palette_presets(
+    *,
+    replicate_path: Path,
+    ftir_path: Path,
+    wide_nmr_path: Path,
+    heatmap_path: Path,
+    temp_path: Path,
+) -> None:
+    combos = [
+        ("point_line", temp_path, {"yscale": "log", "style_preset": "default", "palette_preset": "colorblind_safe"}),
+        ("point_line", temp_path, {"yscale": "log", "style_preset": "nature", "palette_preset": "colorblind_safe"}),
+        ("bar", replicate_path, {"style_preset": "default", "palette_preset": "deep"}),
+        ("box", replicate_path, {"style_preset": "nature", "palette_preset": "mono"}),
+        ("stacked_curve", ftir_path, {"reverse_x": True, "style_preset": "default", "palette_preset": "materials_warm"}),
+        ("segmented_stacked_curve", wide_nmr_path, {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True, "style_preset": "nature", "palette_preset": "okabe_ito"}),
+        ("heatmap", heatmap_path, {"style_preset": "default", "palette_preset": "materials_warm"}),
+    ]
+
+    for template, input_path, options in combos:
+        rendered = build_rendered_plots(template, input_path, 0, **options)
+        try:
+            if plot_style.current_style_preset() != options["style_preset"]:
+                raise AssertionError("Style preset should follow the explicit render option.")
+            if plot_style.current_palette_preset() != options["palette_preset"]:
+                raise AssertionError("Palette preset should follow the explicit render option.")
+            if not rendered:
+                raise AssertionError(f"{template} should render at least one figure for style/palette regression.")
+        finally:
+            for item in rendered:
+                plt.close(item.figure)
+
+    groups = load_replicate_table(replicate_path)
+    plot_style.apply_style("nature", "mono")
+    mono_fig, mono_ax = plot_bar(groups)
+    try:
+        mono_expected = plot_style.get_palette_spec("mono").categorical[0].lower()
+        mono_actual = to_hex(mono_ax.patches[0].get_facecolor(), keep_alpha=False).lower()
+        if mono_actual != mono_expected:
+            raise AssertionError("Bar plot should respect the selected mono categorical palette.")
+    finally:
+        plt.close(mono_fig)
+
+    heatmap_table = wizard.inspect_input_file(heatmap_path)  # keep wizard import live for state tests
+    if heatmap_table.recommendation.template != "heatmap":
+        raise AssertionError("Heatmap inspection should still recommend heatmap during style regression.")
+    from src.data_loader import load_heatmap_table  # local import to keep top import list compact
+
+    plot_style.apply_style("default", "materials_warm")
+    heatmap_fig, heatmap_ax = plot_heatmap(load_heatmap_table(heatmap_path))
+    try:
+        mesh = heatmap_ax.collections[0]
+        if mesh.cmap.name != plot_style.get_sequential_cmap("materials_warm"):
+            raise AssertionError("Heatmap should respect the selected sequential palette preset.")
+
+        if len(heatmap_fig.axes) < 2:
+            raise AssertionError("Heatmap should create an explicit in-figure colorbar axis.")
+        cbar_ax = heatmap_fig.axes[-1]
+        renderer = heatmap_fig.canvas.get_renderer()
+        fig_bbox = heatmap_fig.bbox
+        label_bbox = cbar_ax.yaxis.label.get_window_extent(renderer=renderer)
+        if (
+            label_bbox.x0 < fig_bbox.x0
+            or label_bbox.x1 > fig_bbox.x1
+            or label_bbox.y0 < fig_bbox.y0
+            or label_bbox.y1 > fig_bbox.y1
+        ):
+            raise AssertionError("Heatmap colorbar label should stay inside the figure canvas.")
+    finally:
+        plt.close(heatmap_fig)
+
+
 def _assert_frequency_batch_sync(freq_path: Path) -> None:
     metric_series = {
         metric_name: _to_curve_series(series_list)
@@ -840,6 +939,24 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> None:
         for other in bboxes[idx + 1 :]:
             if bbox.overlaps(other):
                 raise AssertionError("wide_nmr sample labels should not overlap each other.")
+
+    for text, bbox in zip(text_items, bboxes):
+        axis = text.axes
+        for line in axis.lines:
+            x = np.asarray(line.get_xdata(), dtype=float)
+            y = np.asarray(line.get_ydata(), dtype=float)
+            valid = np.isfinite(x) & np.isfinite(y)
+            if valid.sum() == 0:
+                continue
+            points = axis.transData.transform(np.column_stack([x[valid], y[valid]]))
+            inside = (
+                (points[:, 0] >= bbox.x0)
+                & (points[:, 0] <= bbox.x1)
+                & (points[:, 1] >= bbox.y0)
+                & (points[:, 1] <= bbox.y1)
+            )
+            if np.any(inside):
+                raise AssertionError("wide_nmr sample labels should not overlap plotted curves.")
     plt.close(fig)
 
 
@@ -934,6 +1051,13 @@ def main() -> int:
         _assert_stacked_layout(plot_xrd, xrd_path)
         _assert_stacked_layout(plot_dsc, dsc_path)
         _assert_wide_nmr_layout(wide_nmr_path)
+        _assert_style_palette_presets(
+            replicate_path=replicate_path,
+            ftir_path=ftir_path,
+            wide_nmr_path=wide_nmr_path,
+            heatmap_path=heatmap_path,
+            temp_path=temp_path,
+        )
         tensile_series = load_curve_table(tensile_path)
         _assert_curve_padding(plot_tensile_curve, tensile_series)
         _assert_major_tick_skip_every_other()

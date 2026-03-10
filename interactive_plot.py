@@ -5,8 +5,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from src import plot_style
 from make_plot import (
+    PALETTE_PRESET_CHOICES,
     SIZE_CHOICES,
+    STYLE_PRESET_CHOICES,
     _ensure_input_path,
     _resolve_render_options,
     inspect_input_file,
@@ -31,11 +34,25 @@ MENU_ITEMS = [
 MENU = {str(index): item for index, item in enumerate(MENU_ITEMS, start=1)}
 TEMPLATE_LABELS = {template: label for template, label in MENU_ITEMS}
 STATE_PATH = Path(__file__).resolve().with_name(".plot_wizard_state.json")
-STATE_FIELDS = ("size", "xscale", "yscale", "reverse_x", "baseline", "show_colorbar", "use_sidecar")
+STATE_FIELDS = (
+    "size",
+    "xscale",
+    "yscale",
+    "reverse_x",
+    "baseline",
+    "show_colorbar",
+    "style_preset",
+    "palette_preset",
+    "use_sidecar",
+)
 
 
 def _template_defaults(template: str) -> dict[str, Any]:
-    defaults: dict[str, Any] = {"size": "60x110" if template == "segmented_stacked_curve" else "60x55"}
+    defaults: dict[str, Any] = {
+        "size": "60x110" if template == "segmented_stacked_curve" else "60x55",
+        "style_preset": plot_style.DEFAULT_STYLE_PRESET,
+        "palette_preset": plot_style.DEFAULT_PALETTE_PRESET,
+    }
     if template in {"curve", "point_line", "scatter"}:
         defaults.update({"xscale": "linear", "yscale": "linear", "reverse_x": False})
     elif template == "stacked_curve":
@@ -51,9 +68,14 @@ def _load_state() -> dict[str, Any]:
     if not STATE_PATH.exists():
         return {"templates": {}}
     try:
-        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
     except Exception:
         return {"templates": {}}
+    templates = state.get("templates", {})
+    for saved in templates.values():
+        if "style_preset" in saved:
+            saved["style_preset"] = plot_style.normalize_style_preset(saved["style_preset"])
+    return state
 
 
 def _save_state(state: dict[str, Any]) -> None:
@@ -211,6 +233,8 @@ def _print_selected_options(template: str, defaults: dict[str, Any]) -> None:
     _print_section("当前建议设置")
     print(f"  图类型：{TEMPLATE_LABELS.get(template, template)} / {template}")
     print(f"  尺寸：{defaults.get('size')}")
+    print(f"  期刊风格：{defaults.get('style_preset')}")
+    print(f"  配色：{defaults.get('palette_preset')}")
     if template in {"curve", "point_line", "scatter"}:
         print(f"  x 轴：{defaults.get('xscale')}")
         print(f"  y 轴：{defaults.get('yscale')}")
@@ -229,6 +253,18 @@ def _print_selected_options(template: str, defaults: dict[str, Any]) -> None:
 def _prompt_options(template: str, defaults: dict[str, Any]) -> dict[str, Any]:
     options = dict(defaults)
     options["size"] = _prompt_size(str(defaults.get("size", _template_defaults(template)["size"])))
+    options["style_preset"] = _prompt_choice(
+        "期刊风格",
+        tuple(STYLE_PRESET_CHOICES),
+        plot_style.normalize_style_preset(str(defaults.get("style_preset", plot_style.DEFAULT_STYLE_PRESET))),
+    )
+    print(f"  当前风格说明：{plot_style.get_style_description(options['style_preset'])}")
+    options["palette_preset"] = _prompt_choice(
+        "配色 preset",
+        tuple(PALETTE_PRESET_CHOICES),
+        str(defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)),
+    )
+    print(f"  当前配色说明：{plot_style.get_palette_description(options['palette_preset'])}")
     if template in {"curve", "point_line", "scatter"}:
         options["xscale"] = _prompt_choice("x 轴类型", ("linear", "log"), str(defaults.get("xscale", "linear")))
         options["yscale"] = _prompt_choice("y 轴类型", ("linear", "log"), str(defaults.get("yscale", "linear")))
@@ -265,6 +301,8 @@ def _build_render_options(template: str, option_values: dict[str, Any]):
         reverse_x=bool(option_values.get("reverse_x", False)),
         baseline=option_values.get("baseline"),
         show_colorbar=option_values.get("show_colorbar"),
+        style_preset=str(option_values.get("style_preset", plot_style.DEFAULT_STYLE_PRESET)),
+        palette_preset=str(option_values.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)),
         use_sidecar=option_values.get("use_sidecar"),
     )
 

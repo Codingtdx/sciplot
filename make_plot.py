@@ -17,7 +17,8 @@ from src.data_loader import (
     load_replicate_table,
     read_raw_table,
 )
-from src.plot_style import save_pdf, use_nature_style
+from src import plot_style
+from src.plot_style import save_pdf
 from src.plotting import (
     compute_shared_curve_x_layout,
     plot_bar,
@@ -56,6 +57,8 @@ TEMPLATE_CHOICES = (
     "heatmap",
 )
 SIZE_CHOICES = ("60x55", "120x55", "60x110")
+STYLE_PRESET_CHOICES = plot_style.list_public_style_presets()
+PALETTE_PRESET_CHOICES = plot_style.list_palette_presets()
 SIZE_PRESETS: dict[str, tuple[float, float]] = {
     "60x55": (60.0, 55.0),
     "120x55": (120.0, 55.0),
@@ -108,6 +111,8 @@ class RenderOptions:
     reverse_x: bool
     baseline: str
     show_colorbar: bool
+    style_preset: str
+    palette_preset: str
     use_sidecar: bool | None = None
 
 
@@ -132,6 +137,8 @@ class Recommendation:
     reverse_x: bool | None = None
     baseline: str | None = None
     show_colorbar: bool | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
     use_sidecar: bool | None = None
 
 
@@ -168,7 +175,7 @@ def _to_curve_series(series_list: list[RheologySeries]) -> list[CurveSeries]:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate Nature-style research plots from graph-family templates.",
+        description="Generate research plots from graph-family templates.",
     )
     parser.add_argument(
         "--template",
@@ -230,6 +237,17 @@ def _parse_args() -> argparse.Namespace:
         dest="show_colorbar",
         action="store_false",
         help="Hide the colorbar for heatmaps.",
+    )
+    parser.add_argument(
+        "--style-preset",
+        default=plot_style.DEFAULT_STYLE_PRESET,
+        help="Style preset. Default: default",
+    )
+    parser.add_argument(
+        "--palette-preset",
+        choices=PALETTE_PRESET_CHOICES,
+        default=plot_style.DEFAULT_PALETTE_PRESET,
+        help="Color palette preset. Default: colorblind_safe",
     )
     parser.set_defaults(show_colorbar=None)
     return parser.parse_args()
@@ -438,6 +456,8 @@ def _resolve_render_options(
     reverse_x: bool = False,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
+    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
+    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
 ) -> RenderOptions:
     width_mm, height_mm = _resolve_size(size, template)
@@ -449,8 +469,16 @@ def _resolve_render_options(
         reverse_x=reverse_x,
         baseline=baseline or "none",
         show_colorbar=True if show_colorbar is None else show_colorbar,
+        style_preset=plot_style.normalize_style_preset(style_preset),
+        palette_preset=palette_preset,
         use_sidecar=use_sidecar,
     )
+
+
+def _style_preflight_warnings(options: RenderOptions) -> tuple[str, ...]:
+    if options.style_preset == "nature":
+        return ("当前使用的是 Nature 风格 preset：它优先遵循官方图像约束。",)
+    return ()
 
 
 def _detect_point_line_bundle(input_path: Path, sheet: str | int) -> str | None:
@@ -723,7 +751,7 @@ def preflight_render_request(
     sheet: str | int,
     options: RenderOptions,
 ) -> PreflightResult:
-    warnings: list[str] = []
+    warnings: list[str] = list(_style_preflight_warnings(options))
     errors: list[str] = []
 
     try:
@@ -1052,9 +1080,10 @@ def build_rendered_plots(
     reverse_x: bool = False,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
+    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
+    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
 ) -> list[RenderedPlot]:
-    use_nature_style()
     validated_template = _validate_template_name(template)
     options = _resolve_render_options(
         template=validated_template,
@@ -1064,8 +1093,11 @@ def build_rendered_plots(
         reverse_x=reverse_x,
         baseline=baseline,
         show_colorbar=show_colorbar,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
         use_sidecar=use_sidecar,
     )
+    plot_style.apply_style(options.style_preset, options.palette_preset)
     renderer = TEMPLATE_RENDERERS[validated_template]
     return renderer.render(input_path, sheet, options)
 
@@ -1082,6 +1114,8 @@ def render_template(
     reverse_x: bool = False,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
+    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
+    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
@@ -1094,6 +1128,8 @@ def render_template(
         reverse_x=reverse_x,
         baseline=baseline,
         show_colorbar=show_colorbar,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
         use_sidecar=use_sidecar,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
@@ -1115,6 +1151,8 @@ def main() -> int:
             reverse_x=args.reverse_x,
             baseline=args.baseline,
             show_colorbar=args.show_colorbar,
+            style_preset=args.style_preset,
+            palette_preset=args.palette_preset,
         )
         preflight = preflight_render_request(validated_template, input_path, sheet, options)
         if preflight.errors:
@@ -1132,6 +1170,8 @@ def main() -> int:
             reverse_x=args.reverse_x,
             baseline=args.baseline,
             show_colorbar=args.show_colorbar,
+            style_preset=args.style_preset,
+            palette_preset=args.palette_preset,
         )
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
