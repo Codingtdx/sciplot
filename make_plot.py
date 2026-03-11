@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import suppress
 from dataclasses import dataclass
 import re
 import sys
@@ -559,11 +560,8 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             signals=_point_line_bundle_signals(bundle),
         )
 
-    try:
+    with suppress(Exception):
         load_heatmap_table(input_path, sheet_name=sheet)
-    except Exception:
-        pass
-    else:
         return InputInspection(
             model="heatmap_table",
             model_label=_model_label("heatmap_table"),

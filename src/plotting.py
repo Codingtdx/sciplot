@@ -614,7 +614,8 @@ def _prepare_stacked_layout(
 
 
 def _stack_retry_scales() -> tuple[float, ...]:
-    return (1.0, 1.15, 1.35, 1.65, 2.0, 2.45, 3.0)
+    base = 1.15
+    return tuple(base**index for index in range(5))
 
 
 def _compute_x_limits(
@@ -704,10 +705,10 @@ def _compute_stacked_axis_limits(
     )
     y_min = min(float(arr.min()) for arr in y_arrays)
     y_max = max(float(arr.max()) for arr in y_arrays)
-    # Stacked spectra labels sit inside the axes, above their local curves.
-    # Leave dedicated headroom so the top label can fit without colliding with
-    # the highest trace or the top frame.
-    label_headroom = layout.max_span * 0.58
+    # Labels may force a larger stack step during retries. Headroom has to
+    # follow the actual stack spacing, otherwise retries only spread the traces
+    # apart but still leave no room for text near the top edge.
+    label_headroom = max(layout.max_span * 0.58, layout.step * 0.52)
     y_high = y_max + layout.max_span * max(y_padding_top, 0.08) + label_headroom
     return AxisLimits(
         xlim=xlim,
@@ -816,6 +817,22 @@ def _style_categorical_ticklabels(ax: plt.Axes, labels: Sequence[str]) -> None:
 
 
 def _display_points_for_series(ax: plt.Axes, series_list: Sequence[CurveSeries]) -> list[np.ndarray]:
+    def _densify_polyline(points: np.ndarray, max_step_px: float = 3.0) -> np.ndarray:
+        if len(points) < 2:
+            return points
+        dense_parts: list[np.ndarray] = [points[:1]]
+        for start, end in zip(points[:-1], points[1:]):
+            delta = end - start
+            segment_length = float(max(abs(delta[0]), abs(delta[1])))
+            steps = max(int(np.ceil(segment_length / max_step_px)), 1)
+            if steps == 1:
+                dense_parts.append(end[None, :])
+                continue
+            fractions = np.linspace(0.0, 1.0, steps + 1, dtype=float)[1:]
+            segment = start + fractions[:, None] * delta[None, :]
+            dense_parts.append(segment)
+        return np.vstack(dense_parts)
+
     display_points: list[np.ndarray] = []
     for series in series_list:
         x = series.data["x"].to_numpy(dtype=float)
@@ -824,12 +841,363 @@ def _display_points_for_series(ax: plt.Axes, series_list: Sequence[CurveSeries])
         if valid.sum() == 0:
             display_points.append(np.empty((0, 2)))
             continue
-        display_points.append(ax.transData.transform(np.column_stack([x[valid], y[valid]])))
+        points = ax.transData.transform(np.column_stack([x[valid], y[valid]]))
+        dense = _densify_polyline(points)
+        if len(dense) > 3000:
+            indices = np.linspace(0, len(dense) - 1, 3000, dtype=int)
+            dense = dense[indices]
+        display_points.append(dense)
     return display_points
 
 
 def _point_to_display_pixels(fig: plt.Figure, points: float) -> float:
     return points * fig.dpi / 72.0
+
+
+def _display_band_points(
+    points: np.ndarray,
+    bbox_left: float,
+    bbox_right: float,
+    *,
+    fallback_x: float | None = None,
+    margin_px: float | None = None,
+) -> np.ndarray:
+    if points.size == 0:
+        return np.empty((0, 2))
+    band_width = max(bbox_right - bbox_left, 1.0)
+    band_margin = margin_px if margin_px is not None else max(band_width * 0.08, 4.0)
+    band = (points[:, 0] >= bbox_left - band_margin) & (points[:, 0] <= bbox_right + band_margin)
+    if np.any(band):
+        return points[band]
+    target_x = fallback_x if fallback_x is not None else (bbox_left + bbox_right) / 2.0
+    nearest_idx = int(np.argmin(np.abs(points[:, 0] - target_x)))
+    lo = max(0, nearest_idx - 6)
+    hi = min(len(points), nearest_idx + 7)
+    return points[lo:hi]
+
+
+def _flat_window_score(points: np.ndarray) -> float:
+    if len(points) < 3:
+        return float("inf")
+    x = points[:, 0]
+    y = points[:, 1]
+    q15, q35, q65, q90 = np.quantile(y, [0.15, 0.35, 0.65, 0.90])
+    span = float(q65 - q15)
+    peak_penalty = float(q90 - q35)
+    dx = max(float(np.max(x) - np.min(x)), 1.0)
+    slope = abs(float(y[-1] - y[0])) / dx
+    roughness = float(np.median(np.abs(np.diff(y)))) if len(y) > 1 else 0.0
+    return span * 0.75 + peak_penalty * 1.15 + slope * 18.0 + roughness * 2.2
+
+
+def _baseline_level(points: np.ndarray) -> float:
+    if len(points) == 0:
+        return 0.0
+    local_y = np.sort(points[:, 1])
+    cutoff = max(int(np.ceil(len(local_y) * 0.35)), 1)
+    return float(np.mean(local_y[:cutoff]))
+
+
+def _label_rail_candidates(
+    axes_bbox: transforms.Bbox,
+    *,
+    side: str,
+    inset_fraction: float,
+    search_band_fraction: float,
+    max_label_width: float,
+    num_candidates: int = 18,
+) -> list[tuple[float, float]]:
+    positions: list[tuple[float, float]] = []
+    side_pad = axes_bbox.width * inset_fraction
+    search_width = axes_bbox.width * max(search_band_fraction, 0.01)
+    interior_guard = axes_bbox.width * 0.08
+
+    if side == "left":
+        start = float(axes_bbox.x0 + side_pad + max_label_width + 2.0)
+        end = float(min(start + search_width, axes_bbox.x1 - interior_guard))
+        rail_positions = np.linspace(start, end, num_candidates, dtype=float)
+    else:
+        start = float(axes_bbox.x1 - side_pad - max_label_width - 2.0)
+        end = float(max(start - search_width, axes_bbox.x0 + interior_guard))
+        rail_positions = np.linspace(start, end, num_candidates, dtype=float)
+
+    for display_x in rail_positions:
+        edge_distance = (
+            float(display_x - axes_bbox.x0 - max_label_width)
+            if side == "left"
+            else float(axes_bbox.x1 - display_x - max_label_width)
+        )
+        positions.append((float(display_x), edge_distance))
+    return positions
+
+
+def _find_flat_label_windows(
+    display_points: Sequence[np.ndarray],
+    label_records: Sequence[tuple[int, str, tuple[float, float, float] | str, float, float]],
+    *,
+    axes_bbox: transforms.Bbox,
+    side: str,
+    inset_fraction: float,
+    search_band_fraction: float,
+    min_samples: int = 3,
+) -> list[tuple[float, float, dict[int, tuple[np.ndarray, float, float, float, float, float, float]]]]:
+    rail_plans: list[tuple[float, float, dict[int, tuple[np.ndarray, float, float, float, float, float, float]]]] = []
+    max_label_width = max((record[3] for record in label_records), default=0.0)
+    for rail_x, rail_offset in _label_rail_candidates(
+        axes_bbox,
+        side=side,
+        inset_fraction=inset_fraction,
+        search_band_fraction=search_band_fraction,
+        max_label_width=max_label_width,
+    ):
+        per_series: dict[int, tuple[np.ndarray, float, float, float, float, float, float]] = {}
+        total_score = rail_offset * 120.0
+        valid = True
+        for series_index, _, _, bbox_width, bbox_height in label_records:
+            bbox_left = rail_x - bbox_width if side == "left" else rail_x
+            bbox_right = bbox_left + bbox_width
+            local_points = _display_band_points(
+                display_points[series_index],
+                bbox_left,
+                bbox_right,
+                fallback_x=rail_x,
+                margin_px=max(bbox_width * 0.20, 18.0),
+            )
+            if len(local_points) < min_samples:
+                valid = False
+                break
+            baseline = _baseline_level(local_points)
+            flatness = _flat_window_score(local_points)
+            per_series[series_index] = (
+                local_points,
+                baseline,
+                flatness,
+                bbox_left,
+                bbox_right,
+                bbox_width,
+                bbox_height,
+            )
+            total_score += flatness
+        if valid and len(per_series) == len(label_records):
+            rail_plans.append((total_score, rail_x, per_series))
+    rail_plans.sort(key=lambda item: item[0])
+    return rail_plans
+
+
+def _choose_baseline_label_rail(
+    display_points: Sequence[np.ndarray],
+    label_records: Sequence[tuple[int, str, tuple[float, float, float] | str, float, float]],
+    *,
+    axes_bbox: transforms.Bbox,
+    side: str,
+    inset_fraction: float,
+    search_band_fraction: float,
+) -> list[tuple[str, float, float, dict[int, tuple[np.ndarray, float, float, float, float, float, float]]]]:
+    candidate_sides = [side] if side in {"left", "right"} else ["left", "right"]
+    ranked_plans: list[
+        tuple[str, float, float, dict[int, tuple[np.ndarray, float, float, float, float, float, float]]]
+    ] = []
+    for visual_side in candidate_sides:
+        for flatness_score, rail_x, per_series in _find_flat_label_windows(
+            display_points,
+            label_records,
+            axes_bbox=axes_bbox,
+            side=visual_side,
+            inset_fraction=inset_fraction,
+            search_band_fraction=search_band_fraction,
+        ):
+            ranked_plans.append((visual_side, flatness_score, rail_x, per_series))
+    ranked_plans.sort(key=lambda item: item[1])
+    return ranked_plans
+
+
+def _place_labels_on_baseline_rail(
+    ax: plt.Axes,
+    label_records: Sequence[tuple[int, str, tuple[float, float, float] | str, float, float]],
+    *,
+    axes_bbox: transforms.Bbox,
+    all_curve_points: np.ndarray,
+    visual_side: str,
+    rail_x: float,
+    per_series: dict[int, tuple[np.ndarray, float, float, float, float, float, float]],
+    label_gap: float,
+    pixel_offset: float,
+) -> tuple[float, list[tuple[float, float, str, tuple[float, float, float] | str]]] | None:
+    placed_bboxes: list[transforms.Bbox] = []
+    planned_labels: list[tuple[float, float, str, tuple[float, float, float] | str]] = []
+    total_score = 0.0
+    for series_index, label_text, color, _, _ in sorted(label_records, key=lambda item: item[0], reverse=True):
+        local_points, current_baseline, flatness, bbox_left, bbox_right, bbox_width, bbox_height = per_series[series_index]
+        lower_bound = max(current_baseline + pixel_offset, float(axes_bbox.y0 + label_gap))
+        upper_bound = float(axes_bbox.y1 - label_gap - bbox_height)
+        if series_index + 1 < len(label_records) and (series_index + 1) in per_series:
+            upper_baseline = per_series[series_index + 1][1]
+            upper_bound = min(upper_bound, upper_baseline - label_gap - bbox_height)
+        if upper_bound <= lower_bound:
+            return None
+
+        candidate_bottom = lower_bound
+        candidate_bbox = transforms.Bbox.from_bounds(bbox_left, candidate_bottom, bbox_width, bbox_height)
+        candidate_score = _score_label_bbox(
+            candidate_bbox,
+            axes_bbox=axes_bbox,
+            all_curve_points=all_curve_points,
+            placed_bboxes=placed_bboxes,
+            rail_penalty=flatness,
+        )
+        if candidate_score >= 1_000_000_000.0:
+            return None
+
+        candidate_data_x = float(ax.transData.inverted().transform((rail_x, axes_bbox.y0))[0])
+        candidate_data_y = float(ax.transData.inverted().transform((rail_x, candidate_bottom))[1])
+        total_score += candidate_score
+        planned_labels.append((candidate_data_x, candidate_data_y, label_text, color))
+        placed_bboxes.append(candidate_bbox.expanded(1.03, 1.08))
+    return total_score, planned_labels
+
+
+def _score_label_bbox(
+    bbox: transforms.Bbox,
+    *,
+    axes_bbox: transforms.Bbox,
+    all_curve_points: np.ndarray,
+    placed_bboxes: Sequence[transforms.Bbox],
+    rail_penalty: float,
+) -> float:
+    score = rail_penalty
+    if bbox.x0 < axes_bbox.x0 or bbox.x1 > axes_bbox.x1 or bbox.y0 < axes_bbox.y0 or bbox.y1 > axes_bbox.y1:
+        return 1_000_000_000.0
+
+    expanded = bbox.expanded(1.03, 1.10)
+    if placed_bboxes:
+        for placed_bbox in placed_bboxes:
+            if expanded.overlaps(placed_bbox):
+                return 1_000_000_000.0
+
+    x_margin = max(bbox.width * 0.25, 10.0)
+    local_band = (all_curve_points[:, 0] >= bbox.x0 - x_margin) & (all_curve_points[:, 0] <= bbox.x1 + x_margin)
+    local_points = all_curve_points[local_band] if np.any(local_band) else all_curve_points
+    inside = (
+        (local_points[:, 0] >= expanded.x0)
+        & (local_points[:, 0] <= expanded.x1)
+        & (local_points[:, 1] >= expanded.y0)
+        & (local_points[:, 1] <= expanded.y1)
+    )
+    if np.any(inside):
+        return 1_000_000_000.0
+
+    dx = np.where(
+        local_points[:, 0] < expanded.x0,
+        expanded.x0 - local_points[:, 0],
+        np.where(local_points[:, 0] > expanded.x1, local_points[:, 0] - expanded.x1, 0.0),
+    )
+    dy = np.where(
+        local_points[:, 1] < expanded.y0,
+        expanded.y0 - local_points[:, 1],
+        np.where(local_points[:, 1] > expanded.y1, local_points[:, 1] - expanded.y1, 0.0),
+    )
+    distance = np.hypot(dx, dy)
+    near = distance < 11.0
+    if np.any(near):
+        score += float((11.0 - distance[near]).sum()) * 18.0
+    return score
+
+
+def _place_stacked_labels(
+    ax: plt.Axes,
+    series_list: Sequence[CurveSeries],
+    colors: Sequence[tuple[float, float, float] | str],
+    *,
+    reverse_x: bool,
+    side: str,
+    inset_fraction: float,
+    label_offset_pt: float,
+    labels: Sequence[str] | None = None,
+    search_band_fraction: float = 0.10,
+    fontsize: float = 6.0,
+) -> bool:
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    display_points = _display_points_for_series(ax, series_list)
+    axes_bbox = ax.get_window_extent(renderer=renderer)
+    label_gap = _point_to_display_pixels(fig, 3.5)
+    pixel_offset = _point_to_display_pixels(fig, max(label_offset_pt, 5.5))
+    all_points = [points for points in display_points if points.size]
+    if not all_points:
+        return True
+    all_curve_points = np.vstack(all_points)
+    label_texts = list(labels) if labels is not None else [series.sample for series in series_list]
+
+    def _measure_text_bbox(
+        label_text: str,
+        color: tuple[float, float, float] | str,
+        visual_side: str,
+    ) -> tuple[float, float]:
+        text = ax.text(
+            0.5,
+            0.5,
+            label_text,
+            ha="right" if visual_side == "left" else "left",
+            va="bottom",
+            color=color,
+            fontsize=fontsize,
+            alpha=0.0,
+            transform=ax.transAxes,
+        )
+        bbox = text.get_window_extent(renderer=renderer)
+        text.remove()
+        return float(bbox.width), float(bbox.height)
+
+    label_records: list[tuple[int, str, tuple[float, float, float] | str, float, float]] = []
+    for series_index, (label_text, color) in enumerate(zip(label_texts, colors)):
+        bbox_width, bbox_height = _measure_text_bbox(label_text, color, "left")
+        label_records.append((series_index, label_text, color, bbox_width, bbox_height))
+
+    best_result: tuple[float, list[tuple[float, float, str, tuple[float, float, float] | str]], str] | None = None
+    for visual_side, flatness_score, rail_x, per_series in _choose_baseline_label_rail(
+        display_points,
+        label_records,
+        axes_bbox=axes_bbox,
+        side=side,
+        inset_fraction=inset_fraction,
+        search_band_fraction=search_band_fraction,
+    ):
+        plan = _place_labels_on_baseline_rail(
+            ax,
+            label_records,
+            axes_bbox=axes_bbox,
+            all_curve_points=all_curve_points,
+            visual_side=visual_side,
+            rail_x=rail_x,
+            per_series=per_series,
+            label_gap=label_gap,
+            pixel_offset=pixel_offset,
+        )
+        if plan is None:
+            continue
+        total_score, planned_labels = plan
+        total_score += flatness_score
+        if best_result is None or total_score < best_result[0]:
+            best_result = (total_score, planned_labels, visual_side)
+
+    if best_result is None:
+        return False
+
+    _, planned_labels, visual_side = best_result
+    for x_pos, y_pos, label_text, color in planned_labels:
+        ax.text(
+            x_pos,
+            y_pos,
+            label_text,
+            ha="right" if visual_side == "left" else "left",
+            va="bottom",
+            color=color,
+            fontsize=fontsize,
+            clip_on=True,
+            transform=ax.transData,
+        )
+    return True
 
 
 def _override_complete(bounds: tuple[float | None, float | None] | None) -> bool:
@@ -996,187 +1364,36 @@ def _place_series_edge_labels(
     inset_fraction: float,
     label_offset_pt: float,
     labels: Sequence[str] | None = None,
-    search_band_fraction: float = 0.06,
+    search_band_fraction: float = 0.08,
     fontsize: float = 6.0,
 ) -> bool:
-    visual_side = _resolve_series_label_side(
+    return _place_stacked_labels(
+        ax,
         series_list,
-        reverse_x,
-        side,
+        colors,
+        reverse_x=reverse_x,
+        side=side,
         inset_fraction=inset_fraction,
+        label_offset_pt=label_offset_pt,
+        labels=labels,
+        search_band_fraction=search_band_fraction,
+        fontsize=fontsize,
     )
-    fig = ax.figure
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    display_points = _display_points_for_series(ax, series_list)
-    axes_bbox = ax.get_window_extent(renderer=renderer)
-    label_gap = _point_to_display_pixels(fig, 2.5)
-    pixel_offset = _point_to_display_pixels(fig, label_offset_pt)
-    all_points = [points for points in display_points if points.size]
-    if not all_points:
-        return True
-    all_curve_points = np.vstack(all_points)
-    placed_bboxes = []
-    label_texts = list(labels) if labels is not None else [series.sample for series in series_list]
-    candidate_offsets = inset_fraction + np.linspace(0.0, search_band_fraction, 15)
 
-    def _measure_text_bbox(label_text: str, color: tuple[float, float, float] | str):
-        text = ax.text(
-            0.5,
-            0.5,
-            label_text,
-            ha="left" if visual_side == "left" else "right",
-            va="bottom",
-            color=color,
-            fontsize=fontsize,
-            alpha=0.0,
-            transform=ax.transAxes,
-        )
-        fig.canvas.draw()
-        bbox = text.get_window_extent(renderer=renderer)
-        text.remove()
-        return bbox
 
-    def _candidate_x_positions(x: np.ndarray) -> list[tuple[float, float]]:
-        x_min = float(np.min(x))
-        x_max = float(np.max(x))
-        span = max(x_max - x_min, 1e-9)
-        positions: list[tuple[float, float]] = []
-        for offset in candidate_offsets:
-            if visual_side == "left":
-                value = x_max - span * offset if reverse_x else x_min + span * offset
-            else:
-                value = x_min + span * offset if reverse_x else x_max - span * offset
-            positions.append((value, offset))
-        return positions
-
-    def _series_local_display_top(
-        x: np.ndarray,
-        y: np.ndarray,
-        candidate_x: float,
-        bbox_width_px: float,
-    ) -> float:
-        candidate_display_x = float(ax.transData.transform((candidate_x, 0.0))[0])
-        left_data_x = float(ax.transData.inverted().transform((candidate_display_x - bbox_width_px / 2, axes_bbox.y0))[0])
-        right_data_x = float(ax.transData.inverted().transform((candidate_display_x + bbox_width_px / 2, axes_bbox.y0))[0])
-        x_low, x_high = sorted((left_data_x, right_data_x))
-        mask = (x >= x_low) & (x <= x_high)
-        if mask.sum() == 0:
-            idx = int(np.argmin(np.abs(x - candidate_x)))
-            top_y = float(y[idx])
-        else:
-            top_y = float(np.max(y[mask]))
-        return float(ax.transData.transform((candidate_x, top_y))[1])
-
-    def _score_label_bbox(bbox, desired_bottom: float, candidate_offset: float) -> float:
-        score = 0.0
-        if bbox.x0 < axes_bbox.x0 or bbox.x1 > axes_bbox.x1 or bbox.y0 < axes_bbox.y0 or bbox.y1 > axes_bbox.y1:
-            overflow = (
-                max(axes_bbox.x0 - bbox.x0, 0.0)
-                + max(bbox.x1 - axes_bbox.x1, 0.0)
-                + max(axes_bbox.y0 - bbox.y0, 0.0)
-                + max(bbox.y1 - axes_bbox.y1, 0.0)
-            )
-            score += 1_000_000 + overflow * 100
-
-        expanded = bbox.expanded(1.03, 1.10)
-        dx = np.where(
-            all_curve_points[:, 0] < expanded.x0,
-            expanded.x0 - all_curve_points[:, 0],
-            np.where(all_curve_points[:, 0] > expanded.x1, all_curve_points[:, 0] - expanded.x1, 0.0),
-        )
-        dy = np.where(
-            all_curve_points[:, 1] < expanded.y0,
-            expanded.y0 - all_curve_points[:, 1],
-            np.where(all_curve_points[:, 1] > expanded.y1, all_curve_points[:, 1] - expanded.y1, 0.0),
-        )
-        distance = np.hypot(dx, dy)
-        inside = distance == 0
-        if np.any(inside):
-            score += 1_000_000 + float(inside.sum()) * 250.0
-        near = distance < 7.0
-        if np.any(near):
-            score += float((7.0 - distance[near]).sum()) * 8.0
-
-        for placed_bbox in placed_bboxes:
-            if expanded.overlaps(placed_bbox):
-                overlap_x = min(expanded.x1, placed_bbox.x1) - max(expanded.x0, placed_bbox.x0)
-                overlap_y = min(expanded.y1, placed_bbox.y1) - max(expanded.y0, placed_bbox.y0)
-                score += 1_000_000 + max(overlap_x, 0.0) * max(overlap_y, 0.0)
-
-        score += abs(bbox.y0 - desired_bottom) * 0.25
-        score += max(candidate_offset - inset_fraction, 0.0) * 100.0
-        return score
-
-    label_records: list[tuple[float, str, CurveSeries, tuple[float, float, float] | str, np.ndarray, np.ndarray, object]] = []
-    for series, color, label_text in zip(series_list, colors, label_texts):
-        x = series.data["x"].to_numpy(dtype=float)
-        y = series.data["y"].to_numpy(dtype=float)
-        valid = np.isfinite(x) & np.isfinite(y)
-        x = x[valid]
-        y = y[valid]
-        if len(x) == 0:
-            continue
-
-        order = np.argsort(x)
-        x = x[order]
-        y = y[order]
-        candidate_x = _candidate_x_positions(x)[0][0]
-        text_bbox = _measure_text_bbox(label_text, color)
-        display_y = _series_local_display_top(x, y, candidate_x, text_bbox.width)
-        label_records.append((display_y, label_text, series, color, x, y, text_bbox))
-
-    label_records.sort(key=lambda item: item[0], reverse=True)
-
-    for _, label_text, series, color, x, y, text_bbox in label_records:
-        best_choice: tuple[float, float, float, object] | None = None
-        bbox_width = text_bbox.width
-        bbox_height = text_bbox.height
-        for candidate_x, candidate_offset in _candidate_x_positions(x):
-            local_top = _series_local_display_top(x, y, candidate_x, bbox_width)
-            base_bottom = max(local_top + pixel_offset, axes_bbox.y0 + label_gap)
-            for step in range(28):
-                candidate_bottom = base_bottom + step * (bbox_height * 0.55 + label_gap)
-                max_bottom = axes_bbox.y1 - label_gap - bbox_height
-                candidate_bottom = min(candidate_bottom, max_bottom)
-                if candidate_bottom < axes_bbox.y0 + label_gap:
-                    continue
-                data_y = float(ax.transData.inverted().transform((ax.transData.transform((candidate_x, 0))[0], candidate_bottom))[1])
-                text = ax.text(
-                    candidate_x,
-                    data_y,
-                    label_text,
-                    ha="left" if visual_side == "left" else "right",
-                    va="bottom",
-                    color=color,
-                    fontsize=fontsize,
-                    clip_on=True,
-                    transform=ax.transData,
-                )
-                fig.canvas.draw()
-                bbox = text.get_window_extent(renderer=renderer)
-                score = _score_label_bbox(bbox, base_bottom, candidate_offset)
-                text.remove()
-                if best_choice is None or score < best_choice[0]:
-                    best_choice = (score, candidate_x, data_y, bbox)
-
-        if best_choice is None or best_choice[0] >= 1_000_000:
-            return False
-        _, best_x, best_y, final_bbox = best_choice
-        final_text = ax.text(
-            best_x,
-            best_y,
-            label_text,
-            ha="left" if visual_side == "left" else "right",
-            va="bottom",
-            color=color,
-            fontsize=fontsize,
-            clip_on=True,
-            transform=ax.transData,
-        )
-        fig.canvas.draw()
-        placed_bboxes.append(final_text.get_window_extent(renderer=renderer).expanded(1.02, 1.06))
-    return len(placed_bboxes) == len(label_records)
+def _compute_heatmap_cax_geometry(position: transforms.Bbox) -> tuple[list[float], list[float]]:
+    reserved_width = max(position.width * 0.24, 0.090)
+    heatmap_width = max(position.width - reserved_width, position.width * 0.72)
+    cbar_pad = min(max(position.width * 0.032, 0.012), reserved_width * 0.24)
+    cbar_width = min(max(position.width * 0.050, 0.020), reserved_width - cbar_pad - 0.006)
+    heatmap_rect = [position.x0, position.y0, heatmap_width, position.height]
+    cax_rect = [
+        position.x0 + heatmap_width + cbar_pad,
+        position.y0 + position.height * 0.10,
+        cbar_width,
+        position.height * 0.80,
+    ]
+    return heatmap_rect, cax_rect
 
 
 def _legend_candidates(
@@ -1483,7 +1700,7 @@ def plot_curves(
                 side=series_label_side,
                 inset_fraction=label_track_inset_fraction,
                 label_offset_pt=label_offset_pt,
-                search_band_fraction=0.18 if stacked_mode_enabled else 0.08,
+                search_band_fraction=0.24 if stacked_mode_enabled else 0.08,
                 fontsize=6.2 if stacked_mode_enabled else 6.0,
             )
         else:
@@ -2062,7 +2279,7 @@ def plot_wide_nmr(
             inset_fraction=config.label_inset_fraction,
             label_offset_pt=config.label_offset_pt,
             labels=display_names,
-            search_band_fraction=0.18,
+            search_band_fraction=0.14,
             fontsize=6.4,
         ):
             break
@@ -2416,25 +2633,15 @@ def plot_heatmap(
     cax = None
     if show_colorbar:
         position = ax.get_position()
-        cbar_pad = min(0.012, position.width * 0.045)
-        cbar_width = min(0.028, position.width * 0.085)
-        heatmap_width = max(position.width - cbar_width - cbar_pad, position.width * 0.80)
-        ax.set_position([position.x0, position.y0, heatmap_width, position.height])
-        cax = fig.add_axes(
-            [
-                position.x0 + heatmap_width + cbar_pad,
-                position.y0,
-                cbar_width,
-                position.height,
-            ]
-        )
+        heatmap_rect, cax_rect = _compute_heatmap_cax_geometry(position)
+        ax.set_position(heatmap_rect)
+        cax = fig.add_axes(cax_rect)
 
     heatmap = sns.heatmap(
         matrix,
         ax=ax,
         cmap=plot_style.get_sequential_cmap(),
-        cbar=show_colorbar,
-        cbar_ax=cax,
+        cbar=False,
         linewidths=0.0,
     )
     ax.set_xlabel(_format_axis_label(table.x_label, table.x_unit))
@@ -2447,19 +2654,17 @@ def plot_heatmap(
     for tick in ax.get_yticklabels():
         tick.set_fontsize(6)
 
-    if show_colorbar and heatmap.collections:
-        colorbar = heatmap.collections[0].colorbar
-        if colorbar is not None:
-            colorbar.set_label(
-                _format_axis_label(table.z_label, table.z_unit),
-                fontsize=6.0,
-                labelpad=1.0,
-            )
-            colorbar.ax.tick_params(labelsize=6)
-            colorbar.ax.yaxis.label.set_clip_on(False)
-            colorbar.ax.yaxis.label.set_rotation(90)
-            colorbar.ax.yaxis.set_label_position("right")
-            colorbar.ax.yaxis.set_label_coords(1.15, 0.5)
+    if show_colorbar and heatmap.collections and cax is not None:
+        colorbar = fig.colorbar(heatmap.collections[0], cax=cax)
+        colorbar.ax.tick_params(labelsize=5.5, pad=1.0, length=3.0)
+        colorbar.outline.set_linewidth(0.8)
+        colorbar.set_label(
+            textwrap.fill(_format_axis_label(table.z_label, table.z_unit), width=12, break_long_words=False),
+            fontsize=5.4,
+            rotation=270,
+            labelpad=7.0,
+            va="bottom",
+        )
     return fig, ax
 
 

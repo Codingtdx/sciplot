@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QEvent, QObject, QRunnable, QThreadPool, QTimer, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QDragEnterEvent, QDropEvent, QFont, QFontDatabase, QPixmap
+from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QFont, QFontDatabase, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -19,12 +19,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMenu,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QStackedWidget,
-    QToolBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -34,7 +35,6 @@ import interactive_plot as terminal_wizard
 from make_plot import (
     PALETTE_PRESET_CHOICES,
     RenderedPlot,
-    STYLE_PRESET_CHOICES,
     _ensure_input_path,
     _resolve_render_options,
     build_rendered_plots,
@@ -49,14 +49,14 @@ from make_plot import (
 from src import plot_style
 
 
-APP_TITLE = "绘图精灵 3.1"
-APP_SUBTITLE = "把文件交给程序，一步一步确认，边看预览边出图。"
+APP_TITLE = "绘图精灵"
 RECENT_FILES_KEY = "recent_files"
 MAX_RECENT_FILES = 8
 PREVIEW_DEBOUNCE_MS = 260
 PREVIEW_BASE_DPI = 160
 MENU_ITEMS = terminal_wizard.MENU_ITEMS
 TEMPLATE_LABELS = terminal_wizard.TEMPLATE_LABELS
+GUI_PALETTE_PRESET_CHOICES = ("colorblind_safe", "deep", "muted", "mono")
 
 
 def _pick_app_font() -> QFont:
@@ -64,15 +64,19 @@ def _pick_app_font() -> QFont:
         "PingFang SC",
         "SF Pro Text",
         "Helvetica Neue",
+        "Helvetica",
         "Arial",
         "Noto Sans CJK SC",
+        "DejaVu Sans",
     ]
-    database = QFontDatabase()
-    available = set(database.families())
+    try:
+        available = set(QFontDatabase.families())
+    except TypeError:
+        available = set(QFontDatabase().families())
     for family in preferred_families:
         if family in available:
             return QFont(family, 12)
-    return QFont()
+    return QFont("Arial", 12)
 
 
 def _html_bullets(items: tuple[str, ...] | list[str]) -> str:
@@ -186,7 +190,8 @@ class PlotWizardWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(APP_TITLE)
-        self.resize(1540, 980)
+        self.resize(1720, 980)
+        self.setMinimumSize(1080, 620)
         self.threadpool = QThreadPool.globalInstance()
         self.preview_timer = QTimer(self)
         self.preview_timer.setSingleShot(True)
@@ -222,133 +227,114 @@ class PlotWizardWindow(QMainWindow):
         super().closeEvent(event)
 
     def _build_ui(self) -> None:
-        self._build_toolbar()
-
         root = QWidget()
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(20, 18, 20, 18)
+        root_layout.setContentsMargins(14, 14, 14, 14)
         root_layout.setSpacing(0)
         self.setCentralWidget(root)
 
-        shell_wrap = QHBoxLayout()
-        shell_wrap.setContentsMargins(0, 0, 0, 0)
-        shell_wrap.addStretch(1)
-
-        self.shell = QWidget()
+        self.shell = QFrame()
         self.shell.setObjectName("Shell")
-        self.shell.setMaximumWidth(1140)
-        shell_layout = QVBoxLayout(self.shell)
+        shell_layout = QHBoxLayout(self.shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
-        shell_layout.setSpacing(14)
+        shell_layout.setSpacing(0)
 
-        self.sidebar = self._build_sidebar()
+        self.wizard_header = self._build_wizard_header()
+        self.progress_strip = self._build_progress_strip()
         self.center_panel = self._build_center_panel()
         self.preview_panel = self._build_preview_panel()
-        self.progress_strip = self._build_progress_strip()
+        self.wizard_panel = QFrame()
+        self.wizard_panel.setObjectName("WizardPanel")
+        self.wizard_panel.setMinimumWidth(520)
+        wizard_layout = QVBoxLayout(self.wizard_panel)
+        wizard_layout.setContentsMargins(18, 18, 18, 18)
+        wizard_layout.setSpacing(10)
+        wizard_layout.addWidget(self.wizard_header)
+        wizard_layout.addWidget(self.progress_strip)
+        wizard_layout.addWidget(self.center_panel, 1)
+        self.preview_panel.setMinimumWidth(560)
 
-        shell_layout.addWidget(self.sidebar)
-        shell_layout.addWidget(self.center_panel)
-        shell_layout.addWidget(self.preview_panel, 1)
-        shell_layout.addWidget(self.progress_strip)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(10)
+        self.splitter.addWidget(self.wizard_panel)
+        self.splitter.addWidget(self.preview_panel)
+        self.splitter.setStretchFactor(0, 3)
+        self.splitter.setStretchFactor(1, 4)
+        self.splitter.setSizes([620, 1100])
 
-        shell_wrap.addWidget(self.shell, 1)
-        shell_wrap.addStretch(1)
-        root_layout.addLayout(shell_wrap, 1)
+        shell_layout.addWidget(self.splitter)
+        root_layout.addWidget(self.shell, 1)
 
-    def _build_toolbar(self) -> None:
-        toolbar = QToolBar()
-        toolbar.setMovable(False)
-        toolbar.setObjectName("MainToolbar")
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-
-        open_action = QAction("打开文件", self)
-        open_action.triggered.connect(self._choose_file)
-        toolbar.addAction(open_action)
-
-        export_action = QAction("导出 PDF", self)
-        export_action.triggered.connect(self._export_current)
-        toolbar.addAction(export_action)
-
-        refresh_action = QAction("刷新预览", self)
-        refresh_action.triggered.connect(self.schedule_preview)
-        toolbar.addAction(refresh_action)
-
-    def _build_sidebar(self) -> QWidget:
+    def _build_wizard_header(self) -> QWidget:
         frame = QFrame()
-        frame.setObjectName("HeaderStrip")
+        frame.setObjectName("WizardTopBar")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(14)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(10)
 
-        app_badge = QLabel("绘图\n精灵")
-        app_badge.setObjectName("AppBadge")
-        app_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        app_title = QLabel(APP_TITLE)
+        app_title = QLabel("绘图精灵")
         app_title.setObjectName("HeaderTitle")
-        app_subtitle = QLabel(APP_SUBTITLE)
-        app_subtitle.setObjectName("MutedText")
-        app_subtitle.setWordWrap(True)
-        title_box = QWidget()
-        title_layout = QVBoxLayout(title_box)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(2)
-        title_layout.addWidget(app_title)
-        title_layout.addWidget(app_subtitle)
 
         self.current_file_label = QLabel("未选择文件")
-        self.current_file_label.setWordWrap(True)
-        self.current_file_label.setObjectName("RailValue")
+        self.current_file_label.setWordWrap(False)
+        self.current_file_label.setObjectName("MetaPill")
         self.current_file_label.setToolTip("")
         self.current_sheet_label = QLabel("Sheet · -")
-        self.current_sheet_label.setObjectName("RailValue")
-
-        rail_meta = QWidget()
-        rail_meta_layout = QVBoxLayout(rail_meta)
-        rail_meta_layout.setContentsMargins(0, 0, 0, 0)
-        rail_meta_layout.setSpacing(2)
-        rail_meta_layout.addWidget(self.current_file_label)
-        rail_meta_layout.addWidget(self.current_sheet_label)
+        self.current_sheet_label.setObjectName("MetaPill")
 
         self.recent_button = QToolButton()
         self.recent_button.setObjectName("RecentButton")
-        self.recent_button.setText("最近文件")
+        self.recent_button.setText("最近")
         self.recent_button.clicked.connect(self._show_recent_menu)
 
-        layout.addWidget(app_badge, 0, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(title_box, 0)
-        layout.addWidget(rail_meta, 1)
-        layout.addWidget(self.recent_button, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(app_title, 0)
+        layout.addWidget(self.current_file_label, 1)
+        layout.addWidget(self.current_sheet_label, 0)
+        layout.addWidget(self.recent_button, 0)
         return frame
 
     def _build_progress_strip(self) -> QWidget:
         frame = QFrame()
         frame.setObjectName("ProgressStrip")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(18)
+        layout.setContentsMargins(20, 10, 20, 10)
+        layout.setSpacing(6)
         self.step_items = []
         for title in ("文件", "Sheet", "识别", "图型", "参数", "检查", "导出"):
-            layout.addWidget(self._build_step_item(title), 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addStretch(1)
+            step = self._build_step_item(title)
+            step.setSizePolicy(step.sizePolicy().horizontalPolicy(), step.sizePolicy().verticalPolicy())
+            layout.addWidget(step, 1, Qt.AlignmentFlag.AlignCenter)
         return frame
 
     def _build_center_panel(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
 
-        self.center_title = QLabel("先选择一个文件")
+        self.center_title = QLabel("选择文件")
         self.center_title.setObjectName("CenterHero")
-        self.center_subtitle = QLabel("一次只做一个决定。程序先推荐，你只在必要时确认。")
+        self.center_subtitle = QLabel("当前只做这一步。")
         self.center_subtitle.setObjectName("MutedText")
         self.center_subtitle.setWordWrap(True)
         layout.addWidget(self.center_title)
         layout.addWidget(self.center_subtitle)
 
+        self.center_scroll = QScrollArea()
+        self.center_scroll.setObjectName("CenterScroll")
+        self.center_scroll.setWidgetResizable(True)
+        self.center_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.center_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.center_scroll_content = QWidget()
+        self.center_scroll_layout = QVBoxLayout(self.center_scroll_content)
+        self.center_scroll_layout.setContentsMargins(2, 2, 2, 2)
+        self.center_scroll_layout.setSpacing(6)
         self.center_stack = QStackedWidget()
-        layout.addWidget(self.center_stack, 1)
+        self.center_scroll_layout.addWidget(self.center_stack)
+        self.center_scroll_layout.addStretch(1)
+        self.center_scroll.setWidget(self.center_scroll_content)
+        layout.addWidget(self.center_scroll, 1)
 
         file_page = QWidget()
         file_layout = QVBoxLayout(file_page)
@@ -365,11 +351,11 @@ class PlotWizardWindow(QMainWindow):
         sheet_layout.setContentsMargins(0, 0, 0, 0)
         sheet_layout.setSpacing(14)
         self.sheet_card, sheet_body = self._make_card("选择工作表")
-        self.sheet_hint = QLabel("如果文件里有多个 sheet，这一步只需要决定读哪一个。")
+        self.sheet_hint = QLabel("如果有多个 sheet，这一步只决定读哪一个。")
         self.sheet_hint.setWordWrap(True)
         self.sheet_combo = QComboBox()
         self.sheet_combo.currentIndexChanged.connect(self._on_sheet_changed)
-        self.sheet_summary = QLabel("当前将按这个 sheet 做识别和推荐。")
+        self.sheet_summary = QLabel("当前将按这个 sheet 继续。")
         self.sheet_summary.setObjectName("MutedText")
         self.sheet_summary.setWordWrap(True)
         sheet_body.addWidget(self.sheet_hint)
@@ -446,7 +432,7 @@ class PlotWizardWindow(QMainWindow):
         template_layout.setContentsMargins(0, 0, 0, 0)
         template_layout.setSpacing(14)
         self.template_card, template_body = self._make_card("确认图类型")
-        self.template_summary_label = QLabel("这一页只决定你想画哪种图。")
+        self.template_summary_label = QLabel("这里只决定图类型。")
         self.template_summary_label.setObjectName("MutedText")
         self.template_summary_label.setWordWrap(True)
         template_body.addWidget(self.template_combo)
@@ -472,11 +458,8 @@ class PlotWizardWindow(QMainWindow):
         self.size_combo = QComboBox()
         self.size_combo.addItems(list(terminal_wizard.SIZE_CHOICES))
         self.size_combo.currentTextChanged.connect(self._on_option_changed)
-        self.style_combo = QComboBox()
-        self.style_combo.addItems(list(STYLE_PRESET_CHOICES))
-        self.style_combo.currentTextChanged.connect(self._on_option_changed)
         self.palette_combo = QComboBox()
-        self.palette_combo.addItems(list(PALETTE_PRESET_CHOICES))
+        self.palette_combo.addItems([name for name in PALETTE_PRESET_CHOICES if name in GUI_PALETTE_PRESET_CHOICES])
         self.palette_combo.currentTextChanged.connect(self._on_option_changed)
         self.xscale_combo = QComboBox()
         self.xscale_combo.addItems(["linear", "log"])
@@ -493,7 +476,7 @@ class PlotWizardWindow(QMainWindow):
         self.show_colorbar_checkbox.stateChanged.connect(self._on_option_changed)
         self.use_sidecar_checkbox = QCheckBox("使用 sidecar（断轴/高亮/编号）")
         self.use_sidecar_checkbox.stateChanged.connect(self._on_option_changed)
-        self.style_note_label = QLabel("default：当前默认科研风格。")
+        self.style_note_label = QLabel("风格：当前默认科研风格。")
         self.style_note_label.setObjectName("MutedText")
         self.style_note_label.setWordWrap(True)
         self.palette_note_label = QLabel("默认安全配色。")
@@ -502,21 +485,33 @@ class PlotWizardWindow(QMainWindow):
         self.palette_swatches_label = QLabel("")
         self.palette_swatches_label.setObjectName("MutedText")
         self.palette_swatches_label.setTextFormat(Qt.TextFormat.RichText)
-
         self.option_rows: dict[str, QWidget] = {}
-        controls_body.addWidget(self._option_row("图类型", self.template_combo, "template"))
+        self.appearance_toggle = QToolButton()
+        self.appearance_toggle.setObjectName("InlineToggle")
+        self.appearance_toggle.setText("高级选项")
+        self.appearance_toggle.setCheckable(True)
+        self.appearance_toggle.setChecked(False)
+        self.appearance_toggle.toggled.connect(self._toggle_appearance_panel)
+        self.appearance_panel = QFrame()
+        self.appearance_panel.setObjectName("SubtlePanel")
+        self.appearance_panel.hide()
+        appearance_layout = QVBoxLayout(self.appearance_panel)
+        appearance_layout.setContentsMargins(12, 12, 12, 12)
+        appearance_layout.setSpacing(10)
+        appearance_layout.addWidget(self._option_row("配色", self.palette_combo, "palette_preset"))
+        appearance_layout.addWidget(self.style_note_label)
+        appearance_layout.addWidget(self.palette_note_label)
+        appearance_layout.addWidget(self.palette_swatches_label)
+
         controls_body.addWidget(self._option_row("尺寸", self.size_combo, "size"))
-        controls_body.addWidget(self._option_row("期刊风格", self.style_combo, "style_preset"))
-        controls_body.addWidget(self._option_row("配色", self.palette_combo, "palette_preset"))
         controls_body.addWidget(self._option_row("x 轴", self.xscale_combo, "xscale"))
         controls_body.addWidget(self._option_row("y 轴", self.yscale_combo, "yscale"))
         controls_body.addWidget(self._option_row("", self.reverse_x_checkbox, "reverse_x"))
         controls_body.addWidget(self._option_row("基线修正", self.baseline_combo, "baseline"))
         controls_body.addWidget(self._option_row("", self.show_colorbar_checkbox, "show_colorbar"))
         controls_body.addWidget(self._option_row("", self.use_sidecar_checkbox, "use_sidecar"))
-        controls_body.addWidget(self.style_note_label)
-        controls_body.addWidget(self.palette_note_label)
-        controls_body.addWidget(self.palette_swatches_label)
+        controls_body.addWidget(self.appearance_toggle, 0, Qt.AlignmentFlag.AlignLeft)
+        controls_body.addWidget(self.appearance_panel)
         options_layout.addWidget(self.controls_card)
         options_actions = QHBoxLayout()
         self.options_back_button = QPushButton("返回图类型")
@@ -609,13 +604,13 @@ class PlotWizardWindow(QMainWindow):
     def _build_preview_panel(self) -> QWidget:
         frame = QFrame()
         frame.setObjectName("PreviewPanel")
-        frame.setMinimumHeight(360)
+        frame.setMinimumWidth(460)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
         header_row = QHBoxLayout()
-        title = QLabel("预览")
+        title = QLabel("实时预览")
         title.setObjectName("PreviewTitle")
         self.preview_status_label = QLabel("等待预览")
         self.preview_status_label.setObjectName("MutedText")
@@ -663,7 +658,7 @@ class PlotWizardWindow(QMainWindow):
         self.preview_surface = QFrame()
         self.preview_surface.setObjectName("PreviewSurface")
         self.preview_surface_layout = QVBoxLayout(self.preview_surface)
-        self.preview_surface_layout.setContentsMargins(12, 12, 12, 12)
+        self.preview_surface_layout.setContentsMargins(10, 10, 10, 10)
         self.preview_placeholder = QLabel()
         self.preview_placeholder.setWordWrap(True)
         self.preview_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -706,13 +701,14 @@ class PlotWizardWindow(QMainWindow):
         row.setObjectName("ProgressStep")
         layout = QVBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(2)
         dot = QLabel("●")
         dot.setObjectName("ProgressDot")
         dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
         text = QLabel(title)
         text.setObjectName("ProgressText")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text.setWordWrap(False)
         layout.addWidget(dot)
         layout.addWidget(text)
         self.step_items.append((dot, text))
@@ -741,22 +737,14 @@ class PlotWizardWindow(QMainWindow):
             QMainWindow {
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #d8e9f8,
-                    stop: 0.45 #edf3f8,
-                    stop: 1 #dce7f2
+                    stop: 0 #dbe8f4,
+                    stop: 0.48 #eef4f8,
+                    stop: 1 #e3ebf3
                 );
             }
-            QToolBar#MainToolbar {
-                spacing: 8px;
-                background: rgba(255, 255, 255, 0.8);
-                border: 1px solid rgba(206, 220, 236, 0.9);
-                border-radius: 18px;
-                padding: 10px;
-                margin: 12px 18px 6px 18px;
-            }
             QToolButton, QPushButton {
-                background: rgba(255, 255, 255, 0.92);
-                border: 1px solid #d5e0ea;
+                background: rgba(255, 255, 255, 0.96);
+                border: 1px solid #d8e1ea;
                 border-radius: 12px;
                 padding: 8px 12px;
                 font-size: 13px;
@@ -764,66 +752,68 @@ class PlotWizardWindow(QMainWindow):
             QPushButton:hover, QToolButton:hover {
                 border-color: #8fc4f4;
             }
-            QWidget#Shell {
+            QFrame#Shell {
                 background: transparent;
             }
-            QFrame#HeaderStrip {
-                background: rgba(236, 244, 250, 0.84);
-                border: 1px solid rgba(190, 209, 226, 0.95);
-                border-radius: 22px;
-            }
-            QLabel#AppBadge {
-                min-width: 72px;
-                max-width: 72px;
-                min-height: 72px;
-                max-height: 72px;
+            QFrame#WizardPanel, QFrame#PreviewPanel {
+                background: rgba(247, 250, 253, 0.92);
+                border: 1px solid rgba(209, 220, 230, 0.92);
                 border-radius: 24px;
-                background: rgba(255, 255, 255, 0.88);
-                border: 1px solid #d6e2ed;
-                font-size: 16px;
-                font-weight: 700;
-                color: #0f2537;
-                line-height: 1.2;
+            }
+            QFrame#WizardTopBar {
+                background: rgba(255, 255, 255, 0.72);
+                border: 1px solid rgba(218, 228, 237, 0.88);
+                border-radius: 16px;
             }
             QLabel#HeaderTitle {
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: 700;
                 color: #10283c;
             }
-            QLabel#RailValue {
-                color: #587086;
+            QLabel#MetaPill {
+                background: rgba(255, 255, 255, 0.84);
+                border: 1px solid rgba(212, 224, 236, 0.94);
+                border-radius: 11px;
+                color: #4d657a;
                 font-size: 12px;
+                padding: 6px 10px;
             }
             QLabel#ProgressDot {
                 color: #b4c1cd;
-                font-size: 10px;
+                font-size: 9px;
             }
             QLabel#ProgressText {
                 color: #7a8b99;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 600;
             }
             QFrame#ProgressStrip {
-                background: rgba(255, 255, 255, 0.7);
-                border: 1px solid rgba(208, 221, 234, 0.92);
-                border-radius: 18px;
+                background: rgba(255, 255, 255, 0.58);
+                border: 1px solid rgba(216, 226, 235, 0.86);
+                border-radius: 14px;
             }
             QToolButton#RecentButton {
-                background: rgba(255, 255, 255, 0.68);
-                padding: 8px 10px;
+                background: rgba(255, 255, 255, 0.76);
+                padding: 7px 10px;
+            }
+            QToolButton#InlineToggle {
+                background: rgba(246, 250, 253, 0.92);
+                border: 1px solid #d6e3ee;
+                border-radius: 10px;
+                padding: 7px 10px;
             }
             QLabel#CenterHero {
-                font-size: 24px;
+                font-size: 18px;
                 font-weight: 700;
                 color: #10283c;
             }
             QLabel#PreviewTitle {
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: 700;
                 color: #14283a;
             }
             QLabel#CardTitle {
-                font-size: 17px;
+                font-size: 15px;
                 font-weight: 650;
                 color: #16293b;
             }
@@ -831,24 +821,23 @@ class PlotWizardWindow(QMainWindow):
                 color: #587086;
             }
             QFrame#Card, QFrame#DropCard {
-                background: rgba(255, 255, 255, 0.88);
-                border: 1px solid #d8e4ef;
-                border-radius: 22px;
+                background: rgba(255, 255, 255, 0.90);
+                border: 1px solid #dce5ee;
+                border-radius: 20px;
             }
             QFrame#SubtlePanel {
                 background: rgba(245, 249, 252, 0.92);
                 border: 1px solid #dbe6f0;
                 border-radius: 16px;
             }
-            QFrame#PreviewPanel {
-                background: rgba(238, 245, 251, 0.95);
-                border: 1px solid #d6e1eb;
-                border-radius: 28px;
-            }
             QFrame#PreviewSurface {
                 background: white;
                 border: 1px solid #dce6ef;
-                border-radius: 20px;
+                border-radius: 18px;
+            }
+            QSplitter::handle {
+                background: transparent;
+                width: 10px;
             }
             QListWidget#ResultFiles, QComboBox, QScrollArea#CenterScroll {
                 background: rgba(255, 255, 255, 0.72);
@@ -877,17 +866,19 @@ class PlotWizardWindow(QMainWindow):
             }
             QLabel#PreviewPlaceholder {
                 color: #5e7486;
-                font-size: 14px;
-                padding: 16px;
+                font-size: 13px;
+                padding: 12px;
             }
             """
         )
 
     def _apply_shadows(self) -> None:
         for widget, blur, offset_y in (
-            (self.sidebar, 30, 12),
-            (self.preview_surface, 28, 10),
-            (self.progress_strip, 18, 6),
+            (self.wizard_panel, 24, 10),
+            (self.preview_panel, 24, 10),
+            (self.wizard_header, 12, 4),
+            (self.preview_surface, 22, 8),
+            (self.progress_strip, 10, 3),
             (self.drop_card, 18, 8),
             (self.sheet_card, 18, 8),
             (self.recognition_card, 18, 8),
@@ -902,6 +893,10 @@ class PlotWizardWindow(QMainWindow):
             shadow.setColor(QColor(32, 60, 82, 28))
             widget.setGraphicsEffect(shadow)
 
+    def _toggle_appearance_panel(self, checked: bool) -> None:
+        self.appearance_panel.setVisible(checked)
+        self.appearance_toggle.setText("收起高级选项" if checked else "高级选项")
+
     def _current_template(self) -> str:
         return str(self.template_combo.currentData())
 
@@ -911,8 +906,8 @@ class PlotWizardWindow(QMainWindow):
     def _current_option_values(self) -> dict[str, Any]:
         return {
             "size": self.size_combo.currentText(),
-            "style_preset": self.style_combo.currentText(),
-            "palette_preset": self.palette_combo.currentText(),
+            "style_preset": plot_style.DEFAULT_STYLE_PRESET,
+            "palette_preset": self.palette_combo.currentText() or plot_style.DEFAULT_PALETTE_PRESET,
             "xscale": self.xscale_combo.currentText(),
             "yscale": self.yscale_combo.currentText(),
             "reverse_x": self.reverse_x_checkbox.isChecked(),
@@ -964,13 +959,13 @@ class PlotWizardWindow(QMainWindow):
         index = self.page_indices[page]
         self.center_stack.setCurrentIndex(index)
         titles = {
-            "file": ("先选文件", "先把数据交给程序。"),
-            "sheet": ("确认工作表", "如果文件里有多个 sheet，这一步只做这个决定。"),
-            "recognition": ("先看推荐", "程序已经判断完输入结构，先看结论。"),
-            "template": ("确认图类型", "如果推荐没问题，基本只要一路继续。"),
-            "options": ("只改必要参数", "这里只保留当前图真正有用的选项。"),
-            "preflight": ("最后检查", "现在只确认能不能稳稳画出来。"),
-            "result": ("图已经画好了", "可以继续重画、换文件，或者直接结束。"),
+            "file": ("选择文件", "先把数据交给程序。"),
+            "sheet": ("选择工作表", "只做这一个决定。"),
+            "recognition": ("程序推荐", "先看程序怎么判断。"),
+            "template": ("确认图类型", "如果推荐没问题，基本只要继续。"),
+            "options": ("调整参数", "这里只保留必要选项。"),
+            "preflight": ("出图前检查", "确认现在能稳稳画出来。"),
+            "result": ("导出完成", "可以重画、换文件，或者结束。"),
         }
         title, subtitle = titles[page]
         self.center_title.setText(title)
@@ -1118,8 +1113,10 @@ class PlotWizardWindow(QMainWindow):
             self.template_combo.blockSignals(False)
 
             self.size_combo.setCurrentText(str(defaults.get("size", "60x55")))
-            self.style_combo.setCurrentText(str(defaults.get("style_preset", plot_style.DEFAULT_STYLE_PRESET)))
-            self.palette_combo.setCurrentText(str(defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)))
+            requested_palette = str(defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET))
+            if requested_palette not in GUI_PALETTE_PRESET_CHOICES:
+                requested_palette = plot_style.DEFAULT_PALETTE_PRESET
+            self.palette_combo.setCurrentText(requested_palette)
             self.xscale_combo.setCurrentText(str(defaults.get("xscale", "linear")))
             self.yscale_combo.setCurrentText(str(defaults.get("yscale", "linear")))
             self.reverse_x_checkbox.setChecked(bool(defaults.get("reverse_x", False)))
@@ -1169,12 +1166,10 @@ class PlotWizardWindow(QMainWindow):
         self._update_preflight_and_preview()
 
     def _update_style_palette_summary(self) -> None:
-        style_name = self.style_combo.currentText() or plot_style.DEFAULT_STYLE_PRESET
         palette_name = self.palette_combo.currentText() or plot_style.DEFAULT_PALETTE_PRESET
-        style_note = plot_style.get_style_note(style_name)
         palette_note = plot_style.get_palette_description(palette_name)
-        self.style_note_label.setText(f"风格：{style_note}")
-        self.style_note_label.setToolTip(plot_style.get_style_description(style_name))
+        self.style_note_label.setText("风格：当前默认科研风格。")
+        self.style_note_label.setToolTip(plot_style.get_style_description(plot_style.DEFAULT_STYLE_PRESET))
         self.palette_note_label.setText(f"配色：{palette_note}")
         self.palette_note_label.setToolTip(plot_style.get_palette_description(palette_name))
         swatches = plot_style.get_palette_swatches(palette_name, limit=6)

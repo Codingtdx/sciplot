@@ -8,3 +8,8 @@ statsmodels
 jupyterlab
 openpyxl
 PySide6
+fastapi
+uvicorn
+pypdf
+reportlab
+PyMuPDF

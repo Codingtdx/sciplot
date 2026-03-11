@@ -4,3 +4,7 @@ figures/
 .DS_Store
 plots/
 .plot_wizard_state.json
+app/desktop/node_modules/
+app/desktop/dist/
+app/desktop/src-tauri/target/
+.tmp/

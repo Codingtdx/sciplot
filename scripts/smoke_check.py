@@ -410,6 +410,20 @@ def _write_wide_nmr_bundle(path: Path) -> None:
 
 
 def _assert_stacked_layout(plot_fn, path: Path) -> None:
+    def _densify(points: np.ndarray, max_step_px: float = 3.0) -> np.ndarray:
+        if len(points) < 2:
+            return points
+        dense = [points[:1]]
+        for start, end in zip(points[:-1], points[1:]):
+            delta = end - start
+            steps = max(int(np.ceil(max(abs(delta[0]), abs(delta[1])) / max_step_px)), 1)
+            if steps == 1:
+                dense.append(end[None, :])
+                continue
+            fractions = np.linspace(0.0, 1.0, steps + 1, dtype=float)[1:]
+            dense.append(start + fractions[:, None] * delta[None, :])
+        return np.vstack(dense)
+
     series_list = load_curve_table(path)
     fig, ax = plot_fn(series_list)
     fig.canvas.draw()
@@ -432,6 +446,10 @@ def _assert_stacked_layout(plot_fn, path: Path) -> None:
     if len(label_texts) != len(series_list):
         raise AssertionError("Expected one in-axes sample label per stacked spectral series.")
 
+    anchor_x = [float(text.get_transform().transform(text.get_position())[0]) for text in label_texts]
+    if max(anchor_x) - min(anchor_x) > 4.0:
+        raise AssertionError("Stacked spectral sample labels should stay aligned on a common x rail.")
+
     bboxes = [text.get_window_extent(renderer=renderer).expanded(1.01, 1.03) for text in label_texts]
     if any(
         bbox.x0 < axes_bbox.x0 or bbox.x1 > axes_bbox.x1 or bbox.y0 < axes_bbox.y0 or bbox.y1 > axes_bbox.y1
@@ -450,7 +468,7 @@ def _assert_stacked_layout(plot_fn, path: Path) -> None:
             valid = np.isfinite(x) & np.isfinite(y)
             if valid.sum() == 0:
                 continue
-            points = ax.transData.transform(np.column_stack([x[valid], y[valid]]))
+            points = _densify(ax.transData.transform(np.column_stack([x[valid], y[valid]])))
             inside = (
                 (points[:, 0] >= bbox.x0)
                 & (points[:, 0] <= bbox.x1)
@@ -798,7 +816,7 @@ def _assert_style_palette_presets(
         cbar_ax = heatmap_fig.axes[-1]
         renderer = heatmap_fig.canvas.get_renderer()
         fig_bbox = heatmap_fig.bbox
-        label_bbox = cbar_ax.yaxis.label.get_window_extent(renderer=renderer)
+        label_bbox = cbar_ax.title.get_window_extent(renderer=renderer)
         if (
             label_bbox.x0 < fig_bbox.x0
             or label_bbox.x1 > fig_bbox.x1
@@ -894,6 +912,20 @@ def _assert_legend_candidate_insets() -> None:
 
 
 def _assert_wide_nmr_layout(bundle_path: Path) -> None:
+    def _densify(points: np.ndarray, max_step_px: float = 3.0) -> np.ndarray:
+        if len(points) < 2:
+            return points
+        dense = [points[:1]]
+        for start, end in zip(points[:-1], points[1:]):
+            delta = end - start
+            steps = max(int(np.ceil(max(abs(delta[0]), abs(delta[1])) / max_step_px)), 1)
+            if steps == 1:
+                dense.append(end[None, :])
+                continue
+            fractions = np.linspace(0.0, 1.0, steps + 1, dtype=float)[1:]
+            dense.append(start + fractions[:, None] * delta[None, :])
+        return np.vstack(dense)
+
     config = load_wide_nmr_config(bundle_path)
     series_list = load_curve_table(bundle_path)
     fig, ax = plot_wide_nmr(series_list, config)
@@ -928,6 +960,10 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> None:
     if len(text_items) != len(series_list):
         raise AssertionError("wide_nmr should render one in-axes sample label per series.")
 
+    anchor_x = [float(text.get_transform().transform(text.get_position())[0]) for text in text_items]
+    if max(anchor_x) - min(anchor_x) > 4.0:
+        raise AssertionError("wide_nmr sample labels should stay aligned on a common x rail.")
+
     renderer = fig.canvas.get_renderer()
     bboxes = [text.get_window_extent(renderer=renderer).expanded(1.01, 1.03) for text in text_items]
     for text, bbox in zip(text_items, bboxes):
@@ -948,7 +984,7 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> None:
             valid = np.isfinite(x) & np.isfinite(y)
             if valid.sum() == 0:
                 continue
-            points = axis.transData.transform(np.column_stack([x[valid], y[valid]]))
+            points = _densify(axis.transData.transform(np.column_stack([x[valid], y[valid]])))
             inside = (
                 (points[:, 0] >= bbox.x0)
                 & (points[:, 0] <= bbox.x1)
