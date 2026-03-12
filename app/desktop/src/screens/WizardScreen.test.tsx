@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { preprocessTensileReplicates, renderPreview } from "../lib/api";
@@ -99,6 +99,10 @@ function mockWizardReload() {
 }
 
 describe("WizardScreen", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(open).mockReset();
@@ -145,6 +149,119 @@ describe("WizardScreen", () => {
     expect(screen.getByDisplayValue("Colorblind Safe")).toBeInTheDocument();
   });
 
+  it("cleans heatmap-only options when switching back to a curve template", () => {
+    useWizardStore.setState({
+      step: "template",
+      template: "heatmap",
+      options: {
+        size: "60x55",
+        show_colorbar: true,
+        palette_preset: "colorblind_safe",
+      },
+    });
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /曲线/ }));
+
+    expect(useWizardStore.getState().template).toBe("curve");
+    expect(useWizardStore.getState().options).toEqual({
+      size: "60x55",
+      xscale: "linear",
+      yscale: "linear",
+      reverse_x: false,
+      palette_preset: "colorblind_safe",
+    });
+  });
+
+  it("keeps only the latest preview response when options change quickly", async () => {
+    vi.useFakeTimers();
+    let resolveFirst:
+      | ((value: {
+          template: string;
+          sheet: string | number;
+          previews: Array<{ filename: string; png_base64: string }>;
+        }) => void)
+      | undefined;
+    let resolveSecond:
+      | ((value: {
+          template: string;
+          sheet: string | number;
+          previews: Array<{ filename: string; png_base64: string }>;
+        }) => void)
+      | undefined;
+
+    vi.mocked(renderPreview)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      step: "options",
+      template: "curve",
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+      },
+    });
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(renderPreview).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      useWizardStore.getState().setOptions({
+        size: "60x55",
+        xscale: "log",
+        yscale: "linear",
+        reverse_x: false,
+      });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(renderPreview).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveFirst?.({
+        template: "curve",
+        sheet: 0,
+        previews: [{ filename: "old.pdf", png_base64: "old" }],
+      });
+      await Promise.resolve();
+    });
+
+    expect(useWizardStore.getState().previews).toEqual([]);
+
+    await act(async () => {
+      resolveSecond?.({
+        template: "curve",
+        sheet: 0,
+        previews: [{ filename: "new.pdf", png_base64: "new" }],
+      });
+      await Promise.resolve();
+    });
+
+    expect(useWizardStore.getState().previews[0]?.filename).toBe("new.pdf");
+  });
+
   it("preprocesses raw tensile CSV files, reloads the workbook, and records the project", async () => {
     vi.mocked(open).mockResolvedValue([
       "/fixtures/BlendSet_A.csv",
@@ -174,6 +291,7 @@ describe("WizardScreen", () => {
     await waitFor(() => {
       expect(loadWizardDataFile).toHaveBeenCalledWith(
         expect.any(Object),
+        TEST_META,
         TEST_PREPROCESS_RESPONSE.output_path,
         TEST_PREPROCESS_RESPONSE.preferred_sheet,
         "inspect",

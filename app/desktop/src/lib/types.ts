@@ -1,17 +1,10 @@
-export type TemplateName =
-  | "curve"
-  | "point_line"
-  | "stacked_curve"
-  | "segmented_stacked_curve"
-  | "bar"
-  | "box"
-  | "violin"
-  | "scatter"
-  | "heatmap";
+export type TemplateName = string;
 
-export type SizePreset = "60x55" | "120x55" | "60x110";
+export type SizePreset = string;
 
-export type PalettePreset = "colorblind_safe" | "deep" | "muted" | "mono";
+export type PalettePreset = string;
+
+export type StylePreset = string;
 
 export type WizardStep =
   | "file"
@@ -67,6 +60,8 @@ export type RenderOptionsPayload = {
   palette_preset?: PalettePreset;
   use_sidecar?: boolean | null;
 };
+
+export type EditableRenderOption = keyof RenderOptionsPayload;
 
 export type InspectResponse = {
   input_path: string;
@@ -190,7 +185,7 @@ export type WorkbenchSize = {
 };
 
 export type WorkbenchStyle = {
-  id: string;
+  id: StylePreset;
   label: string;
   public: boolean;
   description: string;
@@ -213,17 +208,17 @@ export type WorkbenchTemplate = {
   category: string;
   default_size: SizePreset;
   allowed_sizes: SizePreset[];
-  editable_options: Array<keyof RenderOptionsPayload | "size">;
+  editable_options: EditableRenderOption[];
   default_options: RenderOptionsPayload & { size?: SizePreset };
-  available_styles: string[];
-  available_palettes: Array<PalettePreset | string>;
+  available_styles: StylePreset[];
+  available_palettes: PalettePreset[];
 };
 
 export type WorkbenchMeta = {
   version: number;
   defaults: {
-    style_preset: string;
-    palette_preset: PalettePreset | string;
+    style_preset: StylePreset;
+    palette_preset: PalettePreset;
   };
   global_frame: GlobalFrame;
   sizes: WorkbenchSize[];
@@ -232,16 +227,16 @@ export type WorkbenchMeta = {
   templates: WorkbenchTemplate[];
   template_ids: TemplateName[];
   size_ids: SizePreset[];
-  palette_preset_ids: Array<PalettePreset | string>;
-  default_style: string;
-  default_palette: PalettePreset | string;
+  palette_preset_ids: PalettePreset[];
+  default_style: StylePreset;
+  default_palette: PalettePreset;
 };
 
 export type PlotContract = {
   version: number;
   defaults: {
-    style_preset: string;
-    palette_preset: string;
+    style_preset: StylePreset;
+    palette_preset: PalettePreset;
   };
   global_frame: GlobalFrame;
   size_presets: Record<string, { label: string; width_mm: number; height_mm: number }>;

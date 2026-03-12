@@ -7,14 +7,17 @@ import type {
   TemplateName,
   WizardProject,
   WizardStep,
+  WorkbenchMeta,
 } from "./types";
 import { useComposerStore, useWizardStore } from "./store";
+import { selectionFromInspection } from "./wizard";
 
 type WizardStoreSnapshot = ReturnType<typeof useWizardStore.getState>;
 type ComposerStoreSnapshot = ReturnType<typeof useComposerStore.getState>;
 
 export function applyInspectionToWizard(
   wizard: WizardStoreSnapshot,
+  meta: WorkbenchMeta | null,
   inspected: InspectResponse,
   overrides?: {
     template?: TemplateName | null;
@@ -22,21 +25,16 @@ export function applyInspectionToWizard(
     nextStep?: WizardStep;
   },
 ) {
+  const selection = selectionFromInspection(meta, inspected.inspection, {
+    template: overrides?.template,
+    options: overrides?.options,
+  });
   wizard.setInputPath(inspected.input_path);
   wizard.setSheet(inspected.sheet);
   wizard.setSheetNames(inspected.sheet_names);
   wizard.setInspection(inspected.inspection);
-  wizard.setTemplate(overrides?.template ?? inspected.inspection.recommendation.template);
-  wizard.setOptions({
-    size: inspected.inspection.recommendation.size,
-    xscale: inspected.inspection.recommendation.xscale,
-    yscale: inspected.inspection.recommendation.yscale,
-    reverse_x: inspected.inspection.recommendation.reverse_x,
-    baseline: inspected.inspection.recommendation.baseline,
-    show_colorbar: inspected.inspection.recommendation.show_colorbar,
-    use_sidecar: inspected.inspection.recommendation.use_sidecar,
-    ...overrides?.options,
-  });
+  wizard.setTemplate(selection.template);
+  wizard.setOptions(selection.options);
   wizard.setStep(
     overrides?.nextStep ?? (inspected.sheet_names.length > 1 ? "sheet" : "inspect"),
   );
@@ -44,6 +42,7 @@ export function applyInspectionToWizard(
 
 export async function loadWizardDataFile(
   wizard: WizardStoreSnapshot,
+  meta: WorkbenchMeta | null,
   filePath: string,
   initialSheet: string | number = 0,
   nextStep?: WizardStep,
@@ -56,12 +55,13 @@ export async function loadWizardDataFile(
   wizard.setStep("file");
 
   const inspected = await inspectFile(filePath, initialSheet);
-  applyInspectionToWizard(wizard, inspected, { nextStep });
+  applyInspectionToWizard(wizard, meta, inspected, { nextStep });
   return inspected;
 }
 
 export async function loadWizardProjectFile(
   wizard: WizardStoreSnapshot,
+  meta: WorkbenchMeta | null,
   projectPath: string,
 ): Promise<WizardProject> {
   const keepBusy = wizard.busy;
@@ -76,7 +76,7 @@ export async function loadWizardProjectFile(
 
   const { input_path, options, outputs, sheet, template } = payload.wizard;
   const inspected = await inspectFile(input_path, sheet);
-  applyInspectionToWizard(wizard, inspected, {
+  applyInspectionToWizard(wizard, meta, inspected, {
     template: template ?? inspected.inspection.recommendation.template,
     options,
   });

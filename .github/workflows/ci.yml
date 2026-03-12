@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  desktop-and-python:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: app/desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Install desktop dependencies
+        working-directory: app/desktop
+        run: npm ci
+
+      - name: Python unit tests
+        run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Python smoke check
+        run: .venv/bin/python scripts/smoke_check.py
+
+      - name: Desktop tests
+        working-directory: app/desktop
+        run: npm test
+
+      - name: Desktop build
+        working-directory: app/desktop
+        run: npm run build
+
+      - name: Tauri cargo check
+        working-directory: app/desktop/src-tauri
+        run: cargo check

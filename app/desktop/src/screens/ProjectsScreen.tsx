@@ -33,7 +33,11 @@ export function ProjectsScreen({
 
     try {
       if (entry.mode === "wizard" && entry.kind === "data") {
-        const inspected = await loadWizardDataFile(useWizardStore.getState(), entry.path);
+        const inspected = await loadWizardDataFile(
+          useWizardStore.getState(),
+          meta,
+          entry.path,
+        );
         rememberProject({
           mode: "wizard",
           kind: "data",
@@ -48,7 +52,11 @@ export function ProjectsScreen({
       }
 
       if (entry.mode === "wizard") {
-        const payload = await loadWizardProjectFile(useWizardStore.getState(), entry.path);
+        const payload = await loadWizardProjectFile(
+          useWizardStore.getState(),
+          meta,
+          entry.path,
+        );
         rememberProject({
           mode: "wizard",
           kind: "project",

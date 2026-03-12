@@ -13,3 +13,4 @@ uvicorn
 pypdf
 reportlab
 PyMuPDF
+Pillow

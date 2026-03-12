@@ -39,7 +39,7 @@ type WizardState = {
   setSheetNames(value: string[]): void;
   setInspection(value: InputInspection | null): void;
   setTemplate(value: TemplateName | null): void;
-  setOptions(value: Partial<RenderOptionsPayload>): void;
+  setOptions(value: RenderOptionsPayload): void;
   setPreflight(value: PreflightResult | null): void;
   setPreviews(value: PreviewItem[]): void;
   setPreviewIndex(value: number): void;
@@ -120,7 +120,7 @@ export const useWizardStore = create<WizardState>()(
       setSheetNames: (value) => set({ sheetNames: value }),
       setInspection: (value) => set({ inspection: value }),
       setTemplate: (value) => set({ template: value }),
-      setOptions: (value) => set((state) => ({ options: { ...state.options, ...value } })),
+      setOptions: (value) => set({ options: { ...value } }),
       setPreflight: (value) => set({ preflight: value }),
       setPreviews: (value) => set({ previews: value, previewIndex: 0 }),
       setPreviewIndex: (value) => set({ previewIndex: value }),

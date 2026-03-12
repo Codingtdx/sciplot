@@ -11,14 +11,25 @@ import type {
   TensileReplicateResponse,
   WorkbenchMeta,
 } from "./types";
+import { coercePlotContract, coerceWorkbenchMeta } from "./runtime";
+import { resolveSidecarUrl } from "./sidecar";
 
-const SIDECAR_URL = "http://127.0.0.1:8765";
+const SIDECAR_URL = resolveSidecarUrl();
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+type RequestOptions = {
+  signal?: AbortSignal;
+};
+
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  options: RequestOptions = {},
+): Promise<T> {
   const response = await fetch(`${SIDECAR_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -31,8 +42,10 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return payload as T;
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${SIDECAR_URL}${path}`);
+async function getJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await fetch(`${SIDECAR_URL}${path}`, {
+    signal: options.signal,
+  });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail =
@@ -44,31 +57,34 @@ async function getJson<T>(path: string): Promise<T> {
   return payload as T;
 }
 
-export async function healthcheck(): Promise<boolean> {
+export async function healthcheck(options: RequestOptions = {}): Promise<boolean> {
   try {
-    const response = await fetch(`${SIDECAR_URL}/health`);
+    const response = await fetch(`${SIDECAR_URL}/health`, {
+      signal: options.signal,
+    });
     return response.ok;
   } catch {
     return false;
   }
 }
 
-export async function getWorkbenchMeta(): Promise<WorkbenchMeta> {
-  return getJson<WorkbenchMeta>("/meta");
+export async function getWorkbenchMeta(options: RequestOptions = {}): Promise<WorkbenchMeta> {
+  return coerceWorkbenchMeta(await getJson<unknown>("/meta", options));
 }
 
-export async function getPlotContract(): Promise<PlotContract> {
-  return getJson<PlotContract>("/plot-contract");
+export async function getPlotContract(options: RequestOptions = {}): Promise<PlotContract> {
+  return coercePlotContract(await getJson<unknown>("/plot-contract", options));
 }
 
 export async function inspectFile(
   inputPath: string,
   sheet: string | number,
+  options: RequestOptions = {},
 ): Promise<InspectResponse> {
   return postJson<InspectResponse>("/inspect-file", {
     input_path: inputPath,
     sheet,
-  });
+  }, options);
 }
 
 export async function preflightRender(
@@ -76,13 +92,14 @@ export async function preflightRender(
   sheet: string | number,
   template: TemplateName,
   options: RenderOptionsPayload,
+  requestOptions: RequestOptions = {},
 ): Promise<PreflightResponse> {
   return postJson<PreflightResponse>("/preflight-render", {
     input_path: inputPath,
     sheet,
     template,
     options,
-  });
+  }, requestOptions);
 }
 
 export async function renderPreview(
@@ -90,13 +107,14 @@ export async function renderPreview(
   sheet: string | number,
   template: TemplateName,
   options: RenderOptionsPayload,
+  requestOptions: RequestOptions = {},
 ): Promise<RenderPreviewResponse> {
   return postJson<RenderPreviewResponse>("/render-preview", {
     input_path: inputPath,
     sheet,
     template,
     options,
-  });
+  }, requestOptions);
 }
 
 export async function exportRender(
@@ -105,6 +123,7 @@ export async function exportRender(
   template: TemplateName,
   options: RenderOptionsPayload,
   outputDir?: string,
+  requestOptions: RequestOptions = {},
 ): Promise<ExportResponse> {
   return postJson<ExportResponse>("/export-render", {
     input_path: inputPath,
@@ -112,29 +131,31 @@ export async function exportRender(
     template,
     options,
     output_dir: outputDir ?? null,
-  });
+  }, requestOptions);
 }
 
 export async function preprocessTensileReplicates(
   filePaths: string[],
   outputPath: string,
   groupName?: string,
+  options: RequestOptions = {},
 ): Promise<TensileReplicateResponse> {
   return postJson<TensileReplicateResponse>("/preprocess-tensile-replicates", {
     file_paths: filePaths,
     output_path: outputPath,
     group_name: groupName ?? null,
-  });
+  }, options);
 }
 
 export async function panelThumbnail(
   filePath: string,
   pageIndex = 0,
+  options: RequestOptions = {},
 ): Promise<string> {
   const response = await postJson<{ png_base64: string }>("/panel-thumbnail", {
     file_path: filePath,
     page_index: pageIndex,
-  });
+  }, options);
   return response.png_base64;
 }
 
@@ -143,7 +164,18 @@ export async function composePreview(project: ComposerProject): Promise<{
   validation_error: string | null;
   png_base64: string;
 }> {
-  return postJson("/compose-preview", project);
+  return composePreviewWithOptions(project);
+}
+
+export async function composePreviewWithOptions(
+  project: ComposerProject,
+  options: RequestOptions = {},
+): Promise<{
+  valid: boolean;
+  validation_error: string | null;
+  png_base64: string;
+}> {
+  return postJson("/compose-preview", project, options);
 }
 
 export async function composeExport(project: ComposerProject): Promise<{

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { PreviewPane } from "../components/PreviewPane";
@@ -8,15 +8,11 @@ import {
   inspectFile,
   preflightRender,
   preprocessTensileReplicates,
-  renderPreview,
   saveProject,
 } from "../lib/api";
 import { loadWizardDataFile, loadWizardProjectFile, applyInspectionToWizard } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type {
-  PalettePreset,
-  RenderOptionsPayload,
-  SizePreset,
   TemplateName,
   TensileReplicateResponse,
   WizardProject,
@@ -36,19 +32,32 @@ import {
   templateLabel,
   toDialogPaths,
 } from "../lib/workbench";
+import {
+  areRenderOptionsEqual,
+  mergeRenderOptions,
+  sanitizeRenderOptions,
+  sanitizeTemplateId,
+  templateMeta as wizardTemplateMeta,
+} from "../lib/wizard";
+import { useWizardPreview } from "./wizard/useWizardPreview";
 
 export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const wizard = useWizardStore();
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
-  const [previewBusy, setPreviewBusy] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
   const [tensileBatchResult, setTensileBatchResult] = useState<TensileReplicateResponse | null>(null);
+  const setWizardOptions = wizard.setOptions;
+  const setWizardPreviews = wizard.setPreviews;
+  const setWizardTemplate = wizard.setTemplate;
 
   const stepMeta = STEP_COPY[wizard.step];
   const recommendation = wizard.inspection?.recommendation ?? null;
   const templateOptions = templateChoices(meta);
   const sizeOptions = sizeChoices(meta, wizard.template);
   const paletteOptions = publicPaletteChoices(meta, wizard.template);
+  const currentTemplate = useMemo(
+    () => wizardTemplateMeta(meta, wizard.template),
+    [meta, wizard.template],
+  );
 
   const invalidateRenderState = () => {
     wizard.setPreflight(null);
@@ -56,55 +65,69 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   const updateWizardTemplate = (value: TemplateName) => {
+    const nextTemplate = sanitizeTemplateId(
+      meta,
+      value,
+      recommendation?.template ?? wizard.template,
+    );
+    if (!nextTemplate) {
+      return;
+    }
     invalidateRenderState();
-    wizard.setTemplate(value);
+    setWizardTemplate(nextTemplate);
+    setWizardOptions(sanitizeRenderOptions(meta, nextTemplate, wizard.options));
   };
 
-  const updateWizardOptions = (value: Parameters<typeof wizard.setOptions>[0]) => {
+  const updateWizardOptions = (value: Partial<typeof wizard.options>) => {
+    if (!wizard.template) {
+      return;
+    }
     invalidateRenderState();
-    wizard.setOptions(value);
+    setWizardOptions(
+      mergeRenderOptions(meta, wizard.template, wizard.options, value),
+    );
   };
 
   useEffect(() => {
+    const nextTemplate = sanitizeTemplateId(
+      meta,
+      wizard.template,
+      recommendation?.template ?? null,
+    );
+    if (nextTemplate !== wizard.template) {
+      setWizardTemplate(nextTemplate);
+    }
+    const nextOptions = sanitizeRenderOptions(
+      meta,
+      nextTemplate,
+      wizard.options,
+    );
+    if (!areRenderOptionsEqual(nextOptions, wizard.options)) {
+      setWizardOptions(nextOptions);
+    }
+  }, [
+    meta,
+    recommendation?.template,
+    setWizardOptions,
+    setWizardTemplate,
+    wizard.options,
+    wizard.template,
+  ]);
+
+  const { busy: previewBusy, error: previewError } = useWizardPreview({
+    inputPath: wizard.inputPath,
+    sheet: wizard.sheet,
+    template: wizard.template,
+    options: wizard.options,
+    onPreviews: setWizardPreviews,
+  });
+
+  useEffect(() => {
     if (!wizard.inputPath || !wizard.template) {
-      setPreviewBusy(false);
-      setPreviewError(null);
-      wizard.setPreviews([]);
+      setWizardPreviews([]);
       return;
     }
-
-    const template = wizard.template;
-    let cancelled = false;
-    const handle = window.setTimeout(async () => {
-      setPreviewBusy(true);
-      setPreviewError(null);
-      try {
-        const payload = await renderPreview(
-          wizard.inputPath,
-          wizard.sheet,
-          template,
-          wizard.options,
-        );
-        if (!cancelled) {
-          wizard.setPreviews(payload.previews);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setPreviewError(getErrorMessage(error));
-          wizard.setPreviews([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setPreviewBusy(false);
-        }
-      }
-    }, 220);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(handle);
-    };
-  }, [wizard.inputPath, wizard.options, wizard.sheet, wizard.template]);
+  }, [setWizardPreviews, wizard.inputPath, wizard.template]);
 
   const openDataFile = async () => {
     const selected = await open({
@@ -124,7 +147,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     setTensileBatchResult(null);
     wizard.setBusy(true);
     try {
-      const inspected = await loadWizardDataFile(wizard, path);
+      const inspected = await loadWizardDataFile(wizard, meta, path);
       rememberProject({
         mode: "wizard",
         kind: "data",
@@ -154,7 +177,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.setError(null);
     wizard.setBusy(true);
     try {
-      const payload = await loadWizardProjectFile(wizard, path);
+      const payload = await loadWizardProjectFile(wizard, meta, path);
       rememberProject({
         mode: "wizard",
         kind: "project",
@@ -241,6 +264,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       setTensileBatchResult(result);
       const inspected = await loadWizardDataFile(
         wizard,
+        meta,
         result.output_path,
         result.preferred_sheet,
         "inspect",
@@ -268,7 +292,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.setBusy(true);
     try {
       const inspected = await inspectFile(wizard.inputPath, sheetValue);
-      applyInspectionToWizard(wizard, inspected, { nextStep: "inspect" });
+      applyInspectionToWizard(wizard, meta, inspected, { nextStep: "inspect" });
       invalidateRenderState();
     } catch (error) {
       wizard.setError(getErrorMessage(error));
@@ -536,10 +560,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   <span className="field-label">尺寸</span>
                   <select
                     className="field"
-                    value={wizard.options.size ?? sizeOptions[0]?.id ?? "60x55"}
-                    onChange={(event) =>
-                      updateWizardOptions({ size: event.target.value as SizePreset })
-                    }
+                    value={wizard.options.size ?? sizeOptions[0]?.id ?? ""}
+                    onChange={(event) => updateWizardOptions({ size: event.target.value })}
                   >
                     {sizeOptions.map((choice) => (
                       <option key={choice.id} value={choice.id}>
@@ -549,7 +571,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   </select>
                 </label>
 
-                {meta?.templates.find((item) => item.id === wizard.template)?.editable_options.includes("xscale") && (
+                {currentTemplate?.editable_options.includes("xscale") && (
                   <>
                     <label>
                       <span className="field-label">X 轴</span>
@@ -558,7 +580,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                         value={wizard.options.xscale ?? "linear"}
                         onChange={(event) =>
                           updateWizardOptions({
-                            xscale: event.target.value as "linear" | "log",
+                            xscale: event.target.value === "log" ? "log" : "linear",
                           })
                         }
                       >
@@ -573,7 +595,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                         value={wizard.options.yscale ?? "linear"}
                         onChange={(event) =>
                           updateWizardOptions({
-                            yscale: event.target.value as "linear" | "log",
+                            yscale: event.target.value === "log" ? "log" : "linear",
                           })
                         }
                       >
@@ -584,7 +606,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   </>
                 )}
 
-                {meta?.templates.find((item) => item.id === wizard.template)?.editable_options.includes("reverse_x") && (
+                {currentTemplate?.editable_options.includes("reverse_x") && (
                   <label className="toggle-field">
                     <input
                       checked={Boolean(wizard.options.reverse_x)}
@@ -597,7 +619,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   </label>
                 )}
 
-                {meta?.templates.find((item) => item.id === wizard.template)?.editable_options.includes("baseline") && (
+                {currentTemplate?.editable_options.includes("baseline") && (
                   <label>
                     <span className="field-label">Baseline</span>
                     <select
@@ -605,7 +627,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                       value={wizard.options.baseline ?? "none"}
                       onChange={(event) =>
                         updateWizardOptions({
-                          baseline: event.target.value as "none" | "linear_endpoints",
+                          baseline:
+                            event.target.value === "linear_endpoints"
+                              ? "linear_endpoints"
+                              : "none",
                         })
                       }
                     >
@@ -615,7 +640,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   </label>
                 )}
 
-                {meta?.templates.find((item) => item.id === wizard.template)?.editable_options.includes("show_colorbar") && (
+                {currentTemplate?.editable_options.includes("show_colorbar") && (
                   <label className="toggle-field">
                     <input
                       checked={Boolean(wizard.options.show_colorbar ?? true)}
@@ -636,10 +661,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                     <span className="field-label">配色</span>
                     <select
                       className="field"
-                      value={wizard.options.palette_preset ?? meta?.default_palette ?? "colorblind_safe"}
+                      value={wizard.options.palette_preset ?? meta?.default_palette ?? ""}
                       onChange={(event) =>
                         updateWizardOptions({
-                          palette_preset: event.target.value as PalettePreset,
+                          palette_preset: event.target.value,
                         })
                       }
                     >

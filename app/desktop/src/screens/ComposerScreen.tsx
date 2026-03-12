@@ -5,9 +5,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ComposerCanvas } from "../components/ComposerCanvas";
 import {
   composeExport,
-  composePreview,
   importComposerPanels,
-  panelThumbnail,
   saveProject,
   threeUp,
   twoUpEditorial,
@@ -20,18 +18,50 @@ import {
 import { loadComposerProjectFile } from "../lib/project-io";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import { getErrorMessage, orderPanels, toDialogPaths } from "../lib/workbench";
+import { useComposerPreview } from "./composer/useComposerPreview";
+import { usePanelThumbnails } from "./composer/usePanelThumbnails";
+
+const RASTER_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".bmp",
+  ".tif",
+  ".tiff",
+]);
+
+function isPdfPath(path: string): boolean {
+  return path.toLowerCase().endsWith(".pdf");
+}
+
+function isRasterPath(path: string): boolean {
+  const dotIndex = path.lastIndexOf(".");
+  if (dotIndex < 0) {
+    return false;
+  }
+  return RASTER_EXTENSIONS.has(path.slice(dotIndex).toLowerCase());
+}
+
+function describeSkippedFiles(paths: string[]): string | null {
+  if (paths.length === 0) {
+    return null;
+  }
+  const leaves = paths.map((path) => path.split(/[/\\]/).pop() ?? path);
+  return `已跳过不支持的文件: ${leaves.join("、")}。`;
+}
 
 export function ComposerScreen() {
   const composer = useComposerStore();
   const pdfImportMode = useWorkbenchStore((state) => state.pdfImportMode);
   const setPdfImportMode = useWorkbenchStore((state) => state.setPdfImportMode);
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
-  const [thumbnailMap, setThumbnailMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [exportPath, setExportPath] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const projectRef = useRef(composer.project);
+  const thumbnailMap = usePanelThumbnails(composer.project.panels);
 
   const selectedPanel = composer.project.panels.find((item) => item.id === composer.selectedId) ?? null;
   const selectedText = composer.project.texts.find((item) => item.id === composer.selectedId) ?? null;
@@ -64,52 +94,13 @@ export function ComposerScreen() {
     setExportPath(null);
   }, [composer.project]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function refreshPreview() {
-      try {
-        const response = await composePreview(composer.project);
-        if (!cancelled) {
-          composer.setPreview(response.png_base64, response.validation_error ?? null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          composer.setPreview(null, getErrorMessage(error));
-        }
-      }
+  useComposerPreview(composer.project, (payload, error) => {
+    if (payload) {
+      composer.setPreview(payload.png_base64, payload.validation_error ?? null);
+      return;
     }
-
-    void refreshPreview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [composer.project]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadThumbs() {
-      const next: Record<string, string> = {};
-      for (const panel of composer.project.panels) {
-        try {
-          next[panel.id] = `data:image/png;base64,${await panelThumbnail(panel.file_path, panel.page_index)}`;
-        } catch {
-          continue;
-        }
-      }
-      if (!cancelled) {
-        setThumbnailMap(next);
-      }
-    }
-
-    void loadThumbs();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [composer.project.panels]);
+    composer.setPreview(null, error);
+  });
 
   useEffect(() => {
     let disposed = false;
@@ -121,8 +112,11 @@ export function ComposerScreen() {
         return;
       }
 
-      const pdfs = cleaned.filter((path) => path.toLowerCase().endsWith(".pdf"));
-      const assets = cleaned.filter((path) => !path.toLowerCase().endsWith(".pdf"));
+      const pdfs = cleaned.filter(isPdfPath);
+      const rasters = cleaned.filter(isRasterPath);
+      const unsupported = cleaned.filter(
+        (path) => !isPdfPath(path) && !isRasterPath(path),
+      );
 
       setBusy(true);
       setDropNotice(null);
@@ -135,8 +129,8 @@ export function ComposerScreen() {
             panels: response.panels,
           };
         }
-        if (assets.length > 0) {
-          const response = await importComposerPanels(nextProject, assets, "asset");
+        if (rasters.length > 0) {
+          const response = await importComposerPanels(nextProject, rasters, "asset");
           nextProject = {
             ...nextProject,
             panels: response.panels,
@@ -146,23 +140,37 @@ export function ComposerScreen() {
         composer.setProject(nextProject);
         composer.setSelectedId(null);
 
-        const unsupported = cleaned.length - pdfs.length - assets.length;
-        if (unsupported > 0) {
-          setDropNotice("部分文件格式未导入。PDF 会按当前模式导入，图片会作为素材导入。");
-        } else if (pdfs.length > 0 && assets.length > 0) {
+        const skippedNotice = describeSkippedFiles(unsupported);
+        if (pdfs.length > 0 && rasters.length > 0) {
           setDropNotice(
-            pdfImportMode === "graph"
-              ? "已导入图 panel 和素材。PDF 已自动吸附到网格。"
-              : "已导入 PDF 素材和图片素材。素材可以继续拖拽、缩放和对齐。",
+            [
+              pdfImportMode === "graph"
+                ? "已导入图 panel 和素材。PDF 已自动吸附到网格。"
+                : "已导入 PDF 素材和图片素材。素材可以继续拖拽、缩放和对齐。",
+              skippedNotice,
+            ]
+              .filter(Boolean)
+              .join(" "),
           );
         } else if (pdfs.length > 0) {
           setDropNotice(
-            pdfImportMode === "graph"
-              ? "已导入图 panel。PDF 已自动吸附到 3x3 网格。"
-              : "已导入 PDF 素材。可以继续拖拽、缩放和对齐。",
+            [
+              pdfImportMode === "graph"
+                ? "已导入图 panel。PDF 已自动吸附到 3x3 网格。"
+                : "已导入 PDF 素材。可以继续拖拽、缩放和对齐。",
+              skippedNotice,
+            ]
+              .filter(Boolean)
+              .join(" "),
           );
-        } else {
-          setDropNotice("已导入素材。可以继续拖拽、缩放和对齐。");
+        } else if (rasters.length > 0) {
+          setDropNotice(
+            ["已导入素材。可以继续拖拽、缩放和对齐。", skippedNotice]
+              .filter(Boolean)
+              .join(" "),
+          );
+        } else if (skippedNotice) {
+          setDropNotice(skippedNotice);
         }
       } catch (error) {
         setDropNotice(getErrorMessage(error));

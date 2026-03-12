@@ -1,13 +1,22 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "./lib/store";
-import { ComposerScreen } from "./screens/ComposerScreen";
-import { ProjectsScreen } from "./screens/ProjectsScreen";
-import { SettingsScreen } from "./screens/SettingsScreen";
-import { WizardScreen } from "./screens/WizardScreen";
 import { AppMode, NAV_ITEMS, SCREEN_META, getWizardStepLabel } from "./lib/workbench";
 import type { PlotContract, WorkbenchMeta } from "./lib/types";
+
+const WizardScreen = lazy(async () => ({
+  default: (await import("./screens/WizardScreen")).WizardScreen,
+}));
+const ComposerScreen = lazy(async () => ({
+  default: (await import("./screens/ComposerScreen")).ComposerScreen,
+}));
+const ProjectsScreen = lazy(async () => ({
+  default: (await import("./screens/ProjectsScreen")).ProjectsScreen,
+}));
+const SettingsScreen = lazy(async () => ({
+  default: (await import("./screens/SettingsScreen")).SettingsScreen,
+}));
 
 export default function App() {
   const persistedScreen = useWorkbenchStore((state) => state.lastScreen);
@@ -29,6 +38,16 @@ export default function App() {
   const wizardOutputsCount = useWizardStore((state) => state.outputs.length);
   const composerPanelCount = useComposerStore((state) => state.project.panels.length);
   const composerTextCount = useComposerStore((state) => state.project.texts.length);
+  const workbenchLoadRef = useRef<Promise<void> | null>(null);
+  const workbenchStateRef = useRef<{
+    meta: WorkbenchMeta | null;
+    contract: PlotContract | null;
+    metaError: string | null;
+  }>({
+    meta: null,
+    contract: null,
+    metaError: null,
+  });
 
   useEffect(() => {
     if (rememberLastScreen) {
@@ -48,29 +67,42 @@ export default function App() {
     }
   }, [rememberLastScreen, persistedScreen, setPersistedScreen]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadWorkbenchData() {
-      try {
-        const [meta, contract] = await Promise.all([getWorkbenchMeta(), getPlotContract()]);
-        if (!cancelled) {
-          setWorkbenchMeta(meta);
-          setPlotContract(contract);
-          setMetaError(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setMetaError(error instanceof Error ? error.message : String(error));
-        }
-      }
+  const loadWorkbenchData = () => {
+    if (workbenchLoadRef.current) {
+      return workbenchLoadRef.current;
     }
 
+    let request: Promise<void>;
+    request = Promise.all([getWorkbenchMeta(), getPlotContract()])
+      .then(([meta, contract]) => {
+        setWorkbenchMeta(meta);
+        setPlotContract(contract);
+        setMetaError(null);
+      })
+      .catch((error) => {
+        setMetaError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (workbenchLoadRef.current === request) {
+          workbenchLoadRef.current = null;
+        }
+      });
+
+    workbenchLoadRef.current = request;
+    return request;
+  };
+
+  useEffect(() => {
     void loadWorkbenchData();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    workbenchStateRef.current = {
+      meta: workbenchMeta,
+      contract: plotContract,
+      metaError,
+    };
+  }, [metaError, plotContract, workbenchMeta]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +112,12 @@ export default function App() {
       const ok = await healthcheck();
       if (!cancelled) {
         setSidecarReady(ok);
+        if (ok) {
+          const { meta, contract, metaError: currentMetaError } = workbenchStateRef.current;
+          if (!meta || !contract || currentMetaError) {
+            void loadWorkbenchData();
+          }
+        }
       }
     }
 
@@ -97,6 +135,12 @@ export default function App() {
       }
     };
   }, [autoStatusPoll, setSidecarReady]);
+
+  useEffect(() => {
+    if (sidecarReady && (!workbenchMeta || !plotContract || metaError)) {
+      void loadWorkbenchData();
+    }
+  }, [metaError, plotContract, sidecarReady, workbenchMeta]);
 
   const meta = SCREEN_META[mode];
 
@@ -162,14 +206,16 @@ export default function App() {
         {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
 
         <main className="dashboard-main">
-          {mode === "wizard" && <WizardScreen meta={workbenchMeta} />}
-          {mode === "composer" && <ComposerScreen />}
-          {mode === "projects" && (
-            <ProjectsScreen meta={workbenchMeta} onNavigate={setMode} />
-          )}
-          {mode === "settings" && (
-            <SettingsScreen contract={plotContract} meta={workbenchMeta} />
-          )}
+          <Suspense fallback={<div className="placeholder-card">正在载入工作台…</div>}>
+            {mode === "wizard" && <WizardScreen meta={workbenchMeta} />}
+            {mode === "composer" && <ComposerScreen />}
+            {mode === "projects" && (
+              <ProjectsScreen meta={workbenchMeta} onNavigate={setMode} />
+            )}
+            {mode === "settings" && (
+              <SettingsScreen contract={plotContract} meta={workbenchMeta} />
+            )}
+          </Suspense>
         </main>
       </section>
     </div>

@@ -82,7 +82,8 @@ def _ensure_header_row_content(raw: pd.DataFrame, row_index: int, *, row_name: s
 
 
 def _series_pair_has_any_data(pair: pd.DataFrame) -> bool:
-    return bool(pair.applymap(_has_content).to_numpy().any())
+    mapped = pair.map(_has_content) if hasattr(pair, "map") else pair.applymap(_has_content)
+    return bool(mapped.to_numpy().any())
 
 
 def _coerce_numeric_pair(pair: pd.DataFrame, *, column_numbers: tuple[int, int], table_name: str) -> pd.DataFrame:
