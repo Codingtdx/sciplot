@@ -1071,6 +1071,37 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> None:
     plt.close(fig)
 
 
+def _assert_stacked_series_clearance(
+    plotter: Callable[[Sequence[CurveSeries]], tuple[plt.Figure, plt.Axes]],
+    table_path: Path,
+) -> None:
+    series_list = load_curve_table(table_path)
+    fig, ax = plotter(series_list)
+    try:
+        line_arrays: list[np.ndarray] = []
+        for line in ax.lines:
+            y = np.asarray(line.get_ydata(), dtype=float)
+            y = y[np.isfinite(y)]
+            if y.size:
+                line_arrays.append(y)
+        if len(line_arrays) < 2:
+            raise AssertionError("Stacked spectra check requires at least two plotted series.")
+
+        spans = [float(np.nanmax(arr) - np.nanmin(arr)) for arr in line_arrays]
+        max_span = max(spans) if spans else 0.0
+        min_clearance = max(max_span * 0.03, 1e-9)
+        for lower, upper in zip(line_arrays, line_arrays[1:]):
+            lower_peak = float(np.nanmax(lower))
+            upper_baseline = float(np.nanmin(upper))
+            if upper_baseline - lower_peak <= min_clearance:
+                raise AssertionError(
+                    "Stacked spectra should leave a visible gap between one trace's peak envelope "
+                    "and the next trace's baseline."
+                )
+    finally:
+        plt.close(fig)
+
+
 def _to_curve_series(series_list) -> list[CurveSeries]:
     return [
         CurveSeries(
@@ -1161,6 +1192,10 @@ def main() -> int:
         _assert_stacked_layout(plot_nmr, nmr_path)
         _assert_stacked_layout(plot_xrd, xrd_path)
         _assert_stacked_layout(plot_dsc, dsc_path)
+        _assert_stacked_series_clearance(plot_ftir, ftir_path)
+        _assert_stacked_series_clearance(plot_nmr, nmr_path)
+        _assert_stacked_series_clearance(plot_xrd, xrd_path)
+        _assert_stacked_series_clearance(plot_dsc, dsc_path)
         _assert_wide_nmr_layout(wide_nmr_path)
         _assert_style_palette_presets(
             replicate_path=replicate_path,

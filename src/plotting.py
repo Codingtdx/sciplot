@@ -619,9 +619,17 @@ def _prepare_stacked_layout(
     max_span = max(spans) if spans else 1.0
     max_peak_height = max(peak_heights) if peak_heights else max_span
     scale = max(step_scale, 1.0)
-    floor = max(max_span * stack_floor_fraction * scale, max_peak_height * 0.12 * scale)
+    floor = max(
+        max_span * stack_floor_fraction * scale,
+        max_peak_height * 0.16 * scale,
+    )
     step = max_span * (1.0 + stack_gap_fraction) * scale
-    peak_clearance = max(max_span * max(stack_gap_fraction, 0.12) * 0.4, max_peak_height * 0.08)
+    # Stacked spectra need enough room for the whole peak envelope to clear the
+    # next series baseline, not just enough room for labels.
+    peak_clearance = max(
+        max_span * max(stack_gap_fraction, 0.16) * 0.95,
+        max_peak_height * 0.24,
+    )
     minimum_step = (max_peak_height + peak_clearance) * scale
     step = max(step, minimum_step)
 
