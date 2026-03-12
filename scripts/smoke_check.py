@@ -61,6 +61,7 @@ from src.plotting import (
 )
 from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
 from src.plot_contract import load_plot_contract, validation_rule
+from src.tensile_replicates import export_tensile_replicate_workbook
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import load_wide_nmr_config
 from src.wide_nmr import (
@@ -72,6 +73,16 @@ from src.wide_nmr import (
 
 
 SMOKE_REPORT_PATH = ROOT / "figures" / "debug_outputs" / "smoke_report.json"
+TENSILE_RAW_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
+TENSILE_WORKBOOK_SHEETS = {
+    "Representative_Curve",
+    "All_Curves",
+    "Summary",
+    "All_Specimens",
+    "Strength_Replicates",
+    "Modulus_Replicates",
+    "Elongation_Replicates",
+}
 
 
 def _validation_result(rule_name: str, *, passed: bool, details: dict[str, object]) -> dict[str, object]:
@@ -86,6 +97,13 @@ def _validation_result(rule_name: str, *, passed: bool, details: dict[str, objec
     if rule.tolerance_mm is not None:
         payload["tolerance_mm"] = rule.tolerance_mm
     return payload
+
+
+def _repo_relative_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _write_curve_table(path: Path, x_label: str, y_label: str, x_unit: str, y_unit: str) -> None:
@@ -1135,6 +1153,166 @@ def _assert_frequency_batch_sync(freq_path: Path) -> None:
         raise AssertionError("Frequency sweep legends are no longer anchored near the configured 2.5% inset.")
 
 
+def _assert_tensile_preprocess_workflow(
+    *,
+    base: Path,
+    outputs_dir: Path,
+    template_by_output: dict[str, str],
+) -> list[dict[str, object]]:
+    valid_a = TENSILE_RAW_FIXTURE_DIR / "BlendSet_A.csv"
+    valid_b = TENSILE_RAW_FIXTURE_DIR / "BlendSet_B.csv"
+    invalid_bad = TENSILE_RAW_FIXTURE_DIR / "BlendSet_bad.csv"
+    invalid_no_curve = TENSILE_RAW_FIXTURE_DIR / "BlendSet_nocurve.csv"
+    required_fixtures = (valid_a, valid_b, invalid_bad, invalid_no_curve)
+    missing = [path for path in required_fixtures if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "Tensile preprocess smoke fixtures are missing: "
+            + ", ".join(_repo_relative_path(path) for path in missing)
+        )
+
+    preprocess_dir = base / "tensile_preprocess"
+    preprocess_dir.mkdir(parents=True, exist_ok=True)
+    reports: list[dict[str, object]] = []
+    successful_cases = (
+        (
+            "all_valid",
+            (valid_a, valid_b),
+            2,
+            0,
+            "BlendSet",
+        ),
+        (
+            "mixed_valid_invalid",
+            (valid_a, valid_b, invalid_bad),
+            2,
+            1,
+            "BlendSet",
+        ),
+    )
+
+    for case_id, input_paths, expected_samples, expected_warnings, expected_group in successful_cases:
+        workbook_path = preprocess_dir / f"{case_id}.xlsx"
+        result = export_tensile_replicate_workbook(input_paths, workbook_path)
+        if not result.output_path.exists():
+            raise AssertionError(f"{case_id} should write a workbook for the wizard.")
+        if result.group_name != expected_group:
+            raise AssertionError(
+                f"{case_id} inferred group name drifted: {result.group_name!r} != {expected_group!r}."
+            )
+        if result.sample_count != expected_samples:
+            raise AssertionError(
+                f"{case_id} should keep {expected_samples} parsed samples, got {result.sample_count}."
+            )
+        if len(result.warnings) != expected_warnings:
+            raise AssertionError(
+                f"{case_id} should surface {expected_warnings} warnings, got {len(result.warnings)}."
+            )
+        if set(result.sheet_names) != TENSILE_WORKBOOK_SHEETS:
+            raise AssertionError(f"{case_id} workbook sheets drifted away from the tensile export contract.")
+        if result.preferred_sheet != "Representative_Curve" or result.preferred_sheet not in result.sheet_names:
+            raise AssertionError(f"{case_id} should default the wizard to Representative_Curve.")
+        if result.representative_filename not in {valid_a.name, valid_b.name}:
+            raise AssertionError(f"{case_id} representative sample should come from a valid raw CSV.")
+
+        if case_id == "mixed_valid_invalid":
+            warning_text = "\n".join(result.warnings)
+            if invalid_bad.name not in warning_text:
+                raise AssertionError("Mixed tensile preprocess warnings should name the skipped invalid raw CSV.")
+
+        inspection = inspect_input_file(result.output_path, result.preferred_sheet)
+        if inspection.model != "curve_table":
+            raise AssertionError(f"{case_id} workbook should load back into the wizard as a curve table.")
+        if inspection.recommendation.template != "curve":
+            raise AssertionError(f"{case_id} representative sheet should recommend the standard curve template.")
+        options = _resolve_render_options(
+            template=inspection.recommendation.template,
+            size=inspection.recommendation.size,
+            xscale=inspection.recommendation.xscale,
+            yscale=inspection.recommendation.yscale,
+            reverse_x=bool(inspection.recommendation.reverse_x),
+            baseline=inspection.recommendation.baseline,
+            show_colorbar=inspection.recommendation.show_colorbar,
+            use_sidecar=inspection.recommendation.use_sidecar,
+        )
+        preflight = preflight_render_request(
+            inspection.recommendation.template,
+            result.output_path,
+            result.preferred_sheet,
+            options,
+        )
+        if preflight.errors:
+            raise AssertionError(f"{case_id} workbook should pass preflight, got: {preflight.errors}")
+
+        render_outputs = render_template(
+            inspection.recommendation.template,
+            result.output_path,
+            outputs_dir / f"tensile_preprocess_{case_id}",
+            result.preferred_sheet,
+            size=inspection.recommendation.size,
+            xscale=inspection.recommendation.xscale,
+            yscale=inspection.recommendation.yscale,
+            reverse_x=bool(inspection.recommendation.reverse_x),
+            baseline=inspection.recommendation.baseline,
+            show_colorbar=inspection.recommendation.show_colorbar,
+            use_sidecar=inspection.recommendation.use_sidecar,
+        )
+        if not render_outputs:
+            raise AssertionError(f"{case_id} workbook should remain renderable after preprocess.")
+        for output in render_outputs:
+            if not output.exists() or output.stat().st_size <= 0:
+                raise AssertionError(f"{case_id} downstream render produced an empty PDF: {output.name}")
+            template_by_output[str(output)] = inspection.recommendation.template
+
+        reports.append(
+            {
+                "case_id": case_id,
+                "status": "passed",
+                "input_files": [_repo_relative_path(path) for path in input_paths],
+                "output_path": str(result.output_path),
+                "group_name": result.group_name,
+                "preferred_sheet": result.preferred_sheet,
+                "sheet_names": list(result.sheet_names),
+                "sample_count": result.sample_count,
+                "representative_filename": result.representative_filename,
+                "warnings_count": len(result.warnings),
+                "warnings": list(result.warnings),
+                "downstream": {
+                    "inspection_model": inspection.model,
+                    "recommended_template": inspection.recommendation.template,
+                    "preflight_warnings": list(preflight.warnings),
+                    "render_outputs": [str(path) for path in render_outputs],
+                },
+            }
+        )
+
+    failed_case_output = preprocess_dir / "all_invalid.xlsx"
+    try:
+        export_tensile_replicate_workbook((invalid_bad, invalid_no_curve), failed_case_output)
+    except ValueError as exc:
+        message = str(exc)
+        if "没有成功解析任何拉伸 CSV" not in message:
+            raise AssertionError("All-invalid tensile preprocess should fail with a user-facing aggregate error.") from exc
+        if failed_case_output.exists():
+            raise AssertionError("All-invalid tensile preprocess should not leave behind an empty workbook.")
+        reports.append(
+            {
+                "case_id": "all_invalid",
+                "status": "blocked",
+                "input_files": [
+                    _repo_relative_path(invalid_bad),
+                    _repo_relative_path(invalid_no_curve),
+                ],
+                "error": message,
+                "generated_workbook": False,
+            }
+        )
+    else:
+        raise AssertionError("All-invalid tensile preprocess should fail instead of creating a workbook.")
+
+    return reports
+
+
 def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
     graph_paths = [
         outputs_dir / "point_line" / "freq_storage_modulus.pdf",
@@ -1444,6 +1622,7 @@ def _write_smoke_report(
     *,
     output_reports: list[dict[str, object]],
     validation_reports: list[dict[str, object]],
+    preprocess_reports: list[dict[str, object]],
 ) -> Path:
     contract = load_plot_contract()
     payload = {
@@ -1452,10 +1631,12 @@ def _write_smoke_report(
         "summary": {
             "pdf_count": len(output_reports),
             "validation_count": len(validation_reports),
+            "preprocess_case_count": len(preprocess_reports),
             "templates_checked": sorted({str(item["template"]) for item in output_reports}),
         },
         "outputs": output_reports,
         "validations": validation_reports,
+        "preprocess_runs": preprocess_reports,
     }
     SMOKE_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     SMOKE_REPORT_PATH.write_text(
@@ -1539,6 +1720,11 @@ def main() -> int:
                 template_by_output[str(output)] = template
                 print(output)
 
+        preprocess_reports = _assert_tensile_preprocess_workflow(
+            base=base,
+            outputs_dir=outputs,
+            template_by_output=template_by_output,
+        )
         output_reports = _assert_rendered_output_files(outputs, template_by_output)
         _assert_stacked_layout(plot_ftir, ftir_path)
         _assert_stacked_layout(plot_nmr, nmr_path)
@@ -1584,6 +1770,7 @@ def main() -> int:
         report_path = _write_smoke_report(
             output_reports=output_reports,
             validation_reports=validation_reports,
+            preprocess_reports=preprocess_reports,
         )
 
     print(f"Smoke check passed. Report: {report_path}")
