@@ -36,6 +36,7 @@ from src.composer import (
     ComposerText,
     compose_export_pdf,
     compose_preview_png,
+    import_panels_from_paths,
     panel_thumbnail_png,
     project_from_dict,
     three_up_panels_from_paths,
@@ -78,6 +79,7 @@ class ComposerPanelPayload(BaseModel):
     h_mm: float
     locked: bool = False
     label: str | None = None
+    kind: str = "graph"
 
 
 class ComposerTextPayload(BaseModel):
@@ -98,6 +100,12 @@ class ComposerRequest(BaseModel):
     panels: list[ComposerPanelPayload] = Field(default_factory=list)
     texts: list[ComposerTextPayload] = Field(default_factory=list)
     auto_labels: bool = True
+
+
+class ComposerImportRequest(BaseModel):
+    project: ComposerRequest
+    file_paths: list[str]
+    kind: str = "graph"
 
 
 class SaveProjectRequest(BaseModel):
@@ -369,6 +377,17 @@ def open_project(request: OpenProjectRequest) -> dict[str, Any]:
 def composer_three_up(request: list[str]) -> dict[str, Any]:
     try:
         panels = [asdict(panel) for panel in three_up_panels_from_paths(request)]
+        return {"panels": panels}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/composer/import-panels")
+def composer_import_panels(request: ComposerImportRequest) -> dict[str, Any]:
+    try:
+        project = _build_composer_project(request.project)
+        file_paths = [str(Path(path).expanduser()) for path in request.file_paths]
+        panels = [asdict(panel) for panel in import_panels_from_paths(project, file_paths, kind=request.kind)]
         return {"panels": panels}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

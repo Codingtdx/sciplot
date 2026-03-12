@@ -100,6 +100,7 @@ export type ComposerPanel = {
   h_mm: number;
   locked?: boolean;
   label?: string | null;
+  kind: "graph" | "asset";
 };
 
 export type ComposerText = {

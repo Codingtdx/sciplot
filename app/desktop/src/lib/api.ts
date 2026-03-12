@@ -120,6 +120,18 @@ export async function threeUp(filePaths: string[]): Promise<{ panels: ComposerPa
   return postJson("/composer/three-up", filePaths);
 }
 
+export async function importComposerPanels(
+  project: ComposerProject,
+  filePaths: string[],
+  kind: "graph" | "asset",
+): Promise<{ panels: ComposerPanel[] }> {
+  return postJson("/composer/import-panels", {
+    project,
+    file_paths: filePaths,
+    kind,
+  });
+}
+
 export async function saveProject(projectPath: string, data: unknown): Promise<void> {
   await postJson("/save-project", {
     project_path: projectPath,

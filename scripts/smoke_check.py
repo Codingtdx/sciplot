@@ -24,6 +24,15 @@ from make_plot import (
     preflight_render_request,
     render_template,
 )
+from src.composer import (
+    ComposerProject,
+    ComposerText,
+    compose_export_pdf,
+    compose_preview_png,
+    import_panels_from_paths,
+    three_up_panels_from_paths,
+    validate_non_overlapping_panels,
+)
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
 from src import plot_style
 from src.plotting import (
@@ -879,6 +888,60 @@ def _assert_frequency_batch_sync(freq_path: Path) -> None:
         raise AssertionError("Frequency sweep legends are no longer anchored near the configured 2.5% inset.")
 
 
+def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
+    graph_paths = [
+        outputs_dir / "point_line" / "freq_storage_modulus.pdf",
+        outputs_dir / "point_line" / "freq_loss_modulus.pdf",
+        outputs_dir / "bar" / "tensile_modulus_bar.pdf",
+    ]
+    if any(not path.exists() for path in graph_paths):
+        raise AssertionError("Composer smoke test requires rendered graph PDFs to exist.")
+
+    project = ComposerProject()
+    graph_panels = three_up_panels_from_paths(graph_paths)
+    project.panels = graph_panels
+    ok, reason = validate_non_overlapping_panels(project)
+    if not ok:
+        raise AssertionError(f"Three-up composer layout should be valid: {reason}")
+    if [round(panel.x_mm, 1) for panel in graph_panels] != [0.0, 60.0, 120.0]:
+        raise AssertionError("Three-up composer layout should snap graph panels to 0/60/120 mm.")
+    if any(panel.kind != "graph" for panel in graph_panels):
+        raise AssertionError("Three-up composer layout should create graph panels only.")
+
+    asset_paths = [
+        outputs_dir / "heatmap" / "heatmap_heatmap.pdf",
+        outputs_dir / "stacked_curve" / "ftir_stacked_curve.pdf",
+    ]
+    if any(not path.exists() for path in asset_paths):
+        raise AssertionError("Composer smoke test requires asset-import PDFs to exist.")
+    imported_asset_panels = import_panels_from_paths(project, asset_paths, kind="asset")
+    if len(imported_asset_panels) != len(project.panels) + len(asset_paths):
+        raise AssertionError("Asset import should append one panel per imported file.")
+    if any(panel.kind != "asset" for panel in imported_asset_panels[-len(asset_paths) :]):
+        raise AssertionError("PDF asset import should preserve asset kind for composer panels.")
+
+    project.panels = imported_asset_panels
+    project.texts = [
+        ComposerText(
+            id="text-1",
+            text="Panel note",
+            x_mm=5.0,
+            y_mm=160.0,
+            font_size_pt=9.0,
+            align="left",
+        )
+    ]
+
+    preview_png = compose_preview_png(project)
+    if len(preview_png) < 1024:
+        raise AssertionError("Composer preview should produce a non-trivial PNG payload.")
+
+    export_path = base / "composer_export.pdf"
+    exported = compose_export_pdf(project, export_path)
+    if not exported.exists() or exported.stat().st_size <= 0:
+        raise AssertionError("Composer export should write a non-empty PDF.")
+
+
 def _assert_legend_candidate_insets() -> None:
     fig, ax = plt.subplots()
     try:
@@ -1112,6 +1175,7 @@ def main() -> int:
         )
         _assert_frequency_batch_sync(freq_path)
         _assert_legend_candidate_insets()
+        _assert_composer_workflow(outputs, base)
 
     print("Smoke check passed.")
     return 0

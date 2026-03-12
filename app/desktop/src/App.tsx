@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import { ComposerCanvas } from "./components/ComposerCanvas";
 import { PreviewPane } from "./components/PreviewPane";
 import {
   composeExport,
+  importComposerPanels,
   composePreview,
   healthcheck,
   inspectFile,
@@ -601,8 +603,34 @@ function ComposerPane() {
   const [thumbnailMap, setThumbnailMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [exportPath, setExportPath] = useState<string | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
+  const [pdfImportMode, setPdfImportMode] = useState<"graph" | "asset">("graph");
+  const projectRef = useRef(composer.project);
   const selectedPanel = composer.project.panels.find((item) => item.id === composer.selectedId) ?? null;
   const selectedText = composer.project.texts.find((item) => item.id === composer.selectedId) ?? null;
+  const selectedPanelLabel = selectedPanel
+    ? (() => {
+        if (!composer.project.auto_labels) {
+          return selectedPanel.label ?? "";
+        }
+        const ordered = [...composer.project.panels].sort((a, b) => {
+          if (Math.abs(a.y_mm - b.y_mm) > 0.25) {
+            return a.y_mm - b.y_mm;
+          }
+          if (Math.abs(a.x_mm - b.x_mm) > 0.25) {
+            return a.x_mm - b.x_mm;
+          }
+          return a.id.localeCompare(b.id);
+        });
+        const index = ordered.findIndex((panel) => panel.id === selectedPanel.id);
+        return index >= 0 ? String.fromCharCode("a".charCodeAt(0) + index) : "";
+      })()
+    : "";
+
+  useEffect(() => {
+    projectRef.current = composer.project;
+  }, [composer.project]);
 
   useEffect(() => {
     let cancelled = false;
@@ -645,7 +673,96 @@ function ComposerPane() {
     };
   }, [composer.project.panels]);
 
-  const importPanels = async () => {
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    async function handleDroppedPaths(paths: string[]) {
+      const cleaned = paths.filter(Boolean);
+      if (cleaned.length === 0) {
+        return;
+      }
+      const pdfs = cleaned.filter((path) => path.toLowerCase().endsWith(".pdf"));
+      const assets = cleaned.filter((path) => !path.toLowerCase().endsWith(".pdf"));
+      setBusy(true);
+      setDropNotice(null);
+      try {
+        let nextProject = projectRef.current;
+        if (pdfs.length > 0) {
+          const response = await importComposerPanels(nextProject, pdfs, pdfImportMode);
+          nextProject = {
+            ...nextProject,
+            panels: response.panels,
+          };
+        }
+        if (assets.length > 0) {
+          const response = await importComposerPanels(nextProject, assets, "asset");
+          nextProject = {
+            ...nextProject,
+            panels: response.panels,
+          };
+        }
+        composer.setProject(nextProject);
+        composer.setSelectedId(null);
+        setExportPath(null);
+        const unsupported = cleaned.length - pdfs.length - assets.length;
+        if (unsupported > 0) {
+          setDropNotice("部分文件格式未导入。PDF 会按当前模式导入，图片会作为素材导入。");
+        } else if (pdfs.length > 0 && assets.length > 0) {
+          setDropNotice(
+            pdfImportMode === "graph"
+              ? "已导入图 panel 和素材。PDF 已自动吸附到网格。"
+              : "已导入 PDF 素材和图片素材。素材可以继续拖拽、缩放和对齐。",
+          );
+        } else if (pdfs.length > 0) {
+          setDropNotice(
+            pdfImportMode === "graph"
+              ? "已导入图 panel。PDF 已自动吸附到 3×3 网格。"
+              : "已导入 PDF 素材。可以继续拖拽、缩放和对齐。",
+          );
+        } else {
+          setDropNotice("已导入素材。可以继续拖拽、缩放和对齐。");
+        }
+      } catch (error) {
+        setDropNotice(error instanceof Error ? error.message : String(error));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function attach() {
+      const webview = getCurrentWebviewWindow();
+      unlisten = await webview.onDragDropEvent((event) => {
+        if (disposed) {
+          return;
+        }
+        if (event.payload.type === "enter") {
+          setDropActive(true);
+          return;
+        }
+        if (event.payload.type === "over") {
+          return;
+        }
+        if (event.payload.type === "leave") {
+          setDropActive(false);
+          return;
+        }
+        if (event.payload.type === "drop") {
+          setDropActive(false);
+          void handleDroppedPaths(event.payload.paths);
+        }
+      });
+    }
+
+    void attach();
+    return () => {
+      disposed = true;
+      setDropActive(false);
+      void unlisten?.();
+    };
+  }, [composer, pdfImportMode]);
+
+  const importGraphPanels = async () => {
     const selected = await open({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
@@ -656,12 +773,66 @@ function ComposerPane() {
     }
     setBusy(true);
     try {
-      const response = await threeUp(paths);
+      const response = await importComposerPanels(composer.project, paths, "graph");
       composer.setProject({
         ...composer.project,
         panels: response.panels,
       });
       setExportPath(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importAssetPanels = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [
+        { name: "Visual Assets", extensions: ["pdf", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"] },
+      ],
+    });
+    const paths = Array.isArray(selected) ? selected.filter((item): item is string => typeof item === "string") : [];
+    if (paths.length === 0) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await importComposerPanels(composer.project, paths, "asset");
+      composer.setProject({
+        ...composer.project,
+        panels: response.panels,
+      });
+      setExportPath(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const quickThreeUp = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    const paths = Array.isArray(selected)
+      ? selected.filter((item): item is string => typeof item === "string").slice(0, 3)
+      : [];
+    if (paths.length === 0) {
+      return;
+    }
+    setBusy(true);
+    setDropNotice(null);
+    try {
+      const response = await threeUp(paths);
+      composer.setProject({
+        ...composer.project,
+        panels: response.panels,
+        texts: [],
+      });
+      composer.setSelectedId(null);
+      setExportPath(null);
+      setDropNotice("已按 180 mm 画布生成三联图排版。");
+    } catch (error) {
+      setDropNotice(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
@@ -753,7 +924,7 @@ function ComposerPane() {
       | ComposerProject;
     const project =
       "project" in payload && payload.project ? payload.project : (payload as ComposerProject);
-    composer.setProject(project);
+    composer.setProject(normalizeComposerProject(project));
     setExportPath(null);
   };
 
@@ -772,10 +943,40 @@ function ComposerPane() {
       <div className="composer-sidebar">
         <div className="eyebrow">拼图器</div>
         <h2>180 × 170 mm 画布</h2>
-        <p>拖入 PDF panel，自动避免重叠，支持三联图排版和 a/b/c 序号。</p>
+        <p>拖入 PDF 时可按当前模式导入为图 panel 或素材；图片始终作为素材导入。支持文字、三联图排版和 a/b/c 序号。</p>
+        <div className="inspector-card">
+          <div className="field-label">PDF 导入模式</div>
+          <div className="mode-switch">
+            <button
+              className={`mode-button ${pdfImportMode === "graph" ? "active" : ""}`}
+              onClick={() => setPdfImportMode("graph")}
+              type="button"
+            >
+              作为图
+            </button>
+            <button
+              className={`mode-button ${pdfImportMode === "asset" ? "active" : ""}`}
+              onClick={() => setPdfImportMode("asset")}
+              type="button"
+            >
+              作为素材
+            </button>
+          </div>
+          <div className="hint-text">
+            {pdfImportMode === "graph"
+              ? "Graph panel 会吸附到 3×3 网格，不支持缩放。"
+              : "Asset 支持 PDF/图片，允许在格子中移动和缩放。"}
+          </div>
+        </div>
         <div className="sidebar-actions">
-          <button className="primary-button" onClick={importPanels} type="button">
-            导入 PDF
+          <button className="primary-button" onClick={importGraphPanels} type="button">
+            导入图
+          </button>
+          <button className="ghost-button" onClick={quickThreeUp} type="button">
+            三联图
+          </button>
+          <button className="ghost-button" onClick={importAssetPanels} type="button">
+            导入素材
           </button>
           <button className="ghost-button" onClick={openComposerProject} type="button">
             打开项目
@@ -806,13 +1007,24 @@ function ComposerPane() {
         {selectedPanel && (
           <div className="inspector-card">
             <div className="field-label">选中 panel</div>
+            <div className="info-grid compact-grid">
+              <div>
+                <span className="field-label">类型</span>
+                <strong>{selectedPanel.kind === "graph" ? "Graph" : "Asset"}</strong>
+              </div>
+              <div>
+                <span className="field-label">标签</span>
+                <strong>{selectedPanelLabel || "-"}</strong>
+              </div>
+            </div>
             <label>
-              <span className="field-label">标签</span>
+              <span className="field-label">自定义标签</span>
               <input
                 className="field"
                 type="text"
                 value={selectedPanel.label ?? ""}
                 onChange={(event) => updateSelectedPanel({ label: event.target.value || null })}
+                disabled={composer.project.auto_labels}
               />
             </label>
             <label className="toggle-field">
@@ -841,6 +1053,12 @@ function ComposerPane() {
                 <strong>{selectedPanel.h_mm.toFixed(1)}</strong>
               </div>
             </div>
+            {selectedPanel.kind === "graph" && (
+              <div className="hint-text">Graph panel 会自动吸附到 3×3 网格，不支持手动缩放。</div>
+            )}
+            {selectedPanel.kind === "asset" && (
+              <div className="hint-text">Asset 可自由拖拽和缩放，但仍会避免与其他 panel 重叠。</div>
+            )}
             <button className="ghost-button danger-button" onClick={removeSelected} type="button">
               删除 panel
             </button>
@@ -891,10 +1109,26 @@ function ComposerPane() {
           </div>
         )}
         {composer.validationError && <div className="warning-card">{composer.validationError}</div>}
+        {dropNotice && (
+          <div className={dropNotice.includes("未导入") || dropNotice.includes("错误") ? "warning-card" : "success-card"}>
+            {dropNotice}
+          </div>
+        )}
         {exportPath && <div className="success-card">已导出：{exportPath}</div>}
       </div>
       <div className="composer-main">
+        <div className={`composer-drop-overlay ${dropActive ? "visible" : ""}`}>
+          <div className="composer-drop-card">
+            <strong>松开即可导入</strong>
+            <span>
+              {pdfImportMode === "graph"
+                ? "PDF 会作为图 panel 吸附到 3×3 网格，图片会作为素材导入。"
+                : "PDF 和图片都会作为素材导入，可拖拽、缩放并吸附到网格。"}
+            </span>
+          </div>
+        </div>
         <ComposerCanvas
+          autoLabels={composer.project.auto_labels}
           heightMm={composer.project.canvas_height_mm}
           onPanelsChange={composer.updatePanels}
           onTextsChange={composer.updateTexts}
@@ -905,6 +1139,16 @@ function ComposerPane() {
           thumbnails={thumbnailMap}
           widthMm={composer.project.canvas_width_mm}
         />
+        {composer.project.panels.length === 0 && !busy && (
+          <div className="composer-empty-state">
+            <strong>先拖入图或素材开始拼图</strong>
+            <span>
+              {pdfImportMode === "graph"
+                ? "图 panel 会自动吸附到 3×3 网格；素材可自由缩放与移动。"
+                : "当前模式会把 PDF 当作素材导入；素材可自由缩放、移动并自动避让。"}
+            </span>
+          </div>
+        )}
         {busy && <div className="composer-status">正在更新…</div>}
       </div>
     </div>
@@ -945,3 +1189,10 @@ export default function App() {
     </div>
   );
 }
+  const normalizeComposerProject = (project: ComposerProject): ComposerProject => ({
+    ...project,
+    panels: project.panels.map((panel) => ({
+      ...panel,
+      kind: panel.kind ?? "graph",
+    })),
+  });
