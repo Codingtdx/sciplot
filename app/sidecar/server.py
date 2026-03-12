@@ -37,6 +37,7 @@ from src.composer import (
     compose_export_pdf,
     compose_preview_png,
     import_panels_from_paths,
+    two_up_editorial_panels_from_paths,
     panel_thumbnail_png,
     project_from_dict,
     three_up_panels_from_paths,
@@ -377,6 +378,15 @@ def open_project(request: OpenProjectRequest) -> dict[str, Any]:
 def composer_three_up(request: list[str]) -> dict[str, Any]:
     try:
         panels = [asdict(panel) for panel in three_up_panels_from_paths(request)]
+        return {"panels": panels}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/composer/two-up-editorial")
+def composer_two_up_editorial(request: list[str]) -> dict[str, Any]:
+    try:
+        panels = [asdict(panel) for panel in two_up_editorial_panels_from_paths(request)]
         return {"panels": panels}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -30,6 +30,7 @@ from src.composer import (
     compose_export_pdf,
     compose_preview_png,
     import_panels_from_paths,
+    two_up_editorial_panels_from_paths,
     three_up_panels_from_paths,
     validate_non_overlapping_panels,
 )
@@ -907,6 +908,17 @@ def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
         raise AssertionError("Three-up composer layout should snap graph panels to 0/60/120 mm.")
     if any(panel.kind != "graph" for panel in graph_panels):
         raise AssertionError("Three-up composer layout should create graph panels only.")
+
+    editorial_project = ComposerProject()
+    editorial_panels = two_up_editorial_panels_from_paths(graph_paths[:2])
+    editorial_project.panels = editorial_panels
+    ok, reason = validate_non_overlapping_panels(editorial_project)
+    if not ok:
+        raise AssertionError(f"Two-up editorial composer layout should be valid: {reason}")
+    if [round(panel.x_mm, 1) for panel in editorial_panels] != [0.0, 60.0]:
+        raise AssertionError("Two-up editorial layout should snap graph panels to 0/60 mm.")
+    if len(editorial_panels) != 2 or any(panel.kind != "graph" for panel in editorial_panels):
+        raise AssertionError("Two-up editorial layout should create exactly two graph panels.")
 
     asset_paths = [
         outputs_dir / "heatmap" / "heatmap_heatmap.pdf",

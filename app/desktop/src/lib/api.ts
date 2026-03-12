@@ -120,6 +120,10 @@ export async function threeUp(filePaths: string[]): Promise<{ panels: ComposerPa
   return postJson("/composer/three-up", filePaths);
 }
 
+export async function twoUpEditorial(filePaths: string[]): Promise<{ panels: ComposerPanel[] }> {
+  return postJson("/composer/two-up-editorial", filePaths);
+}
+
 export async function importComposerPanels(
   project: ComposerProject,
   filePaths: string[],

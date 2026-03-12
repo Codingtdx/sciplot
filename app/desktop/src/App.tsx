@@ -17,6 +17,7 @@ import {
   saveProject,
   exportRender,
   threeUp,
+  twoUpEditorial,
 } from "./lib/api";
 import { useComposerStore, useWizardStore } from "./lib/store";
 import type {
@@ -290,301 +291,322 @@ function WizardPane() {
 
   return (
     <div className="wizard-shell">
-      <Stepper current={wizard.step} />
+      <div className="wizard-column">
+        <div className="wizard-topbar">
+          <div className="wizard-title">
+            <div className="eyebrow">CodeGod</div>
+            <h1>绘图精灵</h1>
+          </div>
+          <div className="wizard-topbar-actions">
+            <button className="ghost-button compact-button" onClick={openWizardProject} type="button">
+              打开项目
+            </button>
+          </div>
+        </div>
 
-      <div className="wizard-card">
         {(wizard.inputPath || wizard.sheetNames.length > 0) && (
-          <div className="wizard-context">
-            <div>
-              <span className="field-label">当前文件</span>
+          <div className="wizard-filebar">
+            <div className="file-chip">
+              <span className="file-chip-label">文件</span>
               <strong>{wizard.inputPath ? wizard.inputPath.split("/").pop() : "未选择"}</strong>
             </div>
             {wizard.sheetNames.length > 0 && (
-              <div>
-                <span className="field-label">Sheet</span>
+              <div className="file-chip">
+                <span className="file-chip-label">Sheet</span>
                 <strong>{String(wizard.sheet)}</strong>
               </div>
             )}
           </div>
         )}
-        {wizard.error && <div className="error-card">{wizard.error}</div>}
 
-        {wizard.step === "file" && (
-          <div className="step-block">
-            <h2>拖文件或直接选择</h2>
-            <p>程序会先识别输入模型，再推荐最可能正确的图类型和关键参数。</p>
-            <div className="step-actions">
-              <button className="primary-button" onClick={openDataFile} type="button">
-                打开数据文件
-              </button>
-              <button className="ghost-button" onClick={openWizardProject} type="button">
-                打开项目
-              </button>
-            </div>
-            {!wizard.sidecarReady && (
-              <div className="warning-card">本地 Python sidecar 尚未连通，稍后会自动重试。</div>
-            )}
-          </div>
-        )}
+        <Stepper current={wizard.step} />
 
-        {wizard.step === "sheet" && (
-          <div className="step-block">
-            <h2>选择 sheet</h2>
-            <p>这个文件包含多个工作表。先确认你要出图的那个。</p>
-            <select
-              className="field"
-              value={String(wizard.sheet)}
-              onChange={(event) => void rerunInspect(event.target.value)}
-            >
-              {wizard.sheetNames.map((name, index) => (
-                <option key={name} value={name}>
-                  {index}. {name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="wizard-card">
+          {wizard.error && <div className="error-card">{wizard.error}</div>}
 
-        {wizard.step === "inspect" && wizard.inspection && (
-          <div className="step-block">
-            <h2>识别结果</h2>
-            <p>{wizard.inspection.recommendation.reason}</p>
-            <div className="info-grid">
-              <div>
-                <span className="field-label">输入模型</span>
-                <strong>{wizard.inspection.model_label}</strong>
+          {wizard.step === "file" && (
+            <div className="step-block">
+              <h2>先给我数据</h2>
+              <p>拖文件或者直接打开。程序会先识别输入结构，再推荐最可能正确的出图方式。</p>
+              <div className="step-actions">
+                <button className="primary-button" onClick={openDataFile} type="button">
+                  打开数据文件
+                </button>
+                <button className="ghost-button" onClick={openWizardProject} type="button">
+                  打开项目
+                </button>
               </div>
-              <div>
-                <span className="field-label">推荐图型</span>
-                <strong>{wizard.inspection.recommendation.template}</strong>
-              </div>
-            </div>
-            {wizard.inspection.signals.length > 0 && (
-              <details>
-                <summary>为什么这样推荐</summary>
-                <ul className="bullet-list">
-                  {wizard.inspection.signals.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
-                调整图型
-              </button>
-              <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
-                采用推荐继续
-              </button>
-            </div>
-          </div>
-        )}
-
-        {wizard.step === "template" && (
-          <div className="step-block">
-            <h2>确认图类型</h2>
-            <select
-              className="field"
-              value={wizard.template ?? "curve"}
-              onChange={(event) => wizard.setTemplate(event.target.value as TemplateName)}
-            >
-              {templateChoices.map((template) => (
-                <option key={template} value={template}>
-                  {template}
-                </option>
-              ))}
-            </select>
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => wizard.setStep("inspect")} type="button">
-                返回
-              </button>
-              <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
-                下一步
-              </button>
-            </div>
-          </div>
-        )}
-
-        {wizard.step === "options" && wizard.template && (
-          <div className="step-block">
-            <h2>调整必要参数</h2>
-            <div className="field-grid">
-              <label>
-                <span className="field-label">尺寸</span>
-                <select
-                  className="field"
-                  value={wizard.options.size}
-                  onChange={(event) => wizard.setOptions({ size: event.target.value as SizePreset })}
-                >
-                  {sizeChoices.map((choice) => (
-                    <option key={choice} value={choice}>
-                      {choice}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="field-label">配色</span>
-                <select
-                  className="field"
-                  value={wizard.options.palette_preset}
-                  onChange={(event) =>
-                    wizard.setOptions({ palette_preset: event.target.value as PalettePreset })
-                  }
-                >
-                  {paletteChoices.map((choice) => (
-                    <option key={choice} value={choice}>
-                      {choice}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {["curve", "point_line", "scatter"].includes(wizard.template) && (
-                <>
-                  <label>
-                    <span className="field-label">X 轴</span>
-                    <select
-                      className="field"
-                      value={wizard.options.xscale}
-                      onChange={(event) => wizard.setOptions({ xscale: event.target.value as "linear" | "log" })}
-                    >
-                      <option value="linear">linear</option>
-                      <option value="log">log</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span className="field-label">Y 轴</span>
-                    <select
-                      className="field"
-                      value={wizard.options.yscale}
-                      onChange={(event) => wizard.setOptions({ yscale: event.target.value as "linear" | "log" })}
-                    >
-                      <option value="linear">linear</option>
-                      <option value="log">log</option>
-                    </select>
-                  </label>
-                  <label className="toggle-field">
-                    <input
-                      checked={Boolean(wizard.options.reverse_x)}
-                      onChange={(event) => wizard.setOptions({ reverse_x: event.target.checked })}
-                      type="checkbox"
-                    />
-                    <span>反向 X 轴</span>
-                  </label>
-                </>
+              {!wizard.sidecarReady && (
+                <div className="warning-card">本地 Python sidecar 尚未连通，稍后会自动重试。</div>
               )}
-              {["stacked_curve", "segmented_stacked_curve"].includes(wizard.template) && (
-                <>
+            </div>
+          )}
+
+          {wizard.step === "sheet" && (
+            <div className="step-block">
+              <h2>选择 sheet</h2>
+              <p>这个文件里有多个工作表，先确认当前要出图的那一张。</p>
+              <select
+                className="field"
+                value={String(wizard.sheet)}
+                onChange={(event) => void rerunInspect(event.target.value)}
+              >
+                {wizard.sheetNames.map((name, index) => (
+                  <option key={name} value={name}>
+                    {index}. {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {wizard.step === "inspect" && wizard.inspection && (
+            <div className="step-block">
+              <h2>程序这样判断</h2>
+              <p>{wizard.inspection.recommendation.reason}</p>
+              <div className="info-grid">
+                <div>
+                  <span className="field-label">输入模型</span>
+                  <strong>{wizard.inspection.model_label}</strong>
+                </div>
+                <div>
+                  <span className="field-label">推荐图型</span>
+                  <strong>{wizard.inspection.recommendation.template}</strong>
+                </div>
+              </div>
+              {wizard.inspection.signals.length > 0 && (
+                <details>
+                  <summary>为什么这样推荐</summary>
+                  <ul className="bullet-list">
+                    {wizard.inspection.signals.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="step-actions">
+                <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
+                  改图型
+                </button>
+                <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
+                  采用推荐
+                </button>
+              </div>
+            </div>
+          )}
+
+          {wizard.step === "template" && (
+            <div className="step-block">
+              <h2>确认图类型</h2>
+              <p>如果推荐已经对了，这一步一般不用改。</p>
+              <select
+                className="field"
+                value={wizard.template ?? "curve"}
+                onChange={(event) => wizard.setTemplate(event.target.value as TemplateName)}
+              >
+                {templateChoices.map((template) => (
+                  <option key={template} value={template}>
+                    {template}
+                  </option>
+                ))}
+              </select>
+              <div className="step-actions">
+                <button className="ghost-button" onClick={() => wizard.setStep("inspect")} type="button">
+                  返回
+                </button>
+                <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
+                  下一步
+                </button>
+              </div>
+            </div>
+          )}
+
+          {wizard.step === "options" && wizard.template && (
+            <div className="step-block">
+              <h2>调整必要参数</h2>
+              <div className="field-grid">
+                <label>
+                  <span className="field-label">尺寸</span>
+                  <select
+                    className="field"
+                    value={wizard.options.size}
+                    onChange={(event) => wizard.setOptions({ size: event.target.value as SizePreset })}
+                  >
+                    {sizeChoices.map((choice) => (
+                      <option key={choice} value={choice}>
+                        {choice}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {["curve", "point_line", "scatter"].includes(wizard.template) && (
+                  <>
+                    <label>
+                      <span className="field-label">X 轴</span>
+                      <select
+                        className="field"
+                        value={wizard.options.xscale}
+                        onChange={(event) => wizard.setOptions({ xscale: event.target.value as "linear" | "log" })}
+                      >
+                        <option value="linear">linear</option>
+                        <option value="log">log</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span className="field-label">Y 轴</span>
+                      <select
+                        className="field"
+                        value={wizard.options.yscale}
+                        onChange={(event) => wizard.setOptions({ yscale: event.target.value as "linear" | "log" })}
+                      >
+                        <option value="linear">linear</option>
+                        <option value="log">log</option>
+                      </select>
+                    </label>
+                    <label className="toggle-field">
+                      <input
+                        checked={Boolean(wizard.options.reverse_x)}
+                        onChange={(event) => wizard.setOptions({ reverse_x: event.target.checked })}
+                        type="checkbox"
+                      />
+                      <span>反向 X 轴</span>
+                    </label>
+                  </>
+                )}
+                {["stacked_curve", "segmented_stacked_curve"].includes(wizard.template) && (
+                  <>
+                    <label className="toggle-field">
+                      <input
+                        checked={Boolean(wizard.options.reverse_x)}
+                        onChange={(event) => wizard.setOptions({ reverse_x: event.target.checked })}
+                        type="checkbox"
+                      />
+                      <span>反向 X 轴</span>
+                    </label>
+                    <label>
+                      <span className="field-label">Baseline</span>
+                      <select
+                        className="field"
+                        value={wizard.options.baseline}
+                        onChange={(event) =>
+                          wizard.setOptions({
+                            baseline: event.target.value as "none" | "linear_endpoints",
+                          })
+                        }
+                      >
+                        <option value="none">none</option>
+                        <option value="linear_endpoints">linear_endpoints</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+                {wizard.template === "heatmap" && (
                   <label className="toggle-field">
                     <input
-                      checked={Boolean(wizard.options.reverse_x)}
-                      onChange={(event) => wizard.setOptions({ reverse_x: event.target.checked })}
+                      checked={Boolean(wizard.options.show_colorbar)}
+                      onChange={(event) => wizard.setOptions({ show_colorbar: event.target.checked })}
                       type="checkbox"
                     />
-                    <span>反向 X 轴</span>
+                    <span>显示 colorbar</span>
                   </label>
+                )}
+              </div>
+              <details>
+                <summary>高级选项</summary>
+                <div className="field-grid compact-grid advanced-grid">
                   <label>
-                    <span className="field-label">Baseline</span>
+                    <span className="field-label">配色</span>
                     <select
                       className="field"
-                      value={wizard.options.baseline}
+                      value={wizard.options.palette_preset}
                       onChange={(event) =>
-                        wizard.setOptions({
-                          baseline: event.target.value as "none" | "linear_endpoints",
-                        })
+                        wizard.setOptions({ palette_preset: event.target.value as PalettePreset })
                       }
                     >
-                      <option value="none">none</option>
-                      <option value="linear_endpoints">linear_endpoints</option>
+                      {paletteChoices.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {choice}
+                        </option>
+                      ))}
                     </select>
                   </label>
-                </>
-              )}
-              {wizard.template === "heatmap" && (
-                <label className="toggle-field">
-                  <input
-                    checked={Boolean(wizard.options.show_colorbar)}
-                    onChange={(event) => wizard.setOptions({ show_colorbar: event.target.checked })}
-                    type="checkbox"
-                  />
-                  <span>显示 colorbar</span>
-                </label>
-              )}
-            </div>
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
-                返回
-              </button>
-              <button className="primary-button" onClick={() => void runPreflight()} type="button">
-                继续检查
-              </button>
-            </div>
-          </div>
-        )}
-
-        {wizard.step === "preflight" && wizard.preflight && (
-          <div className="step-block">
-            <h2>预检查</h2>
-            {wizard.preflight.errors.length > 0 ? (
-              <div className="error-card">
-                <strong>当前不能直接出图：</strong>
-                <ul className="bullet-list">
-                  {wizard.preflight.errors.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="success-card">当前检查通过，可以直接导出。</div>
-            )}
-            {wizard.preflight.warnings.length > 0 && (
-              <details>
-                <summary>建议先注意</summary>
-                <ul className="bullet-list">
-                  {wizard.preflight.warnings.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+                </div>
               </details>
-            )}
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
-                返回修改
-              </button>
-              <button
-                className="primary-button"
-                disabled={wizard.preflight.errors.length > 0}
-                onClick={() => void runExport()}
-                type="button"
-              >
-                导出 PDF
-              </button>
+              <div className="step-actions">
+                <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
+                  返回
+                </button>
+                <button className="primary-button" onClick={() => void runPreflight()} type="button">
+                  继续检查
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {wizard.step === "export" && (
-          <div className="step-block">
-            <h2>导出完成</h2>
-            <p>程序已经按当前图类型和参数导出 PDF。</p>
-            <ul className="bullet-list">
-              {wizard.outputs.map((output) => (
-                <li key={output}>{output}</li>
-              ))}
-            </ul>
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => void saveWizardProject()} type="button">
-                保存项目
-              </button>
-              <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
-                改参数重画
-              </button>
-              <button className="primary-button" onClick={openDataFile} type="button">
-                换文件
-              </button>
+          {wizard.step === "preflight" && wizard.preflight && (
+            <div className="step-block">
+              <h2>预检查</h2>
+              {wizard.preflight.errors.length > 0 ? (
+                <div className="error-card">
+                  <strong>当前不能直接出图：</strong>
+                  <ul className="bullet-list">
+                    {wizard.preflight.errors.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="success-card">当前检查通过，可以直接导出。</div>
+              )}
+              {wizard.preflight.warnings.length > 0 && (
+                <details>
+                  <summary>建议先注意</summary>
+                  <ul className="bullet-list">
+                    {wizard.preflight.warnings.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="step-actions">
+                <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
+                  返回修改
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={wizard.preflight.errors.length > 0}
+                  onClick={() => void runExport()}
+                  type="button"
+                >
+                  导出 PDF
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {wizard.step === "export" && (
+            <div className="step-block">
+              <h2>导出完成</h2>
+              <p>程序已经按当前图类型和参数导出 PDF。</p>
+              <ul className="bullet-list">
+                {wizard.outputs.map((output) => (
+                  <li key={output}>{output}</li>
+                ))}
+              </ul>
+              <div className="step-actions">
+                <button className="ghost-button" onClick={() => void saveWizardProject()} type="button">
+                  保存项目
+                </button>
+                <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
+                  改参数重画
+                </button>
+                <button className="primary-button" onClick={openDataFile} type="button">
+                  换文件
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <PreviewPane
@@ -838,6 +860,36 @@ function ComposerPane() {
     }
   };
 
+  const quickTwoUpEditorial = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    const paths = Array.isArray(selected)
+      ? selected.filter((item): item is string => typeof item === "string").slice(0, 2)
+      : [];
+    if (paths.length === 0) {
+      return;
+    }
+    setBusy(true);
+    setDropNotice(null);
+    try {
+      const response = await twoUpEditorial(paths);
+      composer.setProject({
+        ...composer.project,
+        panels: response.panels,
+        texts: [],
+      });
+      composer.setSelectedId(null);
+      setExportPath(null);
+      setDropNotice("已按 180 mm 画布生成两图 + 说明区排版。第三列可继续放结构式、示意图、图片或文字。");
+    } catch (error) {
+      setDropNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const addText = () => {
     composer.updateTexts([
       ...composer.project.texts,
@@ -974,6 +1026,9 @@ function ComposerPane() {
           </button>
           <button className="ghost-button" onClick={quickThreeUp} type="button">
             三联图
+          </button>
+          <button className="ghost-button" onClick={quickTwoUpEditorial} type="button">
+            两图+说明区
           </button>
           <button className="ghost-button" onClick={importAssetPanels} type="button">
             导入素材
@@ -1160,32 +1215,40 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="brand-block">
+      <aside className="app-rail">
+        <div className="rail-brand">
           <div className="brand-mark">CG</div>
           <div>
             <div className="eyebrow">CodeGod</div>
-            <div className="brand-title">绘图精灵 4.0</div>
+            <div className="rail-title">Plot Studio</div>
           </div>
         </div>
-        <div className="mode-switch">
+
+        <div className="rail-section">
           <button
-            className={`mode-button ${mode === "wizard" ? "active" : ""}`}
+            className={`rail-nav-button ${mode === "wizard" ? "active" : ""}`}
             onClick={() => setMode("wizard")}
             type="button"
           >
-            绘图精灵
+            <span className="rail-nav-label">绘图精灵</span>
+            <span className="rail-nav-hint">单图出图</span>
           </button>
           <button
-            className={`mode-button ${mode === "composer" ? "active" : ""}`}
+            className={`rail-nav-button ${mode === "composer" ? "active" : ""}`}
             onClick={() => setMode("composer")}
             type="button"
           >
-            拼图器
+            <span className="rail-nav-label">拼图器</span>
+            <span className="rail-nav-hint">180 mm 画布</span>
           </button>
         </div>
-      </header>
-      <main className="app-body">{mode === "wizard" ? <WizardPane /> : <ComposerPane />}</main>
+
+        <div className="rail-footer">
+          <div className="rail-status-dot" />
+          <span>本地 sidecar 驱动中</span>
+        </div>
+      </aside>
+      <main className="app-workspace">{mode === "wizard" ? <WizardPane /> : <ComposerPane />}</main>
     </div>
   );
 }

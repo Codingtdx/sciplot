@@ -320,6 +320,29 @@ def three_up_panels_from_paths(file_paths: list[str | Path]) -> list[ComposerPan
     return panels
 
 
+def two_up_editorial_panels_from_paths(file_paths: list[str | Path]) -> list[ComposerPanel]:
+    panels: list[ComposerPanel] = []
+    labels = "abcdefghijklmnopqrstuvwxyz"
+    for index, file_path in enumerate(file_paths[:2]):
+        aspect_ratio = pdf_page_aspect_ratio(file_path, 0)
+        width_mm = 60.0
+        height_mm = max(20.0, width_mm / max(aspect_ratio, 1e-6))
+        panels.append(
+            ComposerPanel(
+                id=f"panel-{index + 1}",
+                file_path=str(Path(file_path).expanduser()),
+                page_index=0,
+                x_mm=index * 60.0,
+                y_mm=0.0,
+                w_mm=width_mm,
+                h_mm=height_mm,
+                label=labels[index],
+                kind="graph",
+            )
+        )
+    return panels
+
+
 def _draw_text(draw: ImageDraw.ImageDraw, text: ComposerText, dpi: float, canvas_height_px: int) -> None:
     x_px = mm_to_px(text.x_mm, dpi)
     y_px = mm_to_px(text.y_mm, dpi)

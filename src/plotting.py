@@ -601,8 +601,9 @@ def _prepare_stacked_layout(
         max_span = max(spans) if spans else 1.0
         return StackedLayout(list(series_list), 0.0, max_span, max_span)
 
-    prepared: list[tuple[CurveSeries, pd.DataFrame, float]] = []
+    prepared: list[tuple[CurveSeries, pd.DataFrame, float, float]] = []
     spans: list[float] = []
+    peak_heights: list[float] = []
     for series in series_list:
         y = series.data["y"].to_numpy(dtype=float)
         finite = y[np.isfinite(y)]
@@ -610,16 +611,22 @@ def _prepare_stacked_layout(
         if finite.size:
             shifted["y"] = shifted["y"] - float(finite.min())
         span = _robust_span(shifted["y"].to_numpy(dtype=float))
-        prepared.append((series, shifted, span))
+        peak_height = float(np.nanmax(shifted["y"].to_numpy(dtype=float))) if finite.size else 0.0
+        prepared.append((series, shifted, span, peak_height))
         spans.append(span)
+        peak_heights.append(peak_height)
 
     max_span = max(spans) if spans else 1.0
+    max_peak_height = max(peak_heights) if peak_heights else max_span
     scale = max(step_scale, 1.0)
-    floor = max_span * stack_floor_fraction * scale
+    floor = max(max_span * stack_floor_fraction * scale, max_peak_height * 0.12 * scale)
     step = max_span * (1.0 + stack_gap_fraction) * scale
+    peak_clearance = max(max_span * max(stack_gap_fraction, 0.12) * 0.4, max_peak_height * 0.08)
+    minimum_step = (max_peak_height + peak_clearance) * scale
+    step = max(step, minimum_step)
 
     stacked: list[CurveSeries] = []
-    for idx, (series, shifted, _) in enumerate(prepared):
+    for idx, (series, shifted, _, _) in enumerate(prepared):
         final = shifted.copy()
         final["y"] = final["y"] + floor + idx * step
         stacked.append(_clone_curve_series(series, final))
@@ -931,24 +938,19 @@ def _stacked_label_y_candidates(
 ) -> np.ndarray:
     if upper_bound <= lower_bound:
         return np.array([], dtype=float)
-    # Prefer labels close to the local baseline, but allow them to climb within
-    # the corridor when dense curves would otherwise force an overlap.
-    corridor = upper_bound - lower_bound
+    corridor_mid = float((lower_bound + upper_bound) / 2.0)
     preferred_offsets = np.array(
         [
             0.0,
-            max(bbox_height * 0.10, 3.0),
-            max(bbox_height * 0.22, 6.0),
-            max(bbox_height * 0.40, 10.0),
+            max(min(bbox_height * 0.10, 5.0), 2.5),
+            -max(min(bbox_height * 0.10, 5.0), 2.5),
+            max(min(bbox_height * 0.18, 8.0), 4.0),
+            -max(min(bbox_height * 0.18, 8.0), 4.0),
         ],
         dtype=float,
     )
-    if corridor > bbox_height * 1.6:
-        stepped = np.linspace(lower_bound, upper_bound, 7, dtype=float)
-        candidates = np.concatenate([lower_bound + preferred_offsets, stepped])
-    else:
-        candidates = lower_bound + preferred_offsets
-    candidates = candidates[candidates <= upper_bound + 1e-6]
+    candidates = corridor_mid + preferred_offsets
+    candidates = candidates[(candidates >= lower_bound - 1e-6) & (candidates <= upper_bound + 1e-6)]
     if candidates.size == 0:
         return np.array([lower_bound], dtype=float)
     return np.unique(np.clip(candidates, lower_bound, upper_bound))
@@ -1008,7 +1010,7 @@ def _find_flat_label_windows(
         max_label_width=max_label_width,
     ):
         per_series: dict[int, BaselineLabelWindow] = {}
-        total_score = rail_offset * 0.35
+        total_score = rail_offset * 0.18
         valid = True
         for series_index, _, _, bbox_width, bbox_height in label_records:
             bbox_left = rail_x - bbox_width if side == "left" else rail_x
@@ -1033,6 +1035,10 @@ def _find_flat_label_windows(
             baseline = _baseline_level(local_points)
             flatness = _flat_window_score(local_points)
             peak_height = max(float(np.max(local_points[:, 1])) - baseline, 0.0)
+            local_min = float(np.min(local_points[:, 1]))
+            local_max = float(np.max(local_points[:, 1]))
+            local_span = max(local_max - local_min, 0.0)
+            upper_quartile_penalty = max(float(np.quantile(local_points[:, 1], 0.75)) - baseline, 0.0)
             per_series[series_index] = BaselineLabelWindow(
                 points=local_points,
                 baseline=baseline,
@@ -1042,10 +1048,18 @@ def _find_flat_label_windows(
                 bbox_right=bbox_right,
                 bbox_width=bbox_width,
                 bbox_height=bbox_height,
-                local_min=float(np.min(local_points[:, 1])),
-                local_max=float(np.max(local_points[:, 1])),
+                local_min=local_min,
+                local_max=local_max,
             )
-            total_score += flatness * 1.2 + peak_height * 6.5
+            # Strongly prefer rails that sit on flat baseline segments rather
+            # than near peaks. The rail is shared by all series, so the score
+            # needs to punish even a single peaky local window quite hard.
+            total_score += (
+                flatness * 1.0
+                + upper_quartile_penalty * 7.5
+                + peak_height * 13.5
+                + local_span * 4.5
+            )
         if valid and len(per_series) == len(label_records):
             rail_plans.append((total_score, rail_x, per_series))
     rail_plans.sort(key=lambda item: item[0])
@@ -1075,7 +1089,7 @@ def _choose_baseline_label_rail(
             search_band_fraction=search_band_fraction,
         ):
             ranked_plans.append((visual_side, flatness_score, rail_x, per_series))
-    ranked_plans.sort(key=lambda item: item[1])
+    ranked_plans.sort(key=lambda item: (item[1], 0 if item[0] == "right" else 1))
     return ranked_plans
 
 
@@ -1094,14 +1108,26 @@ def _place_labels_on_baseline_rail(
     placed_bboxes: list[transforms.Bbox] = []
     planned_labels: list[tuple[float, float, str, tuple[float, float, float] | str]] = []
     total_score = 0.0
+    previous_label_top: float | None = None
     for series_index, label_text, color, _, _ in sorted(label_records, key=lambda item: item[0], reverse=True):
         window = per_series[series_index]
         bbox_height = window.bbox_height
-        lower_bound = max(window.baseline + pixel_offset, float(axes_bbox.y0 + label_gap))
+        # Use the local baseline as the primary anchor so labels sit above the
+        # flat rail rather than near peaks. Curve/label collisions are still
+        # handled by bbox scoring against all rendered points.
+        lower_bound = max(
+            window.baseline + max(pixel_offset, window.bbox_height * 0.18),
+            float(axes_bbox.y0 + label_gap),
+        )
         upper_bound = float(axes_bbox.y1 - label_gap - bbox_height)
         if series_index + 1 < len(label_records) and (series_index + 1) in per_series:
             upper_window = per_series[series_index + 1]
-            upper_bound = min(upper_bound, upper_window.baseline - label_gap - bbox_height)
+            upper_bound = min(
+                upper_bound,
+                upper_window.baseline - max(pixel_offset * 0.55, label_gap) - bbox_height,
+            )
+        if previous_label_top is not None:
+            upper_bound = min(upper_bound, previous_label_top - label_gap - bbox_height)
         if upper_bound <= lower_bound:
             return None
 
@@ -1124,8 +1150,8 @@ def _place_labels_on_baseline_rail(
                 axes_bbox=axes_bbox,
                 all_curve_points=all_curve_points,
                 placed_bboxes=placed_bboxes,
-                rail_penalty=window.flatness * 1.1
-                + window.peak_height * 4.2
+                rail_penalty=window.flatness * 1.0
+                + window.peak_height * 1.6
                 + float(candidate_bottom - lower_bound) * 0.65,
             )
             if candidate_score >= 1_000_000_000.0:
@@ -1143,6 +1169,7 @@ def _place_labels_on_baseline_rail(
         total_score += candidate_score
         planned_labels.append((candidate_data_x, candidate_data_y, label_text, color))
         placed_bboxes.append(candidate_bbox.expanded(1.03, 1.08))
+        previous_label_top = float(candidate_bbox.y0)
     return total_score, planned_labels
 
 
