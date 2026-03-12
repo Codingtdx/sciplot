@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import json
 import tempfile
 from pathlib import Path
 
@@ -58,6 +60,7 @@ from src.plotting import (
     plot_xrd,
 )
 from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
+from src.plot_contract import load_plot_contract, validation_rule
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import load_wide_nmr_config
 from src.wide_nmr import (
@@ -66,6 +69,23 @@ from src.wide_nmr import (
     WIDE_NMR_TOTAL_HEIGHT_MM,
     WIDE_NMR_WIDTH_MM,
 )
+
+
+SMOKE_REPORT_PATH = ROOT / "figures" / "debug_outputs" / "smoke_report.json"
+
+
+def _validation_result(rule_name: str, *, passed: bool, details: dict[str, object]) -> dict[str, object]:
+    rule = validation_rule(rule_name)
+    payload: dict[str, object] = {
+        "id": rule_name,
+        "label": rule.label,
+        "severity": rule.severity,
+        "passed": passed,
+        "details": details,
+    }
+    if rule.tolerance_mm is not None:
+        payload["tolerance_mm"] = rule.tolerance_mm
+    return payload
 
 
 def _write_curve_table(path: Path, x_label: str, y_label: str, x_unit: str, y_unit: str) -> None:
@@ -768,7 +788,7 @@ def _assert_axis_frame_alignment(
     tensile_path: Path,
     heatmap_path: Path,
     wide_nmr_path: Path,
-) -> None:
+) -> list[dict[str, object]]:
     from src.data_loader import load_heatmap_table
 
     groups = load_replicate_table(replicate_path)
@@ -778,6 +798,7 @@ def _assert_axis_frame_alignment(
     wide_nmr_config = load_wide_nmr_config(wide_nmr_path)
 
     figures: list[plt.Figure] = []
+    validation_reports: list[dict[str, object]] = []
     try:
         axis_frames: dict[str, np.ndarray] = {}
         for name, builder in (
@@ -793,6 +814,7 @@ def _assert_axis_frame_alignment(
             axis_frames[name] = np.asarray(ax.get_position().bounds, dtype=float)
 
         reference = axis_frames["curve"]
+        single_panel_tolerance_mm = validation_rule("single_panel_axis_frame").tolerance_mm or 0.05
         for name, frame in axis_frames.items():
             if not np.allclose(frame, reference, atol=5e-6):
                 raise AssertionError(f"{name} drifted away from the shared single-panel axis frame.")
@@ -803,12 +825,58 @@ def _assert_axis_frame_alignment(
         reference_left_mm = reference[0] * reference_width_mm
         reference_right_mm = (1.0 - (reference[0] + reference[2])) * reference_width_mm
         reference_bottom_mm = reference[1] * reference_height_mm
+        reference_top_mm = (1.0 - (reference[1] + reference[3])) * reference_height_mm
+        validation_reports.append(
+            _validation_result(
+                "single_panel_axis_frame",
+                passed=True,
+                details={
+                    "reference_template": "curve",
+                    "reference_edges_mm": {
+                        "left": round(reference_left_mm, 3),
+                        "right": round(reference_right_mm, 3),
+                        "bottom": round(reference_bottom_mm, 3),
+                        "top": round(reference_top_mm, 3),
+                    },
+                    "checked_templates": {
+                        name: {
+                            "left": round(frame[0] * reference_width_mm, 3),
+                            "right": round((1.0 - (frame[0] + frame[2])) * reference_width_mm, 3),
+                            "bottom": round(frame[1] * reference_height_mm, 3),
+                            "top": round((1.0 - (frame[1] + frame[3])) * reference_height_mm, 3),
+                        }
+                        for name, frame in axis_frames.items()
+                    },
+                    "tolerance_mm": single_panel_tolerance_mm,
+                },
+            )
+        )
 
         heatmap_fig = figures[-1]
         heatmap_renderer = heatmap_fig.canvas.get_renderer()
         heatmap_canvas = heatmap_fig.bbox
         heatmap_cbar_ax = heatmap_fig.axes[-1]
         heatmap_cbar_bbox = heatmap_cbar_ax.get_tightbbox(renderer=heatmap_renderer)
+        validation_reports.append(
+            _validation_result(
+                "heatmap_main_frame",
+                passed=True,
+                details={
+                    "edges_mm": {
+                        "left": round(axis_frames["heatmap"][0] * reference_width_mm, 3),
+                        "right": round((1.0 - (axis_frames["heatmap"][0] + axis_frames["heatmap"][2])) * reference_width_mm, 3),
+                        "bottom": round(axis_frames["heatmap"][1] * reference_height_mm, 3),
+                        "top": round((1.0 - (axis_frames["heatmap"][1] + axis_frames["heatmap"][3])) * reference_height_mm, 3),
+                    },
+                    "reference_edges_mm": {
+                        "left": round(reference_left_mm, 3),
+                        "right": round(reference_right_mm, 3),
+                        "bottom": round(reference_bottom_mm, 3),
+                        "top": round(reference_top_mm, 3),
+                    },
+                },
+            )
+        )
         if (
             heatmap_cbar_bbox.x0 < heatmap_canvas.x0
             or heatmap_cbar_bbox.x1 > heatmap_canvas.x1
@@ -816,6 +884,38 @@ def _assert_axis_frame_alignment(
             or heatmap_cbar_bbox.y1 > heatmap_canvas.y1
         ):
             raise AssertionError("Heatmap top colorbar should stay inside the figure canvas.")
+        validation_reports.append(
+            _validation_result(
+                "heatmap_colorbar_inside_canvas",
+                passed=True,
+                details={
+                    "colorbar_bbox_px": {
+                        "x0": round(float(heatmap_cbar_bbox.x0), 3),
+                        "x1": round(float(heatmap_cbar_bbox.x1), 3),
+                        "y0": round(float(heatmap_cbar_bbox.y0), 3),
+                        "y1": round(float(heatmap_cbar_bbox.y1), 3),
+                    },
+                    "canvas_bbox_px": {
+                        "x0": round(float(heatmap_canvas.x0), 3),
+                        "x1": round(float(heatmap_canvas.x1), 3),
+                        "y0": round(float(heatmap_canvas.y0), 3),
+                        "y1": round(float(heatmap_canvas.y1), 3),
+                    },
+                },
+            )
+        )
+        if heatmap_cbar_bbox.width <= heatmap_cbar_bbox.height:
+            raise AssertionError("Heatmap colorbar should remain horizontal.")
+        validation_reports.append(
+            _validation_result(
+                "heatmap_horizontal_colorbar",
+                passed=True,
+                details={
+                    "width_px": round(float(heatmap_cbar_bbox.width), 3),
+                    "height_px": round(float(heatmap_cbar_bbox.height), 3),
+                },
+            )
+        )
 
         expected_heatmap_label = _format_axis_label(heatmap_table.z_label, heatmap_table.z_unit)
         heatmap_labels = [text for text in heatmap_fig.texts if text.get_text() == expected_heatmap_label]
@@ -842,21 +942,53 @@ def _assert_axis_frame_alignment(
         wide_left_mm = left_frame[0] * wide_width_mm
         wide_right_mm = (1.0 - (right_frame[0] + right_frame[2])) * wide_width_mm
         wide_bottom_mm = left_frame[1] * wide_height_mm
+        wide_top_mm = (1.0 - (left_frame[1] + left_frame[3])) * wide_height_mm
         if not np.isclose(wide_left_mm, reference_left_mm, atol=0.05):
             raise AssertionError("wide_nmr should share the same left axis anchor as the standard single-panel frame.")
         if not np.isclose(wide_right_mm, reference_right_mm, atol=0.05):
             raise AssertionError("wide_nmr should share the same right axis anchor as the standard single-panel frame.")
         if not np.isclose(wide_bottom_mm, reference_bottom_mm, atol=0.05):
             raise AssertionError("wide_nmr should share the same bottom axis anchor as the standard single-panel frame.")
+        validation_reports.append(
+            _validation_result(
+                "wide_nmr_horizontal_alignment",
+                passed=True,
+                details={
+                    "edges_mm": {
+                        "left": round(wide_left_mm, 3),
+                        "right": round(wide_right_mm, 3),
+                        "bottom": round(wide_bottom_mm, 3),
+                        "top": round(wide_top_mm, 3),
+                    },
+                    "reference_edges_mm": {
+                        "left": round(reference_left_mm, 3),
+                        "right": round(reference_right_mm, 3),
+                        "bottom": round(reference_bottom_mm, 3),
+                        "top": round(reference_top_mm, 3),
+                    },
+                },
+            )
+        )
         segment_bottoms = [axis.get_position().y0 for axis in wide_fig.axes]
         segment_tops = [axis.get_position().y1 for axis in wide_fig.axes]
         if not np.allclose(segment_bottoms, segment_bottoms[0], atol=5e-6):
             raise AssertionError("wide_nmr segment axes should align on a common bottom edge.")
         if not np.allclose(segment_tops, segment_tops[0], atol=5e-6):
             raise AssertionError("wide_nmr segment axes should align on a common top edge.")
+        validation_reports.append(
+            _validation_result(
+                "wide_nmr_segment_alignment",
+                passed=True,
+                details={
+                    "segment_bottoms": [round(float(item), 6) for item in segment_bottoms],
+                    "segment_tops": [round(float(item), 6) for item in segment_tops],
+                },
+            )
+        )
     finally:
         for fig in figures:
             plt.close(fig)
+    return validation_reports
 
 
 def _assert_major_tick_skip_every_other() -> None:
@@ -1100,11 +1232,15 @@ def _assert_legend_candidate_insets() -> None:
         plt.close(fig)
 
 
-def _assert_rendered_output_files(outputs_dir: Path) -> None:
+def _assert_rendered_output_files(
+    outputs_dir: Path,
+    template_by_output: dict[str, str],
+) -> list[dict[str, object]]:
     pdf_paths = sorted(outputs_dir.rglob("*.pdf"))
     if not pdf_paths:
         raise AssertionError("Smoke outputs should include at least one exported PDF.")
 
+    reports: list[dict[str, object]] = []
     for pdf_path in pdf_paths:
         doc = fitz.open(pdf_path)
         try:
@@ -1130,11 +1266,39 @@ def _assert_rendered_output_files(outputs_dir: Path) -> None:
             raster = pixels.reshape(-1, channels)
             if np.all(raster[:, :3] >= 250):
                 raise AssertionError(f"{pdf_path.name} rasterized to an almost fully white page.")
+
+            reports.append(
+                {
+                    "template": template_by_output.get(str(pdf_path), pdf_path.parent.name),
+                    "output_path": str(pdf_path),
+                    "output_filename": pdf_path.name,
+                    "output_key": f"{template_by_output.get(str(pdf_path), pdf_path.parent.name)}/{pdf_path.name}",
+                    "page_count": int(doc.page_count),
+                    "page_size_mm": {
+                        "width": round(float(page.rect.width * 25.4 / 72.0), 3),
+                        "height": round(float(page.rect.height * 25.4 / 72.0), 3),
+                    },
+                    "has_visible_content": True,
+                    "non_blank": True,
+                    "rules": [
+                        _validation_result(
+                            "non_blank_pdf",
+                            passed=True,
+                            details={
+                                "filename": pdf_path.name,
+                                "page_count": int(doc.page_count),
+                                "channels": int(channels),
+                            },
+                        )
+                    ],
+                }
+            )
         finally:
             doc.close()
+    return reports
 
 
-def _assert_wide_nmr_layout(bundle_path: Path) -> None:
+def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:
     def _densify(points: np.ndarray, max_step_px: float = 3.0) -> np.ndarray:
         if len(points) < 2:
             return points
@@ -1217,6 +1381,18 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> None:
             if np.any(inside):
                 raise AssertionError("wide_nmr sample labels should not overlap plotted curves.")
     plt.close(fig)
+    return [
+        _validation_result(
+            "wide_nmr_structure_reserve",
+            passed=True,
+            details={
+                "reserved_mm": round(float(reserved_mm), 3),
+                "spectrum_mm": round(float(spectrum_mm), 3),
+                "expected_reserved_mm": round(float(WIDE_NMR_STRUCTURE_RESERVED_MM), 3),
+                "expected_spectrum_mm": round(float(WIDE_NMR_SPECTRUM_HEIGHT_MM), 3),
+            },
+        )
+    ]
 
 
 def _assert_stacked_series_clearance(
@@ -1262,6 +1438,31 @@ def _to_curve_series(series_list) -> list[CurveSeries]:
         )
         for series in series_list
     ]
+
+
+def _write_smoke_report(
+    *,
+    output_reports: list[dict[str, object]],
+    validation_reports: list[dict[str, object]],
+) -> Path:
+    contract = load_plot_contract()
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "contract_version": contract.version,
+        "summary": {
+            "pdf_count": len(output_reports),
+            "validation_count": len(validation_reports),
+            "templates_checked": sorted({str(item["template"]) for item in output_reports}),
+        },
+        "outputs": output_reports,
+        "validations": validation_reports,
+    }
+    SMOKE_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SMOKE_REPORT_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return SMOKE_REPORT_PATH
 
 
 def main() -> int:
@@ -1329,14 +1530,16 @@ def main() -> int:
             ("heatmap", heatmap_path, {}),
         ]
 
+        template_by_output: dict[str, str] = {}
         for template, input_path, options in jobs:
             rendered = render_template(template, input_path, outputs / template, **options)
             for output in rendered:
                 if not output.exists():
                     raise FileNotFoundError(f"Expected output was not created: {output}")
+                template_by_output[str(output)] = template
                 print(output)
 
-        _assert_rendered_output_files(outputs)
+        output_reports = _assert_rendered_output_files(outputs, template_by_output)
         _assert_stacked_layout(plot_ftir, ftir_path)
         _assert_stacked_layout(plot_nmr, nmr_path)
         _assert_stacked_layout(plot_xrd, xrd_path)
@@ -1345,7 +1548,6 @@ def main() -> int:
         _assert_stacked_series_clearance(plot_nmr, nmr_path)
         _assert_stacked_series_clearance(plot_xrd, xrd_path)
         _assert_stacked_series_clearance(plot_dsc, dsc_path)
-        _assert_wide_nmr_layout(wide_nmr_path)
         _assert_style_palette_presets(
             replicate_path=replicate_path,
             ftir_path=ftir_path,
@@ -1369,17 +1571,22 @@ def main() -> int:
             temp_series,
             expect_log_y=True,
         )
-        _assert_axis_frame_alignment(
+        validation_reports = _assert_axis_frame_alignment(
             replicate_path=replicate_path,
             tensile_path=tensile_path,
             heatmap_path=heatmap_path,
             wide_nmr_path=wide_nmr_path,
         )
+        validation_reports.extend(_assert_wide_nmr_layout(wide_nmr_path))
         _assert_frequency_batch_sync(freq_path)
         _assert_legend_candidate_insets()
         _assert_composer_workflow(outputs, base)
+        report_path = _write_smoke_report(
+            output_reports=output_reports,
+            validation_reports=validation_reports,
+        )
 
-    print("Smoke check passed.")
+    print(f"Smoke check passed. Report: {report_path}")
     return 0
 
 

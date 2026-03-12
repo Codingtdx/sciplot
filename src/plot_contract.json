@@ -1,0 +1,852 @@
+{
+  "version": 1,
+  "defaults": {
+    "style_preset": "default",
+    "palette_preset": "colorblind_safe"
+  },
+  "aliases": {
+    "style_presets": {
+      "lab_default": "default"
+    }
+  },
+  "global_frame": {
+    "panel_width_mm": 60.0,
+    "panel_height_mm": 55.0,
+    "left_margin_mm": 14.0,
+    "right_margin_mm": 4.5,
+    "bottom_margin_mm": 11.0,
+    "top_margin_mm": 5.5
+  },
+  "size_presets": {
+    "60x55": {
+      "label": "60 x 55 mm",
+      "width_mm": 60.0,
+      "height_mm": 55.0
+    },
+    "120x55": {
+      "label": "120 x 55 mm",
+      "width_mm": 120.0,
+      "height_mm": 55.0
+    },
+    "60x110": {
+      "label": "60 x 110 mm",
+      "width_mm": 60.0,
+      "height_mm": 110.0
+    }
+  },
+  "special_layouts": {
+    "heatmap": {
+      "colorbar_x_offset_fraction": 0.38,
+      "colorbar_width_fraction": 0.5,
+      "colorbar_y_offset_fraction": 0.18,
+      "colorbar_y_offset_min": 0.018,
+      "colorbar_y_offset_max_fraction": 0.42,
+      "colorbar_height_fraction": 0.13,
+      "colorbar_height_min": 0.013,
+      "colorbar_bottom_gap": 0.012,
+      "label_y_fraction": 0.56,
+      "label_font_size_pt": 4.8,
+      "tick_font_size_pt": 4.3,
+      "tick_length_pt": 2.0
+    },
+    "wide_nmr": {
+      "width_mm": 60.0,
+      "total_height_mm": 110.0,
+      "structure_reserved_mm": 18.0,
+      "spectrum_height_mm": 92.0
+    }
+  },
+  "styles": {
+    "default": {
+      "label": "Default",
+      "public": true,
+      "description": "默认：沿用当前最稳的 60 mm 面板风格。",
+      "hard_constraints": false,
+      "preset_note": "当前默认科研风格，优先稳定性和可用性。",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.0,
+        "panel_label_size_pt": 8.0,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.5,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.3,
+        "line_alpha": 0.7,
+        "marker_alpha": 0.8,
+        "fill_alpha": 0.4,
+        "max_fill_alpha": 0.5,
+        "marker_size_pt": 3.8
+      },
+      "spacing": {
+        "axes_labelpad": 2.0,
+        "xtick_major_pad": 1.5,
+        "ytick_major_pad": 1.5,
+        "legend_inset_fraction": 0.025
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "balanced",
+        "label_tightness": "balanced"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
+      }
+    },
+    "nature": {
+      "label": "Nature",
+      "public": true,
+      "description": "Nature：官方约束优先的紧凑科研图风格。",
+      "hard_constraints": true,
+      "preset_note": "基于 Nature 当前公开图像规范的硬约束实现。",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 6.5,
+        "legend_font_size_pt": 5.8,
+        "panel_label_size_pt": 8.0,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.4,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.2,
+        "line_alpha": 0.92,
+        "marker_alpha": 0.95,
+        "fill_alpha": 0.34,
+        "max_fill_alpha": 0.45,
+        "marker_size_pt": 3.4
+      },
+      "spacing": {
+        "axes_labelpad": 2.0,
+        "xtick_major_pad": 1.4,
+        "ytick_major_pad": 1.4,
+        "legend_inset_fraction": 0.025
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "science_editorial": {
+      "label": "Science Editorial",
+      "public": false,
+      "description": "Science：更克制、注释更少、观感更开阔。",
+      "hard_constraints": false,
+      "preset_note": "软风格 preset，抽象自 Science 常见编辑风格，不是投稿合规保证。",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica Neue",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.0,
+        "panel_label_size_pt": 8.0,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 0.95,
+        "tick_width_pt": 0.95,
+        "tick_length_pt": 3.2,
+        "minor_tick_width_pt": 0.75,
+        "minor_tick_length_pt": 1.9,
+        "line_width_pt": 1.15,
+        "line_alpha": 0.88,
+        "marker_alpha": 0.92,
+        "fill_alpha": 0.3,
+        "max_fill_alpha": 0.42,
+        "marker_size_pt": 3.5
+      },
+      "spacing": {
+        "axes_labelpad": 2.4,
+        "xtick_major_pad": 1.8,
+        "ytick_major_pad": 1.8,
+        "legend_inset_fraction": 0.024
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "airy",
+        "label_tightness": "balanced"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
+      }
+    },
+    "jacs_analytical": {
+      "label": "JACS Analytical",
+      "public": false,
+      "description": "JACS：更紧凑、分析图观感更硬朗。",
+      "hard_constraints": false,
+      "preset_note": "软风格 preset，抽象自 ACS/JACS 常见分析图语言，不是投稿合规保证。",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 6.8,
+        "legend_font_size_pt": 5.9,
+        "panel_label_size_pt": 8.0,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.05,
+        "tick_width_pt": 1.05,
+        "tick_length_pt": 3.5,
+        "minor_tick_width_pt": 0.85,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.4,
+        "line_alpha": 0.86,
+        "marker_alpha": 0.95,
+        "fill_alpha": 0.28,
+        "max_fill_alpha": 0.4,
+        "marker_size_pt": 3.6
+      },
+      "spacing": {
+        "axes_labelpad": 1.8,
+        "xtick_major_pad": 1.4,
+        "ytick_major_pad": 1.4,
+        "legend_inset_fraction": 0.022
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
+      }
+    },
+    "advanced_materials_spacious": {
+      "label": "Advanced Materials Spacious",
+      "public": false,
+      "description": "Advanced Materials：留白更宽、展示感更强。",
+      "hard_constraints": false,
+      "preset_note": "软风格 preset，抽象自 Advanced Materials 常见版面语言，不是投稿合规保证。",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica Neue",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.2,
+        "panel_label_size_pt": 8.0,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 0.95,
+        "tick_width_pt": 0.95,
+        "tick_length_pt": 3.2,
+        "minor_tick_width_pt": 0.75,
+        "minor_tick_length_pt": 1.9,
+        "line_width_pt": 1.18,
+        "line_alpha": 0.9,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.33,
+        "max_fill_alpha": 0.44,
+        "marker_size_pt": 3.8
+      },
+      "spacing": {
+        "axes_labelpad": 2.6,
+        "xtick_major_pad": 1.8,
+        "ytick_major_pad": 1.8,
+        "legend_inset_fraction": 0.026
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "airy",
+        "label_tightness": "airy"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
+      }
+    }
+  },
+  "palettes": {
+    "colorblind_safe": {
+      "label": "Colorblind Safe",
+      "public": true,
+      "description": "默认安全配色：分类色用 colorblind，连续色用 cividis。",
+      "categorical": [
+        "#0173b2",
+        "#de8f05",
+        "#029e73",
+        "#d55e00",
+        "#cc78bc",
+        "#ca9161",
+        "#fbafe4",
+        "#949494",
+        "#ece133",
+        "#56b4e9"
+      ],
+      "sequential": "cividis",
+      "diverging": "vlag"
+    },
+    "deep": {
+      "label": "Deep",
+      "public": true,
+      "description": "Seaborn deep：平衡、沉稳、通用。",
+      "categorical": [
+        "#4c72b0",
+        "#dd8452",
+        "#55a868",
+        "#c44e52",
+        "#8172b3",
+        "#937860",
+        "#da8bc3",
+        "#8c8c8c",
+        "#ccb974",
+        "#64b5cd"
+      ],
+      "sequential": "crest",
+      "diverging": "vlag"
+    },
+    "muted": {
+      "label": "Muted",
+      "public": true,
+      "description": "Seaborn muted：克制柔和，适合多组对比。",
+      "categorical": [
+        "#4878d0",
+        "#ee854a",
+        "#6acc64",
+        "#d65f5f",
+        "#956cb4",
+        "#8c613c",
+        "#dc7ec0",
+        "#797979",
+        "#d5bb67",
+        "#82c6e2"
+      ],
+      "sequential": "rocket",
+      "diverging": "coolwarm"
+    },
+    "bright": {
+      "label": "Bright",
+      "public": false,
+      "description": "Seaborn bright：高饱和、对比更强。",
+      "categorical": [
+        "#023eff",
+        "#ff7c00",
+        "#1ac938",
+        "#e8000b",
+        "#8b2be2",
+        "#9f4800",
+        "#f14cc1",
+        "#a3a3a3",
+        "#ffc400",
+        "#00d7ff"
+      ],
+      "sequential": "mako",
+      "diverging": "icefire"
+    },
+    "mono": {
+      "label": "Mono",
+      "public": true,
+      "description": "灰阶单色：适合硬朗分析图和黑白打印。",
+      "categorical": [
+        "#111827",
+        "#374151",
+        "#6b7280",
+        "#9ca3af",
+        "#d1d5db"
+      ],
+      "sequential": "Greys",
+      "diverging": "Greys"
+    },
+    "okabe_ito": {
+      "label": "Okabe-Ito",
+      "public": false,
+      "description": "Okabe-Ito：经典色盲友好科研配色。",
+      "categorical": [
+        "#000000",
+        "#e69f00",
+        "#56b4e9",
+        "#009e73",
+        "#f0e442",
+        "#0072b2",
+        "#d55e00",
+        "#cc79a7"
+      ],
+      "sequential": "cividis",
+      "diverging": "PuOr"
+    },
+    "tol_muted": {
+      "label": "Tol Muted",
+      "public": false,
+      "description": "Paul Tol muted：低刺激、均衡的分类配色。",
+      "categorical": [
+        "#332288",
+        "#88ccee",
+        "#44aa99",
+        "#117733",
+        "#999933",
+        "#ddcc77",
+        "#cc6677",
+        "#882255",
+        "#aa4499"
+      ],
+      "sequential": "YlGnBu",
+      "diverging": "BrBG"
+    },
+    "materials_warm": {
+      "label": "Materials Warm",
+      "public": false,
+      "description": "暖色科研展示配色：更偏材料展示风格。",
+      "categorical": [
+        "#355070",
+        "#6d597a",
+        "#b56576",
+        "#e56b6f",
+        "#eaac8b",
+        "#f6bd60",
+        "#84a59d"
+      ],
+      "sequential": "rocket",
+      "diverging": "Spectral"
+    }
+  },
+  "templates": {
+    "curve": {
+      "label": "曲线",
+      "description": "普通单图曲线。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "point_line": {
+      "label": "点线",
+      "description": "带 marker 的普通单图曲线。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "multi_output_bundle_notice"
+      ]
+    },
+    "stacked_curve": {
+      "label": "堆叠曲线",
+      "description": "光谱类的单列堆叠曲线。",
+      "category": "stacked_spectrum",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55"
+      ],
+      "editable_options": [
+        "size",
+        "reverse_x",
+        "baseline",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "reverse_x": false,
+        "baseline": "none"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "segmented_stacked_curve": {
+      "label": "分段堆叠曲线",
+      "description": "wide NMR 双高面板，左右底对齐，顶部预留结构式区域。",
+      "category": "wide_nmr",
+      "default_size": "60x110",
+      "allowed_sizes": [
+        "60x110"
+      ],
+      "editable_options": [
+        "size",
+        "reverse_x",
+        "baseline",
+        "palette_preset",
+        "use_sidecar"
+      ],
+      "default_options": {
+        "size": "60x110",
+        "reverse_x": true,
+        "baseline": "linear_endpoints",
+        "use_sidecar": true
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "wide_nmr_horizontal_alignment",
+        "wide_nmr_structure_reserve",
+        "wide_nmr_segment_alignment",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "bar": {
+      "label": "柱状",
+      "description": "统计类柱状图。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55"
+      ],
+      "editable_options": [
+        "size",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "box": {
+      "label": "箱线",
+      "description": "统计类箱线图。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55"
+      ],
+      "editable_options": [
+        "size",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "violin": {
+      "label": "小提琴",
+      "description": "统计类小提琴图。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55"
+      ],
+      "editable_options": [
+        "size",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "scatter": {
+      "label": "散点",
+      "description": "单图散点图。",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "heatmap": {
+      "label": "热图",
+      "description": "主热图区与普通单图共用轴框，顶部水平色带独立放置。",
+      "category": "heatmap",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "show_colorbar",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "show_colorbar": true
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "heatmap_main_frame",
+        "heatmap_horizontal_colorbar",
+        "heatmap_colorbar_inside_canvas",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    }
+  },
+  "validation_rules": {
+    "single_panel_axis_frame": {
+      "label": "标准单图轴框对齐",
+      "description": "标准单图模板必须共享同一物理轴框。",
+      "severity": "error",
+      "tolerance_mm": 0.05
+    },
+    "wide_nmr_horizontal_alignment": {
+      "label": "wide NMR 左右底对齐",
+      "description": "wide NMR 只要求左、右、底与标准单图共用锚点。",
+      "severity": "error",
+      "tolerance_mm": 0.05
+    },
+    "wide_nmr_structure_reserve": {
+      "label": "wide NMR 顶部结构区",
+      "description": "wide NMR 必须保留顶部结构式预留区。",
+      "severity": "error",
+      "tolerance_mm": 1.0
+    },
+    "wide_nmr_segment_alignment": {
+      "label": "wide NMR 分段轴对齐",
+      "description": "wide NMR 的分段轴必须共享统一的上下边界。",
+      "severity": "error",
+      "tolerance_mm": 0.05
+    },
+    "heatmap_main_frame": {
+      "label": "Heatmap 主图区轴框",
+      "description": "Heatmap 主图区必须与标准单图共用同一轴框。",
+      "severity": "error",
+      "tolerance_mm": 0.05
+    },
+    "heatmap_horizontal_colorbar": {
+      "label": "Heatmap 顶部水平色带",
+      "description": "Heatmap 必须使用顶部水平色带，不得挤压主图区。",
+      "severity": "error",
+      "tolerance_mm": 0.05
+    },
+    "heatmap_colorbar_inside_canvas": {
+      "label": "Heatmap 色带在画布内",
+      "description": "Heatmap 色带和 z 标签必须完整落在画布内。",
+      "severity": "error",
+      "tolerance_mm": 0.2
+    },
+    "non_blank_pdf": {
+      "label": "导出 PDF 非空白",
+      "description": "每个输出 PDF 都必须存在可见内容并能正确栅格化。",
+      "severity": "error"
+    },
+    "multi_output_bundle_notice": {
+      "label": "多输出提醒",
+      "description": "多输出 bundle 应给出输出张数提醒。",
+      "severity": "warning"
+    },
+    "dense_group_label_warning": {
+      "label": "分组过多提醒",
+      "description": "统计图分组较多时应提醒横轴标签可能拥挤。",
+      "severity": "warning"
+    }
+  }
+}

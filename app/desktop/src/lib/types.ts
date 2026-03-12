@@ -172,3 +172,82 @@ export type WorkbenchSettings = {
   auto_status_poll: boolean;
   remember_last_screen: boolean;
 };
+
+export type GlobalFrame = {
+  panel_width_mm: number;
+  panel_height_mm: number;
+  left_margin_mm: number;
+  right_margin_mm: number;
+  bottom_margin_mm: number;
+  top_margin_mm: number;
+};
+
+export type WorkbenchSize = {
+  id: SizePreset;
+  label: string;
+  width_mm: number;
+  height_mm: number;
+};
+
+export type WorkbenchStyle = {
+  id: string;
+  label: string;
+  public: boolean;
+  description: string;
+  hard_constraints: boolean;
+  preset_note: string;
+};
+
+export type WorkbenchPalette = {
+  id: PalettePreset | string;
+  label: string;
+  public: boolean;
+  description: string;
+  swatches: string[];
+};
+
+export type WorkbenchTemplate = {
+  id: TemplateName;
+  label: string;
+  description: string;
+  category: string;
+  default_size: SizePreset;
+  allowed_sizes: SizePreset[];
+  editable_options: Array<keyof RenderOptionsPayload | "size">;
+  default_options: RenderOptionsPayload & { size?: SizePreset };
+  available_styles: string[];
+  available_palettes: Array<PalettePreset | string>;
+};
+
+export type WorkbenchMeta = {
+  version: number;
+  defaults: {
+    style_preset: string;
+    palette_preset: PalettePreset | string;
+  };
+  global_frame: GlobalFrame;
+  sizes: WorkbenchSize[];
+  styles: WorkbenchStyle[];
+  palettes: WorkbenchPalette[];
+  templates: WorkbenchTemplate[];
+  template_ids: TemplateName[];
+  size_ids: SizePreset[];
+  palette_preset_ids: Array<PalettePreset | string>;
+  default_style: string;
+  default_palette: PalettePreset | string;
+};
+
+export type PlotContract = {
+  version: number;
+  defaults: {
+    style_preset: string;
+    palette_preset: string;
+  };
+  global_frame: GlobalFrame;
+  size_presets: Record<string, { label: string; width_mm: number; height_mm: number }>;
+  special_layouts: Record<string, Record<string, number | string | boolean>>;
+  styles: Record<string, Record<string, unknown>>;
+  palettes: Record<string, Record<string, unknown>>;
+  templates: Record<string, Record<string, unknown>>;
+  validation_rules: Record<string, Record<string, unknown>>;
+};

@@ -300,6 +300,10 @@ button {
   padding: 24px 26px 26px;
 }
 
+.topbar-warning {
+  margin: 16px 26px 0;
+}
+
 .desk-layout {
   min-height: 100%;
   display: grid;

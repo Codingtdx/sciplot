@@ -29,6 +29,7 @@ from make_plot import (
     _resolve_render_options,
 )
 from src import plot_style
+from src.plot_contract import meta_payload, plot_contract_dict
 from src.composer import (
     ComposerPanel,
     ComposerProject,
@@ -212,13 +213,22 @@ def health() -> dict[str, str]:
 
 @app.get("/meta")
 def meta() -> dict[str, Any]:
-    return {
-        "templates": list(TEMPLATE_CHOICES),
-        "sizes": list(SIZE_CHOICES),
-        "palette_presets": list(PALETTE_PRESET_CHOICES),
-        "default_style": plot_style.DEFAULT_STYLE_PRESET,
-        "default_palette": plot_style.DEFAULT_PALETTE_PRESET,
-    }
+    payload = meta_payload()
+    payload.update(
+        {
+            "template_ids": list(TEMPLATE_CHOICES),
+            "size_ids": list(SIZE_CHOICES),
+            "palette_preset_ids": list(PALETTE_PRESET_CHOICES),
+            "default_style": plot_style.DEFAULT_STYLE_PRESET,
+            "default_palette": plot_style.DEFAULT_PALETTE_PRESET,
+        }
+    )
+    return payload
+
+
+@app.get("/plot-contract")
+def plot_contract() -> dict[str, Any]:
+    return plot_contract_dict()
 
 
 @app.post("/inspect-file")

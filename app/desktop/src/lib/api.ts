@@ -3,11 +3,13 @@ import type {
   ComposerProject,
   ExportResponse,
   InspectResponse,
+  PlotContract,
   PreflightResponse,
   RenderOptionsPayload,
   RenderPreviewResponse,
   TemplateName,
   TensileReplicateResponse,
+  WorkbenchMeta,
 } from "./types";
 
 const SIDECAR_URL = "http://127.0.0.1:8765";
@@ -29,6 +31,19 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return payload as T;
 }
 
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${SIDECAR_URL}${path}`);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail =
+      typeof payload?.detail === "string"
+        ? payload.detail
+        : `Request failed: ${response.status}`;
+    throw new Error(detail);
+  }
+  return payload as T;
+}
+
 export async function healthcheck(): Promise<boolean> {
   try {
     const response = await fetch(`${SIDECAR_URL}/health`);
@@ -36,6 +51,14 @@ export async function healthcheck(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function getWorkbenchMeta(): Promise<WorkbenchMeta> {
+  return getJson<WorkbenchMeta>("/meta");
+}
+
+export async function getPlotContract(): Promise<PlotContract> {
+  return getJson<PlotContract>("/plot-contract");
 }
 
 export async function inspectFile(

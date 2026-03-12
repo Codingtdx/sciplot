@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import re
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
@@ -37,6 +37,16 @@ from src.rheology_loader import (
     load_stress_relaxation_metric,
     load_temperature_sweep_metrics,
 )
+from src.plot_contract import (
+    default_options_for_template,
+    default_size_for_template,
+    palette_names,
+    size_names,
+    size_preset_contract,
+    template_contract,
+    template_names,
+    validation_rule,
+)
 from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
@@ -47,35 +57,13 @@ RenderFn = Callable[[Path, str | int, "RenderOptions"], list["RenderedPlot"]]
 
 WORKSPACE_OUTPUT_DIR = Path("figures") / "debug_outputs"
 
-TEMPLATE_CHOICES = (
-    "curve",
-    "point_line",
-    "stacked_curve",
-    "segmented_stacked_curve",
-    "bar",
-    "box",
-    "violin",
-    "scatter",
-    "heatmap",
-)
-SIZE_CHOICES = ("60x55", "120x55", "60x110")
+TEMPLATE_CHOICES = template_names()
+SIZE_CHOICES = size_names()
 STYLE_PRESET_CHOICES = plot_style.list_public_style_presets()
-PALETTE_PRESET_CHOICES = plot_style.list_palette_presets()
-SIZE_PRESETS: dict[str, tuple[float, float]] = {
-    "60x55": (60.0, 55.0),
-    "120x55": (120.0, 55.0),
-    "60x110": (60.0, 110.0),
-}
+PALETTE_PRESET_CHOICES = palette_names()
 DEFAULT_SIZE_BY_TEMPLATE: dict[str, str] = {
-    "curve": "60x55",
-    "point_line": "60x55",
-    "stacked_curve": "60x55",
-    "segmented_stacked_curve": "60x110",
-    "bar": "60x55",
-    "box": "60x55",
-    "violin": "60x55",
-    "scatter": "60x55",
-    "heatmap": "60x55",
+    name: default_size_for_template(name)
+    for name in TEMPLATE_CHOICES
 }
 LEGACY_TEMPLATE_HINTS = {
     "box_bar_plots": "请改用 `bar` 或 `box`，需要时再用 `violin`。",
@@ -442,11 +430,33 @@ def _validate_template_name(template: str) -> str:
 
 
 def _resolve_size(size_text: str | None, template: str) -> tuple[float, float]:
+    spec = template_contract(template)
     chosen = size_text or DEFAULT_SIZE_BY_TEMPLATE[template]
-    try:
-        return SIZE_PRESETS[chosen]
-    except KeyError as exc:
-        raise ValueError(f"Invalid size preset: {chosen}. Supported sizes: {', '.join(SIZE_CHOICES)}") from exc
+    if chosen not in spec.allowed_sizes:
+        raise ValueError(
+            f"Template `{template}` does not support size `{chosen}`. Supported sizes: {', '.join(spec.allowed_sizes)}"
+        )
+    size_spec = size_preset_contract(chosen)
+    return size_spec.width_mm, size_spec.height_mm
+
+
+def _recommendation(template: TemplateName, reason: str, **overrides: Any) -> Recommendation:
+    defaults = default_options_for_template(template)
+    payload: dict[str, Any] = {
+        "template": template,
+        "reason": reason,
+        "size": defaults.get("size", default_size_for_template(template)),
+        "xscale": defaults.get("xscale"),
+        "yscale": defaults.get("yscale"),
+        "reverse_x": defaults.get("reverse_x"),
+        "baseline": defaults.get("baseline"),
+        "show_colorbar": defaults.get("show_colorbar"),
+        "style_preset": defaults.get("style_preset"),
+        "palette_preset": defaults.get("palette_preset"),
+        "use_sidecar": defaults.get("use_sidecar"),
+    }
+    payload.update(overrides)
+    return Recommendation(**payload)
 
 
 def _resolve_render_options(
@@ -463,14 +473,19 @@ def _resolve_render_options(
     use_sidecar: bool | None = None,
 ) -> RenderOptions:
     width_mm, height_mm = _resolve_size(size, template)
+    defaults = default_options_for_template(template)
     return RenderOptions(
         width_mm=width_mm,
         height_mm=height_mm,
-        xscale=xscale or "linear",
-        yscale=yscale or "linear",
+        xscale=xscale or defaults.get("xscale", "linear"),
+        yscale=yscale or defaults.get("yscale", "linear"),
         reverse_x=reverse_x,
-        baseline=baseline or "none",
-        show_colorbar=True if show_colorbar is None else show_colorbar,
+        baseline=baseline or defaults.get("baseline", "none"),
+        show_colorbar=(
+            defaults.get("show_colorbar", True)
+            if show_colorbar is None
+            else show_colorbar
+        ),
         style_preset=plot_style.normalize_style_preset(style_preset),
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
@@ -520,10 +535,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model=bundle,
             model_label=_model_label(bundle),
-            recommendation=Recommendation(
-                template="point_line",
-                reason="识别到频率扫描的 5 列一组流变导出表。",
-                size="60x55",
+            recommendation=_recommendation(
+                "point_line",
+                "识别到频率扫描的 5 列一组流变导出表。",
                 xscale="log",
                 yscale="log",
                 reverse_x=False,
@@ -535,9 +549,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model=bundle,
             model_label=_model_label(bundle),
-            recommendation=Recommendation(
-                template="point_line",
-                reason="识别到温度扫描的 5 列一组流变导出表。",
+            recommendation=_recommendation(
+                "point_line",
+                "识别到温度扫描的 5 列一组流变导出表。",
                 size="120x55",
                 xscale="linear",
                 yscale="log",
@@ -550,10 +564,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model=bundle,
             model_label=_model_label(bundle),
-            recommendation=Recommendation(
-                template="point_line",
-                reason="识别到应力松弛的 4 列一组导出表。",
-                size="60x55",
+            recommendation=_recommendation(
+                "point_line",
+                "识别到应力松弛的 4 列一组导出表。",
                 xscale="log",
                 yscale="linear",
                 reverse_x=False,
@@ -566,10 +579,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="heatmap_table",
             model_label=_model_label("heatmap_table"),
-            recommendation=Recommendation(
-                template="heatmap",
-                reason="识别到 X / Y / Z 角色列的热图长表。",
-                size="60x55",
+            recommendation=_recommendation(
+                "heatmap",
+                "识别到 X / Y / Z 角色列的热图长表。",
                 show_colorbar=True,
             ),
             signals=(
@@ -594,10 +606,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="replicate_table",
             model_label=_model_label("replicate_table"),
-            recommendation=Recommendation(
-                template="box",
-                reason="识别到共享 y 轴名 + 样品名 + 单位 + 重复值的统计表。",
-                size="60x55",
+            recommendation=_recommendation(
+                "box",
+                "识别到共享 y 轴名 + 样品名 + 单位 + 重复值的统计表。",
             ),
             warnings=tuple(warnings),
             signals=(
@@ -611,10 +622,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="curve_table",
             model_label=_model_label("curve_table"),
-            recommendation=Recommendation(
-                template="segmented_stacked_curve",
-                reason="识别到普通曲线表，并在同目录发现 wide_nmr sidecar。",
-                size="60x110",
+            recommendation=_recommendation(
+                "segmented_stacked_curve",
+                "识别到普通曲线表，并在同目录发现 wide_nmr sidecar。",
                 reverse_x=True,
                 baseline="linear_endpoints",
                 use_sidecar=True,
@@ -629,10 +639,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="curve_table",
             model_label=_model_label("curve_table"),
-            recommendation=Recommendation(
-                template="stacked_curve",
-                reason="根据 Chemical shift / ppm 判断为 NMR 风格谱图。",
-                size="60x55",
+            recommendation=_recommendation(
+                "stacked_curve",
+                "根据 Chemical shift / ppm 判断为 NMR 风格谱图。",
                 reverse_x=True,
                 baseline="linear_endpoints",
             ),
@@ -646,10 +655,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="curve_table",
             model_label=_model_label("curve_table"),
-            recommendation=Recommendation(
-                template="stacked_curve",
-                reason="根据 Wavenumber / cm^-1 判断为 FTIR 风格谱图。",
-                size="60x55",
+            recommendation=_recommendation(
+                "stacked_curve",
+                "根据 Wavenumber / cm^-1 判断为 FTIR 风格谱图。",
                 reverse_x=True,
                 baseline="none",
             ),
@@ -663,10 +671,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="curve_table",
             model_label=_model_label("curve_table"),
-            recommendation=Recommendation(
-                template="stacked_curve",
-                reason="根据 Heat flow 标签判断为 DSC 风格堆积图。",
-                size="60x55",
+            recommendation=_recommendation(
+                "stacked_curve",
+                "根据 Heat flow 标签判断为 DSC 风格堆积图。",
                 reverse_x=False,
                 baseline="linear_endpoints",
             ),
@@ -680,10 +687,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         return InputInspection(
             model="curve_table",
             model_label=_model_label("curve_table"),
-            recommendation=Recommendation(
-                template="stacked_curve",
-                reason="根据 2theta / counts / intensity 判断为 XRD 风格谱图。",
-                size="60x55",
+            recommendation=_recommendation(
+                "stacked_curve",
+                "根据 2theta / counts / intensity 判断为 XRD 风格谱图。",
                 reverse_x=False,
                 baseline="none",
             ),
@@ -696,13 +702,9 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
     return InputInspection(
         model="curve_table",
         model_label=_model_label("curve_table"),
-        recommendation=Recommendation(
-            template="curve",
-            reason="识别到普通成对曲线表，默认推荐普通曲线图。",
-            size="60x55",
-            xscale="linear",
-            yscale="linear",
-            reverse_x=False,
+        recommendation=_recommendation(
+            "curve",
+            "识别到普通成对曲线表，默认推荐普通曲线图。",
         ),
         signals=(
             "检测到标准成对曲线表。",
@@ -794,7 +796,7 @@ def preflight_render_request(
             if not groups:
                 raise ValueError("统计表没有有效分组。")
             if len(groups) >= 6:
-                warnings.append("分组较多，横轴标签可能会自动换行或缩小字号。")
+                warnings.append(validation_rule("dense_group_label_warning").description)
         elif template == "heatmap":
             load_heatmap_table(input_path, sheet_name=sheet)
         else:
@@ -805,7 +807,9 @@ def preflight_render_request(
     if not errors:
         preview_names = _preview_output_filenames(template, input_path, sheet, options)
         if len(preview_names) > 1:
-            warnings.append(f"这次会导出 {len(preview_names)} 张 PDF。")
+            warnings.append(
+                f"{validation_rule('multi_output_bundle_notice').description} 当前会导出 {len(preview_names)} 张 PDF。"
+            )
     else:
         preview_names = ()
 

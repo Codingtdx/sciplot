@@ -8,36 +8,30 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import scienceplots  # noqa: F401
 import seaborn as sns
+from src.plot_contract import (
+    load_plot_contract,
+    normalize_style_alias,
+    palette_names,
+    public_style_names,
+    style_names,
+)
 
+
+_CONTRACT = load_plot_contract()
 
 MM_TO_INCH = 1 / 25.4
-PANEL_WIDTH_MM = 60
-PANEL_HEIGHT_MM = 55
+PANEL_WIDTH_MM = _CONTRACT.global_frame.panel_width_mm
+PANEL_HEIGHT_MM = _CONTRACT.global_frame.panel_height_mm
 
 # Keep a single physical axis frame across panel types so exported figures align
 # cleanly when compared side-by-side or composed into a board.
-LEFT_MARGIN_MM = 14.0
-RIGHT_MARGIN_MM = 4.5
-BOTTOM_MARGIN_MM = 11.0
-TOP_MARGIN_MM = 5.5
+LEFT_MARGIN_MM = _CONTRACT.global_frame.left_margin_mm
+RIGHT_MARGIN_MM = _CONTRACT.global_frame.right_margin_mm
+BOTTOM_MARGIN_MM = _CONTRACT.global_frame.bottom_margin_mm
+TOP_MARGIN_MM = _CONTRACT.global_frame.top_margin_mm
 
-FONT_SIZE_PT = 7
-AXIS_LINEWIDTH_PT = 1.0
-TICK_WIDTH_PT = 1.0
-TICK_LENGTH_PT = 3.5
-MINOR_TICK_WIDTH_PT = 0.8
-MINOR_TICK_LENGTH_PT = 2.0
-LINE_WIDTH_PT = 1.3
-LINE_ALPHA = 0.70
-MARKER_ALPHA = 0.80
-FILL_ALPHA = 0.40
-MAX_FILL_ALPHA = 0.50
-
-DEFAULT_STYLE_PRESET = "default"
-DEFAULT_PALETTE_PRESET = "colorblind_safe"
-STYLE_PRESET_ALIASES = {
-    "lab_default": "default",
-}
+DEFAULT_STYLE_PRESET = _CONTRACT.defaults.style_preset
+DEFAULT_PALETTE_PRESET = _CONTRACT.defaults.palette_preset
 
 
 @dataclass(frozen=True)
@@ -127,316 +121,58 @@ def _margin_fraction(total_mm: float, edge_mm: float) -> float:
     return edge_mm / total_mm
 
 
-def _hex_palette(name: str, n_colors: int = 10) -> tuple[str, ...]:
-    return tuple(sns.color_palette(name, n_colors=n_colors).as_hex())
+def _style_from_contract(name: str) -> JournalStyleSpec:
+    spec = _CONTRACT.styles[name]
+    return JournalStyleSpec(
+        name=name,
+        description=spec.description,
+        hard_constraints=spec.hard_constraints,
+        preset_note=spec.preset_note,
+        typography=TypographySpec(
+            font_family=spec.typography.font_family,
+            font_size_pt=spec.typography.font_size_pt,
+            legend_font_size_pt=spec.typography.legend_font_size_pt,
+            panel_label_size_pt=spec.typography.panel_label_size_pt,
+            panel_label_weight=spec.typography.panel_label_weight,
+        ),
+        stroke=StrokeSpec(**spec.stroke.__dict__),
+        spacing=SpacingSpec(
+            panel_width_mm=PANEL_WIDTH_MM,
+            panel_height_mm=PANEL_HEIGHT_MM,
+            left_margin_mm=LEFT_MARGIN_MM,
+            right_margin_mm=RIGHT_MARGIN_MM,
+            bottom_margin_mm=BOTTOM_MARGIN_MM,
+            top_margin_mm=TOP_MARGIN_MM,
+            axes_labelpad=spec.spacing.axes_labelpad,
+            xtick_major_pad=spec.spacing.xtick_major_pad,
+            ytick_major_pad=spec.spacing.ytick_major_pad,
+            legend_inset_fraction=spec.spacing.legend_inset_fraction,
+        ),
+        annotation=AnnotationSpec(**spec.annotation.__dict__),
+        export=ExportSpec(**spec.export.__dict__),
+    )
 
 
-_BASE_TYPOGRAPHY = TypographySpec(
-    font_family=("Arial", "Helvetica", "DejaVu Sans"),
-    font_size_pt=FONT_SIZE_PT,
-    legend_font_size_pt=6.0,
-    panel_label_size_pt=8.0,
-    panel_label_weight="bold",
-)
-_BASE_STROKE = StrokeSpec(
-    axis_linewidth_pt=AXIS_LINEWIDTH_PT,
-    tick_width_pt=TICK_WIDTH_PT,
-    tick_length_pt=TICK_LENGTH_PT,
-    minor_tick_width_pt=MINOR_TICK_WIDTH_PT,
-    minor_tick_length_pt=MINOR_TICK_LENGTH_PT,
-    line_width_pt=LINE_WIDTH_PT,
-    line_alpha=LINE_ALPHA,
-    marker_alpha=MARKER_ALPHA,
-    fill_alpha=FILL_ALPHA,
-    max_fill_alpha=MAX_FILL_ALPHA,
-    marker_size_pt=3.8,
-)
-_BASE_SPACING = SpacingSpec(
-    panel_width_mm=PANEL_WIDTH_MM,
-    panel_height_mm=PANEL_HEIGHT_MM,
-    left_margin_mm=LEFT_MARGIN_MM,
-    right_margin_mm=RIGHT_MARGIN_MM,
-    bottom_margin_mm=BOTTOM_MARGIN_MM,
-    top_margin_mm=TOP_MARGIN_MM,
-    axes_labelpad=2.0,
-    xtick_major_pad=1.5,
-    ytick_major_pad=1.5,
-    legend_inset_fraction=0.025,
-)
-_BASE_ANNOTATION = AnnotationSpec(
-    legend_frameon=False,
-    legend_tightness="balanced",
-    label_tightness="balanced",
-)
-_BASE_EXPORT = ExportSpec(
-    figure_dpi=150,
-    savefig_dpi=300,
-    savefig_format="pdf",
-    pdf_fonttype=42,
-    ps_fonttype=42,
-    color_space="RGB",
-    vector_preferred=True,
-    accessibility_note="Avoid red-green collisions and rainbow scales when possible.",
-)
+def _palette_from_contract(name: str) -> PaletteSpec:
+    spec = _CONTRACT.palettes[name]
+    return PaletteSpec(
+        name=name,
+        description=spec.description,
+        categorical=spec.categorical,
+        sequential=spec.sequential,
+        diverging=spec.diverging,
+    )
 
 
 STYLE_PRESETS: dict[str, JournalStyleSpec] = {
-    "default": JournalStyleSpec(
-        name="default",
-        description="默认：沿用当前最稳的 60 mm 面板风格。",
-        hard_constraints=False,
-        preset_note="当前默认科研风格，优先稳定性和可用性。",
-        typography=_BASE_TYPOGRAPHY,
-        stroke=_BASE_STROKE,
-        spacing=_BASE_SPACING,
-        annotation=_BASE_ANNOTATION,
-        export=_BASE_EXPORT,
-    ),
-    "nature": JournalStyleSpec(
-        name="nature",
-        description="Nature：官方约束优先的紧凑科研图风格。",
-        hard_constraints=True,
-        preset_note="基于 Nature 当前公开图像规范的硬约束实现。",
-        typography=TypographySpec(
-            font_family=("Arial", "Helvetica", "DejaVu Sans"),
-            font_size_pt=6.5,
-            legend_font_size_pt=5.8,
-            panel_label_size_pt=8.0,
-            panel_label_weight="bold",
-        ),
-        stroke=StrokeSpec(
-            axis_linewidth_pt=1.0,
-            tick_width_pt=1.0,
-            tick_length_pt=3.4,
-            minor_tick_width_pt=0.8,
-            minor_tick_length_pt=2.0,
-            line_width_pt=1.2,
-            line_alpha=0.92,
-            marker_alpha=0.95,
-            fill_alpha=0.34,
-            max_fill_alpha=0.45,
-            marker_size_pt=3.4,
-        ),
-        spacing=SpacingSpec(
-            panel_width_mm=PANEL_WIDTH_MM,
-            panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=LEFT_MARGIN_MM,
-            right_margin_mm=RIGHT_MARGIN_MM,
-            bottom_margin_mm=BOTTOM_MARGIN_MM,
-            top_margin_mm=TOP_MARGIN_MM,
-            axes_labelpad=2.0,
-            xtick_major_pad=1.4,
-            ytick_major_pad=1.4,
-            legend_inset_fraction=0.025,
-        ),
-        annotation=AnnotationSpec(
-            legend_frameon=False,
-            legend_tightness="tight",
-            label_tightness="tight",
-        ),
-        export=ExportSpec(
-            figure_dpi=150,
-            savefig_dpi=300,
-            savefig_format="pdf",
-            pdf_fonttype=42,
-            ps_fonttype=42,
-            color_space="RGB",
-            vector_preferred=True,
-            accessibility_note="Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts.",
-        ),
-    ),
-    "science_editorial": JournalStyleSpec(
-        name="science_editorial",
-        description="Science：更克制、注释更少、观感更开阔。",
-        hard_constraints=False,
-        preset_note="软风格 preset，抽象自 Science 常见编辑风格，不是投稿合规保证。",
-        typography=TypographySpec(
-            font_family=("Arial", "Helvetica Neue", "Helvetica", "DejaVu Sans"),
-            font_size_pt=7.0,
-            legend_font_size_pt=6.0,
-            panel_label_size_pt=8.0,
-            panel_label_weight="bold",
-        ),
-        stroke=StrokeSpec(
-            axis_linewidth_pt=0.95,
-            tick_width_pt=0.95,
-            tick_length_pt=3.2,
-            minor_tick_width_pt=0.75,
-            minor_tick_length_pt=1.9,
-            line_width_pt=1.15,
-            line_alpha=0.88,
-            marker_alpha=0.92,
-            fill_alpha=0.30,
-            max_fill_alpha=0.42,
-            marker_size_pt=3.5,
-        ),
-        spacing=SpacingSpec(
-            panel_width_mm=PANEL_WIDTH_MM,
-            panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=LEFT_MARGIN_MM,
-            right_margin_mm=RIGHT_MARGIN_MM,
-            bottom_margin_mm=BOTTOM_MARGIN_MM,
-            top_margin_mm=TOP_MARGIN_MM,
-            axes_labelpad=2.4,
-            xtick_major_pad=1.8,
-            ytick_major_pad=1.8,
-            legend_inset_fraction=0.024,
-        ),
-        annotation=AnnotationSpec(
-            legend_frameon=False,
-            legend_tightness="airy",
-            label_tightness="balanced",
-        ),
-        export=_BASE_EXPORT,
-    ),
-    "jacs_analytical": JournalStyleSpec(
-        name="jacs_analytical",
-        description="JACS：更紧凑、分析图观感更硬朗。",
-        hard_constraints=False,
-        preset_note="软风格 preset，抽象自 ACS/JACS 常见分析图语言，不是投稿合规保证。",
-        typography=TypographySpec(
-            font_family=("Arial", "Helvetica", "DejaVu Sans"),
-            font_size_pt=6.8,
-            legend_font_size_pt=5.9,
-            panel_label_size_pt=8.0,
-            panel_label_weight="bold",
-        ),
-        stroke=StrokeSpec(
-            axis_linewidth_pt=1.05,
-            tick_width_pt=1.05,
-            tick_length_pt=3.5,
-            minor_tick_width_pt=0.85,
-            minor_tick_length_pt=2.0,
-            line_width_pt=1.4,
-            line_alpha=0.86,
-            marker_alpha=0.95,
-            fill_alpha=0.28,
-            max_fill_alpha=0.40,
-            marker_size_pt=3.6,
-        ),
-        spacing=SpacingSpec(
-            panel_width_mm=PANEL_WIDTH_MM,
-            panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=LEFT_MARGIN_MM,
-            right_margin_mm=RIGHT_MARGIN_MM,
-            bottom_margin_mm=BOTTOM_MARGIN_MM,
-            top_margin_mm=TOP_MARGIN_MM,
-            axes_labelpad=1.8,
-            xtick_major_pad=1.4,
-            ytick_major_pad=1.4,
-            legend_inset_fraction=0.022,
-        ),
-        annotation=AnnotationSpec(
-            legend_frameon=False,
-            legend_tightness="tight",
-            label_tightness="tight",
-        ),
-        export=_BASE_EXPORT,
-    ),
-    "advanced_materials_spacious": JournalStyleSpec(
-        name="advanced_materials_spacious",
-        description="Advanced Materials：留白更宽、展示感更强。",
-        hard_constraints=False,
-        preset_note="软风格 preset，抽象自 Advanced Materials 常见版面语言，不是投稿合规保证。",
-        typography=TypographySpec(
-            font_family=("Arial", "Helvetica Neue", "Helvetica", "DejaVu Sans"),
-            font_size_pt=7.0,
-            legend_font_size_pt=6.2,
-            panel_label_size_pt=8.0,
-            panel_label_weight="bold",
-        ),
-        stroke=StrokeSpec(
-            axis_linewidth_pt=0.95,
-            tick_width_pt=0.95,
-            tick_length_pt=3.2,
-            minor_tick_width_pt=0.75,
-            minor_tick_length_pt=1.9,
-            line_width_pt=1.18,
-            line_alpha=0.90,
-            marker_alpha=0.96,
-            fill_alpha=0.33,
-            max_fill_alpha=0.44,
-            marker_size_pt=3.8,
-        ),
-        spacing=SpacingSpec(
-            panel_width_mm=PANEL_WIDTH_MM,
-            panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=LEFT_MARGIN_MM,
-            right_margin_mm=RIGHT_MARGIN_MM,
-            bottom_margin_mm=BOTTOM_MARGIN_MM,
-            top_margin_mm=TOP_MARGIN_MM,
-            axes_labelpad=2.6,
-            xtick_major_pad=1.8,
-            ytick_major_pad=1.8,
-            legend_inset_fraction=0.026,
-        ),
-        annotation=AnnotationSpec(
-            legend_frameon=False,
-            legend_tightness="airy",
-            label_tightness="airy",
-        ),
-        export=_BASE_EXPORT,
-    ),
+    name: _style_from_contract(name)
+    for name in style_names()
 }
 
 
 PALETTE_PRESETS: dict[str, PaletteSpec] = {
-    "colorblind_safe": PaletteSpec(
-        name="colorblind_safe",
-        description="默认安全配色：分类色用 colorblind，连续色用 cividis。",
-        categorical=_hex_palette("colorblind"),
-        sequential="cividis",
-        diverging="vlag",
-    ),
-    "deep": PaletteSpec(
-        name="deep",
-        description="Seaborn deep：平衡、沉稳、通用。",
-        categorical=_hex_palette("deep"),
-        sequential="crest",
-        diverging="vlag",
-    ),
-    "muted": PaletteSpec(
-        name="muted",
-        description="Seaborn muted：克制柔和，适合多组对比。",
-        categorical=_hex_palette("muted"),
-        sequential="rocket",
-        diverging="coolwarm",
-    ),
-    "bright": PaletteSpec(
-        name="bright",
-        description="Seaborn bright：高饱和、对比更强。",
-        categorical=_hex_palette("bright"),
-        sequential="mako",
-        diverging="icefire",
-    ),
-    "mono": PaletteSpec(
-        name="mono",
-        description="灰阶单色：适合硬朗分析图和黑白打印。",
-        categorical=("#111827", "#374151", "#6B7280", "#9CA3AF", "#D1D5DB"),
-        sequential="Greys",
-        diverging="Greys",
-    ),
-    "okabe_ito": PaletteSpec(
-        name="okabe_ito",
-        description="Okabe-Ito：经典色盲友好科研配色。",
-        categorical=("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"),
-        sequential="cividis",
-        diverging="PuOr",
-    ),
-    "tol_muted": PaletteSpec(
-        name="tol_muted",
-        description="Paul Tol muted：低刺激、均衡的分类配色。",
-        categorical=("#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#DDCC77", "#CC6677", "#882255", "#AA4499"),
-        sequential="YlGnBu",
-        diverging="BrBG",
-    ),
-    "materials_warm": PaletteSpec(
-        name="materials_warm",
-        description="暖色科研展示配色：更偏材料展示风格。",
-        categorical=("#355070", "#6D597A", "#B56576", "#E56B6F", "#EAAC8B", "#F6BD60", "#84A59D"),
-        sequential="rocket",
-        diverging="Spectral",
-    ),
+    name: _palette_from_contract(name)
+    for name in palette_names()
 }
 
 
@@ -445,8 +181,7 @@ _CURRENT_PALETTE_PRESET = DEFAULT_PALETTE_PRESET
 
 
 def normalize_style_preset(style_preset: str | None) -> str:
-    preset = (style_preset or DEFAULT_STYLE_PRESET).strip()
-    return STYLE_PRESET_ALIASES.get(preset, preset)
+    return normalize_style_alias(style_preset)
 
 
 def get_style_spec(style_preset: str | None = None) -> JournalStyleSpec:
@@ -466,15 +201,15 @@ def get_palette_spec(palette_preset: str | None = None) -> PaletteSpec:
 
 
 def list_style_presets() -> tuple[str, ...]:
-    return tuple(STYLE_PRESETS.keys())
+    return style_names()
 
 
 def list_public_style_presets() -> tuple[str, ...]:
-    return ("default", "nature")
+    return public_style_names()
 
 
 def list_palette_presets() -> tuple[str, ...]:
-    return tuple(PALETTE_PRESETS.keys())
+    return palette_names()
 
 
 def current_style_preset() -> str:

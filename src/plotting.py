@@ -17,6 +17,7 @@ from matplotlib.ticker import FixedLocator, LogLocator
 
 from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup
 from src import plot_style
+from src.plot_contract import load_plot_contract
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import (
     WIDE_NMR_SPECTRUM_HEIGHT_MM,
@@ -35,6 +36,7 @@ MARKER_STYLE_CYCLE = ("o", "s", "^", "D", "v", "P", "X")
 HIDDEN_Y_LABEL_X = -0.167
 INSIDE_LEGEND_INSET_FRACTION = 0.025
 MAX_VISIBLE_Y_MAJOR_TICKS = 7
+_HEATMAP_LAYOUT = load_plot_contract().special_layouts["heatmap"]
 
 
 @dataclass
@@ -1509,10 +1511,27 @@ def _place_series_edge_labels(
 
 def _compute_heatmap_cax_geometry(position: transforms.Bbox) -> tuple[list[float], list[float]]:
     available_height = max(1.0 - position.y1, 1e-6)
-    cbar_y0 = position.y1 + min(max(available_height * 0.18, 0.018), available_height * 0.42)
-    cbar_height = min(max(available_height * 0.13, 0.013), max(available_height - (cbar_y0 - position.y1) - 0.012, 0.010))
-    cbar_x0 = position.x0 + position.width * 0.38
-    cbar_width = position.width * 0.50
+    cbar_y0 = position.y1 + min(
+        max(
+            available_height * float(_HEATMAP_LAYOUT["colorbar_y_offset_fraction"]),
+            float(_HEATMAP_LAYOUT["colorbar_y_offset_min"]),
+        ),
+        available_height * float(_HEATMAP_LAYOUT["colorbar_y_offset_max_fraction"]),
+    )
+    cbar_height = min(
+        max(
+            available_height * float(_HEATMAP_LAYOUT["colorbar_height_fraction"]),
+            float(_HEATMAP_LAYOUT["colorbar_height_min"]),
+        ),
+        max(
+            available_height
+            - (cbar_y0 - position.y1)
+            - float(_HEATMAP_LAYOUT["colorbar_bottom_gap"]),
+            0.010,
+        ),
+    )
+    cbar_x0 = position.x0 + position.width * float(_HEATMAP_LAYOUT["colorbar_x_offset_fraction"])
+    cbar_width = position.width * float(_HEATMAP_LAYOUT["colorbar_width_fraction"])
     heatmap_rect = [position.x0, position.y0, position.width, position.height]
     cax_rect = [
         cbar_x0,
@@ -2776,11 +2795,11 @@ def plot_heatmap(
         cax = fig.add_axes(cax_rect)
         colorbar_label = fig.text(
             position.x0,
-            min(0.975, position.y1 + (1.0 - position.y1) * 0.56),
+            min(0.975, position.y1 + (1.0 - position.y1) * float(_HEATMAP_LAYOUT["label_y_fraction"])),
             _format_axis_label(table.z_label, table.z_unit),
             ha="left",
             va="center",
-            fontsize=4.8,
+            fontsize=float(_HEATMAP_LAYOUT["label_font_size_pt"]),
         )
 
     heatmap = sns.heatmap(
@@ -2805,10 +2824,14 @@ def plot_heatmap(
         z_max = float(np.nanmax(matrix.to_numpy(dtype=float)))
         colorbar = fig.colorbar(heatmap.collections[0], cax=cax, orientation="horizontal")
         colorbar.set_ticks(np.linspace(z_min, z_max, 3))
-        colorbar.ax.tick_params(labelsize=4.3, pad=0.2, length=2.0)
+        colorbar.ax.tick_params(
+            labelsize=float(_HEATMAP_LAYOUT["tick_font_size_pt"]),
+            pad=0.2,
+            length=float(_HEATMAP_LAYOUT["tick_length_pt"]),
+        )
         colorbar.outline.set_linewidth(0.8)
         if colorbar_label is not None:
-            colorbar_label.set_fontsize(4.8)
+            colorbar_label.set_fontsize(float(_HEATMAP_LAYOUT["label_font_size_pt"]))
     return fig, ax
 
 

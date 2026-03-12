@@ -3,11 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import tomllib
+from src.plot_contract import load_plot_contract
 
-WIDE_NMR_WIDTH_MM = 60.0
-WIDE_NMR_TOTAL_HEIGHT_MM = 110.0
-WIDE_NMR_STRUCTURE_RESERVED_MM = 18.0
-WIDE_NMR_SPECTRUM_HEIGHT_MM = WIDE_NMR_TOTAL_HEIGHT_MM - WIDE_NMR_STRUCTURE_RESERVED_MM
+_CONTRACT = load_plot_contract()
+_WIDE_NMR_LAYOUT = _CONTRACT.special_layouts["wide_nmr"]
+
+WIDE_NMR_WIDTH_MM = float(_WIDE_NMR_LAYOUT["width_mm"])
+WIDE_NMR_TOTAL_HEIGHT_MM = float(_WIDE_NMR_LAYOUT["total_height_mm"])
+WIDE_NMR_STRUCTURE_RESERVED_MM = float(_WIDE_NMR_LAYOUT["structure_reserved_mm"])
+WIDE_NMR_SPECTRUM_HEIGHT_MM = float(_WIDE_NMR_LAYOUT["spectrum_height_mm"])
 
 
 @dataclass(frozen=True)

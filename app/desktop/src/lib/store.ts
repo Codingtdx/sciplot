@@ -79,16 +79,7 @@ type WorkbenchState = {
 
 const storage = createJSONStorage(() => localStorage);
 
-const defaultOptions: RenderOptionsPayload = {
-  size: "60x55",
-  xscale: "linear",
-  yscale: "linear",
-  reverse_x: false,
-  baseline: "none",
-  show_colorbar: true,
-  palette_preset: "colorblind_safe",
-  use_sidecar: null,
-};
+const defaultOptions: RenderOptionsPayload = {};
 
 const emptyProject: ComposerProject = {
   version: 1,
