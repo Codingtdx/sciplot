@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import scienceplots  # noqa: F401
@@ -13,10 +14,12 @@ MM_TO_INCH = 1 / 25.4
 PANEL_WIDTH_MM = 60
 PANEL_HEIGHT_MM = 55
 
-LEFT_MARGIN_MM = 11.5
-RIGHT_MARGIN_MM = 3.5
-BOTTOM_MARGIN_MM = 10.5
-TOP_MARGIN_MM = 4.5
+# Keep a single physical axis frame across panel types so exported figures align
+# cleanly when compared side-by-side or composed into a board.
+LEFT_MARGIN_MM = 14.0
+RIGHT_MARGIN_MM = 4.5
+BOTTOM_MARGIN_MM = 11.0
+TOP_MARGIN_MM = 5.5
 
 FONT_SIZE_PT = 7
 AXIS_LINEWIDTH_PT = 1.0
@@ -217,10 +220,10 @@ STYLE_PRESETS: dict[str, JournalStyleSpec] = {
         spacing=SpacingSpec(
             panel_width_mm=PANEL_WIDTH_MM,
             panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=11.5,
-            right_margin_mm=3.5,
-            bottom_margin_mm=10.0,
-            top_margin_mm=4.2,
+            left_margin_mm=LEFT_MARGIN_MM,
+            right_margin_mm=RIGHT_MARGIN_MM,
+            bottom_margin_mm=BOTTOM_MARGIN_MM,
+            top_margin_mm=TOP_MARGIN_MM,
             axes_labelpad=2.0,
             xtick_major_pad=1.4,
             ytick_major_pad=1.4,
@@ -270,10 +273,10 @@ STYLE_PRESETS: dict[str, JournalStyleSpec] = {
         spacing=SpacingSpec(
             panel_width_mm=PANEL_WIDTH_MM,
             panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=12.0,
-            right_margin_mm=4.0,
-            bottom_margin_mm=10.8,
-            top_margin_mm=4.8,
+            left_margin_mm=LEFT_MARGIN_MM,
+            right_margin_mm=RIGHT_MARGIN_MM,
+            bottom_margin_mm=BOTTOM_MARGIN_MM,
+            top_margin_mm=TOP_MARGIN_MM,
             axes_labelpad=2.4,
             xtick_major_pad=1.8,
             ytick_major_pad=1.8,
@@ -314,10 +317,10 @@ STYLE_PRESETS: dict[str, JournalStyleSpec] = {
         spacing=SpacingSpec(
             panel_width_mm=PANEL_WIDTH_MM,
             panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=11.0,
-            right_margin_mm=3.2,
-            bottom_margin_mm=10.0,
-            top_margin_mm=4.0,
+            left_margin_mm=LEFT_MARGIN_MM,
+            right_margin_mm=RIGHT_MARGIN_MM,
+            bottom_margin_mm=BOTTOM_MARGIN_MM,
+            top_margin_mm=TOP_MARGIN_MM,
             axes_labelpad=1.8,
             xtick_major_pad=1.4,
             ytick_major_pad=1.4,
@@ -358,10 +361,10 @@ STYLE_PRESETS: dict[str, JournalStyleSpec] = {
         spacing=SpacingSpec(
             panel_width_mm=PANEL_WIDTH_MM,
             panel_height_mm=PANEL_HEIGHT_MM,
-            left_margin_mm=12.5,
-            right_margin_mm=4.3,
-            bottom_margin_mm=11.0,
-            top_margin_mm=5.2,
+            left_margin_mm=LEFT_MARGIN_MM,
+            right_margin_mm=RIGHT_MARGIN_MM,
+            bottom_margin_mm=BOTTOM_MARGIN_MM,
+            top_margin_mm=TOP_MARGIN_MM,
             axes_labelpad=2.6,
             xtick_major_pad=1.8,
             ytick_major_pad=1.8,

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import textwrap
 from typing import Sequence
 
+from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -1507,16 +1508,17 @@ def _place_series_edge_labels(
 
 
 def _compute_heatmap_cax_geometry(position: transforms.Bbox) -> tuple[list[float], list[float]]:
-    reserved_width = max(position.width * 0.24, 0.090)
-    heatmap_width = max(position.width - reserved_width, position.width * 0.72)
-    cbar_pad = min(max(position.width * 0.032, 0.012), reserved_width * 0.24)
-    cbar_width = min(max(position.width * 0.050, 0.020), reserved_width - cbar_pad - 0.006)
-    heatmap_rect = [position.x0, position.y0, heatmap_width, position.height]
+    available_height = max(1.0 - position.y1, 1e-6)
+    cbar_y0 = position.y1 + min(max(available_height * 0.18, 0.018), available_height * 0.42)
+    cbar_height = min(max(available_height * 0.13, 0.013), max(available_height - (cbar_y0 - position.y1) - 0.012, 0.010))
+    cbar_x0 = position.x0 + position.width * 0.38
+    cbar_width = position.width * 0.50
+    heatmap_rect = [position.x0, position.y0, position.width, position.height]
     cax_rect = [
-        position.x0 + heatmap_width + cbar_pad,
-        position.y0 + position.height * 0.10,
+        cbar_x0,
+        cbar_y0,
         cbar_width,
-        position.height * 0.80,
+        cbar_height,
     ]
     return heatmap_rect, cax_rect
 
@@ -2423,9 +2425,9 @@ def plot_wide_nmr(
         _draw_wide_nmr_break_marks(left_axis, right_axis)
 
     first = series_list[0]
-    fig.supxlabel(_format_axis_label(first.x_label, first.x_unit), x=0.985, ha="right")
+    fig.supxlabel(_format_axis_label(first.x_label, first.x_unit), x=1 - right_margin_mm / width_mm, ha="right")
     if config.panel_label:
-        fig.text(0.01, 0.98, config.panel_label, ha="left", va="top", fontsize=10)
+        fig.text(left_margin_mm / width_mm, 0.98, config.panel_label, ha="left", va="top", fontsize=10)
 
     return fig, axes[0]
 
@@ -2766,11 +2768,20 @@ def plot_heatmap(
     )
 
     cax = None
+    colorbar_label = None
     if show_colorbar:
         position = ax.get_position()
         heatmap_rect, cax_rect = _compute_heatmap_cax_geometry(position)
         ax.set_position(heatmap_rect)
         cax = fig.add_axes(cax_rect)
+        colorbar_label = fig.text(
+            position.x0,
+            min(0.975, position.y1 + (1.0 - position.y1) * 0.56),
+            _format_axis_label(table.z_label, table.z_unit),
+            ha="left",
+            va="center",
+            fontsize=4.8,
+        )
 
     heatmap = sns.heatmap(
         matrix,
@@ -2790,16 +2801,14 @@ def plot_heatmap(
         tick.set_fontsize(6)
 
     if show_colorbar and heatmap.collections and cax is not None:
-        colorbar = fig.colorbar(heatmap.collections[0], cax=cax)
-        colorbar.ax.tick_params(labelsize=5.5, pad=1.0, length=3.0)
+        z_min = float(np.nanmin(matrix.to_numpy(dtype=float)))
+        z_max = float(np.nanmax(matrix.to_numpy(dtype=float)))
+        colorbar = fig.colorbar(heatmap.collections[0], cax=cax, orientation="horizontal")
+        colorbar.set_ticks(np.linspace(z_min, z_max, 3))
+        colorbar.ax.tick_params(labelsize=4.3, pad=0.2, length=2.0)
         colorbar.outline.set_linewidth(0.8)
-        colorbar.set_label(
-            textwrap.fill(_format_axis_label(table.z_label, table.z_unit), width=12, break_long_words=False),
-            fontsize=5.4,
-            rotation=270,
-            labelpad=7.0,
-            va="bottom",
-        )
+        if colorbar_label is not None:
+            colorbar_label.set_fontsize(4.8)
     return fig, ax
 
 

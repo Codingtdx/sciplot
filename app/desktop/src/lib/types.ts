@@ -93,6 +93,24 @@ export type ExportResponse = {
   outputs: string[];
 };
 
+export type TensileMetricSummary = {
+  label: string;
+  unit: string;
+  mean: number | null;
+  std: number | null;
+};
+
+export type TensileReplicateResponse = {
+  output_path: string;
+  group_name: string;
+  preferred_sheet: string;
+  sheet_names: string[];
+  sample_count: number;
+  representative_filename: string;
+  metrics: TensileMetricSummary[];
+  warnings: string[];
+};
+
 export type ComposerPanel = {
   id: string;
   file_path: string;

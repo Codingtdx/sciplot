@@ -3,16 +3,17 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from matplotlib.colors import to_hex
-
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from src import mpl_backend  # noqa: F401
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import to_hex
 
 import interactive_plot as wizard
 from make_plot import (
@@ -38,6 +39,7 @@ from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
 from src import plot_style
 from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
+    _format_axis_label,
     _cap_visible_major_ticks,
     _legend_candidates,
     _place_legend_candidate,
@@ -759,6 +761,103 @@ def _assert_stat_plot_tick_cap(groups) -> None:
             plt.close(fig)
 
 
+def _assert_axis_frame_alignment(
+    *,
+    replicate_path: Path,
+    tensile_path: Path,
+    heatmap_path: Path,
+    wide_nmr_path: Path,
+) -> None:
+    from src.data_loader import load_heatmap_table
+
+    groups = load_replicate_table(replicate_path)
+    tensile_series = load_curve_table(tensile_path)
+    heatmap_table = load_heatmap_table(heatmap_path)
+    wide_nmr_series = load_curve_table(wide_nmr_path)
+    wide_nmr_config = load_wide_nmr_config(wide_nmr_path)
+
+    figures: list[plt.Figure] = []
+    try:
+        axis_frames: dict[str, np.ndarray] = {}
+        for name, builder in (
+            ("bar", lambda: plot_bar(groups)),
+            ("box", lambda: plot_box(groups)),
+            ("violin", lambda: plot_violin(groups)),
+            ("curve", lambda: plot_tensile_curve(tensile_series)),
+            ("heatmap", lambda: plot_heatmap(heatmap_table)),
+        ):
+            fig, ax = builder()
+            figures.append(fig)
+            fig.canvas.draw()
+            axis_frames[name] = np.asarray(ax.get_position().bounds, dtype=float)
+
+        reference = axis_frames["curve"]
+        for name, frame in axis_frames.items():
+            if not np.allclose(frame, reference, atol=5e-6):
+                raise AssertionError(f"{name} drifted away from the shared single-panel axis frame.")
+
+        reference_fig = figures[0]
+        reference_width_mm = reference_fig.get_size_inches()[0] * 25.4
+        reference_height_mm = reference_fig.get_size_inches()[1] * 25.4
+        reference_left_mm = reference[0] * reference_width_mm
+        reference_right_mm = (1.0 - (reference[0] + reference[2])) * reference_width_mm
+        reference_bottom_mm = reference[1] * reference_height_mm
+
+        heatmap_fig = figures[-1]
+        heatmap_renderer = heatmap_fig.canvas.get_renderer()
+        heatmap_canvas = heatmap_fig.bbox
+        heatmap_cbar_ax = heatmap_fig.axes[-1]
+        heatmap_cbar_bbox = heatmap_cbar_ax.get_tightbbox(renderer=heatmap_renderer)
+        if (
+            heatmap_cbar_bbox.x0 < heatmap_canvas.x0
+            or heatmap_cbar_bbox.x1 > heatmap_canvas.x1
+            or heatmap_cbar_bbox.y0 < heatmap_canvas.y0
+            or heatmap_cbar_bbox.y1 > heatmap_canvas.y1
+        ):
+            raise AssertionError("Heatmap top colorbar should stay inside the figure canvas.")
+
+        expected_heatmap_label = _format_axis_label(heatmap_table.z_label, heatmap_table.z_unit)
+        heatmap_labels = [text for text in heatmap_fig.texts if text.get_text() == expected_heatmap_label]
+        if len(heatmap_labels) != 1:
+            raise AssertionError("Heatmap should render one explicit top-strip z label.")
+        label_bbox = heatmap_labels[0].get_window_extent(renderer=heatmap_renderer)
+        if (
+            label_bbox.x0 < heatmap_canvas.x0
+            or label_bbox.x1 > heatmap_canvas.x1
+            or label_bbox.y0 < heatmap_canvas.y0
+            or label_bbox.y1 > heatmap_canvas.y1
+        ):
+            raise AssertionError("Heatmap top-strip z label should stay inside the figure canvas.")
+
+        wide_fig, _ = plot_wide_nmr(wide_nmr_series, wide_nmr_config)
+        figures.append(wide_fig)
+        wide_fig.canvas.draw()
+        left_axis = wide_fig.axes[0]
+        right_axis = wide_fig.axes[-1]
+        left_frame = np.asarray(left_axis.get_position().bounds, dtype=float)
+        right_frame = np.asarray(right_axis.get_position().bounds, dtype=float)
+        wide_width_mm = wide_fig.get_size_inches()[0] * 25.4
+        wide_height_mm = wide_fig.get_size_inches()[1] * 25.4
+        wide_left_mm = left_frame[0] * wide_width_mm
+        wide_right_mm = (1.0 - (right_frame[0] + right_frame[2])) * wide_width_mm
+        wide_bottom_mm = left_frame[1] * wide_height_mm
+        if not np.isclose(wide_left_mm, reference_left_mm, atol=0.05):
+            raise AssertionError("wide_nmr should share the same left axis anchor as the standard single-panel frame.")
+        if not np.isclose(wide_right_mm, reference_right_mm, atol=0.05):
+            raise AssertionError("wide_nmr should share the same right axis anchor as the standard single-panel frame.")
+        if not np.isclose(wide_bottom_mm, reference_bottom_mm, atol=0.05):
+            raise AssertionError("wide_nmr should share the same bottom axis anchor as the standard single-panel frame.")
+        segment_bottoms = [axis.get_position().y0 for axis in wide_fig.axes]
+        segment_tops = [axis.get_position().y1 for axis in wide_fig.axes]
+        if not np.allclose(segment_bottoms, segment_bottoms[0], atol=5e-6):
+            raise AssertionError("wide_nmr segment axes should align on a common bottom edge.")
+        if not np.allclose(segment_tops, segment_tops[0], atol=5e-6):
+            raise AssertionError("wide_nmr segment axes should align on a common top edge.")
+    finally:
+        for fig in figures:
+            plt.close(fig)
+
+
 def _assert_major_tick_skip_every_other() -> None:
     ticks = np.array([0, 1, 2, 3, 4, 5, 6], dtype=float)
     kept = _cap_visible_major_ticks(ticks, scale="linear", max_major_ticks=7)
@@ -826,14 +925,28 @@ def _assert_style_palette_presets(
         cbar_ax = heatmap_fig.axes[-1]
         renderer = heatmap_fig.canvas.get_renderer()
         fig_bbox = heatmap_fig.bbox
-        label_bbox = cbar_ax.title.get_window_extent(renderer=renderer)
+        label_bbox = cbar_ax.get_tightbbox(renderer=renderer)
         if (
             label_bbox.x0 < fig_bbox.x0
             or label_bbox.x1 > fig_bbox.x1
             or label_bbox.y0 < fig_bbox.y0
             or label_bbox.y1 > fig_bbox.y1
         ):
-            raise AssertionError("Heatmap colorbar label should stay inside the figure canvas.")
+            raise AssertionError("Heatmap colorbar strip should stay inside the figure canvas.")
+
+        heatmap_table = load_heatmap_table(heatmap_path)
+        expected_label = _format_axis_label(heatmap_table.z_label, heatmap_table.z_unit)
+        matching_labels = [text for text in heatmap_fig.texts if text.get_text() == expected_label]
+        if len(matching_labels) != 1:
+            raise AssertionError("Heatmap should render one explicit top-strip z label.")
+        top_label_bbox = matching_labels[0].get_window_extent(renderer=renderer)
+        if (
+            top_label_bbox.x0 < fig_bbox.x0
+            or top_label_bbox.x1 > fig_bbox.x1
+            or top_label_bbox.y0 < fig_bbox.y0
+            or top_label_bbox.y1 > fig_bbox.y1
+        ):
+            raise AssertionError("Heatmap top-strip z label should stay inside the figure canvas.")
     finally:
         plt.close(heatmap_fig)
 
@@ -1219,6 +1332,12 @@ def main() -> int:
             lambda series: plot_frequency_sweep(series, xscale="linear", yscale="log"),
             temp_series,
             expect_log_y=True,
+        )
+        _assert_axis_frame_alignment(
+            replicate_path=replicate_path,
+            tensile_path=tensile_path,
+            heatmap_path=heatmap_path,
+            wide_nmr_path=wide_nmr_path,
         )
         _assert_frequency_batch_sync(freq_path)
         _assert_legend_candidate_insets()

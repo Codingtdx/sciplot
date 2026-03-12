@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 import pandas as pd
 

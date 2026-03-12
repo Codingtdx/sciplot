@@ -8,7 +8,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-import matplotlib.pyplot as plt
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -43,6 +42,7 @@ from src.composer import (
     three_up_panels_from_paths,
     validate_non_overlapping_panels,
 )
+from src.tensile_replicates import export_tensile_replicate_workbook
 
 
 class RenderOptionsPayload(BaseModel):
@@ -68,6 +68,12 @@ class RenderRequest(FileRequest):
 
 class ExportRenderRequest(RenderRequest):
     output_dir: str | None = None
+
+
+class TensileReplicateRequest(BaseModel):
+    file_paths: list[str]
+    output_path: str
+    group_name: str | None = None
 
 
 class ComposerPanelPayload(BaseModel):
@@ -309,6 +315,19 @@ def export_render(request: ExportRenderRequest) -> dict[str, Any]:
         )
         outputs = export_rendered_plots(rendered_plots, output_dir, close=True)
         return {"outputs": [str(path) for path in outputs]}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/preprocess-tensile-replicates")
+def preprocess_tensile_replicates(request: TensileReplicateRequest) -> dict[str, Any]:
+    try:
+        result = export_tensile_replicate_workbook(
+            request.file_paths,
+            request.output_path,
+            group_name=request.group_name,
+        )
+        return _serialize(result)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

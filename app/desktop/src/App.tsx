@@ -13,6 +13,7 @@ import {
   inspectFile,
   openProject,
   panelThumbnail,
+  preprocessTensileReplicates,
   preflightRender,
   renderPreview,
   saveProject,
@@ -29,6 +30,7 @@ import type {
   RecentProjectEntry,
   SizePreset,
   TemplateName,
+  TensileReplicateResponse,
   WizardProject,
   WizardStep,
   WorkbenchScreen,
@@ -176,6 +178,34 @@ function formatLeaf(path: string) {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
+function formatMetricValue(value: number | null) {
+  if (value == null || Number.isNaN(value)) {
+    return "-";
+  }
+  return value.toFixed(2);
+}
+
+function inferTensileGroupName(filePaths: string[]) {
+  const stems = filePaths.map((path) => formatLeaf(path).replace(/\.[^.]+$/, ""));
+  if (stems.length === 0) {
+    return "Tensile_Group";
+  }
+  let prefix = stems[0];
+  for (const stem of stems.slice(1)) {
+    while (prefix && !stem.startsWith(prefix)) {
+      prefix = prefix.slice(0, -1);
+    }
+  }
+  prefix = prefix.replace(/[_\-\s]+$/, "");
+  return prefix || stems[0] || "Tensile_Group";
+}
+
+function defaultSiblingPath(filePath: string, filename: string) {
+  const parts = filePath.split(/[/\\]/);
+  parts[parts.length - 1] = filename;
+  return parts.join(filePath.includes("\\") ? "\\" : "/");
+}
+
 function formatRecentTimestamp(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -243,6 +273,8 @@ type ComposerStoreSnapshot = ReturnType<typeof useComposerStore.getState>;
 async function loadWizardDataFile(
   wizard: WizardStoreSnapshot,
   filePath: string,
+  initialSheet: string | number = 0,
+  nextStep?: WizardStep,
 ): Promise<InspectResponse> {
   const keepBusy = wizard.busy;
   wizard.reset();
@@ -251,7 +283,7 @@ async function loadWizardDataFile(
   wizard.setInputPath(filePath);
   wizard.setStep("file");
 
-  const inspected = await inspectFile(filePath, 0);
+  const inspected = await inspectFile(filePath, initialSheet);
   wizard.setInputPath(inspected.input_path);
   wizard.setSheet(inspected.sheet);
   wizard.setSheetNames(inspected.sheet_names);
@@ -266,7 +298,7 @@ async function loadWizardDataFile(
     show_colorbar: inspected.inspection.recommendation.show_colorbar,
     use_sidecar: inspected.inspection.recommendation.use_sidecar,
   });
-  wizard.setStep(inspected.sheet_names.length > 1 ? "sheet" : "inspect");
+  wizard.setStep(nextStep ?? (inspected.sheet_names.length > 1 ? "sheet" : "inspect"));
   return inspected;
 }
 
@@ -348,6 +380,7 @@ function WizardPane() {
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [tensileBatchResult, setTensileBatchResult] = useState<TensileReplicateResponse | null>(null);
 
   const stepMeta = STEP_COPY[wizard.step];
   const recommendation = wizard.inspection?.recommendation ?? null;
@@ -422,6 +455,7 @@ function WizardPane() {
       return;
     }
 
+    setTensileBatchResult(null);
     wizard.setBusy(true);
     try {
       const inspected = await loadWizardDataFile(wizard, selected);
@@ -448,6 +482,7 @@ function WizardPane() {
       return;
     }
 
+    setTensileBatchResult(null);
     wizard.reset();
     wizard.setError(null);
     wizard.setBusy(true);
@@ -499,6 +534,60 @@ function WizardPane() {
       title: formatLeaf(destination),
       detail: `已保存绘图项目 · ${wizard.outputs.length} 个结果`,
     });
+  };
+
+  const runTensileReplicatePreprocess = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
+    });
+    const filePaths = Array.isArray(selected)
+      ? selected.filter((item): item is string => typeof item === "string")
+      : [];
+    if (filePaths.length === 0) {
+      return;
+    }
+
+    const inferredGroupName = inferTensileGroupName(filePaths);
+    const destination = await save({
+      defaultPath: defaultSiblingPath(
+        filePaths[0],
+        `${inferredGroupName}_plot_wizard_template.xlsx`,
+      ),
+      filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
+    });
+    if (typeof destination !== "string") {
+      return;
+    }
+
+    setTensileBatchResult(null);
+    wizard.setError(null);
+    wizard.setBusy(true);
+    try {
+      const result = await preprocessTensileReplicates(
+        filePaths,
+        destination,
+        inferredGroupName,
+      );
+      setTensileBatchResult(result);
+      const inspected = await loadWizardDataFile(
+        wizard,
+        result.output_path,
+        result.preferred_sheet,
+        "inspect",
+      );
+      rememberProject({
+        mode: "wizard",
+        kind: "data",
+        path: result.output_path,
+        title: formatLeaf(result.output_path),
+        detail: `拉伸整理 · ${result.sample_count} 个重复样 · ${TEMPLATE_LABELS[inspected.inspection.recommendation.template]}`,
+      });
+    } catch (error) {
+      wizard.setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      wizard.setBusy(false);
+    }
   };
 
   const rerunInspect = async (sheetValue: string | number) => {
@@ -630,6 +719,41 @@ function WizardPane() {
           </div>
 
           {wizard.error && <div className="error-card">{wizard.error}</div>}
+          {tensileBatchResult && (
+            <>
+              <div className="success-card">
+                已整理 {tensileBatchResult.sample_count} 个拉伸重复样，代表曲线来自 {tensileBatchResult.representative_filename}，模板工作簿已生成并载入当前工作台。
+              </div>
+              <div className="summary-grid">
+                <div className="stat-tile">
+                  <span>输出文件</span>
+                  <strong>{formatLeaf(tensileBatchResult.output_path)}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>默认工作表</span>
+                  <strong>{tensileBatchResult.preferred_sheet}</strong>
+                </div>
+                {tensileBatchResult.metrics.map((metric) => (
+                  <div className="stat-tile" key={metric.label}>
+                    <span>{metric.label}</span>
+                    <strong>
+                      {formatMetricValue(metric.mean)} ± {formatMetricValue(metric.std)} {metric.unit}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+              {tensileBatchResult.warnings.length > 0 && (
+                <details>
+                  <summary>展开查看被跳过的文件</summary>
+                  <ul className="bullet-list">
+                    {tensileBatchResult.warnings.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
 
           {wizard.step === "file" && (
             <div className="step-block">
@@ -637,9 +761,16 @@ function WizardPane() {
                 <strong>拖文件或直接打开</strong>
                 <span>支持 CSV、TSV、TXT、XLSX、XLSM。程序会先做结构识别，再给出推荐。</span>
               </div>
+              <div className="focus-panel">
+                <strong>原始拉伸重复样也可以直接整理</strong>
+                <span>一次选择多份仪器导出的拉伸 CSV，程序会自动提取强度/模量/断裂伸长率，计算均值，并找出最接近均值的代表曲线，再导出成绘图精灵可直接读取的模板工作簿。</span>
+              </div>
               <div className="step-actions">
                 <button className="primary-button" onClick={openDataFile} type="button">
                   打开数据文件
+                </button>
+                <button className="ghost-button" onClick={() => void runTensileReplicatePreprocess()} type="button">
+                  整理拉伸重复 CSV
                 </button>
                 <button className="ghost-button" onClick={openWizardProject} type="button">
                   打开已有项目
@@ -697,6 +828,11 @@ function WizardPane() {
                 </details>
               )}
               <div className="step-actions">
+                {wizard.sheetNames.length > 1 && (
+                  <button className="ghost-button" onClick={() => wizard.setStep("sheet")} type="button">
+                    改 sheet
+                  </button>
+                )}
                 <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
                   改图型
                 </button>

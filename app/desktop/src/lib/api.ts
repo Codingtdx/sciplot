@@ -7,6 +7,7 @@ import type {
   RenderOptionsPayload,
   RenderPreviewResponse,
   TemplateName,
+  TensileReplicateResponse,
 } from "./types";
 
 const SIDECAR_URL = "http://127.0.0.1:8765";
@@ -88,6 +89,18 @@ export async function exportRender(
     template,
     options,
     output_dir: outputDir ?? null,
+  });
+}
+
+export async function preprocessTensileReplicates(
+  filePaths: string[],
+  outputPath: string,
+  groupName?: string,
+): Promise<TensileReplicateResponse> {
+  return postJson<TensileReplicateResponse>("/preprocess-tensile-replicates", {
+    file_paths: filePaths,
+    output_path: outputPath,
+    group_name: groupName ?? null,
   });
 }
 
