@@ -19,18 +19,22 @@ import {
   threeUp,
   twoUpEditorial,
 } from "./lib/api";
-import { useComposerStore, useWizardStore } from "./lib/store";
+import { useComposerStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import type {
   ComposerPanel,
   ComposerProject,
+  InspectResponse,
   PalettePreset,
+  PdfImportMode,
+  RecentProjectEntry,
   SizePreset,
   TemplateName,
   WizardProject,
   WizardStep,
+  WorkbenchScreen,
 } from "./lib/types";
 
-type AppMode = "wizard" | "composer" | "projects" | "settings";
+type AppMode = WorkbenchScreen;
 
 const NAV_ITEMS: Array<{
   id: AppMode;
@@ -172,6 +176,19 @@ function formatLeaf(path: string) {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
+function formatRecentTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString("zh-CN", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function getWizardStepLabel(step: WizardStep) {
   return STEPS.find((item) => item.id === step)?.label ?? step;
 }
@@ -220,6 +237,90 @@ function normalizeComposerProject(project: ComposerProject): ComposerProject {
   };
 }
 
+type WizardStoreSnapshot = ReturnType<typeof useWizardStore.getState>;
+type ComposerStoreSnapshot = ReturnType<typeof useComposerStore.getState>;
+
+async function loadWizardDataFile(
+  wizard: WizardStoreSnapshot,
+  filePath: string,
+): Promise<InspectResponse> {
+  const keepBusy = wizard.busy;
+  wizard.reset();
+  wizard.setBusy(keepBusy);
+  wizard.setError(null);
+  wizard.setInputPath(filePath);
+  wizard.setStep("file");
+
+  const inspected = await inspectFile(filePath, 0);
+  wizard.setInputPath(inspected.input_path);
+  wizard.setSheet(inspected.sheet);
+  wizard.setSheetNames(inspected.sheet_names);
+  wizard.setInspection(inspected.inspection);
+  wizard.setTemplate(inspected.inspection.recommendation.template);
+  wizard.setOptions({
+    size: inspected.inspection.recommendation.size,
+    xscale: inspected.inspection.recommendation.xscale,
+    yscale: inspected.inspection.recommendation.yscale,
+    reverse_x: inspected.inspection.recommendation.reverse_x,
+    baseline: inspected.inspection.recommendation.baseline,
+    show_colorbar: inspected.inspection.recommendation.show_colorbar,
+    use_sidecar: inspected.inspection.recommendation.use_sidecar,
+  });
+  wizard.setStep(inspected.sheet_names.length > 1 ? "sheet" : "inspect");
+  return inspected;
+}
+
+async function loadWizardProjectFile(
+  wizard: WizardStoreSnapshot,
+  projectPath: string,
+): Promise<WizardProject> {
+  const keepBusy = wizard.busy;
+  wizard.reset();
+  wizard.setBusy(keepBusy);
+  wizard.setError(null);
+
+  const payload = (await openProject(projectPath)) as WizardProject;
+  if (!payload || payload.mode !== "wizard") {
+    throw new Error("这不是可识别的绘图精灵项目文件。");
+  }
+
+  const { input_path, options, outputs, sheet, template } = payload.wizard;
+  const inspected = await inspectFile(input_path, sheet);
+  wizard.setInputPath(inspected.input_path);
+  wizard.setSheet(inspected.sheet);
+  wizard.setSheetNames(inspected.sheet_names);
+  wizard.setInspection(inspected.inspection);
+  wizard.setTemplate(template ?? inspected.inspection.recommendation.template);
+  wizard.setOptions({
+    size: inspected.inspection.recommendation.size,
+    xscale: inspected.inspection.recommendation.xscale,
+    yscale: inspected.inspection.recommendation.yscale,
+    reverse_x: inspected.inspection.recommendation.reverse_x,
+    baseline: inspected.inspection.recommendation.baseline,
+    show_colorbar: inspected.inspection.recommendation.show_colorbar,
+    use_sidecar: inspected.inspection.recommendation.use_sidecar,
+    ...options,
+  });
+  wizard.setOutputs(outputs ?? []);
+  wizard.setStep(outputs && outputs.length > 0 ? "export" : "options");
+  return payload;
+}
+
+async function loadComposerProjectFile(
+  composer: ComposerStoreSnapshot,
+  projectPath: string,
+): Promise<ComposerProject> {
+  const payload = (await openProject(projectPath)) as
+    | { version?: number; mode?: string; project?: ComposerProject }
+    | ComposerProject;
+  const project =
+    "project" in payload && payload.project ? payload.project : (payload as ComposerProject);
+  const normalized = normalizeComposerProject(project);
+  composer.setProject(normalized);
+  composer.setSelectedId(null);
+  return normalized;
+}
+
 function StepFlow({ current }: { current: WizardStep }) {
   const currentIndex = STEPS.findIndex((step) => step.id === current);
 
@@ -244,6 +345,7 @@ function StepFlow({ current }: { current: WizardStep }) {
 
 function WizardPane() {
   const wizard = useWizardStore();
+  const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
@@ -273,6 +375,7 @@ function WizardPane() {
       return;
     }
 
+    const template = wizard.template;
     let cancelled = false;
     const handle = window.setTimeout(async () => {
       setPreviewBusy(true);
@@ -281,7 +384,7 @@ function WizardPane() {
         const payload = await renderPreview(
           wizard.inputPath,
           wizard.sheet,
-          wizard.template,
+          template,
           wizard.options,
         );
         if (!cancelled) {
@@ -319,29 +422,20 @@ function WizardPane() {
       return;
     }
 
-    wizard.reset();
-    wizard.setError(null);
-    wizard.setInputPath(selected);
-    wizard.setStep("file");
+    wizard.setBusy(true);
     try {
-      const inspected = await inspectFile(selected, 0);
-      wizard.setInputPath(inspected.input_path);
-      wizard.setSheet(inspected.sheet);
-      wizard.setSheetNames(inspected.sheet_names);
-      wizard.setInspection(inspected.inspection);
-      wizard.setTemplate(inspected.inspection.recommendation.template);
-      wizard.setOptions({
-        size: inspected.inspection.recommendation.size,
-        xscale: inspected.inspection.recommendation.xscale,
-        yscale: inspected.inspection.recommendation.yscale,
-        reverse_x: inspected.inspection.recommendation.reverse_x,
-        baseline: inspected.inspection.recommendation.baseline,
-        show_colorbar: inspected.inspection.recommendation.show_colorbar,
-        use_sidecar: inspected.inspection.recommendation.use_sidecar,
+      const inspected = await loadWizardDataFile(wizard, selected);
+      rememberProject({
+        mode: "wizard",
+        kind: "data",
+        path: inspected.input_path,
+        title: formatLeaf(inspected.input_path),
+        detail: `数据文件 · ${inspected.sheet_names.length} sheet · ${TEMPLATE_LABELS[inspected.inspection.recommendation.template]}`,
       });
-      wizard.setStep(inspected.sheet_names.length > 1 ? "sheet" : "inspect");
     } catch (error) {
       wizard.setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      wizard.setBusy(false);
     }
   };
 
@@ -358,29 +452,14 @@ function WizardPane() {
     wizard.setError(null);
     wizard.setBusy(true);
     try {
-      const payload = (await openProject(selected)) as WizardProject;
-      if (!payload || payload.mode !== "wizard") {
-        throw new Error("这不是可识别的绘图精灵项目文件。");
-      }
-      const { input_path, options, outputs, sheet, template } = payload.wizard;
-      const inspected = await inspectFile(input_path, sheet);
-      wizard.setInputPath(inspected.input_path);
-      wizard.setSheet(inspected.sheet);
-      wizard.setSheetNames(inspected.sheet_names);
-      wizard.setInspection(inspected.inspection);
-      wizard.setTemplate(template ?? inspected.inspection.recommendation.template);
-      wizard.setOptions({
-        size: inspected.inspection.recommendation.size,
-        xscale: inspected.inspection.recommendation.xscale,
-        yscale: inspected.inspection.recommendation.yscale,
-        reverse_x: inspected.inspection.recommendation.reverse_x,
-        baseline: inspected.inspection.recommendation.baseline,
-        show_colorbar: inspected.inspection.recommendation.show_colorbar,
-        use_sidecar: inspected.inspection.recommendation.use_sidecar,
-        ...options,
+      const payload = await loadWizardProjectFile(wizard, selected);
+      rememberProject({
+        mode: "wizard",
+        kind: "project",
+        path: selected,
+        title: formatLeaf(selected),
+        detail: `绘图项目 · ${formatLeaf(payload.wizard.input_path)} · ${payload.wizard.outputs.length} 个结果`,
       });
-      wizard.setOutputs(outputs ?? []);
-      wizard.setStep(outputs && outputs.length > 0 ? "export" : "options");
     } catch (error) {
       wizard.setError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -413,6 +492,13 @@ function WizardPane() {
       },
     };
     await saveProject(destination, payload);
+    rememberProject({
+      mode: "wizard",
+      kind: "project",
+      path: destination,
+      title: formatLeaf(destination),
+      detail: `已保存绘图项目 · ${wizard.outputs.length} 个结果`,
+    });
   };
 
   const rerunInspect = async (sheetValue: string | number) => {
@@ -1003,12 +1089,14 @@ function WizardPane() {
 
 function ComposerPane() {
   const composer = useComposerStore();
+  const pdfImportMode = useWorkbenchStore((state) => state.pdfImportMode);
+  const setPdfImportMode = useWorkbenchStore((state) => state.setPdfImportMode);
+  const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [thumbnailMap, setThumbnailMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [exportPath, setExportPath] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
-  const [pdfImportMode, setPdfImportMode] = useState<"graph" | "asset">("graph");
   const projectRef = useRef(composer.project);
 
   const selectedPanel = composer.project.panels.find((item) => item.id === composer.selectedId) ?? null;
@@ -1375,6 +1463,13 @@ function ComposerPane() {
       mode: "composer",
       project: composer.project,
     });
+    rememberProject({
+      mode: "composer",
+      kind: "project",
+      path: destination,
+      title: formatLeaf(destination),
+      detail: `已保存拼图项目 · ${composer.project.panels.length} 个 panel`,
+    });
   };
 
   const openComposerProject = async () => {
@@ -1386,13 +1481,14 @@ function ComposerPane() {
       return;
     }
 
-    const payload = (await openProject(selected)) as
-      | { version?: number; mode?: string; project?: ComposerProject }
-      | ComposerProject;
-    const project =
-      "project" in payload && payload.project ? payload.project : (payload as ComposerProject);
-    composer.setProject(normalizeComposerProject(project));
-    composer.setSelectedId(null);
+    const project = await loadComposerProjectFile(composer, selected);
+    rememberProject({
+      mode: "composer",
+      kind: "project",
+      path: selected,
+      title: formatLeaf(selected),
+      detail: `拼图项目 · ${project.panels.length} 个 panel / ${project.texts.length} 段文字`,
+    });
     setDropNotice("项目已加载，可以继续调整拼图。");
   };
 
@@ -1745,10 +1841,67 @@ function ComposerPane() {
 }
 
 function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
-  const inputPath = useWizardStore((state) => state.inputPath);
-  const wizardStep = useWizardStore((state) => state.step);
-  const wizardOutputs = useWizardStore((state) => state.outputs);
-  const composerProject = useComposerStore((state) => state.project);
+  const wizard = useWizardStore();
+  const composer = useComposerStore();
+  const recentProjects = useWorkbenchStore((state) => state.recentProjects);
+  const rememberProject = useWorkbenchStore((state) => state.rememberProject);
+  const [activeRecentId, setActiveRecentId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [noticeTone, setNoticeTone] = useState<"success" | "warning">("success");
+
+  const reopenRecent = async (entry: RecentProjectEntry) => {
+    setActiveRecentId(entry.id);
+    setNotice(null);
+
+    try {
+      if (entry.mode === "wizard" && entry.kind === "data") {
+        const inspected = await loadWizardDataFile(useWizardStore.getState(), entry.path);
+        rememberProject({
+          mode: "wizard",
+          kind: "data",
+          path: inspected.input_path,
+          title: formatLeaf(inspected.input_path),
+          detail: `数据文件 · ${inspected.sheet_names.length} sheet · ${TEMPLATE_LABELS[inspected.inspection.recommendation.template]}`,
+        });
+        setNoticeTone("success");
+        setNotice(`已恢复数据文件：${formatLeaf(inspected.input_path)}`);
+        onNavigate("wizard");
+        return;
+      }
+
+      if (entry.mode === "wizard") {
+        const payload = await loadWizardProjectFile(useWizardStore.getState(), entry.path);
+        rememberProject({
+          mode: "wizard",
+          kind: "project",
+          path: entry.path,
+          title: formatLeaf(entry.path),
+          detail: `绘图项目 · ${formatLeaf(payload.wizard.input_path)} · ${payload.wizard.outputs.length} 个结果`,
+        });
+        setNoticeTone("success");
+        setNotice(`已恢复绘图项目：${formatLeaf(entry.path)}`);
+        onNavigate("wizard");
+        return;
+      }
+
+      const project = await loadComposerProjectFile(useComposerStore.getState(), entry.path);
+      rememberProject({
+        mode: "composer",
+        kind: "project",
+        path: entry.path,
+        title: formatLeaf(entry.path),
+        detail: `拼图项目 · ${project.panels.length} 个 panel / ${project.texts.length} 段文字`,
+      });
+      setNoticeTone("success");
+      setNotice(`已恢复拼图项目：${formatLeaf(entry.path)}`);
+      onNavigate("composer");
+    } catch (error) {
+      setNoticeTone("warning");
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActiveRecentId(null);
+    }
+  };
 
   return (
     <div className="desk-layout">
@@ -1768,8 +1921,8 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
             <div className="section-head">
               <div>
                 <div className="card-kicker">绘图精灵</div>
-                <h2>{inputPath ? formatLeaf(inputPath) : "还没有加载数据"}</h2>
-                <p>当前步骤是 {getWizardStepLabel(wizardStep)}，导出文件数为 {wizardOutputs.length}。</p>
+                <h2>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "还没有加载数据"}</h2>
+                <p>当前步骤是 {getWizardStepLabel(wizard.step)}，导出文件数为 {wizard.outputs.length}。</p>
               </div>
             </div>
             <div className="step-actions">
@@ -1784,11 +1937,11 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
               <div>
                 <div className="card-kicker">拼图器</div>
                 <h2>
-                  {composerProject.panels.length} 个 panel / {composerProject.texts.length} 段文字
+                  {composer.project.panels.length} 个 panel / {composer.project.texts.length} 段文字
                 </h2>
                 <p>
-                  当前画布 {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm，
-                  自动编号 {composerProject.auto_labels ? "已开启" : "已关闭"}。
+                  当前画布 {composer.project.canvas_width_mm} x {composer.project.canvas_height_mm} mm，
+                  自动编号 {composer.project.auto_labels ? "已开启" : "已关闭"}。
                 </p>
               </div>
             </div>
@@ -1799,6 +1952,47 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
             </div>
           </article>
         </div>
+
+        <article className="work-card section-card">
+          <div className="section-head">
+            <div>
+              <div className="card-kicker">最近项目与输入</div>
+              <h2>从最近一次工作现场继续</h2>
+              <p>打开过的数据文件、保存过的项目和最近恢复过的工作，都会在这里形成可回跳的入口。</p>
+            </div>
+          </div>
+
+          {notice && (
+            <div className={noticeTone === "success" ? "success-card" : "warning-card"}>
+              {notice}
+            </div>
+          )}
+
+          <div className="layer-list">
+            {recentProjects.length === 0 && (
+              <div className="placeholder-card">
+                还没有最近记录。先在绘图精灵或拼图器里打开/保存一次项目，这里就会开始积累。
+              </div>
+            )}
+
+            {recentProjects.map((entry) => (
+              <button
+                className="layer-item recent-item"
+                disabled={activeRecentId === entry.id}
+                key={entry.id}
+                onClick={() => void reopenRecent(entry)}
+                type="button"
+              >
+                <strong>{entry.title}</strong>
+                <span>{entry.detail}</span>
+                <span className="recent-meta">
+                  {entry.mode === "wizard" ? "绘图精灵" : "拼图器"} ·{" "}
+                  {entry.kind === "data" ? "数据文件" : "项目文件"} · {formatRecentTimestamp(entry.updated_at)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </article>
       </section>
 
       <aside className="desk-context">
@@ -1806,13 +2000,36 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
           <div className="context-card-head">
             <div>
               <h3>4.x 项目观</h3>
-              <p>这里先做成轻项目页，用来承接状态和跳转，不提前伪造复杂的项目管理器。</p>
+              <p>项目页现在已经不只是说明页，而是承担“最近项目恢复”和“双工作流切换”的入口。</p>
+            </div>
+          </div>
+          <div className="context-list">
+            <div className="context-row">
+              <span>最近记录</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>绘图结果</span>
+              <strong>{wizard.outputs.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>拼图图层</span>
+              <strong>{composer.project.panels.length}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="context-card">
+          <div className="context-card-head">
+            <div>
+              <h3>使用方式</h3>
+              <p>让项目页做“恢复现场”的事，而不是重新造一套笨重的资源管理器。</p>
             </div>
           </div>
           <ul className="bullet-list">
-            <li>单图出图走绘图精灵。</li>
-            <li>拼版与画布编辑走拼图器。</li>
-            <li>真正的“最近项目列表”下一步可以接持久化记录。</li>
+            <li>单图出图继续走绘图精灵。</li>
+            <li>拼版和画布编辑继续走拼图器。</li>
+            <li>最近记录优先服务于快速回到上一次工作现场。</li>
           </ul>
         </article>
       </aside>
@@ -1823,8 +2040,16 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
 function SettingsPane() {
   const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
+  const resetWizard = useWizardStore((state) => state.reset);
+  const resetComposer = useComposerStore((state) => state.reset);
   const composerProject = useComposerStore((state) => state.project);
+  const pdfImportMode = useWorkbenchStore((state) => state.pdfImportMode);
+  const recentProjects = useWorkbenchStore((state) => state.recentProjects);
+  const settings = useWorkbenchStore((state) => state.settings);
+  const updateSettings = useWorkbenchStore((state) => state.updateSettings);
+  const clearRecentProjects = useWorkbenchStore((state) => state.clearRecentProjects);
   const [checking, setChecking] = useState(false);
+  const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
 
   const refreshSidecar = async () => {
     setChecking(true);
@@ -1833,6 +2058,27 @@ function SettingsPane() {
     } finally {
       setChecking(false);
     }
+  };
+
+  const runMaintenance = (action: "wizard" | "composer" | "recent" | "all") => {
+    if (action === "wizard" || action === "all") {
+      resetWizard();
+    }
+    if (action === "composer" || action === "all") {
+      resetComposer();
+    }
+    if (action === "recent" || action === "all") {
+      clearRecentProjects();
+    }
+
+    const labels = {
+      wizard: "已重置绘图精灵现场。",
+      composer: "已重置拼图器现场。",
+      recent: "已清空最近项目记录。",
+      all: "已重置工作台现场并清空最近记录。",
+    } as const;
+
+    setMaintenanceNotice(labels[action]);
   };
 
   return (
@@ -1870,6 +2116,67 @@ function SettingsPane() {
               </div>
             </div>
           </article>
+
+          <article className="work-card section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">工作台偏好</div>
+                <h2>把少量真正有用的偏好保存下来</h2>
+                <p>这里不堆很多伪配置，只保留会明显影响工作体验的开关。</p>
+              </div>
+            </div>
+
+            <div className="inspector-stack">
+              <label className="toggle-field">
+                <input
+                  checked={settings.auto_status_poll}
+                  onChange={(event) =>
+                    updateSettings({ auto_status_poll: event.target.checked })
+                  }
+                  type="checkbox"
+                />
+                <span>自动轮询 sidecar 状态</span>
+              </label>
+
+              <label className="toggle-field">
+                <input
+                  checked={settings.remember_last_screen}
+                  onChange={(event) =>
+                    updateSettings({ remember_last_screen: event.target.checked })
+                  }
+                  type="checkbox"
+                />
+                <span>记住上次打开的工作台页面</span>
+              </label>
+            </div>
+          </article>
+
+          <article className="work-card section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">维护动作</div>
+                <h2>需要时快速清理现场</h2>
+                <p>重置当前工作状态，而不是去手动找缓存或改配置文件。</p>
+              </div>
+            </div>
+
+            {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
+
+            <div className="step-actions">
+              <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
+                重置绘图精灵
+              </button>
+              <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
+                重置拼图器
+              </button>
+              <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
+                清空最近记录
+              </button>
+              <button className="ghost-button danger-button" onClick={() => runMaintenance("all")} type="button">
+                全部重置
+              </button>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -1877,14 +2184,42 @@ function SettingsPane() {
         <article className="context-card">
           <div className="context-card-head">
             <div>
+              <h3>当前状态</h3>
+              <p>把真实运行状态和当前偏好总结出来，避免设置页变成一堆无意义开关。</p>
+            </div>
+          </div>
+          <div className="context-list">
+            <div className="context-row">
+              <span>最近记录</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>PDF 导入模式</span>
+              <strong>{pdfImportMode === "graph" ? "作为图" : "作为素材"}</strong>
+            </div>
+            <div className="context-row">
+              <span>自动轮询</span>
+              <strong>{settings.auto_status_poll ? "开启" : "关闭"}</strong>
+            </div>
+            <div className="context-row">
+              <span>记住页面</span>
+              <strong>{settings.remember_last_screen ? "开启" : "关闭"}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="context-card">
+          <div className="context-card-head">
+            <div>
               <h3>当前原则</h3>
-              <p>设置页先用来说明行为边界，不把还不稳定的配置项伪装成正式能力。</p>
+              <p>设置页继续遵守你定的方向: 桌面工作台，不是 Web 后台表单墙。</p>
             </div>
           </div>
           <ul className="bullet-list">
             <li>左侧保持轻导航，不承担主要操作。</li>
             <li>绘图精灵按单步卡片流推进。</li>
             <li>拼图器把对象属性、图层和对齐信息收在右侧。</li>
+            <li>最近项目和偏好都会在本地持久化保存。</li>
           </ul>
         </article>
       </aside>
@@ -1893,7 +2228,16 @@ function SettingsPane() {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>("wizard");
+  const persistedScreen = useWorkbenchStore((state) => state.lastScreen);
+  const setPersistedScreen = useWorkbenchStore((state) => state.setLastScreen);
+  const rememberLastScreen = useWorkbenchStore(
+    (state) => state.settings.remember_last_screen,
+  );
+  const autoStatusPoll = useWorkbenchStore((state) => state.settings.auto_status_poll);
+  const recentProjectsCount = useWorkbenchStore((state) => state.recentProjects.length);
+  const [mode, setMode] = useState<AppMode>(() =>
+    rememberLastScreen ? persistedScreen : "wizard",
+  );
   const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
   const wizardStep = useWizardStore((state) => state.step);
@@ -1902,7 +2246,26 @@ export default function App() {
   const composerTextCount = useComposerStore((state) => state.project.texts.length);
 
   useEffect(() => {
+    if (rememberLastScreen) {
+      setMode(persistedScreen);
+    }
+  }, [persistedScreen, rememberLastScreen]);
+
+  useEffect(() => {
+    if (rememberLastScreen) {
+      setPersistedScreen(mode);
+    }
+  }, [mode, rememberLastScreen, setPersistedScreen]);
+
+  useEffect(() => {
+    if (!rememberLastScreen && persistedScreen !== "wizard") {
+      setPersistedScreen("wizard");
+    }
+  }, [rememberLastScreen, persistedScreen, setPersistedScreen]);
+
+  useEffect(() => {
     let cancelled = false;
+    let intervalId: number | undefined;
 
     async function check() {
       const ok = await healthcheck();
@@ -1912,15 +2275,19 @@ export default function App() {
     }
 
     void check();
-    const intervalId = window.setInterval(() => {
-      void check();
-    }, 6000);
+    if (autoStatusPoll) {
+      intervalId = window.setInterval(() => {
+        void check();
+      }, 6000);
+    }
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [setSidecarReady]);
+  }, [autoStatusPoll, setSidecarReady]);
 
   const meta = SCREEN_META[mode];
 
@@ -1928,9 +2295,9 @@ export default function App() {
   if (mode === "composer") {
     secondaryStatusLabel = `${composerPanelCount} 图层 / ${composerTextCount} 文字`;
   } else if (mode === "projects") {
-    secondaryStatusLabel = `${wizardOutputsCount} 个导出结果`;
+    secondaryStatusLabel = `${recentProjectsCount} 条最近记录`;
   } else if (mode === "settings") {
-    secondaryStatusLabel = "Workbench Rules";
+    secondaryStatusLabel = autoStatusPoll ? "Auto Polling" : "Manual Polling";
   }
 
   return (

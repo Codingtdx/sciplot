@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import type {
   ComposerPanel,
@@ -6,11 +7,15 @@ import type {
   ComposerText,
   InputInspection,
   PalettePreset,
+  PdfImportMode,
   PreflightResult,
   PreviewItem,
+  RecentProjectEntry,
   RenderOptionsPayload,
   TemplateName,
   WizardStep,
+  WorkbenchScreen,
+  WorkbenchSettings,
 } from "./types";
 
 type WizardState = {
@@ -45,64 +50,6 @@ type WizardState = {
   reset(): void;
 };
 
-const defaultOptions: RenderOptionsPayload = {
-  size: "60x55",
-  xscale: "linear",
-  yscale: "linear",
-  reverse_x: false,
-  baseline: "none",
-  show_colorbar: true,
-  palette_preset: "colorblind_safe",
-  use_sidecar: null,
-};
-
-export const useWizardStore = create<WizardState>((set) => ({
-  inputPath: "",
-  sheet: 0,
-  sheetNames: [],
-  inspection: null,
-  template: null,
-  options: { ...defaultOptions },
-  preflight: null,
-  previews: [],
-  previewIndex: 0,
-  outputs: [],
-  step: "file",
-  sidecarReady: false,
-  busy: false,
-  error: null,
-  setSidecarReady: (value) => set({ sidecarReady: value }),
-  setInputPath: (value) => set({ inputPath: value }),
-  setSheet: (value) => set({ sheet: value }),
-  setSheetNames: (value) => set({ sheetNames: value }),
-  setInspection: (value) => set({ inspection: value }),
-  setTemplate: (value) => set({ template: value }),
-  setOptions: (value) => set((state) => ({ options: { ...state.options, ...value } })),
-  setPreflight: (value) => set({ preflight: value }),
-  setPreviews: (value) => set({ previews: value, previewIndex: 0 }),
-  setPreviewIndex: (value) => set({ previewIndex: value }),
-  setOutputs: (value) => set({ outputs: value }),
-  setStep: (value) => set({ step: value }),
-  setBusy: (value) => set({ busy: value }),
-  setError: (value) => set({ error: value }),
-  reset: () =>
-    set({
-      inputPath: "",
-      sheet: 0,
-      sheetNames: [],
-      inspection: null,
-      template: null,
-      options: { ...defaultOptions },
-      preflight: null,
-      previews: [],
-      previewIndex: 0,
-      outputs: [],
-      step: "file",
-      busy: false,
-      error: null,
-    }),
-}));
-
 type ComposerState = {
   project: ComposerProject;
   previewPng: string | null;
@@ -118,6 +65,31 @@ type ComposerState = {
   reset(): void;
 };
 
+type WorkbenchState = {
+  lastScreen: WorkbenchScreen;
+  pdfImportMode: PdfImportMode;
+  recentProjects: RecentProjectEntry[];
+  settings: WorkbenchSettings;
+  setLastScreen(value: WorkbenchScreen): void;
+  setPdfImportMode(value: PdfImportMode): void;
+  rememberProject(entry: Omit<RecentProjectEntry, "id" | "updated_at">): void;
+  clearRecentProjects(): void;
+  updateSettings(value: Partial<WorkbenchSettings>): void;
+};
+
+const storage = createJSONStorage(() => localStorage);
+
+const defaultOptions: RenderOptionsPayload = {
+  size: "60x55",
+  xscale: "linear",
+  yscale: "linear",
+  reverse_x: false,
+  baseline: "none",
+  show_colorbar: true,
+  palette_preset: "colorblind_safe",
+  use_sidecar: null,
+};
+
 const emptyProject: ComposerProject = {
   version: 1,
   mode: "composer",
@@ -129,23 +101,146 @@ const emptyProject: ComposerProject = {
   auto_labels: true,
 };
 
-export const useComposerStore = create<ComposerState>((set) => ({
-  project: { ...emptyProject, panels: [], texts: [] },
-  previewPng: null,
-  validationError: null,
-  selectedId: null,
-  palettePreset: "colorblind_safe",
-  setProject: (project) => set({ project }),
-  updatePanels: (panels) => set((state) => ({ project: { ...state.project, panels } })),
-  updateTexts: (texts) => set((state) => ({ project: { ...state.project, texts } })),
-  setPreview: (png, validationError) => set({ previewPng: png, validationError }),
-  setSelectedId: (value) => set({ selectedId: value }),
-  setPalettePreset: (value) => set({ palettePreset: value }),
-  reset: () =>
-    set({
+const defaultWorkbenchSettings: WorkbenchSettings = {
+  auto_status_poll: true,
+  remember_last_screen: true,
+};
+
+export const useWizardStore = create<WizardState>()(
+  persist(
+    (set) => ({
+      inputPath: "",
+      sheet: 0,
+      sheetNames: [],
+      inspection: null,
+      template: null,
+      options: { ...defaultOptions },
+      preflight: null,
+      previews: [],
+      previewIndex: 0,
+      outputs: [],
+      step: "file",
+      sidecarReady: false,
+      busy: false,
+      error: null,
+      setSidecarReady: (value) => set({ sidecarReady: value }),
+      setInputPath: (value) => set({ inputPath: value }),
+      setSheet: (value) => set({ sheet: value }),
+      setSheetNames: (value) => set({ sheetNames: value }),
+      setInspection: (value) => set({ inspection: value }),
+      setTemplate: (value) => set({ template: value }),
+      setOptions: (value) => set((state) => ({ options: { ...state.options, ...value } })),
+      setPreflight: (value) => set({ preflight: value }),
+      setPreviews: (value) => set({ previews: value, previewIndex: 0 }),
+      setPreviewIndex: (value) => set({ previewIndex: value }),
+      setOutputs: (value) => set({ outputs: value }),
+      setStep: (value) => set({ step: value }),
+      setBusy: (value) => set({ busy: value }),
+      setError: (value) => set({ error: value }),
+      reset: () =>
+        set({
+          inputPath: "",
+          sheet: 0,
+          sheetNames: [],
+          inspection: null,
+          template: null,
+          options: { ...defaultOptions },
+          preflight: null,
+          previews: [],
+          previewIndex: 0,
+          outputs: [],
+          step: "file",
+          busy: false,
+          error: null,
+        }),
+    }),
+    {
+      name: "codegod-wizard-store",
+      storage,
+      partialize: (state) => ({
+        inputPath: state.inputPath,
+        sheet: state.sheet,
+        sheetNames: state.sheetNames,
+        inspection: state.inspection,
+        template: state.template,
+        options: state.options,
+        preflight: state.preflight,
+        outputs: state.outputs,
+        step: state.step,
+      }),
+    },
+  ),
+);
+
+export const useComposerStore = create<ComposerState>()(
+  persist(
+    (set) => ({
       project: { ...emptyProject, panels: [], texts: [] },
       previewPng: null,
       validationError: null,
       selectedId: null,
+      palettePreset: "colorblind_safe",
+      setProject: (project) => set({ project }),
+      updatePanels: (panels) => set((state) => ({ project: { ...state.project, panels } })),
+      updateTexts: (texts) => set((state) => ({ project: { ...state.project, texts } })),
+      setPreview: (png, validationError) => set({ previewPng: png, validationError }),
+      setSelectedId: (value) => set({ selectedId: value }),
+      setPalettePreset: (value) => set({ palettePreset: value }),
+      reset: () =>
+        set({
+          project: { ...emptyProject, panels: [], texts: [] },
+          previewPng: null,
+          validationError: null,
+          selectedId: null,
+          palettePreset: "colorblind_safe",
+        }),
     }),
-}));
+    {
+      name: "codegod-composer-store",
+      storage,
+      partialize: (state) => ({
+        project: state.project,
+        palettePreset: state.palettePreset,
+      }),
+    },
+  ),
+);
+
+export const useWorkbenchStore = create<WorkbenchState>()(
+  persist(
+    (set) => ({
+      lastScreen: "wizard",
+      pdfImportMode: "graph",
+      recentProjects: [],
+      settings: { ...defaultWorkbenchSettings },
+      setLastScreen: (value) => set({ lastScreen: value }),
+      setPdfImportMode: (value) => set({ pdfImportMode: value }),
+      rememberProject: (entry) =>
+        set((state) => {
+          const nextEntry: RecentProjectEntry = {
+            ...entry,
+            id: `${entry.mode}:${entry.kind}:${entry.path}`,
+            updated_at: new Date().toISOString(),
+          };
+          const deduped = state.recentProjects.filter(
+            (item) => item.id !== nextEntry.id,
+          );
+          return {
+            recentProjects: [nextEntry, ...deduped].slice(0, 10),
+          };
+        }),
+      clearRecentProjects: () => set({ recentProjects: [] }),
+      updateSettings: (value) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ...value,
+          },
+        })),
+    }),
+    {
+      name: "codegod-workbench-store",
+      storage,
+    },
+  ),
+);

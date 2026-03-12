@@ -22,6 +22,9 @@ export type WizardStep =
   | "preflight"
   | "export";
 
+export type WorkbenchScreen = "wizard" | "composer" | "projects" | "settings";
+export type PdfImportMode = "graph" | "asset";
+
 export type PreviewItem = {
   filename: string;
   png_base64: string;
@@ -133,4 +136,21 @@ export type WizardProject = {
     options: RenderOptionsPayload;
     outputs: string[];
   };
+};
+
+export type RecentEntryKind = "data" | "project";
+
+export type RecentProjectEntry = {
+  id: string;
+  mode: "wizard" | "composer";
+  kind: RecentEntryKind;
+  path: string;
+  title: string;
+  detail: string;
+  updated_at: string;
+};
+
+export type WorkbenchSettings = {
+  auto_status_poll: boolean;
+  remember_last_screen: boolean;
 };
