@@ -28,6 +28,7 @@ import type {
   PalettePreset,
   PdfImportMode,
   RecentProjectEntry,
+  RenderOptionsPayload,
   SizePreset,
   TemplateName,
   TensileReplicateResponse,
@@ -178,6 +179,19 @@ function formatLeaf(path: string) {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toDialogPaths(selected: string | string[] | null, limit?: number) {
+  const paths = Array.isArray(selected)
+    ? selected.filter((item): item is string => typeof item === "string")
+    : typeof selected === "string"
+      ? [selected]
+      : [];
+  return typeof limit === "number" ? paths.slice(0, limit) : paths;
+}
+
 function formatMetricValue(value: number | null) {
   if (value == null || Number.isNaN(value)) {
     return "-";
@@ -270,6 +284,55 @@ function normalizeComposerProject(project: ComposerProject): ComposerProject {
 type WizardStoreSnapshot = ReturnType<typeof useWizardStore.getState>;
 type ComposerStoreSnapshot = ReturnType<typeof useComposerStore.getState>;
 
+function applyInspectionToWizard(
+  wizard: WizardStoreSnapshot,
+  inspected: InspectResponse,
+  overrides?: {
+    template?: TemplateName | null;
+    options?: RenderOptionsPayload;
+    nextStep?: WizardStep;
+  },
+) {
+  wizard.setInputPath(inspected.input_path);
+  wizard.setSheet(inspected.sheet);
+  wizard.setSheetNames(inspected.sheet_names);
+  wizard.setInspection(inspected.inspection);
+  wizard.setTemplate(overrides?.template ?? inspected.inspection.recommendation.template);
+  wizard.setOptions({
+    size: inspected.inspection.recommendation.size,
+    xscale: inspected.inspection.recommendation.xscale,
+    yscale: inspected.inspection.recommendation.yscale,
+    reverse_x: inspected.inspection.recommendation.reverse_x,
+    baseline: inspected.inspection.recommendation.baseline,
+    show_colorbar: inspected.inspection.recommendation.show_colorbar,
+    use_sidecar: inspected.inspection.recommendation.use_sidecar,
+    ...overrides?.options,
+  });
+  wizard.setStep(
+    overrides?.nextStep ?? (inspected.sheet_names.length > 1 ? "sheet" : "inspect"),
+  );
+}
+
+function extractComposerProject(payload: unknown): ComposerProject {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("这不是可识别的拼图器项目文件。");
+  }
+
+  const candidate = payload as { mode?: unknown; project?: unknown };
+  if ("project" in candidate && candidate.project) {
+    if (candidate.mode != null && candidate.mode !== "composer") {
+      throw new Error("这不是可识别的拼图器项目文件。");
+    }
+    return candidate.project as ComposerProject;
+  }
+
+  if ("mode" in candidate && candidate.mode !== "composer") {
+    throw new Error("这不是可识别的拼图器项目文件。");
+  }
+
+  return candidate as ComposerProject;
+}
+
 async function loadWizardDataFile(
   wizard: WizardStoreSnapshot,
   filePath: string,
@@ -284,21 +347,7 @@ async function loadWizardDataFile(
   wizard.setStep("file");
 
   const inspected = await inspectFile(filePath, initialSheet);
-  wizard.setInputPath(inspected.input_path);
-  wizard.setSheet(inspected.sheet);
-  wizard.setSheetNames(inspected.sheet_names);
-  wizard.setInspection(inspected.inspection);
-  wizard.setTemplate(inspected.inspection.recommendation.template);
-  wizard.setOptions({
-    size: inspected.inspection.recommendation.size,
-    xscale: inspected.inspection.recommendation.xscale,
-    yscale: inspected.inspection.recommendation.yscale,
-    reverse_x: inspected.inspection.recommendation.reverse_x,
-    baseline: inspected.inspection.recommendation.baseline,
-    show_colorbar: inspected.inspection.recommendation.show_colorbar,
-    use_sidecar: inspected.inspection.recommendation.use_sidecar,
-  });
-  wizard.setStep(nextStep ?? (inspected.sheet_names.length > 1 ? "sheet" : "inspect"));
+  applyInspectionToWizard(wizard, inspected, { nextStep });
   return inspected;
 }
 
@@ -318,20 +367,9 @@ async function loadWizardProjectFile(
 
   const { input_path, options, outputs, sheet, template } = payload.wizard;
   const inspected = await inspectFile(input_path, sheet);
-  wizard.setInputPath(inspected.input_path);
-  wizard.setSheet(inspected.sheet);
-  wizard.setSheetNames(inspected.sheet_names);
-  wizard.setInspection(inspected.inspection);
-  wizard.setTemplate(template ?? inspected.inspection.recommendation.template);
-  wizard.setOptions({
-    size: inspected.inspection.recommendation.size,
-    xscale: inspected.inspection.recommendation.xscale,
-    yscale: inspected.inspection.recommendation.yscale,
-    reverse_x: inspected.inspection.recommendation.reverse_x,
-    baseline: inspected.inspection.recommendation.baseline,
-    show_colorbar: inspected.inspection.recommendation.show_colorbar,
-    use_sidecar: inspected.inspection.recommendation.use_sidecar,
-    ...options,
+  applyInspectionToWizard(wizard, inspected, {
+    template: template ?? inspected.inspection.recommendation.template,
+    options,
   });
   wizard.setOutputs(outputs ?? []);
   wizard.setStep(outputs && outputs.length > 0 ? "export" : "options");
@@ -342,11 +380,8 @@ async function loadComposerProjectFile(
   composer: ComposerStoreSnapshot,
   projectPath: string,
 ): Promise<ComposerProject> {
-  const payload = (await openProject(projectPath)) as
-    | { version?: number; mode?: string; project?: ComposerProject }
-    | ComposerProject;
-  const project =
-    "project" in payload && payload.project ? payload.project : (payload as ComposerProject);
+  const payload = await openProject(projectPath);
+  const project = extractComposerProject(payload);
   const normalized = normalizeComposerProject(project);
   composer.setProject(normalized);
   composer.setSelectedId(null);
@@ -425,7 +460,7 @@ function WizardPane() {
         }
       } catch (error) {
         if (!cancelled) {
-          setPreviewError(error instanceof Error ? error.message : String(error));
+          setPreviewError(getErrorMessage(error));
           wizard.setPreviews([]);
         }
       } finally {
@@ -451,14 +486,15 @@ function WizardPane() {
         },
       ],
     });
-    if (typeof selected !== "string") {
+    const path = toDialogPaths(selected, 1)[0];
+    if (!path) {
       return;
     }
 
     setTensileBatchResult(null);
     wizard.setBusy(true);
     try {
-      const inspected = await loadWizardDataFile(wizard, selected);
+      const inspected = await loadWizardDataFile(wizard, path);
       rememberProject({
         mode: "wizard",
         kind: "data",
@@ -467,7 +503,7 @@ function WizardPane() {
         detail: `数据文件 · ${inspected.sheet_names.length} sheet · ${TEMPLATE_LABELS[inspected.inspection.recommendation.template]}`,
       });
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -478,7 +514,8 @@ function WizardPane() {
       multiple: false,
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
-    if (typeof selected !== "string") {
+    const path = toDialogPaths(selected, 1)[0];
+    if (!path) {
       return;
     }
 
@@ -487,16 +524,16 @@ function WizardPane() {
     wizard.setError(null);
     wizard.setBusy(true);
     try {
-      const payload = await loadWizardProjectFile(wizard, selected);
+      const payload = await loadWizardProjectFile(wizard, path);
       rememberProject({
         mode: "wizard",
         kind: "project",
-        path: selected,
-        title: formatLeaf(selected),
+        path,
+        title: formatLeaf(path),
         detail: `绘图项目 · ${formatLeaf(payload.wizard.input_path)} · ${payload.wizard.outputs.length} 个结果`,
       });
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -526,14 +563,18 @@ function WizardPane() {
         outputs: wizard.outputs,
       },
     };
-    await saveProject(destination, payload);
-    rememberProject({
-      mode: "wizard",
-      kind: "project",
-      path: destination,
-      title: formatLeaf(destination),
-      detail: `已保存绘图项目 · ${wizard.outputs.length} 个结果`,
-    });
+    try {
+      await saveProject(destination, payload);
+      rememberProject({
+        mode: "wizard",
+        kind: "project",
+        path: destination,
+        title: formatLeaf(destination),
+        detail: `已保存绘图项目 · ${wizard.outputs.length} 个结果`,
+      });
+    } catch (error) {
+      wizard.setError(getErrorMessage(error));
+    }
   };
 
   const runTensileReplicatePreprocess = async () => {
@@ -541,9 +582,7 @@ function WizardPane() {
       multiple: true,
       filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
     });
-    const filePaths = Array.isArray(selected)
-      ? selected.filter((item): item is string => typeof item === "string")
-      : [];
+    const filePaths = toDialogPaths(selected);
     if (filePaths.length === 0) {
       return;
     }
@@ -584,7 +623,7 @@ function WizardPane() {
         detail: `拉伸整理 · ${result.sample_count} 个重复样 · ${TEMPLATE_LABELS[inspected.inspection.recommendation.template]}`,
       });
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -599,23 +638,10 @@ function WizardPane() {
     wizard.setBusy(true);
     try {
       const inspected = await inspectFile(wizard.inputPath, sheetValue);
-      wizard.setSheet(inspected.sheet);
-      wizard.setSheetNames(inspected.sheet_names);
-      wizard.setInspection(inspected.inspection);
-      wizard.setTemplate(inspected.inspection.recommendation.template);
-      wizard.setOptions({
-        size: inspected.inspection.recommendation.size,
-        xscale: inspected.inspection.recommendation.xscale,
-        yscale: inspected.inspection.recommendation.yscale,
-        reverse_x: inspected.inspection.recommendation.reverse_x,
-        baseline: inspected.inspection.recommendation.baseline,
-        show_colorbar: inspected.inspection.recommendation.show_colorbar,
-        use_sidecar: inspected.inspection.recommendation.use_sidecar,
-      });
+      applyInspectionToWizard(wizard, inspected, { nextStep: "inspect" });
       invalidateRenderState();
-      wizard.setStep("inspect");
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -638,7 +664,7 @@ function WizardPane() {
       wizard.setPreflight(response.preflight);
       wizard.setStep("preflight");
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -661,7 +687,7 @@ function WizardPane() {
       wizard.setOutputs(response.outputs);
       wizard.setStep("export");
     } catch (error) {
-      wizard.setError(error instanceof Error ? error.message : String(error));
+      wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
     }
@@ -1280,7 +1306,7 @@ function ComposerPane() {
         }
       } catch (error) {
         if (!cancelled) {
-          composer.setPreview(null, error instanceof Error ? error.message : String(error));
+          composer.setPreview(null, getErrorMessage(error));
         }
       }
     }
@@ -1370,7 +1396,7 @@ function ComposerPane() {
           setDropNotice("已导入素材。可以继续拖拽、缩放和对齐。");
         }
       } catch (error) {
-        setDropNotice(error instanceof Error ? error.message : String(error));
+        setDropNotice(getErrorMessage(error));
       } finally {
         setBusy(false);
       }
@@ -1406,30 +1432,36 @@ function ComposerPane() {
     };
   }, [pdfImportMode]);
 
+  const runComposerTask = async (task: () => Promise<void>) => {
+    setBusy(true);
+    setDropNotice(null);
+    try {
+      await task();
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const importGraphPanels = async () => {
     const selected = await open({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
-    const paths = Array.isArray(selected)
-      ? selected.filter((item): item is string => typeof item === "string")
-      : [];
+    const paths = toDialogPaths(selected);
     if (paths.length === 0) {
       return;
     }
 
-    setBusy(true);
-    setDropNotice(null);
-    try {
+    await runComposerTask(async () => {
       const response = await importComposerPanels(composer.project, paths, "graph");
       composer.setProject({
         ...composer.project,
         panels: response.panels,
       });
       composer.setSelectedId(null);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const importAssetPanels = async () => {
@@ -1442,25 +1474,19 @@ function ComposerPane() {
         },
       ],
     });
-    const paths = Array.isArray(selected)
-      ? selected.filter((item): item is string => typeof item === "string")
-      : [];
+    const paths = toDialogPaths(selected);
     if (paths.length === 0) {
       return;
     }
 
-    setBusy(true);
-    setDropNotice(null);
-    try {
+    await runComposerTask(async () => {
       const response = await importComposerPanels(composer.project, paths, "asset");
       composer.setProject({
         ...composer.project,
         panels: response.panels,
       });
       composer.setSelectedId(null);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const quickThreeUp = async () => {
@@ -1468,18 +1494,12 @@ function ComposerPane() {
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
-    const paths = Array.isArray(selected)
-      ? selected
-          .filter((item): item is string => typeof item === "string")
-          .slice(0, 3)
-      : [];
+    const paths = toDialogPaths(selected, 3);
     if (paths.length === 0) {
       return;
     }
 
-    setBusy(true);
-    setDropNotice(null);
-    try {
+    await runComposerTask(async () => {
       const response = await threeUp(paths);
       composer.setProject({
         ...composer.project,
@@ -1488,11 +1508,7 @@ function ComposerPane() {
       });
       composer.setSelectedId(null);
       setDropNotice("已按 180 mm 画布生成三联图排版。");
-    } catch (error) {
-      setDropNotice(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const quickTwoUpEditorial = async () => {
@@ -1500,18 +1516,12 @@ function ComposerPane() {
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
-    const paths = Array.isArray(selected)
-      ? selected
-          .filter((item): item is string => typeof item === "string")
-          .slice(0, 2)
-      : [];
+    const paths = toDialogPaths(selected, 2);
     if (paths.length === 0) {
       return;
     }
 
-    setBusy(true);
-    setDropNotice(null);
-    try {
+    await runComposerTask(async () => {
       const response = await twoUpEditorial(paths);
       composer.setProject({
         ...composer.project,
@@ -1520,11 +1530,7 @@ function ComposerPane() {
       });
       composer.setSelectedId(null);
       setDropNotice("已按 180 mm 画布生成两图 + 说明区排版。");
-    } catch (error) {
-      setDropNotice(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const addText = () => {
@@ -1590,21 +1596,25 @@ function ComposerPane() {
       defaultPath: "codegod-composer.plotproject.json",
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
-    if (typeof destination !== "string") {
+    const path = toDialogPaths(destination, 1)[0];
+    if (!path) {
       return;
     }
 
-    await saveProject(destination, {
-      version: 1,
-      mode: "composer",
-      project: composer.project,
-    });
-    rememberProject({
-      mode: "composer",
-      kind: "project",
-      path: destination,
-      title: formatLeaf(destination),
-      detail: `已保存拼图项目 · ${composer.project.panels.length} 个 panel`,
+    await runComposerTask(async () => {
+      await saveProject(path, {
+        version: 1,
+        mode: "composer",
+        project: composer.project,
+      });
+      rememberProject({
+        mode: "composer",
+        kind: "project",
+        path,
+        title: formatLeaf(path),
+        detail: `已保存拼图项目 · ${composer.project.panels.length} 个 panel`,
+      });
+      setDropNotice("拼图项目已保存。");
     });
   };
 
@@ -1613,30 +1623,29 @@ function ComposerPane() {
       multiple: false,
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
-    if (typeof selected !== "string") {
+    const path = toDialogPaths(selected, 1)[0];
+    if (!path) {
       return;
     }
 
-    const project = await loadComposerProjectFile(composer, selected);
-    rememberProject({
-      mode: "composer",
-      kind: "project",
-      path: selected,
-      title: formatLeaf(selected),
-      detail: `拼图项目 · ${project.panels.length} 个 panel / ${project.texts.length} 段文字`,
+    await runComposerTask(async () => {
+      const project = await loadComposerProjectFile(composer, path);
+      rememberProject({
+        mode: "composer",
+        kind: "project",
+        path,
+        title: formatLeaf(path),
+        detail: `拼图项目 · ${project.panels.length} 个 panel / ${project.texts.length} 段文字`,
+      });
+      setDropNotice("项目已加载，可以继续调整拼图。");
     });
-    setDropNotice("项目已加载，可以继续调整拼图。");
   };
 
   const exportComposer = async () => {
-    setBusy(true);
-    setDropNotice(null);
-    try {
+    await runComposerTask(async () => {
       const response = await composeExport(composer.project);
       setExportPath(response.output_path);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   return (
@@ -2033,7 +2042,7 @@ function ProjectsPane({ onNavigate }: { onNavigate(mode: AppMode): void }) {
       onNavigate("composer");
     } catch (error) {
       setNoticeTone("warning");
-      setNotice(error instanceof Error ? error.message : String(error));
+      setNotice(getErrorMessage(error));
     } finally {
       setActiveRecentId(null);
     }

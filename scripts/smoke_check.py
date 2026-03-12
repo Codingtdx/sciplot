@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import fitz
 from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1099,6 +1100,40 @@ def _assert_legend_candidate_insets() -> None:
         plt.close(fig)
 
 
+def _assert_rendered_output_files(outputs_dir: Path) -> None:
+    pdf_paths = sorted(outputs_dir.rglob("*.pdf"))
+    if not pdf_paths:
+        raise AssertionError("Smoke outputs should include at least one exported PDF.")
+
+    for pdf_path in pdf_paths:
+        doc = fitz.open(pdf_path)
+        try:
+            if doc.page_count < 1:
+                raise AssertionError(f"{pdf_path.name} should contain at least one page.")
+
+            page = doc[0]
+            if page.rect.width <= 0 or page.rect.height <= 0:
+                raise AssertionError(f"{pdf_path.name} should have a positive page size.")
+
+            if not page.get_drawings() and not page.get_images() and not page.get_text("words"):
+                raise AssertionError(f"{pdf_path.name} appears to have no visible page content.")
+
+            pixmap = page.get_pixmap(dpi=96, alpha=False)
+            pixels = np.frombuffer(pixmap.samples, dtype=np.uint8)
+            if pixels.size == 0 or pixels.min() == pixels.max():
+                raise AssertionError(f"{pdf_path.name} failed raster sanity-check and may be blank.")
+
+            channels = max(pixmap.n, 1)
+            if pixels.size % channels != 0:
+                raise AssertionError(f"{pdf_path.name} produced an unexpected raster layout.")
+
+            raster = pixels.reshape(-1, channels)
+            if np.all(raster[:, :3] >= 250):
+                raise AssertionError(f"{pdf_path.name} rasterized to an almost fully white page.")
+        finally:
+            doc.close()
+
+
 def _assert_wide_nmr_layout(bundle_path: Path) -> None:
     def _densify(points: np.ndarray, max_step_px: float = 3.0) -> np.ndarray:
         if len(points) < 2:
@@ -1301,6 +1336,7 @@ def main() -> int:
                     raise FileNotFoundError(f"Expected output was not created: {output}")
                 print(output)
 
+        _assert_rendered_output_files(outputs)
         _assert_stacked_layout(plot_ftir, ftir_path)
         _assert_stacked_layout(plot_nmr, nmr_path)
         _assert_stacked_layout(plot_xrd, xrd_path)
