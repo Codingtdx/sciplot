@@ -106,6 +106,7 @@ class ComposerPanelPayload(StrictModel):
     label: str | None = None
     kind: Literal["graph", "asset"] = "graph"
     z_index: int = 0
+    group_id: str | None = None
     region_id: str | None = None
     slot_id: str | None = None
     crop_rect: ComposerCropRectPayload = Field(default_factory=ComposerCropRectPayload)
@@ -121,6 +122,7 @@ class ComposerTextPayload(StrictModel):
     z_index: int = 0
     locked: bool = False
     hidden: bool = False
+    group_id: str | None = None
     region_id: str | None = None
     slot_id: str | None = None
 

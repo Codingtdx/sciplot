@@ -77,6 +77,7 @@ export function normalizeComposerProject(project: ComposerProject): ComposerProj
     z_index: readNumber(panel.z_index, index),
     locked: readBoolean(panel.locked, false),
     hidden: readBoolean(panel.hidden, false),
+    group_id: readOptionalText(panel.group_id),
     region_id: panel.region_id ?? null,
     slot_id: panel.slot_id ?? null,
     crop_rect: normalizeCropRect(panel.crop_rect),
@@ -88,6 +89,7 @@ export function normalizeComposerProject(project: ComposerProject): ComposerProj
     z_index: readNumber(text.z_index, panels.length + index),
     locked: readBoolean(text.locked, false),
     hidden: readBoolean(text.hidden, false),
+    group_id: readOptionalText(text.group_id),
     region_id: text.region_id ?? null,
     slot_id: text.slot_id ?? null,
   }));
@@ -277,6 +279,7 @@ function extractComposerPanels(payload: unknown): ComposerPanel[] {
       label: readOptionalText(panel.label),
       kind: panel.kind === "asset" ? "asset" : "graph",
       z_index: readNumber(panel.z_index, index),
+      group_id: readOptionalText(panel.group_id),
       region_id: readOptionalText(panel.region_id),
       slot_id: readOptionalText(panel.slot_id),
       crop_rect: normalizeCropRect(panel.crop_rect as Partial<ComposerCropRect> | undefined),
@@ -301,6 +304,7 @@ function extractComposerTexts(payload: unknown): ComposerText[] {
       z_index: readNumber(text.z_index, index),
       locked: readBoolean(text.locked, false),
       hidden: readBoolean(text.hidden, false),
+      group_id: readOptionalText(text.group_id),
       region_id: readOptionalText(text.region_id),
       slot_id: readOptionalText(text.slot_id),
     };
@@ -473,7 +477,7 @@ export function removeRegion(project: ComposerProject, regionId: string) {
 
 export function moveRegion(project: ComposerProject, regionId: string, col: number, row: number) {
   const target = findRegion(project, regionId);
-  if (!target) {
+  if (!target || target.locked) {
     return project;
   }
   const nextRegion: ComposerRegion = { ...target, col, row };
@@ -610,8 +614,30 @@ function drawableSelection(project: ComposerProject, ids: string[]): DrawableSel
   }, []);
 }
 
+function drawableHidden(item: DrawableSelectionItem) {
+  return Boolean(item.item.hidden);
+}
+
+function drawableGroupId(item: DrawableSelectionItem) {
+  return item.item.group_id ?? null;
+}
+
 function isFreeTransformDrawable(item: DrawableSelectionItem) {
   return item.type === "text" || item.item.kind === "asset";
+}
+
+function isGraphPanelMovementLocked(project: ComposerProject, panel: ComposerPanel) {
+  if (panel.kind !== "graph") {
+    return Boolean(panel.locked);
+  }
+  return Boolean(panel.locked || findRegion(project, panel.region_id)?.locked);
+}
+
+function drawablePositionLocked(project: ComposerProject, item: DrawableSelectionItem) {
+  if (item.type === "panel") {
+    return isGraphPanelMovementLocked(project, item.item);
+  }
+  return Boolean(item.item.locked);
 }
 
 function drawableRect(item: DrawableSelectionItem): DrawableRect {
@@ -631,6 +657,9 @@ function applyRectToDrawable(
   selection: DrawableSelectionItem,
   rect: DrawableRect,
 ): ComposerProject {
+  if (drawablePositionLocked(project, selection)) {
+    return project;
+  }
   const nextRect = clampDrawableRect(rect, project);
   if (selection.type === "panel") {
     return normalizeComposerProject({
@@ -679,6 +708,107 @@ function selectionBounds(items: DrawableSelectionItem[]) {
   };
 }
 
+export function nextGroupId(project: ComposerProject) {
+  const ids = new Set(
+    [
+      ...project.panels.map((panel) => panel.group_id),
+      ...project.texts.map((text) => text.group_id),
+    ].filter((value): value is string => Boolean(value)),
+  );
+  let index = 1;
+  while (ids.has(`group-${index}`)) {
+    index += 1;
+  }
+  return `group-${index}`;
+}
+
+export function groupMemberIds(project: ComposerProject, groupId: string) {
+  return orderDrawables(project)
+    .filter((entry) => {
+      const item = drawableSelection(project, [entry.id])[0];
+      return item ? drawableGroupId(item) === groupId : false;
+    })
+    .map((entry) => entry.id);
+}
+
+export function expandSelectionWithGroups(project: ComposerProject, ids: string[]) {
+  const expanded = new Set(ids);
+  drawableSelection(project, ids).forEach((item) => {
+    const groupId = drawableGroupId(item);
+    if (!groupId) {
+      return;
+    }
+    groupMemberIds(project, groupId).forEach((memberId) => expanded.add(memberId));
+  });
+  return orderDrawables(project)
+    .map((entry) => entry.id)
+    .filter((id) => expanded.has(id));
+}
+
+export function groupDrawables(project: ComposerProject, ids: string[]) {
+  const items = drawableSelection(project, ids).filter(isFreeTransformDrawable);
+  if (items.length < 2) {
+    return project;
+  }
+  const groupId = nextGroupId(project);
+  const targetIds = new Set(items.map((item) => item.item.id));
+  return normalizeComposerProject({
+    ...project,
+    panels: project.panels.map((panel) =>
+      targetIds.has(panel.id) ? { ...panel, group_id: groupId } : panel,
+    ),
+    texts: project.texts.map((text) =>
+      targetIds.has(text.id) ? { ...text, group_id: groupId } : text,
+    ),
+  });
+}
+
+export function ungroupDrawables(project: ComposerProject, ids: string[]) {
+  const items = drawableSelection(project, ids).filter(isFreeTransformDrawable);
+  if (items.length === 0) {
+    return project;
+  }
+  const targetIds = new Set(items.map((item) => item.item.id));
+  const groupIds = new Set(
+    items
+      .map((item) => drawableGroupId(item))
+      .filter((value): value is string => Boolean(value)),
+  );
+  const shouldClear = (id: string, groupId?: string | null) =>
+    targetIds.has(id) || Boolean(groupId && groupIds.has(groupId));
+  return normalizeComposerProject({
+    ...project,
+    panels: project.panels.map((panel) =>
+      shouldClear(panel.id, panel.group_id) ? { ...panel, group_id: null } : panel,
+    ),
+    texts: project.texts.map((text) =>
+      shouldClear(text.id, text.group_id) ? { ...text, group_id: null } : text,
+    ),
+  });
+}
+
+export function moveDrawablesByDelta(
+  project: ComposerProject,
+  ids: string[],
+  dx_mm: number,
+  dy_mm: number,
+) {
+  const items = drawableSelection(project, ids).filter(
+    (item) => isFreeTransformDrawable(item) && !drawablePositionLocked(project, item),
+  );
+  if (items.length === 0) {
+    return project;
+  }
+  return items.reduce((nextProject, item) => {
+    const rect = drawableRect(item);
+    return applyRectToDrawable(nextProject, item, {
+      ...rect,
+      x_mm: rect.x_mm + dx_mm,
+      y_mm: rect.y_mm + dy_mm,
+    });
+  }, project);
+}
+
 export function editableSelectionIds(project: ComposerProject, ids: string[]) {
   return drawableSelection(project, ids)
     .filter(isFreeTransformDrawable)
@@ -689,7 +819,7 @@ export function drawableIdsInRect(project: ComposerProject, rect: DrawableRect) 
   return orderDrawables(project)
     .filter((entry) => {
       const item = drawableSelection(project, [entry.id])[0];
-      return item ? rectsIntersect(drawableRect(item), rect) : false;
+      return item ? !drawableHidden(item) && rectsIntersect(drawableRect(item), rect) : false;
     })
     .map((entry) => entry.id);
 }
@@ -856,19 +986,117 @@ export function moveGraphSelectionByCells(
   dcol: number,
   drow: number,
 ) {
-  let nextProject = project;
-  for (const id of ids) {
-    const panel = nextProject.panels.find((item) => item.id === id && item.kind === "graph");
-    if (!panel?.region_id) {
-      continue;
-    }
-    const region = findRegion(nextProject, panel.region_id);
-    if (!region) {
-      continue;
-    }
-    nextProject = moveRegion(nextProject, region.id, region.col + dcol, region.row + drow);
+  const regions = Array.from(
+    new Map(
+      ids
+        .map((id) => project.panels.find((item) => item.id === id && item.kind === "graph"))
+        .filter((panel): panel is ComposerPanel => Boolean(panel?.region_id))
+        .filter((panel) => !isGraphPanelMovementLocked(project, panel))
+        .map((panel) => {
+          const region = findRegion(project, panel.region_id);
+          return region ? [region.id, region] : null;
+        })
+        .filter((entry): entry is [string, ComposerRegion] => entry != null),
+    ).values(),
+  );
+
+  if (regions.length === 0) {
+    return project;
   }
-  return nextProject;
+
+  const selectedRegionIds = new Set(regions.map((region) => region.id));
+  const occupiedByOthers = new Set(
+    project.regions
+      .filter((region) => !selectedRegionIds.has(region.id))
+      .flatMap((region) => cellsForRegion(region).map((cell) => `${cell.col}:${cell.row}`)),
+  );
+  const nextRegions = new Map<string, ComposerRegion>();
+  const regionDeltas = new Map<
+    string,
+    { dx_mm: number; dy_mm: number; rect: ReturnType<typeof regionRect> }
+  >();
+
+  for (const region of regions) {
+    const nextRegion = {
+      ...region,
+      col: region.col + dcol,
+      row: region.row + drow,
+    };
+    if (
+      nextRegion.col < 0 ||
+      nextRegion.row < 0 ||
+      nextRegion.col + nextRegion.col_span > project.layout_grid.columns ||
+      nextRegion.row + nextRegion.row_span > project.layout_grid.rows
+    ) {
+      return project;
+    }
+    if (
+      cellsForRegion(nextRegion).some((cell) =>
+        occupiedByOthers.has(`${cell.col}:${cell.row}`),
+      )
+    ) {
+      return project;
+    }
+    const currentRect = regionRect(project, region);
+    const rect = regionRect(project, nextRegion);
+    nextRegions.set(region.id, nextRegion);
+    regionDeltas.set(region.id, {
+      dx_mm: rect.x_mm - currentRect.x_mm,
+      dy_mm: rect.y_mm - currentRect.y_mm,
+      rect,
+    });
+  }
+
+  const linkedRegionId = (value: { region_id?: string | null; slot_id?: string | null }) => {
+    for (const regionId of selectedRegionIds) {
+      if (value.region_id === regionId || value.slot_id?.startsWith(`${regionId}:`)) {
+        return regionId;
+      }
+    }
+    return null;
+  };
+
+  return normalizeComposerProject({
+    ...project,
+    regions: project.regions.map((region) => nextRegions.get(region.id) ?? region),
+    panels: project.panels.map((panel) => {
+      const regionId = linkedRegionId(panel);
+      if (!regionId) {
+        return panel;
+      }
+      if (panel.kind === "graph" && panel.region_id === regionId) {
+        const nextRect = regionDeltas.get(regionId)?.rect;
+        return nextRect
+          ? {
+              ...panel,
+              x_mm: nextRect.x_mm,
+              y_mm: nextRect.y_mm,
+              w_mm: nextRect.w_mm,
+              h_mm: nextRect.h_mm,
+            }
+          : panel;
+      }
+      const delta = regionDeltas.get(regionId);
+      return delta
+        ? {
+            ...panel,
+            x_mm: panel.x_mm + delta.dx_mm,
+            y_mm: panel.y_mm + delta.dy_mm,
+          }
+        : panel;
+    }),
+    texts: project.texts.map((text) => {
+      const regionId = linkedRegionId(text);
+      const delta = regionId ? regionDeltas.get(regionId) : null;
+      return delta
+        ? {
+            ...text,
+            x_mm: text.x_mm + delta.dx_mm,
+            y_mm: text.y_mm + delta.dy_mm,
+          }
+        : text;
+    }),
+  });
 }
 
 export type ComposerClipboard = {
@@ -1063,6 +1291,19 @@ export function pasteComposerClipboard(
   }
 
   const regionIdMap = new Map<string, string>();
+  const groupCounts = new Map<string, number>();
+  [...clipboard.panels, ...clipboard.texts].forEach((item) => {
+    if (!item.group_id) {
+      return;
+    }
+    groupCounts.set(item.group_id, (groupCounts.get(item.group_id) ?? 0) + 1);
+  });
+  const groupIdMap = new Map<string, string>();
+  groupCounts.forEach((count, groupId) => {
+    if (count > 1) {
+      groupIdMap.set(groupId, nextGroupId(nextProject));
+    }
+  });
   const regionDeltaMm = regionOffset
     ? {
         dx_mm: regionOffset.dcol * project.layout_grid.cell_width_mm,
@@ -1094,6 +1335,7 @@ export function pasteComposerClipboard(
       id: clonedPanelId,
       z_index: nextZ,
       crop_rect: { ...panel.crop_rect },
+      group_id: panel.group_id ? groupIdMap.get(panel.group_id) ?? null : null,
       region_id: nextPanelRegionId,
       slot_id: panel.slot_id,
     } satisfies ComposerPanel;
@@ -1152,6 +1394,7 @@ export function pasteComposerClipboard(
       ...text,
       id: clonedTextId,
       z_index: nextZ,
+      group_id: text.group_id ? groupIdMap.get(text.group_id) ?? null : null,
       region_id: nextTextRegionId,
       slot_id: text.slot_id,
     } satisfies ComposerText;

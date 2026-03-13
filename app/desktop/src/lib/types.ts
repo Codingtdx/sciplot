@@ -119,6 +119,7 @@ export type ComposerPanel = {
   label?: string | null;
   kind: "graph" | "asset";
   z_index: number;
+  group_id?: string | null;
   region_id?: string | null;
   slot_id?: string | null;
   crop_rect: ComposerCropRect;
@@ -134,6 +135,7 @@ export type ComposerText = {
   z_index: number;
   locked?: boolean;
   hidden?: boolean;
+  group_id?: string | null;
   region_id?: string | null;
   slot_id?: string | null;
 };

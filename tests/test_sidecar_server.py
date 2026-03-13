@@ -112,6 +112,7 @@ def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -
                     "hidden": True,
                     "kind": "graph",
                     "z_index": 0,
+                    "group_id": None,
                     "region_id": "region-1",
                     "slot_id": None,
                     "crop_rect": {"x": 0, "y": 0, "width": 1, "height": 1},
@@ -128,6 +129,7 @@ def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -
                     "z_index": 1,
                     "locked": True,
                     "hidden": False,
+                    "group_id": "group-1",
                     "region_id": None,
                     "slot_id": None,
                 }
@@ -155,6 +157,7 @@ def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -
     assert payload["project"]["panels"][0]["file_path"] == "/tmp/a.pdf"
     assert payload["project"]["panels"][0]["hidden"] is True
     assert payload["project"]["texts"][0]["locked"] is True
+    assert payload["project"]["texts"][0]["group_id"] == "group-1"
 
 
 def test_open_project_rejects_legacy_composer_v1(tmp_path: Path) -> None:

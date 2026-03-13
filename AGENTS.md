@@ -7,11 +7,13 @@
 - `src/`: 绘图内核、数据加载、布局规则、拉伸预处理、拼图后端。
 - `src/rendering/`: 绘图服务层；现在按 `inspect / recommendation / preflight / render / cache / options / io` 拆开，CLI 和 sidecar 都只应该调用这一层。
 - `src/plotting.py`: 仍保留核心绘图实现；如果只是复用绘图家族入口，优先从 `src/plotting_families/` 进入，不要继续把新调用点直接绑死到这个大文件。
-- `src/composer.py`: Composer v2 后端真相源；维护 `layout_grid / regions / slot / z_index / crop_rect / hidden`、拼图预览和可编辑 PDF 导出。
+- `src/composer.py`: Composer v2 后端真相源；维护 `layout_grid / regions / slot / z_index / group_id / crop_rect / hidden`、拼图预览和可编辑 PDF 导出。
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
 - `app/desktop/src/`: 4.x GUI。屏幕按 `wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
+- `app/desktop/e2e/`: Playwright 真实指针级 E2E；Composer 的框选、拖拽、`Alt` 复制、region 移动等浏览器交互从这里回归，默认通过 mock sidecar + 浏览器宿主运行。
+- `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
 - `.pre-commit-config.yaml`: 本地提交前的轻量门禁。
@@ -33,8 +35,9 @@
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
+- 桌面端如果既要跑在 Tauri 内，也要跑浏览器宿主 E2E，就不要在 screen 或 hook 里直接 import Tauri API；统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类包装层。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
-- Composer drawable 的运行时字段除了几何和层级外，还包括 `locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
+- Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
 
 ## 拼图器约束
 
@@ -45,9 +48,11 @@
 - `free region` 只表示合并后的占格区域，不直接导出；真正导出的仍是 `panel / text` 这些 drawable。
 - 自由素材和文字允许覆盖 graph；要防的是 region 占格冲突，不是所有 drawable 一律禁止 overlap。
 - 所有非破坏性裁边都走 drawable 上的 `crop_rect`；不要修改源 PDF 或源图片文件。
-- drawable 的 `hidden` 表示“仍留在项目里，但预览和导出都忽略”；不要把隐藏当删除，也不要让导出偷偷带上隐藏对象。
-- 文字对象和自由素材都允许 `locked`；锁定后不能继续拖拽，但仍应保留在图层列表、项目文件和导出里。
+- drawable 的 `hidden` 表示“仍留在项目里，但预览、导出、画布框选和智能吸附都忽略”；不要把隐藏当删除，也不要让导出偷偷带上隐藏对象。
+- 文字对象和自由素材都允许 `locked`；graph 还要同时尊重 region 锁。锁定后不能继续拖拽，也不能再被方向键、贴边/居中、适配绑定区这类位置编辑改动，但仍应保留在图层列表、项目文件和导出里。
+- `group_id` 只用于自由 drawable 的成组选择、整组拖拽、复制/粘贴和重复；不要把 graph region 的占格语义混进 group 里。
 - Composer 导出必须保持单页 PDF，并优先保证 Illustrator 继续选中 `graph / asset / text / 结构式覆盖物` 这一层级。
+- 导出 PDF 里的每个可见 graph / asset / text 都应挂到稳定命名的 OCG 图层；改导出时别把这层命名语义丢掉，也别把 hidden 对象导成可见图层。
 
 ## 绘图不变量
 
@@ -78,6 +83,10 @@
   - `.venv/bin/python scripts/smoke_check.py`
 - GUI 组件测试：
   - `cd app/desktop && npm test`
+- GUI 真实交互 E2E：
+  - `cd app/desktop && npm run test:e2e`
+- GUI Tauri 启动 smoke：
+  - `cd app/desktop && npm run test:e2e:tauri-smoke`
 - GUI 构建：
   - `cd app/desktop && npm run build`
 - Tauri 编译检查：
@@ -108,6 +117,8 @@
 - `ruff check`
 - `mypy src/composer.py`
 - `app/desktop npm test`
+- 如果改了画布交互、拖拽、框选、region 移动、快捷键或 Tauri 包装层，再跑 `app/desktop npm run test:e2e`
+- 如果改了 Tauri 启动链路、窗口配置、wrapper 与真实宿主交互或桌面打包入口，再跑 `app/desktop npm run test:e2e:tauri-smoke`
 - `app/desktop npm run build`
 - `app/desktop/src-tauri cargo check`
 
@@ -141,6 +152,8 @@
 - 不要在 sidecar 里直接 `return {...}` 一坨裸对象而不经过 response model。
 - 不要让 `save/open project` 旁路 `app/sidecar/schemas.py` 的校验/迁移层。
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
+- 不要在可被浏览器宿主测试覆盖的前端代码里直接 import `@tauri-apps/api/*` 或 `@tauri-apps/plugin-dialog`；这样会让 Playwright E2E 无法稳定启动。
+- macOS 上当前没有稳定的 Tauri WebDriver 回归链路时，优先保留 `npm run test:e2e` 这套真实指针浏览器回归，再用 `npm run test:e2e:tauri-smoke` 守真实宿主启动；不要为了“像桌面端”把可重复的浏览器 E2E 删掉。
 - 不要把 graph region 的位置真相源拆成两份；region 负责占格，graph panel 的 `x/y/w/h` 只是归一化结果。
 - 不要再把 Composer 改回旧的 `3x3 原点吸附 + panels-only` 心智模型；v2 的事实源是 `regions + drawables`。
 - 不要让 graph 导入悄悄接受任意尺寸 PDF；不符合 `60x55 / 120x55 / 60x110 mm` 的 PDF 应提示改用 asset 模式。

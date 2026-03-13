@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Group,
   Image,
@@ -15,6 +15,7 @@ import {
   cellRect,
   drawableIdsInRect,
   findRegion,
+  moveDrawablesByDelta,
   moveRegion,
   orderDrawables,
   regionAtCell,
@@ -96,7 +97,7 @@ function candidateGuides(project: ComposerProject, movingId: string) {
   });
 
   project.panels
-    .filter((panel) => panel.id !== movingId)
+    .filter((panel) => panel.id !== movingId && !panel.hidden)
     .forEach((panel) => {
       vertical.add(panel.x_mm);
       vertical.add(panel.x_mm + panel.w_mm / 2);
@@ -107,7 +108,7 @@ function candidateGuides(project: ComposerProject, movingId: string) {
     });
 
   project.texts
-    .filter((text) => text.id !== movingId)
+    .filter((text) => text.id !== movingId && !text.hidden)
     .forEach((text) => {
       const bounds = textBounds(text);
       vertical.add(bounds.x_mm);
@@ -187,6 +188,7 @@ function PanelNode({
   transformEnabled,
   displayLabel,
   imageSrc,
+  selectedObjectIds,
   onSelect,
   onDuplicateDragStart,
   consumeSuppressedClick,
@@ -199,6 +201,7 @@ function PanelNode({
   transformEnabled: boolean;
   displayLabel: string;
   imageSrc: string | null;
+  selectedObjectIds: string[];
   onSelect(additive: boolean): void;
   onDuplicateDragStart(id: string): string | null;
   consumeSuppressedClick(): boolean;
@@ -216,6 +219,8 @@ function PanelNode({
   }
 
   const slotRegion = panel.region_id ? findRegion(project, panel.region_id) : null;
+  const movementLocked =
+    panel.kind === "graph" ? Boolean(panel.locked || slotRegion?.locked) : Boolean(panel.locked);
 
   return (
     <>
@@ -224,7 +229,7 @@ function PanelNode({
         ref={groupRef}
         x={panel.x_mm * SCALE}
         y={panel.y_mm * SCALE}
-        draggable={!panel.locked}
+        draggable={!movementLocked}
         onClick={(event) => {
           if (consumeSuppressedClick()) {
             return;
@@ -303,22 +308,33 @@ function PanelNode({
             w_mm: panel.w_mm,
             h_mm: panel.h_mm,
           });
-          onProjectChange({
-            ...project,
-            panels: project.panels.map((item) =>
-              item.id === activePanelId
-                ? {
-                    ...item,
-                    ...snapped.rect,
-                  }
-                : item,
-            ),
-          });
+          if (selectedObjectIds.includes(panel.id) && selectedObjectIds.length > 1) {
+            onProjectChange(
+              moveDrawablesByDelta(
+                project,
+                selectedObjectIds,
+                snapped.rect.x_mm - panel.x_mm,
+                snapped.rect.y_mm - panel.y_mm,
+              ),
+            );
+          } else {
+            onProjectChange({
+              ...project,
+              panels: project.panels.map((item) =>
+                item.id === activePanelId
+                  ? {
+                      ...item,
+                      ...snapped.rect,
+                    }
+                  : item,
+              ),
+            });
+          }
           onGuidesChange([]);
           activeDragPanelIdRef.current = panel.id;
         }}
         onTransformEnd={() => {
-          if (panel.kind !== "asset") {
+          if (panel.kind !== "asset" || movementLocked) {
             return;
           }
           const node = groupRef.current;
@@ -396,7 +412,7 @@ function PanelNode({
           })()
         )}
       </Group>
-      {panel.kind === "asset" && transformEnabled && (
+      {panel.kind === "asset" && transformEnabled && !movementLocked && (
         <Transformer
           ref={trRef}
           rotateEnabled={false}
@@ -437,13 +453,22 @@ export function ComposerCanvas({
   onObjectSelection(ids: string[], additive?: boolean): void;
   onDuplicateDrawableStart(id: string): string | null;
   onProjectChange(project: ComposerProject): void;
-  onSelectedCellsChange(cells: Array<{ col: number; row: number }>): void;
+  onSelectedCellsChange(
+    cells: Array<{ col: number; row: number }>,
+    options?: { preserveSelection?: boolean },
+  ): void;
 }) {
   const stageRef = useRef<any>(null);
   const stageWidth = useMemo(() => project.canvas_width_mm * SCALE, [project.canvas_width_mm]);
   const stageHeight = useMemo(() => project.canvas_height_mm * SCALE, [project.canvas_height_mm]);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [marqueeRect, setMarqueeRect] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const marqueeRectRef = useRef<{
     x: number;
     y: number;
     width: number;
@@ -490,6 +515,106 @@ export function ComposerCanvas({
     return true;
   };
 
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return undefined;
+    }
+    const container = stage.container();
+
+    const updatePointer = (mouseEvent: MouseEvent) => {
+      stage.setPointersPositions(mouseEvent);
+      return stage.getPointerPosition();
+    };
+
+    const handleMouseDown = (mouseEvent: MouseEvent) => {
+      const pointer = updatePointer(mouseEvent);
+      if (!pointer) {
+        return;
+      }
+      const target = stage.getIntersection(pointer) ?? stage;
+      if (
+        nodeOrAncestorHasName(target, "composer-drawable") ||
+        nodeOrAncestorHasName(target, "composer-region")
+      ) {
+        return;
+      }
+      if (target === stage || nodeOrAncestorHasName(target, "composer-surface")) {
+        onSelect(null, false);
+        setGuides([]);
+      }
+      const nextRect = {
+        x: pointer.x,
+        y: pointer.y,
+        width: 0,
+        height: 0,
+      };
+      marqueeStartRef.current = {
+        x: pointer.x,
+        y: pointer.y,
+        additive: Boolean(mouseEvent.shiftKey || mouseEvent.metaKey),
+      };
+      marqueeRectRef.current = nextRect;
+      setMarqueeRect(nextRect);
+    };
+
+    const handleMouseMove = (mouseEvent: MouseEvent) => {
+      const start = marqueeStartRef.current;
+      if (!start) {
+        return;
+      }
+      const pointer = updatePointer(mouseEvent);
+      if (!pointer) {
+        return;
+      }
+      const nextRect = {
+        x: Math.min(start.x, pointer.x),
+        y: Math.min(start.y, pointer.y),
+        width: Math.abs(pointer.x - start.x),
+        height: Math.abs(pointer.y - start.y),
+      };
+      marqueeRectRef.current = nextRect;
+      setMarqueeRect(nextRect);
+    };
+
+    const handleMouseUp = () => {
+      const start = marqueeStartRef.current;
+      if (!start) {
+        return;
+      }
+      const nextRect = marqueeRectRef.current;
+      marqueeStartRef.current = null;
+      marqueeRectRef.current = null;
+      if (!nextRect) {
+        return;
+      }
+      setMarqueeRect(null);
+      setGuides([]);
+      if (nextRect.width < 6 && nextRect.height < 6) {
+        return;
+      }
+      const selectedIds = drawableIdsInRect(project, {
+        x_mm: nextRect.x / SCALE,
+        y_mm: nextRect.y / SCALE,
+        w_mm: nextRect.width / SCALE,
+        h_mm: nextRect.height / SCALE,
+      });
+      suppressClickRef.current = true;
+      onObjectSelection(selectedIds, start.additive);
+      onSelectedCellsChange([], { preserveSelection: true });
+    };
+
+    container.addEventListener("mousedown", handleMouseDown);
+    container.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      container.removeEventListener("mousedown", handleMouseDown);
+      container.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [onObjectSelection, onSelect, onSelectedCellsChange, project, stageHeight, stageWidth]);
+
   return (
     <div className="composer-stage-shell">
       <Stage
@@ -497,76 +622,6 @@ export function ComposerCanvas({
         width={stageWidth}
         height={stageHeight}
         className="composer-stage"
-        onMouseDownCapture={(event: any) => {
-          const target = event.target;
-          if (
-            nodeOrAncestorHasName(target, "composer-drawable") ||
-            nodeOrAncestorHasName(target, "composer-region")
-          ) {
-            return;
-          }
-          const pointer = stageRef.current?.getPointerPosition();
-          if (!pointer) {
-            return;
-          }
-          marqueeStartRef.current = {
-            x: pointer.x,
-            y: pointer.y,
-            additive: Boolean(event.evt.shiftKey || event.evt.metaKey),
-          };
-          setMarqueeRect({
-            x: pointer.x,
-            y: pointer.y,
-            width: 0,
-            height: 0,
-          });
-        }}
-        onMouseMoveCapture={() => {
-          const start = marqueeStartRef.current;
-          const pointer = stageRef.current?.getPointerPosition();
-          if (!start || !pointer) {
-            return;
-          }
-          setMarqueeRect({
-            x: Math.min(start.x, pointer.x),
-            y: Math.min(start.y, pointer.y),
-            width: Math.abs(pointer.x - start.x),
-            height: Math.abs(pointer.y - start.y),
-          });
-        }}
-        onMouseUpCapture={() => {
-          const start = marqueeStartRef.current;
-          if (!start) {
-            return;
-          }
-          const nextRect = marqueeRect;
-          marqueeStartRef.current = null;
-          if (!nextRect) {
-            return;
-          }
-          setMarqueeRect(null);
-          setGuides([]);
-          if (nextRect.width < 6 && nextRect.height < 6) {
-            return;
-          }
-          suppressClickRef.current = true;
-          onObjectSelection(
-            drawableIdsInRect(project, {
-              x_mm: nextRect.x / SCALE,
-              y_mm: nextRect.y / SCALE,
-              w_mm: nextRect.width / SCALE,
-              h_mm: nextRect.height / SCALE,
-            }),
-            start.additive,
-          );
-          onSelectedCellsChange([]);
-        }}
-        onMouseDown={(event) => {
-          if (event.target === event.target.getStage()) {
-            onSelect(null, false);
-            setGuides([]);
-          }
-        }}
       >
         <Layer>
           <Rect
@@ -612,7 +667,7 @@ export function ComposerCanvas({
                     const region = regionAtCell(project, col, row);
                     if (region) {
                       onSelect(region.id, false);
-                      onSelectedCellsChange([]);
+                      onSelectedCellsChange([], { preserveSelection: true });
                       return;
                     }
                     const nextCells = event.evt.shiftKey
@@ -637,14 +692,14 @@ export function ComposerCanvas({
                 x={rect.x_mm * SCALE}
                 y={rect.y_mm * SCALE}
                 draggable={region.kind === "free" && !region.locked}
-                onClick={() => {
-                  if (suppressClickRef.current) {
-                    suppressClickRef.current = false;
-                    return;
-                  }
-                  onSelect(region.id, false);
-                  onSelectedCellsChange([]);
-                }}
+                  onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false;
+                      return;
+                    }
+                    onSelect(region.id, false);
+                    onSelectedCellsChange([], { preserveSelection: true });
+                  }}
                 onDragEnd={(event) => {
                   if (region.kind !== "free") {
                     return;
@@ -754,6 +809,7 @@ export function ComposerCanvas({
                 panel={entry.item}
                 project={project}
                 selected={selectedObjectIds.includes(entry.item.id)}
+                selectedObjectIds={selectedObjectIds}
                 transformEnabled={selectedObjectIds.length === 1 && selectedObjectIds[0] === entry.item.id}
                 onGuidesChange={setGuides}
                 onProjectChange={(next) => onProjectChange(next)}
@@ -761,7 +817,7 @@ export function ComposerCanvas({
                 consumeSuppressedClick={consumeSuppressedClick}
                 onSelect={(additive) => {
                   onSelect(entry.item.id, additive);
-                  onSelectedCellsChange([]);
+                  onSelectedCellsChange([], { preserveSelection: true });
                 }}
               />
             ) : (
@@ -780,14 +836,14 @@ export function ComposerCanvas({
                     return;
                   }
                   onSelect(entry.item.id, Boolean(event.evt.shiftKey || event.evt.metaKey));
-                  onSelectedCellsChange([]);
+                  onSelectedCellsChange([], { preserveSelection: true });
                 }}
                 onTap={() => {
                   if (consumeSuppressedClick()) {
                     return;
                   }
                   onSelect(entry.item.id, false);
-                  onSelectedCellsChange([]);
+                  onSelectedCellsChange([], { preserveSelection: true });
                 }}
                 onDragStart={(event) => {
                   activeTextDragIdRef.current = entry.item.id;
@@ -824,18 +880,29 @@ export function ComposerCanvas({
                     y_mm: event.target.y() / SCALE,
                   });
                   const snapped = snapRectWithGuides(project, activeTextId, bounds);
-                  onProjectChange({
-                    ...project,
-                    texts: project.texts.map((item) =>
-                      item.id === activeTextId
-                        ? {
-                            ...item,
-                            x_mm: snapped.rect.x_mm,
-                            y_mm: snapped.rect.y_mm,
-                          }
-                        : item,
-                    ),
-                  });
+                  if (selectedObjectIds.includes(entry.item.id) && selectedObjectIds.length > 1) {
+                    onProjectChange(
+                      moveDrawablesByDelta(
+                        project,
+                        selectedObjectIds,
+                        snapped.rect.x_mm - textBounds(entry.item).x_mm,
+                        snapped.rect.y_mm - textBounds(entry.item).y_mm,
+                      ),
+                    );
+                  } else {
+                    onProjectChange({
+                      ...project,
+                      texts: project.texts.map((item) =>
+                        item.id === activeTextId
+                          ? {
+                              ...item,
+                              x_mm: snapped.rect.x_mm,
+                              y_mm: snapped.rect.y_mm,
+                            }
+                          : item,
+                      ),
+                    });
+                  }
                   setGuides([]);
                   activeTextDragIdRef.current = null;
                 }}

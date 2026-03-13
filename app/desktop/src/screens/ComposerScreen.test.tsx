@@ -264,6 +264,56 @@ describe("ComposerScreen", () => {
     });
   });
 
+  it("groups the selected objects and reselects the whole group from one member", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
+      shiftKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "成组" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.group_id).toBeTruthy();
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.group_id).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+
+    await waitFor(() => {
+      const tile = screen.getByText("多选对象").closest(".stat-tile");
+      expect(tile).not.toBeNull();
+      expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
+    });
+  });
+
+  it("ungroups the selected objects", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
+      shiftKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "成组" }));
+
+    await waitFor(() => {
+      expect(useComposerStore.getState().project.panels.find((panel) => panel.id === "asset-1")?.group_id).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "解组" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.group_id).toBeNull();
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.group_id).toBeNull();
+    });
+  });
+
   it("supports marquee-driven multi-select from the canvas", async () => {
     seedComposerProject();
 
@@ -275,6 +325,58 @@ describe("ComposerScreen", () => {
       const tile = screen.getByText("多选对象").closest(".stat-tile");
       expect(tile).not.toBeNull();
       expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
+    });
+  });
+
+  it("locks and unlocks selected drawables from the layer actions", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
+      shiftKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "锁定选中" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.locked).toBe(true);
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.locked).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "解锁选中" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.locked).toBe(false);
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.locked).toBe(false);
+    });
+  });
+
+  it("hides and shows selected drawables from the layer actions", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
+      shiftKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "隐藏选中" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.hidden).toBe(true);
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.hidden).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "显示选中" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.hidden).toBe(false);
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.hidden).toBe(false);
     });
   });
 
@@ -290,6 +392,35 @@ describe("ComposerScreen", () => {
       const project = useComposerStore.getState().project;
       expect(project.panels.find((panel) => panel.id === "asset-1")?.x_mm).toBe(10.5);
       expect(project.panels.find((panel) => panel.id === "asset-1")?.y_mm).toBe(20);
+    });
+  });
+
+  it("does not move or resize a locked asset through keyboard and binding actions", async () => {
+    seedComposerProject();
+    useComposerStore.getState().setProject({
+      ...useComposerStore.getState().project,
+      panels: useComposerStore
+        .getState()
+        .project.panels.map((panel) =>
+          panel.id === "asset-1" ? { ...panel, locked: true } : panel,
+        ),
+    });
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: "适配到绑定区域" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")).toMatchObject({
+        x_mm: 10,
+        y_mm: 20,
+        w_mm: 24,
+        h_mm: 12,
+        locked: true,
+      });
     });
   });
 

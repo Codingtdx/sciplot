@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { flushSync } from "react-dom";
 import { useShallow } from "zustand/react/shallow";
 
@@ -18,9 +16,11 @@ import {
   composerLayerTitle,
   describePanelSlot,
   duplicateComposerSelection,
+  expandSelectionWithGroups,
   distributeDrawables,
   editableSelectionIds,
   findRegion,
+  groupDrawables,
   mergeCellsIntoFreeRegion,
   moveGraphSelectionByCells,
   moveRegion,
@@ -39,8 +39,11 @@ import {
   resolveSelectedPanelLabel,
   selectedRegionIdsForObjects,
   type ComposerClipboard,
+  ungroupDrawables,
 } from "../lib/composer";
 import { loadComposerProjectFile } from "../lib/project-io";
+import { openDialog, saveDialog } from "../lib/tauri-dialog";
+import { getCodeGodWebviewWindow } from "../lib/tauri-webview";
 import type { ComposerPanel, ComposerProject, ComposerText } from "../lib/types";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import { getErrorMessage, toDialogPaths } from "../lib/workbench";
@@ -191,7 +194,11 @@ export function ComposerScreen() {
   const projectRef = useRef(composer.project);
   const selectedRegionRef = useRef<string | null>(null);
   const clipboardRef = useRef<ComposerClipboard | null>(null);
-  const thumbnailMap = usePanelThumbnails(composer.project.panels);
+  const visiblePanels = useMemo(
+    () => composer.project.panels.filter((panel) => !panel.hidden),
+    [composer.project.panels],
+  );
+  const thumbnailMap = usePanelThumbnails(visiblePanels);
 
   const primaryObjectId = selectedObjectIds.length === 1 ? selectedObjectIds[0] : null;
   const selectedPanel = composer.project.panels.find((item) => item.id === primaryObjectId) ?? null;
@@ -203,6 +210,13 @@ export function ComposerScreen() {
   const selectedPanelLabel = selectedPanel
     ? resolveSelectedPanelLabel(composer.project, selectedPanel)
     : "";
+  const selectedPanelPositionLocked = Boolean(
+    selectedPanel &&
+      (selectedPanel.locked ||
+        (selectedPanel.kind === "graph" &&
+          findRegion(composer.project, selectedPanel.region_id)?.locked)),
+  );
+  const selectedTextPositionLocked = Boolean(selectedText?.locked);
   const selectedEditableIds = useMemo(
     () => editableSelectionIds(composer.project, selectedObjectIds),
     [composer.project, selectedObjectIds],
@@ -221,9 +235,30 @@ export function ComposerScreen() {
     () =>
       selectedObjectIds
         .map((id) => composer.project.panels.find((item) => item.id === id) ?? composer.project.texts.find((item) => item.id === id) ?? null)
-        .filter(Boolean),
+        .filter((item): item is ComposerPanel | ComposerText => item != null),
     [composer.project.panels, composer.project.texts, selectedObjectIds],
   );
+  const selectedGroupIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          multiSelectedItems
+            .map((item) => item.group_id)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ),
+    [multiSelectedItems],
+  );
+  const selectedHiddenCount = useMemo(
+    () => multiSelectedItems.filter((item) => Boolean(item.hidden)).length,
+    [multiSelectedItems],
+  );
+  const selectedLockedCount = useMemo(
+    () => multiSelectedItems.filter((item) => Boolean(item.locked)).length,
+    [multiSelectedItems],
+  );
+  const canGroupSelection = selectedEditableIds.length >= 2;
+  const canUngroupSelection = selectedGroupIds.length > 0;
 
   const freeRegions = useMemo(
     () => composer.project.regions.filter((region) => region.kind === "free"),
@@ -255,8 +290,8 @@ export function ComposerScreen() {
             title: composerLayerTitle(composer.project, panel),
             detail:
               panel.kind === "graph"
-                ? `Graph · ${describePanelSlot(panel, composer.project)}${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`
-                : `Asset · ${panel.w_mm.toFixed(1)} x ${panel.h_mm.toFixed(1)} mm${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`,
+                ? `Graph · ${describePanelSlot(panel, composer.project)}${panel.group_id ? ` · ${panel.group_id}` : ""}${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`
+                : `Asset · ${panel.w_mm.toFixed(1)} x ${panel.h_mm.toFixed(1)} mm${panel.group_id ? ` · ${panel.group_id}` : ""}${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`,
           };
         }
         const text = composer.project.texts.find((entry) => entry.id === item.id)!;
@@ -264,7 +299,7 @@ export function ComposerScreen() {
           id: text.id,
           type: "text" as const,
           title: text.text || "Text",
-          detail: `Text · ${text.font_size_pt} pt${text.hidden ? " · Hidden" : ""}${text.locked ? " · Locked" : ""}`,
+          detail: `Text · ${text.font_size_pt} pt${text.group_id ? ` · ${text.group_id}` : ""}${text.hidden ? " · Hidden" : ""}${text.locked ? " · Locked" : ""}`,
         };
       }),
     ],
@@ -366,7 +401,7 @@ export function ComposerScreen() {
     }
 
     async function attach() {
-      const webview = getCurrentWebviewWindow();
+      const webview = getCodeGodWebviewWindow();
       unlisten = await webview.onDragDropEvent((event) => {
         if (disposed) {
           return;
@@ -415,7 +450,7 @@ export function ComposerScreen() {
   };
 
   const importGraphPanels = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
@@ -432,7 +467,7 @@ export function ComposerScreen() {
   };
 
   const importAssetPanels = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: true,
       filters: [
         {
@@ -458,7 +493,7 @@ export function ComposerScreen() {
   };
 
   const quickThreeUp = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
@@ -475,7 +510,7 @@ export function ComposerScreen() {
   };
 
   const quickTwoUpEditorial = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
@@ -514,6 +549,49 @@ export function ComposerScreen() {
     composer.setProject(normalizeComposerProject(project));
   };
 
+  const filterLockedPanelPatch = (patch: Partial<ComposerPanel>) => {
+    if (!selectedPanelPositionLocked) {
+      return patch;
+    }
+    const nextPatch: Partial<ComposerPanel> = {};
+    if ("label" in patch) {
+      nextPatch.label = patch.label;
+    }
+    if ("locked" in patch) {
+      nextPatch.locked = patch.locked;
+    }
+    if ("hidden" in patch) {
+      nextPatch.hidden = patch.hidden;
+    }
+    if ("crop_rect" in patch) {
+      nextPatch.crop_rect = patch.crop_rect;
+    }
+    return nextPatch;
+  };
+
+  const filterLockedTextPatch = (patch: Partial<ComposerText>) => {
+    if (!selectedTextPositionLocked) {
+      return patch;
+    }
+    const nextPatch: Partial<ComposerText> = {};
+    if ("text" in patch) {
+      nextPatch.text = patch.text;
+    }
+    if ("font_size_pt" in patch) {
+      nextPatch.font_size_pt = patch.font_size_pt;
+    }
+    if ("align" in patch) {
+      nextPatch.align = patch.align;
+    }
+    if ("locked" in patch) {
+      nextPatch.locked = patch.locked;
+    }
+    if ("hidden" in patch) {
+      nextPatch.hidden = patch.hidden;
+    }
+    return nextPatch;
+  };
+
   const applyPasteResult = (result: {
     project: ComposerProject;
     selectedId: string | null;
@@ -535,7 +613,7 @@ export function ComposerScreen() {
         item.id === selectedPanel.id
           ? {
               ...item,
-              ...patch,
+              ...filterLockedPanelPatch(patch),
             }
           : item,
       ),
@@ -552,7 +630,7 @@ export function ComposerScreen() {
         item.id === selectedText.id
           ? {
               ...item,
-              ...patch,
+              ...filterLockedTextPatch(patch),
             }
           : item,
       ),
@@ -668,6 +746,45 @@ export function ComposerScreen() {
     }
   };
 
+  const updateSelectedDrawableFlags = (patch: {
+    locked?: boolean;
+    hidden?: boolean;
+  }) => {
+    if (selectedObjectIds.length === 0) {
+      return;
+    }
+    const targetIds = new Set(selectedObjectIds);
+    const nextProject = normalizeComposerProject({
+      ...composer.project,
+      panels: composer.project.panels.map((panel) =>
+        targetIds.has(panel.id)
+          ? {
+              ...panel,
+              ...patch,
+            }
+          : panel,
+      ),
+      texts: composer.project.texts.map((text) =>
+        targetIds.has(text.id)
+          ? {
+              ...text,
+              ...patch,
+            }
+          : text,
+      ),
+    });
+    setProject(nextProject);
+    if (patch.hidden === true) {
+      setDropNotice(`已隐藏 ${selectedObjectIds.length} 个选中对象。`);
+    } else if (patch.hidden === false) {
+      setDropNotice(`已显示 ${selectedObjectIds.length} 个选中对象。`);
+    } else if (patch.locked === true) {
+      setDropNotice(`已锁定 ${selectedObjectIds.length} 个选中对象。`);
+    } else if (patch.locked === false) {
+      setDropNotice(`已解锁 ${selectedObjectIds.length} 个选中对象。`);
+    }
+  };
+
   const copySelection = () => {
     const clipboard = buildComposerClipboard(
       composer.project,
@@ -708,9 +825,35 @@ export function ComposerScreen() {
     }
   };
 
+  const groupCurrentSelection = () => {
+    if (!canGroupSelection) {
+      return;
+    }
+    const nextProject = groupDrawables(composer.project, selectedObjectIds);
+    const nextSelection = expandSelectionWithGroups(nextProject, selectedObjectIds);
+    setProject(nextProject);
+    setSelectedObjectIds(nextSelection);
+    composer.setSelectedId(nextSelection[nextSelection.length - 1] ?? null);
+    setDropNotice("已把选中自由对象编成一组。");
+  };
+
+  const ungroupCurrentSelection = () => {
+    if (!canUngroupSelection) {
+      return;
+    }
+    const nextProject = ungroupDrawables(composer.project, selectedObjectIds);
+    setProject(nextProject);
+    setSelectedObjectIds(selectedObjectIds);
+    composer.setSelectedId(selectedObjectIds[selectedObjectIds.length - 1] ?? null);
+    setDropNotice("已解组当前选中对象。");
+  };
+
   const duplicateDrawableForDrag = (id: string) => {
     try {
-      const result = duplicateComposerSelection(composer.project, null, [id], {
+      const sourceIds = selectedObjectIds.includes(id)
+        ? selectedObjectIds
+        : expandSelectionWithGroups(composer.project, [id]);
+      const result = duplicateComposerSelection(composer.project, null, sourceIds, {
         freeOffsetMm: 0,
       });
       flushSync(() => {
@@ -782,7 +925,7 @@ export function ComposerScreen() {
   };
 
   const saveComposerProject = async () => {
-    const destination = await save({
+    const destination = await saveDialog({
       defaultPath: "codegod-composer-v2.plotproject.json",
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
@@ -809,7 +952,7 @@ export function ComposerScreen() {
   };
 
   const openComposerProject = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: false,
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
@@ -876,15 +1019,16 @@ export function ComposerScreen() {
     }
 
     setSelectedCells([]);
+    const groupedIds = expandSelectionWithGroups(composer.project, [id]);
     if (!additive) {
-      composer.setSelectedId(id);
-      setSelectedObjectIds([id]);
+      composer.setSelectedId(groupedIds[groupedIds.length - 1] ?? id);
+      setSelectedObjectIds(groupedIds);
       return;
     }
 
-    const next = selectedObjectIds.includes(id)
-      ? selectedObjectIds.filter((item) => item !== id)
-      : [...selectedObjectIds, id];
+    const next = groupedIds.every((groupedId) => selectedObjectIds.includes(groupedId))
+      ? selectedObjectIds.filter((item) => !groupedIds.includes(item))
+      : expandSelectionWithGroups(composer.project, [...selectedObjectIds, ...groupedIds]);
     setSelectedObjectIds(next);
     composer.setSelectedId(next.length > 0 ? next[next.length - 1] : null);
   };
@@ -905,12 +1049,16 @@ export function ComposerScreen() {
 
     setSelectedCells([]);
     if (!additive) {
-      setSelectedObjectIds(known);
-      composer.setSelectedId(known[known.length - 1] ?? null);
+      const expanded = expandSelectionWithGroups(composer.project, known);
+      setSelectedObjectIds(expanded);
+      composer.setSelectedId(expanded[expanded.length - 1] ?? null);
       return;
     }
 
-    const merged = Array.from(new Set([...selectedObjectIds, ...known]));
+    const merged = expandSelectionWithGroups(
+      composer.project,
+      Array.from(new Set([...selectedObjectIds, ...known])),
+    );
     setSelectedObjectIds(merged);
     composer.setSelectedId(merged[merged.length - 1] ?? null);
   };
@@ -956,6 +1104,16 @@ export function ComposerScreen() {
       if (shortcut && shortcutKey === "d" && hasSelection) {
         event.preventDefault();
         duplicateSelection();
+        return;
+      }
+      if (shortcut && !event.shiftKey && shortcutKey === "g" && canGroupSelection) {
+        event.preventDefault();
+        groupCurrentSelection();
+        return;
+      }
+      if (shortcut && event.shiftKey && shortcutKey === "g" && canUngroupSelection) {
+        event.preventDefault();
+        ungroupCurrentSelection();
         return;
       }
 
@@ -1014,15 +1172,19 @@ export function ComposerScreen() {
     };
   }, [
     canCopySelection,
+    canGroupSelection,
     canPasteSelection,
     composer.project,
     copySelection,
     duplicateSelection,
+    groupCurrentSelection,
     hasSelection,
     pasteSelection,
     removeSelected,
     selectedObjectIds,
     selectedRegion,
+    canUngroupSelection,
+    ungroupCurrentSelection,
   ]);
 
   return (
@@ -1087,8 +1249,11 @@ export function ComposerScreen() {
               onObjectSelection={selectComposerObjects}
               onProjectChange={setProject}
               onSelect={selectComposerItem}
-              onSelectedCellsChange={(cells) => {
+              onSelectedCellsChange={(cells, options) => {
                 setSelectedCells(uniqueCells(cells));
+                if (options?.preserveSelection) {
+                  return;
+                }
                 composer.setSelectedId(null);
                 setSelectedObjectIds([]);
               }}
@@ -1237,13 +1402,33 @@ export function ComposerScreen() {
                   <span>绑定区域</span>
                   <strong>{selectedHighlightRegionIds.length}</strong>
                 </div>
+                <div className="stat-tile">
+                  <span>对象组</span>
+                  <strong>{selectedGroupIds.length}</strong>
+                </div>
               </div>
 
               <div className="hint-text">
-                Shift 可继续增减选择；方向键微调自由对象，Graph 仍按整格移动。对齐和分布只会作用于 asset / text。
+                Shift 可继续增减选择；同组对象会一起被选中。方向键微调自由对象，Graph 仍按整格移动。对齐和分布只会作用于 asset / text。
               </div>
 
               <div className="stacked-actions">
+                <button
+                  className="ghost-button"
+                  disabled={!canGroupSelection}
+                  onClick={groupCurrentSelection}
+                  type="button"
+                >
+                  成组
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!canUngroupSelection}
+                  onClick={ungroupCurrentSelection}
+                  type="button"
+                >
+                  解组
+                </button>
                 <button
                   className="ghost-button"
                   disabled={selectedEditableIds.length < 2}
@@ -1813,9 +1998,51 @@ export function ComposerScreen() {
             </div>
             <div className="context-row">
               <span>快捷键</span>
-              <strong>Shift 复选 / Alt 拖拽复制 / Cmd-C,V,D / 方向键</strong>
+              <strong>Shift 复选 / Alt 拖拽复制 / Cmd-C,V,D,G / 方向键</strong>
             </div>
           </div>
+
+          {selectedObjectIds.length > 0 && (
+            <div className="inspector-stack">
+              <div className="hint-text">
+                当前图层多选：{selectedObjectIds.length} 个对象，其中 {selectedHiddenCount} 个已隐藏，{selectedLockedCount} 个已锁定。
+              </div>
+              <div className="stacked-actions">
+                <button
+                  className="ghost-button"
+                  disabled={selectedLockedCount === multiSelectedItems.length}
+                  onClick={() => updateSelectedDrawableFlags({ locked: true })}
+                  type="button"
+                >
+                  锁定选中
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedLockedCount === 0}
+                  onClick={() => updateSelectedDrawableFlags({ locked: false })}
+                  type="button"
+                >
+                  解锁选中
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedHiddenCount === multiSelectedItems.length}
+                  onClick={() => updateSelectedDrawableFlags({ hidden: true })}
+                  type="button"
+                >
+                  隐藏选中
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedHiddenCount === 0}
+                  onClick={() => updateSelectedDrawableFlags({ hidden: false })}
+                  type="button"
+                >
+                  显示选中
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="layer-list">
             {layerItems.length === 0 && (

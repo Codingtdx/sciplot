@@ -7,12 +7,18 @@ import {
   duplicateComposerSelection,
   drawableIdsInRect,
   distributeDrawables,
+  expandSelectionWithGroups,
   extractComposerProject,
+  groupDrawables,
   mergeCellsIntoFreeRegion,
+  moveDrawablesByDelta,
+  moveGraphSelectionByCells,
+  moveRegion,
   normalizeComposerProject,
   nudgeDrawables,
   pasteComposerClipboard,
   placeDrawableInRect,
+  ungroupDrawables,
 } from "./composer";
 
 function projectWithDrawables() {
@@ -278,6 +284,62 @@ describe("drawable layout helpers", () => {
       y_mm: 18,
     });
   });
+
+  it("keeps locked free drawables fixed when nudging or placing inside a bound rect", () => {
+    const project = normalizeComposerProject({
+      ...projectWithDrawables(),
+      panels: projectWithDrawables().panels.map((panel) =>
+        panel.id === "asset-2" ? { ...panel, locked: true } : panel,
+      ),
+      texts: projectWithDrawables().texts.map((text) =>
+        text.id === "text-1" ? { ...text, locked: true } : text,
+      ),
+    });
+
+    const nudged = nudgeDrawables(project, ["asset-2", "text-1"], 5, -3);
+    const placed = placeDrawableInRect(
+      project,
+      "asset-2",
+      {
+        x_mm: 0,
+        y_mm: 2.5,
+        w_mm: 60,
+        h_mm: 55,
+      },
+      "bottom",
+    );
+
+    expect(nudged.panels.find((panel) => panel.id === "asset-2")).toMatchObject({
+      x_mm: 45,
+      y_mm: 32,
+    });
+    expect(nudged.texts.find((text) => text.id === "text-1")).toMatchObject({
+      x_mm: 30,
+      y_mm: 60,
+    });
+    expect(placed.panels.find((panel) => panel.id === "asset-2")).toMatchObject({
+      x_mm: 45,
+      y_mm: 32,
+    });
+  });
+
+  it("ignores hidden drawables when marquee selecting", () => {
+    const project = normalizeComposerProject({
+      ...projectWithDrawables(),
+      panels: projectWithDrawables().panels.map((panel) =>
+        panel.id === "asset-2" ? { ...panel, hidden: true } : panel,
+      ),
+    });
+
+    const ids = drawableIdsInRect(project, {
+      x_mm: 8,
+      y_mm: 18,
+      w_mm: 52,
+      h_mm: 20,
+    });
+
+    expect(ids).toEqual(["asset-1"]);
+  });
 });
 
 describe("composer clipboard helpers", () => {
@@ -395,5 +457,162 @@ describe("composer clipboard helpers", () => {
     expect(pastedRegion).toMatchObject({ col: 1, row: 0, label: "Notes" });
     expect(pastedAsset?.region_id).toBe(pastedRegion?.id);
     expect(pastedText?.region_id).toBe(pastedRegion?.id);
+  });
+});
+
+describe("group helpers", () => {
+  it("expands selection to all members of the same group", () => {
+    const project = normalizeComposerProject({
+      ...projectWithDrawables(),
+      panels: projectWithDrawables().panels.map((panel) =>
+        panel.id === "asset-1" || panel.id === "asset-2"
+          ? { ...panel, group_id: "group-1" }
+          : panel,
+      ),
+    });
+
+    expect(expandSelectionWithGroups(project, ["asset-1"])).toEqual(["asset-1", "asset-2"]);
+  });
+
+  it("groups and ungroups selected free drawables", () => {
+    const project = projectWithDrawables();
+
+    const grouped = groupDrawables(project, ["asset-1", "text-1"]);
+    const groupId = grouped.panels.find((panel) => panel.id === "asset-1")?.group_id;
+
+    expect(groupId).toBeTruthy();
+    expect(grouped.texts.find((text) => text.id === "text-1")?.group_id).toBe(groupId);
+
+    const ungrouped = ungroupDrawables(grouped, ["asset-1"]);
+    expect(ungrouped.panels.find((panel) => panel.id === "asset-1")?.group_id).toBeNull();
+    expect(ungrouped.texts.find((text) => text.id === "text-1")?.group_id).toBeNull();
+  });
+
+  it("moves grouped free drawables together by delta", () => {
+    const project = normalizeComposerProject({
+      ...projectWithDrawables(),
+      panels: projectWithDrawables().panels.map((panel) =>
+        panel.id === "asset-1" || panel.id === "asset-2"
+          ? { ...panel, group_id: "group-1" }
+          : panel,
+      ),
+    });
+
+    const moved = moveDrawablesByDelta(project, ["asset-1", "asset-2"], 5, -2);
+
+    expect(moved.panels.find((panel) => panel.id === "asset-1")).toMatchObject({
+      x_mm: 15,
+      y_mm: 18,
+    });
+    expect(moved.panels.find((panel) => panel.id === "asset-2")).toMatchObject({
+      x_mm: 50,
+      y_mm: 30,
+    });
+  });
+
+  it("does not move a locked free region", () => {
+    const project = normalizeComposerProject({
+      ...EMPTY_COMPOSER_PROJECT,
+      regions: [
+        {
+          id: "region-1",
+          kind: "free",
+          col: 0,
+          row: 0,
+          col_span: 1,
+          row_span: 1,
+          label: null,
+          locked: true,
+          slot_kind: null,
+        },
+      ],
+    });
+
+    const moved = moveRegion(project, "region-1", 1, 1);
+
+    expect(moved.regions[0]).toMatchObject({ col: 0, row: 0 });
+  });
+
+  it("moves adjacent graph selections together without colliding with each other", () => {
+    const project = normalizeComposerProject({
+      ...EMPTY_COMPOSER_PROJECT,
+      regions: [
+        {
+          id: "region-1",
+          kind: "graph",
+          col: 0,
+          row: 0,
+          col_span: 1,
+          row_span: 1,
+          label: null,
+          locked: false,
+          slot_kind: null,
+        },
+        {
+          id: "region-2",
+          kind: "graph",
+          col: 1,
+          row: 0,
+          col_span: 1,
+          row_span: 1,
+          label: null,
+          locked: false,
+          slot_kind: null,
+        },
+      ],
+      panels: [
+        {
+          id: "panel-1",
+          file_path: "/tmp/panel-1.pdf",
+          page_index: 0,
+          x_mm: 0,
+          y_mm: 2.5,
+          w_mm: 60,
+          h_mm: 55,
+          locked: false,
+          label: null,
+          kind: "graph",
+          z_index: 0,
+          region_id: "region-1",
+          slot_id: null,
+          crop_rect: { x: 0, y: 0, width: 1, height: 1 },
+        },
+        {
+          id: "panel-2",
+          file_path: "/tmp/panel-2.pdf",
+          page_index: 0,
+          x_mm: 60,
+          y_mm: 2.5,
+          w_mm: 60,
+          h_mm: 55,
+          locked: false,
+          label: null,
+          kind: "graph",
+          z_index: 1,
+          region_id: "region-2",
+          slot_id: null,
+          crop_rect: { x: 0, y: 0, width: 1, height: 1 },
+        },
+      ],
+    });
+
+    const moved = moveGraphSelectionByCells(project, ["panel-1", "panel-2"], 1, 0);
+
+    expect(moved.regions.find((region) => region.id === "region-1")).toMatchObject({
+      col: 1,
+      row: 0,
+    });
+    expect(moved.regions.find((region) => region.id === "region-2")).toMatchObject({
+      col: 2,
+      row: 0,
+    });
+    expect(moved.panels.find((panel) => panel.id === "panel-1")).toMatchObject({
+      x_mm: 60,
+      y_mm: 2.5,
+    });
+    expect(moved.panels.find((panel) => panel.id === "panel-2")).toMatchObject({
+      x_mm: 120,
+      y_mm: 2.5,
+    });
   });
 });

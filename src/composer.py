@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field, replace
 from io import BytesIO
@@ -91,6 +92,7 @@ class ComposerPanel:
     label: str | None = None
     kind: str = "graph"
     z_index: int = 0
+    group_id: str | None = None
     region_id: str | None = None
     slot_id: str | None = None
     crop_rect: ComposerCropRect = field(default_factory=ComposerCropRect)
@@ -107,6 +109,7 @@ class ComposerText:
     z_index: int = 0
     locked: bool = False
     hidden: bool = False
+    group_id: str | None = None
     region_id: str | None = None
     slot_id: str | None = None
 
@@ -312,6 +315,7 @@ def _normalize_panels(project: ComposerProject) -> None:
         panel.crop_rect = _normalize_crop_rect(panel.crop_rect)
         panel.locked = bool(panel.locked)
         panel.hidden = bool(panel.hidden)
+        panel.group_id = str(panel.group_id) if panel.group_id else None
         panel.kind = "asset" if panel.kind == "asset" else "graph"
         if panel.kind == "graph" and panel.region_id and panel.region_id in region_lookup:
             x_mm, y_mm, w_mm, h_mm = region_rect_mm(project, region_lookup[panel.region_id])
@@ -332,6 +336,7 @@ def _normalize_texts(project: ComposerProject) -> None:
         text.font_size_pt = min(max(float(text.font_size_pt), 5.0), 72.0)
         text.locked = bool(text.locked)
         text.hidden = bool(text.hidden)
+        text.group_id = str(text.group_id) if text.group_id else None
         text.x_mm = min(max(float(text.x_mm), 0.0), project.canvas_width_mm)
         text.y_mm = min(max(float(text.y_mm), 0.0), project.canvas_height_mm)
 
@@ -423,6 +428,7 @@ def project_from_dict(data: dict[str, Any]) -> ComposerProject:
                 label=item.get("label"),
                 kind=str(item.get("kind", "graph")),
                 z_index=int(item.get("z_index", 0)),
+                group_id=item.get("group_id"),
                 region_id=item.get("region_id"),
                 slot_id=item.get("slot_id"),
                 crop_rect=_parse_crop_rect(item.get("crop_rect")),
@@ -441,6 +447,7 @@ def project_from_dict(data: dict[str, Any]) -> ComposerProject:
                 z_index=int(item.get("z_index", 0)),
                 locked=bool(item.get("locked", False)),
                 hidden=bool(item.get("hidden", False)),
+                group_id=item.get("group_id"),
                 region_id=item.get("region_id"),
                 slot_id=item.get("slot_id"),
             )
@@ -791,13 +798,86 @@ def _draw_text_pdf(page: fitz.Page, text: ComposerText) -> None:
         x_pt -= text_length / 2.0
     elif text.align == "right":
         x_pt -= text_length
-    y_pt = mm_to_pt(text.y_mm) + text.font_size_pt
-    page.insert_text(
-        fitz.Point(x_pt, y_pt),
-        text.text,
-        fontname="helv",
-        fontsize=text.font_size_pt,
-        color=(0.1, 0.1, 0.12),
+    y_pt = mm_to_pt(text.y_mm)
+    text_rect = fitz.Rect(
+        x_pt,
+        y_pt,
+        x_pt + max(text_length + 4.0, text.font_size_pt),
+        y_pt + text.font_size_pt * 1.8,
+    )
+    escaped_text = html.escape(text.text).replace("\n", "<br/>")
+    page.insert_htmlbox(
+        text_rect,
+        (
+            "<div "
+            f"style=\"font-family: Helvetica; font-size: {text.font_size_pt}pt; "
+            "color: rgb(26, 26, 31); margin: 0; padding: 0; "
+            f"text-align: {text.align};\">"
+            f"{escaped_text}"
+            "</div>"
+        ),
+        overlay=True,
+    )
+
+
+def _clean_layer_fragment(value: str | None, fallback: str) -> str:
+    normalized = " ".join((value or "").split())
+    if not normalized:
+        return fallback
+    return normalized[:72]
+
+
+def _panel_layer_name(project: ComposerProject, panel: ComposerPanel) -> str:
+    if panel.kind == "graph":
+        label = _panel_label_text(project, panel)
+        suffix = f" [{label}]" if label else ""
+        return f"Graph/{panel.id}{suffix}"
+    prefix = "Structure Asset" if panel.slot_id else "Asset"
+    leaf = _clean_layer_fragment(panel.label or Path(panel.file_path).name, panel.id)
+    return f"{prefix}/{panel.id} {leaf}"
+
+
+def _text_layer_name(text: ComposerText) -> str:
+    prefix = "Structure Text" if text.slot_id else "Text"
+    snippet = _clean_layer_fragment(text.text, text.id)
+    return f"{prefix}/{text.id} {snippet}"
+
+
+def _ensure_ocg(document: fitz.Document, cache: dict[str, int], name: str) -> int:
+    existing = cache.get(name)
+    if existing is not None:
+        return existing
+    ocg_xref = int(document.add_ocg(name))
+    cache[name] = ocg_xref
+    return ocg_xref
+
+
+def _draw_text_pdf_with_oc(page: fitz.Page, text: ComposerText, oc_xref: int) -> None:
+    text_length = fitz.get_text_length(text.text, fontname="helv", fontsize=text.font_size_pt)
+    x_pt = mm_to_pt(text.x_mm)
+    if text.align == "center":
+        x_pt -= text_length / 2.0
+    elif text.align == "right":
+        x_pt -= text_length
+    y_pt = mm_to_pt(text.y_mm)
+    text_rect = fitz.Rect(
+        x_pt,
+        y_pt,
+        x_pt + max(text_length + 4.0, text.font_size_pt),
+        y_pt + text.font_size_pt * 1.8,
+    )
+    escaped_text = html.escape(text.text).replace("\n", "<br/>")
+    page.insert_htmlbox(
+        text_rect,
+        (
+            "<div "
+            f"style=\"font-family: Helvetica; font-size: {text.font_size_pt}pt; "
+            "color: rgb(26, 26, 31); margin: 0; padding: 0; "
+            f"text-align: {text.align};\">"
+            f"{escaped_text}"
+            "</div>"
+        ),
+        oc=oc_xref,
         overlay=True,
     )
 
@@ -809,12 +889,14 @@ def compose_export_pdf(project: ComposerProject, output_path: str | Path) -> Pat
 
     document = fitz.open()
     page = document.new_page(width=mm_to_pt(normalized.canvas_width_mm), height=mm_to_pt(normalized.canvas_height_mm))
+    ocg_cache: dict[str, int] = {}
 
     for kind, drawable in _sorted_drawables(normalized):
         if kind == "panel":
             panel = cast(ComposerPanel, drawable)
             if panel.hidden:
                 continue
+            panel_ocg = _ensure_ocg(document, ocg_cache, _panel_layer_name(normalized, panel))
             target_rect = fitz.Rect(
                 mm_to_pt(panel.x_mm),
                 mm_to_pt(panel.y_mm),
@@ -831,6 +913,7 @@ def compose_export_pdf(project: ComposerProject, output_path: str | Path) -> Pat
                         panel.page_index,
                         clip=_pdf_clip_rect(panel, source_page.rect),
                         keep_proportion=False,
+                        oc=panel_ocg,
                         overlay=True,
                     )
                 finally:
@@ -840,6 +923,7 @@ def compose_export_pdf(project: ComposerProject, output_path: str | Path) -> Pat
                     target_rect,
                     stream=_raster_stream_for_panel(panel),
                     keep_proportion=False,
+                    oc=panel_ocg,
                     overlay=True,
                 )
             else:
@@ -848,19 +932,24 @@ def compose_export_pdf(project: ComposerProject, output_path: str | Path) -> Pat
             if normalized.auto_labels and panel.kind == "graph":
                 label = _panel_label_text(normalized, panel)
                 if label:
-                    page.insert_text(
-                        fitz.Point(mm_to_pt(panel.x_mm) + 8, mm_to_pt(panel.y_mm) + 12),
-                        label,
-                        fontname="helv",
-                        fontsize=9,
-                        color=(0.1, 0.1, 0.12),
-                        overlay=True,
+                    _draw_text_pdf_with_oc(
+                        page,
+                        ComposerText(
+                            id=f"{panel.id}:label",
+                            text=label,
+                            x_mm=panel.x_mm + (8.0 * PT_TO_MM),
+                            y_mm=panel.y_mm + (3.0 * PT_TO_MM),
+                            font_size_pt=9,
+                            align="left",
+                        ),
+                        panel_ocg,
                     )
         else:
             text = cast(ComposerText, drawable)
             if text.hidden:
                 continue
-            _draw_text_pdf(page, text)
+            text_ocg = _ensure_ocg(document, ocg_cache, _text_layer_name(text))
+            _draw_text_pdf_with_oc(page, text, text_ocg)
 
     document.save(output)
     document.close()

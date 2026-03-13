@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { open, save } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
@@ -12,6 +11,7 @@ import {
   saveProject,
 } from "../lib/api";
 import { loadWizardDataFile, loadWizardProjectFile, applyInspectionToWizard } from "../lib/project-io";
+import { openDialog, saveDialog } from "../lib/tauri-dialog";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type {
   TemplateName,
@@ -162,7 +162,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   }, [setWizardPreviews, wizard.inputPath, wizard.template]);
 
   const openDataFile = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: false,
       filters: [
         {
@@ -195,7 +195,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   const openWizardProject = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: false,
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
@@ -228,7 +228,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     if (!wizard.inputPath) {
       return;
     }
-    const destination = await save({
+    const destination = await saveDialog({
       defaultPath: "codegod-wizard.plotproject.json",
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
@@ -263,7 +263,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   const runTensileReplicatePreprocess = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: true,
       filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
     });
@@ -273,7 +273,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
 
     const inferredGroupName = inferTensileGroupName(filePaths);
-    const destination = await save({
+    const destination = await saveDialog({
       defaultPath: defaultSiblingPath(
         filePaths[0],
         `${inferredGroupName}_plot_wizard_template.xlsx`,
