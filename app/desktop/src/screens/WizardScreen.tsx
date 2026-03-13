@@ -503,26 +503,20 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   return (
     <div className="desk-layout wizard-layout">
       <section className="desk-main wizard-main">
-        <article className="work-card hero-card wizard-hero-card">
-          <div className="section-head hero-head">
+        <article className="work-card section-card wizard-workspace-card">
+          <div className="section-head wizard-workspace-head">
             <div>
               <div className="card-kicker">绘图</div>
-              <h2>从数据到 PDF 的单图流程</h2>
-              <p>载入后自动识别、预览和预检，只保留关键参数给你确认。</p>
+              <h2>单图自动检查流</h2>
+              <p>输入、识别、模板、参数和导出都收在同一块工作区里。</p>
             </div>
-            <div className="metric-strip">
-              <div className={`metric-chip ${statusChip.tone}`}>
-                <span>当前状态</span>
-                <strong>{statusChip.label}</strong>
-              </div>
-              <div className={`metric-chip ${wizard.sidecarReady ? "good" : "warn"}`}>
-                <span>Sidecar</span>
-                <strong>{wizard.sidecarReady ? "Ready" : "Waiting"}</strong>
-              </div>
+            <div className="wizard-inline-chips">
+              {wizard.inputPath && <span className="signal-tag">{formatLeaf(wizard.inputPath)}</span>}
+              <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
             </div>
           </div>
 
-          <div className="wizard-input-bar">
+          <div className="wizard-toolbar">
             <button className="primary-button" onClick={openDataFile} type="button">
               选择数据
             </button>
@@ -593,333 +587,313 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
               )}
             </div>
           )}
-        </article>
 
-        <div className="wizard-section-grid">
-          <article className="work-card section-card wizard-section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">识别摘要</div>
-                <h2>当前输入识别结果</h2>
-                <p>自动判断输入结构，并给出推荐模板与默认参数。</p>
-              </div>
-            </div>
-            {!wizard.inspection ? (
-              <div className="placeholder-card">选择数据后，这里会显示输入模型、推荐图型和推荐原因。</div>
-            ) : (
-              <div className="wizard-section-stack">
-                <div className="info-grid wizard-tight-grid">
-                  <div className="stat-tile">
-                    <span>输入模型</span>
-                    <strong>{wizard.inspection.model_label}</strong>
-                  </div>
-                  <div className="stat-tile">
-                    <span>推荐图型</span>
-                    <strong>{templateLabel(meta, wizard.inspection.recommendation.template)}</strong>
-                  </div>
-                </div>
-                <div className="focus-panel">
-                  <strong>推荐原因</strong>
-                  <span>{wizard.inspection.recommendation.reason}</span>
-                </div>
-                {wizard.inspection.warnings.length > 0 && (
-                  <div className="warning-card">
-                    <strong>输入提醒</strong>
-                    <ul className="bullet-list">
-                      {wizard.inspection.warnings.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {wizard.inspection.signals.length > 0 && (
-                  <details>
-                    <summary>展开查看识别信号</summary>
-                    <ul className="bullet-list">
-                      {wizard.inspection.signals.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            )}
-          </article>
-
-          <article className="work-card section-card wizard-section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">图型</div>
-                <h2>兼容模板</h2>
-                <p>默认只展示当前输入兼容的图型，避免点进必报错的路径。</p>
-              </div>
-            </div>
-            {!wizard.inspection ? (
-              <div className="placeholder-card">先载入数据，再根据识别结果显示兼容模板。</div>
-            ) : (
-              <div className="wizard-section-stack">
-                <div className="wizard-template-grid">
-                  {compatibleTemplates.map((template) => (
-                    <button
-                      className={`wizard-template-chip ${wizard.template === template.id ? "active" : ""}`}
-                      key={template.id}
-                      onClick={() => updateWizardTemplate(template.id)}
-                      type="button"
-                    >
-                      <strong>{template.label}</strong>
-                      <span>{template.description}</span>
-                    </button>
-                  ))}
-                </div>
-                {incompatibleTemplates.length > 0 && (
-                  <>
-                    <button
-                      className="ghost-button"
-                      onClick={() => setShowAllTemplates((current) => !current)}
-                      type="button"
-                    >
-                      {showAllTemplates ? "收起其他图型" : "更多图型"}
-                    </button>
-                    {showAllTemplates && (
-                      <div className="wizard-template-grid">
-                        {incompatibleTemplates.map((template) => (
-                          <button
-                            className="wizard-template-chip disabled"
-                            disabled
-                            key={template.id}
-                            type="button"
-                          >
-                            <strong>{template.label}</strong>
-                            <span>{templateCompatibilityReason(wizard.inspection?.model)}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </article>
-
-          <article className="work-card section-card wizard-section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">参数</div>
-                <h2>关键参数</h2>
-                <p>这里只保留尺寸、坐标轴和少量模板相关选项，其他尽量自动处理。</p>
-              </div>
-            </div>
-            {!wizard.template ? (
-              <div className="placeholder-card">确认输入后，这里会显示当前模板可编辑的参数。</div>
-            ) : (
-              <div className="wizard-section-stack">
-                <div className="field-grid wizard-tight-grid">
-                  <label>
-                    <span className="field-label">尺寸</span>
-                    <select
-                      className="field"
-                      value={wizard.options.size ?? sizeOptions[0]?.id ?? ""}
-                      onChange={(event) => updateWizardOptions({ size: event.target.value })}
-                    >
-                      {sizeOptions.map((choice) => (
-                        <option key={choice.id} value={choice.id}>
-                          {choice.id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {currentTemplate?.editable_options.includes("xscale") && (
-                    <label>
-                      <span className="field-label">X 轴</span>
-                      <select
-                        className="field"
-                        value={wizard.options.xscale ?? "linear"}
-                        onChange={(event) =>
-                          updateWizardOptions({
-                            xscale: event.target.value === "log" ? "log" : "linear",
-                          })
-                        }
-                      >
-                        <option value="linear">linear</option>
-                        <option value="log">log</option>
-                      </select>
-                    </label>
-                  )}
-
-                  {currentTemplate?.editable_options.includes("yscale") && (
-                    <label>
-                      <span className="field-label">Y 轴</span>
-                      <select
-                        className="field"
-                        value={wizard.options.yscale ?? "linear"}
-                        onChange={(event) =>
-                          updateWizardOptions({
-                            yscale: event.target.value === "log" ? "log" : "linear",
-                          })
-                        }
-                      >
-                        <option value="linear">linear</option>
-                        <option value="log">log</option>
-                      </select>
-                    </label>
-                  )}
-
-                  {currentTemplate?.editable_options.includes("reverse_x") && (
-                    <label className="toggle-field">
-                      <input
-                        checked={Boolean(wizard.options.reverse_x)}
-                        onChange={(event) =>
-                          updateWizardOptions({ reverse_x: event.target.checked })
-                        }
-                        type="checkbox"
-                      />
-                      <span>反向 X 轴</span>
-                    </label>
-                  )}
-
-                  {currentTemplate?.editable_options.includes("baseline") && (
-                    <label>
-                      <span className="field-label">Baseline</span>
-                      <select
-                        className="field"
-                        value={wizard.options.baseline ?? "none"}
-                        onChange={(event) =>
-                          updateWizardOptions({
-                            baseline:
-                              event.target.value === "linear_endpoints"
-                                ? "linear_endpoints"
-                                : "none",
-                          })
-                        }
-                      >
-                        <option value="none">none</option>
-                        <option value="linear_endpoints">linear_endpoints</option>
-                      </select>
-                    </label>
-                  )}
-
-                  {currentTemplate?.editable_options.includes("show_colorbar") && (
-                    <label className="toggle-field">
-                      <input
-                        checked={Boolean(
-                          wizard.options.show_colorbar ??
-                            currentTemplate.default_options.show_colorbar ??
-                            true,
-                        )}
-                        onChange={(event) =>
-                          updateWizardOptions({ show_colorbar: event.target.checked })
-                        }
-                        type="checkbox"
-                      />
-                      <span>显示 colorbar</span>
-                    </label>
-                  )}
-                </div>
-
-                {currentTemplate?.editable_options.includes("palette_preset") && (
-                  <details>
-                    <summary>高级选项</summary>
-                    <div className="field-grid compact-grid advanced-grid wizard-tight-grid">
-                      <label>
-                        <span className="field-label">配色</span>
-                        <select
-                          className="field"
-                          value={wizard.options.palette_preset ?? meta?.default_palette ?? ""}
-                          onChange={(event) =>
-                            updateWizardOptions({
-                              palette_preset: event.target.value,
-                            })
-                          }
-                        >
-                          {paletteOptions.map((choice) => (
-                            <option key={choice.id} value={choice.id}>
-                              {choice.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+          <div className="wizard-pane-grid">
+            <section className="wizard-pane">
+              <div className="card-kicker">识别摘要</div>
+              <h3>当前输入识别结果</h3>
+              {!wizard.inspection ? (
+                <div className="placeholder-card">选择数据后，这里会显示输入模型、推荐图型和推荐原因。</div>
+              ) : (
+                <div className="wizard-section-stack">
+                  <div className="info-grid wizard-tight-grid">
+                    <div className="stat-tile">
+                      <span>输入模型</span>
+                      <strong>{wizard.inspection.model_label}</strong>
                     </div>
-                  </details>
-                )}
-              </div>
-            )}
-          </article>
-
-          <article className="work-card section-card wizard-section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">导出</div>
-                <h2>自动检查与导出</h2>
-                <p>参数改动后会自动重跑预览和预检；有阻断错误时不会允许导出。</p>
-              </div>
-            </div>
-            <div className="wizard-section-stack">
-              {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
-              {!preflightRequestError && preflightBusy && (
-                <div className="placeholder-card">正在更新预检结果…</div>
-              )}
-              {!preflightRequestError && !preflightBusy && wizard.preflight && (
-                <>
-                  {blockingErrors.length > 0 ? (
-                    <div className="error-card">
-                      <strong>当前还不能直接导出：</strong>
+                    <div className="stat-tile">
+                      <span>推荐图型</span>
+                      <strong>{templateLabel(meta, wizard.inspection.recommendation.template)}</strong>
+                    </div>
+                  </div>
+                  <div className="focus-panel">
+                    <strong>推荐原因</strong>
+                    <span>{wizard.inspection.recommendation.reason}</span>
+                  </div>
+                  {wizard.inspection.warnings.length > 0 && (
+                    <div className="warning-card">
+                      <strong>输入提醒</strong>
                       <ul className="bullet-list">
-                        {blockingErrors.map((item) => (
+                        {wizard.inspection.warnings.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
                     </div>
-                  ) : (
-                    <div className="success-card">当前预检通过，可以直接导出。</div>
                   )}
-                  {wizard.preflight.warnings.length > 0 && (
+                  {wizard.inspection.signals.length > 0 && (
                     <details>
-                      <summary>展开查看导出前提醒</summary>
+                      <summary>展开查看识别信号</summary>
                       <ul className="bullet-list">
-                        {wizard.preflight.warnings.map((item) => (
+                        {wizard.inspection.signals.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
                     </details>
                   )}
-                </>
+                </div>
               )}
-              {!wizard.preflight && !preflightBusy && !preflightRequestError && (
-                <div className="placeholder-card">载入数据并确认模板后，系统会自动生成预检结果。</div>
-              )}
+            </section>
 
-              <div className="step-actions">
-                {!recommendationApplied && wizard.inspection && (
-                  <button className="ghost-button" onClick={applyRecommendedSelection} type="button">
-                    恢复推荐
-                  </button>
-                )}
-                <button
-                  className="primary-button"
-                  disabled={!canExport}
-                  onClick={() => void runExport()}
-                  type="button"
-                >
-                  导出 PDF
-                </button>
-              </div>
-
-              <div className="focus-panel">
-                <strong>{wizard.outputs.length > 0 ? "导出结果" : "预计输出"}</strong>
-                {expectedOutputs.length > 0 ? (
-                  <ul className="output-list">
-                    {expectedOutputs.map((item) => (
-                      <li key={item}>{formatLeaf(item)}</li>
+            <section className="wizard-pane">
+              <div className="card-kicker">图型</div>
+              <h3>兼容模板</h3>
+              {!wizard.inspection ? (
+                <div className="placeholder-card">先载入数据，再根据识别结果显示兼容模板。</div>
+              ) : (
+                <div className="wizard-section-stack">
+                  <div className="wizard-template-grid">
+                    {compatibleTemplates.map((template) => (
+                      <button
+                        className={`wizard-template-chip ${wizard.template === template.id ? "active" : ""}`}
+                        key={template.id}
+                        onClick={() => updateWizardTemplate(template.id)}
+                        type="button"
+                      >
+                        <strong>{template.label}</strong>
+                        <span>{template.description}</span>
+                      </button>
                     ))}
-                  </ul>
-                ) : (
-                  <span>当前还没有可导出的文件列表。</span>
+                  </div>
+                  {incompatibleTemplates.length > 0 && (
+                    <>
+                      <button
+                        className="ghost-button"
+                        onClick={() => setShowAllTemplates((current) => !current)}
+                        type="button"
+                      >
+                        {showAllTemplates ? "收起其他图型" : "更多图型"}
+                      </button>
+                      {showAllTemplates && (
+                        <div className="wizard-template-grid">
+                          {incompatibleTemplates.map((template) => (
+                            <button
+                              className="wizard-template-chip disabled"
+                              disabled
+                              key={template.id}
+                              type="button"
+                            >
+                              <strong>{template.label}</strong>
+                              <span>{templateCompatibilityReason(wizard.inspection?.model)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="wizard-pane">
+              <div className="card-kicker">参数</div>
+              <h3>关键参数</h3>
+              {!wizard.template ? (
+                <div className="placeholder-card">确认输入后，这里会显示当前模板可编辑的参数。</div>
+              ) : (
+                <div className="wizard-section-stack">
+                  <div className="field-grid wizard-tight-grid">
+                    <label>
+                      <span className="field-label">尺寸</span>
+                      <select
+                        className="field"
+                        value={wizard.options.size ?? sizeOptions[0]?.id ?? ""}
+                        onChange={(event) => updateWizardOptions({ size: event.target.value })}
+                      >
+                        {sizeOptions.map((choice) => (
+                          <option key={choice.id} value={choice.id}>
+                            {choice.id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {currentTemplate?.editable_options.includes("xscale") && (
+                      <label>
+                        <span className="field-label">X 轴</span>
+                        <select
+                          className="field"
+                          value={wizard.options.xscale ?? "linear"}
+                          onChange={(event) =>
+                            updateWizardOptions({
+                              xscale: event.target.value === "log" ? "log" : "linear",
+                            })
+                          }
+                        >
+                          <option value="linear">linear</option>
+                          <option value="log">log</option>
+                        </select>
+                      </label>
+                    )}
+
+                    {currentTemplate?.editable_options.includes("yscale") && (
+                      <label>
+                        <span className="field-label">Y 轴</span>
+                        <select
+                          className="field"
+                          value={wizard.options.yscale ?? "linear"}
+                          onChange={(event) =>
+                            updateWizardOptions({
+                              yscale: event.target.value === "log" ? "log" : "linear",
+                            })
+                          }
+                        >
+                          <option value="linear">linear</option>
+                          <option value="log">log</option>
+                        </select>
+                      </label>
+                    )}
+
+                    {currentTemplate?.editable_options.includes("reverse_x") && (
+                      <label className="toggle-field">
+                        <input
+                          checked={Boolean(wizard.options.reverse_x)}
+                          onChange={(event) =>
+                            updateWizardOptions({ reverse_x: event.target.checked })
+                          }
+                          type="checkbox"
+                        />
+                        <span>反向 X 轴</span>
+                      </label>
+                    )}
+
+                    {currentTemplate?.editable_options.includes("baseline") && (
+                      <label>
+                        <span className="field-label">Baseline</span>
+                        <select
+                          className="field"
+                          value={wizard.options.baseline ?? "none"}
+                          onChange={(event) =>
+                            updateWizardOptions({
+                              baseline:
+                                event.target.value === "linear_endpoints"
+                                  ? "linear_endpoints"
+                                  : "none",
+                            })
+                          }
+                        >
+                          <option value="none">none</option>
+                          <option value="linear_endpoints">linear_endpoints</option>
+                        </select>
+                      </label>
+                    )}
+
+                    {currentTemplate?.editable_options.includes("show_colorbar") && (
+                      <label className="toggle-field">
+                        <input
+                          checked={Boolean(
+                            wizard.options.show_colorbar ??
+                              currentTemplate.default_options.show_colorbar ??
+                              true,
+                          )}
+                          onChange={(event) =>
+                            updateWizardOptions({ show_colorbar: event.target.checked })
+                          }
+                          type="checkbox"
+                        />
+                        <span>显示 colorbar</span>
+                      </label>
+                    )}
+                  </div>
+
+                  {currentTemplate?.editable_options.includes("palette_preset") && (
+                    <details>
+                      <summary>高级选项</summary>
+                      <div className="field-grid compact-grid advanced-grid wizard-tight-grid">
+                        <label>
+                          <span className="field-label">配色</span>
+                          <select
+                            className="field"
+                            value={wizard.options.palette_preset ?? meta?.default_palette ?? ""}
+                            onChange={(event) =>
+                              updateWizardOptions({
+                                palette_preset: event.target.value,
+                              })
+                            }
+                          >
+                            {paletteOptions.map((choice) => (
+                              <option key={choice.id} value={choice.id}>
+                                {choice.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="wizard-pane">
+              <div className="card-kicker">导出</div>
+              <h3>自动检查与导出</h3>
+              <div className="wizard-section-stack">
+                {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
+                {!preflightRequestError && preflightBusy && (
+                  <div className="placeholder-card">正在更新预检结果…</div>
                 )}
+                {!preflightRequestError && !preflightBusy && wizard.preflight && (
+                  <>
+                    {blockingErrors.length > 0 ? (
+                      <div className="error-card">
+                        <strong>当前还不能直接导出：</strong>
+                        <ul className="bullet-list">
+                          {blockingErrors.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="success-card">当前预检通过，可以直接导出。</div>
+                    )}
+                    {wizard.preflight.warnings.length > 0 && (
+                      <details>
+                        <summary>展开查看导出前提醒</summary>
+                        <ul className="bullet-list">
+                          {wizard.preflight.warnings.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </>
+                )}
+                {!wizard.preflight && !preflightBusy && !preflightRequestError && (
+                  <div className="placeholder-card">载入数据并确认模板后，系统会自动生成预检结果。</div>
+                )}
+
+                <div className="step-actions">
+                  {!recommendationApplied && wizard.inspection && (
+                    <button className="ghost-button" onClick={applyRecommendedSelection} type="button">
+                      恢复推荐
+                    </button>
+                  )}
+                  <button
+                    className="primary-button"
+                    disabled={!canExport}
+                    onClick={() => void runExport()}
+                    type="button"
+                  >
+                    导出 PDF
+                  </button>
+                </div>
+
+                <div className="focus-panel">
+                  <strong>{wizard.outputs.length > 0 ? "导出结果" : "预计输出"}</strong>
+                  {expectedOutputs.length > 0 ? (
+                    <ul className="output-list">
+                      {expectedOutputs.map((item) => (
+                        <li key={item}>{formatLeaf(item)}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span>当前还没有可导出的文件列表。</span>
+                  )}
+                </div>
               </div>
-            </div>
-          </article>
-        </div>
+            </section>
+          </div>
+        </article>
       </section>
 
       <aside className="desk-context wizard-context">

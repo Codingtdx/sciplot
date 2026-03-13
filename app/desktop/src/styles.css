@@ -308,21 +308,22 @@ button {
   display: flex;
   justify-content: space-between;
   gap: clamp(10px, 1vw, 14px);
-  padding: clamp(14px, 1.2vw, 18px) clamp(16px, 1.4vw, 22px) clamp(12px, 1vw, 16px);
+  padding: clamp(10px, 0.9vw, 14px) clamp(14px, 1.2vw, 18px) clamp(9px, 0.8vw, 12px);
   border-bottom: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
 }
 
 .topbar-copy h1 {
   margin: 4px 0;
-  font-size: var(--title-size);
-  line-height: 1.08;
+  font-size: clamp(1.1rem, 1.35vw, 1.4rem);
+  line-height: 1.02;
   letter-spacing: -0.03em;
 }
 
 .topbar-copy p {
   margin: 0;
-  max-width: 720px;
+  max-width: 560px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
@@ -387,7 +388,7 @@ button {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: clamp(12px, 1.2vw, 18px) clamp(14px, 1.4vw, 20px) clamp(16px, 1.4vw, 20px);
+  padding: clamp(10px, 1vw, 14px) clamp(12px, 1.1vw, 16px) clamp(14px, 1.2vw, 18px);
 }
 
 .topbar-warning {
@@ -426,6 +427,53 @@ button {
 
 .hero-card {
   background: var(--surface-hero);
+}
+
+.wizard-workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wizard-workspace-head {
+  align-items: center;
+}
+
+.wizard-inline-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wizard-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wizard-pane-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wizard-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+.wizard-pane h3 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .wizard-hero-card {
@@ -921,8 +969,8 @@ button {
 .preview-pane {
   display: flex;
   flex-direction: column;
-  min-height: clamp(240px, 34vh, 320px);
-  padding: 14px;
+  min-height: clamp(220px, 30vh, 300px);
+  padding: 12px;
 }
 
 .preview-toolbar {
@@ -1238,6 +1286,7 @@ summary {
   .field-grid,
   .info-grid,
   .summary-grid,
+  .wizard-pane-grid,
   .wizard-section-grid,
   .wizard-template-grid,
   .desk-context {
@@ -1272,7 +1321,12 @@ summary {
     flex-direction: column;
   }
 
+  .wizard-workspace-head {
+    align-items: flex-start;
+  }
+
   .wizard-input-bar,
+  .wizard-toolbar,
   .wizard-summary-row {
     flex-direction: column;
     align-items: stretch;
