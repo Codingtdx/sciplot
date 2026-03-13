@@ -162,7 +162,7 @@ export default function App() {
           <div className="brand-mark">CG</div>
           <div className="rail-brand-text">
             <strong>CodeGod</strong>
-            <span>4.x</span>
+            <span>5.0</span>
           </div>
         </div>
 
@@ -195,7 +195,7 @@ export default function App() {
           </div>
 
           <div className="status-pills">
-            <span className="status-pill accent">4.x Workbench</span>
+            <span className="status-pill accent">5.0 Workbench</span>
             <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
               {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
             </span>

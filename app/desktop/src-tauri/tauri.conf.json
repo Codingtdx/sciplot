@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodeGod 4.0",
-  "version": "4.0.0",
+  "productName": "CodeGod 5.0",
+  "version": "5.0.0",
   "identifier": "com.codegod.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "CodeGod 4.0",
+        "title": "CodeGod 5.0",
         "width": 1600,
         "height": 980,
         "minWidth": 1200,

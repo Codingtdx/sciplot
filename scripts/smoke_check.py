@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
-import tempfile
-from pathlib import Path
-
 import sys
+import tempfile
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import fitz
-from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -28,30 +27,33 @@ from make_plot import (
     preflight_render_request,
     render_template,
 )
+from src import (
+    mpl_backend,  # noqa: F401
+    plot_style,
+)
 from src.composer import (
-    ComposerProject,
     ComposerText,
     compose_export_pdf,
     compose_preview_png,
     import_panels_from_paths,
-    two_up_editorial_panels_from_paths,
     three_up_panels_from_paths,
+    two_up_editorial_panels_from_paths,
     validate_non_overlapping_panels,
 )
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
-from src import plot_style
+from src.plot_contract import load_plot_contract, validation_rule
 from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
-    _format_axis_label,
     _cap_visible_major_ticks,
+    _format_axis_label,
     _legend_candidates,
     _place_legend_candidate,
     compute_shared_curve_x_layout,
     plot_bar,
     plot_box,
     plot_dsc,
-    plot_ftir,
     plot_frequency_sweep,
+    plot_ftir,
     plot_heatmap,
     plot_nmr,
     plot_tensile_curve,
@@ -60,17 +62,15 @@ from src.plotting import (
     plot_xrd,
 )
 from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
-from src.plot_contract import load_plot_contract, validation_rule
 from src.tensile_replicates import export_tensile_replicate_workbook
 from src.text_normalization import normalize_label, normalize_unit
-from src.wide_nmr import load_wide_nmr_config
 from src.wide_nmr import (
     WIDE_NMR_SPECTRUM_HEIGHT_MM,
     WIDE_NMR_STRUCTURE_RESERVED_MM,
     WIDE_NMR_TOTAL_HEIGHT_MM,
     WIDE_NMR_WIDTH_MM,
+    load_wide_nmr_config,
 )
-
 
 SMOKE_REPORT_PATH = ROOT / "figures" / "debug_outputs" / "smoke_report.json"
 TENSILE_RAW_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
@@ -115,7 +115,7 @@ def _write_curve_table(path: Path, x_label: str, y_label: str, x_unit: str, y_un
         [x_unit, y_unit, x_unit, y_unit],
         ["Sample A", "Sample A", "Sample B", "Sample B"],
     ]
-    for xv, yv1, yv2 in zip(x, y1, y2):
+    for xv, yv1, yv2 in zip(x, y1, y2, strict=True):
         rows.append([xv, yv1, xv, yv2])
     pd.DataFrame(rows).to_csv(path, header=False, index=False)
 
@@ -349,19 +349,73 @@ def _write_wide_nmr_bundle(path: Path) -> None:
     x = np.linspace(3.7, 9.3, 2400)
     sample_names = ["0:1", "0.1:1", "0.2:1", "0.3:1", "0.4:1", "0.5:1"]
     curve_params = [
-        [(8.95, 0.010, 1.4), (8.45, 0.012, 1.1), (8.18, 0.010, 1.6), (8.08, 0.010, 1.4), (7.86, 0.013, 1.1), (7.58, 0.014, 0.9), (7.50, 0.014, 0.8), (4.06, 0.010, 2.6)],
-        [(8.94, 0.010, 1.2), (8.43, 0.012, 0.9), (8.19, 0.010, 1.2), (8.07, 0.010, 1.1), (7.85, 0.013, 1.0), (7.57, 0.014, 0.9), (7.49, 0.014, 0.7), (4.06, 0.010, 2.1)],
-        [(8.93, 0.010, 1.0), (8.44, 0.012, 0.8), (8.18, 0.010, 1.0), (8.06, 0.010, 0.95), (7.84, 0.013, 0.9), (7.56, 0.014, 0.85), (7.48, 0.014, 0.65), (4.06, 0.010, 1.8)],
-        [(8.92, 0.010, 0.8), (8.45, 0.012, 0.65), (8.19, 0.010, 0.82), (8.05, 0.010, 0.8), (7.83, 0.013, 0.8), (7.55, 0.014, 0.8), (7.47, 0.014, 0.62), (4.06, 0.010, 1.5)],
-        [(8.91, 0.010, 0.65), (8.46, 0.012, 0.52), (8.20, 0.010, 0.66), (8.04, 0.010, 0.65), (7.82, 0.013, 0.72), (7.54, 0.014, 0.74), (7.46, 0.014, 0.58), (4.06, 0.010, 1.2)],
-        [(8.90, 0.010, 0.52), (8.47, 0.012, 0.44), (8.21, 0.010, 0.54), (8.03, 0.010, 0.53), (7.81, 0.013, 0.64), (7.53, 0.014, 0.68), (7.45, 0.014, 0.54), (4.06, 0.010, 1.0)],
+        [
+            (8.95, 0.010, 1.4),
+            (8.45, 0.012, 1.1),
+            (8.18, 0.010, 1.6),
+            (8.08, 0.010, 1.4),
+            (7.86, 0.013, 1.1),
+            (7.58, 0.014, 0.9),
+            (7.50, 0.014, 0.8),
+            (4.06, 0.010, 2.6),
+        ],
+        [
+            (8.94, 0.010, 1.2),
+            (8.43, 0.012, 0.9),
+            (8.19, 0.010, 1.2),
+            (8.07, 0.010, 1.1),
+            (7.85, 0.013, 1.0),
+            (7.57, 0.014, 0.9),
+            (7.49, 0.014, 0.7),
+            (4.06, 0.010, 2.1),
+        ],
+        [
+            (8.93, 0.010, 1.0),
+            (8.44, 0.012, 0.8),
+            (8.18, 0.010, 1.0),
+            (8.06, 0.010, 0.95),
+            (7.84, 0.013, 0.9),
+            (7.56, 0.014, 0.85),
+            (7.48, 0.014, 0.65),
+            (4.06, 0.010, 1.8),
+        ],
+        [
+            (8.92, 0.010, 0.8),
+            (8.45, 0.012, 0.65),
+            (8.19, 0.010, 0.82),
+            (8.05, 0.010, 0.8),
+            (7.83, 0.013, 0.8),
+            (7.55, 0.014, 0.8),
+            (7.47, 0.014, 0.62),
+            (4.06, 0.010, 1.5),
+        ],
+        [
+            (8.91, 0.010, 0.65),
+            (8.46, 0.012, 0.52),
+            (8.20, 0.010, 0.66),
+            (8.04, 0.010, 0.65),
+            (7.82, 0.013, 0.72),
+            (7.54, 0.014, 0.74),
+            (7.46, 0.014, 0.58),
+            (4.06, 0.010, 1.2),
+        ],
+        [
+            (8.90, 0.010, 0.52),
+            (8.47, 0.012, 0.44),
+            (8.21, 0.010, 0.54),
+            (8.03, 0.010, 0.53),
+            (7.81, 0.013, 0.64),
+            (7.53, 0.014, 0.68),
+            (7.45, 0.014, 0.54),
+            (4.06, 0.010, 1.0),
+        ],
     ]
     rows = [
         ["Chemical shift", "Intensity"] * len(sample_names),
         ["ppm", "a.u."] * len(sample_names),
         [item for sample in sample_names for item in (sample, sample)],
     ]
-    for idx, x_value in enumerate(x):
+    for _idx, x_value in enumerate(x):
         row: list[float] = []
         for series_peaks in curve_params:
             y_value = 0.01 * np.sin(x_value * 2.5)
@@ -465,7 +519,7 @@ def _assert_stacked_layout(plot_fn, path: Path) -> None:
         if len(points) < 2:
             return points
         dense = [points[:1]]
-        for start, end in zip(points[:-1], points[1:]):
+        for start, end in zip(points[:-1], points[1:], strict=True):
             delta = end - start
             steps = max(int(np.ceil(max(abs(delta[0]), abs(delta[1])) / max_step_px)), 1)
             if steps == 1:
@@ -678,9 +732,17 @@ def _assert_inspection_and_preflight(
         baseline=wide_nmr_inspection.recommendation.baseline,
         use_sidecar=wide_nmr_inspection.recommendation.use_sidecar,
     )
-    segmented_preflight = preflight_render_request("segmented_stacked_curve", wide_nmr_path, 0, segmented_options)
+    segmented_preflight = preflight_render_request(
+        "segmented_stacked_curve",
+        wide_nmr_path,
+        0,
+        segmented_options,
+    )
     if segmented_preflight.errors:
-        raise AssertionError(f"segmented_stacked_curve preflight should succeed with sidecar, got: {segmented_preflight.errors}")
+        raise AssertionError(
+            "segmented_stacked_curve preflight should succeed with sidecar, "
+            f"got: {segmented_preflight.errors}"
+        )
 
     missing_sidecar_options = _resolve_render_options(
         template="segmented_stacked_curve",
@@ -689,7 +751,12 @@ def _assert_inspection_and_preflight(
         baseline="linear_endpoints",
         use_sidecar=True,
     )
-    missing_sidecar_preflight = preflight_render_request("segmented_stacked_curve", tensile_path, 0, missing_sidecar_options)
+    missing_sidecar_preflight = preflight_render_request(
+        "segmented_stacked_curve",
+        tensile_path,
+        0,
+        missing_sidecar_options,
+    )
     if not missing_sidecar_preflight.errors:
         raise AssertionError("segmented_stacked_curve preflight should fail when sidecar is required but missing.")
     if "sidecar 配置文件" not in missing_sidecar_preflight.errors[0]:
@@ -756,7 +823,9 @@ def _assert_curve_padding(plot_fn, series_list, *, expect_log_y: bool = False) -
     yticks = yticks[np.isfinite(yticks)]
     if yticks.size and yticks.min() < raw_y_min:
         if expect_log_y:
-            raise AssertionError("Log y-axis should hide the bottom boundary tick when it falls below the raw data range.")
+            raise AssertionError(
+                "Log y-axis should hide the bottom boundary tick when it falls below the raw data range."
+            )
         raise AssertionError("Curve y-axis should not show lower ticks below the raw data range.")
 
     visible_y_ticks = np.asarray(ax.get_yticks(), dtype=float)
@@ -882,9 +951,17 @@ def _assert_axis_frame_alignment(
                 details={
                     "edges_mm": {
                         "left": round(axis_frames["heatmap"][0] * reference_width_mm, 3),
-                        "right": round((1.0 - (axis_frames["heatmap"][0] + axis_frames["heatmap"][2])) * reference_width_mm, 3),
+                        "right": round(
+                            (1.0 - (axis_frames["heatmap"][0] + axis_frames["heatmap"][2]))
+                            * reference_width_mm,
+                            3,
+                        ),
                         "bottom": round(axis_frames["heatmap"][1] * reference_height_mm, 3),
-                        "top": round((1.0 - (axis_frames["heatmap"][1] + axis_frames["heatmap"][3])) * reference_height_mm, 3),
+                        "top": round(
+                            (1.0 - (axis_frames["heatmap"][1] + axis_frames["heatmap"][3]))
+                            * reference_height_mm,
+                            3,
+                        ),
                     },
                     "reference_edges_mm": {
                         "left": round(reference_left_mm, 3),
@@ -966,7 +1043,9 @@ def _assert_axis_frame_alignment(
         if not np.isclose(wide_right_mm, reference_right_mm, atol=0.05):
             raise AssertionError("wide_nmr should share the same right axis anchor as the standard single-panel frame.")
         if not np.isclose(wide_bottom_mm, reference_bottom_mm, atol=0.05):
-            raise AssertionError("wide_nmr should share the same bottom axis anchor as the standard single-panel frame.")
+            raise AssertionError(
+                "wide_nmr should share the same bottom axis anchor as the standard single-panel frame."
+            )
         validation_reports.append(
             _validation_result(
                 "wide_nmr_horizontal_alignment",
@@ -1014,7 +1093,9 @@ def _assert_major_tick_skip_every_other() -> None:
     kept = _cap_visible_major_ticks(ticks, scale="linear", max_major_ticks=7)
     expected = np.array([0, 2, 4, 6], dtype=float)
     if not np.array_equal(kept, expected):
-        raise AssertionError("Seven visible y-axis ticks should thin to every other tick using the locator result [::2].")
+        raise AssertionError(
+            "Seven visible y-axis ticks should thin to every other tick using the locator result [::2]."
+        )
 
 
 def _assert_style_palette_presets(
@@ -1026,12 +1107,34 @@ def _assert_style_palette_presets(
     temp_path: Path,
 ) -> None:
     combos = [
-        ("point_line", temp_path, {"yscale": "log", "style_preset": "default", "palette_preset": "colorblind_safe"}),
-        ("point_line", temp_path, {"yscale": "log", "style_preset": "nature", "palette_preset": "colorblind_safe"}),
+        (
+            "point_line",
+            temp_path,
+            {"yscale": "log", "style_preset": "default", "palette_preset": "colorblind_safe"},
+        ),
+        (
+            "point_line",
+            temp_path,
+            {"yscale": "log", "style_preset": "nature", "palette_preset": "colorblind_safe"},
+        ),
         ("bar", replicate_path, {"style_preset": "default", "palette_preset": "deep"}),
         ("box", replicate_path, {"style_preset": "nature", "palette_preset": "mono"}),
-        ("stacked_curve", ftir_path, {"reverse_x": True, "style_preset": "default", "palette_preset": "materials_warm"}),
-        ("segmented_stacked_curve", wide_nmr_path, {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True, "style_preset": "nature", "palette_preset": "okabe_ito"}),
+        (
+            "stacked_curve",
+            ftir_path,
+            {"reverse_x": True, "style_preset": "default", "palette_preset": "materials_warm"},
+        ),
+        (
+            "segmented_stacked_curve",
+            wide_nmr_path,
+            {
+                "reverse_x": True,
+                "baseline": "linear_endpoints",
+                "use_sidecar": True,
+                "style_preset": "nature",
+                "palette_preset": "okabe_ito",
+            },
+        ),
         ("heatmap", heatmap_path, {"style_preset": "default", "palette_preset": "materials_warm"}),
     ]
 
@@ -1138,8 +1241,12 @@ def _assert_frequency_batch_sync(freq_path: Path) -> None:
         renderer = fig.canvas.get_renderer()
         axes_bbox = ax.get_window_extent(renderer=renderer)
         legend_bbox = legend.get_window_extent(renderer=renderer)
-        right_insets.append(min(abs(axes_bbox.x1 - legend_bbox.x1), abs(legend_bbox.x0 - axes_bbox.x0)) / axes_bbox.width)
-        top_bottom_insets.append(min(abs(axes_bbox.y1 - legend_bbox.y1), abs(legend_bbox.y0 - axes_bbox.y0)) / axes_bbox.height)
+        right_insets.append(
+            min(abs(axes_bbox.x1 - legend_bbox.x1), abs(legend_bbox.x0 - axes_bbox.x0)) / axes_bbox.width
+        )
+        top_bottom_insets.append(
+            min(abs(axes_bbox.y1 - legend_bbox.y1), abs(legend_bbox.y0 - axes_bbox.y0)) / axes_bbox.height
+        )
         plt.close(fig)
 
     if any(not np.allclose(bounds, xlims[0]) for bounds in xlims[1:]):
@@ -1292,9 +1399,13 @@ def _assert_tensile_preprocess_workflow(
     except ValueError as exc:
         message = str(exc)
         if "没有成功解析任何拉伸 CSV" not in message:
-            raise AssertionError("All-invalid tensile preprocess should fail with a user-facing aggregate error.") from exc
+            raise AssertionError(
+                "All-invalid tensile preprocess should fail with a user-facing aggregate error."
+            ) from exc
         if failed_case_output.exists():
-            raise AssertionError("All-invalid tensile preprocess should not leave behind an empty workbook.")
+            raise AssertionError(
+                "All-invalid tensile preprocess should not leave behind an empty workbook."
+            ) from exc
         reports.append(
             {
                 "case_id": "all_invalid",
@@ -1322,27 +1433,28 @@ def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
     if any(not path.exists() for path in graph_paths):
         raise AssertionError("Composer smoke test requires rendered graph PDFs to exist.")
 
-    project = ComposerProject()
-    graph_panels = three_up_panels_from_paths(graph_paths)
-    project.panels = graph_panels
+    project = three_up_panels_from_paths(graph_paths)
     ok, reason = validate_non_overlapping_panels(project)
     if not ok:
         raise AssertionError(f"Three-up composer layout should be valid: {reason}")
-    if [round(panel.x_mm, 1) for panel in graph_panels] != [0.0, 60.0, 120.0]:
+    if [round(panel.x_mm, 1) for panel in project.panels] != [0.0, 60.0, 120.0]:
         raise AssertionError("Three-up composer layout should snap graph panels to 0/60/120 mm.")
-    if any(panel.kind != "graph" for panel in graph_panels):
+    if any(panel.kind != "graph" for panel in project.panels):
         raise AssertionError("Three-up composer layout should create graph panels only.")
+    if len(project.regions) != 3:
+        raise AssertionError("Three-up composer layout should create one region per graph panel.")
 
-    editorial_project = ComposerProject()
-    editorial_panels = two_up_editorial_panels_from_paths(graph_paths[:2])
-    editorial_project.panels = editorial_panels
+    editorial_project = two_up_editorial_panels_from_paths(graph_paths[:2])
     ok, reason = validate_non_overlapping_panels(editorial_project)
     if not ok:
         raise AssertionError(f"Two-up editorial composer layout should be valid: {reason}")
+    editorial_panels = editorial_project.panels
     if [round(panel.x_mm, 1) for panel in editorial_panels] != [0.0, 60.0]:
         raise AssertionError("Two-up editorial layout should snap graph panels to 0/60 mm.")
     if len(editorial_panels) != 2 or any(panel.kind != "graph" for panel in editorial_panels):
         raise AssertionError("Two-up editorial layout should create exactly two graph panels.")
+    if len([region for region in editorial_project.regions if region.kind == "free"]) != 1:
+        raise AssertionError("Two-up editorial layout should create one free editorial region.")
 
     asset_paths = [
         outputs_dir / "heatmap" / "heatmap_heatmap.pdf",
@@ -1350,13 +1462,12 @@ def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
     ]
     if any(not path.exists() for path in asset_paths):
         raise AssertionError("Composer smoke test requires asset-import PDFs to exist.")
-    imported_asset_panels = import_panels_from_paths(project, asset_paths, kind="asset")
-    if len(imported_asset_panels) != len(project.panels) + len(asset_paths):
+    project = import_panels_from_paths(project, asset_paths, kind="asset")
+    if len(project.panels) != 3 + len(asset_paths):
         raise AssertionError("Asset import should append one panel per imported file.")
-    if any(panel.kind != "asset" for panel in imported_asset_panels[-len(asset_paths) :]):
+    if any(panel.kind != "asset" for panel in project.panels[-len(asset_paths) :]):
         raise AssertionError("PDF asset import should preserve asset kind for composer panels.")
 
-    project.panels = imported_asset_panels
     project.texts = [
         ComposerText(
             id="text-1",
@@ -1365,6 +1476,7 @@ def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
             y_mm=160.0,
             font_size_pt=9.0,
             align="left",
+            z_index=len(project.panels),
         )
     ]
 
@@ -1481,7 +1593,7 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:
         if len(points) < 2:
             return points
         dense = [points[:1]]
-        for start, end in zip(points[:-1], points[1:]):
+        for start, end in zip(points[:-1], points[1:], strict=True):
             delta = end - start
             steps = max(int(np.ceil(max(abs(delta[0]), abs(delta[1])) / max_step_px)), 1)
             if steps == 1:
@@ -1531,7 +1643,7 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:
 
     renderer = fig.canvas.get_renderer()
     bboxes = [text.get_window_extent(renderer=renderer).expanded(1.01, 1.03) for text in text_items]
-    for text, bbox in zip(text_items, bboxes):
+    for text, bbox in zip(text_items, bboxes, strict=True):
         axis = text.axes
         axis_bbox = axis.get_window_extent(renderer=renderer)
         if bbox.x0 < axis_bbox.x0 or bbox.x1 > axis_bbox.x1 or bbox.y0 < axis_bbox.y0 or bbox.y1 > axis_bbox.y1:
@@ -1541,7 +1653,7 @@ def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:
             if bbox.overlaps(other):
                 raise AssertionError("wide_nmr sample labels should not overlap each other.")
 
-    for text, bbox in zip(text_items, bboxes):
+    for text, bbox in zip(text_items, bboxes, strict=True):
         axis = text.axes
         for line in axis.lines:
             x = np.asarray(line.get_xdata(), dtype=float)
@@ -1592,7 +1704,7 @@ def _assert_stacked_series_clearance(
         spans = [float(np.nanmax(arr) - np.nanmin(arr)) for arr in line_arrays]
         max_span = max(spans) if spans else 0.0
         min_clearance = max(max_span * 0.03, 1e-9)
-        for lower, upper in zip(line_arrays, line_arrays[1:]):
+        for lower, upper in zip(line_arrays, line_arrays[1:], strict=False):
             lower_peak = float(np.nanmax(lower))
             upper_baseline = float(np.nanmin(upper))
             if upper_baseline - lower_peak <= min_clearance:
@@ -1626,7 +1738,7 @@ def _write_smoke_report(
 ) -> Path:
     contract = load_plot_contract()
     payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "contract_version": contract.version,
         "summary": {
             "pdf_count": len(output_reports),
@@ -1703,7 +1815,11 @@ def main() -> int:
             ("scatter", tensile_path, {}),
             ("stacked_curve", ftir_path, {"reverse_x": True}),
             ("stacked_curve", nmr_path, {"reverse_x": True, "baseline": "linear_endpoints"}),
-            ("segmented_stacked_curve", wide_nmr_path, {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True}),
+            (
+                "segmented_stacked_curve",
+                wide_nmr_path,
+                {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True},
+            ),
             ("stacked_curve", xrd_path, {}),
             ("stacked_curve", dsc_path, {"baseline": "linear_endpoints"}),
             ("curve", tga_path, {}),

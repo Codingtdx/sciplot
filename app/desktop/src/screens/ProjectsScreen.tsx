@@ -185,7 +185,7 @@ export function ProjectsScreen({
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>4.x 项目观</h3>
+              <h3>5.0 项目观</h3>
               <p>项目页现在已经不只是说明页，而是承担“最近项目恢复”和“双工作流切换”的入口。</p>
             </div>
           </div>

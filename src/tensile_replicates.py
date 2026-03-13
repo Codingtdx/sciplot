@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
 import os
 import re
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
-
 
 RAW_CSV_ENCODINGS = (
     "gb18030",
@@ -369,7 +368,7 @@ def _workbook_sheets(
         ),
         (
             ALL_CURVES_SHEET,
-            _curve_table_dataframe(((_sample_name(sample), sample.curve) for sample in samples)),
+            _curve_table_dataframe((_sample_name(sample), sample.curve) for sample in samples),
         ),
         (
             SUMMARY_SHEET,

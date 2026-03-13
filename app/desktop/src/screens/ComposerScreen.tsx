@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { flushSync } from "react-dom";
+import { useShallow } from "zustand/react/shallow";
 
 import { ComposerCanvas } from "../components/ComposerCanvas";
 import {
@@ -11,13 +13,37 @@ import {
   twoUpEditorial,
 } from "../lib/api";
 import {
+  alignDrawables,
+  buildComposerClipboard,
   composerLayerTitle,
   describePanelSlot,
+  duplicateComposerSelection,
+  distributeDrawables,
+  editableSelectionIds,
+  findRegion,
+  mergeCellsIntoFreeRegion,
+  moveGraphSelectionByCells,
+  moveRegion,
+  nextTextId,
+  nextZIndex,
+  nudgeDrawables,
+  placeDrawableInRect,
+  normalizeComposerProject,
+  orderDrawables,
+  pasteComposerClipboard,
+  regionRect,
+  regionSlotId,
+  regionSlotRect,
+  removeRegion,
+  reorderDrawable,
   resolveSelectedPanelLabel,
+  selectedRegionIdsForObjects,
+  type ComposerClipboard,
 } from "../lib/composer";
 import { loadComposerProjectFile } from "../lib/project-io";
+import type { ComposerPanel, ComposerProject, ComposerText } from "../lib/types";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
-import { getErrorMessage, orderPanels, toDialogPaths } from "../lib/workbench";
+import { getErrorMessage, toDialogPaths } from "../lib/workbench";
 import { useComposerPreview } from "./composer/useComposerPreview";
 import { usePanelThumbnails } from "./composer/usePanelThumbnails";
 
@@ -30,6 +56,8 @@ const RASTER_EXTENSIONS = new Set([
   ".tif",
   ".tiff",
 ]);
+
+type CellRef = { col: number; row: number };
 
 function isPdfPath(path: string): boolean {
   return path.toLowerCase().endsWith(".pdf");
@@ -51,8 +79,105 @@ function describeSkippedFiles(paths: string[]): string | null {
   return `已跳过不支持的文件: ${leaves.join("、")}。`;
 }
 
+function centerObjectInRect<T extends { x_mm: number; y_mm: number; w_mm?: number; h_mm?: number }>(
+  target: T,
+  rect: { x_mm: number; y_mm: number; w_mm: number; h_mm: number },
+) {
+  const width = "w_mm" in target ? target.w_mm ?? 0 : 0;
+  const height = "h_mm" in target ? target.h_mm ?? 0 : 0;
+  return {
+    ...target,
+    x_mm: rect.x_mm + (rect.w_mm - width) / 2,
+    y_mm: rect.y_mm + (rect.h_mm - height) / 2,
+  };
+}
+
+function fitPanelToRect(
+  panel: ComposerPanel,
+  rect: { x_mm: number; y_mm: number; w_mm: number; h_mm: number },
+) {
+  return {
+    ...panel,
+    x_mm: rect.x_mm,
+    y_mm: rect.y_mm,
+    w_mm: rect.w_mm,
+    h_mm: rect.h_mm,
+  };
+}
+
+function boundRectForDrawable(
+  project: ComposerProject,
+  drawable: ComposerPanel | ComposerText,
+) {
+  if (!drawable.region_id) {
+    return null;
+  }
+  const region = findRegion(project, drawable.region_id);
+  if (!region) {
+    return null;
+  }
+  return drawable.slot_id ? regionSlotRect(project, region) : regionRect(project, region);
+}
+
+function bindingValueForDrawable(drawable: ComposerPanel | ComposerText) {
+  if (drawable.slot_id && drawable.region_id) {
+    return `slot:${drawable.region_id}`;
+  }
+  if (drawable.region_id) {
+    return `region:${drawable.region_id}`;
+  }
+  return "none";
+}
+
+function uniqueCells(cells: CellRef[]) {
+  return Array.from(new Map(cells.map((cell) => [`${cell.col}:${cell.row}`, cell])).values());
+}
+
+function snapImportedAssetsIntoRegion(
+  previousProject: ComposerProject,
+  nextProject: ComposerProject,
+  regionId: string,
+) {
+  const region = findRegion(nextProject, regionId);
+  if (!region || region.kind !== "free") {
+    return nextProject;
+  }
+  const rect = regionRect(nextProject, region);
+  const existingIds = new Set(previousProject.panels.map((panel) => panel.id));
+  let offset = 0;
+  return normalizeComposerProject({
+    ...nextProject,
+    panels: nextProject.panels.map((panel) => {
+      if (panel.kind !== "asset" || existingIds.has(panel.id)) {
+        return panel;
+      }
+      const centered = centerObjectInRect(panel, rect);
+      const placed = {
+        ...centered,
+        x_mm: centered.x_mm + offset,
+        y_mm: centered.y_mm + offset,
+        region_id: region.id,
+        slot_id: null,
+      };
+      offset += 2;
+      return placed;
+    }),
+  });
+}
+
 export function ComposerScreen() {
-  const composer = useComposerStore();
+  const composer = useComposerStore(
+    useShallow((state) => ({
+      project: state.project,
+      selectedId: state.selectedId,
+      setPreview: state.setPreview,
+      setProject: state.setProject,
+      setSelectedId: state.setSelectedId,
+      updatePanels: state.updatePanels,
+      updateTexts: state.updateTexts,
+      validationError: state.validationError,
+    })),
+  );
   const pdfImportMode = useWorkbenchStore((state) => state.pdfImportMode);
   const setPdfImportMode = useWorkbenchStore((state) => state.setPdfImportMode);
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
@@ -60,35 +185,99 @@ export function ComposerScreen() {
   const [exportPath, setExportPath] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
+  const [selectedCells, setSelectedCells] = useState<CellRef[]>([]);
+  const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
+  const [clipboardReady, setClipboardReady] = useState(false);
   const projectRef = useRef(composer.project);
+  const selectedRegionRef = useRef<string | null>(null);
+  const clipboardRef = useRef<ComposerClipboard | null>(null);
   const thumbnailMap = usePanelThumbnails(composer.project.panels);
 
-  const selectedPanel = composer.project.panels.find((item) => item.id === composer.selectedId) ?? null;
-  const selectedText = composer.project.texts.find((item) => item.id === composer.selectedId) ?? null;
+  const primaryObjectId = selectedObjectIds.length === 1 ? selectedObjectIds[0] : null;
+  const selectedPanel = composer.project.panels.find((item) => item.id === primaryObjectId) ?? null;
+  const selectedText = composer.project.texts.find((item) => item.id === primaryObjectId) ?? null;
+  const selectedRegion =
+    selectedObjectIds.length === 0
+      ? composer.project.regions.find((item) => item.id === composer.selectedId) ?? null
+      : null;
   const selectedPanelLabel = selectedPanel
     ? resolveSelectedPanelLabel(composer.project, selectedPanel)
     : "";
+  const selectedEditableIds = useMemo(
+    () => editableSelectionIds(composer.project, selectedObjectIds),
+    [composer.project, selectedObjectIds],
+  );
+  const hasSelection = Boolean(selectedRegion) || selectedObjectIds.length > 0;
+  const canCopySelection = hasSelection;
+  const canPasteSelection = clipboardReady;
+  const selectedHighlightRegionIds = useMemo(
+    () => [
+      ...(selectedRegion ? [selectedRegion.id] : []),
+      ...selectedRegionIdsForObjects(composer.project, selectedObjectIds),
+    ],
+    [composer.project, selectedObjectIds, selectedRegion],
+  );
+  const multiSelectedItems = useMemo(
+    () =>
+      selectedObjectIds
+        .map((id) => composer.project.panels.find((item) => item.id === id) ?? composer.project.texts.find((item) => item.id === id) ?? null)
+        .filter(Boolean),
+    [composer.project.panels, composer.project.texts, selectedObjectIds],
+  );
 
-  const orderedPanels = orderPanels(composer.project.panels);
-  const layerItems = [
-    ...orderedPanels.map((panel) => ({
-      id: panel.id,
-      title: composerLayerTitle(composer.project, panel),
-      detail:
-        panel.kind === "graph"
-          ? `Graph · ${describePanelSlot(panel, composer.project.canvas_height_mm)}`
-          : `Asset · ${panel.w_mm.toFixed(1)} x ${panel.h_mm.toFixed(1)} mm`,
-    })),
-    ...composer.project.texts.map((text) => ({
-      id: text.id,
-      title: text.text || "Text",
-      detail: `Text · ${text.font_size_pt} pt`,
-    })),
-  ];
+  const freeRegions = useMemo(
+    () => composer.project.regions.filter((region) => region.kind === "free"),
+    [composer.project.regions],
+  );
+  const slotRegions = useMemo(
+    () => composer.project.regions.filter((region) => region.slot_kind === "structure"),
+    [composer.project.regions],
+  );
+
+  const orderedDrawables = useMemo(() => orderDrawables(composer.project), [composer.project]);
+  const layerItems = useMemo(
+    () => [
+      ...composer.project.regions.map((region) => ({
+        id: region.id,
+        type: "region" as const,
+        title: region.kind === "graph" ? `Graph Region ${region.id}` : region.label || `Free Region ${region.id}`,
+        detail:
+          region.kind === "graph"
+            ? `${region.col_span} x ${region.row_span} grid${region.locked ? " · Locked" : ""}`
+            : `Free ${region.col_span} x ${region.row_span} region${region.locked ? " · Locked" : ""}`,
+      })),
+      ...orderedDrawables.map((item) => {
+        if (item.type === "panel") {
+          const panel = composer.project.panels.find((entry) => entry.id === item.id)!;
+          return {
+            id: panel.id,
+            type: "panel" as const,
+            title: composerLayerTitle(composer.project, panel),
+            detail:
+              panel.kind === "graph"
+                ? `Graph · ${describePanelSlot(panel, composer.project)}${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`
+                : `Asset · ${panel.w_mm.toFixed(1)} x ${panel.h_mm.toFixed(1)} mm${panel.hidden ? " · Hidden" : ""}${panel.locked ? " · Locked" : ""}`,
+          };
+        }
+        const text = composer.project.texts.find((entry) => entry.id === item.id)!;
+        return {
+          id: text.id,
+          type: "text" as const,
+          title: text.text || "Text",
+          detail: `Text · ${text.font_size_pt} pt${text.hidden ? " · Hidden" : ""}${text.locked ? " · Locked" : ""}`,
+        };
+      }),
+    ],
+    [composer.project, orderedDrawables],
+  );
 
   useEffect(() => {
     projectRef.current = composer.project;
   }, [composer.project]);
+
+  useEffect(() => {
+    selectedRegionRef.current = selectedRegion?.kind === "free" ? selectedRegion.id : null;
+  }, [selectedRegion]);
 
   useEffect(() => {
     setExportPath(null);
@@ -123,30 +312,27 @@ export function ComposerScreen() {
       try {
         let nextProject = projectRef.current;
         if (pdfs.length > 0) {
-          const response = await importComposerPanels(nextProject, pdfs, pdfImportMode);
-          nextProject = {
-            ...nextProject,
-            panels: response.panels,
-          };
+          nextProject = await importComposerPanels(nextProject, pdfs, pdfImportMode);
         }
         if (rasters.length > 0) {
-          const response = await importComposerPanels(nextProject, rasters, "asset");
-          nextProject = {
-            ...nextProject,
-            panels: response.panels,
-          };
+          const beforeRasters = nextProject;
+          nextProject = await importComposerPanels(nextProject, rasters, "asset");
+          if (selectedRegionRef.current) {
+            nextProject = snapImportedAssetsIntoRegion(beforeRasters, nextProject, selectedRegionRef.current);
+          }
         }
 
-        composer.setProject(nextProject);
+        composer.setProject(normalizeComposerProject(nextProject));
         composer.setSelectedId(null);
+        setSelectedCells([]);
 
         const skippedNotice = describeSkippedFiles(unsupported);
         if (pdfs.length > 0 && rasters.length > 0) {
           setDropNotice(
             [
               pdfImportMode === "graph"
-                ? "已导入图 panel 和素材。PDF 已自动吸附到网格。"
-                : "已导入 PDF 素材和图片素材。素材可以继续拖拽、缩放和对齐。",
+                ? "已导入图容器和自由素材。Graph PDF 会自动占据标准网格区域。"
+                : "已导入 PDF 素材和图片素材。素材可以继续自由布局、裁边和叠放。",
               skippedNotice,
             ]
               .filter(Boolean)
@@ -156,8 +342,8 @@ export function ComposerScreen() {
           setDropNotice(
             [
               pdfImportMode === "graph"
-                ? "已导入图 panel。PDF 已自动吸附到 3x3 网格。"
-                : "已导入 PDF 素材。可以继续拖拽、缩放和对齐。",
+                ? "已导入 graph PDF，并自动占据对应区域。"
+                : "已导入 PDF 素材，可继续自由布局。",
               skippedNotice,
             ]
               .filter(Boolean)
@@ -165,7 +351,7 @@ export function ComposerScreen() {
           );
         } else if (rasters.length > 0) {
           setDropNotice(
-            ["已导入素材。可以继续拖拽、缩放和对齐。", skippedNotice]
+            ["已导入自由素材，可继续裁边、吸附和叠放。", skippedNotice]
               .filter(Boolean)
               .join(" "),
           );
@@ -207,7 +393,7 @@ export function ComposerScreen() {
       setDropActive(false);
       void unlisten?.();
     };
-  }, [pdfImportMode]);
+  }, [composer, pdfImportMode]);
 
   const runComposerTask = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -219,6 +405,13 @@ export function ComposerScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const applyImportedProject = (nextProject: ComposerProject) => {
+    composer.setProject(normalizeComposerProject(nextProject));
+    composer.setSelectedId(null);
+    setSelectedCells([]);
+    setSelectedObjectIds([]);
   };
 
   const importGraphPanels = async () => {
@@ -233,11 +426,8 @@ export function ComposerScreen() {
 
     await runComposerTask(async () => {
       const response = await importComposerPanels(composer.project, paths, "graph");
-      composer.setProject({
-        ...composer.project,
-        panels: response.panels,
-      });
-      composer.setSelectedId(null);
+      applyImportedProject(response);
+      setDropNotice("Graph PDF 已按尺寸自动占据 60x55 基础网格。");
     });
   };
 
@@ -258,11 +448,12 @@ export function ComposerScreen() {
 
     await runComposerTask(async () => {
       const response = await importComposerPanels(composer.project, paths, "asset");
-      composer.setProject({
-        ...composer.project,
-        panels: response.panels,
-      });
-      composer.setSelectedId(null);
+      const nextProject =
+        selectedRegion?.kind === "free"
+          ? snapImportedAssetsIntoRegion(composer.project, response, selectedRegion.id)
+          : response;
+      applyImportedProject(nextProject);
+      setDropNotice("素材已导入，可自由布局、裁边和覆盖 graph。");
     });
   };
 
@@ -278,13 +469,8 @@ export function ComposerScreen() {
 
     await runComposerTask(async () => {
       const response = await threeUp(paths);
-      composer.setProject({
-        ...composer.project,
-        panels: response.panels,
-        texts: [],
-      });
-      composer.setSelectedId(null);
-      setDropNotice("已按 180 mm 画布生成三联图排版。");
+      applyImportedProject(response);
+      setDropNotice("已按 region-based 三联图预设排版。");
     });
   };
 
@@ -300,13 +486,8 @@ export function ComposerScreen() {
 
     await runComposerTask(async () => {
       const response = await twoUpEditorial(paths);
-      composer.setProject({
-        ...composer.project,
-        panels: response.panels,
-        texts: [],
-      });
-      composer.setSelectedId(null);
-      setDropNotice("已按 180 mm 画布生成两图 + 说明区排版。");
+      applyImportedProject(response);
+      setDropNotice("已生成两图 + 自由说明区预设。");
     });
   };
 
@@ -314,22 +495,43 @@ export function ComposerScreen() {
     composer.updateTexts([
       ...composer.project.texts,
       {
-        id: `text-${Date.now()}`,
+        id: nextTextId(composer.project),
         text: "Text",
         x_mm: 8,
         y_mm: 8,
         font_size_pt: 8,
         align: "left",
+        z_index: nextZIndex(composer.project),
+        region_id: null,
+        slot_id: null,
       },
     ]);
+    composer.setSelectedId(null);
+    setSelectedObjectIds([]);
   };
 
-  const updateSelectedPanel = (patch: Partial<typeof composer.project.panels[number]>) => {
+  const setProject = (project: ComposerProject) => {
+    composer.setProject(normalizeComposerProject(project));
+  };
+
+  const applyPasteResult = (result: {
+    project: ComposerProject;
+    selectedId: string | null;
+    selectedObjectIds: string[];
+  }) => {
+    setProject(result.project);
+    setSelectedCells([]);
+    setSelectedObjectIds(result.selectedObjectIds);
+    composer.setSelectedId(result.selectedId);
+  };
+
+  const updateSelectedPanel = (patch: Partial<ComposerPanel>) => {
     if (!selectedPanel) {
       return;
     }
-    composer.updatePanels(
-      composer.project.panels.map((item) =>
+    setProject({
+      ...composer.project,
+      panels: composer.project.panels.map((item) =>
         item.id === selectedPanel.id
           ? {
               ...item,
@@ -337,15 +539,16 @@ export function ComposerScreen() {
             }
           : item,
       ),
-    );
+    });
   };
 
-  const updateSelectedText = (patch: Partial<typeof composer.project.texts[number]>) => {
+  const updateSelectedText = (patch: Partial<ComposerText>) => {
     if (!selectedText) {
       return;
     }
-    composer.updateTexts(
-      composer.project.texts.map((item) =>
+    setProject({
+      ...composer.project,
+      texts: composer.project.texts.map((item) =>
         item.id === selectedText.id
           ? {
               ...item,
@@ -353,24 +556,234 @@ export function ComposerScreen() {
             }
           : item,
       ),
+    });
+  };
+
+  const mergeSelectedEmptyCells = () => {
+    try {
+      const next = mergeCellsIntoFreeRegion(composer.project, selectedCells);
+      setProject(next);
+      const newRegion = next.regions[next.regions.length - 1] ?? null;
+      if (newRegion) {
+        composer.setSelectedId(newRegion.id);
+      }
+      setSelectedCells([]);
+      setSelectedObjectIds([]);
+      setDropNotice("空白格已合并成自由布局区域。");
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+    }
+  };
+
+  const unmergeSelectedRegion = () => {
+    if (!selectedRegion || selectedRegion.kind !== "free") {
+      return;
+    }
+    setProject(removeRegion(composer.project, selectedRegion.id));
+    composer.setSelectedId(null);
+    setSelectedObjectIds([]);
+    setDropNotice("自由区域已拆回单格。");
+  };
+
+  const applyBinding = (value: string) => {
+    const targetRect =
+      value === "none"
+        ? null
+        : value.startsWith("slot:")
+          ? regionSlotRect(composer.project, findRegion(composer.project, value.slice(5))!)
+          : regionRect(composer.project, findRegion(composer.project, value.slice(7))!);
+
+    if (selectedPanel) {
+      if (value === "none") {
+        updateSelectedPanel({ region_id: null, slot_id: null });
+        return;
+      }
+      if (!targetRect) {
+        return;
+      }
+      updateSelectedPanel({
+        ...centerObjectInRect(selectedPanel, targetRect),
+        region_id: value.startsWith("slot:") ? value.slice(5) : value.slice(7),
+        slot_id: value.startsWith("slot:")
+          ? regionSlotId(findRegion(composer.project, value.slice(5))!)
+          : null,
+      });
+      return;
+    }
+    if (selectedText) {
+      if (value === "none") {
+        updateSelectedText({ region_id: null, slot_id: null });
+        return;
+      }
+      if (!targetRect) {
+        return;
+      }
+      updateSelectedText({
+        ...centerObjectInRect(selectedText, targetRect),
+        region_id: value.startsWith("slot:") ? value.slice(5) : value.slice(7),
+        slot_id: value.startsWith("slot:")
+          ? regionSlotId(findRegion(composer.project, value.slice(5))!)
+          : null,
+      });
+    }
+  };
+
+  const fitSelectedPanelToBinding = () => {
+    if (!selectedPanel) {
+      return;
+    }
+    const region =
+      selectedPanel.region_id != null
+        ? findRegion(composer.project, selectedPanel.region_id)
+        : null;
+    if (!region) {
+      return;
+    }
+    const targetRect = selectedPanel.slot_id
+      ? regionSlotRect(composer.project, region)
+      : regionRect(composer.project, region);
+    if (!targetRect) {
+      return;
+    }
+    updateSelectedPanel(fitPanelToRect(selectedPanel, targetRect));
+  };
+
+  const placeSelectedDrawableInBinding = (
+    mode: "top" | "middle" | "bottom" | "center" | "left" | "hcenter" | "right",
+  ) => {
+    if (selectedPanel) {
+      const targetRect = boundRectForDrawable(composer.project, selectedPanel);
+      if (!targetRect) {
+        return;
+      }
+      setProject(placeDrawableInRect(composer.project, selectedPanel.id, targetRect, mode));
+      return;
+    }
+    if (selectedText) {
+      const targetRect = boundRectForDrawable(composer.project, selectedText);
+      if (!targetRect) {
+        return;
+      }
+      setProject(placeDrawableInRect(composer.project, selectedText.id, targetRect, mode));
+    }
+  };
+
+  const copySelection = () => {
+    const clipboard = buildComposerClipboard(
+      composer.project,
+      selectedRegion?.id ?? null,
+      selectedObjectIds,
     );
+    if (!clipboard) {
+      return;
+    }
+    clipboardRef.current = clipboard;
+    setClipboardReady(true);
+    setDropNotice("已复制当前选中对象，可继续粘贴或重复。");
+  };
+
+  const pasteSelection = () => {
+    if (!clipboardRef.current) {
+      return;
+    }
+    try {
+      applyPasteResult(pasteComposerClipboard(composer.project, clipboardRef.current));
+      setDropNotice("已粘贴对象副本。");
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+    }
+  };
+
+  const duplicateSelection = () => {
+    if (!hasSelection) {
+      return;
+    }
+    try {
+      applyPasteResult(
+        duplicateComposerSelection(composer.project, selectedRegion?.id ?? null, selectedObjectIds),
+      );
+      setDropNotice("已创建选中对象副本。");
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+    }
+  };
+
+  const duplicateDrawableForDrag = (id: string) => {
+    try {
+      const result = duplicateComposerSelection(composer.project, null, [id], {
+        freeOffsetMm: 0,
+      });
+      flushSync(() => {
+        applyPasteResult(result);
+      });
+      return result.selectedObjectIds[0] ?? null;
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+      return null;
+    }
   };
 
   const removeSelected = () => {
-    if (selectedPanel) {
-      composer.updatePanels(composer.project.panels.filter((item) => item.id !== selectedPanel.id));
+    if (selectedObjectIds.length > 1) {
+      let nextProject = composer.project;
+      for (const id of selectedObjectIds) {
+        const panel = nextProject.panels.find((item) => item.id === id);
+        if (panel) {
+          if (panel.kind === "graph" && panel.region_id) {
+            const withoutRegion = removeRegion(nextProject, panel.region_id);
+            nextProject = normalizeComposerProject({
+              ...withoutRegion,
+              panels: withoutRegion.panels.filter((item) => item.id !== panel.id),
+            });
+          } else {
+            nextProject = normalizeComposerProject({
+              ...nextProject,
+              panels: nextProject.panels.filter((item) => item.id !== panel.id),
+            });
+          }
+          continue;
+        }
+        nextProject = normalizeComposerProject({
+          ...nextProject,
+          texts: nextProject.texts.filter((item) => item.id !== id),
+        });
+      }
+      setProject(nextProject);
+      setSelectedObjectIds([]);
       composer.setSelectedId(null);
+      return;
+    }
+
+    if (selectedRegion) {
+      if (selectedRegion.kind === "free") {
+        unmergeSelectedRegion();
+      }
+      return;
+    }
+    if (selectedPanel) {
+      if (selectedPanel.kind === "graph" && selectedPanel.region_id) {
+        const nextProject = removeRegion(composer.project, selectedPanel.region_id);
+        setProject({
+          ...nextProject,
+          panels: nextProject.panels.filter((item) => item.id !== selectedPanel.id),
+        });
+      } else {
+        composer.updatePanels(composer.project.panels.filter((item) => item.id !== selectedPanel.id));
+      }
+      composer.setSelectedId(null);
+      setSelectedObjectIds([]);
       return;
     }
     if (selectedText) {
       composer.updateTexts(composer.project.texts.filter((item) => item.id !== selectedText.id));
       composer.setSelectedId(null);
+      setSelectedObjectIds([]);
     }
   };
 
   const saveComposerProject = async () => {
     const destination = await save({
-      defaultPath: "codegod-composer.plotproject.json",
+      defaultPath: "codegod-composer-v2.plotproject.json",
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
     const path = toDialogPaths(destination, 1)[0];
@@ -380,7 +793,7 @@ export function ComposerScreen() {
 
     await runComposerTask(async () => {
       await saveProject(path, {
-        version: 1,
+        version: 2,
         mode: "composer",
         project: composer.project,
       });
@@ -389,9 +802,9 @@ export function ComposerScreen() {
         kind: "project",
         path,
         title: path.split(/[/\\]/).pop() ?? path,
-        detail: `已保存拼图项目 · ${composer.project.panels.length} 个 panel`,
+        detail: `Composer v2 项目 · ${composer.project.panels.length} 个对象`,
       });
-      setDropNotice("拼图项目已保存。");
+      setDropNotice("Composer v2 项目已保存。");
     });
   };
 
@@ -412,9 +825,12 @@ export function ComposerScreen() {
         kind: "project",
         path,
         title: path.split(/[/\\]/).pop() ?? path,
-        detail: `拼图项目 · ${project.panels.length} 个 panel / ${project.texts.length} 段文字`,
+        detail: `Composer v2 项目 · ${project.panels.length} 个对象 / ${project.regions.length} 个区域`,
       });
-      setDropNotice("项目已加载，可以继续调整拼图。");
+      setDropNotice("项目已加载，可以继续区域化排版。");
+      setSelectedCells([]);
+      setSelectedObjectIds([]);
+      composer.setSelectedId(null);
     });
   };
 
@@ -422,8 +838,192 @@ export function ComposerScreen() {
     await runComposerTask(async () => {
       const response = await composeExport(composer.project);
       setExportPath(response.output_path);
+      setDropNotice("已导出 Illustrator 友好的可编辑 PDF。");
     });
   };
+
+  const changeLayer = (action: "forward" | "backward" | "front" | "back") => {
+    if (selectedPanel) {
+      setProject(reorderDrawable(composer.project, selectedPanel.id, "panel", action));
+      return;
+    }
+    if (selectedText) {
+      setProject(reorderDrawable(composer.project, selectedText.id, "text", action));
+    }
+  };
+
+  const cropValue = selectedPanel?.crop_rect ?? { x: 0, y: 0, width: 1, height: 1 };
+  const selectedDrawableBinding = selectedPanel
+    ? bindingValueForDrawable(selectedPanel)
+    : selectedText
+      ? bindingValueForDrawable(selectedText)
+      : "none";
+
+  const selectComposerItem = (id: string | null, additive = false) => {
+    if (id == null) {
+      composer.setSelectedId(null);
+      setSelectedCells([]);
+      setSelectedObjectIds([]);
+      return;
+    }
+
+    const region = composer.project.regions.find((item) => item.id === id);
+    if (region) {
+      composer.setSelectedId(region.id);
+      setSelectedCells([]);
+      setSelectedObjectIds([]);
+      return;
+    }
+
+    setSelectedCells([]);
+    if (!additive) {
+      composer.setSelectedId(id);
+      setSelectedObjectIds([id]);
+      return;
+    }
+
+    const next = selectedObjectIds.includes(id)
+      ? selectedObjectIds.filter((item) => item !== id)
+      : [...selectedObjectIds, id];
+    setSelectedObjectIds(next);
+    composer.setSelectedId(next.length > 0 ? next[next.length - 1] : null);
+  };
+
+  const selectComposerObjects = (ids: string[], additive = false) => {
+    const known = ids.filter(
+      (id) =>
+        composer.project.panels.some((item) => item.id === id) ||
+        composer.project.texts.some((item) => item.id === id),
+    );
+
+    if (known.length === 0) {
+      if (!additive) {
+        selectComposerItem(null);
+      }
+      return;
+    }
+
+    setSelectedCells([]);
+    if (!additive) {
+      setSelectedObjectIds(known);
+      composer.setSelectedId(known[known.length - 1] ?? null);
+      return;
+    }
+
+    const merged = Array.from(new Set([...selectedObjectIds, ...known]));
+    setSelectedObjectIds(merged);
+    composer.setSelectedId(merged[merged.length - 1] ?? null);
+  };
+
+  const runAlignment = (mode: Parameters<typeof alignDrawables>[2]) => {
+    setProject(alignDrawables(composer.project, selectedObjectIds, mode));
+  };
+
+  const runDistribution = (axis: Parameters<typeof distributeDrawables>[2]) => {
+    setProject(distributeDrawables(composer.project, selectedObjectIds, axis));
+  };
+
+  useEffect(() => {
+    function handleKeydown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName ?? "";
+      if (
+        target?.isContentEditable ||
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        selectComposerItem(null);
+        return;
+      }
+
+      const shortcut = event.metaKey || event.ctrlKey;
+      const shortcutKey = event.key.toLowerCase();
+      if (shortcut && shortcutKey === "c" && canCopySelection) {
+        event.preventDefault();
+        copySelection();
+        return;
+      }
+      if (shortcut && shortcutKey === "v" && canPasteSelection) {
+        event.preventDefault();
+        pasteSelection();
+        return;
+      }
+      if (shortcut && shortcutKey === "d" && hasSelection) {
+        event.preventDefault();
+        duplicateSelection();
+        return;
+      }
+
+      if ((event.key === "Backspace" || event.key === "Delete") && (selectedObjectIds.length > 0 || selectedRegion)) {
+        event.preventDefault();
+        removeSelected();
+        return;
+      }
+
+      const deltaByKey: Record<string, { dx: number; dy: number }> = {
+        ArrowLeft: { dx: -1, dy: 0 },
+        ArrowRight: { dx: 1, dy: 0 },
+        ArrowUp: { dx: 0, dy: -1 },
+        ArrowDown: { dx: 0, dy: 1 },
+      };
+      const delta = deltaByKey[event.key];
+      if (!delta) {
+        return;
+      }
+
+      if (selectedObjectIds.length === 0) {
+        if (selectedRegion) {
+          event.preventDefault();
+          setProject(
+            moveRegion(
+              composer.project,
+              selectedRegion.id,
+              selectedRegion.col + delta.dx,
+              selectedRegion.row + delta.dy,
+            ),
+          );
+        }
+        return;
+      }
+
+      event.preventDefault();
+      const graphIds = selectedObjectIds.filter((id) =>
+        composer.project.panels.some((panel) => panel.id === id && panel.kind === "graph"),
+      );
+      const freeIds = selectedObjectIds.filter((id) => !graphIds.includes(id));
+
+      let nextProject = composer.project;
+      if (freeIds.length > 0) {
+        const step = event.shiftKey ? 2 : 0.5;
+        nextProject = nudgeDrawables(nextProject, freeIds, delta.dx * step, delta.dy * step);
+      }
+      if (graphIds.length > 0) {
+        nextProject = moveGraphSelectionByCells(nextProject, graphIds, delta.dx, delta.dy);
+      }
+      setProject(nextProject);
+    }
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => {
+      window.removeEventListener("keydown", handleKeydown);
+    };
+  }, [
+    canCopySelection,
+    canPasteSelection,
+    composer.project,
+    copySelection,
+    duplicateSelection,
+    hasSelection,
+    pasteSelection,
+    removeSelected,
+    selectedObjectIds,
+    selectedRegion,
+  ]);
 
   return (
     <div className="desk-layout">
@@ -431,21 +1031,19 @@ export function ComposerScreen() {
         <article className="work-card canvas-shell-card">
           <div className="section-head">
             <div>
-              <div className="card-kicker">Canvas Workspace</div>
-              <h2>画布是主角，操作条只保留高频动作</h2>
-              <p>导入、快速排版和导出放到画布上方，低频设置和对象细节交给右侧上下文面板。</p>
+              <div className="card-kicker">Composer V2</div>
+              <h2>区域化网格、自由对象、可编辑 PDF 导出</h2>
+              <p>Graph PDF 严格占据标准格区，其他素材和文字可自由覆盖，并带有智能吸附线、层级和裁边。</p>
             </div>
             <div className="metric-strip">
               <div className="metric-chip">
-                <span>画布</span>
-                <strong>
-                  {composer.project.canvas_width_mm} x {composer.project.canvas_height_mm} mm
-                </strong>
+                <span>布局区</span>
+                <strong>180 x 165 mm</strong>
               </div>
               <div className="metric-chip">
-                <span>对象</span>
+                <span>Region / 对象</span>
                 <strong>
-                  {composer.project.panels.length} / {composer.project.texts.length}
+                  {composer.project.regions.length} / {composer.project.panels.length + composer.project.texts.length}
                 </strong>
               </div>
             </div>
@@ -462,7 +1060,7 @@ export function ComposerScreen() {
               三联图
             </button>
             <button className="ghost-button" onClick={exportComposer} type="button">
-              导出总图
+              导出可编辑 PDF
             </button>
           </div>
 
@@ -472,32 +1070,35 @@ export function ComposerScreen() {
                 <strong>松开即可导入</strong>
                 <span>
                   {pdfImportMode === "graph"
-                    ? "PDF 会作为图 panel 吸附到 3x3 网格，图片会作为素材导入。"
-                    : "PDF 和图片都会作为素材导入，可拖拽、缩放并吸附到网格。"}
+                    ? "60x55 / 120x55 / 60x110 的 CodeGod PDF 会自动占格，其他 PDF 请切到素材模式。"
+                    : "PDF、图片都会作为自由素材导入，可裁边、吸附、叠放并导出为可编辑 PDF。"}
                 </span>
               </div>
             </div>
 
             <ComposerCanvas
-              autoLabels={composer.project.auto_labels}
-              heightMm={composer.project.canvas_height_mm}
-              onPanelsChange={composer.updatePanels}
-              onTextsChange={composer.updateTexts}
-              onSelect={composer.setSelectedId}
-              panels={composer.project.panels}
+              highlightRegionIds={selectedHighlightRegionIds}
+              project={composer.project}
+              selectedCells={selectedCells}
               selectedId={composer.selectedId}
-              texts={composer.project.texts}
+              selectedObjectIds={selectedObjectIds}
               thumbnails={thumbnailMap}
-              widthMm={composer.project.canvas_width_mm}
+              onDuplicateDrawableStart={duplicateDrawableForDrag}
+              onObjectSelection={selectComposerObjects}
+              onProjectChange={setProject}
+              onSelect={selectComposerItem}
+              onSelectedCellsChange={(cells) => {
+                setSelectedCells(uniqueCells(cells));
+                composer.setSelectedId(null);
+                setSelectedObjectIds([]);
+              }}
             />
 
             {composer.project.panels.length === 0 && !busy && (
               <div className="composer-empty-state">
                 <strong>先拖入图或素材开始拼图</strong>
                 <span>
-                  {pdfImportMode === "graph"
-                    ? "图 panel 会自动吸附到 3x3 网格；素材可自由缩放与移动。"
-                    : "当前模式会把 PDF 当作素材导入；素材可自由缩放、移动并自动避让。"}
+                  Graph PDF 会自动占据标准格区；其他 PDF、图片和文字都可以在格内自由布局，并保留可编辑导出。
                 </span>
               </div>
             )}
@@ -512,7 +1113,7 @@ export function ComposerScreen() {
           <div className="context-card-head">
             <div>
               <h3>拼图动作</h3>
-              <p>把模式、项目操作和低频动作放在这里，不挤占主画布。</p>
+              <p>这里管理导入模式、区域合并和项目读写，不把高频布局操作塞满画布。</p>
             </div>
           </div>
 
@@ -522,7 +1123,7 @@ export function ComposerScreen() {
               onClick={() => setPdfImportMode("graph")}
               type="button"
             >
-              PDF 作为图
+              PDF 作为 Graph
             </button>
             <button
               className={`mode-button ${pdfImportMode === "asset" ? "active" : ""}`}
@@ -539,6 +1140,46 @@ export function ComposerScreen() {
             </button>
             <button className="ghost-button" onClick={addText} type="button">
               添加文字
+            </button>
+            <button
+              className="ghost-button"
+              disabled={!canCopySelection}
+              onClick={copySelection}
+              type="button"
+            >
+              复制选中
+            </button>
+            <button
+              className="ghost-button"
+              disabled={!canPasteSelection}
+              onClick={pasteSelection}
+              type="button"
+            >
+              粘贴副本
+            </button>
+            <button
+              className="ghost-button"
+              disabled={!hasSelection}
+              onClick={duplicateSelection}
+              type="button"
+            >
+              重复选中
+            </button>
+            <button
+              className="ghost-button"
+              disabled={selectedCells.length < 2}
+              onClick={mergeSelectedEmptyCells}
+              type="button"
+            >
+              合并选中空格
+            </button>
+            <button
+              className="ghost-button"
+              disabled={!selectedRegion || selectedRegion.kind !== "free"}
+              onClick={unmergeSelectedRegion}
+              type="button"
+            >
+              拆分自由区域
             </button>
             <button className="ghost-button" onClick={openComposerProject} type="button">
               打开项目
@@ -568,15 +1209,162 @@ export function ComposerScreen() {
             <div>
               <h3>对象属性</h3>
               <p>
-                {selectedPanel || selectedText
-                  ? "当前选中对象的关键信息和可编辑项。"
-                  : "先在画布里选中一个 panel 或文字，这里会切成对应属性面板。"}
+                {hasSelection
+                  ? "当前选中对象或区域的可编辑项。"
+                  : "先选中区域、panel 或文字，这里会切换到对应的编辑器。"}
               </p>
             </div>
           </div>
 
-          {!selectedPanel && !selectedText && (
-            <div className="placeholder-card">还没有选中对象。先点一下画布里的 panel 或文字。</div>
+          {!hasSelection && (
+            <div className="placeholder-card">
+              还没有选中对象。点击 graph、素材、文字，或者按住 Shift 选空白格后合并成区域。
+            </div>
+          )}
+
+          {multiSelectedItems.length > 1 && (
+            <div className="inspector-stack">
+              <div className="info-grid compact-grid">
+                <div className="stat-tile">
+                  <span>多选对象</span>
+                  <strong>{multiSelectedItems.length}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>可对齐对象</span>
+                  <strong>{selectedEditableIds.length}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>绑定区域</span>
+                  <strong>{selectedHighlightRegionIds.length}</strong>
+                </div>
+              </div>
+
+              <div className="hint-text">
+                Shift 可继续增减选择；方向键微调自由对象，Graph 仍按整格移动。对齐和分布只会作用于 asset / text。
+              </div>
+
+              <div className="stacked-actions">
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("left")}
+                  type="button"
+                >
+                  左对齐
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("center")}
+                  type="button"
+                >
+                  水平居中
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("right")}
+                  type="button"
+                >
+                  右对齐
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("top")}
+                  type="button"
+                >
+                  上对齐
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("middle")}
+                  type="button"
+                >
+                  垂直居中
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 2}
+                  onClick={() => runAlignment("bottom")}
+                  type="button"
+                >
+                  下对齐
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 3}
+                  onClick={() => runDistribution("horizontal")}
+                  type="button"
+                >
+                  水平分布
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={selectedEditableIds.length < 3}
+                  onClick={() => runDistribution("vertical")}
+                  type="button"
+                >
+                  垂直分布
+                </button>
+              </div>
+
+              <button className="ghost-button danger-button" onClick={removeSelected} type="button">
+                删除选中对象
+              </button>
+            </div>
+          )}
+
+          {selectedRegion && (
+            <div className="inspector-stack">
+              <div className="info-grid compact-grid">
+                <div className="stat-tile">
+                  <span>类型</span>
+                  <strong>{selectedRegion.kind === "graph" ? "Graph Region" : "Free Region"}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>占格</span>
+                  <strong>
+                    {selectedRegion.col_span} x {selectedRegion.row_span}
+                  </strong>
+                </div>
+                <div className="stat-tile">
+                  <span>结构位</span>
+                  <strong>{selectedRegion.slot_kind === "structure" ? "有" : "无"}</strong>
+                </div>
+              </div>
+
+              <div className="hint-text">
+                {selectedRegion.kind === "graph"
+                  ? "Graph region 只能整格移动，尺寸由契约 PDF 自动决定；方向键同样按整格移动。"
+                  : "Free region 只占格，不会直接导出；你可以把素材和文字吸附到里面，也能用方向键整格移动。"}
+              </div>
+
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(selectedRegion.locked)}
+                  onChange={(event) =>
+                    setProject({
+                      ...composer.project,
+                      regions: composer.project.regions.map((region) =>
+                        region.id === selectedRegion.id
+                          ? { ...region, locked: event.target.checked }
+                          : region,
+                      ),
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>锁定区域移动</span>
+              </label>
+
+              {selectedRegion.kind === "free" && (
+                <button className="ghost-button danger-button" onClick={unmergeSelectedRegion} type="button">
+                  拆分这个区域
+                </button>
+              )}
+            </div>
           )}
 
           {selectedPanel && (
@@ -588,17 +1376,15 @@ export function ComposerScreen() {
                 </div>
                 <div className="stat-tile">
                   <span>标签</span>
-                  <strong>{selectedPanelLabel || "-"}</strong>
+                  <strong>{selectedPanelLabel || selectedPanel.label || "-"}</strong>
                 </div>
                 <div className="stat-tile">
-                  <span>对齐位</span>
-                  <strong>
-                    {describePanelSlot(selectedPanel, composer.project.canvas_height_mm)}
-                  </strong>
+                  <span>位置</span>
+                  <strong>{describePanelSlot(selectedPanel, composer.project)}</strong>
                 </div>
                 <div className="stat-tile">
-                  <span>锁定</span>
-                  <strong>{selectedPanel.locked ? "是" : "否"}</strong>
+                  <span>层级</span>
+                  <strong>{selectedPanel.z_index + 1}</strong>
                 </div>
               </div>
 
@@ -606,7 +1392,7 @@ export function ComposerScreen() {
                 <span className="field-label">自定义标签</span>
                 <input
                   className="field"
-                  disabled={composer.project.auto_labels}
+                  disabled={composer.project.auto_labels && selectedPanel.kind === "graph"}
                   onChange={(event) =>
                     updateSelectedPanel({ label: event.target.value || null })
                   }
@@ -615,6 +1401,33 @@ export function ComposerScreen() {
                 />
               </label>
 
+              {selectedPanel.kind === "asset" ? (
+                <label>
+                  <span className="field-label">绑定区域</span>
+                  <select
+                    className="field"
+                    onChange={(event) => applyBinding(event.target.value)}
+                    value={selectedDrawableBinding}
+                  >
+                    <option value="none">无</option>
+                    {freeRegions.map((region) => (
+                      <option key={region.id} value={`region:${region.id}`}>
+                        Free Region {region.id}
+                      </option>
+                    ))}
+                    {slotRegions.map((region) => (
+                      <option key={`${region.id}:slot`} value={`slot:${region.id}`}>
+                        Structure Slot {region.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="hint-text">
+                  Graph panel 绑定到 region：{selectedPanel.region_id ?? "未绑定"}
+                </div>
+              )}
+
               <label className="toggle-field">
                 <input
                   checked={Boolean(selectedPanel.locked)}
@@ -622,6 +1435,15 @@ export function ComposerScreen() {
                   type="checkbox"
                 />
                 <span>锁定位置</span>
+              </label>
+
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(selectedPanel.hidden)}
+                  onChange={(event) => updateSelectedPanel({ hidden: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>隐藏对象（预览和导出都忽略）</span>
               </label>
 
               <div className="info-grid compact-grid">
@@ -643,10 +1465,161 @@ export function ComposerScreen() {
                 </div>
               </div>
 
+              {selectedPanel.kind === "asset" && (
+                <div className="stacked-actions">
+                  <button className="ghost-button" onClick={fitSelectedPanelToBinding} type="button">
+                    适配到绑定区域
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("left")}
+                    type="button"
+                  >
+                    贴到区域左侧
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("hcenter")}
+                    type="button"
+                  >
+                    水平居中到区域
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("right")}
+                    type="button"
+                  >
+                    贴到区域右侧
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("top")}
+                    type="button"
+                  >
+                    贴到区域顶部
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("middle")}
+                    type="button"
+                  >
+                    吸附到区域中线
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("bottom")}
+                    type="button"
+                  >
+                    贴到区域底部
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={!boundRectForDrawable(composer.project, selectedPanel)}
+                    onClick={() => placeSelectedDrawableInBinding("center")}
+                    type="button"
+                  >
+                    完全居中到区域
+                  </button>
+                  <button className="ghost-button" onClick={() => changeLayer("forward")} type="button">
+                    上移一层
+                  </button>
+                  <button className="ghost-button" onClick={() => changeLayer("backward")} type="button">
+                    下移一层
+                  </button>
+                  <button className="ghost-button" onClick={() => changeLayer("front")} type="button">
+                    置于最前
+                  </button>
+                  <button className="ghost-button" onClick={() => changeLayer("back")} type="button">
+                    置于最后
+                  </button>
+                </div>
+              )}
+
+              <div className="info-grid compact-grid">
+                <label>
+                  <span className="field-label">裁边 X %</span>
+                  <input
+                    className="field"
+                    max={95}
+                    min={0}
+                    onChange={(event) =>
+                      updateSelectedPanel({
+                        crop_rect: {
+                          ...cropValue,
+                          x: Number(event.target.value) / 100,
+                        },
+                      })
+                    }
+                    type="number"
+                    value={Math.round(cropValue.x * 100)}
+                  />
+                </label>
+                <label>
+                  <span className="field-label">裁边 Y %</span>
+                  <input
+                    className="field"
+                    max={95}
+                    min={0}
+                    onChange={(event) =>
+                      updateSelectedPanel({
+                        crop_rect: {
+                          ...cropValue,
+                          y: Number(event.target.value) / 100,
+                        },
+                      })
+                    }
+                    type="number"
+                    value={Math.round(cropValue.y * 100)}
+                  />
+                </label>
+                <label>
+                  <span className="field-label">裁框 W %</span>
+                  <input
+                    className="field"
+                    max={100}
+                    min={1}
+                    onChange={(event) =>
+                      updateSelectedPanel({
+                        crop_rect: {
+                          ...cropValue,
+                          width: Number(event.target.value) / 100,
+                        },
+                      })
+                    }
+                    type="number"
+                    value={Math.round(cropValue.width * 100)}
+                  />
+                </label>
+                <label>
+                  <span className="field-label">裁框 H %</span>
+                  <input
+                    className="field"
+                    max={100}
+                    min={1}
+                    onChange={(event) =>
+                      updateSelectedPanel({
+                        crop_rect: {
+                          ...cropValue,
+                          height: Number(event.target.value) / 100,
+                        },
+                      })
+                    }
+                    type="number"
+                    value={Math.round(cropValue.height * 100)}
+                  />
+                </label>
+              </div>
+
               <div className="hint-text">
                 {selectedPanel.kind === "graph"
-                  ? "Graph panel 会自动吸附到 3x3 网格，不支持手动缩放。"
-                  : "Asset 可自由拖拽和缩放，但仍会自动避让其他 panel。"}
+                  ? "Graph panel 只允许整格移动，不允许脱格自由缩放；可用 crop 做非破坏性裁边。"
+                  : "Asset 可自由移动、缩放、裁边，并允许覆盖 graph；绑定到 region/slot 后会跟随区域一起移动，也能一键贴左/中/右/顶/底。"}
               </div>
 
               <button className="ghost-button danger-button" onClick={removeSelected} type="button">
@@ -700,6 +1673,116 @@ export function ComposerScreen() {
                 </select>
               </label>
 
+              <label>
+                <span className="field-label">绑定区域</span>
+                <select
+                  className="field"
+                  onChange={(event) => applyBinding(event.target.value)}
+                  value={selectedDrawableBinding}
+                >
+                  <option value="none">无</option>
+                  {freeRegions.map((region) => (
+                    <option key={region.id} value={`region:${region.id}`}>
+                      Free Region {region.id}
+                    </option>
+                  ))}
+                  {slotRegions.map((region) => (
+                    <option key={`${region.id}:slot`} value={`slot:${region.id}`}>
+                      Structure Slot {region.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(selectedText.locked)}
+                  onChange={(event) => updateSelectedText({ locked: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>锁定位置</span>
+              </label>
+
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(selectedText.hidden)}
+                  onChange={(event) => updateSelectedText({ hidden: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>隐藏文字（预览和导出都忽略）</span>
+              </label>
+
+              <div className="stacked-actions">
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("left")}
+                  type="button"
+                >
+                  贴到区域左侧
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("hcenter")}
+                  type="button"
+                >
+                  水平居中到区域
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("right")}
+                  type="button"
+                >
+                  贴到区域右侧
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("top")}
+                  type="button"
+                >
+                  贴到区域顶部
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("middle")}
+                  type="button"
+                >
+                  吸附到区域中线
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("bottom")}
+                  type="button"
+                >
+                  贴到区域底部
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!boundRectForDrawable(composer.project, selectedText)}
+                  onClick={() => placeSelectedDrawableInBinding("center")}
+                  type="button"
+                >
+                  完全居中到区域
+                </button>
+                <button className="ghost-button" onClick={() => changeLayer("forward")} type="button">
+                  上移一层
+                </button>
+                <button className="ghost-button" onClick={() => changeLayer("backward")} type="button">
+                  下移一层
+                </button>
+                <button className="ghost-button" onClick={() => changeLayer("front")} type="button">
+                  置于最前
+                </button>
+                <button className="ghost-button" onClick={() => changeLayer("back")} type="button">
+                  置于最后
+                </button>
+              </div>
+
               <button className="ghost-button danger-button" onClick={removeSelected} type="button">
                 删除文字
               </button>
@@ -710,35 +1793,47 @@ export function ComposerScreen() {
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>图层与对齐</h3>
-              <p>右侧专门留给图层浏览和对齐信息，而不是把全部按钮塞到左边。</p>
+              <h3>图层与区域</h3>
+              <p>这里同时列出 region 和导出对象。Region 负责占格，panel / text 负责最终 PDF 内容。</p>
             </div>
           </div>
 
           <div className="context-list">
             <div className="context-row">
-              <span>网格</span>
-              <strong>3 x 3</strong>
+              <span>基础格</span>
+              <strong>60 x 55 mm</strong>
             </div>
             <div className="context-row">
-              <span>自动编号</span>
-              <strong>{composer.project.auto_labels ? "开启" : "关闭"}</strong>
+              <span>结构位</span>
+              <strong>{slotRegions.length}</strong>
             </div>
             <div className="context-row">
               <span>预检状态</span>
               <strong>{composer.validationError ? "有提醒" : "正常"}</strong>
             </div>
+            <div className="context-row">
+              <span>快捷键</span>
+              <strong>Shift 复选 / Alt 拖拽复制 / Cmd-C,V,D / 方向键</strong>
+            </div>
           </div>
 
           <div className="layer-list">
             {layerItems.length === 0 && (
-              <div className="placeholder-card">还没有图层。导入 PDF 或素材后，这里会出现对象列表。</div>
+              <div className="placeholder-card">还没有对象。导入 graph 或素材后，这里会出现区域和图层列表。</div>
             )}
             {layerItems.map((item) => (
               <button
-                className={`layer-item ${composer.selectedId === item.id ? "active" : ""}`}
+                className={`layer-item ${
+                  composer.selectedId === item.id || selectedObjectIds.includes(item.id) ? "active" : ""
+                }`}
                 key={item.id}
-                onClick={() => composer.setSelectedId(item.id)}
+                onClick={(event) => {
+                  if (item.type === "region") {
+                    selectComposerItem(item.id, false);
+                    return;
+                  }
+                  selectComposerItem(item.id, Boolean(event.shiftKey || event.metaKey));
+                }}
                 type="button"
               >
                 <strong>{item.title}</strong>
@@ -751,7 +1846,7 @@ export function ComposerScreen() {
         {composer.validationError && <div className="warning-card">{composer.validationError}</div>}
 
         {dropNotice && (
-          <div className={dropNotice.includes("未导入") ? "warning-card" : "success-card"}>
+          <div className={dropNotice.includes("仅支持") || dropNotice.includes("跳过") ? "warning-card" : "success-card"}>
             {dropNotice}
           </div>
         )}

@@ -1,0 +1,64 @@
+from src.rendering.cache import clear_input_cache
+from src.rendering.constants import (
+    DEFAULT_SIZE_BY_TEMPLATE,
+    PALETTE_PRESET_CHOICES,
+    SIZE_CHOICES,
+    STYLE_PRESET_CHOICES,
+    TEMPLATE_CHOICES,
+)
+from src.rendering.io import (
+    coerce_sheet,
+    default_output_dir,
+    ensure_input_path,
+    list_sheet_names,
+    normalize_input_path_text,
+    resolve_output_dir,
+)
+from src.rendering.models import (
+    InputInspection,
+    PreflightResult,
+    Recommendation,
+    RenderedPlot,
+    RenderOptions,
+    TemplateRenderer,
+)
+from src.rendering.options import resolve_render_options, validate_template_name
+from src.rendering.preflight import preflight_render_request
+from src.rendering.recommendation import inspect_input_file
+from src.rendering.render import (
+    TEMPLATE_RENDERERS,
+    build_rendered_plots,
+    close_rendered_plots,
+    export_rendered_plots,
+    render_template,
+)
+
+__all__ = [
+    "DEFAULT_SIZE_BY_TEMPLATE",
+    "InputInspection",
+    "PALETTE_PRESET_CHOICES",
+    "PreflightResult",
+    "Recommendation",
+    "RenderOptions",
+    "RenderedPlot",
+    "SIZE_CHOICES",
+    "STYLE_PRESET_CHOICES",
+    "TEMPLATE_CHOICES",
+    "TEMPLATE_RENDERERS",
+    "TemplateRenderer",
+    "build_rendered_plots",
+    "clear_input_cache",
+    "close_rendered_plots",
+    "coerce_sheet",
+    "default_output_dir",
+    "ensure_input_path",
+    "export_rendered_plots",
+    "inspect_input_file",
+    "list_sheet_names",
+    "normalize_input_path_text",
+    "preflight_render_request",
+    "render_template",
+    "resolve_output_dir",
+    "resolve_render_options",
+    "validate_template_name",
+]

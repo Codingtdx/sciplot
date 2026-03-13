@@ -86,7 +86,7 @@ export function SettingsScreen({
                 <h2>
                   {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
                 </h2>
-                <p>当前拼图器遵循 3x3 网格和 0.5 mm 步进，这是 4.x 版桌面工作台的默认结构。</p>
+                <p>当前拼图器遵循 3x3 网格和 0.5 mm 步进，这是 5.0 版桌面工作台的默认结构。</p>
               </div>
             </div>
           </article>

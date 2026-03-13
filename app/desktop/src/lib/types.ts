@@ -115,8 +115,13 @@ export type ComposerPanel = {
   w_mm: number;
   h_mm: number;
   locked?: boolean;
+  hidden?: boolean;
   label?: string | null;
   kind: "graph" | "asset";
+  z_index: number;
+  region_id?: string | null;
+  slot_id?: string | null;
+  crop_rect: ComposerCropRect;
 };
 
 export type ComposerText = {
@@ -126,6 +131,41 @@ export type ComposerText = {
   y_mm: number;
   font_size_pt: number;
   align: "left" | "center" | "right";
+  z_index: number;
+  locked?: boolean;
+  hidden?: boolean;
+  region_id?: string | null;
+  slot_id?: string | null;
+};
+
+export type ComposerCropRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type ComposerLayoutGrid = {
+  columns: number;
+  rows: number;
+  cell_width_mm: number;
+  cell_height_mm: number;
+  frame_x_mm: number;
+  frame_y_mm: number;
+  frame_width_mm: number;
+  frame_height_mm: number;
+};
+
+export type ComposerRegion = {
+  id: string;
+  kind: "graph" | "free";
+  col: number;
+  row: number;
+  col_span: number;
+  row_span: number;
+  label?: string | null;
+  locked?: boolean;
+  slot_kind?: "structure" | null;
 };
 
 export type ComposerProject = {
@@ -134,6 +174,8 @@ export type ComposerProject = {
   canvas_width_mm: number;
   canvas_height_mm: number;
   grid_mm: number;
+  layout_grid: ComposerLayoutGrid;
+  regions: ComposerRegion[];
   panels: ComposerPanel[];
   texts: ComposerText[];
   auto_labels: boolean;

@@ -1,19 +1,37 @@
 import { inspectFile, openProject } from "./api";
 import { extractComposerProject, normalizeComposerProject } from "./composer";
+import { extractWizardProject } from "./projects";
 import type {
   ComposerProject,
   InspectResponse,
+  InputInspection,
   RenderOptionsPayload,
   TemplateName,
   WizardProject,
   WizardStep,
   WorkbenchMeta,
 } from "./types";
-import { useComposerStore, useWizardStore } from "./store";
 import { selectionFromInspection } from "./wizard";
 
-type WizardStoreSnapshot = ReturnType<typeof useWizardStore.getState>;
-type ComposerStoreSnapshot = ReturnType<typeof useComposerStore.getState>;
+type WizardStoreSnapshot = {
+  busy: boolean;
+  reset(): void;
+  setBusy(value: boolean): void;
+  setError(value: string | null): void;
+  setInputPath(value: string): void;
+  setInspection(value: InputInspection | null): void;
+  setOptions(value: RenderOptionsPayload): void;
+  setOutputs(value: string[]): void;
+  setSheet(value: string | number): void;
+  setSheetNames(value: string[]): void;
+  setStep(value: WizardStep): void;
+  setTemplate(value: TemplateName | null): void;
+};
+
+type ComposerStoreSnapshot = {
+  setProject(project: ComposerProject): void;
+  setSelectedId(value: string | null): void;
+};
 
 export function applyInspectionToWizard(
   wizard: WizardStoreSnapshot,
@@ -69,10 +87,7 @@ export async function loadWizardProjectFile(
   wizard.setBusy(keepBusy);
   wizard.setError(null);
 
-  const payload = (await openProject(projectPath)) as WizardProject;
-  if (!payload || payload.mode !== "wizard") {
-    throw new Error("这不是可识别的绘图精灵项目文件。");
-  }
+  const payload = extractWizardProject(await openProject(projectPath));
 
   const { input_path, options, outputs, sheet, template } = payload.wizard;
   const inspected = await inspectFile(input_path, sheet);

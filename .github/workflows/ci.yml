@@ -28,13 +28,20 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install pytest ruff mypy coverage httpx pre-commit
 
       - name: Install desktop dependencies
         working-directory: app/desktop
         run: npm ci
 
-      - name: Python unit tests
-        run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+      - name: Ruff
+        run: .venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py
+
+      - name: Mypy
+        run: .venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering
+
+      - name: Python tests
+        run: .venv/bin/python -m pytest tests
 
       - name: Python smoke check
         run: .venv/bin/python scripts/smoke_check.py

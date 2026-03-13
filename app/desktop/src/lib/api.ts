@@ -1,5 +1,4 @@
 import type {
-  ComposerPanel,
   ComposerProject,
   ExportResponse,
   InspectResponse,
@@ -184,11 +183,11 @@ export async function composeExport(project: ComposerProject): Promise<{
   return postJson("/compose-export", project);
 }
 
-export async function threeUp(filePaths: string[]): Promise<{ panels: ComposerPanel[] }> {
+export async function threeUp(filePaths: string[]): Promise<ComposerProject> {
   return postJson("/composer/three-up", filePaths);
 }
 
-export async function twoUpEditorial(filePaths: string[]): Promise<{ panels: ComposerPanel[] }> {
+export async function twoUpEditorial(filePaths: string[]): Promise<ComposerProject> {
   return postJson("/composer/two-up-editorial", filePaths);
 }
 
@@ -196,7 +195,7 @@ export async function importComposerPanels(
   project: ComposerProject,
   filePaths: string[],
   kind: "graph" | "asset",
-): Promise<{ panels: ComposerPanel[] }> {
+): Promise<ComposerProject> {
   return postJson("/composer/import-panels", {
     project,
     file_paths: filePaths,

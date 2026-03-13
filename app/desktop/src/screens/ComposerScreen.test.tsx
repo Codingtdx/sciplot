@@ -1,6 +1,7 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EMPTY_COMPOSER_PROJECT } from "../lib/composer";
 import { importComposerPanels } from "../lib/api";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import { ComposerScreen } from "./ComposerScreen";
@@ -19,7 +20,26 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 }));
 
 vi.mock("../components/ComposerCanvas", () => ({
-  ComposerCanvas: () => <div>Canvas</div>,
+  ComposerCanvas: (props: {
+    onObjectSelection(ids: string[], additive?: boolean): void;
+    onDuplicateDrawableStart(id: string): string | null;
+  }) => (
+    <div>
+      Canvas
+      <button
+        onClick={() => props.onObjectSelection(["asset-1", "asset-2"], false)}
+        type="button"
+      >
+        Mock Marquee Select
+      </button>
+      <button
+        onClick={() => props.onDuplicateDrawableStart("asset-2")}
+        type="button"
+      >
+        Mock Alt Duplicate
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../lib/api", async () => {
@@ -28,12 +48,66 @@ vi.mock("../lib/api", async () => {
     ...actual,
     composePreviewWithOptions: vi.fn().mockRejectedValue(new Error("preview exploded")),
     importComposerPanels: vi.fn(),
-    panelThumbnail: vi.fn(),
+    panelThumbnail: vi.fn().mockResolvedValue(""),
   };
 });
 
+function seedComposerProject() {
+  useComposerStore.getState().setProject({
+    ...EMPTY_COMPOSER_PROJECT,
+    regions: [
+      {
+        id: "region-1",
+        kind: "free",
+        col: 0,
+        row: 0,
+        col_span: 1,
+        row_span: 1,
+        label: null,
+        locked: false,
+        slot_kind: null,
+      },
+    ],
+    panels: [
+      {
+        id: "asset-1",
+        file_path: "/tmp/asset-1.png",
+        page_index: 0,
+        x_mm: 10,
+        y_mm: 20,
+        w_mm: 24,
+        h_mm: 12,
+        locked: false,
+        label: null,
+        kind: "asset",
+        z_index: 0,
+        region_id: "region-1",
+        slot_id: null,
+        crop_rect: { x: 0, y: 0, width: 1, height: 1 },
+      },
+      {
+        id: "asset-2",
+        file_path: "/tmp/asset-2.png",
+        page_index: 0,
+        x_mm: 40,
+        y_mm: 36,
+        w_mm: 18,
+        h_mm: 12,
+        locked: false,
+        label: null,
+        kind: "asset",
+        z_index: 1,
+        region_id: null,
+        slot_id: null,
+        crop_rect: { x: 0, y: 0, width: 1, height: 1 },
+      },
+    ],
+  });
+}
+
 describe("ComposerScreen", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     dragDropHandler = null;
     useComposerStore.getState().reset();
     useWorkbenchStore.setState({
@@ -55,40 +129,80 @@ describe("ComposerScreen", () => {
   it("imports dropped pdfs and rasters while skipping unsupported files", async () => {
     vi.mocked(importComposerPanels)
       .mockResolvedValueOnce({
+        ...EMPTY_COMPOSER_PROJECT,
+        regions: [
+          {
+            id: "region-1",
+            kind: "graph",
+            col: 0,
+            row: 0,
+            col_span: 1,
+            row_span: 1,
+            label: null,
+            locked: false,
+            slot_kind: null,
+          },
+        ],
         panels: [
           {
             id: "panel-1",
             file_path: "/tmp/figure.pdf",
             page_index: 0,
             x_mm: 0,
-            y_mm: 0,
+            y_mm: 2.5,
             w_mm: 60,
-            h_mm: 40,
+            h_mm: 55,
             kind: "graph",
+            z_index: 0,
+            region_id: "region-1",
+            slot_id: null,
+            crop_rect: { x: 0, y: 0, width: 1, height: 1 },
           },
         ],
       })
       .mockResolvedValueOnce({
+        ...EMPTY_COMPOSER_PROJECT,
+        regions: [
+          {
+            id: "region-1",
+            kind: "graph",
+            col: 0,
+            row: 0,
+            col_span: 1,
+            row_span: 1,
+            label: null,
+            locked: false,
+            slot_kind: null,
+          },
+        ],
         panels: [
           {
             id: "panel-1",
             file_path: "/tmp/figure.pdf",
             page_index: 0,
             x_mm: 0,
-            y_mm: 0,
+            y_mm: 2.5,
             w_mm: 60,
-            h_mm: 40,
+            h_mm: 55,
             kind: "graph",
+            z_index: 0,
+            region_id: "region-1",
+            slot_id: null,
+            crop_rect: { x: 0, y: 0, width: 1, height: 1 },
           },
           {
-            id: "panel-2",
+            id: "asset-1",
             file_path: "/tmp/asset.png",
             page_index: 0,
             x_mm: 64,
-            y_mm: 0,
+            y_mm: 20,
             w_mm: 48,
             h_mm: 36,
             kind: "asset",
+            z_index: 1,
+            region_id: null,
+            slot_id: null,
+            crop_rect: { x: 0, y: 0, width: 1, height: 1 },
           },
         ],
       });
@@ -112,7 +226,7 @@ describe("ComposerScreen", () => {
     await waitFor(() => {
       expect(importComposerPanels).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ panels: [] }),
+        expect.objectContaining({ panels: [], regions: [] }),
         ["/tmp/figure.pdf"],
         "graph",
       );
@@ -120,6 +234,7 @@ describe("ComposerScreen", () => {
         2,
         expect.objectContaining({
           panels: [expect.objectContaining({ file_path: "/tmp/figure.pdf" })],
+          regions: [expect.objectContaining({ id: "region-1" })],
         }),
         ["/tmp/asset.png"],
         "asset",
@@ -128,5 +243,155 @@ describe("ComposerScreen", () => {
 
     expect(screen.getByText(/已跳过不支持的文件: notes.txt/)).toBeInTheDocument();
     expect(useComposerStore.getState().project.panels).toHaveLength(2);
+    expect(useComposerStore.getState().project.regions).toHaveLength(1);
+  });
+
+  it("supports multi-select alignment from the layer list", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
+      shiftKey: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "左对齐" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.x_mm).toBe(10);
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.x_mm).toBe(10);
+    });
+  });
+
+  it("supports marquee-driven multi-select from the canvas", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+
+    await waitFor(() => {
+      const tile = screen.getByText("多选对象").closest(".stat-tile");
+      expect(tile).not.toBeNull();
+      expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
+    });
+  });
+
+  it("nudges the selected asset with arrow keys", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.x_mm).toBe(10.5);
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.y_mm).toBe(20);
+    });
+  });
+
+  it("snaps a bound asset to the bottom of its region", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: "贴到区域底部" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.y_mm).toBe(45.5);
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.x_mm).toBe(10);
+    });
+  });
+
+  it("duplicates the selected object with the repeat action", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: "重复选中" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels).toHaveLength(3);
+      expect(project.panels.find((panel) => panel.id === "asset-3")).toMatchObject({
+        x_mm: 44,
+        y_mm: 40,
+        file_path: "/tmp/asset-2.png",
+      });
+    });
+  });
+
+  it("copies and pastes the selected object with keyboard shortcuts", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels).toHaveLength(3);
+      expect(project.panels.find((panel) => panel.id === "asset-3")).toMatchObject({
+        x_mm: 44,
+        y_mm: 40,
+      });
+    });
+
+    expect(screen.getByText("已粘贴对象副本。")).toBeInTheDocument();
+  });
+
+  it("snaps a bound asset to the left edge of its region", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("button", { name: "贴到区域左侧" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.x_mm).toBe(0);
+      expect(project.panels.find((panel) => panel.id === "asset-1")?.y_mm).toBe(20);
+    });
+  });
+
+  it("duplicates a drawable at the same position for alt-drag copy", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mock Alt Duplicate" }));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels).toHaveLength(3);
+      expect(project.panels.find((panel) => panel.id === "asset-3")).toMatchObject({
+        x_mm: 40,
+        y_mm: 36,
+        file_path: "/tmp/asset-2.png",
+      });
+    });
+  });
+
+  it("can hide the selected asset from preview/export", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
+    fireEvent.click(screen.getByLabelText("隐藏对象（预览和导出都忽略）"));
+
+    await waitFor(() => {
+      const project = useComposerStore.getState().project;
+      expect(project.panels.find((panel) => panel.id === "asset-2")?.hidden).toBe(true);
+    });
   });
 });

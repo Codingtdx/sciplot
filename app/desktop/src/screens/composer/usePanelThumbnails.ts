@@ -10,6 +10,7 @@ function isAbortError(error: unknown): boolean {
 
 export function usePanelThumbnails(panels: ComposerPanel[]) {
   const cacheRef = useRef(new Map<string, string>());
+  const inflightRef = useRef(new Map<string, Promise<string>>());
   const [thumbnailMap, setThumbnailMap] = useState<Record<string, string>>({});
   const latestRequestRef = useRef(0);
 
@@ -22,49 +23,65 @@ export function usePanelThumbnails(panels: ComposerPanel[]) {
 
     const requestId = latestRequestRef.current + 1;
     latestRequestRef.current = requestId;
-    const controller = new AbortController();
-
-    void Promise.all(
-      panels.map(async (panel) => {
-        try {
-          const key = requestCacheKey("panel-thumbnail", {
-            file_path: panel.file_path,
-            page_index: panel.page_index,
-          });
-          const cached = cacheRef.current.get(key);
-          if (cached) {
-            return [panel.id, cached] as const;
-          }
-
-          const thumbnail = await panelThumbnail(panel.file_path, panel.page_index, {
-            signal: controller.signal,
-          });
-          cacheRef.current.set(key, thumbnail);
-          return [panel.id, thumbnail] as const;
-        } catch (error) {
-          if (!isAbortError(error)) {
-            return null;
-          }
-          throw error;
-        }
+    let cancelled = false;
+    const panelEntries = panels.map((panel) => ({
+      panel,
+      key: requestCacheKey("panel-thumbnail", {
+        file_path: panel.file_path,
+        page_index: panel.page_index,
       }),
-    )
-      .then((entries) => {
-        if (latestRequestRef.current !== requestId || controller.signal.aborted) {
-          return;
-        }
-        setThumbnailMap(
-          Object.fromEntries(entries.filter(Boolean) as Array<readonly [string, string]>),
-        );
-      })
-      .catch((error) => {
-        if (!isAbortError(error) && latestRequestRef.current === requestId) {
-          setThumbnailMap({});
-        }
+    }));
+
+    setThumbnailMap((current) => {
+      const nextEntries = panelEntries.flatMap(({ panel, key }) => {
+        const cached = cacheRef.current.get(key);
+        const existing = cached ?? current[panel.id];
+        return existing ? [[panel.id, existing] as const] : [];
       });
+      return Object.fromEntries(nextEntries);
+    });
+
+    panelEntries.forEach(({ panel, key }) => {
+      if (cacheRef.current.has(key)) {
+        return;
+      }
+
+      let request = inflightRef.current.get(key);
+      if (!request) {
+        request = panelThumbnail(panel.file_path, panel.page_index)
+          .then((thumbnail) => {
+            cacheRef.current.set(key, thumbnail);
+            return thumbnail;
+          })
+          .finally(() => {
+            inflightRef.current.delete(key);
+          });
+        inflightRef.current.set(key, request);
+      }
+
+      void request
+        .then((thumbnail) => {
+          if (cancelled || latestRequestRef.current !== requestId) {
+            return;
+          }
+          setThumbnailMap((current) => ({
+            ...current,
+            ...Object.fromEntries(
+              panelEntries
+                .filter((entry) => entry.key === key)
+                .map((entry) => [entry.panel.id, thumbnail] as const),
+            ),
+          }));
+        })
+        .catch((error) => {
+          if (!isAbortError(error) && !cancelled && latestRequestRef.current === requestId) {
+            setThumbnailMap((current) => current);
+          }
+        });
+    });
 
     return () => {
-      controller.abort();
+      cancelled = true;
     };
   }, [panels]);
 

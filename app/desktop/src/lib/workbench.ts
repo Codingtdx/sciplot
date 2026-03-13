@@ -47,7 +47,7 @@ export const SCREEN_META: Record<
   settings: {
     eyebrow: "Workbench",
     title: "设置与运行状态",
-    description: "展示 sidecar、画布约定和 4.x 工作台的当前行为，不把不成熟的开关硬塞进界面。",
+    description: "展示 sidecar、画布约定和 5.0 工作台的当前行为，不把不成熟的开关硬塞进界面。",
   },
 };
 
@@ -209,11 +209,8 @@ export function publicPaletteChoices(meta: WorkbenchMeta | null, template: Templ
 
 export function orderPanels(panels: ComposerPanel[]) {
   return [...panels].sort((a, b) => {
-    if (Math.abs(a.y_mm - b.y_mm) > 0.25) {
-      return a.y_mm - b.y_mm;
-    }
-    if (Math.abs(a.x_mm - b.x_mm) > 0.25) {
-      return a.x_mm - b.x_mm;
+    if (a.z_index !== b.z_index) {
+      return a.z_index - b.z_index;
     }
     return a.id.localeCompare(b.id);
   });

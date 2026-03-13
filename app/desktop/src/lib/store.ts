@@ -17,6 +17,7 @@ import type {
   WorkbenchScreen,
   WorkbenchSettings,
 } from "./types";
+import { EMPTY_COMPOSER_PROJECT, normalizeComposerProject } from "./composer";
 
 type WizardState = {
   inputPath: string;
@@ -82,14 +83,11 @@ const storage = createJSONStorage(() => localStorage);
 const defaultOptions: RenderOptionsPayload = {};
 
 const emptyProject: ComposerProject = {
-  version: 1,
-  mode: "composer",
-  canvas_width_mm: 180,
-  canvas_height_mm: 170,
-  grid_mm: 0.5,
+  ...EMPTY_COMPOSER_PROJECT,
+  layout_grid: { ...EMPTY_COMPOSER_PROJECT.layout_grid },
+  regions: [],
   panels: [],
   texts: [],
-  auto_labels: true,
 };
 
 const defaultWorkbenchSettings: WorkbenchSettings = {
@@ -189,6 +187,16 @@ export const useComposerStore = create<ComposerState>()(
     {
       name: "codegod-composer-store",
       storage,
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<ComposerState> | undefined;
+        return {
+          project: state?.project
+            ? normalizeComposerProject(state.project as ComposerProject)
+            : { ...emptyProject, layout_grid: { ...emptyProject.layout_grid }, regions: [], panels: [], texts: [] },
+          palettePreset: typeof state?.palettePreset === "string" ? state.palettePreset : "colorblind_safe",
+        };
+      },
       partialize: (state) => ({
         project: state.project,
         palettePreset: state.palettePreset,

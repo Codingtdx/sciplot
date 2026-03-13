@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from functools import lru_cache
-import json
 from pathlib import Path
 from typing import Any
-
 
 CONTRACT_PATH = Path(__file__).with_name("plot_contract.json")
 DOC_PATH = Path(__file__).resolve().parents[1] / "docs" / "plot_contract.md"
@@ -397,8 +396,16 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
         "",
         "## Global Frame",
         "",
-        f"- Standard panel: `{resolved.global_frame.panel_width_mm:.1f} x {resolved.global_frame.panel_height_mm:.1f} mm`",
-        f"- Margins: left `{resolved.global_frame.left_margin_mm:.1f} mm`, right `{resolved.global_frame.right_margin_mm:.1f} mm`, bottom `{resolved.global_frame.bottom_margin_mm:.1f} mm`, top `{resolved.global_frame.top_margin_mm:.1f} mm`",
+        (
+            f"- Standard panel: `{resolved.global_frame.panel_width_mm:.1f} x "
+            f"{resolved.global_frame.panel_height_mm:.1f} mm`"
+        ),
+        (
+            f"- Margins: left `{resolved.global_frame.left_margin_mm:.1f} mm`, "
+            f"right `{resolved.global_frame.right_margin_mm:.1f} mm`, "
+            f"bottom `{resolved.global_frame.bottom_margin_mm:.1f} mm`, "
+            f"top `{resolved.global_frame.top_margin_mm:.1f} mm`"
+        ),
         "",
         "## Templates",
         "",
@@ -421,14 +428,14 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
         )
 
     lines.extend(["## Validation Rules", ""])
-    for name, spec in resolved.validation_rules.items():
+    for name, rule in resolved.validation_rules.items():
         tolerance_text = (
-            f", tolerance `{spec.tolerance_mm:.2f} mm`"
-            if spec.tolerance_mm is not None
+            f", tolerance `{rule.tolerance_mm:.2f} mm`"
+            if rule.tolerance_mm is not None
             else ""
         )
         lines.append(
-            f"- `{name}`: {spec.label} ({spec.severity}{tolerance_text}) - {spec.description}"
+            f"- `{name}`: {rule.label} ({rule.severity}{tolerance_text}) - {rule.description}"
         )
 
     return "\n".join(lines) + "\n"

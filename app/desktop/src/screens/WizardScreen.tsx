@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
 import { StepFlow } from "../components/StepFlow";
@@ -42,7 +43,38 @@ import {
 import { useWizardPreview } from "./wizard/useWizardPreview";
 
 export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
-  const wizard = useWizardStore();
+  const wizard = useWizardStore(
+    useShallow((state) => ({
+      busy: state.busy,
+      error: state.error,
+      inputPath: state.inputPath,
+      inspection: state.inspection,
+      options: state.options,
+      outputs: state.outputs,
+      preflight: state.preflight,
+      previewIndex: state.previewIndex,
+      previews: state.previews,
+      reset: state.reset,
+      setBusy: state.setBusy,
+      setError: state.setError,
+      setInputPath: state.setInputPath,
+      setInspection: state.setInspection,
+      setOptions: state.setOptions,
+      setOutputs: state.setOutputs,
+      setPreflight: state.setPreflight,
+      setPreviewIndex: state.setPreviewIndex,
+      setPreviews: state.setPreviews,
+      setSheet: state.setSheet,
+      setSheetNames: state.setSheetNames,
+      setStep: state.setStep,
+      setTemplate: state.setTemplate,
+      sheet: state.sheet,
+      sheetNames: state.sheetNames,
+      sidecarReady: state.sidecarReady,
+      step: state.step,
+      template: state.template,
+    })),
+  );
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [tensileBatchResult, setTensileBatchResult] = useState<TensileReplicateResponse | null>(null);
   const setWizardOptions = wizard.setOptions;

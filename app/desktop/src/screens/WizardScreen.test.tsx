@@ -80,7 +80,7 @@ const TEST_INSPECT_RESPONSE: InspectResponse = {
 function mockWizardReload() {
   vi
     .mocked(loadWizardDataFile)
-    .mockImplementationOnce(async (wizard: ReturnType<typeof useWizardStore.getState>) => {
+    .mockImplementationOnce(async (wizard: Parameters<typeof loadWizardDataFile>[0]) => {
       wizard.reset();
       wizard.setInputPath(TEST_INSPECT_RESPONSE.input_path);
       wizard.setSheet(TEST_INSPECT_RESPONSE.sheet);

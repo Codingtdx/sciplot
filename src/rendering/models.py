@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+
+TemplateName = str
+OutputMode = str
+RenderFn = Callable[[Path, str | int, "RenderOptions"], list["RenderedPlot"]]
+
+
+@dataclass(frozen=True)
+class RenderOptions:
+    width_mm: float
+    height_mm: float
+    xscale: str
+    yscale: str
+    reverse_x: bool
+    baseline: str
+    show_colorbar: bool
+    style_preset: str
+    palette_preset: str
+    use_sidecar: bool | None = None
+
+
+@dataclass(frozen=True)
+class TemplateRenderer:
+    render: RenderFn
+
+
+@dataclass(frozen=True)
+class RenderedPlot:
+    filename: str
+    figure: plt.Figure
+
+
+@dataclass(frozen=True)
+class Recommendation:
+    template: TemplateName
+    reason: str
+    size: str | None = None
+    xscale: str | None = None
+    yscale: str | None = None
+    reverse_x: bool | None = None
+    baseline: str | None = None
+    show_colorbar: bool | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
+    use_sidecar: bool | None = None
+
+
+@dataclass(frozen=True)
+class InputInspection:
+    model: str
+    model_label: str
+    recommendation: Recommendation
+    warnings: tuple[str, ...] = ()
+    signals: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PreflightResult:
+    template: TemplateName
+    warnings: tuple[str, ...]
+    errors: tuple[str, ...]
+    output_filenames: tuple[str, ...]

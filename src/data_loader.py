@@ -97,7 +97,8 @@ def _coerce_numeric_pair(pair: pd.DataFrame, *, column_numbers: tuple[int, int],
     if not has_x_values and not has_y_values:
         if _series_pair_has_any_data(pair):
             raise ValueError(
-                f"{table_name} columns {column_numbers[0]} and {column_numbers[1]} contain non-numeric values in the data region."
+                f"{table_name} columns {column_numbers[0]} and {column_numbers[1]} "
+                "contain non-numeric values in the data region."
             )
         return numeric_pair.iloc[0:0].copy()
     numeric_pair.columns = ["x", "y"]

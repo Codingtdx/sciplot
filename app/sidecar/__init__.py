@@ -1,1 +1,1 @@
-"""4.0 sidecar package."""
+"""5.0 sidecar package."""

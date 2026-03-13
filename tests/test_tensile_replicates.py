@@ -6,7 +6,6 @@ from pathlib import Path
 
 from src.tensile_replicates import export_tensile_replicate_workbook, parse_tensile_csv
 
-
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
 
