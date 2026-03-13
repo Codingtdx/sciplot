@@ -5,35 +5,26 @@ import {
   type SaveDialogOptions,
 } from "@tauri-apps/plugin-dialog";
 
-type TauriDialogRuntime = {
-  __CODEGOD_DIALOG__?: {
-    open?: (options?: OpenDialogOptions) => Promise<string | string[] | null>;
-    save?: (options?: SaveDialogOptions) => Promise<string | null>;
-  };
-};
+function wrapDialogError(prefix: string, error: unknown) {
+  const detail =
+    error instanceof Error && error.message.trim() !== ""
+      ? error.message
+      : "请确认当前窗口运行在 Tauri 桌面宿主内。";
+  return new Error(`${prefix}：${detail}`);
+}
 
 export async function openDialog(options?: OpenDialogOptions) {
-  const runtime = globalThis as TauriDialogRuntime;
-  if (runtime.__CODEGOD_DIALOG__?.open) {
-    return runtime.__CODEGOD_DIALOG__.open(options);
-  }
-
   try {
     return await tauriOpen(options);
-  } catch {
-    return null;
+  } catch (error) {
+    throw wrapDialogError("无法打开文件选择窗口", error);
   }
 }
 
 export async function saveDialog(options?: SaveDialogOptions) {
-  const runtime = globalThis as TauriDialogRuntime;
-  if (runtime.__CODEGOD_DIALOG__?.save) {
-    return runtime.__CODEGOD_DIALOG__.save(options);
-  }
-
   try {
     return await tauriSave(options);
-  } catch {
-    return null;
+  } catch (error) {
+    throw wrapDialogError("无法打开保存窗口", error);
   }
 }

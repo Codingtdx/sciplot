@@ -95,9 +95,9 @@ export function ProjectsScreen({
         <article className="work-card hero-card">
           <div className="section-head hero-head">
             <div>
-              <div className="card-kicker">Project Overview</div>
-              <h2>把两个核心工作流都收进一个项目视角</h2>
-              <p>先看到当前会话里已经做到哪一步，再决定回哪一个工作台继续推进。</p>
+              <div className="card-kicker">项目</div>
+              <h2>从最近一次工作现场继续</h2>
+              <p>查看当前会话、最近项目和最近导入的数据文件。</p>
             </div>
           </div>
         </article>
@@ -185,8 +185,8 @@ export function ProjectsScreen({
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>5.0 项目观</h3>
-              <p>项目页现在已经不只是说明页，而是承担“最近项目恢复”和“双工作流切换”的入口。</p>
+              <h3>当前会话</h3>
+              <p>快速查看最近记录、绘图结果和拼图图层数量。</p>
             </div>
           </div>
           <div className="context-list">
@@ -203,20 +203,6 @@ export function ProjectsScreen({
               <strong>{composer.project.panels.length}</strong>
             </div>
           </div>
-        </article>
-
-        <article className="context-card">
-          <div className="context-card-head">
-            <div>
-              <h3>使用方式</h3>
-              <p>让项目页做“恢复现场”的事，而不是重新造一套笨重的资源管理器。</p>
-            </div>
-          </div>
-          <ul className="bullet-list">
-            <li>单图出图继续走绘图精灵。</li>
-            <li>拼版和画布编辑继续走拼图器。</li>
-            <li>最近记录优先服务于快速回到上一次工作现场。</li>
-          </ul>
         </article>
       </aside>
     </div>

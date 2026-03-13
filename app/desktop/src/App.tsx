@@ -3,7 +3,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import { AppMode, NAV_ITEMS, SCREEN_META, getWizardStepLabel } from "./lib/workbench";
-import type { PlotContract, WorkbenchMeta } from "./lib/types";
+import type { PlotContract, ThemePreference, WorkbenchMeta } from "./lib/types";
 
 const WizardScreen = lazy(async () => ({
   default: (await import("./screens/WizardScreen")).WizardScreen,
@@ -18,6 +18,23 @@ const SettingsScreen = lazy(async () => ({
   default: (await import("./screens/SettingsScreen")).SettingsScreen,
 }));
 
+function describeThemePreference(value: ThemePreference) {
+  if (value === "light") {
+    return "Light";
+  }
+  if (value === "dark") {
+    return "Dark";
+  }
+  return "System";
+}
+
+function resolvedTheme(preference: ThemePreference, prefersDark: boolean) {
+  if (preference === "light" || preference === "dark") {
+    return preference;
+  }
+  return prefersDark ? "dark" : "light";
+}
+
 export default function App() {
   const persistedScreen = useWorkbenchStore((state) => state.lastScreen);
   const setPersistedScreen = useWorkbenchStore((state) => state.setLastScreen);
@@ -25,6 +42,7 @@ export default function App() {
     (state) => state.settings.remember_last_screen,
   );
   const autoStatusPoll = useWorkbenchStore((state) => state.settings.auto_status_poll);
+  const themePreference = useWorkbenchStore((state) => state.settings.theme_preference);
   const recentProjectsCount = useWorkbenchStore((state) => state.recentProjects.length);
   const [mode, setMode] = useState<AppMode>(() =>
     rememberLastScreen ? persistedScreen : "wizard",
@@ -142,6 +160,45 @@ export default function App() {
     }
   }, [metaError, plotContract, sidecarReady, workbenchMeta]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const root = document.documentElement;
+    const mediaQuery =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+
+    const applyTheme = () => {
+      const theme = resolvedTheme(themePreference, Boolean(mediaQuery?.matches));
+      root.dataset.theme = theme;
+      root.style.colorScheme = theme;
+    };
+
+    applyTheme();
+    if (!mediaQuery || themePreference !== "system") {
+      return;
+    }
+
+    const handleChange = () => {
+      applyTheme();
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => {
+        mediaQuery.removeEventListener("change", handleChange);
+      };
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => {
+      mediaQuery.removeListener(handleChange);
+    };
+  }, [themePreference]);
+
   const meta = SCREEN_META[mode];
 
   let secondaryStatusLabel = `Step ${getWizardStepLabel(wizardStep)}`;
@@ -150,7 +207,7 @@ export default function App() {
   } else if (mode === "projects") {
     secondaryStatusLabel = `${recentProjectsCount} 条最近记录`;
   } else if (mode === "settings") {
-    secondaryStatusLabel = autoStatusPoll ? "Auto Polling" : "Manual Polling";
+    secondaryStatusLabel = `${describeThemePreference(themePreference)} Theme`;
   } else if (wizardOutputsCount > 0) {
     secondaryStatusLabel = `${getWizardStepLabel(wizardStep)} / ${wizardOutputsCount} outputs`;
   }
@@ -195,7 +252,7 @@ export default function App() {
           </div>
 
           <div className="status-pills">
-            <span className="status-pill accent">5.0 Workbench</span>
+            <span className="status-pill accent">Desktop</span>
             <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
               {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
             </span>

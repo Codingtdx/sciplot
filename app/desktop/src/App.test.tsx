@@ -41,7 +41,11 @@ describe("App", () => {
       lastScreen: "wizard",
       pdfImportMode: "graph",
       recentProjects: [],
-      settings: { auto_status_poll: true, remember_last_screen: true },
+      settings: {
+        auto_status_poll: true,
+        remember_last_screen: true,
+        theme_preference: "system",
+      },
     });
   });
 
@@ -80,5 +84,34 @@ describe("App", () => {
 
     expect(getWorkbenchMeta).toHaveBeenCalledTimes(2);
     expect(getPlotContract).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies the resolved system theme to the document root", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.mocked(getWorkbenchMeta).mockResolvedValue(TEST_META);
+    vi.mocked(getPlotContract).mockResolvedValue(TEST_CONTRACT);
+    vi.mocked(healthcheck).mockResolvedValue(true);
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
   });
 });

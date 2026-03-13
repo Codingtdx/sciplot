@@ -17,6 +17,7 @@ export type WizardStep =
 
 export type WorkbenchScreen = "wizard" | "composer" | "projects" | "settings";
 export type PdfImportMode = "graph" | "asset";
+export type ThemePreference = "system" | "light" | "dark";
 
 export type PreviewItem = {
   filename: string;
@@ -210,6 +211,7 @@ export type RecentProjectEntry = {
 export type WorkbenchSettings = {
   auto_status_poll: boolean;
   remember_last_screen: boolean;
+  theme_preference: ThemePreference;
 };
 
 export type GlobalFrame = {

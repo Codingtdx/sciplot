@@ -29,7 +29,11 @@ describe("ProjectsScreen", () => {
           updated_at: new Date("2026-03-12T12:00:00Z").toISOString(),
         },
       ],
-      settings: { auto_status_poll: true, remember_last_screen: true },
+      settings: {
+        auto_status_poll: true,
+        remember_last_screen: true,
+        theme_preference: "system",
+      },
     });
   });
 
@@ -41,5 +45,11 @@ describe("ProjectsScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("project corrupted")).toBeInTheDocument();
     });
+  });
+
+  it("does not render the removed usage guide card", () => {
+    render(<ProjectsScreen meta={TEST_META} onNavigate={vi.fn()} />);
+
+    expect(screen.queryByText("使用方式")).not.toBeInTheDocument();
   });
 });

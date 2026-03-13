@@ -30,24 +30,24 @@ export const SCREEN_META: Record<
   }
 > = {
   wizard: {
-    eyebrow: "Plot Wizard",
+    eyebrow: "Plot",
     title: "绘图精灵工作台",
-    description: "把选文件、识别、调参、预检和导出收束成清楚的单步卡片流。",
+    description: "导入数据、确认推荐并导出 PDF。",
   },
   composer: {
-    eyebrow: "Composer",
+    eyebrow: "Layout",
     title: "拼图器工作台",
-    description: "让画布成为主舞台，把图层、属性和对齐信息放回右侧上下文面板。",
+    description: "导入图和素材，排版后导出单页可编辑 PDF。",
   },
   projects: {
     eyebrow: "Projects",
     title: "项目总览",
-    description: "从这里看当前会话的绘图和拼图进度，再决定回到哪条工作流继续推进。",
+    description: "查看最近项目，并回到上次的工作现场。",
   },
   settings: {
-    eyebrow: "Workbench",
+    eyebrow: "Settings",
     title: "设置与运行状态",
-    description: "展示 sidecar、画布约定和 5.0 工作台的当前行为，不把不成熟的开关硬塞进界面。",
+    description: "检查连接状态，切换主题，并调整常用偏好。",
   },
 };
 
@@ -73,32 +73,32 @@ export const STEP_COPY: Record<
   }
 > = {
   file: {
-    title: "先把输入数据放进来",
-    description: "文件进来后会先做结构识别，再给出最可能正确的图型和参数建议。",
+    title: "导入数据文件",
+    description: "选择数据后，程序会先识别结构并给出推荐图型。",
   },
   sheet: {
-    title: "确认当前使用的工作表",
-    description: "多 sheet 文件先选对目标页，后面的识别、推荐和预览才有意义。",
+    title: "确认工作表",
+    description: "多 sheet 文件先选对目标页，再继续后续步骤。",
   },
   inspect: {
-    title: "看程序为什么这样判断",
-    description: "这里不是黑箱推荐，而是把推断理由、模型标签和信号都摊开给你看。",
+    title: "查看推荐结果",
+    description: "确认识别结果、推荐图型和关键提醒。",
   },
   template: {
-    title: "必要时改图型，不强迫一步到底",
-    description: "推荐大多数时候会对，但如果你知道业务语义不一样，可以在这里改。",
+    title: "必要时切换图型",
+    description: "如果推荐不适合当前数据，可以在这里改成其他图型。",
   },
   options: {
-    title: "只暴露真正值得你决定的参数",
-    description: "先调尺寸、坐标和关键开关，把低频选项留在收起区域里。",
+    title: "调整关键参数",
+    description: "先确认尺寸、坐标轴和常用选项，再进入检查。",
   },
   preflight: {
-    title: "先预检，再决定要不要导出",
-    description: "让错误在导出前暴露，避免白跑一轮渲染或生成不可靠结果。",
+    title: "检查后再导出",
+    description: "先处理错误和警告，再生成最终 PDF。",
   },
   export: {
-    title: "结果已经产出",
-    description: "这里保留导出路径和后续动作，你可以存项目、回去改参数，或者直接换文件继续。",
+    title: "导出完成",
+    description: "查看结果路径，保存项目，或继续调整参数。",
   },
 };
 

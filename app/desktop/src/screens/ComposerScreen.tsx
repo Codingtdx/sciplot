@@ -260,6 +260,27 @@ export function ComposerScreen() {
   const canGroupSelection = selectedEditableIds.length >= 2;
   const canUngroupSelection = selectedGroupIds.length > 0;
 
+  const readDialogPaths = async (
+    options: Parameters<typeof openDialog>[0],
+    limit?: number,
+  ) => {
+    try {
+      return toDialogPaths(await openDialog(options), limit);
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+      return [];
+    }
+  };
+
+  const readSavePath = async (options: Parameters<typeof saveDialog>[0]) => {
+    try {
+      return toDialogPaths(await saveDialog(options), 1)[0] ?? null;
+    } catch (error) {
+      setDropNotice(getErrorMessage(error));
+      return null;
+    }
+  };
+
   const freeRegions = useMemo(
     () => composer.project.regions.filter((region) => region.kind === "free"),
     [composer.project.regions],
@@ -401,24 +422,30 @@ export function ComposerScreen() {
     }
 
     async function attach() {
-      const webview = getCodeGodWebviewWindow();
-      unlisten = await webview.onDragDropEvent((event) => {
-        if (disposed) {
-          return;
+      try {
+        const webview = getCodeGodWebviewWindow();
+        unlisten = await webview.onDragDropEvent((event) => {
+          if (disposed) {
+            return;
+          }
+          if (event.payload.type === "enter") {
+            setDropActive(true);
+            return;
+          }
+          if (event.payload.type === "leave") {
+            setDropActive(false);
+            return;
+          }
+          if (event.payload.type === "drop") {
+            setDropActive(false);
+            void handleDroppedPaths(event.payload.paths);
+          }
+        });
+      } catch (error) {
+        if (!disposed) {
+          setDropNotice(getErrorMessage(error));
         }
-        if (event.payload.type === "enter") {
-          setDropActive(true);
-          return;
-        }
-        if (event.payload.type === "leave") {
-          setDropActive(false);
-          return;
-        }
-        if (event.payload.type === "drop") {
-          setDropActive(false);
-          void handleDroppedPaths(event.payload.paths);
-        }
-      });
+      }
     }
 
     void attach();
@@ -450,11 +477,10 @@ export function ComposerScreen() {
   };
 
   const importGraphPanels = async () => {
-    const selected = await openDialog({
+    const paths = await readDialogPaths({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
-    const paths = toDialogPaths(selected);
     if (paths.length === 0) {
       return;
     }
@@ -467,7 +493,7 @@ export function ComposerScreen() {
   };
 
   const importAssetPanels = async () => {
-    const selected = await openDialog({
+    const paths = await readDialogPaths({
       multiple: true,
       filters: [
         {
@@ -476,7 +502,6 @@ export function ComposerScreen() {
         },
       ],
     });
-    const paths = toDialogPaths(selected);
     if (paths.length === 0) {
       return;
     }
@@ -493,11 +518,10 @@ export function ComposerScreen() {
   };
 
   const quickThreeUp = async () => {
-    const selected = await openDialog({
+    const paths = await readDialogPaths({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    const paths = toDialogPaths(selected, 3);
+    }, 3);
     if (paths.length === 0) {
       return;
     }
@@ -510,11 +534,10 @@ export function ComposerScreen() {
   };
 
   const quickTwoUpEditorial = async () => {
-    const selected = await openDialog({
+    const paths = await readDialogPaths({
       multiple: true,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    const paths = toDialogPaths(selected, 2);
+    }, 2);
     if (paths.length === 0) {
       return;
     }
@@ -925,11 +948,10 @@ export function ComposerScreen() {
   };
 
   const saveComposerProject = async () => {
-    const destination = await saveDialog({
+    const path = await readSavePath({
       defaultPath: "codegod-composer-v2.plotproject.json",
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
     });
-    const path = toDialogPaths(destination, 1)[0];
     if (!path) {
       return;
     }
@@ -952,11 +974,10 @@ export function ComposerScreen() {
   };
 
   const openComposerProject = async () => {
-    const selected = await openDialog({
+    const path = (await readDialogPaths({
       multiple: false,
       filters: [{ name: "CodeGod Project", extensions: ["json"] }],
-    });
-    const path = toDialogPaths(selected, 1)[0];
+    }, 1))[0];
     if (!path) {
       return;
     }
@@ -1193,9 +1214,9 @@ export function ComposerScreen() {
         <article className="work-card canvas-shell-card">
           <div className="section-head">
             <div>
-              <div className="card-kicker">Composer V2</div>
-              <h2>区域化网格、自由对象、可编辑 PDF 导出</h2>
-              <p>Graph PDF 严格占据标准格区，其他素材和文字可自由覆盖，并带有智能吸附线、层级和裁边。</p>
+              <div className="card-kicker">拼图</div>
+              <h2>拼版、调整并导出单页 PDF</h2>
+              <p>Graph PDF 会按标准尺寸落位，其他素材和文字可以继续自由排版。</p>
             </div>
             <div className="metric-strip">
               <div className="metric-chip">
@@ -1278,7 +1299,7 @@ export function ComposerScreen() {
           <div className="context-card-head">
             <div>
               <h3>拼图动作</h3>
-              <p>这里管理导入模式、区域合并和项目读写，不把高频布局操作塞满画布。</p>
+              <p>切换导入方式、快速生成预设布局，或保存当前项目。</p>
             </div>
           </div>
 
@@ -1376,7 +1397,7 @@ export function ComposerScreen() {
               <p>
                 {hasSelection
                   ? "当前选中对象或区域的可编辑项。"
-                  : "先选中区域、panel 或文字，这里会切换到对应的编辑器。"}
+                  : "先选中区域、图或文字，再在这里调整属性。"}
               </p>
             </div>
           </div>
@@ -1979,7 +2000,7 @@ export function ComposerScreen() {
           <div className="context-card-head">
             <div>
               <h3>图层与区域</h3>
-              <p>这里同时列出 region 和导出对象。Region 负责占格，panel / text 负责最终 PDF 内容。</p>
+              <p>这里列出占位区域和导出对象，方便选中、排序和批量处理。</p>
             </div>
           </div>
 

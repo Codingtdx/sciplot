@@ -47,7 +47,7 @@ export function SettingsScreen({
       wizard: "已重置绘图精灵现场。",
       composer: "已重置拼图器现场。",
       recent: "已清空最近项目记录。",
-      all: "已重置工作台现场并清空最近记录。",
+      all: "已重置当前页面状态并清空最近记录。",
     } as const;
 
     setMaintenanceNotice(labels[action]);
@@ -64,7 +64,7 @@ export function SettingsScreen({
               <div>
                 <div className="card-kicker">运行状态</div>
                 <h2>{sidecarReady ? "Python sidecar 已连通" : "Python sidecar 暂未连通"}</h2>
-                <p>绘图精灵的识别、预检和渲染都依赖 sidecar，这里给一个明确的健康状态反馈。</p>
+                <p>绘图识别、预览和导出都依赖 sidecar，这里可以随时重新检查。</p>
               </div>
             </div>
             <div className="step-actions">
@@ -82,11 +82,11 @@ export function SettingsScreen({
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">画布约定</div>
+                <div className="card-kicker">默认拼图画布</div>
                 <h2>
                   {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
                 </h2>
-                <p>当前拼图器遵循 3x3 网格和 0.5 mm 步进，这是 5.0 版桌面工作台的默认结构。</p>
+                <p>当前项目会使用这套画布尺寸和网格步进来排版。</p>
               </div>
             </div>
           </article>
@@ -94,11 +94,11 @@ export function SettingsScreen({
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">绘图契约</div>
+                <div className="card-kicker">默认绘图区</div>
                 <h2>
                   {meta?.global_frame.panel_width_mm ?? 60} x {meta?.global_frame.panel_height_mm ?? 55} mm 标准轴框
                 </h2>
-                <p>当前前后端都引用同一份绘图契约；这里显示标准单图 frame 和规则总数。</p>
+                <p>这里显示当前单图的默认绘图区尺寸和边距。</p>
               </div>
             </div>
             <div className="context-list">
@@ -124,13 +124,33 @@ export function SettingsScreen({
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">工作台偏好</div>
-                <h2>把少量真正有用的偏好保存下来</h2>
-                <p>这里不堆很多伪配置，只保留会明显影响工作体验的开关。</p>
+                <div className="card-kicker">显示与偏好</div>
+                <h2>主题和常用设置</h2>
+                <p>这些设置会保存在本地，并在下次打开时继续使用。</p>
               </div>
             </div>
 
             <div className="inspector-stack">
+              <label>
+                <span className="field-label">主题</span>
+                <select
+                  className="field"
+                  onChange={(event) =>
+                    updateSettings({
+                      theme_preference:
+                        event.target.value === "light" || event.target.value === "dark"
+                          ? event.target.value
+                          : "system",
+                    })
+                  }
+                  value={settings.theme_preference}
+                >
+                  <option value="system">跟随系统</option>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                </select>
+              </label>
+
               <label className="toggle-field">
                 <input
                   checked={settings.auto_status_poll}
@@ -150,7 +170,7 @@ export function SettingsScreen({
                   }
                   type="checkbox"
                 />
-                <span>记住上次打开的工作台页面</span>
+                <span>记住上次打开的页面</span>
               </label>
             </div>
           </article>
@@ -159,8 +179,8 @@ export function SettingsScreen({
             <div className="section-head">
               <div>
                 <div className="card-kicker">维护动作</div>
-                <h2>需要时快速清理现场</h2>
-                <p>重置当前工作状态，而不是去手动找缓存或改配置文件。</p>
+                <h2>清理当前工作现场</h2>
+                <p>需要时可以重置绘图、拼图或最近项目记录。</p>
               </div>
             </div>
 
@@ -188,8 +208,8 @@ export function SettingsScreen({
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>当前状态</h3>
-              <p>把真实运行状态和当前偏好总结出来，避免设置页变成一堆无意义开关。</p>
+              <h3>当前设置</h3>
+              <p>这里汇总当前保存的主题和常用偏好。</p>
             </div>
           </div>
           <div className="context-list">
@@ -202,6 +222,16 @@ export function SettingsScreen({
               <strong>{pdfImportMode === "graph" ? "作为图" : "作为素材"}</strong>
             </div>
             <div className="context-row">
+              <span>主题</span>
+              <strong>
+                {settings.theme_preference === "system"
+                  ? "跟随系统"
+                  : settings.theme_preference === "light"
+                    ? "浅色"
+                    : "深色"}
+              </strong>
+            </div>
+            <div className="context-row">
               <span>自动轮询</span>
               <strong>{settings.auto_status_poll ? "开启" : "关闭"}</strong>
             </div>
@@ -210,21 +240,6 @@ export function SettingsScreen({
               <strong>{settings.remember_last_screen ? "开启" : "关闭"}</strong>
             </div>
           </div>
-        </article>
-
-        <article className="context-card">
-          <div className="context-card-head">
-            <div>
-              <h3>当前原则</h3>
-              <p>设置页继续遵守你定的方向: 桌面工作台，不是 Web 后台表单墙。</p>
-            </div>
-          </div>
-          <ul className="bullet-list">
-            <li>左侧保持轻导航，不承担主要操作。</li>
-            <li>绘图精灵按单步卡片流推进。</li>
-            <li>拼图器把对象属性、图层和对齐信息收在右侧。</li>
-            <li>最近项目和偏好都会在本地持久化保存。</li>
-          </ul>
         </article>
       </aside>
     </div>

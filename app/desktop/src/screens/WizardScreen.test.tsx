@@ -120,7 +120,11 @@ describe("WizardScreen", () => {
       lastScreen: "wizard",
       pdfImportMode: "graph",
       recentProjects: [],
-      settings: { auto_status_poll: true, remember_last_screen: true },
+      settings: {
+        auto_status_poll: true,
+        remember_last_screen: true,
+        theme_preference: "system",
+      },
     });
   });
 
@@ -313,6 +317,20 @@ describe("WizardScreen", () => {
     expect(useWorkbenchStore.getState().recentProjects[0]?.path).toBe(
       TEST_PREPROCESS_RESPONSE.output_path,
     );
+  });
+
+  it("shows a visible error when the desktop file dialog is unavailable", async () => {
+    vi.mocked(open).mockRejectedValue(new Error("dialog unavailable"));
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "选择数据" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("无法打开文件选择窗口：dialog unavailable"),
+      ).toBeInTheDocument();
+    });
   });
 
   it("clears prior preprocess success when a later preprocess attempt fails", async () => {

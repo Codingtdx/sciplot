@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { EMPTY_COMPOSER_PROJECT } from "../lib/composer";
 import { importComposerPanels } from "../lib/api";
@@ -17,6 +18,11 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
       return () => {};
     }),
   }),
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+  save: vi.fn(),
 }));
 
 vi.mock("../components/ComposerCanvas", () => ({
@@ -114,8 +120,14 @@ describe("ComposerScreen", () => {
       lastScreen: "wizard",
       pdfImportMode: "graph",
       recentProjects: [],
-      settings: { auto_status_poll: true, remember_last_screen: true },
+      settings: {
+        auto_status_poll: true,
+        remember_last_screen: true,
+        theme_preference: "system",
+      },
     });
+    vi.mocked(open).mockReset();
+    vi.mocked(save).mockReset();
   });
 
   it("surfaces preview failures to the user", async () => {
@@ -123,6 +135,20 @@ describe("ComposerScreen", () => {
 
     await waitFor(() => {
       expect(screen.getByText("preview exploded")).toBeInTheDocument();
+    });
+  });
+
+  it("surfaces desktop dialog failures to the user", async () => {
+    vi.mocked(open).mockRejectedValue(new Error("dialog unavailable"));
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "导入图" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("无法打开文件选择窗口：dialog unavailable"),
+      ).toBeInTheDocument();
     });
   });
 

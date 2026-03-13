@@ -7,10 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
     "test:e2e:tauri-smoke": "node scripts/tauri-smoke.mjs",
-    "e2e:install": "playwright install chromium",
     "preview": "vite preview",
     "tauri": "tauri"
   },

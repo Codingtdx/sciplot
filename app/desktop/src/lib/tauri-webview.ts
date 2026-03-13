@@ -15,30 +15,19 @@ type WebviewWindowLike = {
   ): Promise<() => void> | (() => void);
 };
 
-type TauriWebviewRuntime = {
-  __CODEGOD_WEBVIEW_WINDOW__?: WebviewWindowLike;
-};
-
-const FALLBACK_WEBVIEW_WINDOW: WebviewWindowLike = {
-  async onDragDropEvent() {
-    return () => {};
-  },
-};
-
 export function getCodeGodWebviewWindow(): WebviewWindowLike {
-  const runtime = globalThis as TauriWebviewRuntime;
-  if (runtime.__CODEGOD_WEBVIEW_WINDOW__) {
-    return runtime.__CODEGOD_WEBVIEW_WINDOW__;
-  }
-
   try {
     const webviewWindow = getTauriWebviewWindow();
     if (webviewWindow && typeof webviewWindow.onDragDropEvent === "function") {
       return webviewWindow as WebviewWindowLike;
     }
-  } catch {
-    return FALLBACK_WEBVIEW_WINDOW;
+  } catch (error) {
+    const detail =
+      error instanceof Error && error.message.trim() !== ""
+        ? `：${error.message}`
+        : "";
+    throw new Error(`当前桌面运行时不支持拖放导入${detail}`);
   }
 
-  return FALLBACK_WEBVIEW_WINDOW;
+  throw new Error("当前桌面运行时不支持拖放导入。");
 }

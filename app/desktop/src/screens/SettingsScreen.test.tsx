@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { useComposerStore, useWorkbenchStore, useWizardStore } from "../lib/store";
@@ -13,7 +13,11 @@ describe("SettingsScreen", () => {
       lastScreen: "wizard",
       pdfImportMode: "graph",
       recentProjects: [],
-      settings: { auto_status_poll: true, remember_last_screen: true },
+      settings: {
+        auto_status_poll: true,
+        remember_last_screen: true,
+        theme_preference: "system",
+      },
     });
   });
 
@@ -22,5 +26,16 @@ describe("SettingsScreen", () => {
 
     expect(screen.getByText("60 x 55 mm 标准轴框")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("persists the selected theme preference and removes internal guide copy", () => {
+    render(<SettingsScreen contract={TEST_CONTRACT} meta={TEST_META} />);
+
+    fireEvent.change(screen.getByLabelText("主题"), {
+      target: { value: "light" },
+    });
+
+    expect(useWorkbenchStore.getState().settings.theme_preference).toBe("light");
+    expect(screen.queryByText("当前原则")).not.toBeInTheDocument();
   });
 });

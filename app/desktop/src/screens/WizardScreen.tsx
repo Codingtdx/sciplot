@@ -96,6 +96,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.setOutputs([]);
   };
 
+  const showDialogError = (error: unknown) => {
+    wizard.setError(getErrorMessage(error));
+  };
+
   const updateWizardTemplate = (value: TemplateName) => {
     const nextTemplate = sanitizeTemplateId(
       meta,
@@ -162,16 +166,22 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   }, [setWizardPreviews, wizard.inputPath, wizard.template]);
 
   const openDataFile = async () => {
-    const selected = await openDialog({
-      multiple: false,
-      filters: [
-        {
-          name: "Data",
-          extensions: ["csv", "txt", "tsv", "xlsx", "xlsm"],
-        },
-      ],
-    });
-    const path = toDialogPaths(selected, 1)[0];
+    let path: string | undefined;
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        filters: [
+          {
+            name: "Data",
+            extensions: ["csv", "txt", "tsv", "xlsx", "xlsm"],
+          },
+        ],
+      });
+      path = toDialogPaths(selected, 1)[0];
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
     if (!path) {
       return;
     }
@@ -195,11 +205,17 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   const openWizardProject = async () => {
-    const selected = await openDialog({
-      multiple: false,
-      filters: [{ name: "CodeGod Project", extensions: ["json"] }],
-    });
-    const path = toDialogPaths(selected, 1)[0];
+    let path: string | undefined;
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        filters: [{ name: "CodeGod Project", extensions: ["json"] }],
+      });
+      path = toDialogPaths(selected, 1)[0];
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
     if (!path) {
       return;
     }
@@ -228,10 +244,16 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     if (!wizard.inputPath) {
       return;
     }
-    const destination = await saveDialog({
-      defaultPath: "codegod-wizard.plotproject.json",
-      filters: [{ name: "CodeGod Project", extensions: ["json"] }],
-    });
+    let destination: string | null = null;
+    try {
+      destination = await saveDialog({
+        defaultPath: "codegod-wizard.plotproject.json",
+        filters: [{ name: "CodeGod Project", extensions: ["json"] }],
+      });
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
     if (typeof destination !== "string") {
       return;
     }
@@ -263,23 +285,35 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   const runTensileReplicatePreprocess = async () => {
-    const selected = await openDialog({
-      multiple: true,
-      filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
-    });
-    const filePaths = toDialogPaths(selected);
+    let filePaths: string[] = [];
+    try {
+      const selected = await openDialog({
+        multiple: true,
+        filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
+      });
+      filePaths = toDialogPaths(selected);
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
     if (filePaths.length === 0) {
       return;
     }
 
     const inferredGroupName = inferTensileGroupName(filePaths);
-    const destination = await saveDialog({
-      defaultPath: defaultSiblingPath(
-        filePaths[0],
-        `${inferredGroupName}_plot_wizard_template.xlsx`,
-      ),
-      filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
-    });
+    let destination: string | null = null;
+    try {
+      destination = await saveDialog({
+        defaultPath: defaultSiblingPath(
+          filePaths[0],
+          `${inferredGroupName}_plot_wizard_template.xlsx`,
+        ),
+        filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
+      });
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
     if (typeof destination !== "string") {
       return;
     }
@@ -385,11 +419,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         <article className="work-card hero-card">
           <div className="section-head hero-head">
             <div>
-              <div className="card-kicker">Single Figure Flow</div>
-              <h2>一步一步做决定，不把所有表单一次塞给你</h2>
-              <p>
-                现在的重点不是堆按钮，而是把识别、调参、预检和导出组织成能快速推进的工作台。
-              </p>
+              <div className="card-kicker">绘图</div>
+              <h2>从数据到 PDF 的单图流程</h2>
+              <p>按步骤导入、检查和导出，减少来回切换。</p>
             </div>
             <div className="metric-strip">
               <div className="metric-chip">
@@ -424,7 +456,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         <article className="work-card section-card">
           <div className="section-head">
             <div>
-              <div className="card-kicker">当前步骤卡片</div>
+              <div className="card-kicker">当前步骤</div>
               <h2>{stepMeta.title}</h2>
               <p>{stepMeta.description}</p>
             </div>
@@ -434,7 +466,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
           {tensileBatchResult && (
             <>
               <div className="success-card">
-                已整理 {tensileBatchResult.sample_count} 个拉伸重复样，代表曲线来自 {tensileBatchResult.representative_filename}，模板工作簿已生成并载入当前工作台。
+                已整理 {tensileBatchResult.sample_count} 个拉伸重复样，代表曲线来自 {tensileBatchResult.representative_filename}，模板工作簿已生成并载入当前页面。
               </div>
               <div className="summary-grid">
                 <div className="stat-tile">
@@ -471,11 +503,11 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
             <div className="step-block">
               <div className="focus-panel">
                 <strong>拖文件或直接打开</strong>
-                <span>支持 CSV、TSV、TXT、XLSX、XLSM。程序会先做结构识别，再给出推荐。</span>
+                <span>支持 CSV、TSV、TXT、XLSX、XLSM。导入后会先识别结构，再给出推荐。</span>
               </div>
               <div className="focus-panel">
-                <strong>原始拉伸重复样也可以直接整理</strong>
-                <span>一次选择多份仪器导出的拉伸 CSV，程序会自动提取强度/模量/断裂伸长率，计算均值，并找出最接近均值的代表曲线，再导出成绘图精灵可直接读取的模板工作簿。</span>
+                <strong>也可以直接整理拉伸重复样</strong>
+                <span>一次选择多份拉伸 CSV，程序会生成可直接继续绘图的模板工作簿。</span>
               </div>
               <div className="step-actions">
                 <button className="primary-button" onClick={openDataFile} type="button">
@@ -526,7 +558,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                 </div>
               </div>
               <div className="focus-panel">
-                <strong>程序判断</strong>
+                <strong>推荐说明</strong>
                 <span>{wizard.inspection.recommendation.reason}</span>
               </div>
               {wizard.inspection.signals.length > 0 && (
@@ -765,7 +797,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
 
           {wizard.step === "export" && (
             <div className="step-block">
-              <div className="success-card">当前参数已完成导出，结果路径保留在下方卡片里。</div>
+              <div className="success-card">当前参数已完成导出，结果路径保留在下方列表里。</div>
               <div className="step-actions">
                 <button className="ghost-button" onClick={() => void saveWizardProject()} type="button">
                   保存项目
@@ -785,7 +817,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">推荐理由卡片</div>
+                <div className="card-kicker">推荐结果</div>
                 <h2>{templateLabel(meta, recommendation.template)}</h2>
                 <p>{recommendation.reason}</p>
               </div>
@@ -826,11 +858,11 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">Preflight 卡片</div>
+                <div className="card-kicker">检查结果</div>
                 <h2>
                   {wizard.preflight.errors.length > 0 ? "还需要处理问题" : "检查通过"}
                 </h2>
-                <p>把预检结果固定在工作区里，不用来回切回前一步确认状态。</p>
+                <p>先看错误和警告，再决定是否直接导出。</p>
               </div>
             </div>
             <div className="info-grid">
@@ -857,9 +889,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
           <article className="work-card section-card">
             <div className="section-head">
               <div>
-                <div className="card-kicker">导出结果卡片</div>
+                <div className="card-kicker">导出结果</div>
                 <h2>已经生成 {wizard.outputs.length} 个文件</h2>
-                <p>这里保留结果路径，方便你确认产物命名、保存项目或继续二次调整。</p>
+                <p>结果路径保留在这里，方便继续保存项目或修改参数。</p>
               </div>
             </div>
             <ul className="output-list">
@@ -883,8 +915,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>当前上下文</h3>
-              <p>把文件、sheet、图型和导出状态压成一眼能扫到的信息。</p>
+              <h3>当前文件</h3>
+              <p>快速查看当前输入、推荐结果和导出数量。</p>
             </div>
           </div>
           <div className="context-list">

@@ -93,6 +93,7 @@ const emptyProject: ComposerProject = {
 const defaultWorkbenchSettings: WorkbenchSettings = {
   auto_status_poll: true,
   remember_last_screen: true,
+  theme_preference: "system",
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -240,6 +241,17 @@ export const useWorkbenchStore = create<WorkbenchState>()(
     {
       name: "codegod-workbench-store",
       storage,
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<WorkbenchState> | undefined;
+        return {
+          ...currentState,
+          ...persisted,
+          settings: {
+            ...defaultWorkbenchSettings,
+            ...(persisted?.settings ?? {}),
+          },
+        };
+      },
     },
   ),
 );

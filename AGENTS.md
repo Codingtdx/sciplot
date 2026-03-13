@@ -11,8 +11,7 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 4.x GUI。屏幕按 `wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
-- `app/desktop/e2e/`: Playwright 真实指针级 E2E；Composer 的框选、拖拽、`Alt` 复制、region 移动等浏览器交互从这里回归，默认通过 mock sidecar + 浏览器宿主运行。
+- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
@@ -35,7 +34,8 @@
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
-- 桌面端如果既要跑在 Tauri 内，也要跑浏览器宿主 E2E，就不要在 screen 或 hook 里直接 import Tauri API；统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类包装层。
+- 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
+- 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
 
@@ -83,8 +83,6 @@
   - `.venv/bin/python scripts/smoke_check.py`
 - GUI 组件测试：
   - `cd app/desktop && npm test`
-- GUI 真实交互 E2E：
-  - `cd app/desktop && npm run test:e2e`
 - GUI Tauri 启动 smoke：
   - `cd app/desktop && npm run test:e2e:tauri-smoke`
 - GUI 构建：
@@ -117,7 +115,6 @@
 - `ruff check`
 - `mypy src/composer.py`
 - `app/desktop npm test`
-- 如果改了画布交互、拖拽、框选、region 移动、快捷键或 Tauri 包装层，再跑 `app/desktop npm run test:e2e`
 - 如果改了 Tauri 启动链路、窗口配置、wrapper 与真实宿主交互或桌面打包入口，再跑 `app/desktop npm run test:e2e:tauri-smoke`
 - `app/desktop npm run build`
 - `app/desktop/src-tauri cargo check`
@@ -152,8 +149,8 @@
 - 不要在 sidecar 里直接 `return {...}` 一坨裸对象而不经过 response model。
 - 不要让 `save/open project` 旁路 `app/sidecar/schemas.py` 的校验/迁移层。
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
-- 不要在可被浏览器宿主测试覆盖的前端代码里直接 import `@tauri-apps/api/*` 或 `@tauri-apps/plugin-dialog`；这样会让 Playwright E2E 无法稳定启动。
-- macOS 上当前没有稳定的 Tauri WebDriver 回归链路时，优先保留 `npm run test:e2e` 这套真实指针浏览器回归，再用 `npm run test:e2e:tauri-smoke` 守真实宿主启动；不要为了“像桌面端”把可重复的浏览器 E2E 删掉。
+- 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
+- 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要把 graph region 的位置真相源拆成两份；region 负责占格，graph panel 的 `x/y/w/h` 只是归一化结果。
 - 不要再把 Composer 改回旧的 `3x3 原点吸附 + panels-only` 心智模型；v2 的事实源是 `regions + drawables`。
 - 不要让 graph 导入悄悄接受任意尺寸 PDF；不符合 `60x55 / 120x55 / 60x110 mm` 的 PDF 应提示改用 asset 模式。
