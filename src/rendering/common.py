@@ -4,8 +4,20 @@ from pathlib import Path
 
 from src.data_loader import CurveSeries, ReplicateGroup
 from src.plot_contract import validation_rule
-from src.rendering.cache import load_replicate_table_cached
-from src.rendering.constants import FREQUENCY_OUTPUTS, TEMPERATURE_OUTPUTS
+from src.rendering.cache import (
+    load_frequency_sweep_metrics_cached,
+    load_replicate_table_cached,
+    load_stress_relaxation_metric_cached,
+    load_temperature_sweep_metrics_cached,
+)
+from src.rendering.constants import (
+    FREQUENCY_CURVE_OUTPUTS,
+    FREQUENCY_OUTPUTS,
+    STRESS_RELAXATION_CURVE_OUTPUT,
+    STRESS_RELAXATION_OUTPUT,
+    TEMPERATURE_CURVE_OUTPUTS,
+    TEMPERATURE_OUTPUTS,
+)
 from src.rendering.models import RenderOptions, TemplateName
 from src.rheology_loader import RheologySeries
 from src.text_normalization import slugify_label
@@ -97,6 +109,74 @@ def validate_series_scales(series_list: list[CurveSeries], *, xscale: str, yscal
                 raise ValueError(f"Series {series.sample!r} contains non-positive y values and cannot use log y-axis.")
 
 
+def load_rheology_bundle_series(
+    bundle: str,
+    input_path: Path,
+    sheet: str | int,
+) -> dict[str, list[CurveSeries]]:
+    if bundle == "frequency_sweep":
+        return {
+            metric_name: to_curve_series(series_list)
+            for metric_name, series_list in load_frequency_sweep_metrics_cached(input_path, sheet).items()
+        }
+    if bundle == "temperature_sweep":
+        return {
+            metric_name: to_curve_series(series_list)
+            for metric_name, series_list in load_temperature_sweep_metrics_cached(input_path, sheet).items()
+        }
+    if bundle == "stress_relaxation":
+        return {
+            "sigma_over_sigma0": to_curve_series(
+                load_stress_relaxation_metric_cached(input_path, "σ/σ₀", sheet)
+            ),
+        }
+    raise ValueError(f"Unsupported rheology bundle: {bundle}")
+
+
+def rheology_output_filenames(
+    bundle: str,
+    template: TemplateName,
+) -> dict[str, str]:
+    if template == "point_line":
+        if bundle == "frequency_sweep":
+            return FREQUENCY_OUTPUTS
+        if bundle == "temperature_sweep":
+            return TEMPERATURE_OUTPUTS
+        if bundle == "stress_relaxation":
+            return {"sigma_over_sigma0": STRESS_RELAXATION_OUTPUT}
+    if template == "curve":
+        if bundle == "frequency_sweep":
+            return FREQUENCY_CURVE_OUTPUTS
+        if bundle == "temperature_sweep":
+            return TEMPERATURE_CURVE_OUTPUTS
+        if bundle == "stress_relaxation":
+            return {"sigma_over_sigma0": STRESS_RELAXATION_CURVE_OUTPUT}
+    raise ValueError(f"Unsupported bundle/template combination: {bundle} / {template}")
+
+
+def validate_rheology_bundle_scales(
+    bundle: str,
+    input_path: Path,
+    sheet: str | int,
+    *,
+    xscale: str,
+    yscale: str,
+) -> dict[str, list[CurveSeries]]:
+    metric_series = load_rheology_bundle_series(bundle, input_path, sheet)
+    bundle_label = {
+        "frequency_sweep": "频率扫描",
+        "temperature_sweep": "温度扫描",
+        "stress_relaxation": "应力松弛",
+    }.get(bundle, bundle)
+    for metric_name, series_list in metric_series.items():
+        if not series_list:
+            if bundle == "stress_relaxation":
+                raise ValueError("应力松弛表中没有读到 σ/σ₀ 曲线。")
+            raise ValueError(f"{bundle_label}缺少指标数据：{metric_name}")
+        validate_series_scales(series_list, xscale=xscale, yscale=yscale)
+    return metric_series
+
+
 def predict_bar_box_slug(groups: list[ReplicateGroup]) -> str:
     return slugify_label(groups[0].value_label if groups else "value")
 
@@ -107,13 +187,13 @@ def preview_output_filenames(
     sheet: str | int,
     bundle: str | None,
 ) -> tuple[str, ...]:
+    if template in {"point_line", "curve"} and bundle in {
+        "frequency_sweep",
+        "temperature_sweep",
+        "stress_relaxation",
+    }:
+        return tuple(rheology_output_filenames(bundle, template).values())
     if template == "point_line":
-        if bundle == "frequency_sweep":
-            return tuple(FREQUENCY_OUTPUTS.values())
-        if bundle == "temperature_sweep":
-            return tuple(TEMPERATURE_OUTPUTS.values())
-        if bundle == "stress_relaxation":
-            return ("stress_relaxation_sigma_over_sigma0.pdf",)
         return (f"{input_path.stem}_point_line.pdf",)
     if template == "curve":
         return (f"{input_path.stem}_curve.pdf",)
@@ -168,9 +248,12 @@ __all__ = [
     "append_multi_output_warning",
     "humanize_preflight_exception",
     "load_segmented_config",
+    "load_rheology_bundle_series",
     "predict_bar_box_slug",
     "preview_output_filenames",
+    "rheology_output_filenames",
     "style_preflight_warnings",
     "to_curve_series",
+    "validate_rheology_bundle_scales",
     "validate_series_scales",
 ]

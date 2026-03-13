@@ -55,6 +55,23 @@ export const TEST_META: WorkbenchMeta = {
   ],
   templates: [
     {
+      id: "point_line",
+      label: "点线",
+      description: "带点的曲线。",
+      category: "single_panel",
+      default_size: "60x55",
+      allowed_sizes: ["60x55", "120x55"],
+      editable_options: ["size", "xscale", "yscale", "reverse_x", "palette_preset"],
+      default_options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+      },
+      available_styles: ["default", "nature"],
+      available_palettes: ["colorblind_safe", "mono"],
+    },
+    {
       id: "curve",
       label: "曲线",
       description: "普通单图曲线。",
@@ -87,7 +104,7 @@ export const TEST_META: WorkbenchMeta = {
       available_palettes: ["colorblind_safe", "mono"],
     },
   ],
-  template_ids: ["curve", "heatmap"],
+  template_ids: ["point_line", "curve", "heatmap"],
   size_ids: ["60x55", "120x55", "60x110"],
   palette_preset_ids: ["colorblind_safe", "mono"],
   default_style: "default",

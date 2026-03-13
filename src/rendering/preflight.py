@@ -5,11 +5,8 @@ from pathlib import Path
 from src.plot_contract import validation_rule
 from src.rendering.cache import (
     load_curve_table_cached,
-    load_frequency_sweep_metrics_cached,
     load_heatmap_table_cached,
     load_replicate_table_cached,
-    load_stress_relaxation_metric_cached,
-    load_temperature_sweep_metrics_cached,
 )
 from src.rendering.common import (
     append_multi_output_warning,
@@ -17,7 +14,7 @@ from src.rendering.common import (
     load_segmented_config,
     preview_output_filenames,
     style_preflight_warnings,
-    to_curve_series,
+    validate_rheology_bundle_scales,
     validate_series_scales,
 )
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
@@ -32,43 +29,21 @@ def preflight_render_request(
 ) -> PreflightResult:
     warnings: list[str] = list(style_preflight_warnings(options))
     errors: list[str] = []
-    bundle = detect_point_line_bundle(input_path, sheet) if template == "point_line" else None
+    bundle = detect_point_line_bundle(input_path, sheet) if template in {"point_line", "curve"} else None
 
     try:
-        if template == "point_line":
-            if bundle == "frequency_sweep":
-                metric_series = load_frequency_sweep_metrics_cached(input_path, sheet)
-                for metric_name, rheology_series in metric_series.items():
-                    if not rheology_series:
-                        raise ValueError(f"频率扫描缺少指标数据：{metric_name}")
-                    validate_series_scales(
-                        to_curve_series(rheology_series),
-                        xscale=options.xscale,
-                        yscale=options.yscale,
-                    )
-            elif bundle == "temperature_sweep":
-                metric_series = load_temperature_sweep_metrics_cached(input_path, sheet)
-                for metric_name, rheology_series in metric_series.items():
-                    if not rheology_series:
-                        raise ValueError(f"温度扫描缺少指标数据：{metric_name}")
-                    validate_series_scales(
-                        to_curve_series(rheology_series),
-                        xscale=options.xscale,
-                        yscale=options.yscale,
-                    )
-            elif bundle == "stress_relaxation":
-                relaxation_series = to_curve_series(
-                    load_stress_relaxation_metric_cached(input_path, "σ/σ₀", sheet)
+        if template in {"point_line", "curve"}:
+            if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+                validate_rheology_bundle_scales(
+                    bundle,
+                    input_path,
+                    sheet,
+                    xscale=options.xscale,
+                    yscale=options.yscale,
                 )
-                if not relaxation_series:
-                    raise ValueError("应力松弛表中没有读到 σ/σ₀ 曲线。")
-                validate_series_scales(relaxation_series, xscale=options.xscale, yscale=options.yscale)
             else:
                 curve_series = load_curve_table_cached(input_path, sheet)
                 validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
-        elif template == "curve":
-            curve_series = load_curve_table_cached(input_path, sheet)
-            validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
         elif template == "stacked_curve":
             load_curve_table_cached(input_path, sheet)
         elif template == "segmented_stacked_curve":

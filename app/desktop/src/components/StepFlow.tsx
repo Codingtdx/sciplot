@@ -12,10 +12,8 @@ export function StepFlow({ current }: { current: WizardStep }) {
         return (
           <div className={`flow-step ${status}`} key={step.id}>
             <span className="flow-step-index">{String(index + 1).padStart(2, "0")}</span>
-            <div className="flow-step-body">
-              <strong>{step.label}</strong>
-              <span>{step.hint}</span>
-            </div>
+            <strong>{step.label}</strong>
+            <span className="flow-step-hint">{step.hint}</span>
           </div>
         );
       })}

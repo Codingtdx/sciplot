@@ -69,7 +69,7 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
         <div>
           <div className="preview-title">{current?.filename ?? "等待图像"}</div>
           <div className="preview-subtitle">
-            {current ? "当前预览" : "完成当前步骤后自动更新"}
+            {current ? "当前预览" : "修改模板或参数后自动更新"}
           </div>
         </div>
         <div className="preview-nav">

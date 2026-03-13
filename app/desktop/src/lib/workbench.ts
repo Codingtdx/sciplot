@@ -3,6 +3,7 @@ import type {
   PalettePreset,
   SizePreset,
   TemplateName,
+  WorkbenchTemplate,
   WizardStep,
   WorkbenchMeta,
   WorkbenchScreen,
@@ -17,7 +18,7 @@ export const NAV_ITEMS: Array<{
 }> = [
   { id: "wizard", label: "绘图", icon: "WZ" },
   { id: "composer", label: "拼图", icon: "CP" },
-  { id: "projects", label: "项目", icon: "PJ" },
+  { id: "projects", label: "最近", icon: "RC" },
   { id: "settings", label: "设置", icon: "ST" },
 ];
 
@@ -40,9 +41,9 @@ export const SCREEN_META: Record<
     description: "导入图和素材，排版后导出单页可编辑 PDF。",
   },
   projects: {
-    eyebrow: "Projects",
-    title: "项目总览",
-    description: "查看最近项目，并回到上次的工作现场。",
+    eyebrow: "Recent",
+    title: "最近记录",
+    description: "快速回到最近打开的数据或拼图文件。",
   },
   settings: {
     eyebrow: "Settings",
@@ -98,7 +99,7 @@ export const STEP_COPY: Record<
   },
   export: {
     title: "导出完成",
-    description: "查看结果路径，保存项目，或继续调整参数。",
+    description: "查看结果路径，继续调整参数，或直接换下一份数据。",
   },
 };
 
@@ -184,6 +185,65 @@ export function paletteLabel(meta: WorkbenchMeta | null, palette: PalettePreset 
 
 export function templateChoices(meta: WorkbenchMeta | null) {
   return meta?.templates ?? [];
+}
+
+const COMPATIBLE_TEMPLATE_IDS: Record<string, TemplateName[]> = {
+  frequency_sweep: ["point_line", "curve"],
+  temperature_sweep: ["point_line", "curve"],
+  stress_relaxation: ["point_line", "curve"],
+  curve_table: ["curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"],
+  replicate_table: ["bar", "box", "violin"],
+  heatmap_table: ["heatmap"],
+};
+
+export function compatibleTemplateIds(model: string | null | undefined) {
+  if (!model) {
+    return [] as TemplateName[];
+  }
+  return COMPATIBLE_TEMPLATE_IDS[model] ?? [];
+}
+
+export function compatibleTemplateChoices(
+  meta: WorkbenchMeta | null,
+  model: string | null | undefined,
+) {
+  const choices = templateChoices(meta);
+  const preferredIds = compatibleTemplateIds(model);
+  if (preferredIds.length === 0) {
+    return choices;
+  }
+  return preferredIds
+    .map((templateId) => choices.find((item) => item.id === templateId))
+    .filter((item): item is WorkbenchTemplate => Boolean(item));
+}
+
+export function incompatibleTemplateChoices(
+  meta: WorkbenchMeta | null,
+  model: string | null | undefined,
+) {
+  const choices = templateChoices(meta);
+  const preferredIds = new Set(compatibleTemplateIds(model));
+  if (preferredIds.size === 0) {
+    return [] as typeof choices;
+  }
+  return choices.filter((item) => !preferredIds.has(item.id));
+}
+
+export function templateCompatibilityReason(model: string | null | undefined) {
+  switch (model) {
+    case "frequency_sweep":
+    case "temperature_sweep":
+    case "stress_relaxation":
+      return "当前输入是流变导出表，先用点线或曲线。";
+    case "curve_table":
+      return "当前输入是成对曲线表，先用曲线家族。";
+    case "replicate_table":
+      return "当前输入是重复值统计表，先用 bar / box / violin。";
+    case "heatmap_table":
+      return "当前输入是 XYZ 热图表，先用热图。";
+    default:
+      return "当前输入结构和这个图型不兼容。";
+  }
 }
 
 export function sizeChoices(meta: WorkbenchMeta | null, template: TemplateName | null | undefined) {

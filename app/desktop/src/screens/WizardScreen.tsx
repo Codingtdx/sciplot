@@ -1,35 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
-import { StepFlow } from "../components/StepFlow";
 import {
   exportRender,
   inspectFile,
   preflightRender,
   preprocessTensileReplicates,
-  saveProject,
 } from "../lib/api";
-import { loadWizardDataFile, loadWizardProjectFile, applyInspectionToWizard } from "../lib/project-io";
-import { openDialog, saveDialog } from "../lib/tauri-dialog";
+import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
+import { openDialog, saveDialog } from "../lib/tauri-dialog";
 import type {
   TemplateName,
   TensileReplicateResponse,
-  WizardProject,
   WorkbenchMeta,
+  WizardStep,
 } from "../lib/types";
 import {
-  STEP_COPY,
+  compatibleTemplateChoices,
   defaultSiblingPath,
   formatLeaf,
   formatMetricValue,
   getErrorMessage,
-  getWizardStepLabel,
+  incompatibleTemplateChoices,
   inferTensileGroupName,
   publicPaletteChoices,
   sizeChoices,
-  templateChoices,
+  templateCompatibilityReason,
   templateLabel,
   toDialogPaths,
 } from "../lib/workbench";
@@ -38,9 +36,40 @@ import {
   mergeRenderOptions,
   sanitizeRenderOptions,
   sanitizeTemplateId,
+  selectionFromInspection,
   templateMeta as wizardTemplateMeta,
 } from "../lib/wizard";
 import { useWizardPreview } from "./wizard/useWizardPreview";
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function deriveWizardStep(args: {
+  inputPath: string;
+  inspectionReady: boolean;
+  template: TemplateName | null;
+  autoChecking: boolean;
+  preflightReady: boolean;
+  outputsCount: number;
+}): WizardStep {
+  if (!args.inputPath) {
+    return "file";
+  }
+  if (args.outputsCount > 0) {
+    return "export";
+  }
+  if (args.autoChecking || args.preflightReady) {
+    return "preflight";
+  }
+  if (args.template) {
+    return "options";
+  }
+  if (args.inspectionReady) {
+    return "inspect";
+  }
+  return "file";
+}
 
 export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const wizard = useWizardStore(
@@ -77,19 +106,37 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   );
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [tensileBatchResult, setTensileBatchResult] = useState<TensileReplicateResponse | null>(null);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [preflightBusy, setPreflightBusy] = useState(false);
+  const [preflightRequestError, setPreflightRequestError] = useState<string | null>(null);
   const setWizardOptions = wizard.setOptions;
   const setWizardPreviews = wizard.setPreviews;
   const setWizardTemplate = wizard.setTemplate;
+  const latestPreflightRef = useRef(0);
 
-  const stepMeta = STEP_COPY[wizard.step];
   const recommendation = wizard.inspection?.recommendation ?? null;
-  const templateOptions = templateChoices(meta);
   const sizeOptions = sizeChoices(meta, wizard.template);
   const paletteOptions = publicPaletteChoices(meta, wizard.template);
   const currentTemplate = useMemo(
     () => wizardTemplateMeta(meta, wizard.template),
     [meta, wizard.template],
   );
+  const compatibleTemplates = useMemo(
+    () => compatibleTemplateChoices(meta, wizard.inspection?.model),
+    [meta, wizard.inspection?.model],
+  );
+  const incompatibleTemplates = useMemo(
+    () => incompatibleTemplateChoices(meta, wizard.inspection?.model),
+    [meta, wizard.inspection?.model],
+  );
+  const recommendedSelection = useMemo(
+    () => (wizard.inspection ? selectionFromInspection(meta, wizard.inspection) : null),
+    [meta, wizard.inspection],
+  );
+  const recommendationApplied =
+    recommendedSelection != null &&
+    wizard.template === recommendedSelection.template &&
+    areRenderOptionsEqual(wizard.options, recommendedSelection.options);
 
   const invalidateRenderState = () => {
     wizard.setPreflight(null);
@@ -98,6 +145,15 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
 
   const showDialogError = (error: unknown) => {
     wizard.setError(getErrorMessage(error));
+  };
+
+  const applyRecommendedSelection = () => {
+    if (!recommendedSelection) {
+      return;
+    }
+    invalidateRenderState();
+    setWizardTemplate(recommendedSelection.template);
+    setWizardOptions(recommendedSelection.options);
   };
 
   const updateWizardTemplate = (value: TemplateName) => {
@@ -119,9 +175,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       return;
     }
     invalidateRenderState();
-    setWizardOptions(
-      mergeRenderOptions(meta, wizard.template, wizard.options, value),
-    );
+    setWizardOptions(mergeRenderOptions(meta, wizard.template, wizard.options, value));
   };
 
   useEffect(() => {
@@ -133,11 +187,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     if (nextTemplate !== wizard.template) {
       setWizardTemplate(nextTemplate);
     }
-    const nextOptions = sanitizeRenderOptions(
-      meta,
-      nextTemplate,
-      wizard.options,
-    );
+    const nextOptions = sanitizeRenderOptions(meta, nextTemplate, wizard.options);
     if (!areRenderOptionsEqual(nextOptions, wizard.options)) {
       setWizardOptions(nextOptions);
     }
@@ -149,6 +199,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.options,
     wizard.template,
   ]);
+
+  useEffect(() => {
+    setShowAllTemplates(false);
+  }, [wizard.inputPath, wizard.inspection?.model]);
 
   const { busy: previewBusy, error: previewError } = useWizardPreview({
     inputPath: wizard.inputPath,
@@ -165,8 +219,144 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
   }, [setWizardPreviews, wizard.inputPath, wizard.template]);
 
+  useEffect(() => {
+    if (!wizard.inputPath || !wizard.template) {
+      latestPreflightRef.current += 1;
+      setPreflightBusy(false);
+      setPreflightRequestError(null);
+      wizard.setPreflight(null);
+      return;
+    }
+
+    const requestId = latestPreflightRef.current + 1;
+    latestPreflightRef.current = requestId;
+    const inputPath = wizard.inputPath;
+    const sheet = wizard.sheet;
+    const template = wizard.template;
+    const options = wizard.options;
+    const controller = new AbortController();
+    const handle = window.setTimeout(() => {
+      setPreflightBusy(true);
+      setPreflightRequestError(null);
+
+      void preflightRender(
+        inputPath,
+        sheet,
+        template,
+        options,
+        { signal: controller.signal },
+      )
+        .then((response) => {
+          if (latestPreflightRef.current !== requestId || controller.signal.aborted) {
+            return;
+          }
+          wizard.setPreflight(response.preflight);
+          setPreflightRequestError(null);
+        })
+        .catch((error) => {
+          if (isAbortError(error) || latestPreflightRef.current !== requestId) {
+            return;
+          }
+          wizard.setPreflight(null);
+          setPreflightRequestError(getErrorMessage(error));
+        })
+        .finally(() => {
+          if (latestPreflightRef.current === requestId) {
+            setPreflightBusy(false);
+          }
+        });
+    }, 220);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(handle);
+    };
+  }, [
+    wizard.inputPath,
+    wizard.options,
+    wizard.setPreflight,
+    wizard.sheet,
+    wizard.template,
+  ]);
+
+  const blockingErrors = wizard.preflight?.errors ?? [];
+  const hasBlockingErrors = blockingErrors.length > 0 || Boolean(preflightRequestError);
+  const canExport =
+    Boolean(wizard.inputPath) &&
+    Boolean(wizard.template) &&
+    wizard.sidecarReady &&
+    !wizard.busy &&
+    !previewBusy &&
+    !preflightBusy &&
+    !hasBlockingErrors &&
+    wizard.preflight !== null;
+
+  useEffect(() => {
+    const nextStep = deriveWizardStep({
+      inputPath: wizard.inputPath,
+      inspectionReady: wizard.inspection != null,
+      template: wizard.template,
+      autoChecking: previewBusy || preflightBusy,
+      preflightReady: wizard.preflight != null,
+      outputsCount: wizard.outputs.length,
+    });
+    if (wizard.step !== nextStep) {
+      wizard.setStep(nextStep);
+    }
+  }, [
+    preflightBusy,
+    previewBusy,
+    wizard.inputPath,
+    wizard.inspection,
+    wizard.outputs.length,
+    wizard.preflight,
+    wizard.setStep,
+    wizard.step,
+    wizard.template,
+  ]);
+
+  const statusChip = useMemo(() => {
+    if (!wizard.inputPath) {
+      return { label: "等待输入", tone: "warn" };
+    }
+    if (wizard.busy) {
+      return { label: "载入中", tone: "accent" };
+    }
+    if (previewBusy || preflightBusy) {
+      return { label: "自动检查中", tone: "accent" };
+    }
+    if (hasBlockingErrors) {
+      return { label: "需处理错误", tone: "warn" };
+    }
+    if (wizard.outputs.length > 0) {
+      return { label: "已导出", tone: "good" };
+    }
+    if (wizard.preflight) {
+      return { label: "可导出", tone: "good" };
+    }
+    if (wizard.inspection) {
+      return { label: "已识别", tone: "accent" };
+    }
+    return { label: "等待输入", tone: "warn" };
+  }, [
+    hasBlockingErrors,
+    preflightBusy,
+    previewBusy,
+    wizard.busy,
+    wizard.inputPath,
+    wizard.inspection,
+    wizard.outputs.length,
+    wizard.preflight,
+  ]);
+
+  const expectedOutputs =
+    wizard.outputs.length > 0
+      ? wizard.outputs
+      : (wizard.preflight?.output_filenames ?? []).map((filename) => filename);
+
   const openDataFile = async () => {
     let path: string | undefined;
+    wizard.setError(null);
     try {
       const selected = await openDialog({
         multiple: false,
@@ -204,88 +394,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
   };
 
-  const openWizardProject = async () => {
-    let path: string | undefined;
-    try {
-      const selected = await openDialog({
-        multiple: false,
-        filters: [{ name: "CodeGod Project", extensions: ["json"] }],
-      });
-      path = toDialogPaths(selected, 1)[0];
-    } catch (error) {
-      showDialogError(error);
-      return;
-    }
-    if (!path) {
-      return;
-    }
-
-    setTensileBatchResult(null);
-    wizard.reset();
-    wizard.setError(null);
-    wizard.setBusy(true);
-    try {
-      const payload = await loadWizardProjectFile(wizard, meta, path);
-      rememberProject({
-        mode: "wizard",
-        kind: "project",
-        path,
-        title: formatLeaf(path),
-        detail: `绘图项目 · ${formatLeaf(payload.wizard.input_path)} · ${payload.wizard.outputs.length} 个结果`,
-      });
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
-  const saveWizardProject = async () => {
-    if (!wizard.inputPath) {
-      return;
-    }
-    let destination: string | null = null;
-    try {
-      destination = await saveDialog({
-        defaultPath: "codegod-wizard.plotproject.json",
-        filters: [{ name: "CodeGod Project", extensions: ["json"] }],
-      });
-    } catch (error) {
-      showDialogError(error);
-      return;
-    }
-    if (typeof destination !== "string") {
-      return;
-    }
-
-    wizard.setError(null);
-    const payload: WizardProject = {
-      version: 1,
-      mode: "wizard",
-      wizard: {
-        input_path: wizard.inputPath,
-        sheet: wizard.sheet,
-        template: wizard.template,
-        options: wizard.options,
-        outputs: wizard.outputs,
-      },
-    };
-    try {
-      await saveProject(destination, payload);
-      rememberProject({
-        mode: "wizard",
-        kind: "project",
-        path: destination,
-        title: formatLeaf(destination),
-        detail: `已保存绘图项目 · ${wizard.outputs.length} 个结果`,
-      });
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    }
-  };
-
   const runTensileReplicatePreprocess = async () => {
     let filePaths: string[] = [];
+    wizard.setError(null);
     try {
       const selected = await openDialog({
         multiple: true,
@@ -319,7 +430,6 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
 
     setTensileBatchResult(null);
-    wizard.setError(null);
     wizard.setBusy(true);
     try {
       const result = await preprocessTensileReplicates(
@@ -367,31 +477,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
   };
 
-  const runPreflight = async () => {
-    if (!wizard.inputPath || !wizard.template) {
-      return;
-    }
-
-    wizard.setError(null);
-    wizard.setBusy(true);
-    try {
-      const response = await preflightRender(
-        wizard.inputPath,
-        wizard.sheet,
-        wizard.template,
-        wizard.options,
-      );
-      wizard.setPreflight(response.preflight);
-      wizard.setStep("preflight");
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
   const runExport = async () => {
-    if (!wizard.inputPath || !wizard.template) {
+    if (!wizard.inputPath || !wizard.template || !wizard.preflight || hasBlockingErrors) {
       return;
     }
 
@@ -414,19 +501,19 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   };
 
   return (
-    <div className="desk-layout">
-      <section className="desk-main">
-        <article className="work-card hero-card">
+    <div className="desk-layout wizard-layout">
+      <section className="desk-main wizard-main">
+        <article className="work-card hero-card wizard-hero-card">
           <div className="section-head hero-head">
             <div>
               <div className="card-kicker">绘图</div>
               <h2>从数据到 PDF 的单图流程</h2>
-              <p>按步骤导入、检查和导出，减少来回切换。</p>
+              <p>载入后自动识别、预览和预检，只保留关键参数给你确认。</p>
             </div>
             <div className="metric-strip">
-              <div className="metric-chip">
-                <span>当前步骤</span>
-                <strong>{getWizardStepLabel(wizard.step)}</strong>
+              <div className={`metric-chip ${statusChip.tone}`}>
+                <span>当前状态</span>
+                <strong>{statusChip.label}</strong>
               </div>
               <div className={`metric-chip ${wizard.sidecarReady ? "good" : "warn"}`}>
                 <span>Sidecar</span>
@@ -434,41 +521,49 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
               </div>
             </div>
           </div>
-          <StepFlow current={wizard.step} />
-          <div className="hero-actions">
+
+          <div className="wizard-input-bar">
             <button className="primary-button" onClick={openDataFile} type="button">
               选择数据
             </button>
-            <button className="ghost-button" onClick={openWizardProject} type="button">
-              打开项目
-            </button>
             <button
               className="ghost-button"
-              disabled={!wizard.inputPath}
-              onClick={() => void saveWizardProject()}
+              onClick={() => void runTensileReplicatePreprocess()}
               type="button"
             >
-              保存当前项目
+              整理拉伸重复 CSV
             </button>
-          </div>
-        </article>
-
-        <article className="work-card section-card">
-          <div className="section-head">
-            <div>
-              <div className="card-kicker">当前步骤</div>
-              <h2>{stepMeta.title}</h2>
-              <p>{stepMeta.description}</p>
-            </div>
+            {wizard.sheetNames.length > 1 && (
+              <label className="wizard-inline-field">
+                <span className="field-label">Sheet</span>
+                <select
+                  className="field"
+                  value={String(wizard.sheet)}
+                  onChange={(event) => void rerunInspect(event.target.value)}
+                >
+                  {wizard.sheetNames.map((name, index) => (
+                    <option key={name} value={name}>
+                      {index + 1}. {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           {wizard.error && <div className="error-card">{wizard.error}</div>}
+          {!wizard.sidecarReady && (
+            <div className="warning-card">
+              Python sidecar 当前未连通，自动识别、预览和导出会在连接恢复后继续正常工作。
+            </div>
+          )}
           {tensileBatchResult && (
-            <>
+            <div className="wizard-callout-stack">
               <div className="success-card">
-                已整理 {tensileBatchResult.sample_count} 个拉伸重复样，代表曲线来自 {tensileBatchResult.representative_filename}，模板工作簿已生成并载入当前页面。
+                已整理 {tensileBatchResult.sample_count} 个拉伸重复样，代表曲线来自{" "}
+                {tensileBatchResult.representative_filename}，模板工作簿已自动载入。
               </div>
-              <div className="summary-grid">
+              <div className="summary-grid wizard-tight-grid">
                 <div className="stat-tile">
                   <span>输出文件</span>
                   <strong>{formatLeaf(tensileBatchResult.output_path)}</strong>
@@ -496,147 +591,145 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                   </ul>
                 </details>
               )}
-            </>
-          )}
-
-          {wizard.step === "file" && (
-            <div className="step-block">
-              <div className="focus-panel">
-                <strong>拖文件或直接打开</strong>
-                <span>支持 CSV、TSV、TXT、XLSX、XLSM。导入后会先识别结构，再给出推荐。</span>
-              </div>
-              <div className="focus-panel">
-                <strong>也可以直接整理拉伸重复样</strong>
-                <span>一次选择多份拉伸 CSV，程序会生成可直接继续绘图的模板工作簿。</span>
-              </div>
-              <div className="step-actions">
-                <button className="primary-button" onClick={openDataFile} type="button">
-                  打开数据文件
-                </button>
-                <button className="ghost-button" onClick={() => void runTensileReplicatePreprocess()} type="button">
-                  整理拉伸重复 CSV
-                </button>
-                <button className="ghost-button" onClick={openWizardProject} type="button">
-                  打开已有项目
-                </button>
-              </div>
-              {!wizard.sidecarReady && (
-                <div className="warning-card">Python sidecar 当前未连通，识别与预览会在连接恢复后继续正常工作。</div>
-              )}
             </div>
           )}
+        </article>
 
-          {wizard.step === "sheet" && (
-            <div className="step-block">
-              <label>
-                <span className="field-label">当前文件包含多个工作表</span>
-                <select
-                  className="field"
-                  value={String(wizard.sheet)}
-                  onChange={(event) => void rerunInspect(event.target.value)}
-                >
-                  {wizard.sheetNames.map((name, index) => (
-                    <option key={name} value={name}>
-                      {index + 1}. {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+        <div className="wizard-section-grid">
+          <article className="work-card section-card wizard-section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">识别摘要</div>
+                <h2>当前输入识别结果</h2>
+                <p>自动判断输入结构，并给出推荐模板与默认参数。</p>
+              </div>
             </div>
-          )}
-
-          {wizard.step === "inspect" && wizard.inspection && (
-            <div className="step-block">
-              <div className="info-grid">
-                <div className="stat-tile">
-                  <span>输入模型</span>
-                  <strong>{wizard.inspection.model_label}</strong>
+            {!wizard.inspection ? (
+              <div className="placeholder-card">选择数据后，这里会显示输入模型、推荐图型和推荐原因。</div>
+            ) : (
+              <div className="wizard-section-stack">
+                <div className="info-grid wizard-tight-grid">
+                  <div className="stat-tile">
+                    <span>输入模型</span>
+                    <strong>{wizard.inspection.model_label}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>推荐图型</span>
+                    <strong>{templateLabel(meta, wizard.inspection.recommendation.template)}</strong>
+                  </div>
                 </div>
-                <div className="stat-tile">
-                  <span>推荐图型</span>
-                  <strong>{templateLabel(meta, wizard.inspection.recommendation.template)}</strong>
+                <div className="focus-panel">
+                  <strong>推荐原因</strong>
+                  <span>{wizard.inspection.recommendation.reason}</span>
                 </div>
-              </div>
-              <div className="focus-panel">
-                <strong>推荐说明</strong>
-                <span>{wizard.inspection.recommendation.reason}</span>
-              </div>
-              {wizard.inspection.signals.length > 0 && (
-                <details>
-                  <summary>展开查看识别信号</summary>
-                  <ul className="bullet-list">
-                    {wizard.inspection.signals.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              <div className="step-actions">
-                {wizard.sheetNames.length > 1 && (
-                  <button className="ghost-button" onClick={() => wizard.setStep("sheet")} type="button">
-                    改 sheet
-                  </button>
+                {wizard.inspection.warnings.length > 0 && (
+                  <div className="warning-card">
+                    <strong>输入提醒</strong>
+                    <ul className="bullet-list">
+                      {wizard.inspection.warnings.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
-                  改图型
-                </button>
-                <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
-                  采用推荐
-                </button>
+                {wizard.inspection.signals.length > 0 && (
+                  <details>
+                    <summary>展开查看识别信号</summary>
+                    <ul className="bullet-list">
+                      {wizard.inspection.signals.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </article>
+
+          <article className="work-card section-card wizard-section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">图型</div>
+                <h2>兼容模板</h2>
+                <p>默认只展示当前输入兼容的图型，避免点进必报错的路径。</p>
               </div>
             </div>
-          )}
-
-          {wizard.step === "template" && (
-            <div className="step-block">
-              {templateOptions.length === 0 ? (
-                <div className="placeholder-card">正在载入绘图契约，请稍候再选图型。</div>
-              ) : (
-                <div className="template-grid">
-                  {templateOptions.map((template) => (
+            {!wizard.inspection ? (
+              <div className="placeholder-card">先载入数据，再根据识别结果显示兼容模板。</div>
+            ) : (
+              <div className="wizard-section-stack">
+                <div className="wizard-template-grid">
+                  {compatibleTemplates.map((template) => (
                     <button
-                      className={`template-tile ${wizard.template === template.id ? "active" : ""}`}
+                      className={`wizard-template-chip ${wizard.template === template.id ? "active" : ""}`}
                       key={template.id}
                       onClick={() => updateWizardTemplate(template.id)}
                       type="button"
                     >
                       <strong>{template.label}</strong>
-                      <span>{template.id}</span>
+                      <span>{template.description}</span>
                     </button>
                   ))}
                 </div>
-              )}
-              <div className="step-actions">
-                <button className="ghost-button" onClick={() => wizard.setStep("inspect")} type="button">
-                  返回推荐
-                </button>
-                <button className="primary-button" onClick={() => wizard.setStep("options")} type="button">
-                  用这个图型继续
-                </button>
+                {incompatibleTemplates.length > 0 && (
+                  <>
+                    <button
+                      className="ghost-button"
+                      onClick={() => setShowAllTemplates((current) => !current)}
+                      type="button"
+                    >
+                      {showAllTemplates ? "收起其他图型" : "更多图型"}
+                    </button>
+                    {showAllTemplates && (
+                      <div className="wizard-template-grid">
+                        {incompatibleTemplates.map((template) => (
+                          <button
+                            className="wizard-template-chip disabled"
+                            disabled
+                            key={template.id}
+                            type="button"
+                          >
+                            <strong>{template.label}</strong>
+                            <span>{templateCompatibilityReason(wizard.inspection?.model)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </article>
+
+          <article className="work-card section-card wizard-section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">参数</div>
+                <h2>关键参数</h2>
+                <p>这里只保留尺寸、坐标轴和少量模板相关选项，其他尽量自动处理。</p>
               </div>
             </div>
-          )}
+            {!wizard.template ? (
+              <div className="placeholder-card">确认输入后，这里会显示当前模板可编辑的参数。</div>
+            ) : (
+              <div className="wizard-section-stack">
+                <div className="field-grid wizard-tight-grid">
+                  <label>
+                    <span className="field-label">尺寸</span>
+                    <select
+                      className="field"
+                      value={wizard.options.size ?? sizeOptions[0]?.id ?? ""}
+                      onChange={(event) => updateWizardOptions({ size: event.target.value })}
+                    >
+                      {sizeOptions.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                          {choice.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-          {wizard.step === "options" && wizard.template && (
-            <div className="step-block">
-              <div className="field-grid">
-                <label>
-                  <span className="field-label">尺寸</span>
-                  <select
-                    className="field"
-                    value={wizard.options.size ?? sizeOptions[0]?.id ?? ""}
-                    onChange={(event) => updateWizardOptions({ size: event.target.value })}
-                  >
-                    {sizeOptions.map((choice) => (
-                      <option key={choice.id} value={choice.id}>
-                        {choice.id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {currentTemplate?.editable_options.includes("xscale") && (
-                  <>
+                  {currentTemplate?.editable_options.includes("xscale") && (
                     <label>
                       <span className="field-label">X 轴</span>
                       <select
@@ -652,6 +745,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                         <option value="log">log</option>
                       </select>
                     </label>
+                  )}
+
+                  {currentTemplate?.editable_options.includes("yscale") && (
                     <label>
                       <span className="field-label">Y 轴</span>
                       <select
@@ -667,245 +763,168 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                         <option value="log">log</option>
                       </select>
                     </label>
-                  </>
-                )}
+                  )}
 
-                {currentTemplate?.editable_options.includes("reverse_x") && (
-                  <label className="toggle-field">
-                    <input
-                      checked={Boolean(wizard.options.reverse_x)}
-                      onChange={(event) =>
-                        updateWizardOptions({ reverse_x: event.target.checked })
-                      }
-                      type="checkbox"
-                    />
-                    <span>反向 X 轴</span>
-                  </label>
-                )}
+                  {currentTemplate?.editable_options.includes("reverse_x") && (
+                    <label className="toggle-field">
+                      <input
+                        checked={Boolean(wizard.options.reverse_x)}
+                        onChange={(event) =>
+                          updateWizardOptions({ reverse_x: event.target.checked })
+                        }
+                        type="checkbox"
+                      />
+                      <span>反向 X 轴</span>
+                    </label>
+                  )}
 
-                {currentTemplate?.editable_options.includes("baseline") && (
-                  <label>
-                    <span className="field-label">Baseline</span>
-                    <select
-                      className="field"
-                      value={wizard.options.baseline ?? "none"}
-                      onChange={(event) =>
-                        updateWizardOptions({
-                          baseline:
-                            event.target.value === "linear_endpoints"
-                              ? "linear_endpoints"
-                              : "none",
-                        })
-                      }
-                    >
-                      <option value="none">none</option>
-                      <option value="linear_endpoints">linear_endpoints</option>
-                    </select>
-                  </label>
-                )}
+                  {currentTemplate?.editable_options.includes("baseline") && (
+                    <label>
+                      <span className="field-label">Baseline</span>
+                      <select
+                        className="field"
+                        value={wizard.options.baseline ?? "none"}
+                        onChange={(event) =>
+                          updateWizardOptions({
+                            baseline:
+                              event.target.value === "linear_endpoints"
+                                ? "linear_endpoints"
+                                : "none",
+                          })
+                        }
+                      >
+                        <option value="none">none</option>
+                        <option value="linear_endpoints">linear_endpoints</option>
+                      </select>
+                    </label>
+                  )}
 
-                {currentTemplate?.editable_options.includes("show_colorbar") && (
-                  <label className="toggle-field">
-                    <input
-                      checked={Boolean(wizard.options.show_colorbar ?? true)}
-                      onChange={(event) =>
-                        updateWizardOptions({ show_colorbar: event.target.checked })
-                      }
-                      type="checkbox"
-                    />
-                    <span>显示 colorbar</span>
-                  </label>
+                  {currentTemplate?.editable_options.includes("show_colorbar") && (
+                    <label className="toggle-field">
+                      <input
+                        checked={Boolean(
+                          wizard.options.show_colorbar ??
+                            currentTemplate.default_options.show_colorbar ??
+                            true,
+                        )}
+                        onChange={(event) =>
+                          updateWizardOptions({ show_colorbar: event.target.checked })
+                        }
+                        type="checkbox"
+                      />
+                      <span>显示 colorbar</span>
+                    </label>
+                  )}
+                </div>
+
+                {currentTemplate?.editable_options.includes("palette_preset") && (
+                  <details>
+                    <summary>高级选项</summary>
+                    <div className="field-grid compact-grid advanced-grid wizard-tight-grid">
+                      <label>
+                        <span className="field-label">配色</span>
+                        <select
+                          className="field"
+                          value={wizard.options.palette_preset ?? meta?.default_palette ?? ""}
+                          onChange={(event) =>
+                            updateWizardOptions({
+                              palette_preset: event.target.value,
+                            })
+                          }
+                        >
+                          {paletteOptions.map((choice) => (
+                            <option key={choice.id} value={choice.id}>
+                              {choice.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </details>
                 )}
               </div>
+            )}
+          </article>
 
-              <details>
-                <summary>高级选项</summary>
-                <div className="field-grid compact-grid advanced-grid">
-                  <label>
-                    <span className="field-label">配色</span>
-                    <select
-                      className="field"
-                      value={wizard.options.palette_preset ?? meta?.default_palette ?? ""}
-                      onChange={(event) =>
-                        updateWizardOptions({
-                          palette_preset: event.target.value,
-                        })
-                      }
-                    >
-                      {paletteOptions.map((choice) => (
-                        <option key={choice.id} value={choice.id}>
-                          {choice.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </details>
-
-              <div className="step-actions">
-                <button className="ghost-button" onClick={() => wizard.setStep("template")} type="button">
-                  返回图型
-                </button>
-                <button className="primary-button" onClick={() => void runPreflight()} type="button">
-                  继续检查
-                </button>
+          <article className="work-card section-card wizard-section-card">
+            <div className="section-head">
+              <div>
+                <div className="card-kicker">导出</div>
+                <h2>自动检查与导出</h2>
+                <p>参数改动后会自动重跑预览和预检；有阻断错误时不会允许导出。</p>
               </div>
             </div>
-          )}
-
-          {wizard.step === "preflight" && wizard.preflight && (
-            <div className="step-block">
-              {wizard.preflight.errors.length > 0 ? (
-                <div className="error-card">
-                  <strong>当前还不能直接导出：</strong>
-                  <ul className="bullet-list">
-                    {wizard.preflight.errors.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="success-card">当前预检查通过，可以直接导出。</div>
+            <div className="wizard-section-stack">
+              {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
+              {!preflightRequestError && preflightBusy && (
+                <div className="placeholder-card">正在更新预检结果…</div>
               )}
-
-              {wizard.preflight.warnings.length > 0 && (
-                <details>
-                  <summary>展开查看需要留意的问题</summary>
-                  <ul className="bullet-list">
-                    {wizard.preflight.warnings.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </details>
+              {!preflightRequestError && !preflightBusy && wizard.preflight && (
+                <>
+                  {blockingErrors.length > 0 ? (
+                    <div className="error-card">
+                      <strong>当前还不能直接导出：</strong>
+                      <ul className="bullet-list">
+                        {blockingErrors.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="success-card">当前预检通过，可以直接导出。</div>
+                  )}
+                  {wizard.preflight.warnings.length > 0 && (
+                    <details>
+                      <summary>展开查看导出前提醒</summary>
+                      <ul className="bullet-list">
+                        {wizard.preflight.warnings.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
+              )}
+              {!wizard.preflight && !preflightBusy && !preflightRequestError && (
+                <div className="placeholder-card">载入数据并确认模板后，系统会自动生成预检结果。</div>
               )}
 
               <div className="step-actions">
-                <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
-                  返回修改参数
-                </button>
+                {!recommendationApplied && wizard.inspection && (
+                  <button className="ghost-button" onClick={applyRecommendedSelection} type="button">
+                    恢复推荐
+                  </button>
+                )}
                 <button
                   className="primary-button"
-                  disabled={wizard.preflight.errors.length > 0}
+                  disabled={!canExport}
                   onClick={() => void runExport()}
                   type="button"
                 >
                   导出 PDF
                 </button>
               </div>
-            </div>
-          )}
 
-          {wizard.step === "export" && (
-            <div className="step-block">
-              <div className="success-card">当前参数已完成导出，结果路径保留在下方列表里。</div>
-              <div className="step-actions">
-                <button className="ghost-button" onClick={() => void saveWizardProject()} type="button">
-                  保存项目
-                </button>
-                <button className="ghost-button" onClick={() => wizard.setStep("options")} type="button">
-                  改参数重画
-                </button>
-                <button className="primary-button" onClick={openDataFile} type="button">
-                  换文件
-                </button>
+              <div className="focus-panel">
+                <strong>{wizard.outputs.length > 0 ? "导出结果" : "预计输出"}</strong>
+                {expectedOutputs.length > 0 ? (
+                  <ul className="output-list">
+                    {expectedOutputs.map((item) => (
+                      <li key={item}>{formatLeaf(item)}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>当前还没有可导出的文件列表。</span>
+                )}
               </div>
             </div>
-          )}
-        </article>
-
-        {wizard.inspection && recommendation && (
-          <article className="work-card section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">推荐结果</div>
-                <h2>{templateLabel(meta, recommendation.template)}</h2>
-                <p>{recommendation.reason}</p>
-              </div>
-            </div>
-            <div className="info-grid">
-              <div className="stat-tile">
-                <span>识别模型</span>
-                <strong>{wizard.inspection.model_label}</strong>
-              </div>
-              <div className="stat-tile">
-                <span>建议尺寸</span>
-                <strong>{recommendation.size ?? meta?.templates.find((item) => item.id === recommendation.template)?.default_size ?? "60x55"}</strong>
-              </div>
-              <div className="stat-tile">
-                <span>建议 X / Y</span>
-                <strong>
-                  {(recommendation.xscale ?? "linear").toUpperCase()} / {(recommendation.yscale ?? "linear").toUpperCase()}
-                </strong>
-              </div>
-              <div className="stat-tile">
-                <span>建议 sidecar</span>
-                <strong>{recommendation.use_sidecar === false ? "关闭" : "自动"}</strong>
-              </div>
-            </div>
-            {wizard.inspection.signals.length > 0 && (
-              <div className="tag-cloud">
-                {wizard.inspection.signals.map((item) => (
-                  <span className="signal-tag" key={item}>
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
           </article>
-        )}
-
-        {wizard.preflight && (
-          <article className="work-card section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">检查结果</div>
-                <h2>
-                  {wizard.preflight.errors.length > 0 ? "还需要处理问题" : "检查通过"}
-                </h2>
-                <p>先看错误和警告，再决定是否直接导出。</p>
-              </div>
-            </div>
-            <div className="info-grid">
-              <div className={`stat-tile ${wizard.preflight.errors.length > 0 ? "warn-tile" : "good-tile"}`}>
-                <span>错误</span>
-                <strong>{wizard.preflight.errors.length}</strong>
-              </div>
-              <div className="stat-tile">
-                <span>警告</span>
-                <strong>{wizard.preflight.warnings.length}</strong>
-              </div>
-            </div>
-            {wizard.preflight.warnings.length > 0 && (
-              <ul className="bullet-list">
-                {wizard.preflight.warnings.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            )}
-          </article>
-        )}
-
-        {wizard.outputs.length > 0 && (
-          <article className="work-card section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">导出结果</div>
-                <h2>已经生成 {wizard.outputs.length} 个文件</h2>
-                <p>结果路径保留在这里，方便继续保存项目或修改参数。</p>
-              </div>
-            </div>
-            <ul className="output-list">
-              {wizard.outputs.map((output) => (
-                <li key={output}>{output}</li>
-              ))}
-            </ul>
-          </article>
-        )}
+        </div>
       </section>
 
-      <aside className="desk-context">
+      <aside className="desk-context wizard-context">
         <PreviewPane
-          busy={previewBusy || wizard.busy}
+          busy={previewBusy}
           error={previewError}
           onChangeIndex={wizard.setPreviewIndex}
           previewIndex={wizard.previewIndex}
@@ -915,49 +934,59 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         <article className="context-card">
           <div className="context-card-head">
             <div>
-              <h3>当前文件</h3>
-              <p>快速查看当前输入、推荐结果和导出数量。</p>
+              <h3>当前输入</h3>
+              <p>把文件、当前模板和自动检查状态收在同一处，避免重复信息卡。</p>
             </div>
           </div>
-          <div className="context-list">
-            <div className="context-row">
+          <div className="wizard-summary-list">
+            <div className="wizard-summary-row">
               <span>文件</span>
-              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "未选择"}</strong>
+              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "-"}</strong>
             </div>
-            <div className="context-row">
+            <div className="wizard-summary-row">
               <span>Sheet</span>
-              <strong>{wizard.sheetNames.length > 0 ? String(wizard.sheet) : "-"}</strong>
+              <strong>{String(wizard.sheet)}</strong>
             </div>
-            <div className="context-row">
-              <span>推荐图型</span>
-              <strong>{recommendation ? templateLabel(meta, recommendation.template) : "-"}</strong>
+            <div className="wizard-summary-row">
+              <span>当前图型</span>
+              <strong>{templateLabel(meta, wizard.template)}</strong>
             </div>
-            <div className="context-row">
+            <div className="wizard-summary-row">
+              <span>当前阶段</span>
+              <strong>{statusChip.label}</strong>
+            </div>
+            <div className="wizard-summary-row">
               <span>预览数</span>
               <strong>{wizard.previews.length}</strong>
             </div>
-            <div className="context-row">
+            <div className="wizard-summary-row">
               <span>导出数</span>
               <strong>{wizard.outputs.length}</strong>
             </div>
           </div>
-        </article>
 
-        {wizard.inspection && wizard.inspection.warnings.length > 0 && (
-          <article className="context-card warn-card">
-            <div className="context-card-head">
-              <div>
-                <h3>输入提醒</h3>
-                <p>这些提醒不会阻断流程，但值得在导出前看一眼。</p>
-              </div>
+          {(wizard.inspection?.warnings.length ||
+            wizard.preflight?.warnings.length ||
+            hasBlockingErrors) && (
+            <div className="wizard-callout-stack">
+              {hasBlockingErrors && (
+                <div className="error-card">
+                  {preflightRequestError ?? `${blockingErrors.length} 个阻断错误需要先处理。`}
+                </div>
+              )}
+              {wizard.preflight && wizard.preflight.warnings.length > 0 && (
+                <div className="warning-card">
+                  导出前提醒 {wizard.preflight.warnings.length} 条。
+                </div>
+              )}
+              {wizard.inspection && wizard.inspection.warnings.length > 0 && (
+                <div className="warning-card">
+                  输入提醒 {wizard.inspection.warnings.length} 条。
+                </div>
+              )}
             </div>
-            <ul className="bullet-list">
-              {wizard.inspection.warnings.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
-        )}
+          )}
+        </article>
       </aside>
     </div>
   );

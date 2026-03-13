@@ -22,9 +22,9 @@ DEFAULT_SIZE_BY_TEMPLATE: dict[str, str] = {
 }
 LEGACY_TEMPLATE_HINTS = {
     "box_bar_plots": "请改用 `bar` 或 `box`，需要时再用 `violin`。",
-    "frequency_sweep": "请改用 `point_line`。",
-    "temperature_sweep": "请改用 `point_line`。",
-    "stress_relaxation": "请改用 `point_line`。",
+    "frequency_sweep": "请改用 `point_line` 或 `curve`。",
+    "temperature_sweep": "请改用 `point_line` 或 `curve`。",
+    "stress_relaxation": "请改用 `point_line` 或 `curve`。",
     "tensile_curve": "请改用 `curve` 或 `point_line`。",
     "ftir": "请改用 `stacked_curve`。",
     "nmr": "请改用 `stacked_curve`。",
@@ -41,7 +41,19 @@ FREQUENCY_OUTPUTS = {
     "loss_factor": "freq_loss_factor.pdf",
     "complex_viscosity": "freq_complex_viscosity.pdf",
 }
+FREQUENCY_CURVE_OUTPUTS = {
+    "storage_modulus": "freq_storage_modulus_curve.pdf",
+    "loss_modulus": "freq_loss_modulus_curve.pdf",
+    "loss_factor": "freq_loss_factor_curve.pdf",
+    "complex_viscosity": "freq_complex_viscosity_curve.pdf",
+}
 TEMPERATURE_OUTPUTS = {
     "storage_modulus": "temp_storage_modulus.pdf",
     "complex_viscosity": "temp_complex_viscosity.pdf",
 }
+TEMPERATURE_CURVE_OUTPUTS = {
+    "storage_modulus": "temp_storage_modulus_curve.pdf",
+    "complex_viscosity": "temp_complex_viscosity_curve.pdf",
+}
+STRESS_RELAXATION_OUTPUT = "stress_relaxation_sigma_over_sigma0.pdf"
+STRESS_RELAXATION_CURVE_OUTPUT = "stress_relaxation_sigma_over_sigma0_curve.pdf"

@@ -16,100 +16,71 @@ from src.plotting_families.spectral_family import plot_wide_nmr
 from src.plotting_families.stats_family import plot_bar, plot_box, plot_violin
 from src.rendering.cache import (
     load_curve_table_cached,
-    load_frequency_sweep_metrics_cached,
     load_heatmap_table_cached,
     load_replicate_table_cached,
-    load_stress_relaxation_metric_cached,
-    load_temperature_sweep_metrics_cached,
 )
-from src.rendering.common import load_segmented_config, predict_bar_box_slug, to_curve_series
-from src.rendering.constants import FREQUENCY_OUTPUTS, TEMPERATURE_OUTPUTS
+from src.rendering.common import (
+    load_rheology_bundle_series,
+    load_segmented_config,
+    predict_bar_box_slug,
+    rheology_output_filenames,
+)
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName, TemplateRenderer
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.recommendation import detect_point_line_bundle
 
 
-def _render_point_line_frequency(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    metric_series = load_frequency_sweep_metrics_cached(input_path, sheet)
-    curve_metrics = {
-        metric_name: to_curve_series(series_list)
-        for metric_name, series_list in metric_series.items()
-    }
-    all_x_values = [
-        series.data["x"].to_numpy(dtype=float)
-        for metric_name in FREQUENCY_OUTPUTS
-        for series in curve_metrics.get(metric_name, [])
-    ]
-    shared_x_layout = compute_shared_curve_x_layout(all_x_values, xscale=options.xscale)
+def _render_rheology_bundle(
+    bundle: str,
+    template: TemplateName,
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+) -> list[RenderedPlot]:
+    metric_series = load_rheology_bundle_series(bundle, input_path, sheet)
+    output_filenames = rheology_output_filenames(bundle, template)
+    show_markers = template == "point_line"
+
+    shared_x_layout = None
+    if bundle in {"frequency_sweep", "temperature_sweep"}:
+        all_x_values = [
+            series.data["x"].to_numpy(dtype=float)
+            for metric_name in output_filenames
+            for series in metric_series.get(metric_name, [])
+        ]
+        shared_x_layout = compute_shared_curve_x_layout(all_x_values, xscale=options.xscale)
+
     outputs: list[RenderedPlot] = []
-    for metric_name, filename in FREQUENCY_OUTPUTS.items():
-        series_list = curve_metrics.get(metric_name, [])
+    for metric_name, filename in output_filenames.items():
+        series_list = metric_series.get(metric_name, [])
         if not series_list:
-            raise ValueError(f"Missing data for frequency sweep metric: {metric_name}")
-        fig, _ = plot_curves(
-            series_list,
-            show_markers=True,
-            xscale=options.xscale,
-            yscale=options.yscale,
-            width_mm=options.width_mm,
-            height_mm=options.height_mm,
-            reverse_x=options.reverse_x,
-            xlim=shared_x_layout.display_bounds,
-            visible_xticks=shared_x_layout.visible_ticks,
-            legend_expand_axes="y",
-        )
+            raise ValueError(f"Missing data for {bundle} metric: {metric_name}")
+
+        plot_kwargs: dict[str, object] = {
+            "show_markers": show_markers,
+            "xscale": options.xscale,
+            "yscale": options.yscale,
+            "width_mm": options.width_mm,
+            "height_mm": options.height_mm,
+            "reverse_x": options.reverse_x,
+        }
+        if shared_x_layout is not None:
+            plot_kwargs["xlim"] = shared_x_layout.display_bounds
+            plot_kwargs["visible_xticks"] = shared_x_layout.visible_ticks
+            plot_kwargs["legend_expand_axes"] = "y"
+        if bundle == "stress_relaxation":
+            plot_kwargs["y_padding_top"] = 0.12
+            plot_kwargs["y_padding_bottom"] = 0.04
+
+        fig, _ = plot_curves(series_list, **plot_kwargs)
         outputs.append(RenderedPlot(filename=filename, figure=fig))
     return outputs
-
-
-def _render_point_line_temperature(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    metric_series = load_temperature_sweep_metrics_cached(input_path, sheet)
-    all_x_values = [
-        series.data["x"].to_numpy(dtype=float)
-        for metric_name in TEMPERATURE_OUTPUTS
-        for series in metric_series.get(metric_name, [])
-    ]
-    shared_x_layout = compute_shared_curve_x_layout(all_x_values, xscale=options.xscale)
-    outputs: list[RenderedPlot] = []
-    for metric_name, filename in TEMPERATURE_OUTPUTS.items():
-        series_list = to_curve_series(metric_series.get(metric_name, []))
-        if not series_list:
-            raise ValueError(f"Missing data for temperature sweep metric: {metric_name}")
-        fig, _ = plot_curves(
-            series_list,
-            show_markers=True,
-            xscale=options.xscale,
-            yscale=options.yscale,
-            width_mm=options.width_mm,
-            height_mm=options.height_mm,
-            reverse_x=options.reverse_x,
-            xlim=shared_x_layout.display_bounds,
-            visible_xticks=shared_x_layout.visible_ticks,
-            legend_expand_axes="y",
-        )
-        outputs.append(RenderedPlot(filename=filename, figure=fig))
-    return outputs
-
-
-def _render_point_line_relaxation(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = to_curve_series(load_stress_relaxation_metric_cached(input_path, "σ/σ₀", sheet))
-    if not series_list:
-        raise ValueError("No stress relaxation series found for σ/σ₀.")
-    fig, _ = plot_curves(
-        series_list,
-        show_markers=True,
-        xscale=options.xscale,
-        yscale=options.yscale,
-        width_mm=options.width_mm,
-        height_mm=options.height_mm,
-        reverse_x=options.reverse_x,
-        y_padding_top=0.12,
-        y_padding_bottom=0.04,
-    )
-    return [RenderedPlot(filename="stress_relaxation_sigma_over_sigma0.pdf", figure=fig)]
 
 
 def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    bundle = detect_point_line_bundle(input_path, sheet)
+    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(bundle, "curve", input_path, sheet, options)
     series_list = load_curve_table_cached(input_path, sheet)
     fig, _ = plot_curves(
         series_list,
@@ -125,12 +96,8 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
 
 def _render_point_line(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle == "frequency_sweep":
-        return _render_point_line_frequency(input_path, sheet, options)
-    if bundle == "temperature_sweep":
-        return _render_point_line_temperature(input_path, sheet, options)
-    if bundle == "stress_relaxation":
-        return _render_point_line_relaxation(input_path, sheet, options)
+    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(bundle, "point_line", input_path, sheet, options)
 
     series_list = load_curve_table_cached(input_path, sheet)
     fig, _ = plot_curves(

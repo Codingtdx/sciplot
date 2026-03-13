@@ -36,6 +36,10 @@
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
+- 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
+- 单图 `wizard` 现在是单屏自动检查流：文件载入、sheet 切换、模板切换和参数修改后，前端都会自动触发 `inspect / render-preview / preflight`；不要再把主流程改回“多步翻页 + 手动点继续检查”。
+- `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
+- `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
 
@@ -59,6 +63,20 @@
 - 标准单图模板 `curve / point_line / bar / box / violin / scatter / heatmap` 必须共用同一套物理 axis frame。
 - `wide_nmr` 是特例：只要求左、右、底对齐；顶部保留结构式区域；总高度保持双高。
 - `heatmap` 也是特例：主热图区必须和标准单图同 frame；顶部水平 colorbar 不能挤压主图区，也不能出画布。
+- 输入识别先看表结构，再看轴标签/单位，最后才看数值跨度：
+  - 先分清 `curve_table / replicate_table / heatmap xyz_long_table / rheology bundle`。
+  - 曲线类再根据 `Chemical shift / ppm / Wavenumber / 2theta / Heat flow / Time / σ/σ₀` 这些标签和单位判断推荐图型。
+  - `xscale / yscale` 默认值要参考正值数据跨越的数量级；横纵轴变化幅度不够时保留 `linear`，跨越多个数量级时再改成 `log`。
+- stress relaxation 这类 4 列一组导出表不是普通 `curve_table`；`point_line` 和 `curve` 都应走专用 rheology loader 读取 `σ/σ₀`，不要再让 `curve` 误走成对列解析。
+- `frequency_sweep / temperature_sweep / stress_relaxation` 这三类 rheology bundle 上，`curve` 和 `point_line` 必须共享同一套 bundle loader 和指标拆分，只允许在“是否显示 markers”上分叉：
+  - `frequency_sweep curve` 导出 `freq_*_curve.pdf`
+  - `temperature_sweep curve` 导出 `temp_*_curve.pdf`
+  - `stress_relaxation curve` 导出 `stress_relaxation_sigma_over_sigma0_curve.pdf`
+- `wizard` 前端当前使用的兼容模板映射是：
+  - `frequency_sweep / temperature_sweep / stress_relaxation -> point_line, curve`
+  - `curve_table -> curve, point_line, stacked_curve, segmented_stacked_curve, scatter`
+  - `replicate_table -> bar, box, violin`
+  - `heatmap_table -> heatmap`
 - 日常渲染会直接吃契约；完整“画完再审”的重校验只在 smoke / 查 bug 时跑。
 
 ## 修改流程
@@ -151,6 +169,10 @@
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
+- 不要把 wizard 再改回“先保存项目再继续”的心智模型；单图流程默认应该一屏完成导入、推荐、参数和导出。
+- 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
+- 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
+- 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
 - 不要把 graph region 的位置真相源拆成两份；region 负责占格，graph panel 的 `x/y/w/h` 只是归一化结果。
 - 不要再把 Composer 改回旧的 `3x3 原点吸附 + panels-only` 心智模型；v2 的事实源是 `regions + drawables`。
 - 不要让 graph 导入悄悄接受任意尺寸 PDF；不符合 `60x55 / 120x55 / 60x110 mm` 的 PDF 应提示改用 asset 模式。

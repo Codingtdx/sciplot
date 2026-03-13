@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from contextlib import suppress
 from pathlib import Path
 
@@ -11,8 +12,10 @@ from src.rendering.cache import (
     load_curve_table_cached,
     load_heatmap_table_cached,
     load_replicate_table_cached,
+    load_stress_relaxation_metric_cached,
     read_raw_table_cached,
 )
+from src.rendering.common import to_curve_series
 from src.rendering.models import InputInspection, Recommendation, TemplateName
 from src.text_normalization import canonicalize_token, normalize_label
 from src.wide_nmr import wide_nmr_sidecar_path
@@ -58,6 +61,72 @@ def point_line_bundle_signals(bundle: str) -> tuple[str, ...]:
             "同组包含 σ/σ₀ 指标。",
         )
     return ()
+
+
+def axis_dynamic_range(
+    series_list: list[CurveSeries],
+    axis: str,
+) -> tuple[float, float, bool] | None:
+    positive_min: float | None = None
+    positive_max: float | None = None
+    all_positive = True
+
+    for series in series_list:
+        values = pd.to_numeric(series.data[axis], errors="coerce").dropna()
+        if values.empty:
+            continue
+        positive = values[values > 0]
+        if positive.empty:
+            all_positive = False
+            continue
+        if len(positive) != len(values):
+            all_positive = False
+        current_min = float(positive.min())
+        current_max = float(positive.max())
+        positive_min = current_min if positive_min is None else min(positive_min, current_min)
+        positive_max = current_max if positive_max is None else max(positive_max, current_max)
+
+    if positive_min is None or positive_max is None or positive_max <= 0:
+        return None
+
+    ratio = positive_max / positive_min if positive_min > 0 else 0.0
+    orders = math.log10(ratio) if ratio > 0 else 0.0
+    return ratio, orders, all_positive
+
+
+def recommend_axis_scale(
+    series_list: list[CurveSeries],
+    axis: str,
+    *,
+    label: str,
+    min_orders: float,
+) -> tuple[str, str]:
+    summary = axis_dynamic_range(series_list, axis)
+    if summary is None:
+        return "linear", f"{label} 没有稳定的正值跨度，保留 linear。"
+
+    _, orders, all_positive = summary
+    if all_positive and orders >= min_orders:
+        return "log", f"{label} 跨度约 {orders:.1f} 个数量级，默认改为 log。"
+    if not all_positive:
+        return "linear", f"{label} 含非正值或贴近 0 的区段，保留 linear。"
+    return "linear", f"{label} 变化约 {orders:.1f} 个数量级，保留 linear 更易读。"
+
+
+def recommend_curve_scales(series_list: list[CurveSeries]) -> tuple[str, str, tuple[str, ...]]:
+    xscale, xsignal = recommend_axis_scale(
+        series_list,
+        "x",
+        label="横轴",
+        min_orders=2.0,
+    )
+    yscale, ysignal = recommend_axis_scale(
+        series_list,
+        "y",
+        label="纵轴",
+        min_orders=2.3,
+    )
+    return xscale, yscale, (xsignal, ysignal)
 
 
 def recommendation(template: TemplateName, reason: str, **overrides: object) -> Recommendation:
@@ -170,17 +239,21 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             signals=point_line_bundle_signals(bundle),
         )
     if bundle == "stress_relaxation":
+        relaxation_series = to_curve_series(
+            load_stress_relaxation_metric_cached(input_path, "σ/σ₀", sheet)
+        )
+        xscale, yscale, range_signals = recommend_curve_scales(relaxation_series)
         return InputInspection(
             model=bundle,
             model_label=model_label(bundle),
             recommendation=recommendation(
                 "point_line",
                 "识别到应力松弛的 4 列一组导出表。",
-                xscale="log",
-                yscale="linear",
+                xscale=xscale,
+                yscale=yscale,
                 reverse_x=False,
             ),
-            signals=point_line_bundle_signals(bundle),
+            signals=point_line_bundle_signals(bundle) + range_signals,
         )
 
     with suppress(Exception):
@@ -309,16 +382,20 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 "推荐保持正向 x 轴。",
             ),
         )
+    xscale, yscale, range_signals = recommend_curve_scales(series_list)
     return InputInspection(
         model="curve_table",
         model_label=model_label("curve_table"),
         recommendation=recommendation(
             "curve",
             "识别到普通成对曲线表，默认推荐普通曲线图。",
+            xscale=xscale,
+            yscale=yscale,
         ),
         signals=(
             "检测到标准成对曲线表。",
             "当前标签和单位不明显属于谱图或流变导出表。",
             "默认先按普通曲线图处理。",
+            *range_signals,
         ),
     )

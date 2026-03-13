@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { loadComposerProjectFile, loadWizardDataFile, loadWizardProjectFile } from "../lib/project-io";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/store";
-import type { RecentProjectEntry, WorkbenchMeta, WorkbenchScreen } from "../lib/types";
+import type { RecentProjectEntry, WorkbenchMeta } from "../lib/types";
 import {
   AppMode,
   formatLeaf,
@@ -95,56 +95,19 @@ export function ProjectsScreen({
         <article className="work-card hero-card">
           <div className="section-head hero-head">
             <div>
-              <div className="card-kicker">项目</div>
-              <h2>从最近一次工作现场继续</h2>
-              <p>查看当前会话、最近项目和最近导入的数据文件。</p>
+              <div className="card-kicker">最近</div>
+              <h2>最近打开的输入与排版</h2>
+              <p>单图流程默认直接处理数据文件；只有拼图器才需要显式保存项目。</p>
             </div>
           </div>
         </article>
 
-        <div className="summary-grid">
-          <article className="work-card section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">绘图精灵</div>
-                <h2>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "还没有加载数据"}</h2>
-                <p>当前步骤是 {getWizardStepLabel(wizard.step)}，导出文件数为 {wizard.outputs.length}。</p>
-              </div>
-            </div>
-            <div className="step-actions">
-              <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
-                回到绘图精灵
-              </button>
-            </div>
-          </article>
-
-          <article className="work-card section-card">
-            <div className="section-head">
-              <div>
-                <div className="card-kicker">拼图器</div>
-                <h2>
-                  {composer.project.panels.length} 个 panel / {composer.project.texts.length} 段文字
-                </h2>
-                <p>
-                  当前画布 {composer.project.canvas_width_mm} x {composer.project.canvas_height_mm} mm，
-                  自动编号 {composer.project.auto_labels ? "已开启" : "已关闭"}。
-                </p>
-              </div>
-            </div>
-            <div className="step-actions">
-              <button className="primary-button" onClick={() => onNavigate("composer")} type="button">
-                回到拼图器
-              </button>
-            </div>
-          </article>
-        </div>
-
         <article className="work-card section-card">
           <div className="section-head">
             <div>
-              <div className="card-kicker">最近项目与输入</div>
-              <h2>从最近一次工作现场继续</h2>
-              <p>打开过的数据文件、保存过的项目和最近恢复过的工作，都会在这里形成可回跳的入口。</p>
+              <div className="card-kicker">记录</div>
+              <h2>最近工作入口</h2>
+              <p>这里会记住最近打开的数据文件和拼图文件，点一下就能回去继续。</p>
             </div>
           </div>
 
@@ -157,7 +120,7 @@ export function ProjectsScreen({
           <div className="layer-list">
             {recentProjects.length === 0 && (
               <div className="placeholder-card">
-                还没有最近记录。先在绘图精灵或拼图器里打开/保存一次项目，这里就会开始积累。
+                还没有最近记录。先打开一份数据文件，或者在拼图器里载入一次排版文件，这里就会开始积累。
               </div>
             )}
 
@@ -186,24 +149,55 @@ export function ProjectsScreen({
           <div className="context-card-head">
             <div>
               <h3>当前会话</h3>
-              <p>快速查看最近记录、绘图结果和拼图图层数量。</p>
             </div>
           </div>
           <div className="context-list">
+            <div className="context-row">
+              <span>绘图文件</span>
+              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "未加载"}</strong>
+            </div>
             <div className="context-row">
               <span>最近记录</span>
               <strong>{recentProjects.length}</strong>
             </div>
             <div className="context-row">
-              <span>绘图结果</span>
-              <strong>{wizard.outputs.length}</strong>
+              <span>绘图步骤</span>
+              <strong>{getWizardStepLabel(wizard.step)}</strong>
             </div>
             <div className="context-row">
-              <span>拼图图层</span>
-              <strong>{composer.project.panels.length}</strong>
+              <span>拼图对象</span>
+              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
             </div>
           </div>
+          <div className="step-actions compact-actions">
+            <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
+              回到绘图
+            </button>
+            <button className="ghost-button" onClick={() => onNavigate("composer")} type="button">
+              回到拼图
+            </button>
+          </div>
         </article>
+
+        {wizard.outputs.length > 0 && (
+          <article className="context-card">
+            <div className="context-card-head">
+              <div>
+                <h3>最近导出</h3>
+              </div>
+            </div>
+            <div className="context-list">
+              <div className="context-row">
+                <span>输出数</span>
+                <strong>{wizard.outputs.length}</strong>
+              </div>
+              <div className="context-row">
+                <span>最新结果</span>
+                <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
+              </div>
+            </div>
+          </article>
+        )}
       </aside>
     </div>
   );
