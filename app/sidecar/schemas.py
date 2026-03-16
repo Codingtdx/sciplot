@@ -491,6 +491,8 @@ class OpenProjectResponse(StrictModel):
 def serialize_dataclass(value: Any) -> Any:
     if is_dataclass(value):
         return {key: serialize_dataclass(item) for key, item in asdict(value).items()}
+    if isinstance(value, Path):
+        return str(value)
     if isinstance(value, dict):
         return {key: serialize_dataclass(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):

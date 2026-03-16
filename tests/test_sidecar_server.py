@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.sidecar.server import app
 
 client = TestClient(app)
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "tensile_raw"
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -217,6 +218,30 @@ def test_save_project_rejects_unknown_mode(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "这不是可识别的 CodeGod 项目文件。"
+
+
+def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path) -> None:
+    output_path = tmp_path / "BlendSet_plot_wizard_template.xlsx"
+
+    response = client.post(
+        "/preprocess-tensile-replicates",
+        json={
+            "file_paths": [
+                str(FIXTURE_DIR / "BlendSet_A.csv"),
+                str(FIXTURE_DIR / "BlendSet_B.csv"),
+                str(FIXTURE_DIR / "BlendSet_bad.csv"),
+            ],
+            "output_path": str(output_path),
+            "group_name": "BlendSet",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["output_path"] == str(output_path)
+    assert payload["sample_count"] == 2
+    assert payload["preferred_sheet"] == "Representative_Curve"
+    assert "BlendSet_bad.csv" in payload["warnings"][0]
 
 
 def test_save_project_rejects_invalid_wizard_shape(tmp_path: Path) -> None:
