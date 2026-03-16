@@ -798,7 +798,13 @@ def _sorted_limits(bounds: tuple[float, float]) -> tuple[float, float]:
     return (min(bounds), max(bounds))
 
 
-def _assert_curve_padding(plot_fn, series_list, *, expect_log_y: bool = False) -> None:
+def _assert_curve_padding(
+    plot_fn,
+    series_list,
+    *,
+    expect_log_y: bool = False,
+    expect_zero_y_origin: bool = False,
+) -> None:
     fig, ax = plot_fn(series_list)
     fig.canvas.draw()
 
@@ -811,7 +817,12 @@ def _assert_curve_padding(plot_fn, series_list, *, expect_log_y: bool = False) -
 
     if not (x_low < raw_x_min and x_high > raw_x_max):
         raise AssertionError("Curve x-axis was not padded beyond the raw data bounds.")
-    if not (y_low < raw_y_min and y_high > raw_y_max):
+    if expect_zero_y_origin:
+        if not np.isclose(y_low, 0.0):
+            raise AssertionError("Tensile curve y-axis should start at 0.")
+        if not (y_high > raw_y_max):
+            raise AssertionError("Curve y-axis upper bound should still keep headroom above the raw data.")
+    elif not (y_low < raw_y_min and y_high > raw_y_max):
         raise AssertionError("Curve y-axis was not padded beyond the raw data bounds.")
 
     xticks = np.asarray(ax.get_xticks(), dtype=float)
@@ -821,7 +832,10 @@ def _assert_curve_padding(plot_fn, series_list, *, expect_log_y: bool = False) -
 
     yticks = np.asarray(ax.get_yticks(), dtype=float)
     yticks = yticks[np.isfinite(yticks)]
-    if yticks.size and yticks.min() < raw_y_min:
+    if expect_zero_y_origin:
+        if not np.any(np.isclose(yticks, 0.0)):
+            raise AssertionError("Tensile curve should retain 0 as a visible y-axis major tick.")
+    elif yticks.size and yticks.min() < raw_y_min:
         if expect_log_y:
             raise AssertionError(
                 "Log y-axis should hide the bottom boundary tick when it falls below the raw data range."
@@ -864,6 +878,10 @@ def _assert_stat_plot_tick_cap(groups) -> None:
         box_low, _ = _sorted_limits(box_ylim)
         if np.isclose(box_low, 0.0):
             raise AssertionError("Box and violin plots should no longer be forced to start at 0.")
+        box_ticks = np.asarray(name_to_ax["plot_box"].get_yticks(), dtype=float)
+        box_ticks = box_ticks[np.isfinite(box_ticks)]
+        if not np.any(np.isclose(box_ticks, box_low)):
+            raise AssertionError("Box plot should keep its current lower axis start as a visible major tick.")
     finally:
         for _, fig, _ in figures_axes:
             plt.close(fig)
@@ -1860,7 +1878,7 @@ def main() -> int:
             temp_path=temp_path,
         )
         tensile_series = load_curve_table(tensile_path)
-        _assert_curve_padding(plot_tensile_curve, tensile_series)
+        _assert_curve_padding(plot_tensile_curve, tensile_series, expect_zero_y_origin=True)
         _assert_major_tick_skip_every_other()
         _assert_stat_plot_tick_cap(load_replicate_table(replicate_path))
         freq_series = _to_curve_series(load_frequency_sweep_metrics(freq_path)["storage_modulus"])

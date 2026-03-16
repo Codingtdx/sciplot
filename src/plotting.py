@@ -143,6 +143,7 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
         right_margin_mm=None,
         bottom_margin_mm=None,
         top_margin_mm=None,
+        axis_mode="auto_positive",
     ),
     "ftir": CurveTemplate(
         xscale="linear",
@@ -458,6 +459,8 @@ def compute_axis_limits(
             y_max,
             padding_fraction=max(y_padding_top, y_padding_bottom, 0.05),
         )
+        if axis_mode == "auto_positive" and y_min >= 0:
+            y_low = 0.0
     else:
         y_low, y_high = _pad_limits_linear(
             y_min,
@@ -1399,6 +1402,78 @@ def _set_axis_locator_from_filtered_ticks(axis, ticks: np.ndarray, *, which: str
         axis.set_minor_locator(locator)
 
 
+def _uses_positive_zero_origin(
+    *,
+    axis_mode: AxisMode,
+    scale: str,
+    raw_bounds: tuple[float, float] | None,
+) -> bool:
+    return (
+        axis_mode == "auto_positive"
+        and scale == "linear"
+        and raw_bounds is not None
+        and float(raw_bounds[0]) >= 0
+    )
+
+
+def _tick_bounds_with_zero_origin(
+    raw_bounds: tuple[float, float] | None,
+    *,
+    axis_mode: AxisMode,
+    scale: str,
+) -> tuple[float, float] | None:
+    if not _uses_positive_zero_origin(axis_mode=axis_mode, scale=scale, raw_bounds=raw_bounds):
+        return raw_bounds
+    return (0.0, float(raw_bounds[1]))
+
+
+def _pin_positive_zero_origin(
+    ax: plt.Axes,
+    *,
+    axis_mode: AxisMode,
+    scale: str,
+    raw_bounds: tuple[float, float] | None,
+) -> None:
+    if not _uses_positive_zero_origin(axis_mode=axis_mode, scale=scale, raw_bounds=raw_bounds):
+        return
+    y_low, y_high = ax.get_ylim()
+    upper = max(float(raw_bounds[1]), float(max(y_low, y_high)))
+    if y_low <= y_high:
+        ax.set_ylim(0.0, upper)
+    else:
+        ax.set_ylim(upper, 0.0)
+
+
+def _ensure_visible_linear_lower_tick(
+    ax: plt.Axes,
+    *,
+    max_major_ticks: int = MAX_VISIBLE_Y_MAJOR_TICKS,
+) -> None:
+    y_low, y_high = ax.get_ylim()
+    lower = float(min(y_low, y_high))
+    upper = float(max(y_low, y_high))
+    ticks = np.asarray(ax.get_yticks(), dtype=float)
+    ticks = ticks[np.isfinite(ticks)]
+    visible = ticks[(ticks >= lower) & (ticks <= upper)]
+    if np.any(np.isclose(visible, lower)):
+        return
+
+    if visible.size == 0:
+        combined = np.asarray([lower], dtype=float)
+    else:
+        combined = np.unique(np.concatenate(([lower], visible)))
+        if combined.size > max_major_ticks:
+            tail = combined[1:]
+            keep_tail = max_major_ticks - 1
+            if keep_tail <= 0:
+                combined = np.asarray([lower], dtype=float)
+            else:
+                step = max(int(np.ceil(tail.size / keep_tail)), 1)
+                tail = tail[::step][:keep_tail]
+                combined = np.concatenate(([lower], tail))
+    ax.yaxis.set_major_locator(FixedLocator(combined))
+
+
 def _apply_axis_tick_filter(
     axis,
     *,
@@ -1877,6 +1952,14 @@ def plot_curves(
     elif series_label_mode != "edge" and legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
 
+    if not _override_complete(ylim):
+        _pin_positive_zero_origin(
+            ax,
+            axis_mode=axis_mode,
+            scale=yscale,
+            raw_bounds=limits.raw_ylim,
+        )
+
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
     elif not _override_complete(xlim):
@@ -1890,7 +1973,13 @@ def plot_curves(
         _apply_visible_y_tick_policy(
             ax,
             scale=yscale,
-            raw_bounds=None if _override_complete(ylim) else limits.raw_ylim,
+            raw_bounds=None
+            if _override_complete(ylim)
+            else _tick_bounds_with_zero_origin(
+                limits.raw_ylim,
+                axis_mode=axis_mode,
+                scale=yscale,
+            ),
         )
     return fig, ax
 
@@ -2006,6 +2095,14 @@ def plot_scatter(
     elif legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
 
+    if not _override_complete(ylim):
+        _pin_positive_zero_origin(
+            ax,
+            axis_mode=axis_mode,
+            scale=yscale,
+            raw_bounds=limits.raw_ylim,
+        )
+
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
     elif not _override_complete(xlim):
@@ -2018,7 +2115,13 @@ def plot_scatter(
     _apply_visible_y_tick_policy(
         ax,
         scale=yscale,
-        raw_bounds=None if _override_complete(ylim) else limits.raw_ylim,
+        raw_bounds=None
+        if _override_complete(ylim)
+        else _tick_bounds_with_zero_origin(
+            limits.raw_ylim,
+            axis_mode=axis_mode,
+            scale=yscale,
+        ),
     )
     return fig, ax
 
@@ -2454,6 +2557,7 @@ def plot_wide_nmr(
 def _compute_distribution_axis_limits(
     values: Sequence[np.ndarray] | Sequence[Sequence[float]],
     *,
+    axis_mode: AxisMode,
     legend_mode: LegendMode,
     headroom_factor: float | None,
     y_padding_top: float,
@@ -2462,7 +2566,7 @@ def _compute_distribution_axis_limits(
     return compute_axis_limits(
         values,
         kind="box",
-        axis_mode="auto",
+        axis_mode=axis_mode,
         legend_mode=legend_mode,
         headroom_factor=headroom_factor,
         y_padding_top=y_padding_top,
@@ -2544,6 +2648,7 @@ def plot_box(
 
     limits = _compute_distribution_axis_limits(
         values,
+        axis_mode=axis_mode,
         legend_mode=legend_mode,
         headroom_factor=headroom_factor,
         y_padding_top=y_padding_top,
@@ -2554,7 +2659,16 @@ def plot_box(
         side_padding = max(0.28, box_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _apply_visible_y_tick_policy(ax, scale="linear", raw_bounds=limits.raw_ylim)
+    _apply_visible_y_tick_policy(
+        ax,
+        scale="linear",
+        raw_bounds=_tick_bounds_with_zero_origin(
+            limits.raw_ylim,
+            axis_mode=axis_mode,
+            scale="linear",
+        ),
+    )
+    _ensure_visible_linear_lower_tick(ax)
 
     first = groups[0]
     ax.set_ylabel(_format_axis_label(first.value_label, first.value_unit))
@@ -2715,6 +2829,7 @@ def plot_violin(
 
     limits = _compute_distribution_axis_limits(
         values,
+        axis_mode=axis_mode,
         legend_mode=legend_mode,
         headroom_factor=headroom_factor,
         y_padding_top=y_padding_top,

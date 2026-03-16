@@ -326,6 +326,7 @@ def _export_comparison_figures(
         representative_figure, _ = plot_curves(
             representative_series,
             show_markers=False,
+            axis_mode="auto_positive",
             width_mm=60.0,
             height_mm=55.0,
             xscale="linear",
@@ -346,7 +347,11 @@ def _export_comparison_figures(
                 for label, source in zip(labels, loaded_sources, strict=True)
             ]
             metric_slug = slugify_label(metric_name)
-            box_figure, _ = plot_box(groups, width_mm=60.0, height_mm=55.0)
+            box_figure, _ = plot_box(
+                groups,
+                width_mm=60.0,
+                height_mm=55.0,
+            )
             figures.append(box_figure)
             outputs.append(save_pdf(box_figure, bundle_dir / f"{metric_slug}_box_compare.pdf"))
 

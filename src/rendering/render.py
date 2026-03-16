@@ -21,6 +21,7 @@ from src.rendering.cache import (
 )
 from src.rendering.common import (
     load_rheology_bundle_series,
+    looks_like_tensile_curve,
     load_segmented_config,
     predict_bar_box_slug,
     rheology_output_filenames,
@@ -84,9 +85,11 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
         return _render_rheology_bundle(bundle, "curve", input_path, sheet, options)
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
     fig, _ = plot_curves(
         series_list,
         show_markers=False,
+        axis_mode=axis_mode,
         xscale=options.xscale,
         yscale=options.yscale,
         width_mm=options.width_mm,
@@ -103,9 +106,11 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
 
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
     fig, _ = plot_curves(
         series_list,
         show_markers=True,
+        axis_mode=axis_mode,
         xscale=options.xscale,
         yscale=options.yscale,
         width_mm=options.width_mm,
@@ -176,8 +181,10 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
 def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
     fig, _ = plot_scatter(
         series_list,
+        axis_mode=axis_mode,
         xscale=options.xscale,
         yscale=options.yscale,
         width_mm=options.width_mm,
