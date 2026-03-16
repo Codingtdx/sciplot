@@ -7,6 +7,8 @@ import type {
   RenderOptionsPayload,
   RenderPreviewResponse,
   TemplateName,
+  TensileComparisonExportResponse,
+  TensileWorkbookSummary,
   TensileReplicateResponse,
   WorkbenchMeta,
 } from "./types";
@@ -143,6 +145,26 @@ export async function preprocessTensileReplicates(
     file_paths: filePaths,
     output_path: outputPath,
     group_name: groupName ?? null,
+  }, options);
+}
+
+export async function inspectTensileWorkbook(
+  workbookPath: string,
+  options: RequestOptions = {},
+): Promise<TensileWorkbookSummary> {
+  return postJson<TensileWorkbookSummary>("/inspect-tensile-workbook", {
+    workbook_path: workbookPath,
+  }, options);
+}
+
+export async function exportTensileComparison(
+  workbookPaths: string[],
+  outputDir: string,
+  options: RequestOptions = {},
+): Promise<TensileComparisonExportResponse> {
+  return postJson<TensileComparisonExportResponse>("/export-tensile-comparison", {
+    workbook_paths: workbookPaths,
+    output_dir: outputDir,
   }, options);
 }
 

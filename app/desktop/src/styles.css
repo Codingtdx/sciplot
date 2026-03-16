@@ -597,6 +597,38 @@ button {
   word-break: break-word;
 }
 
+.wizard-compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-compare-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+.wizard-compare-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wizard-compare-head strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.wizard-compare-head span {
+  color: var(--text-secondary);
+}
+
 .section-card h2,
 .hero-card h2,
 .context-card h3 {

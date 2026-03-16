@@ -29,8 +29,12 @@ from app.sidecar.schemas import (
     RenderPreviewResponse,
     RenderRequest,
     SaveProjectRequest,
+    TensileComparisonExportRequest,
+    TensileComparisonExportResponse,
     TensileReplicateRequest,
     TensileReplicateResponseModel,
+    TensileWorkbookRequest,
+    TensileWorkbookSummaryResponse,
     ThumbnailRequest,
     composer_project_from_request,
     load_project_document,
@@ -59,7 +63,9 @@ from src.rendering import (
     coerce_sheet,
     ensure_input_path,
     export_rendered_plots,
+    export_tensile_comparison_bundle,
     inspect_input_file,
+    inspect_tensile_workbook,
     list_sheet_names,
     normalize_input_path_text,
     preflight_render_request,
@@ -232,6 +238,28 @@ def preprocess_tensile_replicates(request: TensileReplicateRequest) -> TensileRe
             group_name=request.group_name,
         )
         return TensileReplicateResponseModel.model_validate(serialize_dataclass(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/inspect-tensile-workbook", response_model=TensileWorkbookSummaryResponse)
+def inspect_tensile_workbook_endpoint(
+    request: TensileWorkbookRequest,
+) -> TensileWorkbookSummaryResponse:
+    try:
+        summary = inspect_tensile_workbook(request.workbook_path)
+        return TensileWorkbookSummaryResponse.model_validate(serialize_dataclass(summary))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/export-tensile-comparison", response_model=TensileComparisonExportResponse)
+def export_tensile_comparison(
+    request: TensileComparisonExportRequest,
+) -> TensileComparisonExportResponse:
+    try:
+        exported = export_tensile_comparison_bundle(request.workbook_paths, request.output_dir)
+        return TensileComparisonExportResponse.model_validate(serialize_dataclass(exported))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

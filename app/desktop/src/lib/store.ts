@@ -12,12 +12,19 @@ import type {
   PreviewItem,
   RecentProjectEntry,
   RenderOptionsPayload,
+  TensileComparisonExportResponse,
+  TensileComparisonSource,
   TemplateName,
   WizardStep,
   WorkbenchScreen,
   WorkbenchSettings,
 } from "./types";
 import { EMPTY_COMPOSER_PROJECT, normalizeComposerProject } from "./composer";
+import {
+  moveTensileComparisonSource as moveTensileComparisonSourceList,
+  normalizeTensileComparisonSources,
+  upsertTensileComparisonSource,
+} from "./tensile-comparison";
 
 type WizardState = {
   inputPath: string;
@@ -30,6 +37,8 @@ type WizardState = {
   previews: PreviewItem[];
   previewIndex: number;
   outputs: string[];
+  tensileComparisonSources: TensileComparisonSource[];
+  tensileComparisonResult: TensileComparisonExportResponse | null;
   step: WizardStep;
   sidecarReady: boolean;
   busy: boolean;
@@ -45,6 +54,11 @@ type WizardState = {
   setPreviews(value: PreviewItem[]): void;
   setPreviewIndex(value: number): void;
   setOutputs(value: string[]): void;
+  addTensileComparisonSource(value: TensileComparisonSource): void;
+  removeTensileComparisonSource(workbookPath: string): void;
+  moveTensileComparisonSource(workbookPath: string, offset: -1 | 1): void;
+  clearTensileComparisonSources(): void;
+  setTensileComparisonResult(value: TensileComparisonExportResponse | null): void;
   setStep(value: WizardStep): void;
   setBusy(value: boolean): void;
   setError(value: string | null): void;
@@ -109,6 +123,8 @@ export const useWizardStore = create<WizardState>()(
       previews: [],
       previewIndex: 0,
       outputs: [],
+      tensileComparisonSources: [],
+      tensileComparisonResult: null,
       step: "file",
       sidecarReady: false,
       busy: false,
@@ -124,6 +140,36 @@ export const useWizardStore = create<WizardState>()(
       setPreviews: (value) => set({ previews: value, previewIndex: 0 }),
       setPreviewIndex: (value) => set({ previewIndex: value }),
       setOutputs: (value) => set({ outputs: value }),
+      addTensileComparisonSource: (value) =>
+        set((state) => ({
+          tensileComparisonSources: upsertTensileComparisonSource(
+            state.tensileComparisonSources,
+            value,
+          ),
+          tensileComparisonResult: null,
+        })),
+      removeTensileComparisonSource: (workbookPath) =>
+        set((state) => ({
+          tensileComparisonSources: normalizeTensileComparisonSources(
+            state.tensileComparisonSources.filter((item) => item.workbook_path !== workbookPath),
+          ),
+          tensileComparisonResult: null,
+        })),
+      moveTensileComparisonSource: (workbookPath, offset) =>
+        set((state) => ({
+          tensileComparisonSources: moveTensileComparisonSourceList(
+            state.tensileComparisonSources,
+            workbookPath,
+            offset,
+          ),
+          tensileComparisonResult: null,
+        })),
+      clearTensileComparisonSources: () =>
+        set({
+          tensileComparisonSources: [],
+          tensileComparisonResult: null,
+        }),
+      setTensileComparisonResult: (value) => set({ tensileComparisonResult: value }),
       setStep: (value) => set({ step: value }),
       setBusy: (value) => set({ busy: value }),
       setError: (value) => set({ error: value }),
@@ -156,6 +202,8 @@ export const useWizardStore = create<WizardState>()(
         options: state.options,
         preflight: state.preflight,
         outputs: state.outputs,
+        tensileComparisonSources: state.tensileComparisonSources,
+        tensileComparisonResult: state.tensileComparisonResult,
         step: state.step,
       }),
     },

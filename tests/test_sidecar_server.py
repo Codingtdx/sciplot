@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from app.sidecar.server import app
+from src.tensile_replicates import export_tensile_replicate_workbook
 
 client = TestClient(app)
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "tensile_raw"
@@ -30,6 +31,19 @@ def _write_pdf(path: Path, width_mm: float, height_mm: float) -> Path:
     document.new_page(width=width_mm / 25.4 * 72.0, height=height_mm / 25.4 * 72.0)
     document.save(path)
     document.close()
+    return path
+
+
+def _write_tensile_workbook(path: Path, *, group_name: str = "BlendSet") -> Path:
+    export_tensile_replicate_workbook(
+        [
+            FIXTURE_DIR / "BlendSet_A.csv",
+            FIXTURE_DIR / "BlendSet_B.csv",
+            FIXTURE_DIR / "BlendSet_bad.csv",
+        ],
+        path,
+        group_name=group_name,
+    )
     return path
 
 
@@ -242,6 +256,46 @@ def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path
     assert payload["sample_count"] == 2
     assert payload["preferred_sheet"] == "Representative_Curve"
     assert "BlendSet_bad.csv" in payload["warnings"][0]
+
+
+def test_inspect_tensile_workbook_endpoint_returns_summary(tmp_path: Path) -> None:
+    workbook_path = _write_tensile_workbook(tmp_path / "solid.xlsx")
+
+    response = client.post(
+        "/inspect-tensile-workbook",
+        json={"workbook_path": str(workbook_path)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["workbook_path"] == str(workbook_path)
+    assert payload["label"] == "solid"
+    assert payload["sample_count"] == 2
+    assert payload["sheet_names"][0] == "Representative_Curve"
+
+
+def test_export_tensile_comparison_endpoint_returns_bundle_paths(tmp_path: Path) -> None:
+    workbook_paths = [
+        str(_write_tensile_workbook(tmp_path / "solid.xlsx")),
+        str(_write_tensile_workbook(tmp_path / "4 mm.xlsx")),
+        str(_write_tensile_workbook(tmp_path / "2 mm.xlsx")),
+    ]
+
+    response = client.post(
+        "/export-tensile-comparison",
+        json={
+            "workbook_paths": workbook_paths,
+            "output_dir": str(tmp_path / "exports"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert Path(payload["bundle_dir"]).exists()
+    assert Path(payload["comparison_workbook_path"]).exists()
+    assert payload["labels"] == ["solid", "4 mm", "2 mm"]
+    assert len(payload["outputs"]) == 7
+    assert all(Path(path).exists() for path in payload["outputs"])
 
 
 def test_save_project_rejects_invalid_wizard_shape(tmp_path: Path) -> None:

@@ -3,14 +3,20 @@ import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
 import {
+  exportTensileComparison,
   exportRender,
   inspectFile,
+  inspectTensileWorkbook,
   preflightRender,
   preprocessTensileReplicates,
 } from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import { openDialog, saveDialog } from "../lib/tauri-dialog";
+import {
+  tensileComparisonSourceFromPreprocess,
+  tensileComparisonSourceFromSummary,
+} from "../lib/tensile-comparison";
 import type {
   TemplateName,
   TensileReplicateResponse,
@@ -84,6 +90,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       previewIndex: state.previewIndex,
       previews: state.previews,
       reset: state.reset,
+      addTensileComparisonSource: state.addTensileComparisonSource,
+      clearTensileComparisonSources: state.clearTensileComparisonSources,
+      moveTensileComparisonSource: state.moveTensileComparisonSource,
+      removeTensileComparisonSource: state.removeTensileComparisonSource,
       setBusy: state.setBusy,
       setError: state.setError,
       setInputPath: state.setInputPath,
@@ -96,11 +106,14 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       setSheet: state.setSheet,
       setSheetNames: state.setSheetNames,
       setStep: state.setStep,
+      setTensileComparisonResult: state.setTensileComparisonResult,
       setTemplate: state.setTemplate,
       sheet: state.sheet,
       sheetNames: state.sheetNames,
       sidecarReady: state.sidecarReady,
       step: state.step,
+      tensileComparisonResult: state.tensileComparisonResult,
+      tensileComparisonSources: state.tensileComparisonSources,
       template: state.template,
     })),
   );
@@ -353,6 +366,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.outputs.length > 0
       ? wizard.outputs
       : (wizard.preflight?.output_filenames ?? []).map((filename) => filename);
+  const compareSourceCount = wizard.tensileComparisonSources.length;
+  const canExportTensileComparison = compareSourceCount >= 2 && !wizard.busy;
 
   const openDataFile = async () => {
     let path: string | undefined;
@@ -438,6 +453,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         inferredGroupName,
       );
       setTensileBatchResult(result);
+      wizard.addTensileComparisonSource(tensileComparisonSourceFromPreprocess(result));
       const inspected = await loadWizardDataFile(
         wizard,
         meta,
@@ -451,6 +467,84 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         path: result.output_path,
         title: formatLeaf(result.output_path),
         detail: `拉伸整理 · ${result.sample_count} 个重复样 · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
+      });
+    } catch (error) {
+      wizard.setError(getErrorMessage(error));
+    } finally {
+      wizard.setBusy(false);
+    }
+  };
+
+  const addTensileComparisonWorkbooks = async () => {
+    let workbookPaths: string[] = [];
+    wizard.setError(null);
+    try {
+      const selected = await openDialog({
+        multiple: true,
+        filters: [{ name: "Excel Workbook", extensions: ["xlsx", "xlsm"] }],
+      });
+      workbookPaths = toDialogPaths(selected);
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
+    if (workbookPaths.length === 0) {
+      return;
+    }
+
+    wizard.setBusy(true);
+    const failures: string[] = [];
+    try {
+      for (const workbookPath of workbookPaths) {
+        try {
+          const summary = await inspectTensileWorkbook(workbookPath);
+          wizard.addTensileComparisonSource(tensileComparisonSourceFromSummary(summary));
+        } catch (error) {
+          failures.push(`${formatLeaf(workbookPath)}：${getErrorMessage(error)}`);
+        }
+      }
+      if (failures.length > 0) {
+        wizard.setError(`以下 workbook 未加入对比清单：${failures.join("；")}`);
+      }
+    } finally {
+      wizard.setBusy(false);
+    }
+  };
+
+  const runTensileComparisonExport = async () => {
+    if (wizard.tensileComparisonSources.length < 2) {
+      return;
+    }
+
+    let outputDir: string | undefined;
+    wizard.setError(null);
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        directory: true,
+      });
+      outputDir = toDialogPaths(selected, 1)[0];
+    } catch (error) {
+      showDialogError(error);
+      return;
+    }
+    if (!outputDir) {
+      return;
+    }
+
+    wizard.setBusy(true);
+    try {
+      const result = await exportTensileComparison(
+        wizard.tensileComparisonSources.map((item) => item.workbook_path),
+        outputDir,
+      );
+      wizard.setTensileComparisonResult(result);
+      rememberProject({
+        mode: "wizard",
+        kind: "data",
+        path: result.comparison_workbook_path,
+        title: formatLeaf(result.comparison_workbook_path),
+        detail: `拉伸对比 · ${result.labels.length} 组 · ${result.outputs.length} 个结果`,
       });
     } catch (error) {
       wizard.setError(getErrorMessage(error));
@@ -587,6 +681,136 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
               )}
             </div>
           )}
+
+          <div className="wizard-callout-stack">
+            <div className="focus-panel">
+              <strong>拉伸对比清单</strong>
+              <span>
+                已收集 {compareSourceCount} 组已整理 workbook。达到 2 组后，可直接导出代表曲线、
+                Strength / Modulus / Elongation 的箱线图和柱状图。
+              </span>
+            </div>
+            <div className="step-actions">
+              <button
+                className="ghost-button"
+                onClick={() => void addTensileComparisonWorkbooks()}
+                type="button"
+              >
+                补录已整理 workbook
+              </button>
+              <button
+                className="ghost-button"
+                disabled={compareSourceCount === 0}
+                onClick={() => wizard.clearTensileComparisonSources()}
+                type="button"
+              >
+                清空清单
+              </button>
+              <button
+                className="primary-button"
+                disabled={!canExportTensileComparison}
+                onClick={() => void runTensileComparisonExport()}
+                type="button"
+              >
+                生成对比图
+              </button>
+            </div>
+
+            {compareSourceCount === 0 ? (
+              <div className="placeholder-card">
+                先整理一组拉伸 CSV，或补录至少 2 份已整理 workbook，再生成 7 张对比图。
+              </div>
+            ) : (
+              <div className="wizard-compare-list">
+                {wizard.tensileComparisonSources.map((source, index) => (
+                  <div className="wizard-compare-item" key={source.workbook_path}>
+                    <div className="wizard-compare-head">
+                      <div>
+                        <strong>{source.label}</strong>
+                        <span>
+                          {formatLeaf(source.workbook_path)} · {source.sample_count} 个重复样
+                        </span>
+                      </div>
+                      <div className="step-actions">
+                        <button
+                          className="ghost-button"
+                          disabled={index === 0}
+                          onClick={() =>
+                            wizard.moveTensileComparisonSource(source.workbook_path, -1)
+                          }
+                          type="button"
+                        >
+                          上移
+                        </button>
+                        <button
+                          className="ghost-button"
+                          disabled={index === compareSourceCount - 1}
+                          onClick={() =>
+                            wizard.moveTensileComparisonSource(source.workbook_path, 1)
+                          }
+                          type="button"
+                        >
+                          下移
+                        </button>
+                        <button
+                          className="ghost-button"
+                          onClick={() => wizard.removeTensileComparisonSource(source.workbook_path)}
+                          type="button"
+                        >
+                          移除
+                        </button>
+                      </div>
+                    </div>
+                    <div className="summary-grid wizard-tight-grid">
+                      {source.metrics.map((metric) => (
+                        <div className="stat-tile" key={`${source.workbook_path}:${metric.label}`}>
+                          <span>{metric.label}</span>
+                          <strong>
+                            {formatMetricValue(metric.mean)} ± {formatMetricValue(metric.std)} {metric.unit}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {wizard.tensileComparisonResult && (
+              <div className="wizard-callout-stack">
+                <div className="success-card">
+                  已为 {wizard.tensileComparisonResult.labels.length} 组生成{" "}
+                  {wizard.tensileComparisonResult.outputs.length} 个对比结果。
+                </div>
+                <div className="summary-grid wizard-tight-grid">
+                  <div className="stat-tile">
+                    <span>对比目录</span>
+                    <strong>{formatLeaf(wizard.tensileComparisonResult.bundle_dir)}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>汇总 workbook</span>
+                    <strong>{formatLeaf(wizard.tensileComparisonResult.comparison_workbook_path)}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>组数</span>
+                    <strong>{wizard.tensileComparisonResult.labels.length}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>输出数</span>
+                    <strong>{wizard.tensileComparisonResult.outputs.length}</strong>
+                  </div>
+                </div>
+                <div className="focus-panel">
+                  <strong>导出文件</strong>
+                  <ul className="output-list">
+                    {wizard.tensileComparisonResult.outputs.map((item) => (
+                      <li key={item}>{formatLeaf(item)}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="wizard-pane-grid">
             <section className="wizard-pane">

@@ -63,6 +63,15 @@ class TensileReplicateRequest(StrictModel):
     group_name: str | None = None
 
 
+class TensileWorkbookRequest(StrictModel):
+    workbook_path: str
+
+
+class TensileComparisonExportRequest(StrictModel):
+    workbook_paths: list[str]
+    output_dir: str
+
+
 class ComposerCropRectPayload(StrictModel):
     x: float = 0.0
     y: float = 0.0
@@ -429,6 +438,22 @@ class TensileReplicateResponseModel(StrictModel):
     representative_filename: str
     metrics: list[TensileMetricSummaryResponse]
     warnings: list[str]
+
+
+class TensileWorkbookSummaryResponse(StrictModel):
+    workbook_path: str
+    label: str
+    sheet_names: list[str]
+    sample_count: int
+    representative_filename: str
+    metrics: list[TensileMetricSummaryResponse]
+
+
+class TensileComparisonExportResponse(StrictModel):
+    bundle_dir: str
+    comparison_workbook_path: str
+    labels: list[str]
+    outputs: list[str]
 
 
 class PathResponse(StrictModel):

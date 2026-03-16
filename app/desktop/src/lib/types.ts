@@ -107,6 +107,24 @@ export type TensileReplicateResponse = {
   warnings: string[];
 };
 
+export type TensileWorkbookSummary = {
+  workbook_path: string;
+  label: string;
+  sheet_names: string[];
+  sample_count: number;
+  representative_filename: string;
+  metrics: TensileMetricSummary[];
+};
+
+export type TensileComparisonSource = TensileWorkbookSummary;
+
+export type TensileComparisonExportResponse = {
+  bundle_dir: string;
+  comparison_workbook_path: string;
+  labels: string[];
+  outputs: string[];
+};
+
 export type ComposerPanel = {
   id: string;
   file_path: string;

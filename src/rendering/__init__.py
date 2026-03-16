@@ -32,6 +32,10 @@ from src.rendering.render import (
     export_rendered_plots,
     render_template,
 )
+from src.rendering.tensile_compare import (
+    export_tensile_comparison_bundle,
+    inspect_tensile_workbook,
+)
 
 __all__ = [
     "DEFAULT_SIZE_BY_TEMPLATE",
@@ -53,7 +57,9 @@ __all__ = [
     "default_output_dir",
     "ensure_input_path",
     "export_rendered_plots",
+    "export_tensile_comparison_bundle",
     "inspect_input_file",
+    "inspect_tensile_workbook",
     "list_sheet_names",
     "normalize_input_path_text",
     "preflight_render_request",

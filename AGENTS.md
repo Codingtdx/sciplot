@@ -39,6 +39,7 @@
 - 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
 - 单图 `wizard` 现在是单屏自动检查流：文件载入、sheet 切换、模板切换和参数修改后，前端都会自动触发 `inspect / render-preview / preflight`；不要再把主流程改回“多步翻页 + 手动点继续检查”。
 - `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
+- `wizard` 现在还支持收集任意组数的已整理 tensile workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；补录 workbook 只更新 compare 清单，不应覆盖当前主输入，也不要把 compare 清单写进项目文件 schema。
 - `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
@@ -170,6 +171,7 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要把 wizard 再改回“先保存项目再继续”的心智模型；单图流程默认应该一屏完成导入、推荐、参数和导出。
+- 不要把 tensile compare 清单做成“必须先保存 wizard 项目才能继续”的流；它应该是 wizard 内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前主输入。
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
