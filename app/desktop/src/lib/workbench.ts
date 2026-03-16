@@ -16,6 +16,7 @@ export const NAV_ITEMS: Array<{
   label: string;
   icon: string;
 }> = [
+  { id: "tensile", label: "拉伸", icon: "TS" },
   { id: "wizard", label: "绘图", icon: "WZ" },
   { id: "composer", label: "拼图", icon: "CP" },
   { id: "projects", label: "最近", icon: "RC" },
@@ -30,6 +31,11 @@ export const SCREEN_META: Record<
     description: string;
   }
 > = {
+  tensile: {
+    eyebrow: "Tensile",
+    title: "拉伸工作台",
+    description: "整理 tensile 数据、累积已整理 workbook，并批量导出对比图。",
+  },
   wizard: {
     eyebrow: "Plot",
     title: "绘图精灵工作台",
@@ -191,10 +197,15 @@ const COMPATIBLE_TEMPLATE_IDS: Record<string, TemplateName[]> = {
   frequency_sweep: ["point_line", "curve"],
   temperature_sweep: ["point_line", "curve"],
   stress_relaxation: ["point_line", "curve"],
+  tensile_curve: ["curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"],
   curve_table: ["curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"],
   replicate_table: ["bar", "box", "violin"],
   heatmap_table: ["heatmap"],
 };
+
+export function isTensileCurveModel(model: string | null | undefined) {
+  return model === "tensile_curve";
+}
 
 export function compatibleTemplateIds(model: string | null | undefined) {
   if (!model) {
@@ -235,6 +246,8 @@ export function templateCompatibilityReason(model: string | null | undefined) {
     case "temperature_sweep":
     case "stress_relaxation":
       return "当前输入是流变导出表，先用点线或曲线。";
+    case "tensile_curve":
+      return "当前输入是拉伸应力-应变曲线，先用曲线家族。";
     case "curve_table":
       return "当前输入是成对曲线表，先用曲线家族。";
     case "replicate_table":

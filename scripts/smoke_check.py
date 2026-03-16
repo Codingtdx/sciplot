@@ -1328,10 +1328,12 @@ def _assert_tensile_preprocess_workflow(
                 raise AssertionError("Mixed tensile preprocess warnings should name the skipped invalid raw CSV.")
 
         inspection = inspect_input_file(result.output_path, result.preferred_sheet)
-        if inspection.model != "curve_table":
-            raise AssertionError(f"{case_id} workbook should load back into the wizard as a curve table.")
+        if inspection.model != "tensile_curve":
+            raise AssertionError(f"{case_id} workbook should load back into the wizard as a tensile curve.")
         if inspection.recommendation.template != "curve":
             raise AssertionError(f"{case_id} representative sheet should recommend the standard curve template.")
+        if inspection.recommendation.xscale != "linear" or inspection.recommendation.yscale != "linear":
+            raise AssertionError(f"{case_id} tensile workbook should recommend linear x/y scales.")
         options = _resolve_render_options(
             template=inspection.recommendation.template,
             size=inspection.recommendation.size,

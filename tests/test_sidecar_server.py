@@ -274,6 +274,24 @@ def test_inspect_tensile_workbook_endpoint_returns_summary(tmp_path: Path) -> No
     assert payload["sheet_names"][0] == "Representative_Curve"
 
 
+def test_inspect_file_recognizes_tensile_workbook_curve_sheet(tmp_path: Path) -> None:
+    workbook_path = _write_tensile_workbook(tmp_path / "solid.xlsx")
+
+    response = client.post(
+        "/inspect-file",
+        json={
+            "input_path": str(workbook_path),
+            "sheet": "Representative_Curve",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["inspection"]["model"] == "tensile_curve"
+    assert payload["inspection"]["recommendation"]["xscale"] == "linear"
+    assert payload["inspection"]["recommendation"]["yscale"] == "linear"
+
+
 def test_export_tensile_comparison_endpoint_returns_bundle_paths(tmp_path: Path) -> None:
     workbook_paths = [
         str(_write_tensile_workbook(tmp_path / "solid.xlsx")),

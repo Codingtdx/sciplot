@@ -15,7 +15,7 @@ export type WizardStep =
   | "preflight"
   | "export";
 
-export type WorkbenchScreen = "wizard" | "composer" | "projects" | "settings";
+export type WorkbenchScreen = "tensile" | "wizard" | "composer" | "projects" | "settings";
 export type PdfImportMode = "graph" | "asset";
 export type ThemePreference = "system" | "light" | "dark";
 

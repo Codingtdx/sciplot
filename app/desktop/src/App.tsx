@@ -1,10 +1,13 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
-import { useComposerStore, useWizardStore, useWorkbenchStore } from "./lib/store";
+import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import { AppMode, NAV_ITEMS, SCREEN_META, getWizardStepLabel } from "./lib/workbench";
 import type { PlotContract, ThemePreference, WorkbenchMeta } from "./lib/types";
 
+const TensileScreen = lazy(async () => ({
+  default: (await import("./screens/TensileScreen")).TensileScreen,
+}));
 const WizardScreen = lazy(async () => ({
   default: (await import("./screens/WizardScreen")).WizardScreen,
 }));
@@ -54,6 +57,8 @@ export default function App() {
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
   const wizardStep = useWizardStore((state) => state.step);
   const wizardOutputsCount = useWizardStore((state) => state.outputs.length);
+  const tensileCompareCount = useTensileStore((state) => state.comparisonSources.length);
+  const tensileOutputsCount = useTensileStore((state) => state.comparisonResult?.outputs.length ?? 0);
   const composerPanelCount = useComposerStore((state) => state.project.panels.length);
   const composerTextCount = useComposerStore((state) => state.project.texts.length);
   const workbenchLoadRef = useRef<Promise<void> | null>(null);
@@ -202,7 +207,12 @@ export default function App() {
   const meta = SCREEN_META[mode];
 
   let secondaryStatusLabel = `Step ${getWizardStepLabel(wizardStep)}`;
-  if (mode === "composer") {
+  if (mode === "tensile") {
+    secondaryStatusLabel =
+      tensileOutputsCount > 0
+        ? `${tensileCompareCount} 组 / ${tensileOutputsCount} outputs`
+        : `${tensileCompareCount} 组待对比`;
+  } else if (mode === "composer") {
     secondaryStatusLabel = `${composerPanelCount} 图层 / ${composerTextCount} 文字`;
   } else if (mode === "projects") {
     secondaryStatusLabel = `${recentProjectsCount} 条最近记录`;
@@ -264,6 +274,7 @@ export default function App() {
 
         <main className="dashboard-main">
           <Suspense fallback={<div className="placeholder-card">正在载入工作台…</div>}>
+            {mode === "tensile" && <TensileScreen meta={workbenchMeta} onNavigate={setMode} />}
             {mode === "wizard" && <WizardScreen meta={workbenchMeta} />}
             {mode === "composer" && <ComposerScreen />}
             {mode === "projects" && (

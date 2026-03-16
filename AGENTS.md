@@ -11,7 +11,7 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
+- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `tensile / wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
@@ -39,7 +39,9 @@
 - 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
 - 单图 `wizard` 现在是单屏自动检查流：文件载入、sheet 切换、模板切换和参数修改后，前端都会自动触发 `inspect / render-preview / preflight`；不要再把主流程改回“多步翻页 + 手动点继续检查”。
 - `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
-- `wizard` 现在还支持收集任意组数的已整理 tensile workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；补录 workbook 只更新 compare 清单，不应覆盖当前主输入，也不要把 compare 清单写进项目文件 schema。
+- 拉伸整理和拉伸对比现在收敛到独立 `tensile` 工作台；`wizard` 只保留通用单图绘图流，不再承载 tensile preprocess / compare UI。
+- `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
+- tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
@@ -75,9 +77,11 @@
   - `stress_relaxation curve` 导出 `stress_relaxation_sigma_over_sigma0_curve.pdf`
 - `wizard` 前端当前使用的兼容模板映射是：
   - `frequency_sweep / temperature_sweep / stress_relaxation -> point_line, curve`
+  - `tensile_curve -> curve, point_line, stacked_curve, segmented_stacked_curve, scatter`
   - `curve_table -> curve, point_line, stacked_curve, segmented_stacked_curve, scatter`
   - `replicate_table -> bar, box, violin`
   - `heatmap_table -> heatmap`
+- 所有识别为 `tensile_curve` 的曲线都必须固定使用 `linear` x/y 坐标；不允许在推荐、预检或渲染阶段退回 `log`。
 - 日常渲染会直接吃契约；完整“画完再审”的重校验只在 smoke / 查 bug 时跑。
 
 ## 修改流程
@@ -142,8 +146,9 @@
 
 - `pytest`
 - `scripts/smoke_check.py` 中的 tensile preprocess 段
+- `app/desktop/src/screens/TensileScreen.test.tsx`
 - `app/desktop/src/screens/WizardScreen.test.tsx`
-- 确认生成的 workbook 能被 wizard 自动载入并继续 `inspect / preflight / render`
+- 确认生成的 workbook 能在 tensile 工作台显示整理结果，并且点击“在绘图中打开”后可继续 `inspect / preflight / render`
 
 改 GUI 选项或状态流时，至少回归：
 
@@ -171,7 +176,7 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要把 wizard 再改回“先保存项目再继续”的心智模型；单图流程默认应该一屏完成导入、推荐、参数和导出。
-- 不要把 tensile compare 清单做成“必须先保存 wizard 项目才能继续”的流；它应该是 wizard 内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前主输入。
+- 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
@@ -181,7 +186,7 @@
 - 不要在导出里把所有 PDF 先栅格化；graph 和 PDF asset 应尽量保持矢量。
 - 改对齐规则时，要同时想到 `single_panel`、`wide_nmr`、`heatmap` 三类约束。
 - 改 loader、inspect、preflight 或 render 时，要同时想到 `src/rendering/cache.py` 的缓存失效，不要让旧解析结果穿透到新请求。
-- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 wizard 是否会自动载入 `preferred_sheet`，以及后续 render 能不能继续。
+- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 tensile 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
 
 ## 拉伸预处理夹具

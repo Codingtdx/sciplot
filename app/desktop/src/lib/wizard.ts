@@ -95,6 +95,7 @@ export function sanitizeRenderOptions(
   meta: WorkbenchMeta | null,
   templateId: TemplateName | null | undefined,
   options: RenderOptionsPayload,
+  inputModel?: string | null,
 ): RenderOptionsPayload {
   const template = templateMeta(meta, templateId);
   const allowed = new Set<keyof RenderOptionsPayload>(
@@ -139,6 +140,14 @@ export function sanitizeRenderOptions(
   if (allowed.has("use_sidecar") && typeof source.use_sidecar === "boolean") {
     next.use_sidecar = source.use_sidecar;
   }
+  if (inputModel === "tensile_curve") {
+    if (allowed.has("xscale")) {
+      next.xscale = "linear";
+    }
+    if (allowed.has("yscale")) {
+      next.yscale = "linear";
+    }
+  }
 
   return next;
 }
@@ -148,11 +157,12 @@ export function mergeRenderOptions(
   templateId: TemplateName | null | undefined,
   current: RenderOptionsPayload,
   patch: Partial<RenderOptionsPayload>,
+  inputModel?: string | null,
 ): RenderOptionsPayload {
   return sanitizeRenderOptions(meta, templateId, {
     ...current,
     ...patch,
-  });
+  }, inputModel);
 }
 
 function inspectionOptions(inspection: InputInspection): RenderOptionsPayload {
@@ -189,7 +199,7 @@ export function selectionFromInspection(
     options: sanitizeRenderOptions(meta, template, {
       ...inspectionOptions(inspection),
       ...(overrides?.options ?? {}),
-    }),
+    }, inspection.model),
   };
 }
 

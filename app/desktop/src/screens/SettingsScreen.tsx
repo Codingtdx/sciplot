@@ -1,5 +1,5 @@
 import { healthcheck } from "../lib/api";
-import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/store";
+import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "../lib/store";
 import type { PlotContract, WorkbenchMeta } from "../lib/types";
 import { useState } from "react";
 
@@ -14,6 +14,7 @@ export function SettingsScreen({
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
   const resetWizard = useWizardStore((state) => state.reset);
   const resetComposer = useComposerStore((state) => state.reset);
+  const resetTensile = useTensileStore((state) => state.reset);
   const composerProject = useComposerStore((state) => state.project);
   const pdfImportMode = useWorkbenchStore((state) => state.pdfImportMode);
   const recentProjects = useWorkbenchStore((state) => state.recentProjects);
@@ -32,9 +33,12 @@ export function SettingsScreen({
     }
   };
 
-  const runMaintenance = (action: "wizard" | "composer" | "recent" | "all") => {
+  const runMaintenance = (action: "wizard" | "tensile" | "composer" | "recent" | "all") => {
     if (action === "wizard" || action === "all") {
       resetWizard();
+    }
+    if (action === "tensile" || action === "all") {
+      resetTensile();
     }
     if (action === "composer" || action === "all") {
       resetComposer();
@@ -45,6 +49,7 @@ export function SettingsScreen({
 
     const labels = {
       wizard: "已重置绘图精灵现场。",
+      tensile: "已重置拉伸工作台现场。",
       composer: "已重置拼图器现场。",
       recent: "已清空最近项目记录。",
       all: "已重置当前页面状态并清空最近记录。",
@@ -189,6 +194,9 @@ export function SettingsScreen({
             <div className="step-actions">
               <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
                 重置绘图精灵
+              </button>
+              <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
+                重置拉伸工作台
               </button>
               <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
                 重置拼图器

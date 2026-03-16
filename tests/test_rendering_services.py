@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src.rendering import (
     build_rendered_plots,
@@ -21,6 +22,19 @@ def _write_curve_table(path: Path) -> Path:
         [0, 1.0, 0, 2.0],
         [1, 1.3, 1, 2.4],
         [2, 1.5, 2, 2.8],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_tensile_curve_table(path: Path) -> Path:
+    rows = [
+        ["Strain", "Stress", "Strain", "Stress"],
+        ["%", "MPa", "%", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+        [0.1, 1.0, 0.1, 1.4],
+        [10.0, 120.0, 12.0, 160.0],
+        [1000.0, 12000.0, 1200.0, 14500.0],
     ]
     pd.DataFrame(rows).to_csv(path, header=False, index=False)
     return path
@@ -132,6 +146,28 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
     finally:
         close_rendered_plots(rendered)
+
+
+def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) -> None:
+    input_path = _write_tensile_curve_table(tmp_path / "tensile_curve.csv")
+
+    inspection = inspect_input_file(input_path)
+    assert inspection.model == "tensile_curve"
+    assert inspection.recommendation.template == "curve"
+    assert inspection.recommendation.size == "60x55"
+    assert inspection.recommendation.xscale == "linear"
+    assert inspection.recommendation.yscale == "linear"
+
+    linear_options = resolve_render_options(template="curve", xscale="linear", yscale="linear")
+    linear_preflight = preflight_render_request("curve", input_path, 0, linear_options)
+    assert linear_preflight.errors == ()
+
+    log_options = resolve_render_options(template="curve", xscale="log", yscale="linear")
+    log_preflight = preflight_render_request("curve", input_path, 0, log_options)
+    assert log_preflight.errors == ("拉伸曲线必须使用线性坐标轴，不支持 log x / y。",)
+
+    with pytest.raises(ValueError, match="拉伸曲线必须使用线性坐标轴"):
+        build_rendered_plots("curve", input_path, xscale="log", yscale="linear")
 
 
 def test_frequency_bundle_preflight_matches_multi_output_render(tmp_path: Path) -> None:

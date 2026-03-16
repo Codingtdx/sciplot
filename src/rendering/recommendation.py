@@ -15,7 +15,7 @@ from src.rendering.cache import (
     load_stress_relaxation_metric_cached,
     read_raw_table_cached,
 )
-from src.rendering.common import to_curve_series
+from src.rendering.common import looks_like_tensile_curve, to_curve_series
 from src.rendering.models import InputInspection, Recommendation, TemplateName
 from src.text_normalization import canonicalize_token, normalize_label
 from src.wide_nmr import wide_nmr_sidecar_path
@@ -32,6 +32,7 @@ def clean_text(value: object) -> str:
 def model_label(model: str) -> str:
     labels = {
         "curve_table": "成对曲线表 (curve_table)",
+        "tensile_curve": "拉伸应力-应变曲线 (tensile_curve)",
         "replicate_table": "重复值宽表 (replicate_table)",
         "heatmap_table": "热图长表 (xyz_long_table)",
         "frequency_sweep": "频率扫描导出表",
@@ -380,6 +381,24 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 "横轴或单位命中了 2theta / counts / intensity。",
                 "多条样品曲线更适合堆积展示。",
                 "推荐保持正向 x 轴。",
+            ),
+        )
+    if looks_like_tensile_curve(series_list):
+        return InputInspection(
+            model="tensile_curve",
+            model_label=model_label("tensile_curve"),
+            recommendation=recommendation(
+                "curve",
+                "根据应变/伸长率横轴和应力纵轴判断为拉伸曲线。",
+                size="60x55",
+                xscale="linear",
+                yscale="linear",
+                reverse_x=False,
+            ),
+            signals=(
+                "横轴标签或单位命中了 strain / elongation / %。",
+                "纵轴标签或单位命中了 stress / MPa。",
+                "拉伸曲线默认固定使用线性 x/y 坐标。",
             ),
         )
     xscale, yscale, range_signals = recommend_curve_scales(series_list)

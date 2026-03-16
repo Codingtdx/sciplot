@@ -20,8 +20,10 @@ from src.rendering.constants import (
 )
 from src.rendering.models import RenderOptions, TemplateName
 from src.rheology_loader import RheologySeries
-from src.text_normalization import slugify_label
+from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
+
+TENSILE_LINEAR_SCALE_ERROR = "拉伸曲线必须使用线性坐标轴，不支持 log x / y。"
 
 
 def humanize_preflight_exception(exc: Exception) -> str:
@@ -99,6 +101,8 @@ def to_curve_series(series_list: list[RheologySeries]) -> list[CurveSeries]:
 
 
 def validate_series_scales(series_list: list[CurveSeries], *, xscale: str, yscale: str) -> None:
+    if looks_like_tensile_curve(series_list) and (xscale != "linear" or yscale != "linear"):
+        raise ValueError(TENSILE_LINEAR_SCALE_ERROR)
     if xscale == "log":
         for series in series_list:
             if (series.data["x"] <= 0).any():
@@ -107,6 +111,22 @@ def validate_series_scales(series_list: list[CurveSeries], *, xscale: str, yscal
         for series in series_list:
             if (series.data["y"] <= 0).any():
                 raise ValueError(f"Series {series.sample!r} contains non-positive y values and cannot use log y-axis.")
+
+
+def looks_like_tensile_curve(series_list: list[CurveSeries]) -> bool:
+    if not series_list:
+        return False
+    first = series_list[0]
+    x_label = canonicalize_token(normalize_label(first.x_label))
+    y_label = canonicalize_token(normalize_label(first.y_label))
+    x_unit = canonicalize_token(first.x_unit)
+    y_unit = canonicalize_token(first.y_unit)
+
+    x_label_match = x_label in {"strain", "elongation"} or "strain" in x_label or "elongation" in x_label
+    y_label_match = y_label in {"stress", "σ"} or "stress" in y_label
+    x_unit_match = x_unit in {"%", "percent"}
+    y_unit_match = y_unit in {"pa", "kpa", "mpa", "gpa"}
+    return x_label_match and y_label_match and (x_unit_match or y_unit_match)
 
 
 def load_rheology_bundle_series(
@@ -249,10 +269,12 @@ __all__ = [
     "humanize_preflight_exception",
     "load_segmented_config",
     "load_rheology_bundle_series",
+    "looks_like_tensile_curve",
     "predict_bar_box_slug",
     "preview_output_filenames",
     "rheology_output_filenames",
     "style_preflight_warnings",
+    "TENSILE_LINEAR_SCALE_ERROR",
     "to_curve_series",
     "validate_rheology_bundle_scales",
     "validate_series_scales",

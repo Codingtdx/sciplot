@@ -28,10 +28,13 @@ def _make_workbook(path: Path, *, group_name: str = "BlendSet") -> Path:
     return path
 
 
-def _pdf_width_mm(path: Path) -> float:
+def _pdf_size_mm(path: Path) -> tuple[float, float]:
     document = fitz.open(path)
     try:
-        return document[0].rect.width / 72.0 * 25.4
+        return (
+            document[0].rect.width / 72.0 * 25.4,
+            document[0].rect.height / 72.0 * 25.4,
+        )
     finally:
         document.close()
 
@@ -85,16 +88,15 @@ def test_export_tensile_comparison_bundle_builds_workbook_and_outputs(
     assert len(elongation_groups) == group_count
 
 
-def test_export_tensile_comparison_bundle_grows_curve_width_with_group_count(tmp_path: Path) -> None:
-    smaller = [_make_workbook(tmp_path / f"small_{index + 1}.xlsx") for index in range(2)]
-    larger = [_make_workbook(tmp_path / f"large_{index + 1}.xlsx") for index in range(5)]
+def test_export_tensile_comparison_bundle_keeps_standard_plot_size(tmp_path: Path) -> None:
+    workbook_paths = [_make_workbook(tmp_path / f"group_{index + 1}.xlsx") for index in range(5)]
 
-    smaller_result = export_tensile_comparison_bundle(smaller, tmp_path / "small_exports")
-    larger_result = export_tensile_comparison_bundle(larger, tmp_path / "large_exports")
+    result = export_tensile_comparison_bundle(workbook_paths, tmp_path / "exports")
 
-    small_curve = next(path for path in smaller_result.outputs if path.name == "representative_curve_compare.pdf")
-    large_curve = next(path for path in larger_result.outputs if path.name == "representative_curve_compare.pdf")
-    assert _pdf_width_mm(large_curve) > _pdf_width_mm(small_curve)
+    for output_path in result.outputs:
+        width_mm, height_mm = _pdf_size_mm(output_path)
+        assert width_mm == pytest.approx(60.0, abs=0.2)
+        assert height_mm == pytest.approx(55.0, abs=0.2)
 
 
 def test_export_tensile_comparison_bundle_rejects_fewer_than_two_groups(tmp_path: Path) -> None:

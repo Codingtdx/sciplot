@@ -24,6 +24,7 @@ from src.rendering.common import (
     load_segmented_config,
     predict_bar_box_slug,
     rheology_output_filenames,
+    validate_series_scales,
 )
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName, TemplateRenderer
 from src.rendering.options import resolve_render_options, validate_template_name
@@ -82,6 +83,7 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
     if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         return _render_rheology_bundle(bundle, "curve", input_path, sheet, options)
     series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     fig, _ = plot_curves(
         series_list,
         show_markers=False,
@@ -100,6 +102,7 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
         return _render_rheology_bundle(bundle, "point_line", input_path, sheet, options)
 
     series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     fig, _ = plot_curves(
         series_list,
         show_markers=True,
@@ -114,6 +117,7 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
 
 def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     fig, _ = plot_curves(
         series_list,
         show_markers=False,
@@ -171,6 +175,7 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
 
 def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     fig, _ = plot_scatter(
         series_list,
         xscale=options.xscale,

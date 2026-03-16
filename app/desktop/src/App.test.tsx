@@ -2,9 +2,13 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
-import { useComposerStore, useWizardStore, useWorkbenchStore } from "./lib/store";
+import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import { TEST_CONTRACT, TEST_META } from "./test/fixtures";
 import App from "./App";
+
+vi.mock("./screens/TensileScreen", () => ({
+  TensileScreen: () => <div>Tensile Stub</div>,
+}));
 
 vi.mock("./screens/WizardScreen", () => ({
   WizardScreen: () => <div>Wizard Stub</div>,
@@ -35,6 +39,7 @@ vi.mock("./lib/api", async () => {
 describe("App", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    useTensileStore.getState().reset();
     useWizardStore.getState().reset();
     useComposerStore.getState().reset();
     useWorkbenchStore.setState({
@@ -113,5 +118,24 @@ describe("App", () => {
     });
 
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("shows the tensile tab before the wizard tab in the navigation rail", async () => {
+    vi.mocked(getWorkbenchMeta).mockResolvedValue(TEST_META);
+    vi.mocked(getPlotContract).mockResolvedValue(TEST_CONTRACT);
+    vi.mocked(healthcheck).mockResolvedValue(true);
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const labels = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent?.replace(/\s+/g, " ").trim() ?? "")
+      .filter(Boolean);
+    expect(labels.indexOf("TS拉伸")).toBeLessThan(labels.indexOf("WZ绘图"));
   });
 });

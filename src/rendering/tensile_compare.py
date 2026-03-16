@@ -14,7 +14,6 @@ from src.plot_style import save_pdf
 from src.plotting_families.curve_family import plot_curves
 from src.plotting_families.stats_family import plot_bar, plot_box
 from src.rendering.io import ensure_input_path, list_sheet_names
-from src.rendering.recommendation import inspect_input_file
 from src.tensile_replicates import METRIC_SPECS, REPRESENTATIVE_CURVE_SHEET, SUMMARY_SHEET, TensileMetricSummary
 from src.text_normalization import slugify_label
 
@@ -128,15 +127,10 @@ def export_tensile_comparison_bundle(
             index=False,
         )
 
-    curve_plot_width_mm = max(120.0, 36.0 * len(loaded_sources))
-    stats_plot_width_mm = max(120.0, 22.0 * len(loaded_sources))
     outputs = _export_comparison_figures(
         loaded_sources,
         labels,
-        comparison_workbook_path,
         bundle_dir,
-        curve_plot_width_mm=curve_plot_width_mm,
-        stats_plot_width_mm=stats_plot_width_mm,
     )
     return TensileComparisonExport(
         bundle_dir=bundle_dir,
@@ -311,17 +305,9 @@ def _comparison_summary_dataframe(
 def _export_comparison_figures(
     loaded_sources: list[_LoadedTensileWorkbook],
     labels: list[str],
-    comparison_workbook_path: Path,
     bundle_dir: Path,
-    *,
-    curve_plot_width_mm: float,
-    stats_plot_width_mm: float,
 ) -> list[Path]:
     plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
-    inspection = inspect_input_file(comparison_workbook_path, REPRESENTATIVE_CURVE_SHEET)
-    xscale = inspection.recommendation.xscale or "linear"
-    yscale = inspection.recommendation.yscale or "linear"
-    reverse_x = inspection.recommendation.reverse_x or False
 
     outputs: list[Path] = []
     figures = []
@@ -340,11 +326,11 @@ def _export_comparison_figures(
         representative_figure, _ = plot_curves(
             representative_series,
             show_markers=False,
-            width_mm=curve_plot_width_mm,
+            width_mm=60.0,
             height_mm=55.0,
-            xscale=xscale,
-            yscale=yscale,
-            reverse_x=reverse_x,
+            xscale="linear",
+            yscale="linear",
+            reverse_x=False,
         )
         figures.append(representative_figure)
         outputs.append(save_pdf(representative_figure, bundle_dir / COMPARISON_CURVE_FILENAME))
@@ -360,11 +346,11 @@ def _export_comparison_figures(
                 for label, source in zip(labels, loaded_sources, strict=True)
             ]
             metric_slug = slugify_label(metric_name)
-            box_figure, _ = plot_box(groups, width_mm=stats_plot_width_mm, height_mm=55.0)
+            box_figure, _ = plot_box(groups, width_mm=60.0, height_mm=55.0)
             figures.append(box_figure)
             outputs.append(save_pdf(box_figure, bundle_dir / f"{metric_slug}_box_compare.pdf"))
 
-            bar_figure, _ = plot_bar(groups, width_mm=stats_plot_width_mm, height_mm=55.0)
+            bar_figure, _ = plot_bar(groups, width_mm=60.0, height_mm=55.0)
             figures.append(bar_figure)
             outputs.append(save_pdf(bar_figure, bundle_dir / f"{metric_slug}_bar_compare.pdf"))
     finally:
