@@ -204,7 +204,7 @@ def test_open_project_rejects_legacy_composer_v1(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert "仅支持 version: 2" in response.json()["detail"]
+    assert "only support version: 2" in response.json()["detail"]
 
 
 def test_open_project_rejects_invalid_json(tmp_path: Path) -> None:
@@ -217,7 +217,7 @@ def test_open_project_rejects_invalid_json(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "项目文件不是有效的 JSON。"
+    assert response.json()["detail"] == "The project file is not valid JSON."
 
 
 def test_save_project_rejects_unknown_mode(tmp_path: Path) -> None:
@@ -232,7 +232,7 @@ def test_save_project_rejects_unknown_mode(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "这不是可识别的 CodeGod 项目文件。"
+    assert response.json()["detail"] == "This is not a recognizable CodeGod project file."
 
 
 def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path) -> None:
@@ -333,7 +333,7 @@ def test_save_project_rejects_invalid_wizard_shape(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert "项目文件字段无效" in response.json()["detail"]
+    assert "Invalid project file field" in response.json()["detail"]
 
 
 def test_import_panels_returns_full_composer_project(tmp_path: Path) -> None:

@@ -21,8 +21,8 @@ from src.rendering.cache import (
 )
 from src.rendering.common import (
     load_rheology_bundle_series,
-    looks_like_tensile_curve,
     load_segmented_config,
+    looks_like_tensile_curve,
     predict_bar_box_slug,
     rheology_output_filenames,
     validate_series_scales,

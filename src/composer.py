@@ -373,11 +373,11 @@ def _parse_crop_rect(payload: Any) -> ComposerCropRect:
 def project_from_dict(data: dict[str, Any]) -> ComposerProject:
     payload = data.get("project") if isinstance(data.get("project"), dict) else data
     if not isinstance(payload, dict):
-        raise ValueError("拼图项目字段无效。")
+        raise ValueError("Invalid Composer project field.")
     if payload.get("mode") != "composer":
-        raise ValueError("这不是可识别的拼图器项目文件。")
+        raise ValueError("This is not a recognizable Composer project file.")
     if int(payload.get("version", 0)) != COMPOSER_VERSION:
-        raise ValueError("Composer 项目仅支持 version: 2。")
+        raise ValueError("Composer projects only support version: 2.")
 
     layout_grid_payload = payload.get("layout_grid") or {}
     regions_payload = payload.get("regions") or []
@@ -531,7 +531,7 @@ def _match_graph_pdf_span(file_path: str | Path, page_index: int = 0) -> tuple[i
         if width_ok and height_ok:
             return col_span, row_span, slot_kind
     raise ValueError(
-        "Graph 模式只接受 60x55、120x55 或 60x110 mm 的 CodeGod PDF；请改用 asset 模式导入。"
+        "Graph mode only accepts 60x55, 120x55, or 60x110 mm CodeGod PDFs. Use asset mode instead."
     )
 
 
@@ -558,7 +558,7 @@ def _find_first_fit(project: ComposerProject, col_span: int, row_span: int) -> t
             }
             if occupied.isdisjoint(cells):
                 return col, row
-    raise ValueError("画布网格没有足够连续空位了。")
+    raise ValueError("The layout grid does not have enough continuous free cells.")
 
 
 def _next_panel_id(project: ComposerProject, kind: str) -> str:
@@ -614,7 +614,7 @@ def import_panels_from_paths(
         normalized_path = Path(raw_path).expanduser()
         if kind == "graph":
             if not _is_pdf_path(normalized_path):
-                raise ValueError("Graph 模式只支持 PDF。")
+                raise ValueError("Graph mode only supports PDF files.")
             col_span, row_span, slot_kind = _match_graph_pdf_span(normalized_path)
             col, row = _find_first_fit(next_project, col_span, row_span)
             region = ComposerRegion(
@@ -961,17 +961,17 @@ def validate_non_overlapping_panels(project: ComposerProject) -> tuple[bool, str
     grid = composer_layout_grid(normalized)
 
     if normalized.version != COMPOSER_VERSION:
-        return False, "Composer 项目仅支持 version: 2。"
+        return False, "Composer projects only support version: 2."
 
     occupied: dict[tuple[int, int], str] = {}
     region_lookup = _region_by_id(normalized)
     for region in normalized.regions:
         if region.kind not in {"graph", "free"}:
-            return False, f"未知 region 类型: {region.kind}"
+            return False, f"Unknown region kind: {region.kind}"
         if region.col < 0 or region.row < 0:
-            return False, f"Region {region.id} 越界。"
+            return False, f"Region {region.id} is out of bounds."
         if region.col + region.col_span > grid.columns or region.row + region.row_span > grid.rows:
-            return False, f"Region {region.id} 超出网格范围。"
+            return False, f"Region {region.id} exceeds the layout grid."
         for col in range(region.col, region.col + region.col_span):
             for row in range(region.row, region.row + region.row_span):
                 key = (col, row)
@@ -979,29 +979,29 @@ def validate_non_overlapping_panels(project: ComposerProject) -> tuple[bool, str
                     return False, f"Regions {occupied[key]} and {region.id} overlap."
                 occupied[key] = region.id
         if region.kind == "graph" and _graph_panel_for_region(normalized, region.id) is None:
-            return False, f"Graph region {region.id} 缺少对应图 panel。"
+            return False, f"Graph region {region.id} is missing its matching graph panel."
 
     for panel in normalized.panels:
         if panel.w_mm <= 0 or panel.h_mm <= 0:
-            return False, f"Panel {panel.id} 尺寸无效。"
+            return False, f"Panel {panel.id} has an invalid size."
         if panel.kind == "graph":
             if panel.region_id is None or panel.region_id not in region_lookup:
-                return False, f"Graph panel {panel.id} 缺少有效 region。"
+                return False, f"Graph panel {panel.id} is missing a valid region."
             if region_lookup[panel.region_id].kind != "graph":
-                return False, f"Graph panel {panel.id} 绑定了非 graph region。"
+                return False, f"Graph panel {panel.id} is bound to a non-graph region."
         elif panel.region_id and panel.region_id not in region_lookup:
-            return False, f"Panel {panel.id} 绑定了不存在的 region。"
+            return False, f"Panel {panel.id} is bound to a region that does not exist."
         if panel.slot_id and panel.region_id:
             slot_region = region_lookup.get(panel.region_id)
             if slot_region is None or region_slot_id(slot_region) != panel.slot_id:
-                return False, f"Panel {panel.id} 绑定了无效 slot。"
+                return False, f"Panel {panel.id} is bound to an invalid slot."
 
     for text in normalized.texts:
         if text.region_id and text.region_id not in region_lookup:
-            return False, f"Text {text.id} 绑定了不存在的 region。"
+            return False, f"Text {text.id} is bound to a region that does not exist."
         if text.slot_id and text.region_id:
             slot_region = region_lookup.get(text.region_id)
             if slot_region is None or region_slot_id(slot_region) != text.slot_id:
-                return False, f"Text {text.id} 绑定了无效 slot。"
+                return False, f"Text {text.id} is bound to an invalid slot."
 
     return True, None

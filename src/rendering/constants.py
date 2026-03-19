@@ -21,18 +21,18 @@ DEFAULT_SIZE_BY_TEMPLATE: dict[str, str] = {
     for name in TEMPLATE_CHOICES
 }
 LEGACY_TEMPLATE_HINTS = {
-    "box_bar_plots": "请改用 `bar` 或 `box`，需要时再用 `violin`。",
-    "frequency_sweep": "请改用 `point_line` 或 `curve`。",
-    "temperature_sweep": "请改用 `point_line` 或 `curve`。",
-    "stress_relaxation": "请改用 `point_line` 或 `curve`。",
-    "tensile_curve": "请改用 `curve` 或 `point_line`。",
-    "ftir": "请改用 `stacked_curve`。",
-    "nmr": "请改用 `stacked_curve`。",
-    "wide_nmr": "请改用 `segmented_stacked_curve`。",
-    "xrd": "请改用 `stacked_curve`。",
-    "dsc": "请改用 `stacked_curve`。",
-    "tga": "请改用 `curve`。",
-    "dma": "请改用 `curve`。",
+    "box_bar_plots": "Use `bar` or `box` instead, and switch to `violin` only when needed.",
+    "frequency_sweep": "Use `point_line` or `curve` instead.",
+    "temperature_sweep": "Use `point_line` or `curve` instead.",
+    "stress_relaxation": "Use `point_line` or `curve` instead.",
+    "tensile_curve": "Use `curve` or `point_line` instead.",
+    "ftir": "Use `stacked_curve` instead.",
+    "nmr": "Use `stacked_curve` instead.",
+    "wide_nmr": "Use `segmented_stacked_curve` instead.",
+    "xrd": "Use `stacked_curve` instead.",
+    "dsc": "Use `stacked_curve` instead.",
+    "tga": "Use `curve` instead.",
+    "dma": "Use `curve` instead.",
 }
 
 FREQUENCY_OUTPUTS = {

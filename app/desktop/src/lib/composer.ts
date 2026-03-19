@@ -41,7 +41,7 @@ export const EMPTY_COMPOSER_PROJECT: ComposerProject = {
 
 function asObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error("这不是可识别的拼图器项目文件。");
+    throw new Error("This is not a recognizable Composer project file.");
   }
   return payload as Record<string, unknown>;
 }
@@ -214,12 +214,12 @@ export function describePanelSlot(panel: ComposerPanel, project: ComposerProject
       return region.kind === "graph" ? regionSpanLabel(region) : `Free · ${regionSpanLabel(region)}`;
     }
   }
-  return panel.kind === "graph" ? "Graph Region" : "自由素材";
+  return panel.kind === "graph" ? "Graph Region" : "Free Asset";
 }
 
 export function composerLayerTitle(project: ComposerProject, panel: ComposerPanel) {
   return panel.kind === "graph"
-    ? `图 ${resolveSelectedPanelLabel(project, panel) || panel.id}`
+    ? `Figure ${resolveSelectedPanelLabel(project, panel) || panel.id}`
     : panel.label || formatLeaf(panel.file_path);
 }
 
@@ -315,18 +315,18 @@ export function extractComposerProject(payload: unknown): ComposerProject {
   const candidate = asObject(payload);
   if ("project" in candidate && candidate.project != null) {
     if (candidate.mode != null && candidate.mode !== "composer") {
-      throw new Error("这不是可识别的拼图器项目文件。");
+      throw new Error("This is not a recognizable Composer project file.");
     }
     return extractComposerProject(candidate.project);
   }
 
   if ("mode" in candidate && candidate.mode !== "composer") {
-    throw new Error("这不是可识别的拼图器项目文件。");
+    throw new Error("This is not a recognizable Composer project file.");
   }
 
   const version = readNumber(candidate.version, 0);
   if (version !== 2) {
-    throw new Error("Composer 项目仅支持 version: 2，请重新导入素材创建新项目。");
+    throw new Error("Composer projects only support version: 2. Re-import the assets to create a new project.");
   }
 
   return normalizeComposerProject({
@@ -437,7 +437,7 @@ export function mergeCellsIntoFreeRegion(
   selectedCells: Array<{ col: number; row: number }>,
 ) {
   if (!mergeableCells(project, selectedCells)) {
-    throw new Error("只能合并连续且未被占用的空白格。");
+    throw new Error("Only continuous, unoccupied empty cells can be merged.");
   }
   const cols = selectedCells.map((cell) => cell.col);
   const rows = selectedCells.map((cell) => cell.row);
@@ -1287,7 +1287,7 @@ export function pasteComposerClipboard(
   const nextProject = cloneProject(project);
   const regionOffset = clipboard.regions.length > 0 ? regionPasteOffset(nextProject, clipboard.regions) : null;
   if (clipboard.regions.length > 0 && !regionOffset) {
-    throw new Error("当前画布没有足够连续空位来粘贴区域。");
+    throw new Error("The current canvas does not have enough continuous free cells to paste this region.");
   }
 
   const regionIdMap = new Map<string, string>();
@@ -1343,7 +1343,7 @@ export function pasteComposerClipboard(
     if (panel.kind === "graph" && nextPanel.region_id) {
       const region = findRegion(nextProject, nextPanel.region_id);
       if (!region) {
-        throw new Error("粘贴 graph 时找不到目标区域。");
+        throw new Error("Could not find the target region while pasting the graph.");
       }
       Object.assign(nextPanel, regionRect(nextProject, region));
       nextPanel.slot_id = regionSlotId(region);

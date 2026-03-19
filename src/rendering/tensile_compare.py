@@ -89,7 +89,7 @@ def export_tensile_comparison_bundle(
 ) -> TensileComparisonExport:
     loaded_sources = [_load_tensile_workbook(path) for path in workbook_paths]
     if len(loaded_sources) < 2:
-        raise ValueError("拉伸对比至少需要 2 组已整理 workbook。")
+        raise ValueError("Tensile comparison requires at least 2 prepared workbooks.")
 
     labels = _dedupe_labels(source.base_label for source in loaded_sources)
     _validate_metric_units(loaded_sources)
@@ -144,15 +144,18 @@ def _load_tensile_workbook(workbook_path: str | Path) -> _LoadedTensileWorkbook:
     path = ensure_input_path(str(Path(workbook_path).expanduser()))
     sheet_names = tuple(list_sheet_names(path))
     if not sheet_names:
-        raise ValueError(f"{path.name} 不是有效的 Excel workbook。")
+        raise ValueError(f"{path.name} is not a valid Excel workbook.")
     missing_sheets = sorted(REQUIRED_TENSILE_WORKBOOK_SHEETS.difference(sheet_names))
     if missing_sheets:
         joined = ", ".join(missing_sheets)
-        raise ValueError(f"{path.name} 缺少必需工作表：{joined}")
+        raise ValueError(f"{path.name} is missing required worksheet(s): {joined}")
 
     representative_curves = load_curve_table(path, sheet_name=REPRESENTATIVE_CURVE_SHEET)
     if len(representative_curves) != 1:
-        raise ValueError(f"{path.name} 的 {REPRESENTATIVE_CURVE_SHEET} 必须恰好包含 1 组代表曲线。")
+        raise ValueError(
+            f"{path.name} must contain exactly 1 representative curve group "
+            f"in {REPRESENTATIVE_CURVE_SHEET}."
+        )
 
     sample_count, representative_filename = _summary_fields(path)
 
@@ -162,12 +165,12 @@ def _load_tensile_workbook(workbook_path: str | Path) -> _LoadedTensileWorkbook:
         try:
             groups = load_replicate_table(path, sheet_name=f"{metric_name}_Replicates")
         except Exception as exc:
-            raise ValueError(f"{path.name} 的 {metric_name}_Replicates 不是有效重复值表：{exc}") from exc
+            raise ValueError(f"{path.name} has an invalid replicate table in {metric_name}_Replicates: {exc}") from exc
         if len(groups) != 1:
-            raise ValueError(f"{path.name} 的 {metric_name}_Replicates 必须恰好包含 1 组重复值。")
+            raise ValueError(f"{path.name} must contain exactly 1 replicate group in {metric_name}_Replicates.")
         group = groups[0]
         if group.data.empty:
-            raise ValueError(f"{path.name} 的 {metric_name}_Replicates 没有有效重复值。")
+            raise ValueError(f"{path.name} does not contain valid replicate values in {metric_name}_Replicates.")
         replicate_groups[metric_name] = group
         mean_value = group.data.mean()
         std_value = group.data.std(ddof=1)
@@ -207,9 +210,9 @@ def _summary_fields(path: Path) -> tuple[int, str]:
             if parsed is not None:
                 sample_count = parsed
     if sample_count is None:
-        raise ValueError(f"{path.name} 的 Summary 缺少 Specimens 数量。")
+        raise ValueError(f"{path.name} is missing the Specimens count in Summary.")
     if representative_filename == "":
-        raise ValueError(f"{path.name} 的 Summary 缺少 Representative File。")
+        raise ValueError(f"{path.name} is missing the Representative File entry in Summary.")
     return sample_count, representative_filename
 
 
@@ -372,8 +375,9 @@ def _validate_metric_units(loaded_sources: list[_LoadedTensileWorkbook]) -> None
             group = source.replicate_groups[metric_name]
             if group.value_label != expected_label or group.value_unit != expected_unit:
                 raise ValueError(
-                    f"{metric_name} 的单位或标签不一致："
-                    f"{loaded_sources[0].workbook_path.name} 与 {source.workbook_path.name} 无法直接对比。"
+                    f"The label or unit for {metric_name} does not match: "
+                    f"{loaded_sources[0].workbook_path.name} and "
+                    f"{source.workbook_path.name} cannot be compared directly."
                 )
 
 
@@ -388,8 +392,8 @@ def _validate_curve_axes(loaded_sources: list[_LoadedTensileWorkbook]) -> None:
             or curve.y_unit != first_curve.y_unit
         ):
             raise ValueError(
-                f"{source.workbook_path.name} 的代表曲线坐标轴标签或单位与 "
-                f"{loaded_sources[0].workbook_path.name} 不一致。"
+                f"The representative curve axis labels or units in {source.workbook_path.name} do not match "
+                f"{loaded_sources[0].workbook_path.name}."
             )
 
 

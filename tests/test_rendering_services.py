@@ -164,9 +164,9 @@ def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) 
 
     log_options = resolve_render_options(template="curve", xscale="log", yscale="linear")
     log_preflight = preflight_render_request("curve", input_path, 0, log_options)
-    assert log_preflight.errors == ("拉伸曲线必须使用线性坐标轴，不支持 log x / y。",)
+    assert log_preflight.errors == ("Tensile curves must use linear axes. Log x / y is not supported.",)
 
-    with pytest.raises(ValueError, match="拉伸曲线必须使用线性坐标轴"):
+    with pytest.raises(ValueError, match="Tensile curves must use linear axes"):
         build_rendered_plots("curve", input_path, xscale="log", yscale="linear")
 
 

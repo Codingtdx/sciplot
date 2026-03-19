@@ -1,4 +1,5 @@
 import { healthcheck } from "../lib/api";
+import { InfoTip } from "../components/InfoTip";
 import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "../lib/store";
 import type { PlotContract, WorkbenchMeta } from "../lib/types";
 import { useState } from "react";
@@ -48,11 +49,11 @@ export function SettingsScreen({
     }
 
     const labels = {
-      wizard: "已重置绘图精灵现场。",
-      tensile: "已重置拉伸工作台现场。",
-      composer: "已重置拼图器现场。",
-      recent: "已清空最近项目记录。",
-      all: "已重置当前页面状态并清空最近记录。",
+      wizard: "Plot Builder session reset.",
+      tensile: "Tensile workspace reset.",
+      composer: "Composer workspace reset.",
+      recent: "Recent file history cleared.",
+      all: "All workspace state and recent history cleared.",
     } as const;
 
     setMaintenanceNotice(labels[action]);
@@ -65,12 +66,12 @@ export function SettingsScreen({
       <section className="desk-main">
         <div className="summary-grid">
           <article className="work-card section-card">
-            <div className="section-head">
+            <div className="panel-heading">
               <div>
-                <div className="card-kicker">运行状态</div>
-                <h2>{sidecarReady ? "Python sidecar 已连通" : "Python sidecar 暂未连通"}</h2>
-                <p>绘图识别、预览和导出都依赖 sidecar，这里可以随时重新检查。</p>
+                <div className="card-kicker">Runtime</div>
+                <h2>{sidecarReady ? "Python sidecar is online" : "Python sidecar is offline"}</h2>
               </div>
+              <InfoTip content="Detection, preview, and export all depend on the sidecar. Recheck here when the desktop app starts before the backend is ready." />
             </div>
             <div className="step-actions">
               <button
@@ -79,65 +80,65 @@ export function SettingsScreen({
                 onClick={() => void refreshSidecar()}
                 type="button"
               >
-                {checking ? "检查中…" : "重新检查"}
+                {checking ? "Checking…" : "Check again"}
               </button>
             </div>
           </article>
 
           <article className="work-card section-card">
-            <div className="section-head">
+            <div className="panel-heading">
               <div>
-                <div className="card-kicker">默认拼图画布</div>
+                <div className="card-kicker">Composer</div>
                 <h2>
                   {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
                 </h2>
-                <p>当前项目会使用这套画布尺寸和网格步进来排版。</p>
               </div>
+              <InfoTip content="This reflects the current composer project canvas and grid setup." />
             </div>
           </article>
 
           <article className="work-card section-card">
-            <div className="section-head">
+            <div className="panel-heading">
               <div>
-                <div className="card-kicker">默认绘图区</div>
+                <div className="card-kicker">Plot frame</div>
                 <h2>
-                  {meta?.global_frame.panel_width_mm ?? 60} x {meta?.global_frame.panel_height_mm ?? 55} mm 标准轴框
+                  {meta?.global_frame.panel_width_mm ?? 60} x {meta?.global_frame.panel_height_mm ?? 55} mm standard frame
                 </h2>
-                <p>这里显示当前单图的默认绘图区尺寸和边距。</p>
               </div>
+              <InfoTip content="The plot frame is shared by the standard single-panel figure family and is served directly from the plot contract." />
             </div>
             <div className="context-list">
               <div className="context-row">
-                <span>左 / 右</span>
+                <span>Left / right</span>
                 <strong>
                   {meta?.global_frame.left_margin_mm ?? 14} / {meta?.global_frame.right_margin_mm ?? 4.5} mm
                 </strong>
               </div>
               <div className="context-row">
-                <span>下 / 上</span>
+                <span>Bottom / top</span>
                 <strong>
                   {meta?.global_frame.bottom_margin_mm ?? 11} / {meta?.global_frame.top_margin_mm ?? 5.5} mm
                 </strong>
               </div>
               <div className="context-row">
-                <span>校验规则</span>
+                <span>Validation rules</span>
                 <strong>{validationRuleCount}</strong>
               </div>
             </div>
           </article>
 
           <article className="work-card section-card">
-            <div className="section-head">
+            <div className="panel-heading">
               <div>
-                <div className="card-kicker">显示与偏好</div>
-                <h2>主题和常用设置</h2>
-                <p>这些设置会保存在本地，并在下次打开时继续使用。</p>
+                <div className="card-kicker">Preferences</div>
+                <h2>Theme and defaults</h2>
               </div>
+              <InfoTip content="These preferences are stored locally and restored when the desktop app opens again." />
             </div>
 
             <div className="inspector-stack">
               <label>
-                <span className="field-label">主题</span>
+                <span className="field-label">Theme</span>
                 <select
                   className="field"
                   onChange={(event) =>
@@ -150,9 +151,9 @@ export function SettingsScreen({
                   }
                   value={settings.theme_preference}
                 >
-                  <option value="system">跟随系统</option>
-                  <option value="light">浅色</option>
-                  <option value="dark">深色</option>
+                  <option value="system">Follow system</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
                 </select>
               </label>
 
@@ -164,7 +165,7 @@ export function SettingsScreen({
                   }
                   type="checkbox"
                 />
-                <span>自动轮询 sidecar 状态</span>
+                <span>Auto-refresh sidecar status</span>
               </label>
 
               <label className="toggle-field">
@@ -175,37 +176,37 @@ export function SettingsScreen({
                   }
                   type="checkbox"
                 />
-                <span>记住上次打开的页面</span>
+                <span>Remember last screen</span>
               </label>
             </div>
           </article>
 
           <article className="work-card section-card">
-            <div className="section-head">
+            <div className="panel-heading">
               <div>
-                <div className="card-kicker">维护动作</div>
-                <h2>清理当前工作现场</h2>
-                <p>需要时可以重置绘图、拼图或最近项目记录。</p>
+                <div className="card-kicker">Maintenance</div>
+                <h2>Reset local state</h2>
               </div>
+              <InfoTip content="These actions only reset the desktop app state and recent history. They do not modify source data or exported files on disk." />
             </div>
 
             {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
 
             <div className="step-actions">
               <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
-                重置绘图精灵
+                Reset Plot Builder
               </button>
               <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
-                重置拉伸工作台
+                Reset Tensile
               </button>
               <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
-                重置拼图器
+                Reset Composer
               </button>
               <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
-                清空最近记录
+                Clear recents
               </button>
               <button className="ghost-button danger-button" onClick={() => runMaintenance("all")} type="button">
-                全部重置
+                Reset everything
               </button>
             </div>
           </article>
@@ -214,38 +215,37 @@ export function SettingsScreen({
 
       <aside className="desk-context">
         <article className="context-card">
-          <div className="context-card-head">
+          <div className="panel-heading">
             <div>
-              <h3>当前设置</h3>
-              <p>这里汇总当前保存的主题和常用偏好。</p>
+              <h3>Current state</h3>
             </div>
           </div>
           <div className="context-list">
             <div className="context-row">
-              <span>最近记录</span>
+              <span>Recents</span>
               <strong>{recentProjects.length}</strong>
             </div>
             <div className="context-row">
-              <span>PDF 导入模式</span>
-              <strong>{pdfImportMode === "graph" ? "作为图" : "作为素材"}</strong>
+              <span>PDF import mode</span>
+              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
             </div>
             <div className="context-row">
-              <span>主题</span>
+              <span>Theme</span>
               <strong>
                 {settings.theme_preference === "system"
-                  ? "跟随系统"
+                  ? "Follow system"
                   : settings.theme_preference === "light"
-                    ? "浅色"
-                    : "深色"}
+                    ? "Light"
+                    : "Dark"}
               </strong>
             </div>
             <div className="context-row">
-              <span>自动轮询</span>
-              <strong>{settings.auto_status_poll ? "开启" : "关闭"}</strong>
+              <span>Auto-refresh</span>
+              <strong>{settings.auto_status_poll ? "On" : "Off"}</strong>
             </div>
             <div className="context-row">
-              <span>记住页面</span>
-              <strong>{settings.remember_last_screen ? "开启" : "关闭"}</strong>
+              <span>Remember screen</span>
+              <strong>{settings.remember_last_screen ? "On" : "Off"}</strong>
             </div>
           </div>
         </article>

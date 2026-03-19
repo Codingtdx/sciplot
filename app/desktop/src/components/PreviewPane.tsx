@@ -67,9 +67,9 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
     <section className="preview-pane">
       <div className="preview-toolbar">
         <div>
-          <div className="preview-title">{current?.filename ?? "等待图像"}</div>
+          <div className="preview-title">{current?.filename ?? "Preview"}</div>
           <div className="preview-subtitle">
-            {current ? "当前预览" : "修改模板或参数后自动更新"}
+            {current ? "Live preview" : "Updates automatically after template or option changes"}
           </div>
         </div>
         <div className="preview-nav">
@@ -78,7 +78,7 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
             onClick={() => setZoomMode("fit")}
             type="button"
           >
-            适配宽度
+            Fit
           </button>
           <button
             className={`ghost-button ${zoomMode === "100" ? "active-toggle" : ""}`}
@@ -93,7 +93,7 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
             onClick={() => onChangeIndex(Math.max(0, previewIndex - 1))}
             type="button"
           >
-            上一张
+            Previous
           </button>
           <span className="preview-count">
             {previews.length > 0 ? `${previewIndex + 1} / ${previews.length}` : "0 / 0"}
@@ -104,17 +104,15 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
             onClick={() => onChangeIndex(Math.min(previews.length - 1, previewIndex + 1))}
             type="button"
           >
-            下一张
+            Next
           </button>
         </div>
       </div>
       <div className="preview-surface" onWheel={handleWheel} ref={containerRef}>
-        {busy && <div className="placeholder-card">正在刷新预览…</div>}
+        {busy && <div className="placeholder-card">Refreshing preview…</div>}
         {!busy && error && <div className="error-card">{error}</div>}
         {!busy && !error && !current && (
-          <div className="placeholder-card">
-            选择数据并确认图类型后，这里会显示预览。
-          </div>
+          <div className="placeholder-card">Load a file and choose a template to see previews.</div>
         )}
         {!busy && !error && current && (
           <img

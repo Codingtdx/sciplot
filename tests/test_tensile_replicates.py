@@ -38,7 +38,7 @@ class TensileReplicateTests(unittest.TestCase):
 
         self.addCleanup(path.unlink, missing_ok=True)
 
-        with self.assertRaisesRegex(ValueError, "无法用常见编码读出拉伸导出表。"):
+        with self.assertRaisesRegex(ValueError, "Could not decode the tensile export CSV"):
             parse_tensile_csv(path)
 
 

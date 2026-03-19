@@ -2,7 +2,7 @@ import type { RenderOptionsPayload, WizardProject } from "./types";
 
 function asObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error("这不是可识别的绘图精灵项目文件。");
+    throw new Error("This is not a recognizable Plot Builder project file.");
   }
   return payload as Record<string, unknown>;
 }
@@ -43,12 +43,12 @@ function asRenderOptions(payload: unknown): RenderOptionsPayload {
 export function extractWizardProject(payload: unknown): WizardProject {
   const candidate = asObject(payload);
   if (candidate.mode !== "wizard") {
-    throw new Error("这不是可识别的绘图精灵项目文件。");
+    throw new Error("This is not a recognizable Plot Builder project file.");
   }
 
   const wizard = asObject(candidate.wizard);
   if (typeof wizard.input_path !== "string" || wizard.input_path.trim().length === 0) {
-    throw new Error("绘图项目文件缺少有效的数据路径。");
+    throw new Error("The Plot Builder project file is missing a valid data path.");
   }
 
   return {

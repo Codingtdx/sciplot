@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 
+import { AppIcon } from "./components/AppIcon";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import { AppMode, NAV_ITEMS, SCREEN_META, getWizardStepLabel } from "./lib/workbench";
@@ -210,12 +211,12 @@ export default function App() {
   if (mode === "tensile") {
     secondaryStatusLabel =
       tensileOutputsCount > 0
-        ? `${tensileCompareCount} 组 / ${tensileOutputsCount} outputs`
-        : `${tensileCompareCount} 组待对比`;
+        ? `${tensileCompareCount} sources / ${tensileOutputsCount} outputs`
+        : `${tensileCompareCount} sources queued`;
   } else if (mode === "composer") {
-    secondaryStatusLabel = `${composerPanelCount} 图层 / ${composerTextCount} 文字`;
+    secondaryStatusLabel = `${composerPanelCount + composerTextCount} objects`;
   } else if (mode === "projects") {
-    secondaryStatusLabel = `${recentProjectsCount} 条最近记录`;
+    secondaryStatusLabel = `${recentProjectsCount} recent files`;
   } else if (mode === "settings") {
     secondaryStatusLabel = `${describeThemePreference(themePreference)} Theme`;
   } else if (wizardOutputsCount > 0) {
@@ -229,7 +230,7 @@ export default function App() {
           <div className="brand-mark">CG</div>
           <div className="rail-brand-text">
             <strong>CodeGod</strong>
-            <span>5.0</span>
+            <span>Desktop 5.0</span>
           </div>
         </div>
 
@@ -241,7 +242,9 @@ export default function App() {
               onClick={() => setMode(item.id)}
               type="button"
             >
-              <span className="nav-item-icon">{item.icon}</span>
+              <span className="nav-item-icon">
+                <AppIcon name={item.icon} />
+              </span>
               <span className="nav-item-label">{item.label}</span>
             </button>
           ))}
@@ -249,7 +252,7 @@ export default function App() {
 
         <div className="rail-footer">
           <div className={`rail-status-dot ${sidecarReady ? "online" : "offline"}`} />
-          <span>{sidecarReady ? "Sidecar Ready" : "Waiting"}</span>
+          <span>{sidecarReady ? "Sidecar ready" : "Sidecar offline"}</span>
         </div>
       </aside>
 
@@ -262,18 +265,17 @@ export default function App() {
           </div>
 
           <div className="status-pills">
-            <span className="status-pill accent">Desktop</span>
             <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
               {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
             </span>
-            <span className="status-pill">{secondaryStatusLabel}</span>
+            <span className="status-pill accent">{secondaryStatusLabel}</span>
           </div>
         </header>
 
         {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
 
         <main className="dashboard-main">
-          <Suspense fallback={<div className="placeholder-card">正在载入工作台…</div>}>
+          <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
             {mode === "tensile" && <TensileScreen meta={workbenchMeta} onNavigate={setMode} />}
             {mode === "wizard" && <WizardScreen meta={workbenchMeta} />}
             {mode === "composer" && <ComposerScreen />}

@@ -23,66 +23,93 @@ from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
-TENSILE_LINEAR_SCALE_ERROR = "拉伸曲线必须使用线性坐标轴，不支持 log x / y。"
+TENSILE_LINEAR_SCALE_ERROR = "Tensile curves must use linear axes. Log x / y is not supported."
 
 
 def humanize_preflight_exception(exc: Exception) -> str:
     message = str(exc)
 
     if "Missing segmented_stacked_curve sidecar config" in message:
-        return "当前图类型需要同目录 sidecar 配置文件（用于断轴、高亮和编号），但程序没有找到它。"
+        return (
+            "This figure type requires a sidecar config in the same directory "
+            "for split axes, highlights, and labels, but none was found."
+        )
     if "must include at least" in message:
-        return "表格行数不够。请至少保留名称行、单位行、样品名行，以及一行数据。"
+        return (
+            "The table does not contain enough rows. Keep the label row, unit "
+            "row, sample row, and at least one data row."
+        )
     if "axis label row" in message:
-        return "第 1 行缺少名称行。请在这一行写 X/Y 名称。"
+        return "Row 1 is missing the label row. Put the X/Y labels there."
     if "unit row" in message:
-        return "第 2 行缺少单位行。请在这一行写单位。"
+        return "Row 2 is missing the unit row. Put the units there."
     if "sample row" in message:
-        return "第 3 行缺少样品名行。请在这一行写样品名。"
+        return "Row 3 is missing the sample row. Put the sample names there."
     if "group row" in message:
-        return "第 2 行缺少分组名。请在这一行写各组名称。"
+        return "Row 2 is missing the group row. Put the group names there."
     if "Curve table must contain an even number of columns arranged in X/Y pairs." in message or "X/Y pairs" in message:
-        return "曲线表的列数不是成对的。请按 X/Y、X/Y 的方式整理列。"
+        return "The curve table columns are not arranged in X/Y pairs. Reformat them as X/Y, X/Y, and so on."
     if "matching X/Y numeric data" in message:
-        return "某一组 X/Y 列只有一边是有效数字。请检查这两列是否成对、是否都填了数值。"
+        return (
+            "One X/Y pair only has valid numeric data on one side. Check that "
+            "both columns are paired and fully numeric."
+        )
     if "contains incomplete X/Y rows" in message:
-        return "某一组 X/Y 数据里有不完整的行。请删掉空半行，或把这一组补完整。"
+        return "One X/Y series contains incomplete rows. Remove half-empty rows or fill that series completely."
     if "contains non-numeric values in the data region" in message:
-        return "数据区里有非数字内容。请把说明文字移出数据区，只保留数值。"
+        return "The data region contains non-numeric values. Move notes outside the data area and keep only numbers."
     if "Sample names in columns" in message:
-        return "同一组 X/Y 两列的样品名不一致。请让这一对列的样品名完全相同。"
+        return "The sample names in one X/Y pair do not match. Make both columns use the same sample name."
     if "contains non-positive x values" in message:
-        return "当前选择了 log x 轴，但数据里有小于等于 0 的 x 值。请改用 linear，或先清理这些值。"
+        return (
+            "Log x is selected, but the data contains x values that are less "
+            "than or equal to 0. Switch to linear or clean those values first."
+        )
     if "contains non-positive y values" in message:
-        return "当前选择了 log y 轴，但数据里有小于等于 0 的 y 值。请改用 linear，或先清理这些值。"
+        return (
+            "Log y is selected, but the data contains y values that are less "
+            "than or equal to 0. Switch to linear or clean those values first."
+        )
     if "contains no numeric replicate values" in message:
-        return "某一列没有可用的重复值数字。请删掉空列，或把这一列补成纯数值。"
+        return (
+            "One replicate column does not contain usable numeric values. "
+            "Remove the empty column or fill it with numbers only."
+        )
     if "No valid replicate columns found" in message:
-        return "没有找到有效的重复值列。请确认第 4 行起确实是数值。"
+        return "No valid replicate columns were found. Confirm that numeric replicate values begin on row 4."
     if "No valid X/Y series found" in message:
-        return "没有找到有效的 X/Y 曲线。请确认第 4 行起至少有一组完整数值。"
+        return (
+            "No valid X/Y series were found. Confirm that row 4 onward "
+            "contains at least one complete numeric series."
+        )
     if "Heatmap table must contain exactly three columns: X, Y, Z." in message:
-        return "热图表必须正好有三列，并且分别对应 X、Y、Z。"
+        return "The heatmap table must contain exactly three columns mapped to X, Y, and Z."
     if "Heatmap table role row must contain exactly X, Y and Z." in message:
-        return "热图表第 1 行必须明确写出 X、Y、Z 三个角色列。"
+        return "Row 1 of the heatmap table must explicitly define the X, Y, and Z role columns."
     if "does not contain any numeric Z values" in message:
-        return "热图表的 Z 列没有读到有效数字。请检查第 4 行起的数据。"
+        return "The heatmap Z column does not contain any valid numeric values. Check the data from row 4 onward."
     if "does not contain any valid X/Y coordinates" in message:
-        return "热图表的 X/Y 坐标列为空或无效。请检查第 4 行起的数据。"
-    if "频率扫描缺少指标数据" in message:
-        return f"{message} 请确认这一组导出列是否完整。"
-    if "温度扫描缺少指标数据" in message:
-        return f"{message} 请确认这一组导出列是否完整。"
-    if "应力松弛表中没有读到 σ/σ₀ 曲线" in message:
-        return "应力松弛表里没有读到 σ/σ₀ 曲线。请确认导出文件包含这一列。"
-    if "统计表没有有效分组" in message:
-        return "统计表没有读到有效分组。请确认第 2 行是组名，第 4 行起是重复值。"
+        return "The heatmap X/Y coordinate columns are empty or invalid. Check the data from row 4 onward."
+    if "Frequency sweep is missing metric data" in message:
+        return f"{message} Confirm that this exported bundle includes the complete metric columns."
+    if "Temperature sweep is missing metric data" in message:
+        return f"{message} Confirm that this exported bundle includes the complete metric columns."
+    if "No σ/σ₀ curve was found in the stress relaxation table" in message:
+        return (
+            "No σ/σ₀ curve was found in the stress relaxation table. Confirm "
+            "that the exported file includes that series."
+        )
+    if "No valid groups were found in the replicate table" in message:
+        return (
+            "No valid groups were found in the replicate table. Confirm that "
+            "row 2 contains group names and row 4 onward contains replicate values."
+        )
     return message
 
 
 def style_preflight_warnings(options: RenderOptions) -> tuple[str, ...]:
     if options.style_preset == "nature":
-        return ("当前使用的是 Nature 风格 preset：它优先遵循官方图像约束。",)
+        return ("The Nature preset is active, so official figure constraints take priority.",)
     return ()
 
 
@@ -184,15 +211,15 @@ def validate_rheology_bundle_scales(
 ) -> dict[str, list[CurveSeries]]:
     metric_series = load_rheology_bundle_series(bundle, input_path, sheet)
     bundle_label = {
-        "frequency_sweep": "频率扫描",
-        "temperature_sweep": "温度扫描",
-        "stress_relaxation": "应力松弛",
+        "frequency_sweep": "Frequency sweep",
+        "temperature_sweep": "Temperature sweep",
+        "stress_relaxation": "Stress relaxation",
     }.get(bundle, bundle)
     for metric_name, series_list in metric_series.items():
         if not series_list:
             if bundle == "stress_relaxation":
-                raise ValueError("应力松弛表中没有读到 σ/σ₀ 曲线。")
-            raise ValueError(f"{bundle_label}缺少指标数据：{metric_name}")
+                raise ValueError("No σ/σ₀ curve was found in the stress relaxation table.")
+            raise ValueError(f"{bundle_label} is missing metric data: {metric_name}")
         validate_series_scales(series_list, xscale=xscale, yscale=yscale)
     return metric_series
 
@@ -260,7 +287,8 @@ def load_segmented_config(
 def append_multi_output_warning(warnings: list[str], preview_names: tuple[str, ...]) -> None:
     if len(preview_names) > 1:
         warnings.append(
-            f"{validation_rule('multi_output_bundle_notice').description} 当前会导出 {len(preview_names)} 张 PDF。"
+            f"{validation_rule('multi_output_bundle_notice').description} "
+            f"This run will export {len(preview_names)} PDF files."
         )
 
 

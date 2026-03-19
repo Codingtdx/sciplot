@@ -97,7 +97,7 @@ describe("extractComposerProject", () => {
         mode: "wizard",
         wizard: { input_path: "a.csv" },
       }),
-    ).toThrow("这不是可识别的拼图器项目文件。");
+    ).toThrow("This is not a recognizable Composer project file.");
   });
 
   it("rejects legacy composer v1 payloads", () => {
@@ -112,7 +112,7 @@ describe("extractComposerProject", () => {
           texts: [],
         },
       }),
-    ).toThrow("Composer 项目仅支持 version: 2");
+    ).toThrow("Composer projects only support version: 2");
   });
 
   it("accepts wrapped composer v2 payloads", () => {

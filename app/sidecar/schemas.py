@@ -565,12 +565,12 @@ def _project_validation_message(exc: ValidationError) -> str:
     loc = ".".join(str(item) for item in error.get("loc", ()))
     msg = error.get("msg", "invalid value")
     if loc:
-        return f"项目文件字段无效: {loc} - {msg}"
-    return f"项目文件字段无效: {msg}"
+        return f"Invalid project file field: {loc} - {msg}"
+    return f"Invalid project file field: {msg}"
 
 
 def _composer_version_error() -> ValueError:
-    return ValueError("Composer 项目仅支持 version: 2，请重新导入素材创建新项目。")
+    return ValueError("Composer projects only support version: 2. Re-import the assets to create a new project.")
 
 
 def _normalize_composer_project(payload: dict[str, Any]) -> ComposerProjectDocument:
@@ -584,9 +584,9 @@ def _normalize_composer_project(payload: dict[str, Any]) -> ComposerProjectDocum
         message = str(exc)
         if "version: 2" in message:
             raise _composer_version_error() from exc
-        raise ValueError(f"拼图项目字段无效: {exc}") from exc
+        raise ValueError(f"Invalid Composer project field: {exc}") from exc
     except Exception as exc:
-        raise ValueError(f"拼图项目字段无效: {exc}") from exc
+        raise ValueError(f"Invalid Composer project field: {exc}") from exc
 
     try:
         return ComposerProjectDocument.model_validate(serialize_project(normalized))
@@ -596,7 +596,7 @@ def _normalize_composer_project(payload: dict[str, Any]) -> ComposerProjectDocum
 
 def normalize_project_document(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError("这不是可识别的 CodeGod 项目文件。")
+        raise ValueError("This is not a recognizable CodeGod project file.")
 
     mode = data.get("mode")
     if mode == "wizard":
@@ -610,7 +610,7 @@ def normalize_project_document(data: Any) -> dict[str, Any]:
             raise _composer_version_error()
         project_payload = data.get("project")
         if "project" in data and project_payload is not None and not isinstance(project_payload, dict):
-            raise ValueError("项目文件字段无效: project - 必须是对象。")
+            raise ValueError("Invalid project file field: project - must be an object.")
         if isinstance(project_payload, dict):
             normalized_project = _normalize_composer_project(project_payload)
         else:
@@ -618,7 +618,7 @@ def normalize_project_document(data: Any) -> dict[str, Any]:
         envelope = ComposerProjectEnvelope(version=COMPOSER_VERSION, mode="composer", project=normalized_project)
         return envelope.model_dump()
 
-    raise ValueError("这不是可识别的 CodeGod 项目文件。")
+    raise ValueError("This is not a recognizable CodeGod project file.")
 
 
 def save_project_document(project_path: str | Path, data: Any) -> Path:
@@ -634,7 +634,7 @@ def load_project_document(project_path: str | Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise ValueError("项目文件不是有效的 JSON。") from exc
+        raise ValueError("The project file is not valid JSON.") from exc
     return normalize_project_document(payload)
 
 

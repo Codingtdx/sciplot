@@ -1,3 +1,4 @@
+import type { AppIconName } from "../components/AppIcon";
 import type {
   ComposerPanel,
   PalettePreset,
@@ -14,13 +15,13 @@ export type AppMode = WorkbenchScreen;
 export const NAV_ITEMS: Array<{
   id: AppMode;
   label: string;
-  icon: string;
+  icon: AppIconName;
 }> = [
-  { id: "tensile", label: "拉伸", icon: "TS" },
-  { id: "wizard", label: "绘图", icon: "WZ" },
-  { id: "composer", label: "拼图", icon: "CP" },
-  { id: "projects", label: "最近", icon: "RC" },
-  { id: "settings", label: "设置", icon: "ST" },
+  { id: "tensile", label: "Tensile", icon: "tensile" },
+  { id: "wizard", label: "Plot", icon: "plot" },
+  { id: "composer", label: "Composer", icon: "composer" },
+  { id: "projects", label: "Recents", icon: "projects" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
 export const SCREEN_META: Record<
@@ -32,29 +33,29 @@ export const SCREEN_META: Record<
   }
 > = {
   tensile: {
-    eyebrow: "Tensile",
-    title: "拉伸工作台",
-    description: "整理 tensile 数据、累积已整理 workbook，并批量导出对比图。",
+    eyebrow: "Material Lab",
+    title: "Tensile Workspace",
+    description: "Prepare raw tensile runs, queue workbooks, and export comparison figures.",
   },
   wizard: {
-    eyebrow: "Plot",
-    title: "绘图精灵工作台",
-    description: "导入数据、确认推荐并导出 PDF。",
+    eyebrow: "Figure Flow",
+    title: "Plot Builder",
+    description: "Import data, review the recommendation, and export polished PDF figures.",
   },
   composer: {
-    eyebrow: "Layout",
-    title: "拼图器工作台",
-    description: "导入图和素材，排版后导出单页可编辑 PDF。",
+    eyebrow: "Layout Studio",
+    title: "Figure Composer",
+    description: "Arrange figures, assets, and labels on one editable export canvas.",
   },
   projects: {
-    eyebrow: "Recent",
-    title: "最近记录",
-    description: "快速回到最近打开的数据或拼图文件。",
+    eyebrow: "History",
+    title: "Recent Files",
+    description: "Jump back into recent plotting inputs, workbooks, and composer projects.",
   },
   settings: {
-    eyebrow: "Settings",
-    title: "设置与运行状态",
-    description: "检查连接状态，切换主题，并调整常用偏好。",
+    eyebrow: "Runtime",
+    title: "Settings",
+    description: "Check sidecar health, tune preferences, and reset local workspace state.",
   },
 };
 
@@ -63,13 +64,13 @@ export const STEPS: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: "file", label: "文件", hint: "选输入" },
-  { id: "sheet", label: "Sheet", hint: "选工作表" },
-  { id: "inspect", label: "识别", hint: "看推荐" },
-  { id: "template", label: "图型", hint: "必要时改" },
-  { id: "options", label: "参数", hint: "只调关键项" },
-  { id: "preflight", label: "检查", hint: "拦截风险" },
-  { id: "export", label: "导出", hint: "拿结果" },
+  { id: "file", label: "Import", hint: "Pick a file" },
+  { id: "sheet", label: "Sheet", hint: "Choose a tab" },
+  { id: "inspect", label: "Detect", hint: "Review the fit" },
+  { id: "template", label: "Template", hint: "Switch if needed" },
+  { id: "options", label: "Options", hint: "Adjust essentials" },
+  { id: "preflight", label: "Review", hint: "Resolve blockers" },
+  { id: "export", label: "Export", hint: "Make the PDF" },
 ];
 
 export const STEP_COPY: Record<
@@ -80,32 +81,32 @@ export const STEP_COPY: Record<
   }
 > = {
   file: {
-    title: "导入数据文件",
-    description: "选择数据后，程序会先识别结构并给出推荐图型。",
+    title: "Import a data file",
+    description: "The app inspects structure first and suggests the best starting template.",
   },
   sheet: {
-    title: "确认工作表",
-    description: "多 sheet 文件先选对目标页，再继续后续步骤。",
+    title: "Choose a sheet",
+    description: "For multi-sheet workbooks, confirm the target tab before continuing.",
   },
   inspect: {
-    title: "查看推荐结果",
-    description: "确认识别结果、推荐图型和关键提醒。",
+    title: "Review the recommendation",
+    description: "Confirm the detected model, suggested template, and major warnings.",
   },
   template: {
-    title: "必要时切换图型",
-    description: "如果推荐不适合当前数据，可以在这里改成其他图型。",
+    title: "Switch template if needed",
+    description: "Change templates only when the recommended path does not fit the data.",
   },
   options: {
-    title: "调整关键参数",
-    description: "先确认尺寸、坐标轴和常用选项，再进入检查。",
+    title: "Adjust key options",
+    description: "Review size, axes, and a few essential settings before export.",
   },
   preflight: {
-    title: "检查后再导出",
-    description: "先处理错误和警告，再生成最终 PDF。",
+    title: "Review before export",
+    description: "Clear blockers and warnings before generating the final PDF.",
   },
   export: {
-    title: "导出完成",
-    description: "查看结果路径，继续调整参数，或直接换下一份数据。",
+    title: "Export complete",
+    description: "Check the outputs, keep iterating, or move to the next dataset.",
   },
 };
 
@@ -159,7 +160,7 @@ export function formatRecentTimestamp(value: string) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -245,17 +246,17 @@ export function templateCompatibilityReason(model: string | null | undefined) {
     case "frequency_sweep":
     case "temperature_sweep":
     case "stress_relaxation":
-      return "当前输入是流变导出表，先用点线或曲线。";
+      return "This input is a rheology export bundle. Start with point-line or curve.";
     case "tensile_curve":
-      return "当前输入是拉伸应力-应变曲线，先用曲线家族。";
+      return "This input is a tensile stress-strain curve. Start with curve-family templates.";
     case "curve_table":
-      return "当前输入是成对曲线表，先用曲线家族。";
+      return "This input is a paired curve table. Start with curve-family templates.";
     case "replicate_table":
-      return "当前输入是重复值统计表，先用 bar / box / violin。";
+      return "This input is a replicate summary table. Start with bar, box, or violin.";
     case "heatmap_table":
-      return "当前输入是 XYZ 热图表，先用热图。";
+      return "This input is an XYZ heatmap table. Start with the heatmap template.";
     default:
-      return "当前输入结构和这个图型不兼容。";
+      return "The current input structure is not compatible with this template.";
   }
 }
 

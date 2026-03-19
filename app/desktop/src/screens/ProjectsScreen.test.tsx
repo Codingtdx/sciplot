@@ -25,7 +25,7 @@ describe("ProjectsScreen", () => {
           kind: "project",
           path: "/tmp/demo.json",
           title: "demo.json",
-          detail: "绘图项目",
+          detail: "Plot project",
           updated_at: new Date("2026-03-12T12:00:00Z").toISOString(),
         },
       ],
@@ -50,6 +50,6 @@ describe("ProjectsScreen", () => {
   it("does not render the removed usage guide card", () => {
     render(<ProjectsScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    expect(screen.queryByText("使用方式")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usage guide")).not.toBeInTheDocument();
   });
 });

@@ -174,7 +174,7 @@ def test_invalid_graph_size_requires_asset_mode(tmp_path: Path) -> None:
     try:
         import_panels_from_paths(ComposerProject(), [graph_path], kind="graph")
     except ValueError as exc:
-        assert "请改用 asset 模式导入" in str(exc)
+        assert "Use asset mode instead" in str(exc)
     else:
         raise AssertionError("Unexpectedly accepted an unsupported graph PDF size.")
 

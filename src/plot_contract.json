@@ -71,9 +71,9 @@
     "default": {
       "label": "Default",
       "public": true,
-      "description": "默认：沿用当前最稳的 60 mm 面板风格。",
+      "description": "Default: the most stable 60 mm panel style.",
       "hard_constraints": false,
-      "preset_note": "当前默认科研风格，优先稳定性和可用性。",
+      "preset_note": "Default research style that prioritizes stability and usability.",
       "typography": {
         "font_family": [
           "Arial",
@@ -123,9 +123,9 @@
     "nature": {
       "label": "Nature",
       "public": true,
-      "description": "Nature：官方约束优先的紧凑科研图风格。",
+      "description": "Nature: a compact research-figure style that prioritizes official constraints.",
       "hard_constraints": true,
-      "preset_note": "基于 Nature 当前公开图像规范的硬约束实现。",
+      "preset_note": "Built around the current public Nature image constraints.",
       "typography": {
         "font_family": [
           "Arial",
@@ -175,9 +175,9 @@
     "science_editorial": {
       "label": "Science Editorial",
       "public": false,
-      "description": "Science：更克制、注释更少、观感更开阔。",
+      "description": "Science: quieter, lighter on annotations, and more open in feel.",
       "hard_constraints": false,
-      "preset_note": "软风格 preset，抽象自 Science 常见编辑风格，不是投稿合规保证。",
+      "preset_note": "A soft style preset inspired by common Science editorial figures, not a submission-compliance guarantee.",
       "typography": {
         "font_family": [
           "Arial",
@@ -228,9 +228,9 @@
     "jacs_analytical": {
       "label": "JACS Analytical",
       "public": false,
-      "description": "JACS：更紧凑、分析图观感更硬朗。",
+      "description": "JACS: tighter and more analytical in tone.",
       "hard_constraints": false,
-      "preset_note": "软风格 preset，抽象自 ACS/JACS 常见分析图语言，不是投稿合规保证。",
+      "preset_note": "A soft style preset inspired by common ACS/JACS analytical figures, not a submission-compliance guarantee.",
       "typography": {
         "font_family": [
           "Arial",
@@ -280,9 +280,9 @@
     "advanced_materials_spacious": {
       "label": "Advanced Materials Spacious",
       "public": false,
-      "description": "Advanced Materials：留白更宽、展示感更强。",
+      "description": "Advanced Materials: more white space and a stronger presentation feel.",
       "hard_constraints": false,
-      "preset_note": "软风格 preset，抽象自 Advanced Materials 常见版面语言，不是投稿合规保证。",
+      "preset_note": "A soft style preset inspired by common Advanced Materials layouts, not a submission-compliance guarantee.",
       "typography": {
         "font_family": [
           "Arial",
@@ -335,7 +335,7 @@
     "colorblind_safe": {
       "label": "Colorblind Safe",
       "public": true,
-      "description": "默认安全配色：分类色用 colorblind，连续色用 cividis。",
+      "description": "Default safe palette: colorblind-friendly categorical colors with cividis for sequential scales.",
       "categorical": [
         "#0173b2",
         "#de8f05",
@@ -354,7 +354,7 @@
     "deep": {
       "label": "Deep",
       "public": true,
-      "description": "Seaborn deep：平衡、沉稳、通用。",
+      "description": "Seaborn deep: balanced, calm, and broadly useful.",
       "categorical": [
         "#4c72b0",
         "#dd8452",
@@ -373,7 +373,7 @@
     "muted": {
       "label": "Muted",
       "public": true,
-      "description": "Seaborn muted：克制柔和，适合多组对比。",
+      "description": "Seaborn muted: restrained and soft, suited to multi-group comparisons.",
       "categorical": [
         "#4878d0",
         "#ee854a",
@@ -392,7 +392,7 @@
     "bright": {
       "label": "Bright",
       "public": false,
-      "description": "Seaborn bright：高饱和、对比更强。",
+      "description": "Seaborn bright: higher saturation with stronger contrast.",
       "categorical": [
         "#023eff",
         "#ff7c00",
@@ -411,7 +411,7 @@
     "mono": {
       "label": "Mono",
       "public": true,
-      "description": "灰阶单色：适合硬朗分析图和黑白打印。",
+      "description": "Monochrome grayscale: good for analytical figures and black-and-white printing.",
       "categorical": [
         "#111827",
         "#374151",
@@ -425,7 +425,7 @@
     "okabe_ito": {
       "label": "Okabe-Ito",
       "public": false,
-      "description": "Okabe-Ito：经典色盲友好科研配色。",
+      "description": "Okabe-Ito: a classic colorblind-friendly scientific palette.",
       "categorical": [
         "#000000",
         "#e69f00",
@@ -442,7 +442,7 @@
     "tol_muted": {
       "label": "Tol Muted",
       "public": false,
-      "description": "Paul Tol muted：低刺激、均衡的分类配色。",
+      "description": "Paul Tol muted: low-stimulation, balanced categorical colors.",
       "categorical": [
         "#332288",
         "#88ccee",
@@ -460,7 +460,7 @@
     "materials_warm": {
       "label": "Materials Warm",
       "public": false,
-      "description": "暖色科研展示配色：更偏材料展示风格。",
+      "description": "Warm presentation palette with a stronger materials-showcase feel.",
       "categorical": [
         "#355070",
         "#6d597a",
@@ -476,8 +476,8 @@
   },
   "templates": {
     "curve": {
-      "label": "曲线",
-      "description": "普通单图曲线。",
+      "label": "Curve",
+      "description": "Standard single-panel curve plot.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -514,8 +514,8 @@
       "soft_rules": []
     },
     "point_line": {
-      "label": "点线",
-      "description": "带 marker 的普通单图曲线。",
+      "label": "Point line",
+      "description": "Standard single-panel curve plot with markers.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -554,8 +554,8 @@
       ]
     },
     "stacked_curve": {
-      "label": "堆叠曲线",
-      "description": "光谱类的单列堆叠曲线。",
+      "label": "Stacked curve",
+      "description": "Single-column stacked curves for spectrum-like figures.",
       "category": "stacked_spectrum",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -588,8 +588,8 @@
       "soft_rules": []
     },
     "segmented_stacked_curve": {
-      "label": "分段堆叠曲线",
-      "description": "wide NMR 双高面板，左右底对齐，顶部预留结构式区域。",
+      "label": "Segmented stacked curve",
+      "description": "Wide NMR double-height panel with left/right/bottom alignment and a reserved structure area on top.",
       "category": "wide_nmr",
       "default_size": "60x110",
       "allowed_sizes": [
@@ -627,8 +627,8 @@
       "soft_rules": []
     },
     "bar": {
-      "label": "柱状",
-      "description": "统计类柱状图。",
+      "label": "Bar",
+      "description": "Statistical bar chart.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -660,8 +660,8 @@
       ]
     },
     "box": {
-      "label": "箱线",
-      "description": "统计类箱线图。",
+      "label": "Box",
+      "description": "Statistical box plot.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -693,8 +693,8 @@
       ]
     },
     "violin": {
-      "label": "小提琴",
-      "description": "统计类小提琴图。",
+      "label": "Violin",
+      "description": "Statistical violin plot.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -726,8 +726,8 @@
       ]
     },
     "scatter": {
-      "label": "散点",
-      "description": "单图散点图。",
+      "label": "Scatter",
+      "description": "Single-panel scatter plot.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -764,8 +764,8 @@
       "soft_rules": []
     },
     "heatmap": {
-      "label": "热图",
-      "description": "主热图区与普通单图共用轴框，顶部水平色带独立放置。",
+      "label": "Heatmap",
+      "description": "Heatmap with the main frame aligned to standard single-panel plots and an independent top colorbar.",
       "category": "heatmap",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -803,60 +803,60 @@
   },
   "validation_rules": {
     "single_panel_axis_frame": {
-      "label": "标准单图轴框对齐",
-      "description": "标准单图模板必须共享同一物理轴框。",
+      "label": "Single-panel axis frame alignment",
+      "description": "Standard single-panel templates must share the same physical axis frame.",
       "severity": "error",
       "tolerance_mm": 0.05
     },
     "wide_nmr_horizontal_alignment": {
-      "label": "wide NMR 左右底对齐",
-      "description": "wide NMR 只要求左、右、底与标准单图共用锚点。",
+      "label": "Wide NMR left/right/bottom alignment",
+      "description": "Wide NMR only requires the left, right, and bottom edges to share anchors with the standard single-panel frame.",
       "severity": "error",
       "tolerance_mm": 0.05
     },
     "wide_nmr_structure_reserve": {
-      "label": "wide NMR 顶部结构区",
-      "description": "wide NMR 必须保留顶部结构式预留区。",
+      "label": "Wide NMR top structure reserve",
+      "description": "Wide NMR must keep a reserved structure area at the top.",
       "severity": "error",
       "tolerance_mm": 1.0
     },
     "wide_nmr_segment_alignment": {
-      "label": "wide NMR 分段轴对齐",
-      "description": "wide NMR 的分段轴必须共享统一的上下边界。",
+      "label": "Wide NMR segmented-axis alignment",
+      "description": "Wide NMR segmented axes must share the same top and bottom bounds.",
       "severity": "error",
       "tolerance_mm": 0.05
     },
     "heatmap_main_frame": {
-      "label": "Heatmap 主图区轴框",
-      "description": "Heatmap 主图区必须与标准单图共用同一轴框。",
+      "label": "Heatmap main-frame alignment",
+      "description": "The heatmap main frame must share the same axis frame as standard single-panel plots.",
       "severity": "error",
       "tolerance_mm": 0.05
     },
     "heatmap_horizontal_colorbar": {
-      "label": "Heatmap 顶部水平色带",
-      "description": "Heatmap 必须使用顶部水平色带，不得挤压主图区。",
+      "label": "Heatmap top horizontal colorbar",
+      "description": "Heatmaps must use a top horizontal colorbar without squeezing the main frame.",
       "severity": "error",
       "tolerance_mm": 0.05
     },
     "heatmap_colorbar_inside_canvas": {
-      "label": "Heatmap 色带在画布内",
-      "description": "Heatmap 色带和 z 标签必须完整落在画布内。",
+      "label": "Heatmap colorbar inside canvas",
+      "description": "The heatmap colorbar and z label must stay fully inside the canvas.",
       "severity": "error",
       "tolerance_mm": 0.2
     },
     "non_blank_pdf": {
-      "label": "导出 PDF 非空白",
-      "description": "每个输出 PDF 都必须存在可见内容并能正确栅格化。",
+      "label": "Non-blank exported PDF",
+      "description": "Every exported PDF must contain visible content and rasterize correctly.",
       "severity": "error"
     },
     "multi_output_bundle_notice": {
-      "label": "多输出提醒",
-      "description": "多输出 bundle 应给出输出张数提醒。",
+      "label": "Multi-output notice",
+      "description": "Multi-output bundles should warn how many files will be exported.",
       "severity": "warning"
     },
     "dense_group_label_warning": {
-      "label": "分组过多提醒",
-      "description": "统计图分组较多时应提醒横轴标签可能拥挤。",
+      "label": "Dense group-label warning",
+      "description": "Statistical plots should warn that x-axis labels may become crowded when many groups are present.",
       "severity": "warning"
     }
   }

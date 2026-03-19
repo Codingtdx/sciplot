@@ -42,17 +42,17 @@ const TEST_INSPECT_RESPONSE: InspectResponse = {
   sheet_names: ["Sheet1"],
   inspection: {
     model: "curve_table",
-    model_label: "曲线表",
+    model_label: "Paired curve table (curve_table)",
     recommendation: {
       template: "curve",
-      reason: "识别到普通成对曲线表，默认推荐普通曲线图。",
+      reason: "Detected a standard paired curve table, so a basic curve plot is recommended by default.",
       size: "60x55",
       xscale: "linear",
       yscale: "linear",
       reverse_x: false,
     },
     warnings: [],
-    signals: ["检测到标准成对曲线表。"],
+    signals: ["Detected a standard paired curve table."],
   },
 };
 
@@ -120,10 +120,10 @@ describe("WizardScreen", () => {
       template: "point_line",
       inspection: {
         model: "stress_relaxation",
-        model_label: "应力松弛导出表",
+        model_label: "Stress relaxation export table",
         recommendation: {
           template: "point_line",
-          reason: "识别到应力松弛的 4 列一组导出表。",
+          reason: "Detected a stress relaxation export table with 4 columns per bundle.",
           size: "60x55",
           xscale: "log",
           yscale: "linear",
@@ -142,15 +142,15 @@ describe("WizardScreen", () => {
 
     render(<WizardScreen meta={TEST_META} />);
 
-    expect(getTemplateButton("点线")).toBeInTheDocument();
-    expect(getTemplateButton("曲线")).toBeInTheDocument();
-    expect(queryTemplateButton("热图")).not.toBeInTheDocument();
+    expect(getTemplateButton("Point line")).toBeInTheDocument();
+    expect(getTemplateButton("Curve")).toBeInTheDocument();
+    expect(queryTemplateButton("Heatmap")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "更多图型" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse all templates" }));
 
-    const heatmapButton = getTemplateButton("热图");
+    const heatmapButton = getTemplateButton("Heatmap");
     expect(heatmapButton).toBeDisabled();
-    expect(screen.getByText("当前输入是流变导出表，先用点线或曲线。")).toBeInTheDocument();
+    expect(screen.getByText("This input is a rheology export bundle. Start with point-line or curve.")).toBeInTheDocument();
   });
 
   it("renders options from sidecar meta without local hardcoded lists", () => {
@@ -161,7 +161,7 @@ describe("WizardScreen", () => {
 
     render(<WizardScreen meta={TEST_META} />);
 
-    expect(screen.getByText("显示 colorbar")).toBeInTheDocument();
+    expect(screen.getByText("Show color bar")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Colorblind Safe")).toBeInTheDocument();
   });
 
@@ -172,10 +172,10 @@ describe("WizardScreen", () => {
       template: "heatmap",
       inspection: {
         model: "curve_table",
-        model_label: "曲线表",
+        model_label: "Paired curve table (curve_table)",
         recommendation: {
           template: "curve",
-          reason: "识别到普通成对曲线表。",
+          reason: "Detected a standard paired curve table.",
           size: "60x55",
           xscale: "linear",
           yscale: "linear",
@@ -193,7 +193,7 @@ describe("WizardScreen", () => {
 
     render(<WizardScreen meta={TEST_META} />);
 
-    fireEvent.click(getTemplateButton("曲线"));
+    fireEvent.click(getTemplateButton("Curve"));
 
     expect(useWizardStore.getState().template).toBe("curve");
     expect(useWizardStore.getState().options).toEqual({
@@ -213,10 +213,10 @@ describe("WizardScreen", () => {
       template: "curve",
       inspection: {
         model: "tensile_curve",
-        model_label: "拉伸应力-应变曲线",
+        model_label: "Tensile stress-strain curve (tensile_curve)",
         recommendation: {
           template: "curve",
-          reason: "根据应变/应力标签识别为拉伸曲线。",
+          reason: "The strain / elongation x-axis and stress y-axis suggest a tensile curve.",
           size: "60x55",
           xscale: "linear",
           yscale: "linear",
@@ -241,7 +241,7 @@ describe("WizardScreen", () => {
     });
 
     expect(screen.queryByRole("option", { name: "log" })).not.toBeInTheDocument();
-    expect(screen.getByText("当前输入识别为拉伸应力-应变曲线，x/y 坐标轴固定使用 linear。")).toBeInTheDocument();
+    expect(screen.getByText("Tensile curves stay on linear x/y scales throughout recommendation, review, and render.")).toBeInTheDocument();
   });
 
   it("automatically refreshes preview and preflight when options change quickly", async () => {
@@ -282,10 +282,10 @@ describe("WizardScreen", () => {
       template: "curve",
       inspection: {
         model: "curve_table",
-        model_label: "曲线表",
+        model_label: "Paired curve table (curve_table)",
         recommendation: {
           template: "curve",
-          reason: "识别到普通成对曲线表。",
+          reason: "Detected a standard paired curve table.",
           size: "60x55",
           xscale: "linear",
           yscale: "linear",
@@ -386,10 +386,10 @@ describe("WizardScreen", () => {
       template: "curve",
       inspection: {
         model: "stress_relaxation",
-        model_label: "应力松弛导出表",
+        model_label: "Stress relaxation export table",
         recommendation: {
           template: "point_line",
-          reason: "识别到应力松弛的 4 列一组导出表。",
+          reason: "Detected a stress relaxation export table with 4 columns per bundle.",
           size: "60x55",
           xscale: "log",
           yscale: "linear",
@@ -412,10 +412,10 @@ describe("WizardScreen", () => {
       vi.advanceTimersByTime(250);
     });
 
-    const exportButton = screen.getByRole("button", { name: "导出 PDF" });
+    const exportButton = screen.getByRole("button", { name: "Export PDF" });
     expect(exportButton).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "恢复推荐" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use recommendation" }));
 
     await act(async () => {
       vi.advanceTimersByTime(250);
@@ -440,7 +440,7 @@ describe("WizardScreen", () => {
       }),
       expect.any(Object),
     );
-    expect(screen.getByRole("button", { name: "导出 PDF" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
   });
 
   it("shows a visible error when the desktop file dialog is unavailable", async () => {
@@ -448,11 +448,11 @@ describe("WizardScreen", () => {
 
     render(<WizardScreen meta={TEST_META} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "选择数据" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("无法打开文件选择窗口：dialog unavailable"),
+        screen.getByText("Could not open the file picker: dialog unavailable"),
       ).toBeInTheDocument();
     });
   });

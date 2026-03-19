@@ -60,7 +60,7 @@ const TEST_PREPROCESS_RESPONSE: TensileReplicateResponse = {
     { label: "Strength", unit: "MPa", mean: 46.15, std: 1.34 },
     { label: "Modulus", unit: "MPa", mean: 1237.5, std: 38.89 },
   ],
-  warnings: ["已跳过 BlendSet_bad.csv: 没有找到结果表格 2 中的应力-应变曲线。"],
+  warnings: ["Skipped BlendSet_bad.csv: no stress-strain curve was found in Results Table 2."],
 };
 
 const TEST_INSPECT_RESPONSE: InspectResponse = {
@@ -69,10 +69,10 @@ const TEST_INSPECT_RESPONSE: InspectResponse = {
   sheet_names: TEST_PREPROCESS_RESPONSE.sheet_names,
   inspection: {
     model: "tensile_curve",
-    model_label: "拉伸应力-应变曲线",
+    model_label: "Tensile stress-strain curve (tensile_curve)",
     recommendation: {
       template: "curve",
-      reason: "根据应变/应力标签识别为拉伸曲线。",
+      reason: "The strain / elongation x-axis and stress y-axis suggest a tensile curve.",
       size: "60x55",
       xscale: "linear",
       yscale: "linear",
@@ -168,7 +168,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={onNavigate} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "整理 tensile 数据" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare tensile data" }));
 
     await waitFor(() => {
       expect(preprocessTensileReplicates).toHaveBeenCalledWith(
@@ -183,7 +183,7 @@ describe("TensileScreen", () => {
     });
 
     expect(
-      screen.getByText(/已整理 2 个拉伸重复样，代表曲线来自 BlendSet_A.csv/),
+      screen.getByText(/Prepared 2 replicate samples\. The representative curve comes from BlendSet_A\.csv/),
     ).toBeInTheDocument();
     expect(loadWizardDataFile).not.toHaveBeenCalled();
     expect(useTensileStore.getState().preprocessResult?.output_path).toBe(
@@ -194,7 +194,7 @@ describe("TensileScreen", () => {
       TEST_PREPROCESS_RESPONSE.output_path,
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "在绘图中打开" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Open in Plot Builder" })[0]!);
 
     await waitFor(() => {
       expect(loadWizardDataFile).toHaveBeenCalledWith(
@@ -230,7 +230,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "补录已整理 workbook" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add prepared workbooks" }));
 
     await waitFor(() => {
       expect(inspectTensileWorkbook).toHaveBeenCalledTimes(2);
@@ -262,9 +262,9 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    const moveDownButtons = screen.getAllByRole("button", { name: "下移" });
+    const moveDownButtons = screen.getAllByRole("button", { name: "Move down" });
     fireEvent.click(moveDownButtons[0]);
-    fireEvent.click(screen.getByRole("button", { name: "生成对比图" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export comparison set" }));
 
     await waitFor(() => {
       expect(exportTensileComparison).toHaveBeenCalledWith(
@@ -273,7 +273,7 @@ describe("TensileScreen", () => {
       );
     });
 
-    expect(screen.getByText(/已为 2 组生成 7 个对比结果/)).toBeInTheDocument();
+    expect(screen.getByText(/7 outputs/)).toBeInTheDocument();
     expect(useWorkbenchStore.getState().recentProjects[0]?.path).toBe(
       TEST_TENSILE_COMPARE_RESPONSE.comparison_workbook_path,
     );
@@ -282,6 +282,6 @@ describe("TensileScreen", () => {
   it("keeps the compare export button disabled until at least two groups are collected", () => {
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "生成对比图" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export comparison set" })).toBeDisabled();
   });
 });

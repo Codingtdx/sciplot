@@ -59,7 +59,7 @@ def preflight_render_request(
         elif template in {"bar", "box", "violin"}:
             groups = load_replicate_table_cached(input_path, sheet)
             if not groups:
-                raise ValueError("统计表没有有效分组。")
+                raise ValueError("No valid groups were found in the replicate table.")
             if len(groups) >= 6:
                 warnings.append(validation_rule("dense_group_label_warning").description)
         elif template == "heatmap":

@@ -1,0 +1,191 @@
+import { InfoTip } from "../../components/InfoTip";
+import type {
+  RenderOptionsPayload,
+  TemplateName,
+  WorkbenchMeta,
+  WorkbenchPalette,
+  WorkbenchTemplate,
+} from "../../lib/types";
+
+type Props = {
+  meta: WorkbenchMeta | null;
+  template: TemplateName | null;
+  currentTemplate: WorkbenchTemplate | null;
+  options: RenderOptionsPayload;
+  sizeOptions: Array<{ id: string; label: string }>;
+  paletteOptions: WorkbenchPalette[];
+  tensileCurveMode: boolean;
+  onUpdateOptions(value: Partial<RenderOptionsPayload>): void;
+};
+
+export function WizardOptionsSection({
+  meta,
+  template,
+  currentTemplate,
+  options,
+  sizeOptions,
+  paletteOptions,
+  tensileCurveMode,
+  onUpdateOptions,
+}: Props) {
+  return (
+    <section className="work-card section-card wizard-pane">
+      <div className="panel-heading">
+        <div>
+          <div className="card-kicker">Options</div>
+          <h3>Key controls</h3>
+        </div>
+        <InfoTip content="Keep this area small on purpose. Only the most useful controls stay visible by default." />
+      </div>
+      {!template ? (
+        <div className="placeholder-card">
+          Choose a template to unlock size, axis, and export options.
+        </div>
+      ) : (
+        <div className="wizard-section-stack">
+          <div className="field-grid wizard-tight-grid">
+            <label>
+              <span className="field-label">Size</span>
+              <select
+                className="field"
+                value={options.size ?? sizeOptions[0]?.id ?? ""}
+                onChange={(event) => onUpdateOptions({ size: event.target.value })}
+              >
+                {sizeOptions.map((choice) => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {currentTemplate?.editable_options.includes("xscale") && (
+              <label>
+                <span className="field-label">X scale</span>
+                <select
+                  className="field"
+                  disabled={tensileCurveMode}
+                  value={options.xscale ?? "linear"}
+                  onChange={(event) =>
+                    onUpdateOptions({
+                      xscale: event.target.value === "log" ? "log" : "linear",
+                    })
+                  }
+                >
+                  <option value="linear">Linear</option>
+                  {!tensileCurveMode && <option value="log">Log</option>}
+                </select>
+              </label>
+            )}
+
+            {currentTemplate?.editable_options.includes("yscale") && (
+              <label>
+                <span className="field-label">Y scale</span>
+                <select
+                  className="field"
+                  disabled={tensileCurveMode}
+                  value={options.yscale ?? "linear"}
+                  onChange={(event) =>
+                    onUpdateOptions({
+                      yscale: event.target.value === "log" ? "log" : "linear",
+                    })
+                  }
+                >
+                  <option value="linear">Linear</option>
+                  {!tensileCurveMode && <option value="log">Log</option>}
+                </select>
+              </label>
+            )}
+
+            {currentTemplate?.editable_options.includes("reverse_x") && (
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(options.reverse_x)}
+                  onChange={(event) =>
+                    onUpdateOptions({ reverse_x: event.target.checked })
+                  }
+                  type="checkbox"
+                />
+                <span>Reverse x-axis</span>
+              </label>
+            )}
+
+            {currentTemplate?.editable_options.includes("baseline") && (
+              <label>
+                <span className="field-label">Baseline</span>
+                <select
+                  className="field"
+                  value={options.baseline ?? "none"}
+                  onChange={(event) =>
+                    onUpdateOptions({
+                      baseline:
+                        event.target.value === "linear_endpoints"
+                          ? "linear_endpoints"
+                          : "none",
+                    })
+                  }
+                >
+                  <option value="none">None</option>
+                  <option value="linear_endpoints">Linear endpoints</option>
+                </select>
+              </label>
+            )}
+
+            {currentTemplate?.editable_options.includes("show_colorbar") && (
+              <label className="toggle-field">
+                <input
+                  checked={Boolean(
+                    options.show_colorbar ??
+                      currentTemplate.default_options.show_colorbar ??
+                      true,
+                  )}
+                  onChange={(event) =>
+                    onUpdateOptions({ show_colorbar: event.target.checked })
+                  }
+                  type="checkbox"
+                />
+                <span>Show color bar</span>
+              </label>
+            )}
+          </div>
+
+          {tensileCurveMode && (
+            <div className="focus-panel">
+              <strong>Tensile axis lock</strong>
+              <span>
+                Tensile curves stay on linear x/y scales throughout recommendation,
+                review, and render.
+              </span>
+            </div>
+          )}
+
+          {currentTemplate?.editable_options.includes("palette_preset") && (
+            <details>
+              <summary>More options</summary>
+              <div className="field-grid compact-grid advanced-grid wizard-tight-grid">
+                <label>
+                  <span className="field-label">Palette</span>
+                  <select
+                    className="field"
+                    value={options.palette_preset ?? meta?.default_palette ?? ""}
+                    onChange={(event) =>
+                      onUpdateOptions({
+                        palette_preset: event.target.value,
+                      })
+                    }
+                  >
+                    {paletteOptions.map((choice) => (
+                      <option key={choice.id} value={choice.id}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

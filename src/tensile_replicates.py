@@ -82,7 +82,7 @@ def export_tensile_replicate_workbook(
 ) -> TensileReplicateWorkbook:
     paths = [Path(path).expanduser() for path in file_paths]
     if not paths:
-        raise ValueError("请至少选择一个原始拉伸 CSV 文件。")
+        raise ValueError("Select at least one raw tensile CSV file.")
 
     parsed_samples: list[TensileRawSample] = []
     warnings: list[str] = []
@@ -91,10 +91,13 @@ def export_tensile_replicate_workbook(
         try:
             parsed_samples.append(parse_tensile_csv(path))
         except Exception as exc:
-            warnings.append(f"已跳过 {path.name}: {exc}")
+            warnings.append(f"Skipped {path.name}: {exc}")
 
     if not parsed_samples:
-        raise ValueError("没有成功解析任何拉伸 CSV。请确认文件来自同一类拉伸导出格式。")
+        raise ValueError(
+            "No tensile CSV files could be parsed successfully. Confirm that "
+            "the files come from the same tensile export format."
+        )
 
     resolved_group_name = (group_name or infer_group_name(paths)).strip() or "Tensile_Group"
     summary_df = _build_summary_dataframe(parsed_samples)
@@ -129,12 +132,12 @@ def parse_tensile_csv(path: str | Path) -> TensileRawSample:
     rows = _read_csv_rows(file_path)
     scalar_header_index = _find_scalar_header_index(rows)
     if scalar_header_index is None:
-        raise ValueError("没有找到结果表格 1 中的标量表头。")
+        raise ValueError("Could not find the scalar header row in Results Table 1.")
 
     scalar_headers = rows[scalar_header_index]
     scalar_values = _find_scalar_value_row(rows, scalar_header_index)
     if scalar_values is None:
-        raise ValueError("没有找到结果表格 1 的有效数值行。")
+        raise ValueError("Could not find a valid numeric row in Results Table 1.")
 
     metric_values = {
         "strength": _extract_scalar_value(
@@ -159,7 +162,7 @@ def parse_tensile_csv(path: str | Path) -> TensileRawSample:
 
     curve = _extract_curve_dataframe(rows, start_index=scalar_header_index)
     if curve.empty:
-        raise ValueError("没有找到结果表格 2 中的应力-应变曲线。")
+        raise ValueError("No stress-strain curve was found in Results Table 2.")
 
     return TensileRawSample(
         source_path=file_path,
@@ -180,7 +183,7 @@ def _read_csv_rows(path: Path) -> list[list[str]]:
             continue
         if _looks_like_tensile_text(text):
             return list(csv.reader(text.splitlines()))
-    raise ValueError("无法用常见编码读出拉伸导出表。")
+    raise ValueError("Could not decode the tensile export CSV with the common fallback encodings.")
 
 
 def _looks_like_tensile_text(text: str) -> bool:
@@ -315,7 +318,7 @@ def _build_summary_dataframe(samples: list[TensileRawSample]) -> pd.DataFrame:
 
 def _representative_index(summary_df: pd.DataFrame) -> int:
     if summary_df.empty:
-        raise ValueError("没有可用的重复样统计结果。")
+        raise ValueError("No replicate summary statistics are available.")
     mean_values = summary_df.mean(numeric_only=True)
     std_values = summary_df.std(numeric_only=True)
     scores = pd.Series(0.0, index=summary_df.index, dtype=float)

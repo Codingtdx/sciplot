@@ -12,7 +12,7 @@ from src.rendering.models import RenderOptions
 
 def validate_template_name(template: str) -> str:
     if template in LEGACY_TEMPLATE_HINTS:
-        raise ValueError(f"旧模板名 `{template}` 已停用。{LEGACY_TEMPLATE_HINTS[template]}")
+        raise ValueError(f"Legacy template name `{template}` is no longer supported. {LEGACY_TEMPLATE_HINTS[template]}")
     if template not in TEMPLATE_CHOICES:
         raise ValueError(f"Unknown template: {template}. Supported templates: {', '.join(TEMPLATE_CHOICES)}")
     return template

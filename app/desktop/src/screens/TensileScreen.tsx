@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { InfoTip } from "../components/InfoTip";
 import {
   exportTensileComparison,
   inspectTensileWorkbook,
@@ -58,18 +59,18 @@ export function TensileScreen({
   const latestPreprocessResult = tensile.preprocessResult;
   const statusChip = useMemo(() => {
     if (busy) {
-      return { label: "处理中", tone: "accent" };
+      return { label: "Processing", tone: "accent" };
     }
     if (error) {
-      return { label: "需处理错误", tone: "warn" };
+      return { label: "Needs attention", tone: "warn" };
     }
     if (tensile.comparisonResult) {
-      return { label: "对比已导出", tone: "good" };
+      return { label: "Comparison exported", tone: "good" };
     }
     if (tensile.preprocessResult) {
-      return { label: "已整理", tone: "accent" };
+      return { label: "Workbook prepared", tone: "accent" };
     }
-    return { label: "等待输入", tone: "warn" };
+    return { label: "Waiting for input", tone: "warn" };
   }, [busy, error, tensile.comparisonResult, tensile.preprocessResult]);
 
   const showDialogError = (cause: unknown) => {
@@ -86,7 +87,7 @@ export function TensileScreen({
         kind: "data",
         path: workbookPath,
         title: formatLeaf(workbookPath),
-        detail: `数据文件 · ${inspected.sheet_names.length} sheet · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
+        detail: `Data file · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
       });
       onNavigate("wizard");
     } catch (cause) {
@@ -142,7 +143,7 @@ export function TensileScreen({
         kind: "data",
         path: result.output_path,
         title: formatLeaf(result.output_path),
-        detail: `拉伸整理 · ${result.sample_count} 个重复样 · 已整理 workbook`,
+        detail: `Tensile prep · ${result.sample_count} replicates · Prepared workbook`,
       });
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -180,7 +181,7 @@ export function TensileScreen({
         }
       }
       if (failures.length > 0) {
-        setError(`以下 workbook 未加入对比清单：${failures.join("；")}`);
+        setError(`These workbooks could not be added to the queue: ${failures.join("; ")}`);
       }
     } finally {
       setBusy(false);
@@ -220,7 +221,7 @@ export function TensileScreen({
         kind: "data",
         path: result.comparison_workbook_path,
         title: formatLeaf(result.comparison_workbook_path),
-        detail: `拉伸对比 · ${result.labels.length} 组 · ${result.outputs.length} 个结果`,
+        detail: `Tensile compare · ${result.labels.length} sources · ${result.outputs.length} outputs`,
       });
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -232,12 +233,12 @@ export function TensileScreen({
   return (
     <div className="desk-layout">
       <section className="desk-main">
-        <article className="work-card section-card wizard-workspace-card">
+        <article className="work-card hero-card wizard-workspace-card">
           <div className="section-head wizard-workspace-head">
             <div>
-              <div className="card-kicker">Tensile</div>
-              <h2>拉伸工作台</h2>
-              <p>整理 raw tensile CSV、累积已整理 workbook，并一键导出拉伸对比图。</p>
+              <div className="card-kicker">Material Lab</div>
+              <h2>Tensile workspace</h2>
+              <p>Prepare raw runs, queue workbooks, and export a clean comparison set.</p>
             </div>
             <div className="wizard-inline-chips">
               {tensile.preprocessResult && (
@@ -250,15 +251,21 @@ export function TensileScreen({
           {error && <div className="error-card">{error}</div>}
           {!wizard.sidecarReady && (
             <div className="warning-card">
-              Python sidecar 当前未连通，拉伸整理、校验和对比导出会在连接恢复后继续正常工作。
+              The Python sidecar is offline. Prepare, inspect, and compare actions resume once it reconnects.
             </div>
           )}
+        </article>
 
-          <div className="wizard-pane-grid">
-            <section className="wizard-pane">
-              <div className="card-kicker">整理</div>
-              <h3>整理 tensile 数据</h3>
-              <p className="hint-text">把多份 raw tensile CSV 整理成 workbook，并在需要时再送去绘图页。</p>
+        <div className="wizard-content-grid tensile-content-grid">
+          <div className="wizard-main-stack">
+            <section className="work-card section-card wizard-pane">
+              <div className="panel-heading">
+                <div>
+                  <div className="card-kicker">Prepare</div>
+                  <h3>Build a workbook</h3>
+                </div>
+                <InfoTip content="Preparing creates a workbook that can be reopened in Plot Builder or added to the comparison queue without switching screens automatically." />
+              </div>
               <div className="step-actions">
                 <button
                   className="primary-button"
@@ -266,7 +273,7 @@ export function TensileScreen({
                   onClick={() => void runTensilePreprocess()}
                   type="button"
                 >
-                  整理 tensile 数据
+                  Prepare tensile data
                 </button>
                 {latestPreprocessResult && (
                   <button
@@ -280,28 +287,26 @@ export function TensileScreen({
                     }
                     type="button"
                   >
-                    在绘图中打开
+                    Open in Plot Builder
                   </button>
                 )}
               </div>
 
               {!latestPreprocessResult ? (
-                <div className="placeholder-card">
-                  先选择多份 raw tensile CSV，生成一份可继续绘图和对比的 workbook。
-                </div>
+                <div className="placeholder-card">Select multiple raw CSV files to generate one reusable workbook.</div>
               ) : (
                 <div className="wizard-callout-stack">
                   <div className="success-card">
-                    已整理 {latestPreprocessResult.sample_count} 个拉伸重复样，代表曲线来自{" "}
-                    {latestPreprocessResult.representative_filename}。
+                    Prepared {latestPreprocessResult.sample_count} replicate samples. The representative curve comes from{" "}
+                    {latestPreprocessResult.representative_filename}.
                   </div>
                   <div className="summary-grid wizard-tight-grid">
                     <div className="stat-tile">
-                      <span>输出文件</span>
+                      <span>Workbook</span>
                       <strong>{formatLeaf(latestPreprocessResult.output_path)}</strong>
                     </div>
                     <div className="stat-tile">
-                      <span>默认工作表</span>
+                      <span>Preferred sheet</span>
                       <strong>{latestPreprocessResult.preferred_sheet}</strong>
                     </div>
                     {latestPreprocessResult.metrics.map((metric) => (
@@ -315,7 +320,7 @@ export function TensileScreen({
                   </div>
                   {latestPreprocessResult.warnings.length > 0 && (
                     <details>
-                      <summary>展开查看被跳过的文件</summary>
+                      <summary>Skipped files</summary>
                       <ul className="bullet-list">
                         {latestPreprocessResult.warnings.map((item) => (
                           <li key={item}>{item}</li>
@@ -327,12 +332,17 @@ export function TensileScreen({
               )}
             </section>
 
-            <section className="wizard-pane">
-              <div className="card-kicker">Compare</div>
-              <h3>拉伸对比</h3>
+            <section className="work-card section-card wizard-pane">
+              <div className="panel-heading">
+                <div>
+                  <div className="card-kicker">Compare</div>
+                  <h3>Export a comparison set</h3>
+                </div>
+                <InfoTip content="Two or more prepared workbooks are required. The compare export always keeps the fixed 60 x 55 mm figure size." />
+              </div>
               <div className="focus-panel">
-                <strong>已收集 {compareSourceCount} 组</strong>
-                <span>达到 2 组后，可固定按 `60x55 mm` 导出 1 张代表曲线和 6 张统计图。</span>
+                <strong>{compareSourceCount} source(s) queued</strong>
+                <span>When at least two sources are ready, CodeGod exports one representative curve and six summary figures.</span>
               </div>
               <div className="step-actions">
                 <button
@@ -341,7 +351,7 @@ export function TensileScreen({
                   onClick={() => void addTensileComparisonWorkbooks()}
                   type="button"
                 >
-                  补录已整理 workbook
+                  Add prepared workbooks
                 </button>
                 <button
                   className="ghost-button"
@@ -349,7 +359,7 @@ export function TensileScreen({
                   onClick={() => tensile.clearComparisonSources()}
                   type="button"
                 >
-                  清空清单
+                  Clear queue
                 </button>
                 <button
                   className="primary-button"
@@ -357,14 +367,12 @@ export function TensileScreen({
                   onClick={() => void runTensileComparisonExport()}
                   type="button"
                 >
-                  生成对比图
+                  Export comparison set
                 </button>
               </div>
 
               {compareSourceCount === 0 ? (
-                <div className="placeholder-card">
-                  先整理一组 tensile 数据，或补录至少 2 份已整理 workbook，再生成 7 张对比图。
-                </div>
+                <div className="placeholder-card">Prepare one source or add prepared workbooks, then export once at least two sources are queued.</div>
               ) : (
                 <div className="wizard-compare-list">
                   {tensile.comparisonSources.map((source, index) => (
@@ -373,7 +381,7 @@ export function TensileScreen({
                         <div>
                           <strong>{source.label}</strong>
                           <span>
-                            {formatLeaf(source.workbook_path)} · {source.sample_count} 个重复样
+                            {formatLeaf(source.workbook_path)} · {source.sample_count} replicates
                           </span>
                         </div>
                         <div className="step-actions">
@@ -388,7 +396,7 @@ export function TensileScreen({
                             }
                             type="button"
                           >
-                            在绘图中打开
+                            Open in Plot Builder
                           </button>
                           <button
                             className="ghost-button"
@@ -396,7 +404,7 @@ export function TensileScreen({
                             onClick={() => tensile.moveComparisonSource(source.workbook_path, -1)}
                             type="button"
                           >
-                            上移
+                            Move up
                           </button>
                           <button
                             className="ghost-button"
@@ -404,7 +412,7 @@ export function TensileScreen({
                             onClick={() => tensile.moveComparisonSource(source.workbook_path, 1)}
                             type="button"
                           >
-                            下移
+                            Move down
                           </button>
                           <button
                             className="ghost-button"
@@ -412,7 +420,7 @@ export function TensileScreen({
                             onClick={() => tensile.removeComparisonSource(source.workbook_path)}
                             type="button"
                           >
-                            移除
+                            Remove
                           </button>
                         </div>
                       </div>
@@ -434,29 +442,29 @@ export function TensileScreen({
               {tensile.comparisonResult && (
                 <div className="wizard-callout-stack">
                   <div className="success-card">
-                    已为 {tensile.comparisonResult.labels.length} 组生成{" "}
-                    {tensile.comparisonResult.outputs.length} 个对比结果。
+                    Exported {tensile.comparisonResult.outputs.length} outputs for{" "}
+                    {tensile.comparisonResult.labels.length} sources.
                   </div>
                   <div className="summary-grid wizard-tight-grid">
                     <div className="stat-tile">
-                      <span>对比目录</span>
+                      <span>Bundle folder</span>
                       <strong>{formatLeaf(tensile.comparisonResult.bundle_dir)}</strong>
                     </div>
                     <div className="stat-tile">
-                      <span>汇总 workbook</span>
+                      <span>Summary workbook</span>
                       <strong>{formatLeaf(tensile.comparisonResult.comparison_workbook_path)}</strong>
                     </div>
                     <div className="stat-tile">
-                      <span>组数</span>
+                      <span>Sources</span>
                       <strong>{tensile.comparisonResult.labels.length}</strong>
                     </div>
                     <div className="stat-tile">
-                      <span>输出数</span>
+                      <span>Outputs</span>
                       <strong>{tensile.comparisonResult.outputs.length}</strong>
                     </div>
                   </div>
                   <div className="focus-panel">
-                    <strong>导出文件</strong>
+                    <strong>Output files</strong>
                     <ul className="output-list">
                       {tensile.comparisonResult.outputs.map((item) => (
                         <li key={item}>{formatLeaf(item)}</li>
@@ -467,53 +475,39 @@ export function TensileScreen({
               )}
             </section>
           </div>
-        </article>
+
+          <aside className="desk-context tensile-context">
+            <article className="context-card">
+              <div className="panel-heading">
+                <div>
+                  <h3>Session</h3>
+                </div>
+                <InfoTip content="Preparing and comparing stay on this page. Plot Builder opens only when you choose to send a workbook there." />
+              </div>
+              <div className="wizard-summary-list">
+                <div className="wizard-summary-row">
+                  <span>Latest workbook</span>
+                  <strong>
+                    {latestPreprocessResult ? formatLeaf(latestPreprocessResult.output_path) : "-"}
+                  </strong>
+                </div>
+                <div className="wizard-summary-row">
+                  <span>Preferred sheet</span>
+                  <strong>{latestPreprocessResult?.preferred_sheet ?? "-"}</strong>
+                </div>
+                <div className="wizard-summary-row">
+                  <span>Queued sources</span>
+                  <strong>{compareSourceCount}</strong>
+                </div>
+                <div className="wizard-summary-row">
+                  <span>Exports</span>
+                  <strong>{tensile.comparisonResult?.outputs.length ?? 0}</strong>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </div>
       </section>
-
-      <aside className="desk-context">
-        <article className="context-card">
-          <div className="context-card-head">
-            <div>
-              <h3>当前拉伸现场</h3>
-              <p>这里汇总最近一次整理结果和当前对比清单状态。</p>
-            </div>
-          </div>
-          <div className="wizard-summary-list">
-            <div className="wizard-summary-row">
-              <span>最近整理</span>
-              <strong>
-                {latestPreprocessResult ? formatLeaf(latestPreprocessResult.output_path) : "-"}
-              </strong>
-            </div>
-            <div className="wizard-summary-row">
-              <span>默认工作表</span>
-              <strong>{latestPreprocessResult?.preferred_sheet ?? "-"}</strong>
-            </div>
-            <div className="wizard-summary-row">
-              <span>对比组数</span>
-              <strong>{compareSourceCount}</strong>
-            </div>
-            <div className="wizard-summary-row">
-              <span>导出数</span>
-              <strong>{tensile.comparisonResult?.outputs.length ?? 0}</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="context-card">
-          <div className="context-card-head">
-            <div>
-              <h3>使用提示</h3>
-              <p>整理和对比都留在这一页，只有你明确点击时才会切到绘图。</p>
-            </div>
-          </div>
-          <ul className="bullet-list">
-            <li>整理 raw tensile CSV 后，会自动加入对比清单，但不会抢占绘图页。</li>
-            <li>任意组数都能对比，但 7 张导出图固定保持 `60x55 mm`。</li>
-            <li>拉伸曲线默认固定使用 linear x/y 坐标，不再走 log。</li>
-          </ul>
-        </article>
-      </aside>
     </div>
   );
 }

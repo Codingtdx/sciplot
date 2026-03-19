@@ -56,8 +56,8 @@ export const TEST_META: WorkbenchMeta = {
   templates: [
     {
       id: "point_line",
-      label: "点线",
-      description: "带点的曲线。",
+      label: "Point line",
+      description: "Curve plot with markers.",
       category: "single_panel",
       default_size: "60x55",
       allowed_sizes: ["60x55", "120x55"],
@@ -73,8 +73,8 @@ export const TEST_META: WorkbenchMeta = {
     },
     {
       id: "curve",
-      label: "曲线",
-      description: "普通单图曲线。",
+      label: "Curve",
+      description: "Standard single-panel curve plot.",
       category: "single_panel",
       default_size: "60x55",
       allowed_sizes: ["60x55", "120x55"],
@@ -90,8 +90,8 @@ export const TEST_META: WorkbenchMeta = {
     },
     {
       id: "heatmap",
-      label: "热图",
-      description: "热图",
+      label: "Heatmap",
+      description: "Heatmap",
       category: "heatmap",
       default_size: "60x55",
       allowed_sizes: ["60x55"],

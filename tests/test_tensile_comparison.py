@@ -102,7 +102,7 @@ def test_export_tensile_comparison_bundle_keeps_standard_plot_size(tmp_path: Pat
 def test_export_tensile_comparison_bundle_rejects_fewer_than_two_groups(tmp_path: Path) -> None:
     workbook_path = _make_workbook(tmp_path / "solid.xlsx")
 
-    with pytest.raises(ValueError, match="至少需要 2 组"):
+    with pytest.raises(ValueError, match="requires at least 2 prepared workbooks"):
         export_tensile_comparison_bundle([workbook_path], tmp_path / "exports")
 
 
@@ -113,7 +113,7 @@ def test_export_tensile_comparison_bundle_rejects_missing_required_sheet(tmp_pat
     workbook.save(workbook_path)
     workbook.close()
 
-    with pytest.raises(ValueError, match="缺少必需工作表"):
+    with pytest.raises(ValueError, match="missing required worksheet"):
         export_tensile_comparison_bundle(
             [workbook_path, _make_workbook(tmp_path / "other.xlsx")],
             tmp_path / "exports",
@@ -130,7 +130,7 @@ def test_export_tensile_comparison_bundle_rejects_empty_replicate_sheet(tmp_path
             index=False,
         )
 
-    with pytest.raises(ValueError, match="不是有效重复值表|没有有效重复值|没有可用的重复值数字"):
+    with pytest.raises(ValueError, match="invalid replicate table|does not contain valid replicate values"):
         export_tensile_comparison_bundle(
             [workbook_path, _make_workbook(tmp_path / "other.xlsx")],
             tmp_path / "exports",
@@ -156,7 +156,7 @@ def test_export_tensile_comparison_bundle_rejects_inconsistent_metric_units(tmp_
             index=False,
         )
 
-    with pytest.raises(ValueError, match="单位或标签不一致"):
+    with pytest.raises(ValueError, match="label or unit .* does not match"):
         export_tensile_comparison_bundle([left, right], tmp_path / "exports")
 
 

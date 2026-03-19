@@ -31,7 +31,7 @@ describe("extractWizardProject", () => {
         version: 1,
         mode: "composer",
       }),
-    ).toThrow("这不是可识别的绘图精灵项目文件。");
+    ).toThrow("This is not a recognizable Plot Builder project file.");
   });
 
   it("rejects missing input paths", () => {
@@ -43,6 +43,6 @@ describe("extractWizardProject", () => {
           input_path: "",
         },
       }),
-    ).toThrow("绘图项目文件缺少有效的数据路径。");
+    ).toThrow("The Plot Builder project file is missing a valid data path.");
   });
 });

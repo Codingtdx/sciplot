@@ -143,11 +143,11 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "导入图" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import graph" }));
 
     await waitFor(() => {
       expect(
-        screen.getByText("无法打开文件选择窗口：dialog unavailable"),
+        screen.getByText("Could not open the file picker: dialog unavailable"),
       ).toBeInTheDocument();
     });
   });
@@ -267,7 +267,7 @@ describe("ComposerScreen", () => {
       );
     });
 
-    expect(screen.getByText(/已跳过不支持的文件: notes.txt/)).toBeInTheDocument();
+    expect(screen.getByText(/Skipped unsupported files: notes\.txt/)).toBeInTheDocument();
     expect(useComposerStore.getState().project.panels).toHaveLength(2);
     expect(useComposerStore.getState().project.regions).toHaveLength(1);
   });
@@ -277,11 +277,8 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
-      shiftKey: true,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "左对齐" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+    fireEvent.click(screen.getByRole("button", { name: "Align left" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -295,11 +292,8 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
-      shiftKey: true,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "成组" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+    fireEvent.click(screen.getByRole("button", { name: "Group" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -307,10 +301,12 @@ describe("ComposerScreen", () => {
       expect(project.panels.find((panel) => panel.id === "asset-2")?.group_id).toBeTruthy();
     });
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
+    fireEvent.click(screen.getByRole("tab", { name: "Inspect" }));
 
     await waitFor(() => {
-      const tile = screen.getByText("多选对象").closest(".stat-tile");
+      const tile = screen.getByText("Selected").closest(".stat-tile");
       expect(tile).not.toBeNull();
       expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
     });
@@ -321,17 +317,14 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
-      shiftKey: true,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "成组" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+    fireEvent.click(screen.getByRole("button", { name: "Group" }));
 
     await waitFor(() => {
       expect(useComposerStore.getState().project.panels.find((panel) => panel.id === "asset-1")?.group_id).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "解组" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ungroup" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -348,7 +341,24 @@ describe("ComposerScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
 
     await waitFor(() => {
-      const tile = screen.getByText("多选对象").closest(".stat-tile");
+      const tile = screen.getByText("Selected").closest(".stat-tile");
+      expect(tile).not.toBeNull();
+      expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
+    });
+  });
+
+  it("supports ctrl-click additive selection from the layer list", async () => {
+    seedComposerProject();
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole("tab", { name: "Inspect" }));
+
+    await waitFor(() => {
+      const tile = screen.getByText("Selected").closest(".stat-tile");
       expect(tile).not.toBeNull();
       expect(within(tile as HTMLElement).getByText("2")).toBeInTheDocument();
     });
@@ -359,11 +369,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
-      shiftKey: true,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "锁定选中" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lock selected" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -371,7 +379,7 @@ describe("ComposerScreen", () => {
       expect(project.panels.find((panel) => panel.id === "asset-2")?.locked).toBe(true);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "解锁选中" }));
+    fireEvent.click(screen.getByRole("button", { name: "Unlock selected" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -385,11 +393,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), {
-      shiftKey: true,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "隐藏选中" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide selected" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -397,7 +403,7 @@ describe("ComposerScreen", () => {
       expect(project.panels.find((panel) => panel.id === "asset-2")?.hidden).toBe(true);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "显示选中" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show selected" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -411,6 +417,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
@@ -434,9 +441,10 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    fireEvent.click(screen.getByRole("button", { name: "适配到绑定区域" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fit to binding" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -455,8 +463,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "贴到区域底部" }));
+    fireEvent.click(screen.getByRole("button", { name: "Snap bottom" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -470,8 +479,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "重复选中" }));
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate selection" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -489,6 +499,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
@@ -502,7 +513,7 @@ describe("ComposerScreen", () => {
       });
     });
 
-    expect(screen.getByText("已粘贴对象副本。")).toBeInTheDocument();
+    expect(screen.getByText("Pasted a duplicated selection.")).toBeInTheDocument();
   });
 
   it("snaps a bound asset to the left edge of its region", async () => {
@@ -510,8 +521,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "贴到区域左侧" }));
+    fireEvent.click(screen.getByRole("button", { name: "Snap left" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -543,8 +555,9 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
+    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
-    fireEvent.click(screen.getByLabelText("隐藏对象（预览和导出都忽略）"));
+    fireEvent.click(screen.getByLabelText("Hide object"));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;

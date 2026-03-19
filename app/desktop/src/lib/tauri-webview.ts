@@ -24,10 +24,10 @@ export function getCodeGodWebviewWindow(): WebviewWindowLike {
   } catch (error) {
     const detail =
       error instanceof Error && error.message.trim() !== ""
-        ? `：${error.message}`
+        ? `: ${error.message}`
         : "";
-    throw new Error(`当前桌面运行时不支持拖放导入${detail}`);
+    throw new Error(`The current desktop runtime does not support drag-and-drop import${detail}`);
   }
 
-  throw new Error("当前桌面运行时不支持拖放导入。");
+  throw new Error("The current desktop runtime does not support drag-and-drop import.");
 }

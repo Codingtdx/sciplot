@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
@@ -73,6 +75,7 @@ from src.wide_nmr import (
 )
 
 SMOKE_REPORT_PATH = ROOT / "figures" / "debug_outputs" / "smoke_report.json"
+SMOKE_CAPTURE_DIR_ENV = "CODEGOD_SMOKE_CAPTURE_DIR"
 TENSILE_RAW_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
 TENSILE_WORKBOOK_SHEETS = {
     "Representative_Curve",
@@ -759,8 +762,8 @@ def _assert_inspection_and_preflight(
     )
     if not missing_sidecar_preflight.errors:
         raise AssertionError("segmented_stacked_curve preflight should fail when sidecar is required but missing.")
-    if "sidecar 配置文件" not in missing_sidecar_preflight.errors[0]:
-        raise AssertionError("Missing sidecar preflight error should be rewritten into user-facing Chinese copy.")
+    if "sidecar config" not in missing_sidecar_preflight.errors[0]:
+        raise AssertionError("Missing sidecar preflight error should be rewritten into user-facing English copy.")
 
 
 def _assert_recent_defaults_state(base: Path) -> None:
@@ -1432,7 +1435,7 @@ def _assert_tensile_preprocess_workflow(
         export_tensile_replicate_workbook((invalid_bad, invalid_no_curve), failed_case_output)
     except ValueError as exc:
         message = str(exc)
-        if "没有成功解析任何拉伸 CSV" not in message:
+        if "No tensile CSV files could be parsed successfully" not in message:
             raise AssertionError(
                 "All-invalid tensile preprocess should fail with a user-facing aggregate error."
             ) from exc
@@ -1792,136 +1795,150 @@ def _write_smoke_report(
     return SMOKE_REPORT_PATH
 
 
+def _run_smoke_workspace(base: Path) -> Path:
+    outputs = base / "outputs"
+
+    replicate_path = base / "replicate.csv"
+    tensile_path = base / "tensile.csv"
+    ftir_path = base / "ftir.csv"
+    nmr_path = base / "nmr.csv"
+    xrd_path = base / "xrd.csv"
+    dsc_path = base / "dsc.csv"
+    tga_path = base / "tga.csv"
+    dma_path = base / "dma.csv"
+    heatmap_path = base / "heatmap.csv"
+    wide_nmr_path = base / "wide_nmr.csv"
+    freq_path = base / "freq.xlsx"
+    temp_path = base / "temp.xlsx"
+    relax_path = base / "relax.xlsx"
+
+    _write_replicate_table(replicate_path)
+    _write_curve_table(tensile_path, "Strain", "Stress", "%", "MPa")
+    _write_stacked_curve_table(ftir_path, template="ftir")
+    _write_stacked_curve_table(nmr_path, template="nmr")
+    _write_stacked_curve_table(xrd_path, template="xrd")
+    _write_stacked_curve_table(dsc_path, template="dsc")
+    _write_tga_curve_table(tga_path)
+    _write_dma_curve_table(dma_path)
+    _write_heatmap_table(heatmap_path)
+    _write_wide_nmr_bundle(wide_nmr_path)
+    _write_frequency_xlsx(freq_path)
+    _write_temperature_xlsx(temp_path)
+    _write_relaxation_xlsx(relax_path)
+    _assert_normalization_rules()
+    _assert_input_validation(base)
+    _assert_inspection_and_preflight(
+        freq_path=freq_path,
+        temp_path=temp_path,
+        relax_path=relax_path,
+        replicate_path=replicate_path,
+        heatmap_path=heatmap_path,
+        tensile_path=tensile_path,
+        ftir_path=ftir_path,
+        wide_nmr_path=wide_nmr_path,
+    )
+    _assert_recent_defaults_state(base)
+
+    jobs = [
+        ("bar", replicate_path, {}),
+        ("box", replicate_path, {}),
+        ("violin", replicate_path, {}),
+        ("point_line", freq_path, {"xscale": "log", "yscale": "log"}),
+        ("point_line", temp_path, {"yscale": "log"}),
+        ("point_line", relax_path, {"xscale": "log"}),
+        ("curve", tensile_path, {}),
+        ("scatter", tensile_path, {}),
+        ("stacked_curve", ftir_path, {"reverse_x": True}),
+        ("stacked_curve", nmr_path, {"reverse_x": True, "baseline": "linear_endpoints"}),
+        (
+            "segmented_stacked_curve",
+            wide_nmr_path,
+            {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True},
+        ),
+        ("stacked_curve", xrd_path, {}),
+        ("stacked_curve", dsc_path, {"baseline": "linear_endpoints"}),
+        ("curve", tga_path, {}),
+        ("curve", dma_path, {}),
+        ("heatmap", heatmap_path, {}),
+    ]
+
+    template_by_output: dict[str, str] = {}
+    for template, input_path, options in jobs:
+        rendered = render_template(template, input_path, outputs / template, **options)
+        for output in rendered:
+            if not output.exists():
+                raise FileNotFoundError(f"Expected output was not created: {output}")
+            template_by_output[str(output)] = template
+            print(output)
+
+    preprocess_reports = _assert_tensile_preprocess_workflow(
+        base=base,
+        outputs_dir=outputs,
+        template_by_output=template_by_output,
+    )
+    output_reports = _assert_rendered_output_files(outputs, template_by_output)
+    _assert_stacked_layout(plot_ftir, ftir_path)
+    _assert_stacked_layout(plot_nmr, nmr_path)
+    _assert_stacked_layout(plot_xrd, xrd_path)
+    _assert_stacked_layout(plot_dsc, dsc_path)
+    _assert_stacked_series_clearance(plot_ftir, ftir_path)
+    _assert_stacked_series_clearance(plot_nmr, nmr_path)
+    _assert_stacked_series_clearance(plot_xrd, xrd_path)
+    _assert_stacked_series_clearance(plot_dsc, dsc_path)
+    _assert_style_palette_presets(
+        replicate_path=replicate_path,
+        ftir_path=ftir_path,
+        wide_nmr_path=wide_nmr_path,
+        heatmap_path=heatmap_path,
+        temp_path=temp_path,
+    )
+    tensile_series = load_curve_table(tensile_path)
+    _assert_curve_padding(plot_tensile_curve, tensile_series, expect_zero_y_origin=True)
+    _assert_major_tick_skip_every_other()
+    _assert_stat_plot_tick_cap(load_replicate_table(replicate_path))
+    freq_series = _to_curve_series(load_frequency_sweep_metrics(freq_path)["storage_modulus"])
+    _assert_curve_padding(
+        plot_frequency_sweep,
+        freq_series,
+        expect_log_y=True,
+    )
+    temp_series = _to_curve_series(load_temperature_sweep_metrics(temp_path)["storage_modulus"])
+    _assert_curve_padding(
+        lambda series: plot_frequency_sweep(series, xscale="linear", yscale="log"),
+        temp_series,
+        expect_log_y=True,
+    )
+    validation_reports = _assert_axis_frame_alignment(
+        replicate_path=replicate_path,
+        tensile_path=tensile_path,
+        heatmap_path=heatmap_path,
+        wide_nmr_path=wide_nmr_path,
+    )
+    validation_reports.extend(_assert_wide_nmr_layout(wide_nmr_path))
+    _assert_frequency_batch_sync(freq_path)
+    _assert_legend_candidate_insets()
+    _assert_composer_workflow(outputs, base)
+    return _write_smoke_report(
+        output_reports=output_reports,
+        validation_reports=validation_reports,
+        preprocess_reports=preprocess_reports,
+    )
+
+
 def main() -> int:
+    capture_dir = os.environ.get(SMOKE_CAPTURE_DIR_ENV)
+    if capture_dir:
+        base = Path(capture_dir).expanduser()
+        if base.exists():
+            shutil.rmtree(base)
+        base.mkdir(parents=True, exist_ok=True)
+        report_path = _run_smoke_workspace(base)
+        print(f"Smoke check passed. Report: {report_path}")
+        print(f"Smoke artifacts preserved in: {base}")
+        return 0
+
     with tempfile.TemporaryDirectory(prefix="plot_smoke_") as tmp:
-        base = Path(tmp)
-        outputs = base / "outputs"
-
-        replicate_path = base / "replicate.csv"
-        tensile_path = base / "tensile.csv"
-        ftir_path = base / "ftir.csv"
-        nmr_path = base / "nmr.csv"
-        xrd_path = base / "xrd.csv"
-        dsc_path = base / "dsc.csv"
-        tga_path = base / "tga.csv"
-        dma_path = base / "dma.csv"
-        heatmap_path = base / "heatmap.csv"
-        wide_nmr_path = base / "wide_nmr.csv"
-        freq_path = base / "freq.xlsx"
-        temp_path = base / "temp.xlsx"
-        relax_path = base / "relax.xlsx"
-
-        _write_replicate_table(replicate_path)
-        _write_curve_table(tensile_path, "Strain", "Stress", "%", "MPa")
-        _write_stacked_curve_table(ftir_path, template="ftir")
-        _write_stacked_curve_table(nmr_path, template="nmr")
-        _write_stacked_curve_table(xrd_path, template="xrd")
-        _write_stacked_curve_table(dsc_path, template="dsc")
-        _write_tga_curve_table(tga_path)
-        _write_dma_curve_table(dma_path)
-        _write_heatmap_table(heatmap_path)
-        _write_wide_nmr_bundle(wide_nmr_path)
-        _write_frequency_xlsx(freq_path)
-        _write_temperature_xlsx(temp_path)
-        _write_relaxation_xlsx(relax_path)
-        _assert_normalization_rules()
-        _assert_input_validation(base)
-        _assert_inspection_and_preflight(
-            freq_path=freq_path,
-            temp_path=temp_path,
-            relax_path=relax_path,
-            replicate_path=replicate_path,
-            heatmap_path=heatmap_path,
-            tensile_path=tensile_path,
-            ftir_path=ftir_path,
-            wide_nmr_path=wide_nmr_path,
-        )
-        _assert_recent_defaults_state(base)
-
-        jobs = [
-            ("bar", replicate_path, {}),
-            ("box", replicate_path, {}),
-            ("violin", replicate_path, {}),
-            ("point_line", freq_path, {"xscale": "log", "yscale": "log"}),
-            ("point_line", temp_path, {"yscale": "log"}),
-            ("point_line", relax_path, {"xscale": "log"}),
-            ("curve", tensile_path, {}),
-            ("scatter", tensile_path, {}),
-            ("stacked_curve", ftir_path, {"reverse_x": True}),
-            ("stacked_curve", nmr_path, {"reverse_x": True, "baseline": "linear_endpoints"}),
-            (
-                "segmented_stacked_curve",
-                wide_nmr_path,
-                {"reverse_x": True, "baseline": "linear_endpoints", "use_sidecar": True},
-            ),
-            ("stacked_curve", xrd_path, {}),
-            ("stacked_curve", dsc_path, {"baseline": "linear_endpoints"}),
-            ("curve", tga_path, {}),
-            ("curve", dma_path, {}),
-            ("heatmap", heatmap_path, {}),
-        ]
-
-        template_by_output: dict[str, str] = {}
-        for template, input_path, options in jobs:
-            rendered = render_template(template, input_path, outputs / template, **options)
-            for output in rendered:
-                if not output.exists():
-                    raise FileNotFoundError(f"Expected output was not created: {output}")
-                template_by_output[str(output)] = template
-                print(output)
-
-        preprocess_reports = _assert_tensile_preprocess_workflow(
-            base=base,
-            outputs_dir=outputs,
-            template_by_output=template_by_output,
-        )
-        output_reports = _assert_rendered_output_files(outputs, template_by_output)
-        _assert_stacked_layout(plot_ftir, ftir_path)
-        _assert_stacked_layout(plot_nmr, nmr_path)
-        _assert_stacked_layout(plot_xrd, xrd_path)
-        _assert_stacked_layout(plot_dsc, dsc_path)
-        _assert_stacked_series_clearance(plot_ftir, ftir_path)
-        _assert_stacked_series_clearance(plot_nmr, nmr_path)
-        _assert_stacked_series_clearance(plot_xrd, xrd_path)
-        _assert_stacked_series_clearance(plot_dsc, dsc_path)
-        _assert_style_palette_presets(
-            replicate_path=replicate_path,
-            ftir_path=ftir_path,
-            wide_nmr_path=wide_nmr_path,
-            heatmap_path=heatmap_path,
-            temp_path=temp_path,
-        )
-        tensile_series = load_curve_table(tensile_path)
-        _assert_curve_padding(plot_tensile_curve, tensile_series, expect_zero_y_origin=True)
-        _assert_major_tick_skip_every_other()
-        _assert_stat_plot_tick_cap(load_replicate_table(replicate_path))
-        freq_series = _to_curve_series(load_frequency_sweep_metrics(freq_path)["storage_modulus"])
-        _assert_curve_padding(
-            plot_frequency_sweep,
-            freq_series,
-            expect_log_y=True,
-        )
-        temp_series = _to_curve_series(load_temperature_sweep_metrics(temp_path)["storage_modulus"])
-        _assert_curve_padding(
-            lambda series: plot_frequency_sweep(series, xscale="linear", yscale="log"),
-            temp_series,
-            expect_log_y=True,
-        )
-        validation_reports = _assert_axis_frame_alignment(
-            replicate_path=replicate_path,
-            tensile_path=tensile_path,
-            heatmap_path=heatmap_path,
-            wide_nmr_path=wide_nmr_path,
-        )
-        validation_reports.extend(_assert_wide_nmr_layout(wide_nmr_path))
-        _assert_frequency_batch_sync(freq_path)
-        _assert_legend_candidate_insets()
-        _assert_composer_workflow(outputs, base)
-        report_path = _write_smoke_report(
-            output_reports=output_reports,
-            validation_reports=validation_reports,
-            preprocess_reports=preprocess_reports,
-        )
+        report_path = _run_smoke_workspace(Path(tmp))
 
     print(f"Smoke check passed. Report: {report_path}")
     return 0

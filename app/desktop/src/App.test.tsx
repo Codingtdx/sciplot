@@ -136,6 +136,6 @@ describe("App", () => {
       .getAllByRole("button")
       .map((button) => button.textContent?.replace(/\s+/g, " ").trim() ?? "")
       .filter(Boolean);
-    expect(labels.indexOf("TS拉伸")).toBeLessThan(labels.indexOf("WZ绘图"));
+    expect(labels.indexOf("Tensile")).toBeLessThan(labels.indexOf("Plot"));
   });
 });
