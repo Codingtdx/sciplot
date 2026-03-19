@@ -63,6 +63,7 @@ def test_plot_contract_endpoint_exposes_validation_rules() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert "axis_policy" in payload
     assert "validation_rules" in payload
     assert "templates" in payload
     assert "curve" in payload["templates"]

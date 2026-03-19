@@ -1,6 +1,6 @@
 # CodeGod Plot Contract
 
-- Version: `1`
+- Version: `2`
 - Default style: `default`
 - Default palette: `colorblind_safe`
 
@@ -8,6 +8,18 @@
 
 - Standard panel: `60.0 x 55.0 mm`
 - Margins: left `14.0 mm`, right `4.5 mm`, bottom `11.0 mm`, top `5.5 mm`
+
+## Axis Policy
+
+- Linear axis nice steps: `1`, `2`, `5`
+- Linear outer padding: `5.0%` on standard axes
+- Force labeled linear endpoints visible: `True`
+- Log display steps: `1`, `2`, `5`
+- Log label mode: `decade_only`
+- Log allows unlabeled outer padding: `True`
+- Bar zero-baseline lower padding disabled: `True`
+- Tensile y-axis includes zero: `True`
+- Stacked x-axis uses standard endpoint policy: `True`
 
 ## Templates
 

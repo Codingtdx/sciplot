@@ -27,6 +27,19 @@ class GlobalFrameSpec:
 
 
 @dataclass(frozen=True)
+class AxisPolicySpec:
+    linear_nice_steps: tuple[float, ...]
+    linear_outer_padding_fraction: float
+    linear_force_visible_labeled_endpoints: bool
+    log_display_steps: tuple[float, ...]
+    log_label_mode: str
+    log_allow_unlabeled_outer_padding: bool
+    bar_zero_baseline_no_lower_padding: bool
+    tensile_y_include_zero: bool
+    stacked_x_use_standard_endpoint_policy: bool
+
+
+@dataclass(frozen=True)
 class SizePresetSpec:
     label: str
     width_mm: float
@@ -137,6 +150,7 @@ class PlotContract:
     defaults: DefaultsSpec
     style_aliases: dict[str, str]
     global_frame: GlobalFrameSpec
+    axis_policy: AxisPolicySpec
     size_presets: dict[str, SizePresetSpec]
     special_layouts: dict[str, dict[str, Any]]
     styles: dict[str, StyleContract]
@@ -161,6 +175,19 @@ def load_plot_contract() -> PlotContract:
         defaults=DefaultsSpec(**raw["defaults"]),
         style_aliases=dict(raw.get("aliases", {}).get("style_presets", {})),
         global_frame=GlobalFrameSpec(**raw["global_frame"]),
+        axis_policy=AxisPolicySpec(
+            linear_nice_steps=tuple(float(value) for value in raw["axis_policy"]["linear_nice_steps"]),
+            linear_outer_padding_fraction=float(raw["axis_policy"]["linear_outer_padding_fraction"]),
+            linear_force_visible_labeled_endpoints=bool(
+                raw["axis_policy"]["linear_force_visible_labeled_endpoints"]
+            ),
+            log_display_steps=tuple(float(value) for value in raw["axis_policy"]["log_display_steps"]),
+            log_label_mode=str(raw["axis_policy"]["log_label_mode"]),
+            log_allow_unlabeled_outer_padding=bool(raw["axis_policy"]["log_allow_unlabeled_outer_padding"]),
+            bar_zero_baseline_no_lower_padding=bool(raw["axis_policy"]["bar_zero_baseline_no_lower_padding"]),
+            tensile_y_include_zero=bool(raw["axis_policy"]["tensile_y_include_zero"]),
+            stacked_x_use_standard_endpoint_policy=bool(raw["axis_policy"]["stacked_x_use_standard_endpoint_policy"]),
+        ),
         size_presets={
             key: SizePresetSpec(**value)
             for key, value in raw["size_presets"].items()
@@ -238,6 +265,7 @@ def plot_contract_dict(*, public_only: bool = False) -> dict[str, Any]:
         "defaults": asdict(contract.defaults),
         "aliases": {"style_presets": dict(contract.style_aliases)},
         "global_frame": asdict(contract.global_frame),
+        "axis_policy": asdict(contract.axis_policy),
         "size_presets": {key: asdict(value) for key, value in contract.size_presets.items()},
         "special_layouts": contract.special_layouts,
         "styles": {
@@ -405,6 +433,39 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
             f"right `{resolved.global_frame.right_margin_mm:.1f} mm`, "
             f"bottom `{resolved.global_frame.bottom_margin_mm:.1f} mm`, "
             f"top `{resolved.global_frame.top_margin_mm:.1f} mm`"
+        ),
+        "",
+        "## Axis Policy",
+        "",
+        (
+            "- Linear axis nice steps: "
+            + ", ".join(f"`{value:g}`" for value in resolved.axis_policy.linear_nice_steps)
+        ),
+        (
+            f"- Linear outer padding: "
+            f"`{resolved.axis_policy.linear_outer_padding_fraction * 100:.1f}%` on standard axes"
+        ),
+        (
+            f"- Force labeled linear endpoints visible: "
+            f"`{resolved.axis_policy.linear_force_visible_labeled_endpoints}`"
+        ),
+        (
+            "- Log display steps: "
+            + ", ".join(f"`{value:g}`" for value in resolved.axis_policy.log_display_steps)
+        ),
+        f"- Log label mode: `{resolved.axis_policy.log_label_mode}`",
+        (
+            f"- Log allows unlabeled outer padding: "
+            f"`{resolved.axis_policy.log_allow_unlabeled_outer_padding}`"
+        ),
+        (
+            f"- Bar zero-baseline lower padding disabled: "
+            f"`{resolved.axis_policy.bar_zero_baseline_no_lower_padding}`"
+        ),
+        f"- Tensile y-axis includes zero: `{resolved.axis_policy.tensile_y_include_zero}`",
+        (
+            f"- Stacked x-axis uses standard endpoint policy: "
+            f"`{resolved.axis_policy.stacked_x_use_standard_endpoint_policy}`"
         ),
         "",
         "## Templates",

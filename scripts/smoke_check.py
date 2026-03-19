@@ -817,30 +817,44 @@ def _assert_curve_padding(
 
     if not (x_low < raw_x_min and x_high > raw_x_max):
         raise AssertionError("Curve x-axis was not padded beyond the raw data bounds.")
-    if expect_zero_y_origin:
-        if not np.isclose(y_low, 0.0):
-            raise AssertionError("Tensile curve y-axis should start at 0.")
-        if not (y_high > raw_y_max):
-            raise AssertionError("Curve y-axis upper bound should still keep headroom above the raw data.")
-    elif not (y_low < raw_y_min and y_high > raw_y_max):
+    if not (y_low < raw_y_min and y_high > raw_y_max):
         raise AssertionError("Curve y-axis was not padded beyond the raw data bounds.")
 
     xticks = np.asarray(ax.get_xticks(), dtype=float)
     xticks = xticks[np.isfinite(xticks)]
-    if xticks.size and (xticks.min() < raw_x_min or xticks.max() > raw_x_max):
-        raise AssertionError("Curve x-axis still shows ticks in the padding region.")
+    if xticks.size:
+        if not (xticks.min() > x_low and xticks.max() < x_high):
+            raise AssertionError("Curve x-axis should keep display padding unlabeled.")
+        if xticks.min() > raw_x_min or xticks.max() < raw_x_max:
+            raise AssertionError("Curve x-axis should still cover the raw data with labeled major ticks.")
 
     yticks = np.asarray(ax.get_yticks(), dtype=float)
     yticks = yticks[np.isfinite(yticks)]
     if expect_zero_y_origin:
+        if not (y_low < 0.0):
+            raise AssertionError("Tensile curve y-axis should leave unlabeled padding below 0.")
         if not np.any(np.isclose(yticks, 0.0)):
             raise AssertionError("Tensile curve should retain 0 as a visible y-axis major tick.")
+        if not np.isclose(float(yticks.min()), 0.0):
+            raise AssertionError("Tensile curve should keep 0 as the first visible labeled tick.")
+    elif yticks.size and not (yticks.min() > y_low and yticks.max() < y_high):
+        raise AssertionError("Curve y-axis should keep display padding unlabeled.")
+    elif yticks.size and yticks.min() > raw_y_min:
+        if not expect_log_y:
+            raise AssertionError("Curve y-axis should still cover the raw data with labeled major ticks.")
+    elif yticks.size and yticks.max() < raw_y_max:
+        if not expect_log_y:
+            raise AssertionError("Curve y-axis should still cover the raw data with labeled major ticks.")
+    elif yticks.size and yticks.min() < y_low:
+        raise AssertionError("Curve y-axis should not show ticks beyond the display bounds.")
+    elif yticks.size and yticks.max() > y_high:
+        raise AssertionError("Curve y-axis should not show ticks beyond the display bounds.")
     elif yticks.size and yticks.min() < raw_y_min:
         if expect_log_y:
-            raise AssertionError(
-                "Log y-axis should hide the bottom boundary tick when it falls below the raw data range."
-            )
-        raise AssertionError("Curve y-axis should not show lower ticks below the raw data range.")
+            if not (yticks.max() < y_high):
+                raise AssertionError("Log y-axis should keep its upper display padding unlabeled.")
+        else:
+            raise AssertionError("Linear curve y-axis should not show labels below the labeled lower bound.")
 
     visible_y_ticks = np.asarray(ax.get_yticks(), dtype=float)
     visible_y_ticks = visible_y_ticks[np.isfinite(visible_y_ticks)]
@@ -880,8 +894,8 @@ def _assert_stat_plot_tick_cap(groups) -> None:
             raise AssertionError("Box and violin plots should no longer be forced to start at 0.")
         box_ticks = np.asarray(name_to_ax["plot_box"].get_yticks(), dtype=float)
         box_ticks = box_ticks[np.isfinite(box_ticks)]
-        if not np.any(np.isclose(box_ticks, box_low)):
-            raise AssertionError("Box plot should keep its current lower axis start as a visible major tick.")
+        if not (box_ticks.min() > box_low):
+            raise AssertionError("Box plot should keep its lower display padding unlabeled.")
     finally:
         for _, fig, _ in figures_axes:
             plt.close(fig)
@@ -1109,10 +1123,10 @@ def _assert_axis_frame_alignment(
 def _assert_major_tick_skip_every_other() -> None:
     ticks = np.array([0, 1, 2, 3, 4, 5, 6], dtype=float)
     kept = _cap_visible_major_ticks(ticks, scale="linear", max_major_ticks=7)
-    expected = np.array([0, 2, 4, 6], dtype=float)
+    expected = np.array([0, 1, 2, 3, 4, 5, 6], dtype=float)
     if not np.array_equal(kept, expected):
         raise AssertionError(
-            "Seven visible y-axis ticks should thin to every other tick using the locator result [::2]."
+            "Seven visible y-axis ticks should remain intact when they already fit the cap."
         )
 
 

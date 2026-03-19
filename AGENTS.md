@@ -64,6 +64,11 @@
 ## 绘图不变量
 
 - 标准单图模板 `curve / point_line / bar / box / violin / scatter / heatmap` 必须共用同一套物理 axis frame。
+- 标准单轴图 `curve / point_line / scatter / bar / box / violin` 现在统一采用两层坐标边界：
+  - `labeled bounds` 负责显示整洁端点数字
+  - `display bounds` 负责实际绘图区留白
+- 标准线性轴默认使用 `1/2/5 * 10^n` 的 nice 包络，再做 `5%` 对称无标签 outer padding；x/y 两轴都要按同一套规则处理。
+- `bar` 是例外：`y` 轴必须从 `0` 起画，底部不留 display padding；`box / violin` 不强制从 `0` 起，但自动下界必须显示成可见主刻度。
 - `wide_nmr` 是特例：只要求左、右、底对齐；顶部保留结构式区域；总高度保持双高。
 - `heatmap` 也是特例：主热图区必须和标准单图同 frame；顶部水平 colorbar 不能挤压主图区，也不能出画布。
 - 输入识别先看表结构，再看轴标签/单位，最后才看数值跨度：
@@ -82,6 +87,8 @@
   - `replicate_table -> bar, box, violin`
   - `heatmap_table -> heatmap`
 - 所有识别为 `tensile_curve` 的曲线都必须固定使用 `linear` x/y 坐标；不允许在推荐、预检或渲染阶段退回 `log`。
+- `tensile_curve` 的 `y` 轴必须始终包含并显示 `0`，但 display bounds 仍要在 `0` 下方留出无标签留白；不要再把 tensile 曲线直接贴在横轴上。
+- 标准 `log` 轴允许 display bounds 超过最后一个标签，但标签只显示 decade 主刻度；不要把 `2×10^n`、`5×10^n` 直接当成主标签端点。
 - 日常渲染会直接吃契约；完整“画完再审”的重校验只在 smoke / 查 bug 时跑。
 
 ## 修改流程

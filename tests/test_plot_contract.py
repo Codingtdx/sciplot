@@ -33,6 +33,11 @@ class PlotContractTests(unittest.TestCase):
         contract = load_plot_contract()
         contract_dict = plot_contract_dict()
 
+        self.assertIn("axis_policy", contract_dict)
+        self.assertEqual(
+            contract_dict["axis_policy"]["linear_outer_padding_fraction"],
+            contract.axis_policy.linear_outer_padding_fraction,
+        )
         self.assertEqual(
             set(contract_dict["validation_rules"].keys()),
             set(contract.validation_rules.keys()),

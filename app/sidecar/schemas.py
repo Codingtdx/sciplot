@@ -335,11 +335,24 @@ class ValidationRuleResponse(StrictModel):
     tolerance_mm: float | None = None
 
 
+class AxisPolicyResponse(StrictModel):
+    linear_nice_steps: list[float]
+    linear_outer_padding_fraction: float
+    linear_force_visible_labeled_endpoints: bool
+    log_display_steps: list[float]
+    log_label_mode: str
+    log_allow_unlabeled_outer_padding: bool
+    bar_zero_baseline_no_lower_padding: bool
+    tensile_y_include_zero: bool
+    stacked_x_use_standard_endpoint_policy: bool
+
+
 class PlotContractResponse(StrictModel):
     version: int
     defaults: DefaultsResponse
     aliases: PlotContractAliasesResponse
     global_frame: GlobalFrameResponse
+    axis_policy: AxisPolicyResponse
     size_presets: dict[str, SizePresetContractResponse]
     special_layouts: dict[str, dict[str, Any]]
     styles: dict[str, StyleContractResponse]

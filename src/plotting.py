@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import textwrap
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,14 +12,13 @@ from matplotlib import transforms
 from matplotlib.colors import to_rgba
 from matplotlib.legend import Legend
 from matplotlib.patches import Rectangle
-from matplotlib.ticker import FixedLocator, LogLocator
+from matplotlib.ticker import FixedLocator
 
+from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup
-from src import plot_style
 from src.plot_contract import load_plot_contract
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import (
-    WIDE_NMR_SPECTRUM_HEIGHT_MM,
     WIDE_NMR_STRUCTURE_RESERVED_MM,
     WIDE_NMR_TOTAL_HEIGHT_MM,
     WIDE_NMR_WIDTH_MM,
@@ -29,14 +27,22 @@ from src.wide_nmr import (
     WideNMRSegment,
 )
 
-
 LegendMode = str
 AxisMode = str
 MARKER_STYLE_CYCLE = ("o", "s", "^", "D", "v", "P", "X")
 HIDDEN_Y_LABEL_X = -0.167
 INSIDE_LEGEND_INSET_FRACTION = 0.025
 MAX_VISIBLE_Y_MAJOR_TICKS = 7
-_HEATMAP_LAYOUT = load_plot_contract().special_layouts["heatmap"]
+_PLOT_CONTRACT = load_plot_contract()
+_HEATMAP_LAYOUT = _PLOT_CONTRACT.special_layouts["heatmap"]
+_AXIS_POLICY = _PLOT_CONTRACT.axis_policy
+_LINEAR_NICE_STEPS = tuple(float(value) for value in _AXIS_POLICY.linear_nice_steps)
+_LOG_DISPLAY_STEPS = tuple(float(value) for value in _AXIS_POLICY.log_display_steps)
+_LINEAR_OUTER_PADDING_FRACTION = float(_AXIS_POLICY.linear_outer_padding_fraction)
+_FORCE_VISIBLE_LABELED_ENDPOINTS = bool(_AXIS_POLICY.linear_force_visible_labeled_endpoints)
+_BAR_ZERO_BASELINE_NO_LOWER_PADDING = bool(_AXIS_POLICY.bar_zero_baseline_no_lower_padding)
+_TENSILE_Y_INCLUDE_ZERO = bool(_AXIS_POLICY.tensile_y_include_zero)
+_STACKED_X_USE_STANDARD_ENDPOINT_POLICY = bool(_AXIS_POLICY.stacked_x_use_standard_endpoint_policy)
 
 
 @dataclass
@@ -45,11 +51,21 @@ class AxisLimits:
     ylim: tuple[float, float]
     raw_xlim: tuple[float, float] | None = None
     raw_ylim: tuple[float, float] | None = None
+    x_tick_policy: AxisTickPolicy | None = None
+    y_tick_policy: AxisTickPolicy | None = None
+
+
+@dataclass(frozen=True)
+class AxisTickPolicy:
+    display_bounds: tuple[float, float]
+    labeled_bounds: tuple[float, float]
+    major_ticks: tuple[float, ...]
 
 
 @dataclass(frozen=True)
 class SharedAxisLayout:
     display_bounds: tuple[float, float]
+    labeled_bounds: tuple[float, float]
     raw_bounds: tuple[float, float]
     visible_ticks: tuple[float, ...]
 
@@ -308,6 +324,131 @@ def _merge_limits(
     return float(low), float(high)
 
 
+def _nice_step_ge(value: float) -> float:
+    if not np.isfinite(value) or value <= 0:
+        return 1.0
+    exponent = float(np.floor(np.log10(value)))
+    base = 10 ** exponent
+    scaled = value / base
+    for step in _LINEAR_NICE_STEPS:
+        if scaled <= step:
+            return float(step * base)
+    return float(10.0 * base)
+
+
+def _linear_target_major_step(span: float) -> float:
+    baseline = span if span > 0 else 1.0
+    return _nice_step_ge(baseline / 5.0)
+
+
+def _build_linear_ticks(labeled_min: float, labeled_max: float, step: float) -> tuple[float, ...]:
+    tick_count = int(np.floor((labeled_max - labeled_min) / step)) + 1
+    ticks = labeled_min + np.arange(max(tick_count, 1), dtype=float) * step
+    ticks = ticks[np.isfinite(ticks)]
+    if ticks.size == 0:
+        ticks = np.asarray([labeled_min, labeled_max], dtype=float)
+    if not np.isclose(ticks[0], labeled_min):
+        ticks = np.concatenate(([labeled_min], ticks))
+    if not np.isclose(ticks[-1], labeled_max):
+        ticks = np.concatenate((ticks, [labeled_max]))
+    return tuple(float(tick) for tick in np.unique(np.round(ticks, decimals=12)))
+
+
+def _solve_linear_axis_policy(
+    data_min: float,
+    data_max: float,
+    *,
+    force_zero_min: bool = False,
+    lower_display_padding_fraction: float | None = _LINEAR_OUTER_PADDING_FRACTION,
+    upper_display_padding_fraction: float | None = _LINEAR_OUTER_PADDING_FRACTION,
+) -> AxisTickPolicy:
+    effective_min = float(data_min)
+    effective_max = float(data_max)
+    if force_zero_min and effective_min >= 0:
+        effective_min = 0.0
+
+    if np.isclose(effective_min, effective_max):
+        baseline = max(abs(effective_min), abs(effective_max), 1.0)
+        step = _nice_step_ge(baseline)
+        labeled_min = effective_min - step
+        labeled_max = effective_max + step
+        if force_zero_min and data_min >= 0:
+            labeled_min = 0.0
+    else:
+        step = _linear_target_major_step(effective_max - effective_min)
+        labeled_min = np.floor(effective_min / step) * step
+        labeled_max = np.ceil(effective_max / step) * step
+        if force_zero_min and data_min >= 0:
+            labeled_min = 0.0
+        if np.isclose(labeled_min, labeled_max):
+            labeled_max = labeled_min + step
+
+    labeled_span = float(labeled_max - labeled_min)
+    if labeled_span <= 0:
+        labeled_span = max(abs(labeled_max), 1.0)
+    lower_padding = labeled_span * float(lower_display_padding_fraction or 0.0)
+    upper_padding = labeled_span * float(upper_display_padding_fraction or 0.0)
+    display_min = float(labeled_min - lower_padding)
+    display_max = float(labeled_max + upper_padding)
+    return AxisTickPolicy(
+        display_bounds=(display_min, display_max),
+        labeled_bounds=(float(labeled_min), float(labeled_max)),
+        major_ticks=_build_linear_ticks(float(labeled_min), float(labeled_max), float(step)),
+    )
+
+
+def _snap_log_display_bound(value: float, *, direction: str) -> float:
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError("Log-scale display bounds require strictly positive values.")
+    exponent = int(np.floor(np.log10(value)))
+    base = 10**exponent
+    scaled = value / base
+
+    if direction == "upper":
+        for step in _LOG_DISPLAY_STEPS:
+            if scaled <= step:
+                return float(step * base)
+        return float(10.0 * base)
+
+    for step in reversed(_LOG_DISPLAY_STEPS):
+        if scaled >= step:
+            return float(step * base)
+    return float(_LOG_DISPLAY_STEPS[-1] * (10 ** (exponent - 1)))
+
+
+def _build_decade_ticks(display_min: float, display_max: float) -> tuple[float, ...]:
+    low_exp = int(np.ceil(np.log10(display_min)))
+    high_exp = int(np.floor(np.log10(display_max)))
+    if high_exp < low_exp:
+        candidate = 10 ** round((np.log10(display_min) + np.log10(display_max)) / 2.0)
+        return (float(candidate),)
+    ticks = tuple(float(10**exponent) for exponent in range(low_exp, high_exp + 1))
+    return ticks
+
+
+def _solve_log_axis_policy(
+    data_min: float,
+    data_max: float,
+    *,
+    lower_padding: float,
+    upper_padding: float,
+) -> AxisTickPolicy:
+    padded_min, padded_max = _pad_limits_log_curve(
+        data_min,
+        data_max,
+        lower_padding=lower_padding,
+        upper_padding=upper_padding,
+    )
+    display_min = _snap_log_display_bound(padded_min, direction="lower")
+    display_max = _snap_log_display_bound(padded_max, direction="upper")
+    major_ticks = _build_decade_ticks(data_min, data_max)
+    return AxisTickPolicy(
+        display_bounds=(display_min, display_max),
+        labeled_bounds=(float(major_ticks[0]), float(major_ticks[-1])),
+        major_ticks=major_ticks,
+    )
+
+
 def _pad_limits_linear(
     data_min: float,
     data_max: float,
@@ -439,78 +580,75 @@ def compute_axis_limits(
     y_padding_bottom: float = 0.06,
     headroom_factor: float | None = None,
 ) -> AxisLimits:
-    """Compute display bounds and keep raw data bounds for tick filtering."""
+    """Compute display bounds and tick policies for standard numeric axes."""
     y_arrays = _validate_scale_values(values, scale=yscale, axis_name="Y")
 
     y_min = min(float(arr.min()) for arr in y_arrays)
     y_max = max(float(arr.max()) for arr in y_arrays)
-
-    allow_below_zero = legend_mode == "inside_forced" and y_min >= 0
-    if yscale == "log":
-        y_low, y_high = _pad_limits_log_curve(
-            y_min,
-            y_max,
-            lower_padding=y_padding_bottom,
-            upper_padding=y_padding_top,
-        )
-    elif kind == "line":
-        y_low, y_high = _pad_limits_linear_curve(
-            y_min,
-            y_max,
-            padding_fraction=max(y_padding_top, y_padding_bottom, 0.05),
-        )
-        if axis_mode == "auto_positive" and y_min >= 0:
-            y_low = 0.0
-    else:
-        y_low, y_high = _pad_limits_linear(
-            y_min,
-            y_max,
-            lower_padding=y_padding_bottom,
-            upper_padding=y_padding_top,
-            axis_mode=axis_mode,
-            allow_below_zero=allow_below_zero,
-        )
-
+    effective_y_max = y_max
     if headroom_factor is not None and y_max > 0 and yscale == "linear":
-        y_high = max(y_high, y_max * headroom_factor)
+        effective_y_max = max(y_max, y_max * headroom_factor)
 
-    if kind == "bar" and axis_mode != "manual" and y_min >= 0:
-        y_low = 0.0
+    if yscale == "log":
+        y_policy = _solve_log_axis_policy(
+            y_min,
+            effective_y_max,
+            lower_padding=max(y_padding_bottom, _LINEAR_OUTER_PADDING_FRACTION),
+            upper_padding=max(y_padding_top, _LINEAR_OUTER_PADDING_FRACTION),
+        )
+    else:
+        is_bar = kind == "bar" and axis_mode != "manual" and y_min >= 0 and _BAR_ZERO_BASELINE_NO_LOWER_PADDING
+        force_zero_min = axis_mode == "auto_positive" and y_min >= 0
+        if is_bar:
+            y_policy = _solve_linear_axis_policy(
+                0.0,
+                effective_y_max,
+                force_zero_min=True,
+                lower_display_padding_fraction=0.0,
+                upper_display_padding_fraction=0.0,
+            )
+        else:
+            y_policy = _solve_linear_axis_policy(
+                y_min,
+                effective_y_max,
+                force_zero_min=force_zero_min,
+                lower_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
+                upper_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
+            )
 
     if x_values is None:
-        return AxisLimits(xlim=(0.0, 1.0), ylim=(y_low, y_high), raw_ylim=(y_min, y_max))
+        return AxisLimits(
+            xlim=(0.0, 1.0),
+            ylim=y_policy.display_bounds,
+            raw_ylim=(y_min, y_max),
+            y_tick_policy=y_policy,
+        )
 
     x_arrays = _validate_scale_values(x_values, scale=xscale, axis_name="X")
 
     x_min = min(float(arr.min()) for arr in x_arrays)
     x_max = max(float(arr.max()) for arr in x_arrays)
     if xscale == "log":
-        x_low, x_high = _pad_limits_log_curve(
+        x_policy = _solve_log_axis_policy(
             x_min,
             x_max,
-            lower_padding=x_padding,
-            upper_padding=x_padding,
-        )
-    elif kind == "line":
-        x_low, x_high = _pad_limits_linear_curve(
-            x_min,
-            x_max,
-            padding_fraction=max(x_padding, 0.05),
+            lower_padding=max(x_padding, _LINEAR_OUTER_PADDING_FRACTION),
+            upper_padding=max(x_padding, _LINEAR_OUTER_PADDING_FRACTION),
         )
     else:
-        x_low, x_high = _pad_limits_linear(
+        x_policy = _solve_linear_axis_policy(
             x_min,
             x_max,
-            lower_padding=x_padding,
-            upper_padding=x_padding,
-            axis_mode="manual",
-            allow_below_zero=True,
+            lower_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
+            upper_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
         )
     return AxisLimits(
-        xlim=(x_low, x_high),
-        ylim=(y_low, y_high),
+        xlim=x_policy.display_bounds,
+        ylim=y_policy.display_bounds,
         raw_xlim=(x_min, x_max),
         raw_ylim=(y_min, y_max),
+        x_tick_policy=x_policy,
+        y_tick_policy=y_policy,
     )
 
 
@@ -658,46 +796,25 @@ def _compute_x_limits(
     *,
     xscale: str,
     x_padding: float = 0.02,
-) -> tuple[tuple[float, float], tuple[float, float]]:
+) -> tuple[AxisTickPolicy, tuple[float, float]]:
     x_arrays = _validate_scale_values(x_values, scale=xscale, axis_name="X")
     x_min = min(float(arr.min()) for arr in x_arrays)
     x_max = max(float(arr.max()) for arr in x_arrays)
     if xscale == "log":
-        display = _pad_limits_log_curve(
+        policy = _solve_log_axis_policy(
             x_min,
             x_max,
-            lower_padding=x_padding,
-            upper_padding=x_padding,
+            lower_padding=max(x_padding, _LINEAR_OUTER_PADDING_FRACTION),
+            upper_padding=max(x_padding, _LINEAR_OUTER_PADDING_FRACTION),
         )
     else:
-        display = _pad_limits_linear_curve(
+        policy = _solve_linear_axis_policy(
             x_min,
             x_max,
-            padding_fraction=max(x_padding, 0.05),
+            lower_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
+            upper_display_padding_fraction=_LINEAR_OUTER_PADDING_FRACTION,
         )
-    return display, (x_min, x_max)
-
-
-def _compute_visible_ticks(
-    *,
-    scale: str,
-    display_bounds: tuple[float, float],
-    raw_bounds: tuple[float, float],
-) -> tuple[float, ...]:
-    fig, ax = plt.subplots()
-    try:
-        if scale == "log":
-            ax.set_xscale("log")
-        ax.set_xlim(*display_bounds)
-        try:
-            ticks = ax.xaxis.get_major_locator().tick_values(*display_bounds)
-        except Exception:
-            ticks = np.asarray(ax.get_xticks(), dtype=float)
-    finally:
-        plt.close(fig)
-    bounds_for_ticks = tuple(sorted(display_bounds)) if scale == "log" else raw_bounds
-    filtered = _filter_ticks_to_raw_bounds(np.asarray(ticks, dtype=float), bounds_for_ticks, scale=scale)
-    return tuple(float(tick) for tick in filtered)
+    return policy, (x_min, x_max)
 
 
 def compute_shared_curve_x_layout(
@@ -706,20 +823,16 @@ def compute_shared_curve_x_layout(
     xscale: str,
     x_padding: float = 0.02,
 ) -> SharedAxisLayout:
-    display_bounds, raw_bounds = _compute_x_limits(
+    policy, raw_bounds = _compute_x_limits(
         x_values,
         xscale=xscale,
         x_padding=x_padding,
     )
-    visible_ticks = _compute_visible_ticks(
-        scale=xscale,
-        display_bounds=display_bounds,
-        raw_bounds=raw_bounds,
-    )
     return SharedAxisLayout(
-        display_bounds=display_bounds,
+        display_bounds=policy.display_bounds,
+        labeled_bounds=policy.labeled_bounds,
         raw_bounds=raw_bounds,
-        visible_ticks=visible_ticks,
+        visible_ticks=policy.major_ticks,
     )
 
 
@@ -729,10 +842,11 @@ def _compute_stacked_axis_limits(
     xscale: str,
     y_padding_top: float,
 ) -> AxisLimits:
-    xlim, raw_xlim = _compute_x_limits(
+    x_policy, raw_xlim = _compute_x_limits(
         [series.data["x"].to_numpy(dtype=float) for series in layout.series_list],
         xscale=xscale,
     )
+    xlim = x_policy.display_bounds if _STACKED_X_USE_STANDARD_ENDPOINT_POLICY else x_policy.labeled_bounds
     y_arrays = _validate_scale_values(
         [series.data["y"].to_numpy(dtype=float) for series in layout.series_list],
         scale="linear",
@@ -750,6 +864,7 @@ def _compute_stacked_axis_limits(
         ylim=(0.0, y_high),
         raw_xlim=raw_xlim,
         raw_ylim=(y_min, y_max),
+        x_tick_policy=x_policy if _STACKED_X_USE_STANDARD_ENDPOINT_POLICY else None,
     )
 
 
@@ -856,7 +971,7 @@ def _display_points_for_series(ax: plt.Axes, series_list: Sequence[CurveSeries])
         if len(points) < 2:
             return points
         dense_parts: list[np.ndarray] = [points[:1]]
-        for start, end in zip(points[:-1], points[1:]):
+        for start, end in zip(points[:-1], points[1:], strict=True):
             delta = end - start
             segment_length = float(max(abs(delta[0]), abs(delta[1])))
             steps = max(int(np.ceil(segment_length / max_step_px)), 1)
@@ -1281,7 +1396,7 @@ def _place_stacked_labels(
         return float(bbox.width), float(bbox.height)
 
     label_records: list[tuple[int, str, tuple[float, float, float] | str, float, float]] = []
-    for series_index, (label_text, color) in enumerate(zip(label_texts, colors)):
+    for series_index, (label_text, color) in enumerate(zip(label_texts, colors, strict=True)):
         bbox_width, bbox_height = _measure_text_bbox(label_text, color, "left")
         label_records.append((series_index, label_text, color, bbox_width, bbox_height))
 
@@ -1366,9 +1481,19 @@ def _cap_visible_major_ticks(
 ) -> np.ndarray:
     ticks = np.asarray(ticks, dtype=float)
     ticks = ticks[np.isfinite(ticks)]
-    if ticks.size < max_major_ticks:
+    if ticks.size <= max_major_ticks:
         return ticks
-    return ticks[::2]
+    if ticks.size <= 2:
+        return ticks
+    first = ticks[0]
+    last = ticks[-1]
+    middle = ticks[1:-1]
+    keep_middle = max(max_major_ticks - 2, 0)
+    if keep_middle <= 0:
+        return np.asarray([first, last], dtype=float)
+    step = max(int(np.ceil(middle.size / keep_middle)), 1)
+    trimmed = middle[::step][:keep_middle]
+    return np.concatenate(([first], trimmed, [last]))
 
 
 def _validate_curve_series_input(series_list: Sequence[CurveSeries]) -> None:
@@ -1400,6 +1525,16 @@ def _set_axis_locator_from_filtered_ticks(axis, ticks: np.ndarray, *, which: str
         axis.set_major_locator(locator)
     else:
         axis.set_minor_locator(locator)
+
+
+def _apply_explicit_major_ticks(axis, ticks: Sequence[float], *, max_major_ticks: int | None = None) -> None:
+    values = np.asarray(ticks, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return
+    if max_major_ticks is not None:
+        values = _cap_visible_major_ticks(values, scale="linear", max_major_ticks=max_major_ticks)
+    axis.set_major_locator(FixedLocator(values))
 
 
 def _uses_positive_zero_origin(
@@ -1669,8 +1804,16 @@ def _score_legend_bbox(ax: plt.Axes, legend: Legend, series_list: Sequence[Curve
         )
         score += float(inside.sum()) * 10.0
 
-        dx = np.where(points[:, 0] < bbox.x0, bbox.x0 - points[:, 0], np.where(points[:, 0] > bbox.x1, points[:, 0] - bbox.x1, 0.0))
-        dy = np.where(points[:, 1] < bbox.y0, bbox.y0 - points[:, 1], np.where(points[:, 1] > bbox.y1, points[:, 1] - bbox.y1, 0.0))
+        dx = np.where(
+            points[:, 0] < bbox.x0,
+            bbox.x0 - points[:, 0],
+            np.where(points[:, 0] > bbox.x1, points[:, 0] - bbox.x1, 0.0),
+        )
+        dy = np.where(
+            points[:, 1] < bbox.y0,
+            bbox.y0 - points[:, 1],
+            np.where(points[:, 1] > bbox.y1, points[:, 1] - bbox.y1, 0.0),
+        )
         distance = np.hypot(dx, dy)
         near = distance < 12.0
         if np.any(near):
@@ -1860,7 +2003,7 @@ def plot_curves(
         )
         plotted_series = stacked_layout.series_list if stacked_layout is not None else list(normalized_series)
 
-        for idx, (color, series) in enumerate(zip(palette, plotted_series)):
+        for idx, (color, series) in enumerate(zip(palette, plotted_series, strict=True)):
             markevery = marker_every if marker_every is not None else _infer_markevery(len(series.data))
             line_color = to_rgba(color, stroke.line_alpha)
             ax.plot(
@@ -1900,8 +2043,6 @@ def plot_curves(
         ax.set_ylim(*_merge_limits(limits.ylim, ylim))
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
-        if yscale == "log":
-            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0,), numticks=12))
         if reverse_x:
             ax.invert_xaxis()
 
@@ -1952,34 +2093,15 @@ def plot_curves(
     elif series_label_mode != "edge" and legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
 
-    if not _override_complete(ylim):
-        _pin_positive_zero_origin(
-            ax,
-            axis_mode=axis_mode,
-            scale=yscale,
-            raw_bounds=limits.raw_ylim,
-        )
-
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
-    elif not _override_complete(xlim):
-        _apply_axis_tick_filter(
-            ax.xaxis,
-            raw_bounds=limits.raw_xlim,
-            display_bounds=ax.get_xlim(),
-            scale=xscale,
-        )
-    if show_y_ticks:
-        _apply_visible_y_tick_policy(
-            ax,
-            scale=yscale,
-            raw_bounds=None
-            if _override_complete(ylim)
-            else _tick_bounds_with_zero_origin(
-                limits.raw_ylim,
-                axis_mode=axis_mode,
-                scale=yscale,
-            ),
+    elif not _override_complete(xlim) and limits.x_tick_policy is not None:
+        _apply_explicit_major_ticks(ax.xaxis, limits.x_tick_policy.major_ticks)
+    if show_y_ticks and not _override_complete(ylim) and limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
         )
     return fig, ax
 
@@ -2035,7 +2157,7 @@ def plot_scatter(
     )
     palette = plot_style.get_categorical_palette(n_colors=len(series_list))
 
-    for color, series in zip(palette, series_list):
+    for color, series in zip(palette, series_list, strict=True):
         ax.scatter(
             series.data["x"],
             series.data["y"],
@@ -2063,8 +2185,6 @@ def plot_scatter(
     ax.set_ylim(*_merge_limits(limits.ylim, ylim))
     ax.set_xscale(xscale)
     ax.set_yscale(yscale)
-    if yscale == "log":
-        ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0,), numticks=12))
     if reverse_x:
         ax.invert_xaxis()
 
@@ -2095,34 +2215,16 @@ def plot_scatter(
     elif legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
 
-    if not _override_complete(ylim):
-        _pin_positive_zero_origin(
-            ax,
-            axis_mode=axis_mode,
-            scale=yscale,
-            raw_bounds=limits.raw_ylim,
-        )
-
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
-    elif not _override_complete(xlim):
-        _apply_axis_tick_filter(
-            ax.xaxis,
-            raw_bounds=limits.raw_xlim,
-            display_bounds=ax.get_xlim(),
-            scale=xscale,
+    elif not _override_complete(xlim) and limits.x_tick_policy is not None:
+        _apply_explicit_major_ticks(ax.xaxis, limits.x_tick_policy.major_ticks)
+    if not _override_complete(ylim) and limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
         )
-    _apply_visible_y_tick_policy(
-        ax,
-        scale=yscale,
-        raw_bounds=None
-        if _override_complete(ylim)
-        else _tick_bounds_with_zero_origin(
-            limits.raw_ylim,
-            axis_mode=axis_mode,
-            scale=yscale,
-        ),
-    )
     return fig, ax
 
 
@@ -2232,7 +2334,10 @@ def _prepare_wide_nmr_series(
             ordered_keys.append(series.sample)
 
     display_names = [config.series_labels.get(key, key) for key in ordered_keys]
-    ordered_series = [_clone_with_sample_name(by_sample[key], display_name) for key, display_name in zip(ordered_keys, display_names)]
+    ordered_series = [
+        _clone_with_sample_name(by_sample[key], display_name)
+        for key, display_name in zip(ordered_keys, display_names, strict=True)
+    ]
     return ordered_keys, display_names, ordered_series
 
 
@@ -2257,7 +2362,10 @@ def _wide_nmr_local_edge_score(
     seg_low = min(segment.x_min, segment.x_max)
     seg_high = max(segment.x_min, segment.x_max)
     seg_span = max(seg_high - seg_low, 1e-9)
-    target_x = segment.x_max - seg_span * inset_fraction if side == "left" else segment.x_min + seg_span * inset_fraction
+    if side == "left":
+        target_x = segment.x_max - seg_span * inset_fraction
+    else:
+        target_x = segment.x_min + seg_span * inset_fraction
     window = max(seg_span * 0.08, 1e-9)
 
     for series in series_list:
@@ -2313,7 +2421,7 @@ def _pick_segment_axis_for_region(
     region: WideNMRHighlightRegion,
 ) -> tuple[plt.Axes, WideNMRSegment]:
     region_mid = (region.x_min + region.x_max) / 2
-    for axis, segment in zip(axes, segments):
+    for axis, segment in zip(axes, segments, strict=True):
         seg_low = min(segment.x_min, segment.x_max)
         seg_high = max(segment.x_min, segment.x_max)
         if seg_low <= region_mid <= seg_high:
@@ -2353,7 +2461,7 @@ def _add_wide_nmr_highlights(
     for region in config.highlight_regions:
         label_axis, _ = _pick_segment_axis_for_region(axes, segments, region)
         region_label_drawn = False
-        for axis, segment in zip(axes, segments):
+        for axis, segment in zip(axes, segments, strict=True):
             seg_low = min(segment.x_min, segment.x_max)
             seg_high = max(segment.x_min, segment.x_max)
             overlap_low = max(seg_low, min(region.x_min, region.x_max))
@@ -2363,7 +2471,12 @@ def _add_wide_nmr_highlights(
 
             y_lows: list[float] = []
             y_highs: list[float] = []
-            for raw_name, display_name, series in zip(raw_names, display_names, layout.series_list):
+            for raw_name, display_name, series in zip(
+                raw_names,
+                display_names,
+                layout.series_list,
+                strict=True,
+            ):
                 if not _wide_nmr_region_matches_series(region, raw_name, display_name):
                     continue
                 x = series.data["x"].to_numpy(dtype=float)
@@ -2442,7 +2555,10 @@ def plot_wide_nmr(
     raw_names, display_names, ordered_series = _prepare_wide_nmr_series(series_list, config)
     corrected_series = _baseline_correct_series(ordered_series, baseline_mode=baseline_mode)
 
-    fig = plt.figure(figsize=(plot_style.mm_to_inch(width_mm), plot_style.mm_to_inch(height_mm)), constrained_layout=False)
+    fig = plt.figure(
+        figsize=(plot_style.mm_to_inch(width_mm), plot_style.mm_to_inch(height_mm)),
+        constrained_layout=False,
+    )
     reserved_top_mm = structure_reserved_mm + top_margin_mm
     plot_body_height_mm = max(height_mm - bottom_margin_mm - reserved_top_mm, 1e-9)
     root_grid = fig.add_gridspec(
@@ -2463,7 +2579,7 @@ def plot_wide_nmr(
     )
 
     axes: list[plt.Axes] = []
-    for idx, segment in enumerate(config.segments):
+    for idx, _segment in enumerate(config.segments):
         axis = fig.add_subplot(spectrum_grid[0, idx], sharey=axes[0] if axes else None)
         axes.append(axis)
     stacked_layout: StackedLayout | None = None
@@ -2479,7 +2595,7 @@ def plot_wide_nmr(
         y_max = max(float(np.nanmax(values)) for values in y_arrays)
         y_high = y_max + stacked_layout.max_span * (0.18 + 0.58)
 
-        for axis, segment in zip(axes, config.segments):
+        for axis, segment in zip(axes, config.segments, strict=True):
             axis.cla()
             for series in stacked_layout.series_list:
                 axis.plot(
@@ -2543,7 +2659,7 @@ def plot_wide_nmr(
         if label_success:
             break
 
-    for left_axis, right_axis in zip(axes[:-1], axes[1:]):
+    for left_axis, right_axis in zip(axes[:-1], axes[1:], strict=True):
         _draw_wide_nmr_break_marks(left_axis, right_axis)
 
     first = series_list[0]
@@ -2631,12 +2747,12 @@ def plot_box(
         capprops={"linewidth": 1.0},
         boxprops={"linewidth": 1.0},
     )
-    for patch, color in zip(box["boxes"], palette):
+    for patch, color in zip(box["boxes"], palette, strict=True):
         patch.set_facecolor(color)
         patch.set_alpha(min(stroke.fill_alpha, stroke.max_fill_alpha))
         patch.set_edgecolor(color)
 
-    for pos, group, color in zip(positions, groups, palette):
+    for pos, group, color in zip(positions, groups, palette, strict=True):
         x = np.full(len(group.data), pos, dtype=float)
         jitter_half_span = min(0.06, box_width * 0.18)
         jitter = (
@@ -2659,16 +2775,12 @@ def plot_box(
         side_padding = max(0.28, box_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _apply_visible_y_tick_policy(
-        ax,
-        scale="linear",
-        raw_bounds=_tick_bounds_with_zero_origin(
-            limits.raw_ylim,
-            axis_mode=axis_mode,
-            scale="linear",
-        ),
-    )
-    _ensure_visible_linear_lower_tick(ax)
+    if limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+        )
 
     first = groups[0]
     ax.set_ylabel(_format_axis_label(first.value_label, first.value_unit))
@@ -2735,10 +2847,13 @@ def plot_bar(
         linewidth=1.0,
         alpha=min(stroke.fill_alpha, stroke.max_fill_alpha),
     )
-    for bar, color in zip(bars, palette):
+    for bar, color in zip(bars, palette, strict=True):
         bar.set_edgecolor(color)
 
-    values = [np.concatenate([group.data.to_numpy(), [mean + std]]) for group, mean, std in zip(groups, means, stds)]
+    values = [
+        np.concatenate([group.data.to_numpy(), [mean + std]])
+        for group, mean, std in zip(groups, means, stds, strict=True)
+    ]
     limits = compute_axis_limits(
         values,
         kind="bar",
@@ -2754,10 +2869,12 @@ def plot_bar(
     if len(positions):
         side_padding = max(0.28, bar_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
-    tick_bounds = None
-    if limits.raw_ylim is not None:
-        tick_bounds = (0.0, limits.raw_ylim[1])
-    _apply_visible_y_tick_policy(ax, scale="linear", raw_bounds=tick_bounds)
+    if limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+        )
 
     first = groups[0]
     ax.set_ylabel(_format_axis_label(first.value_label, first.value_unit))
@@ -2818,7 +2935,7 @@ def plot_violin(
         showmedians=True,
         showextrema=False,
     )
-    for body, color in zip(violin["bodies"], palette):
+    for body, color in zip(violin["bodies"], palette, strict=True):
         body.set_facecolor(color)
         body.set_edgecolor(color)
         body.set_alpha(min(stroke.fill_alpha, stroke.max_fill_alpha))
@@ -2841,7 +2958,12 @@ def plot_violin(
         side_padding = max(0.28, violin_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _apply_visible_y_tick_policy(ax, scale="linear", raw_bounds=limits.raw_ylim)
+    if limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+        )
 
     first = groups[0]
     ax.set_ylabel(_format_axis_label(first.value_label, first.value_unit))

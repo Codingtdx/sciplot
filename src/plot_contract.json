@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "defaults": {
     "style_preset": "default",
     "palette_preset": "colorblind_safe"
@@ -16,6 +16,17 @@
     "right_margin_mm": 4.5,
     "bottom_margin_mm": 11.0,
     "top_margin_mm": 5.5
+  },
+  "axis_policy": {
+    "linear_nice_steps": [1.0, 2.0, 5.0],
+    "linear_outer_padding_fraction": 0.05,
+    "linear_force_visible_labeled_endpoints": true,
+    "log_display_steps": [1.0, 2.0, 5.0],
+    "log_label_mode": "decade_only",
+    "log_allow_unlabeled_outer_padding": true,
+    "bar_zero_baseline_no_lower_padding": true,
+    "tensile_y_include_zero": true,
+    "stacked_x_use_standard_endpoint_policy": true
   },
   "size_presets": {
     "60x55": {
