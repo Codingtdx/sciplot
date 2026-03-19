@@ -1723,29 +1723,36 @@ def _place_series_edge_labels(
     )
 
 
-def _compute_heatmap_cax_geometry(position: transforms.Bbox) -> tuple[list[float], list[float]]:
+def _compute_heatmap_cax_geometry(
+    position: transforms.Bbox,
+    *,
+    layout_overrides: dict[str, float] | None = None,
+) -> tuple[list[float], list[float]]:
+    layout = dict(_HEATMAP_LAYOUT)
+    if layout_overrides:
+        layout.update(layout_overrides)
     available_height = max(1.0 - position.y1, 1e-6)
     cbar_y0 = position.y1 + min(
         max(
-            available_height * float(_HEATMAP_LAYOUT["colorbar_y_offset_fraction"]),
-            float(_HEATMAP_LAYOUT["colorbar_y_offset_min"]),
+            available_height * float(layout["colorbar_y_offset_fraction"]),
+            float(layout["colorbar_y_offset_min"]),
         ),
-        available_height * float(_HEATMAP_LAYOUT["colorbar_y_offset_max_fraction"]),
+        available_height * float(layout["colorbar_y_offset_max_fraction"]),
     )
     cbar_height = min(
         max(
-            available_height * float(_HEATMAP_LAYOUT["colorbar_height_fraction"]),
-            float(_HEATMAP_LAYOUT["colorbar_height_min"]),
+            available_height * float(layout["colorbar_height_fraction"]),
+            float(layout["colorbar_height_min"]),
         ),
         max(
             available_height
             - (cbar_y0 - position.y1)
-            - float(_HEATMAP_LAYOUT["colorbar_bottom_gap"]),
+            - float(layout["colorbar_bottom_gap"]),
             0.010,
         ),
     )
-    cbar_x0 = position.x0 + position.width * float(_HEATMAP_LAYOUT["colorbar_x_offset_fraction"])
-    cbar_width = position.width * float(_HEATMAP_LAYOUT["colorbar_width_fraction"])
+    cbar_x0 = position.x0 + position.width * float(layout["colorbar_x_offset_fraction"])
+    cbar_width = position.width * float(layout["colorbar_width_fraction"])
     heatmap_rect = [position.x0, position.y0, position.width, position.height]
     cax_rect = [
         cbar_x0,

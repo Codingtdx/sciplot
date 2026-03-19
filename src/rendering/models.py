@@ -31,9 +31,27 @@ class TemplateRenderer:
 
 
 @dataclass(frozen=True)
+class QAIssue:
+    id: str
+    severity: str
+    metric_value: float | str | None
+    target: float | str | None
+    message: str
+
+
+@dataclass(frozen=True)
+class QAReport:
+    score: float
+    grade: str
+    issues: tuple[QAIssue, ...] = ()
+    autofixes_applied: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class RenderedPlot:
     filename: str
     figure: plt.Figure
+    qa_report: QAReport | None = None
 
 
 @dataclass(frozen=True)

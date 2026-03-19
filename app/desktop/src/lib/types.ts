@@ -22,6 +22,22 @@ export type ThemePreference = "system" | "light" | "dark";
 export type PreviewItem = {
   filename: string;
   png_base64: string;
+  qa?: QAReport | null;
+};
+
+export type QAIssue = {
+  id: string;
+  severity: string;
+  metric_value?: number | string | null;
+  target?: number | string | null;
+  message: string;
+};
+
+export type QAReport = {
+  score: number;
+  grade: "excellent" | "solid" | "needs_cleanup";
+  issues: QAIssue[];
+  autofixes_applied: string[];
 };
 
 export type Recommendation = {
@@ -202,6 +218,20 @@ export type ComposerProject = {
   auto_labels: boolean;
 };
 
+export type ComposerSuggestedPatch = {
+  kind: "panel" | "text";
+  id: string;
+  patch: Record<string, unknown>;
+};
+
+export type ComposerPreviewResponse = {
+  valid: boolean;
+  validation_error: string | null;
+  png_base64: string;
+  qa?: QAReport | null;
+  suggested_project_patch?: ComposerSuggestedPatch[];
+};
+
 export type WizardProject = {
   version: number;
   mode: "wizard";
@@ -305,6 +335,7 @@ export type PlotContract = {
   global_frame: GlobalFrame;
   size_presets: Record<string, { label: string; width_mm: number; height_mm: number }>;
   special_layouts: Record<string, Record<string, number | string | boolean>>;
+  qa_profiles: Record<string, Record<string, number | string | boolean | string[]>>;
   styles: Record<string, Record<string, unknown>>;
   palettes: Record<string, Record<string, unknown>>;
   templates: Record<string, Record<string, unknown>>;

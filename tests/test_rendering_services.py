@@ -27,6 +27,23 @@ def _write_curve_table(path: Path) -> Path:
     return path
 
 
+def _write_dense_curve_table(path: Path) -> Path:
+    import numpy as np
+
+    x = np.linspace(0.5, 10.0, 80)
+    y_a = np.sin(x / 2.0) + 2.1
+    y_b = np.cos(x / 3.0) + 3.2
+    rows = [
+        ["Strain", "Stress", "Strain", "Stress"],
+        ["%", "MPa", "%", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for x_value, y_value_a, y_value_b in zip(x, y_a, y_b, strict=True):
+        rows.append([x_value, y_value_a, x_value, y_value_b])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_tensile_curve_table(path: Path) -> Path:
     rows = [
         ["Strain", "Stress", "Strain", "Stress"],
@@ -262,5 +279,37 @@ def test_bar_preflight_matches_render_filename(tmp_path: Path) -> None:
     rendered = build_rendered_plots("bar", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_small_curve_render_prefers_direct_labels_when_they_fit(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
+
+    rendered = build_rendered_plots("curve", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "direct_series_labels" in plot.qa_report.autofixes_applied
+        ax = plot.figure.axes[0]
+        assert ax.get_legend() is None
+        assert {text.get_text() for text in ax.texts} == {"Sample A", "Sample B"}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_bar_render_uses_editorial_spacing_and_raw_point_overlay(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    rendered = build_rendered_plots("bar", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "bar_raw_points_overlay" in plot.qa_report.autofixes_applied
+        assert "stats_spacing_profile" in plot.qa_report.autofixes_applied
+        ax = plot.figure.axes[0]
+        assert ax.collections
     finally:
         close_rendered_plots(rendered)

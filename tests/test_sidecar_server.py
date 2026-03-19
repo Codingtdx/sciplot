@@ -26,6 +26,23 @@ def _write_curve_table(path: Path) -> Path:
     return path
 
 
+def _write_dense_curve_table(path: Path) -> Path:
+    import numpy as np
+
+    x = np.linspace(0.5, 10.0, 80)
+    y_a = np.sin(x / 2.0) + 2.1
+    y_b = np.cos(x / 3.0) + 3.2
+    rows = [
+        ["Strain", "Stress", "Strain", "Stress"],
+        ["%", "MPa", "%", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for x_value, y_value_a, y_value_b in zip(x, y_a, y_b, strict=True):
+        rows.append([x_value, y_value_a, x_value, y_value_b])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_pdf(path: Path, width_mm: float, height_mm: float) -> Path:
     document = fitz.open()
     document.new_page(width=width_mm / 25.4 * 72.0, height=height_mm / 25.4 * 72.0)
@@ -64,6 +81,7 @@ def test_plot_contract_endpoint_exposes_validation_rules() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert "axis_policy" in payload
+    assert "qa_profiles" in payload
     assert "validation_rules" in payload
     assert "templates" in payload
     assert "curve" in payload["templates"]
@@ -257,6 +275,91 @@ def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path
     assert payload["sample_count"] == 2
     assert payload["preferred_sheet"] == "Representative_Curve"
     assert "BlendSet_bad.csv" in payload["warnings"][0]
+
+
+def test_render_preview_includes_advisory_qa_payload(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
+
+    response = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["previews"]
+    qa = payload["previews"][0]["qa"]
+    assert qa["grade"] in {"excellent", "solid", "needs_cleanup"}
+    assert "direct_series_labels" in qa["autofixes_applied"]
+
+
+def test_compose_preview_returns_cleanup_patch_without_blocking_export(tmp_path: Path) -> None:
+    response = client.post(
+        "/compose-preview",
+        json={
+            "version": 2,
+            "mode": "composer",
+            "canvas_width_mm": 180,
+            "canvas_height_mm": 170,
+            "grid_mm": 0.5,
+            "layout_grid": {
+                "columns": 3,
+                "rows": 3,
+                "cell_width_mm": 60,
+                "cell_height_mm": 55,
+                "frame_x_mm": 0,
+                "frame_y_mm": 2.5,
+                "frame_width_mm": 180,
+                "frame_height_mm": 165,
+            },
+            "regions": [],
+            "panels": [],
+            "texts": [
+                {
+                    "id": "text-1",
+                    "text": "Hello",
+                    "x_mm": 178,
+                    "y_mm": 10,
+                    "font_size_pt": 5,
+                    "align": "left",
+                    "z_index": 0,
+                    "locked": False,
+                    "hidden": False,
+                    "group_id": None,
+                    "region_id": None,
+                    "slot_id": None,
+                },
+                {
+                    "id": "text-2",
+                    "text": "World",
+                    "x_mm": 178,
+                    "y_mm": 10,
+                    "font_size_pt": 8,
+                    "align": "left",
+                    "z_index": 1,
+                    "locked": False,
+                    "hidden": False,
+                    "group_id": None,
+                    "region_id": None,
+                    "slot_id": None,
+                },
+            ],
+            "auto_labels": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["valid"] is True
+    assert payload["validation_error"] is None
+    assert payload["qa"]["issues"]
+    assert payload["suggested_project_patch"]
+    assert payload["suggested_project_patch"][0]["kind"] == "text"
 
 
 def test_inspect_tensile_workbook_endpoint_returns_summary(tmp_path: Path) -> None:

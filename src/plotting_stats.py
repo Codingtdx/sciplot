@@ -158,6 +158,11 @@ def plot_bar(
     top_margin_mm: float | None = None,
     bar_width: float = 0.35,
     spacing_scale: float = 1.0,
+    capsize: float = 2.5,
+    show_raw_points: bool = False,
+    raw_point_size: float = 10.0,
+    raw_point_alpha: float | None = None,
+    raw_point_jitter_fraction: float = 0.18,
     ylim: tuple[float, float] | None = None,
     headroom_factor: float | None = None,
     y_padding_top: float = 0.15,
@@ -201,7 +206,7 @@ def plot_bar(
         positions,
         means,
         yerr=stds,
-        capsize=2.5,
+        capsize=capsize,
         width=bar_width,
         color=palette,
         edgecolor=palette,
@@ -210,6 +215,24 @@ def plot_bar(
     )
     for bar, color in zip(bars, palette, strict=True):
         bar.set_edgecolor(color)
+
+    if show_raw_points:
+        for pos, group, color in zip(positions, groups, palette, strict=True):
+            jitter_half_span = min(0.075, max(bar_width * raw_point_jitter_fraction, 0.03))
+            jitter = (
+                np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
+                if len(group.data) > 1
+                else np.array([0.0])
+            )
+            ax.scatter(
+                np.full(len(group.data), pos, dtype=float) + jitter,
+                group.data,
+                color=color,
+                alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
+                s=raw_point_size,
+                zorder=3,
+                linewidths=0.0,
+            )
 
     values = [
         np.concatenate([group.data.to_numpy(), [mean + std]])

@@ -10,6 +10,7 @@ import {
   twoUpEditorial,
 } from "../lib/api";
 import {
+  applySuggestedComposerPatch,
   alignDrawables,
   buildComposerClipboard,
   distributeDrawables,
@@ -65,6 +66,7 @@ export function ComposerScreen() {
       setPreview: state.setPreview,
       setProject: state.setProject,
       setSelectedId: state.setSelectedId,
+      suggestedProjectPatch: state.suggestedProjectPatch,
       updatePanels: state.updatePanels,
       updateTexts: state.updateTexts,
       validationError: state.validationError,
@@ -179,11 +181,25 @@ export function ComposerScreen() {
 
   useComposerPreview(composer.project, (payload, error) => {
     if (payload) {
-      composer.setPreview(payload.png_base64, payload.validation_error ?? null);
+      composer.setPreview(
+        payload.png_base64,
+        payload.validation_error ?? null,
+        payload.qa ?? null,
+        payload.suggested_project_patch ?? [],
+      );
       return;
     }
     composer.setPreview(null, error);
   });
+
+  const applyPreviewCleanup = () => {
+    if (composer.suggestedProjectPatch.length === 0) {
+      return;
+    }
+    setProject(applySuggestedComposerPatch(composer.project, composer.suggestedProjectPatch));
+    setDropNoticeTone("success");
+    setDropNotice("Applied layout cleanup suggestions.");
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -1104,6 +1120,17 @@ export function ComposerScreen() {
         )}
 
         {composer.validationError && <div className="warning-card">{composer.validationError}</div>}
+
+        {!composer.validationError && composer.suggestedProjectPatch.length > 0 && (
+          <div className="warning-card">
+            <div>Preview found a few layout cleanups that can be applied safely.</div>
+            <div className="stacked-actions">
+              <button className="ghost-button" onClick={applyPreviewCleanup} type="button">
+                Apply cleanup suggestions
+              </button>
+            </div>
+          </div>
+        )}
 
         {dropNotice && (
           <div className={dropNoticeTone === "warning" ? "warning-card" : "success-card"}>

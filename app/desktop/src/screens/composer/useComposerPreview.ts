@@ -2,12 +2,14 @@ import { useEffect, useRef } from "react";
 
 import { composePreviewWithOptions } from "../../lib/api";
 import { requestCacheKey } from "../../lib/sidecar";
-import type { ComposerProject } from "../../lib/types";
+import type { ComposerProject, ComposerSuggestedPatch, QAReport } from "../../lib/types";
 import { getErrorMessage } from "../../lib/workbench";
 
 type PreviewPayload = {
   png_base64: string;
   validation_error: string | null;
+  qa?: QAReport | null;
+  suggested_project_patch?: ComposerSuggestedPatch[];
 };
 
 function isAbortError(error: unknown): boolean {
@@ -43,6 +45,8 @@ export function useComposerPreview(
           const payload = {
             png_base64: response.png_base64,
             validation_error: response.validation_error ?? null,
+            qa: response.qa ?? null,
+            suggested_project_patch: response.suggested_project_patch ?? [],
           };
           cacheRef.current.set(key, payload);
           if (latestRequestRef.current !== requestId || controller.signal.aborted) {

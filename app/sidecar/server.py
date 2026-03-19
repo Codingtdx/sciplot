@@ -52,6 +52,7 @@ from src.composer import (
     two_up_editorial_panels_from_paths,
     validate_non_overlapping_panels,
 )
+from src.composer_qa import analyze_composer_project
 from src.plot_contract import meta_payload, plot_contract_dict
 from src.rendering import (
     DEFAULT_SIZE_BY_TEMPLATE,
@@ -280,10 +281,13 @@ def compose_preview(request: ComposerRequest) -> ComposerPreviewResponse:
         project = composer_project_from_request(request)
         ok, reason = validate_non_overlapping_panels(project)
         png_bytes = compose_preview_png(project)
+        qa_report, suggested_patch = analyze_composer_project(project)
         return ComposerPreviewResponse(
             valid=ok,
             validation_error=reason,
             png_base64=b64encode(png_bytes).decode("ascii"),
+            qa=serialize_dataclass(qa_report),
+            suggested_project_patch=serialize_dataclass(suggested_patch),
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

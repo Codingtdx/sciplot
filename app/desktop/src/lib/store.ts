@@ -3,10 +3,12 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import type {
   ComposerPanel,
+  ComposerSuggestedPatch,
   ComposerProject,
   ComposerText,
   InputInspection,
   PalettePreset,
+  QAReport,
   PdfImportMode,
   PreflightResult,
   PreviewItem,
@@ -76,12 +78,19 @@ type ComposerState = {
   project: ComposerProject;
   previewPng: string | null;
   validationError: string | null;
+  previewQa: QAReport | null;
+  suggestedProjectPatch: ComposerSuggestedPatch[];
   selectedId: string | null;
   palettePreset: PalettePreset;
   setProject(project: ComposerProject): void;
   updatePanels(panels: ComposerPanel[]): void;
   updateTexts(texts: ComposerText[]): void;
-  setPreview(png: string | null, validationError: string | null): void;
+  setPreview(
+    png: string | null,
+    validationError: string | null,
+    qa?: QAReport | null,
+    suggestedProjectPatch?: ComposerSuggestedPatch[],
+  ): void;
   setSelectedId(value: string | null): void;
   setPalettePreset(value: PalettePreset): void;
   reset(): void;
@@ -242,12 +251,15 @@ export const useComposerStore = create<ComposerState>()(
       project: { ...emptyProject, panels: [], texts: [] },
       previewPng: null,
       validationError: null,
+      previewQa: null,
+      suggestedProjectPatch: [],
       selectedId: null,
       palettePreset: "colorblind_safe",
       setProject: (project) => set({ project }),
       updatePanels: (panels) => set((state) => ({ project: { ...state.project, panels } })),
       updateTexts: (texts) => set((state) => ({ project: { ...state.project, texts } })),
-      setPreview: (png, validationError) => set({ previewPng: png, validationError }),
+      setPreview: (png, validationError, previewQa = null, suggestedProjectPatch = []) =>
+        set({ previewPng: png, validationError, previewQa, suggestedProjectPatch }),
       setSelectedId: (value) => set({ selectedId: value }),
       setPalettePreset: (value) => set({ palettePreset: value }),
       reset: () =>
@@ -255,6 +267,8 @@ export const useComposerStore = create<ComposerState>()(
           project: { ...emptyProject, panels: [], texts: [] },
           previewPng: null,
           validationError: null,
+          previewQa: null,
+          suggestedProjectPatch: [],
           selectedId: null,
           palettePreset: "colorblind_safe",
         }),

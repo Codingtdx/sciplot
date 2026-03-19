@@ -153,6 +153,7 @@ class PlotContract:
     axis_policy: AxisPolicySpec
     size_presets: dict[str, SizePresetSpec]
     special_layouts: dict[str, dict[str, Any]]
+    qa_profiles: dict[str, dict[str, Any]]
     styles: dict[str, StyleContract]
     palettes: dict[str, PaletteContract]
     templates: dict[str, TemplateContract]
@@ -195,6 +196,10 @@ def load_plot_contract() -> PlotContract:
         special_layouts={
             key: dict(value)
             for key, value in raw.get("special_layouts", {}).items()
+        },
+        qa_profiles={
+            key: dict(value)
+            for key, value in raw.get("qa_profiles", {}).items()
         },
         styles={
             key: StyleContract(
@@ -268,6 +273,7 @@ def plot_contract_dict(*, public_only: bool = False) -> dict[str, Any]:
         "axis_policy": asdict(contract.axis_policy),
         "size_presets": {key: asdict(value) for key, value in contract.size_presets.items()},
         "special_layouts": contract.special_layouts,
+        "qa_profiles": contract.qa_profiles,
         "styles": {
             key: {
                 **asdict(value),
@@ -319,6 +325,14 @@ def validation_rule(rule_name: str) -> ValidationRuleContract:
         return contract.validation_rules[rule_name]
     except KeyError as exc:
         raise ValueError(f"Unknown validation rule: {rule_name}") from exc
+
+
+def qa_profile(profile_name: str) -> dict[str, Any]:
+    contract = load_plot_contract()
+    try:
+        return dict(contract.qa_profiles[profile_name])
+    except KeyError as exc:
+        raise ValueError(f"Unknown QA profile: {profile_name}") from exc
 
 
 def public_style_names() -> tuple[str, ...]:
@@ -472,18 +486,25 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
         "",
     ]
 
-    for name, spec in resolved.templates.items():
+    if resolved.qa_profiles:
+        lines.extend(["## QA Profiles", ""])
+        for name, profile_spec in resolved.qa_profiles.items():
+            tokens = ", ".join(f"`{key}`={value!r}" for key, value in profile_spec.items())
+            lines.append(f"- `{name}`: {tokens}")
+        lines.append("")
+
+    for name, template_spec in resolved.templates.items():
         lines.extend(
             [
-                f"### `{name}` / {spec.label}",
+                f"### `{name}` / {template_spec.label}",
                 "",
-                f"- Category: `{spec.category}`",
-                f"- Default size: `{spec.default_size}`",
-                f"- Allowed sizes: {', '.join(f'`{item}`' for item in spec.allowed_sizes)}",
-                f"- Editable options: {', '.join(f'`{item}`' for item in spec.editable_options)}",
-                f"- Description: {spec.description}",
-                f"- Hard rules: {', '.join(f'`{item}`' for item in spec.hard_rules) or 'None'}",
-                f"- Soft rules: {', '.join(f'`{item}`' for item in spec.soft_rules) or 'None'}",
+                f"- Category: `{template_spec.category}`",
+                f"- Default size: `{template_spec.default_size}`",
+                f"- Allowed sizes: {', '.join(f'`{item}`' for item in template_spec.allowed_sizes)}",
+                f"- Editable options: {', '.join(f'`{item}`' for item in template_spec.editable_options)}",
+                f"- Description: {template_spec.description}",
+                f"- Hard rules: {', '.join(f'`{item}`' for item in template_spec.hard_rules) or 'None'}",
+                f"- Soft rules: {', '.join(f'`{item}`' for item in template_spec.soft_rules) or 'None'}",
                 "",
             ]
         )

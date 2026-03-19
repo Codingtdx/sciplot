@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { EMPTY_COMPOSER_PROJECT } from "../lib/composer";
-import { importComposerPanels } from "../lib/api";
+import { composePreviewWithOptions, importComposerPanels } from "../lib/api";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import { ComposerScreen } from "./ComposerScreen";
 
@@ -136,6 +136,60 @@ describe("ComposerScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("preview exploded")).toBeInTheDocument();
     });
+  });
+
+  it("applies preview cleanup suggestions to the project", async () => {
+    vi.mocked(composePreviewWithOptions).mockResolvedValue({
+      valid: true,
+      validation_error: null,
+      png_base64: "",
+      qa: {
+        score: 82,
+        grade: "solid",
+        issues: [],
+        autofixes_applied: [],
+      },
+      suggested_project_patch: [
+        {
+          kind: "text",
+          id: "text-1",
+          patch: { x_mm: 120, y_mm: 24 },
+        },
+      ],
+    });
+    useComposerStore.getState().setProject({
+      ...EMPTY_COMPOSER_PROJECT,
+      texts: [
+        {
+          id: "text-1",
+          text: "Hello",
+          x_mm: 178,
+          y_mm: 10,
+          font_size_pt: 8,
+          align: "left",
+          z_index: 0,
+        },
+      ],
+    });
+
+    render(<ComposerScreen />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Apply cleanup suggestions" }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply cleanup suggestions" }));
+
+    await waitFor(() => {
+      expect(useComposerStore.getState().project.texts[0]).toMatchObject({
+        x_mm: 120,
+        y_mm: 24,
+      });
+    });
+
+    expect(screen.getByText("Applied layout cleanup suggestions.")).toBeInTheDocument();
   });
 
   it("surfaces desktop dialog failures to the user", async () => {

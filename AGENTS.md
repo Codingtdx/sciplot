@@ -27,6 +27,7 @@
 ## 唯一事实源
 
 - `src/plot_contract.json` 是绘图契约唯一事实源。
+- 契约里的 `qa_profiles` 不是给终端用户看的评分表，而是内部 editorial policy / autofix 的唯一策略源；small panel legend、heatmap top strip、stat spacing、Composer cleanup patch 都应从这里读门槛。
 - `src/plot_contract.py` 负责 typed loader；Python 绘图逻辑、sidecar `/meta`、`/plot-contract`、smoke 校验都要读这一份。
 - GUI 只能消费 sidecar 返回的模板、尺寸、palette、默认值和标签，不要在前端再维护一套本地常量。
 - 项目文件的唯一合法入口是 sidecar 的校验/迁移层：保存走 `/save-project`，打开走 `/open-project`；不要在前端或脚本里直接信任任意 JSON payload。
@@ -37,6 +38,7 @@
 
 - CLI、GUI、旧脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
+- `render-preview` 与 `compose-preview` 可以返回 advisory QA / cleanup patch，但它们不是 blocker；真正阻止导出的一律仍走 preflight / Composer overlap 校验。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
@@ -70,6 +72,7 @@
 ## 绘图不变量
 
 - 标准单图模板 `curve / point_line / bar / box / violin / scatter / heatmap` 必须共用同一套物理 axis frame。
+- editorial autofix 只能优化 axis frame 内部纪律，不能改 shared axis frame 的物理锚点；`60x55` 小图彼此左右上下坐标轴必须对齐，两张 `60x55` 并排后的最左/最右边界也必须与 `120x55` 中图对齐。
 - 标准单轴图 `curve / point_line / scatter / bar / box / violin` 现在统一采用两层坐标边界：
   - `labeled bounds` 负责显示整洁端点数字
   - `display bounds` 负责实际绘图区留白
@@ -96,6 +99,7 @@
 - `tensile_curve` 的 `y` 轴必须始终包含并显示 `0`，但 display bounds 仍要在 `0` 下方留出无标签留白；不要再把 tensile 曲线直接贴在横轴上。
 - 标准 `log` 轴允许 display bounds 超过最后一个标签，但标签只显示 decade 主刻度；不要把 `2×10^n`、`5×10^n` 直接当成主标签端点。
 - 日常渲染会直接吃契约；完整“画完再审”的重校验只在 smoke / 查 bug 时跑。
+- 日常 UI 不展示面向用户的 QA scorecard；QA 主要用于 render-time 候选布局选择、静默 autofix、smoke 报告和可选调试输出。
 
 ## 修改流程
 
@@ -193,6 +197,7 @@
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
+- 不要把内部 QA / editorial policy 做成“让用户自己盯着分数改图”的前台功能；默认产品行为应该是软件自己统一出图，必要时只暴露极少数 cleanup 提示。
 - 不要把 graph region 的位置真相源拆成两份；region 负责占格，graph panel 的 `x/y/w/h` 只是归一化结果。
 - 不要再把 Composer 改回旧的 `3x3 原点吸附 + panels-only` 心智模型；v2 的事实源是 `regions + drawables`。
 - 不要让 graph 导入悄悄接受任意尺寸 PDF；不符合 `60x55 / 120x55 / 60x110 mm` 的 PDF 应提示改用 asset 模式。

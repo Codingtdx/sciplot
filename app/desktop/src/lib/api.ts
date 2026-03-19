@@ -1,4 +1,5 @@
 import type {
+  ComposerPreviewResponse,
   ComposerProject,
   ExportResponse,
   InspectResponse,
@@ -191,12 +192,8 @@ export async function composePreview(project: ComposerProject): Promise<{
 export async function composePreviewWithOptions(
   project: ComposerProject,
   options: RequestOptions = {},
-): Promise<{
-  valid: boolean;
-  validation_error: string | null;
-  png_base64: string;
-}> {
-  return postJson("/compose-preview", project, options);
+): Promise<ComposerPreviewResponse> {
+  return postJson<ComposerPreviewResponse>("/compose-preview", project, options);
 }
 
 export async function composeExport(project: ComposerProject): Promise<{

@@ -235,6 +235,33 @@ function readSpecialLayoutMap(
   return next;
 }
 
+function readQaProfileMap(
+  value: unknown,
+  label: string,
+): Record<string, Record<string, number | string | boolean | string[]>> {
+  const record = requireRecord(value, label);
+  const next: Record<string, Record<string, number | string | boolean | string[]>> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const spec = requireRecord(entry, `${label}.${key}`);
+    next[key] = Object.entries(spec).reduce<Record<string, number | string | boolean | string[]>>(
+      (result, [specKey, specValue]) => {
+        if (
+          typeof specValue === "number" ||
+          typeof specValue === "string" ||
+          typeof specValue === "boolean"
+        ) {
+          result[specKey] = specValue;
+        } else if (Array.isArray(specValue) && specValue.every((item) => typeof item === "string")) {
+          result[specKey] = [...specValue];
+        }
+        return result;
+      },
+      {},
+    );
+  }
+  return next;
+}
+
 export function coerceWorkbenchMeta(value: unknown): WorkbenchMeta {
   const record = requireRecord(value, "Workbench meta");
   const defaults = requireRecord(record.defaults, "Workbench meta.defaults");
@@ -309,6 +336,7 @@ export function coercePlotContract(value: unknown): PlotContract {
     },
     size_presets: readSizePresetMap(record.size_presets ?? {}, "Plot contract.size_presets"),
     special_layouts: readSpecialLayoutMap(record.special_layouts ?? {}, "Plot contract.special_layouts"),
+    qa_profiles: readQaProfileMap(record.qa_profiles ?? {}, "Plot contract.qa_profiles"),
     styles: readLooseRecordMap(record.styles ?? {}, "Plot contract.styles"),
     palettes: readLooseRecordMap(record.palettes ?? {}, "Plot contract.palettes"),
     templates: readLooseRecordMap(record.templates ?? {}, "Plot contract.templates"),

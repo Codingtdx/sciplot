@@ -129,6 +129,7 @@ export const TEST_CONTRACT: PlotContract = {
       spectrum_height_mm: 92,
     },
   },
+  qa_profiles: {},
   styles: {},
   palettes: {},
   templates: {},

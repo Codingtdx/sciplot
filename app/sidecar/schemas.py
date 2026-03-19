@@ -355,6 +355,7 @@ class PlotContractResponse(StrictModel):
     axis_policy: AxisPolicyResponse
     size_presets: dict[str, SizePresetContractResponse]
     special_layouts: dict[str, dict[str, Any]]
+    qa_profiles: dict[str, dict[str, Any]]
     styles: dict[str, StyleContractResponse]
     palettes: dict[str, PaletteContractResponse]
     templates: dict[str, TemplateContractResponse]
@@ -405,9 +406,25 @@ class PreflightRenderResponse(StrictModel):
     preflight: PreflightResultResponse
 
 
+class QAIssueResponse(StrictModel):
+    id: str
+    severity: str
+    metric_value: float | str | None = None
+    target: float | str | None = None
+    message: str
+
+
+class QAReportResponse(StrictModel):
+    score: float
+    grade: Literal["excellent", "solid", "needs_cleanup"]
+    issues: list[QAIssueResponse] = Field(default_factory=list)
+    autofixes_applied: list[str] = Field(default_factory=list)
+
+
 class PreviewItemResponse(StrictModel):
     filename: str
     png_base64: str
+    qa: QAReportResponse | None = None
 
 
 class RenderPreviewResponse(StrictModel):
@@ -429,10 +446,18 @@ class PanelThumbnailResponse(StrictModel):
     png_base64: str
 
 
+class ComposerSuggestedPatchResponse(StrictModel):
+    kind: Literal["panel", "text"]
+    id: str
+    patch: dict[str, Any]
+
+
 class ComposerPreviewResponse(StrictModel):
     valid: bool
     validation_error: str | None
     png_base64: str
+    qa: QAReportResponse | None = None
+    suggested_project_patch: list[ComposerSuggestedPatchResponse] = Field(default_factory=list)
 
 
 class TensileMetricSummaryResponse(StrictModel):
@@ -555,6 +580,11 @@ def rendered_plots_to_preview_payload(rendered_plots: list[Any], *, dpi: int = 1
             PreviewItemResponse(
                 filename=rendered.filename,
                 png_base64=b64encode(buffer.getvalue()).decode("ascii"),
+                qa=(
+                    serialize_dataclass(rendered.qa_report)
+                    if getattr(rendered, "qa_report", None) is not None
+                    else None
+                ),
             )
         )
     return previews

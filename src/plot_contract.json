@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "defaults": {
     "style_preset": "default",
     "palette_preset": "colorblind_safe"
@@ -65,6 +65,74 @@
       "total_height_mm": 110.0,
       "structure_reserved_mm": 18.0,
       "spectrum_height_mm": 92.0
+    }
+  },
+  "qa_profiles": {
+    "alignment": {
+      "preserve_shared_axis_frame": true,
+      "single_panel_width_mm": 60.0,
+      "single_panel_height_mm": 55.0,
+      "double_panel_width_mm": 120.0
+    },
+    "curve": {
+      "small_panel_width_mm": 60.0,
+      "small_panel_height_mm": 55.0,
+      "direct_label_max_series": 4,
+      "legend_area_ratio_warn": 0.055,
+      "legend_area_ratio_fail": 0.07,
+      "dense_marker_point_threshold": 24,
+      "dense_markevery_min": 2,
+      "dense_markevery_max": 6,
+      "dense_marker_scale": 0.88,
+      "dense_tick_width_scale": 0.85,
+      "dense_tick_length_scale": 0.9,
+      "dense_line_width_scale": 0.96,
+      "stroke_hierarchy_target": 0.3,
+      "label_collision_margin_px": 3.0
+    },
+    "heatmap": {
+      "small_panel_width_mm": 60.0,
+      "small_panel_height_mm": 55.0,
+      "colorbar_x_offset_fraction": 0.29,
+      "colorbar_width_fraction": 0.56,
+      "colorbar_y_offset_fraction": 0.2,
+      "colorbar_height_fraction": 0.1,
+      "colorbar_tick_count": 4,
+      "label_gap_pt": 6.0,
+      "min_label_gap_px": 6.0,
+      "safe_sequential_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "bright",
+        "mono",
+        "okabe_ito",
+        "tol_muted",
+        "materials_warm"
+      ]
+    },
+    "stats": {
+      "min_bar_width": 0.28,
+      "max_bar_width": 0.42,
+      "min_spacing_scale": 1.0,
+      "max_spacing_scale": 1.18,
+      "raw_point_max_groups": 6,
+      "raw_point_max_replicates": 10,
+      "raw_point_size": 11.0,
+      "raw_point_alpha": 0.75,
+      "bar_width_ratio_warn": 0.34,
+      "bar_width_ratio_fail": 0.42,
+      "error_cap_ratio_target": 0.22
+    },
+    "stacked": {
+      "label_density_warn_per_axis": 5.0,
+      "reserve_tolerance_mm": 1.0
+    },
+    "composer": {
+      "min_text_size_pt": 6.0,
+      "text_overlap_margin_mm": 1.0,
+      "canvas_margin_mm": 0.5,
+      "binding_overflow_tolerance_mm": 0.25
     }
   },
   "styles": {

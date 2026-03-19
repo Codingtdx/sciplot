@@ -4,6 +4,7 @@ import type {
   ComposerPanel,
   ComposerProject,
   ComposerRegion,
+  ComposerSuggestedPatch,
   ComposerText,
 } from "./types";
 import { formatLeaf } from "./workbench";
@@ -137,6 +138,38 @@ export function normalizeComposerProject(project: ComposerProject): ComposerProj
     texts,
     auto_labels: project.auto_labels ?? true,
   };
+}
+
+export function applySuggestedComposerPatch(
+  project: ComposerProject,
+  patchOperations: ComposerSuggestedPatch[],
+): ComposerProject {
+  if (patchOperations.length === 0) {
+    return project;
+  }
+  const panelPatches = new Map(
+    patchOperations
+      .filter((item) => item.kind === "panel")
+      .map((item) => [item.id, item.patch]),
+  );
+  const textPatches = new Map(
+    patchOperations
+      .filter((item) => item.kind === "text")
+      .map((item) => [item.id, item.patch]),
+  );
+  return normalizeComposerProject({
+    ...project,
+    panels: project.panels.map((panel) =>
+      panelPatches.has(panel.id)
+        ? { ...panel, ...(panelPatches.get(panel.id) as Partial<ComposerPanel>) }
+        : panel,
+    ),
+    texts: project.texts.map((text) =>
+      textPatches.has(text.id)
+        ? { ...text, ...(textPatches.get(text.id) as Partial<ComposerText>) }
+        : text,
+    ),
+  });
 }
 
 export function regionRect(project: ComposerProject, region: ComposerRegion) {

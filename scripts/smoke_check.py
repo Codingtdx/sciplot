@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -62,6 +63,7 @@ from src.plotting import (
     plot_xrd,
 )
 from src.plotting_curves import _legend_candidates, _place_legend_candidate
+from src.rendering import close_rendered_plots, export_rendered_plots
 from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
 from src.tensile_replicates import export_tensile_replicate_workbook
 from src.text_normalization import normalize_label, normalize_unit
@@ -1561,6 +1563,7 @@ def _assert_legend_candidate_insets() -> None:
 def _assert_rendered_output_files(
     outputs_dir: Path,
     template_by_output: dict[str, str],
+    qa_by_output_key: dict[str, dict[str, object] | None],
 ) -> list[dict[str, object]]:
     pdf_paths = sorted(outputs_dir.rglob("*.pdf"))
     if not pdf_paths:
@@ -1599,6 +1602,9 @@ def _assert_rendered_output_files(
                     "output_path": str(pdf_path),
                     "output_filename": pdf_path.name,
                     "output_key": f"{template_by_output.get(str(pdf_path), pdf_path.parent.name)}/{pdf_path.name}",
+                    "qa": qa_by_output_key.get(
+                        f"{template_by_output.get(str(pdf_path), pdf_path.parent.name)}/{pdf_path.name}"
+                    ),
                     "page_count": int(doc.page_count),
                     "page_size_mm": {
                         "width": round(float(page.rect.width * 25.4 / 72.0), 3),
@@ -1622,6 +1628,45 @@ def _assert_rendered_output_files(
         finally:
             doc.close()
     return reports
+
+
+def _assert_editorial_policy_outputs(qa_by_output_key: dict[str, dict[str, object] | None]) -> None:
+    def _report_for(key: str) -> dict[str, object]:
+        payload = qa_by_output_key.get(key)
+        if payload is None:
+            raise AssertionError(f"Missing QA report for smoke output: {key}")
+        return payload
+
+    tensile_curve = _report_for("curve/tensile_curve.pdf")
+    tensile_autofixes = {str(item) for item in tensile_curve.get("autofixes_applied", [])}
+    if "direct_series_labels" not in tensile_autofixes:
+        raise AssertionError("Small tensile curve should prefer direct series labels when they fit cleanly.")
+    tensile_issue_ids = {str(item.get("id")) for item in tensile_curve.get("issues", []) if isinstance(item, dict)}
+    if "series_identification" in tensile_issue_ids:
+        raise AssertionError("Chosen tensile curve candidate should not lose series identification.")
+
+    heatmap_report = _report_for("heatmap/heatmap_heatmap.pdf")
+    heatmap_autofixes = {str(item) for item in heatmap_report.get("autofixes_applied", [])}
+    if "heatmap_colorbar_tuned" not in heatmap_autofixes:
+        raise AssertionError("Heatmap editorial policy should tune the top-strip colorbar layout.")
+    heatmap_issue_ids = {str(item.get("id")) for item in heatmap_report.get("issues", []) if isinstance(item, dict)}
+    if "colorbar_label_gap" in heatmap_issue_ids:
+        raise AssertionError("Heatmap top-strip label and colorbar should no longer be cramped.")
+
+    bar_report = _report_for("bar/tensile_modulus_bar.pdf")
+    bar_autofixes = {str(item) for item in bar_report.get("autofixes_applied", [])}
+    if "bar_raw_points_overlay" not in bar_autofixes:
+        raise AssertionError("Bar render should apply the editorial raw-point overlay.")
+    bar_issue_ids = {str(item.get("id")) for item in bar_report.get("issues", []) if isinstance(item, dict)}
+    if "raw_point_overlay" in bar_issue_ids:
+        raise AssertionError("Bar render should not report a missing raw-point overlay after autofix.")
+
+    wide_nmr_report = _report_for("segmented_stacked_curve/wide_nmr_segmented_stacked_curve.pdf")
+    wide_issue_ids = {str(item.get("id")) for item in wide_nmr_report.get("issues", []) if isinstance(item, dict)}
+    if "stacked_label_collision" in wide_issue_ids:
+        raise AssertionError("wide_nmr labels should remain non-overlapping after editorial review.")
+    if "wide_nmr_reserve" in wide_issue_ids:
+        raise AssertionError("wide_nmr reserve space should remain intact after editorial review.")
 
 
 def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:
@@ -1862,20 +1907,29 @@ def _run_smoke_workspace(base: Path) -> Path:
     ]
 
     template_by_output: dict[str, str] = {}
+    qa_by_output_key: dict[str, dict[str, object] | None] = {}
     for template, input_path, options in jobs:
-        rendered = render_template(template, input_path, outputs / template, **options)
-        for output in rendered:
-            if not output.exists():
-                raise FileNotFoundError(f"Expected output was not created: {output}")
-            template_by_output[str(output)] = template
-            print(output)
+        rendered_plots = build_rendered_plots(template, input_path, 0, **options)
+        try:
+            rendered_paths = export_rendered_plots(rendered_plots, outputs / template)
+            for rendered_plot, output in zip(rendered_plots, rendered_paths, strict=True):
+                if not output.exists():
+                    raise FileNotFoundError(f"Expected output was not created: {output}")
+                template_by_output[str(output)] = template
+                qa_by_output_key[f"{template}/{output.name}"] = (
+                    asdict(rendered_plot.qa_report) if rendered_plot.qa_report is not None else None
+                )
+                print(output)
+        finally:
+            close_rendered_plots(rendered_plots)
 
     preprocess_reports = _assert_tensile_preprocess_workflow(
         base=base,
         outputs_dir=outputs,
         template_by_output=template_by_output,
     )
-    output_reports = _assert_rendered_output_files(outputs, template_by_output)
+    output_reports = _assert_rendered_output_files(outputs, template_by_output, qa_by_output_key)
+    _assert_editorial_policy_outputs(qa_by_output_key)
     _assert_stacked_layout(plot_ftir, ftir_path)
     _assert_stacked_layout(plot_nmr, nmr_path)
     _assert_stacked_layout(plot_xrd, xrd_path)
