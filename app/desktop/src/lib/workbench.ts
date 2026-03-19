@@ -190,6 +190,13 @@ export function paletteLabel(meta: WorkbenchMeta | null, palette: PalettePreset 
   return meta.palettes.find((item) => item.id === palette)?.label ?? palette;
 }
 
+export function styleLabel(meta: WorkbenchMeta | null, style: string | null | undefined) {
+  if (!meta || !style) {
+    return style ?? "-";
+  }
+  return meta.styles.find((item) => item.id === style)?.label ?? style;
+}
+
 export function templateChoices(meta: WorkbenchMeta | null) {
   return meta?.templates ?? [];
 }
@@ -281,6 +288,17 @@ export function publicPaletteChoices(meta: WorkbenchMeta | null, template: Templ
   );
 }
 
+export function publicStyleChoices(meta: WorkbenchMeta | null, template: TemplateName | null | undefined) {
+  const currentTemplate = templateMeta(meta, template);
+  if (!currentTemplate || !meta) {
+    return [] as WorkbenchMeta["styles"];
+  }
+  return meta.styles.filter(
+    (item) =>
+      item.public && currentTemplate.available_styles.includes(item.id),
+  );
+}
+
 export function orderPanels(panels: ComposerPanel[]) {
   return [...panels].sort((a, b) => {
     if (a.z_index !== b.z_index) {
@@ -288,4 +306,71 @@ export function orderPanels(panels: ComposerPanel[]) {
     }
     return a.id.localeCompare(b.id);
   });
+}
+
+type WizardSessionSnapshot = {
+  inputPath: string;
+  inspection: unknown | null;
+  template: string | null | undefined;
+  outputs: readonly string[];
+  exportResult?: { output_dir?: string | null } | null;
+};
+
+type ComposerSessionSnapshot = {
+  regions: readonly unknown[];
+  panels: readonly unknown[];
+  texts: readonly unknown[];
+};
+
+function confirmSessionReplacement(message: string) {
+  if (typeof window === "undefined" || typeof window.confirm !== "function") {
+    return true;
+  }
+  return window.confirm(message);
+}
+
+export function hasWizardSessionContent(session: WizardSessionSnapshot) {
+  return Boolean(
+    session.inputPath ||
+      session.inspection ||
+      session.template ||
+      session.outputs.length > 0 ||
+      session.exportResult?.output_dir,
+  );
+}
+
+export function hasComposerSessionContent(project: ComposerSessionSnapshot) {
+  return (
+    project.regions.length > 0 ||
+    project.panels.length > 0 ||
+    project.texts.length > 0
+  );
+}
+
+export function confirmReplaceWizardSession(
+  session: WizardSessionSnapshot,
+  nextLabel: string,
+  nextPath?: string,
+) {
+  if (!hasWizardSessionContent(session)) {
+    return true;
+  }
+  if (nextPath && session.inputPath && nextPath === session.inputPath) {
+    return true;
+  }
+  return confirmSessionReplacement(
+    `Opening ${nextLabel} will replace the current Plot Builder session. Save the current project first if you need to keep it. Continue?`,
+  );
+}
+
+export function confirmReplaceComposerSession(
+  project: ComposerSessionSnapshot,
+  nextLabel: string,
+) {
+  if (!hasComposerSessionContent(project)) {
+    return true;
+  }
+  return confirmSessionReplacement(
+    `Opening ${nextLabel} will replace the current Composer layout. Save the current project first if you need to keep it. Continue?`,
+  );
 }

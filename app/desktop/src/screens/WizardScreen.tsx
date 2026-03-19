@@ -3,18 +3,20 @@ import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
 import { StepFlow } from "../components/StepFlow";
-import { exportRender, inspectFile } from "../lib/api";
+import { exportRender, inspectFile, openPath } from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import { openDialog } from "../lib/tauri-dialog";
 import type { TemplateName, WorkbenchMeta } from "../lib/types";
 import {
   compatibleTemplateChoices,
+  confirmReplaceWizardSession,
   formatLeaf,
   getErrorMessage,
   incompatibleTemplateChoices,
   isTensileCurveModel,
   publicPaletteChoices,
+  publicStyleChoices,
   sizeChoices,
   templateLabel,
   toDialogPaths,
@@ -49,6 +51,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       inspection: state.inspection,
       options: state.options,
       outputs: state.outputs,
+      exportResult: state.exportResult,
       preflight: state.preflight,
       previewIndex: state.previewIndex,
       previews: state.previews,
@@ -59,17 +62,20 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       setInspection: state.setInspection,
       setOptions: state.setOptions,
       setOutputs: state.setOutputs,
+      setExportResult: state.setExportResult,
       setPreflight: state.setPreflight,
       setPreviewIndex: state.setPreviewIndex,
       setPreviews: state.setPreviews,
       setSheet: state.setSheet,
       setSheetNames: state.setSheetNames,
       setStep: state.setStep,
+      setSubmissionReport: state.setSubmissionReport,
       setTemplate: state.setTemplate,
       sheet: state.sheet,
       sheetNames: state.sheetNames,
       sidecarReady: state.sidecarReady,
       step: state.step,
+      submissionReport: state.submissionReport,
       template: state.template,
     })),
   );
@@ -79,6 +85,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const recommendation = wizard.inspection?.recommendation ?? null;
   const tensileCurveMode = isTensileCurveModel(wizard.inspection?.model);
   const sizeOptions = sizeChoices(meta, wizard.template);
+  const styleOptions = publicStyleChoices(meta, wizard.template);
   const paletteOptions = publicPaletteChoices(meta, wizard.template);
   const currentTemplate = useMemo(
     () => wizardTemplateMeta(meta, wizard.template),
@@ -104,6 +111,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const invalidateRenderState = () => {
     wizard.setPreflight(null);
     wizard.setOutputs([]);
+    wizard.setExportResult(null);
+    wizard.setSubmissionReport(null);
   };
 
   const showDialogError = (error: unknown) => {
@@ -177,7 +186,11 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     setShowAllTemplates(false);
   }, [wizard.inputPath, wizard.inspection?.model]);
 
-  const { busy: previewBusy, error: previewError } = useWizardPreview({
+  const {
+    busy: previewBusy,
+    error: previewError,
+    activity: previewActivity,
+  } = useWizardPreview({
     inputPath: wizard.inputPath,
     sheet: wizard.sheet,
     template: wizard.template,
@@ -185,12 +198,17 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     onPreviews: wizard.setPreviews,
   });
 
-  const { busy: preflightBusy, error: preflightRequestError } = useWizardPreflight({
+  const {
+    busy: preflightBusy,
+    error: preflightRequestError,
+    activity: preflightActivity,
+  } = useWizardPreflight({
     inputPath: wizard.inputPath,
     sheet: wizard.sheet,
     template: wizard.template,
     options: wizard.options,
     onPreflight: wizard.setPreflight,
+    onSubmissionReport: wizard.setSubmissionReport,
   });
 
   const blockingErrors = wizard.preflight?.errors ?? [];
@@ -236,6 +254,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         busy: wizard.busy,
         previewBusy,
         preflightBusy,
+        previewActivity,
+        preflightActivity,
         hasBlockingErrors,
         outputsCount: wizard.outputs.length,
         preflightReady: wizard.preflight != null,
@@ -244,7 +264,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     [
       hasBlockingErrors,
       preflightBusy,
+      preflightActivity,
       previewBusy,
+      previewActivity,
       wizard.busy,
       wizard.inputPath,
       wizard.inspection,
@@ -274,6 +296,21 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       return;
     }
     if (!path) {
+      return;
+    }
+    if (
+      !confirmReplaceWizardSession(
+        {
+          inputPath: wizard.inputPath,
+          inspection: wizard.inspection,
+          template: wizard.template,
+          outputs: wizard.outputs,
+          exportResult: wizard.exportResult,
+        },
+        formatLeaf(path),
+        path,
+      )
+    ) {
       return;
     }
 
@@ -327,11 +364,26 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         wizard.options,
       );
       wizard.setOutputs(response.outputs);
+      wizard.setExportResult(response);
+      wizard.setSubmissionReport(response.submission_report ?? wizard.submissionReport);
       wizard.setStep("export");
     } catch (error) {
       wizard.setError(getErrorMessage(error));
     } finally {
       wizard.setBusy(false);
+    }
+  };
+
+  const openOutputFolder = async () => {
+    const target = wizard.exportResult?.output_dir;
+    if (!target) {
+      return;
+    }
+    wizard.setError(null);
+    try {
+      await openPath(target);
+    } catch (error) {
+      wizard.setError(getErrorMessage(error));
     }
   };
 
@@ -419,6 +471,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
               options={wizard.options}
               paletteOptions={paletteOptions}
               sizeOptions={sizeOptions}
+              styleOptions={styleOptions}
               template={wizard.template}
               tensileCurveMode={tensileCurveMode}
             />
@@ -426,12 +479,17 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
             <WizardExportSection
               blockingErrors={blockingErrors}
               canExport={canExport}
+              exportResult={wizard.exportResult}
               hasExportedOutputs={wizard.outputs.length > 0}
               onExport={() => void runExport()}
+              onOpenOutputDir={() => void openOutputFolder()}
               outputItems={expectedOutputs}
               preflight={wizard.preflight}
+              preflightActivity={preflightActivity}
               preflightBusy={preflightBusy}
               preflightRequestError={preflightRequestError}
+              previewActivity={previewActivity}
+              submissionReport={wizard.submissionReport}
             />
           </div>
 
@@ -452,10 +510,14 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
               meta={meta}
               outputsCount={wizard.outputs.length}
               preflightRequestError={preflightRequestError}
+              preflightActivity={preflightActivity}
               preflightWarningsCount={wizard.preflight?.warnings.length ?? 0}
+              previewActivity={previewActivity}
               previewsCount={wizard.previews.length}
               sheet={wizard.sheet}
               statusChip={statusChip}
+              stylePreset={wizard.options.style_preset ?? meta?.default_style ?? null}
+              submissionReport={wizard.submissionReport}
               template={wizard.template}
             />
           </aside>

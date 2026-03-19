@@ -64,6 +64,22 @@ class HeatmapEditorialLayout:
     label_gap_pt: float
 
 
+@dataclass(frozen=True)
+class CompactCurveEditorialProfile:
+    direct_label_inset_fraction: float
+    direct_label_offset_pt: float
+    direct_label_search_band_fraction: float
+    tick_width_scale: float
+    tick_length_scale: float
+    legend_max_series: int
+    legend_columns: int
+    legend_font_scale: float
+    legend_handlelength: float
+    legend_handletextpad: float
+    legend_columnspacing: float
+    legend_borderpad: float
+
+
 def _rendered_plot_with_qa(
     *,
     filename: str,
@@ -94,6 +110,37 @@ def _prefer_direct_labels(options: RenderOptions, series_count: int) -> bool:
     )
 
 
+def _compact_curve_editorial_profile() -> CompactCurveEditorialProfile:
+    profile = qa_profile("curve")
+    return CompactCurveEditorialProfile(
+        direct_label_inset_fraction=float(profile.get("compact_direct_label_inset_fraction", 0.04)),
+        direct_label_offset_pt=float(profile.get("compact_direct_label_offset_pt", 4.0)),
+        direct_label_search_band_fraction=float(profile.get("compact_direct_label_search_band_fraction", 0.12)),
+        tick_width_scale=float(profile.get("compact_tick_width_scale", 0.82)),
+        tick_length_scale=float(profile.get("compact_tick_length_scale", 0.88)),
+        legend_max_series=int(profile.get("compact_legend_max_series", 3)),
+        legend_columns=int(profile.get("compact_legend_columns", 2)),
+        legend_font_scale=float(profile.get("compact_legend_font_scale", 0.92)),
+        legend_handlelength=float(profile.get("compact_legend_handlelength", 1.35)),
+        legend_handletextpad=float(profile.get("compact_legend_handletextpad", 0.35)),
+        legend_columnspacing=float(profile.get("compact_legend_columnspacing", 0.8)),
+        legend_borderpad=float(profile.get("compact_legend_borderpad", 0.15)),
+    )
+
+
+def _is_compact_curve_panel(options: RenderOptions) -> bool:
+    profile = qa_profile("curve")
+    return bool(
+        np.isclose(options.width_mm, float(profile.get("small_panel_width_mm", options.width_mm)), atol=0.05)
+        and np.isclose(options.height_mm, float(profile.get("small_panel_height_mm", options.height_mm)), atol=0.05)
+    )
+
+
+def _prefer_compact_legend(options: RenderOptions, series_count: int) -> bool:
+    profile = _compact_curve_editorial_profile()
+    return _is_compact_curve_panel(options) and 1 < series_count <= profile.legend_max_series
+
+
 def _float_plot_kw(base_kwargs: dict[str, object], key: str, default: float) -> float:
     value = base_kwargs.get(key)
     return float(value) if isinstance(value, (int, float)) else default
@@ -113,6 +160,45 @@ def _curve_dense_fix(
     )
 
 
+def _compact_curve_fix(options: RenderOptions) -> CurveAutofix:
+    if not _is_compact_curve_panel(options):
+        return CurveAutofix()
+    profile = _compact_curve_editorial_profile()
+    return CurveAutofix(
+        tick_width_scale=profile.tick_width_scale,
+        tick_length_scale=profile.tick_length_scale,
+        autofixes_applied=("compact_tick_hierarchy",),
+    )
+
+
+def _merge_curve_fixes(*fixes: CurveAutofix) -> CurveAutofix:
+    marker_every = None
+    marker_size_scale = 1.0
+    tick_width_scale = 1.0
+    tick_length_scale = 1.0
+    line_width_scale = 1.0
+    collection_size_scale = 1.0
+    autofixes: list[str] = []
+    for fix in fixes:
+        if fix.marker_every is not None:
+            marker_every = max(marker_every or fix.marker_every, fix.marker_every)
+        marker_size_scale *= fix.marker_size_scale
+        tick_width_scale *= fix.tick_width_scale
+        tick_length_scale *= fix.tick_length_scale
+        line_width_scale *= fix.line_width_scale
+        collection_size_scale *= fix.collection_size_scale
+        autofixes.extend(fix.autofixes_applied)
+    return CurveAutofix(
+        marker_every=marker_every,
+        marker_size_scale=marker_size_scale,
+        tick_width_scale=tick_width_scale,
+        tick_length_scale=tick_length_scale,
+        line_width_scale=line_width_scale,
+        collection_size_scale=collection_size_scale,
+        autofixes_applied=tuple(dict.fromkeys(autofixes)),
+    )
+
+
 def _post_curve_fix(dense_fix: CurveAutofix, *, include_line_scale: bool) -> CurveAutofix:
     return CurveAutofix(
         tick_width_scale=dense_fix.tick_width_scale,
@@ -128,12 +214,287 @@ def _curve_candidate_key(candidate: tuple[RenderedPlot, str]) -> tuple[float, in
     qa = rendered.qa_report
     if qa is None:
         return (0.0, 0, 0)
-    unsafe_issue_ids = {"series_identification", "label_out_of_bounds"}
+    unsafe_issue_ids = {"series_identification", "label_out_of_bounds", "label_collision"}
     if any(issue.id in unsafe_issue_ids for issue in qa.issues):
         return (-1.0, -999, 0)
     critical_count = sum(1 for issue in qa.issues if issue.severity == "critical")
-    direct_bonus = 1 if strategy.startswith("direct") else 0
+    direct_bonus = 2 if strategy.startswith("direct") else 1 if strategy == "compact_legend" else 0
     return (qa.score, -critical_count, direct_bonus)
+
+
+def _resolve_visual_edge_target(
+    x_values: np.ndarray,
+    *,
+    reverse_x: bool,
+    side: str,
+    inset_fraction: float,
+) -> float:
+    x_min = float(np.min(x_values))
+    x_max = float(np.max(x_values))
+    span = x_max - x_min
+    if np.isclose(span, 0.0):
+        return x_min
+    if side == "left":
+        return x_max - span * inset_fraction if reverse_x else x_min + span * inset_fraction
+    return x_min + span * inset_fraction if reverse_x else x_max - span * inset_fraction
+
+
+def _display_point_offset(fig: plt.Figure, value_pt: float) -> float:
+    return max(value_pt, 0.0) * fig.dpi / 72.0
+
+
+def _measure_label_bbox(
+    ax: plt.Axes,
+    renderer,
+    *,
+    label_text: str,
+    color: object,
+    fontsize: float,
+    horizontal_alignment: str,
+) -> tuple[float, float]:
+    probe = ax.text(
+        0.5,
+        0.5,
+        label_text,
+        fontsize=fontsize,
+        color=color,
+        ha=horizontal_alignment,
+        va="center",
+        alpha=0.0,
+        transform=ax.transAxes,
+    )
+    bbox = probe.get_window_extent(renderer=renderer)
+    probe.remove()
+    return float(bbox.width), float(bbox.height)
+
+
+def _spread_label_centers(
+    desired: np.ndarray,
+    heights: np.ndarray,
+    *,
+    lower: float,
+    upper: float,
+    gap_px: float,
+) -> np.ndarray | None:
+    if desired.size == 0:
+        return np.array([], dtype=float)
+    order = np.argsort(desired)
+    ordered_desired = desired[order]
+    ordered_heights = heights[order]
+    centers = ordered_desired.copy()
+    lower_bounds = lower + ordered_heights / 2.0
+    upper_bounds = upper - ordered_heights / 2.0
+    centers[0] = np.clip(centers[0], lower_bounds[0], upper_bounds[0])
+    for idx in range(1, len(centers)):
+        required_gap = max(gap_px, (ordered_heights[idx - 1] + ordered_heights[idx]) / 2.0 + 1.0)
+        centers[idx] = max(np.clip(centers[idx], lower_bounds[idx], upper_bounds[idx]), centers[idx - 1] + required_gap)
+    overflow = max(centers[-1] - upper_bounds[-1], 0.0)
+    if overflow > 0:
+        centers -= overflow
+    for idx in range(len(centers) - 2, -1, -1):
+        required_gap = max(gap_px, (ordered_heights[idx] + ordered_heights[idx + 1]) / 2.0 + 1.0)
+        centers[idx] = min(centers[idx], centers[idx + 1] - required_gap)
+    underflow = max(lower_bounds[0] - centers[0], 0.0)
+    if underflow > 0:
+        centers += underflow
+    for idx in range(1, len(centers)):
+        required_gap = max(gap_px, (ordered_heights[idx - 1] + ordered_heights[idx]) / 2.0 + 1.0)
+        centers[idx] = max(centers[idx], centers[idx - 1] + required_gap)
+    if np.any(centers < lower_bounds - 1e-6) or np.any(centers > upper_bounds + 1e-6):
+        return None
+    result = np.empty_like(centers)
+    result[order] = centers
+    return result
+
+
+def _series_display_colors(ax: plt.Axes, series_count: int) -> list[object]:
+    if len(ax.lines) >= series_count:
+        return [line.get_color() for line in ax.lines[:series_count]]
+    if len(ax.collections) >= series_count:
+        colors: list[object] = []
+        for collection in ax.collections[:series_count]:
+            facecolors = collection.get_facecolors()
+            colors.append(tuple(facecolors[0]) if len(facecolors) else "black")
+        return colors
+    return list(plot_style.get_categorical_palette(n_colors=series_count))
+
+
+def _place_endpoint_direct_labels(
+    ax: plt.Axes,
+    series_list,
+    *,
+    reverse_x: bool,
+    side: str,
+    inset_fraction: float,
+    label_offset_pt: float,
+    fontsize: float,
+) -> bool:
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    axes_bbox = ax.get_window_extent(renderer=renderer)
+    colors = _series_display_colors(ax, len(series_list))
+    offset_px = _display_point_offset(fig, max(label_offset_pt, 3.5))
+    gap_px = _display_point_offset(fig, 2.6)
+    margin_px = 1.5
+
+    desired_y: list[float] = []
+    widths: list[float] = []
+    heights: list[float] = []
+    anchor_x: list[float] = []
+    labels: list[str] = []
+    text_colors: list[object] = []
+
+    alignment = "right" if side == "left" else "left"
+
+    for series, color in zip(series_list, colors, strict=True):
+        x = series.data["x"].to_numpy(dtype=float)
+        y = series.data["y"].to_numpy(dtype=float)
+        valid = np.isfinite(x) & np.isfinite(y)
+        x = x[valid]
+        y = y[valid]
+        if len(x) < 2:
+            return False
+        order = np.argsort(x)
+        x = x[order]
+        y = y[order]
+        target_x = _resolve_visual_edge_target(x, reverse_x=reverse_x, side=side, inset_fraction=inset_fraction)
+        target_y = float(np.interp(target_x, x, y))
+        curve_px = ax.transData.transform((target_x, target_y))
+        label_text = str(series.sample)
+        width_px, height_px = _measure_label_bbox(
+            ax,
+            renderer,
+            label_text=label_text,
+            color=color,
+            fontsize=fontsize,
+            horizontal_alignment=alignment,
+        )
+        if width_px > axes_bbox.width - 2.0 * margin_px:
+            return False
+        if side == "left":
+            anchor = min(curve_px[0] - offset_px, axes_bbox.x1 - margin_px)
+            anchor = max(anchor, axes_bbox.x0 + width_px + margin_px)
+            if anchor - width_px < axes_bbox.x0 + margin_px - 1e-6:
+                return False
+        else:
+            anchor = max(curve_px[0] + offset_px, axes_bbox.x0 + margin_px)
+            anchor = min(anchor, axes_bbox.x1 - width_px - margin_px)
+            if anchor + width_px > axes_bbox.x1 - margin_px + 1e-6:
+                return False
+        desired_y.append(float(curve_px[1]))
+        widths.append(width_px)
+        heights.append(height_px)
+        anchor_x.append(float(anchor))
+        labels.append(label_text)
+        text_colors.append(color)
+
+    centers = _spread_label_centers(
+        np.asarray(desired_y, dtype=float),
+        np.asarray(heights, dtype=float),
+        lower=float(axes_bbox.y0 + margin_px),
+        upper=float(axes_bbox.y1 - margin_px),
+        gap_px=gap_px,
+    )
+    if centers is None:
+        return False
+
+    inverse = ax.transData.inverted()
+    for x_px, y_px, label_text, color in zip(anchor_x, centers, labels, text_colors, strict=True):
+        data_x, data_y = inverse.transform((x_px, y_px))
+        ax.text(
+            float(data_x),
+            float(data_y),
+            label_text,
+            ha=alignment,
+            va="center",
+            color=color,
+            fontsize=fontsize,
+            clip_on=True,
+            zorder=4.5,
+        )
+    return True
+
+
+def _ensure_direct_labels(
+    ax: plt.Axes,
+    series_list,
+    *,
+    options: RenderOptions,
+    reverse_x: bool,
+    side: str,
+    fontsize: float = 6.0,
+) -> bool:
+    existing = [text for text in ax.texts if text.get_visible() and str(text.get_text()).strip()]
+    if len(existing) == len(series_list):
+        return True
+    for text in tuple(ax.texts):
+        text.remove()
+    profile = _compact_curve_editorial_profile()
+    colors = _series_display_colors(ax, len(series_list))
+    if _place_series_edge_labels(
+        ax,
+        series_list,
+        colors,
+        reverse_x=reverse_x,
+        side=side,
+        inset_fraction=profile.direct_label_inset_fraction,
+        label_offset_pt=profile.direct_label_offset_pt,
+        search_band_fraction=profile.direct_label_search_band_fraction,
+        fontsize=fontsize,
+    ):
+        return True
+    if not _is_compact_curve_panel(options):
+        return False
+    return _place_endpoint_direct_labels(
+        ax,
+        series_list,
+        reverse_x=reverse_x,
+        side=side,
+        inset_fraction=profile.direct_label_inset_fraction,
+        label_offset_pt=profile.direct_label_offset_pt,
+        fontsize=fontsize,
+    )
+
+
+def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
+    if series_count < 2:
+        return False
+    handles, labels = ax.get_legend_handles_labels()
+    visible_labels = [label for label in labels if not str(label).startswith("_")]
+    if len(visible_labels) < 2:
+        return False
+    profile = _compact_curve_editorial_profile()
+    inset = plot_style.current_spacing().legend_inset_fraction
+    legend = ax.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.0 - inset),
+        bbox_transform=ax.transAxes,
+        borderaxespad=0.0,
+        frameon=False,
+        ncol=min(profile.legend_columns, len(visible_labels)),
+        fontsize=plot_style.current_typography().legend_font_size_pt * profile.legend_font_scale,
+        handlelength=profile.legend_handlelength,
+        handletextpad=profile.legend_handletextpad,
+        columnspacing=profile.legend_columnspacing,
+        labelspacing=0.25,
+        borderpad=profile.legend_borderpad,
+    )
+    ax.figure.canvas.draw()
+    renderer = ax.figure.canvas.get_renderer()
+    axes_bbox = ax.get_window_extent(renderer=renderer)
+    legend_bbox = legend.get_window_extent(renderer=renderer)
+    if (
+        legend_bbox.x0 < axes_bbox.x0
+        or legend_bbox.x1 > axes_bbox.x1
+        or legend_bbox.y0 < axes_bbox.y0
+        or legend_bbox.y1 > axes_bbox.y1
+    ):
+        legend.remove()
+        return False
+    return True
 
 
 def _render_curve_candidate(
@@ -145,13 +506,26 @@ def _render_curve_candidate(
     show_markers: bool,
     scatter: bool,
     direct_label_side: str | None,
+    legend_variant: str,
     base_kwargs: dict[str, object],
 ) -> tuple[RenderedPlot, str]:
-    dense_fix = _curve_dense_fix(series_list, show_markers=show_markers, scatter=scatter)
-    strategy = "legend" if direct_label_side is None else f"direct_{direct_label_side}"
-    autofixes = list(dense_fix.autofixes_applied)
+    combined_fix = _merge_curve_fixes(
+        _curve_dense_fix(series_list, show_markers=show_markers, scatter=scatter),
+        _compact_curve_fix(options),
+    )
+    compact_legend = legend_variant == "compact"
+    strategy = (
+        "compact_legend"
+        if compact_legend
+        else "legend"
+        if direct_label_side is None
+        else f"direct_{direct_label_side}"
+    )
+    autofixes = list(combined_fix.autofixes_applied)
     if direct_label_side is not None:
         autofixes.append("direct_series_labels")
+    if compact_legend:
+        autofixes.append("compact_inside_legend")
 
     if scatter:
         fig, ax = plot_scatter(
@@ -162,32 +536,34 @@ def _render_curve_candidate(
             width_mm=options.width_mm,
             height_mm=options.height_mm,
             reverse_x=options.reverse_x,
-            legend_mode="none" if direct_label_side is not None else "inside_best",
+            legend_mode="none" if direct_label_side is not None or compact_legend else "inside_best",
             legend_expand_axes=str(base_kwargs.get("legend_expand_axes", "xy")),
-            marker_size=14.0 * (dense_fix.collection_size_scale if dense_fix.collection_size_scale != 1.0 else 1.0),
+            marker_size=14.0
+            * (combined_fix.collection_size_scale if combined_fix.collection_size_scale != 1.0 else 1.0),
             visible_xticks=base_kwargs.get("visible_xticks"),
             xlim=base_kwargs.get("xlim"),
-            y_padding_top=_float_plot_kw(base_kwargs, "y_padding_top", 0.12),
+            y_padding_top=(
+                _float_plot_kw(base_kwargs, "y_padding_top", 0.12) + 0.04
+                if compact_legend
+                else _float_plot_kw(base_kwargs, "y_padding_top", 0.12)
+            ),
             y_padding_bottom=_float_plot_kw(base_kwargs, "y_padding_bottom", 0.06),
         )
         if direct_label_side is not None and len(series_list) > 1:
-            palette = plot_style.get_categorical_palette(n_colors=len(series_list))
-            _place_series_edge_labels(
+            _ensure_direct_labels(
                 ax,
                 series_list,
-                palette,
+                options=options,
                 reverse_x=options.reverse_x,
                 side=direct_label_side,
-                inset_fraction=0.06,
-                label_offset_pt=5.0,
-                search_band_fraction=0.08,
-                fontsize=6.0,
             )
-        applied = apply_curve_autofix(ax, _post_curve_fix(dense_fix, include_line_scale=False))
+        elif compact_legend:
+            _apply_compact_inside_legend(ax, series_count=len(series_list))
+        applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=False))
     else:
         marker_size = None
         if show_markers:
-            marker_size = plot_style.current_stroke().marker_size_pt * dense_fix.marker_size_scale
+            marker_size = plot_style.current_stroke().marker_size_pt * combined_fix.marker_size_scale
         fig, ax = plot_curves(
             series_list,
             show_markers=show_markers,
@@ -197,9 +573,13 @@ def _render_curve_candidate(
             width_mm=options.width_mm,
             height_mm=options.height_mm,
             reverse_x=options.reverse_x,
-            marker_every=dense_fix.marker_every if show_markers else None,
+            marker_every=combined_fix.marker_every if show_markers else None,
             marker_size=marker_size,
-            legend_mode="none" if direct_label_side is not None else str(base_kwargs.get("legend_mode", "inside_best")),
+            legend_mode=(
+                "none"
+                if direct_label_side is not None or compact_legend
+                else str(base_kwargs.get("legend_mode", "inside_best"))
+            ),
             legend_expand_axes=str(base_kwargs.get("legend_expand_axes", "xy")),
             series_label_mode=(
                 "edge"
@@ -209,10 +589,24 @@ def _render_curve_candidate(
             series_label_side=direct_label_side or str(base_kwargs.get("series_label_side", "auto")),
             visible_xticks=base_kwargs.get("visible_xticks"),
             xlim=base_kwargs.get("xlim"),
-            y_padding_top=_float_plot_kw(base_kwargs, "y_padding_top", 0.18),
+            y_padding_top=(
+                _float_plot_kw(base_kwargs, "y_padding_top", 0.18) + 0.04
+                if compact_legend
+                else _float_plot_kw(base_kwargs, "y_padding_top", 0.18)
+            ),
             y_padding_bottom=_float_plot_kw(base_kwargs, "y_padding_bottom", 0.06),
         )
-        applied = apply_curve_autofix(ax, _post_curve_fix(dense_fix, include_line_scale=show_markers))
+        if direct_label_side is not None and len(series_list) > 1:
+            _ensure_direct_labels(
+                ax,
+                series_list,
+                options=options,
+                reverse_x=options.reverse_x,
+                side=direct_label_side,
+            )
+        elif compact_legend:
+            _apply_compact_inside_legend(ax, series_count=len(series_list))
+        applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=show_markers))
 
     rendered = _rendered_plot_with_qa(
         filename=filename,
@@ -244,9 +638,24 @@ def _render_curve_like_plot(
             show_markers=show_markers,
             scatter=scatter,
             direct_label_side=None,
+            legend_variant="standard",
             base_kwargs=resolved_kwargs,
         )
     ]
+    if _prefer_compact_legend(options, len(series_list)):
+        candidates.append(
+            _render_curve_candidate(
+                filename=filename,
+                template=template,
+                series_list=series_list,
+                options=options,
+                show_markers=show_markers,
+                scatter=scatter,
+                direct_label_side=None,
+                legend_variant="compact",
+                base_kwargs=resolved_kwargs,
+            )
+        )
     if _prefer_direct_labels(options, len(series_list)) and len(series_list) > 1:
         for side in ("left", "right"):
             candidates.append(
@@ -258,6 +667,7 @@ def _render_curve_like_plot(
                     show_markers=show_markers,
                     scatter=scatter,
                     direct_label_side=side,
+                    legend_variant="standard",
                     base_kwargs=resolved_kwargs,
                 )
             )

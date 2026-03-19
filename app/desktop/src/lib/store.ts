@@ -14,6 +14,7 @@ import type {
   PreviewItem,
   RecentProjectEntry,
   RenderOptionsPayload,
+  SubmissionReport,
   TensileComparisonExportResponse,
   TensileComparisonSource,
   TensileReplicateResponse,
@@ -21,6 +22,7 @@ import type {
   WizardStep,
   WorkbenchScreen,
   WorkbenchSettings,
+  ExportResponse,
 } from "./types";
 import { EMPTY_COMPOSER_PROJECT, normalizeComposerProject } from "./composer";
 import {
@@ -40,6 +42,8 @@ type WizardState = {
   previews: PreviewItem[];
   previewIndex: number;
   outputs: string[];
+  exportResult: ExportResponse | null;
+  submissionReport: SubmissionReport | null;
   step: WizardStep;
   sidecarReady: boolean;
   busy: boolean;
@@ -55,6 +59,8 @@ type WizardState = {
   setPreviews(value: PreviewItem[]): void;
   setPreviewIndex(value: number): void;
   setOutputs(value: string[]): void;
+  setExportResult(value: ExportResponse | null): void;
+  setSubmissionReport(value: SubmissionReport | null): void;
   setStep(value: WizardStep): void;
   setBusy(value: boolean): void;
   setError(value: string | null): void;
@@ -79,6 +85,7 @@ type ComposerState = {
   previewPng: string | null;
   validationError: string | null;
   previewQa: QAReport | null;
+  submissionReport: SubmissionReport | null;
   suggestedProjectPatch: ComposerSuggestedPatch[];
   selectedId: string | null;
   palettePreset: PalettePreset;
@@ -89,6 +96,7 @@ type ComposerState = {
     png: string | null,
     validationError: string | null,
     qa?: QAReport | null,
+    submissionReport?: SubmissionReport | null,
     suggestedProjectPatch?: ComposerSuggestedPatch[],
   ): void;
   setSelectedId(value: string | null): void;
@@ -139,6 +147,8 @@ export const useWizardStore = create<WizardState>()(
       previews: [],
       previewIndex: 0,
       outputs: [],
+      exportResult: null,
+      submissionReport: null,
       step: "file",
       sidecarReady: false,
       busy: false,
@@ -154,6 +164,8 @@ export const useWizardStore = create<WizardState>()(
       setPreviews: (value) => set({ previews: value, previewIndex: 0 }),
       setPreviewIndex: (value) => set({ previewIndex: value }),
       setOutputs: (value) => set({ outputs: value }),
+      setExportResult: (value) => set({ exportResult: value }),
+      setSubmissionReport: (value) => set({ submissionReport: value }),
       setStep: (value) => set({ step: value }),
       setBusy: (value) => set({ busy: value }),
       setError: (value) => set({ error: value }),
@@ -169,6 +181,8 @@ export const useWizardStore = create<WizardState>()(
           previews: [],
           previewIndex: 0,
           outputs: [],
+          exportResult: null,
+          submissionReport: null,
           step: "file",
           busy: false,
           error: null,
@@ -186,6 +200,8 @@ export const useWizardStore = create<WizardState>()(
         options: state.options,
         preflight: state.preflight,
         outputs: state.outputs,
+        exportResult: state.exportResult,
+        submissionReport: state.submissionReport,
         step: state.step,
       }),
     },
@@ -252,14 +268,15 @@ export const useComposerStore = create<ComposerState>()(
       previewPng: null,
       validationError: null,
       previewQa: null,
+      submissionReport: null,
       suggestedProjectPatch: [],
       selectedId: null,
       palettePreset: "colorblind_safe",
       setProject: (project) => set({ project }),
       updatePanels: (panels) => set((state) => ({ project: { ...state.project, panels } })),
       updateTexts: (texts) => set((state) => ({ project: { ...state.project, texts } })),
-      setPreview: (png, validationError, previewQa = null, suggestedProjectPatch = []) =>
-        set({ previewPng: png, validationError, previewQa, suggestedProjectPatch }),
+      setPreview: (png, validationError, previewQa = null, submissionReport = null, suggestedProjectPatch = []) =>
+        set({ previewPng: png, validationError, previewQa, submissionReport, suggestedProjectPatch }),
       setSelectedId: (value) => set({ selectedId: value }),
       setPalettePreset: (value) => set({ palettePreset: value }),
       reset: () =>
@@ -268,6 +285,7 @@ export const useComposerStore = create<ComposerState>()(
           previewPng: null,
           validationError: null,
           previewQa: null,
+          submissionReport: null,
           suggestedProjectPatch: [],
           selectedId: null,
           palettePreset: "colorblind_safe",

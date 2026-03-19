@@ -48,10 +48,35 @@ class QAReport:
 
 
 @dataclass(frozen=True)
+class SubmissionCheck:
+    id: str
+    status: str
+    message: str
+    metric_value: float | str | None = None
+    target: float | str | None = None
+    source: str | None = None
+
+
+@dataclass(frozen=True)
+class SubmissionReport:
+    context: str
+    readiness: str
+    summary: str
+    template: str | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
+    output_count: int = 0
+    output_filenames: tuple[str, ...] = ()
+    blockers: tuple[str, ...] = ()
+    checks: tuple[SubmissionCheck, ...] = ()
+
+
+@dataclass(frozen=True)
 class RenderedPlot:
     filename: str
     figure: plt.Figure
     qa_report: QAReport | None = None
+    submission_report: SubmissionReport | None = None
 
 
 @dataclass(frozen=True)
@@ -84,3 +109,4 @@ class PreflightResult:
     warnings: tuple[str, ...]
     errors: tuple[str, ...]
     output_filenames: tuple[str, ...]
+    submission_report: SubmissionReport | None = None

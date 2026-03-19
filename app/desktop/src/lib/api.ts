@@ -136,6 +136,15 @@ export async function exportRender(
   }, requestOptions);
 }
 
+export async function openPath(
+  outputPath: string,
+  requestOptions: RequestOptions = {},
+): Promise<{ output_path: string }> {
+  return postJson<{ output_path: string }>("/open-path", {
+    output_path: outputPath,
+  }, requestOptions);
+}
+
 export async function preprocessTensileReplicates(
   filePaths: string[],
   outputPath: string,

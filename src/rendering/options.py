@@ -43,7 +43,20 @@ def resolve_render_options(
     use_sidecar: bool | None = None,
 ) -> RenderOptions:
     width_mm, height_mm = resolve_size(size, template)
+    spec = template_contract(template)
     defaults = default_options_for_template(template)
+    normalized_style = plot_style.normalize_style_preset(style_preset or defaults.get("style_preset"))
+    if normalized_style not in spec.available_styles:
+        raise ValueError(
+            f"Template `{template}` does not support style `{normalized_style}`. "
+            f"Supported styles: {', '.join(spec.available_styles)}"
+        )
+    resolved_palette = palette_preset or defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)
+    if resolved_palette not in spec.available_palettes:
+        raise ValueError(
+            f"Template `{template}` does not support palette `{resolved_palette}`. "
+            f"Supported palettes: {', '.join(spec.available_palettes)}"
+        )
     return RenderOptions(
         width_mm=width_mm,
         height_mm=height_mm,
@@ -52,8 +65,8 @@ def resolve_render_options(
         reverse_x=reverse_x,
         baseline=baseline or defaults.get("baseline", "none"),
         show_colorbar=defaults.get("show_colorbar", True) if show_colorbar is None else show_colorbar,
-        style_preset=plot_style.normalize_style_preset(style_preset),
-        palette_preset=palette_preset,
+        style_preset=normalized_style,
+        palette_preset=resolved_palette,
         use_sidecar=use_sidecar,
     )
 

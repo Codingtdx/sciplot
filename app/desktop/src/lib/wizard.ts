@@ -3,6 +3,7 @@ import type {
   PalettePreset,
   RenderOptionsPayload,
   SizePreset,
+  StylePreset,
   TemplateName,
   WorkbenchMeta,
   WorkbenchTemplate,
@@ -15,6 +16,7 @@ const ALL_RENDER_OPTION_KEYS = [
   "reverse_x",
   "baseline",
   "show_colorbar",
+  "style_preset",
   "palette_preset",
   "use_sidecar",
 ] as const satisfies Array<keyof RenderOptionsPayload>;
@@ -91,6 +93,21 @@ function pickAllowedPalette(
   return available[0];
 }
 
+function pickAllowedStyle(
+  meta: WorkbenchMeta | null,
+  template: WorkbenchTemplate | null,
+  candidate: string | undefined,
+): StylePreset | undefined {
+  const available = template?.available_styles ?? meta?.styles.map((item) => item.id) ?? [];
+  if (candidate && available.includes(candidate as StylePreset)) {
+    return candidate as StylePreset;
+  }
+  if (meta?.default_style && available.includes(meta.default_style)) {
+    return meta.default_style;
+  }
+  return available[0];
+}
+
 export function sanitizeRenderOptions(
   meta: WorkbenchMeta | null,
   templateId: TemplateName | null | undefined,
@@ -130,6 +147,12 @@ export function sanitizeRenderOptions(
   }
   if (allowed.has("show_colorbar") && typeof source.show_colorbar === "boolean") {
     next.show_colorbar = source.show_colorbar;
+  }
+  if (allowed.has("style_preset")) {
+    const style = pickAllowedStyle(meta, template, source.style_preset);
+    if (style) {
+      next.style_preset = style;
+    }
   }
   if (allowed.has("palette_preset")) {
     const palette = pickAllowedPalette(meta, template, source.palette_preset);
@@ -174,6 +197,8 @@ function inspectionOptions(inspection: InputInspection): RenderOptionsPayload {
     reverse_x: recommendation.reverse_x,
     baseline: recommendation.baseline,
     show_colorbar: recommendation.show_colorbar,
+    style_preset: recommendation.style_preset,
+    palette_preset: recommendation.palette_preset,
     use_sidecar: recommendation.use_sidecar,
   };
 }

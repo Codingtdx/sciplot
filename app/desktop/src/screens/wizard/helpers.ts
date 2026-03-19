@@ -36,6 +36,8 @@ export function getWizardStatusChip(args: {
   busy: boolean;
   previewBusy: boolean;
   preflightBusy: boolean;
+  previewActivity: "idle" | "scheduled" | "running" | "ready" | "error";
+  preflightActivity: "idle" | "scheduled" | "running" | "ready" | "error";
   hasBlockingErrors: boolean;
   outputsCount: number;
   preflightReady: boolean;
@@ -46,6 +48,18 @@ export function getWizardStatusChip(args: {
   }
   if (args.busy) {
     return { label: "Loading file", tone: "accent" };
+  }
+  if (args.previewActivity === "scheduled" || args.preflightActivity === "scheduled") {
+    return { label: "Queueing checks", tone: "accent" };
+  }
+  if (args.previewActivity === "running" && args.preflightActivity === "running") {
+    return { label: "Refreshing preview and review", tone: "accent" };
+  }
+  if (args.previewActivity === "running") {
+    return { label: "Refreshing preview", tone: "accent" };
+  }
+  if (args.preflightActivity === "running") {
+    return { label: "Checking export readiness", tone: "accent" };
   }
   if (args.previewBusy || args.preflightBusy) {
     return { label: "Reviewing changes", tone: "accent" };

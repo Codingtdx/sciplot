@@ -1,6 +1,11 @@
 import { InfoTip } from "../../components/InfoTip";
-import type { TemplateName, WorkbenchMeta } from "../../lib/types";
-import { formatLeaf, templateLabel } from "../../lib/workbench";
+import type {
+  RequestActivity,
+  SubmissionReport,
+  TemplateName,
+  WorkbenchMeta,
+} from "../../lib/types";
+import { formatLeaf, styleLabel, templateLabel } from "../../lib/workbench";
 
 import type { WizardStatusChip } from "./helpers";
 
@@ -9,7 +14,11 @@ type Props = {
   inputPath: string;
   sheet: string | number;
   template: TemplateName | null;
+  stylePreset: string | null;
   statusChip: WizardStatusChip;
+  previewActivity: RequestActivity;
+  preflightActivity: RequestActivity;
+  submissionReport: SubmissionReport | null;
   previewsCount: number;
   outputsCount: number;
   inspectionWarningsCount: number;
@@ -24,7 +33,11 @@ export function WizardSessionCard({
   inputPath,
   sheet,
   template,
+  stylePreset,
   statusChip,
+  previewActivity,
+  preflightActivity,
+  submissionReport,
   previewsCount,
   outputsCount,
   inspectionWarningsCount,
@@ -55,8 +68,24 @@ export function WizardSessionCard({
           <strong>{templateLabel(meta, template)}</strong>
         </div>
         <div className="wizard-summary-row">
+          <span>Mode</span>
+          <strong>{styleLabel(meta, stylePreset)}</strong>
+        </div>
+        <div className="wizard-summary-row">
           <span>Status</span>
           <strong>{statusChip.label}</strong>
+        </div>
+        <div className="wizard-summary-row">
+          <span>Preview</span>
+          <strong>{previewActivity}</strong>
+        </div>
+        <div className="wizard-summary-row">
+          <span>Preflight</span>
+          <strong>{preflightActivity}</strong>
+        </div>
+        <div className="wizard-summary-row">
+          <span>Readiness</span>
+          <strong>{submissionReport?.readiness ?? "-"}</strong>
         </div>
         <div className="wizard-summary-row">
           <span>Previews</span>

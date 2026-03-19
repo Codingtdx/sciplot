@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { preflightRender, renderPreview } from "../lib/api";
+import { exportRender, openPath, preflightRender, renderPreview } from "../lib/api";
+import { loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type { InspectResponse } from "../lib/types";
 import { TEST_META } from "../test/fixtures";
@@ -11,6 +12,14 @@ import { WizardScreen } from "./WizardScreen";
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
+
+vi.mock("../lib/project-io", async () => {
+  const actual = await vi.importActual<typeof import("../lib/project-io")>("../lib/project-io");
+  return {
+    ...actual,
+    loadWizardDataFile: vi.fn(),
+  };
+});
 
 vi.mock("../lib/api", async () => {
   const actual = await vi.importActual<typeof import("../lib/api")>("../lib/api");
@@ -32,6 +41,28 @@ vi.mock("../lib/api", async () => {
       template: "curve",
       sheet: "Representative_Curve",
       previews: [],
+    }),
+    exportRender: vi.fn().mockResolvedValue({
+      outputs: ["/tmp/exports/curve.pdf"],
+      output_dir: "/tmp/exports",
+      preview_outputs: ["/tmp/exports/curve.preview.png"],
+      artifact_paths: [
+        "/tmp/exports/codegod_normalized_options.json",
+        "/tmp/exports/codegod_manifest.json",
+      ],
+      manifest_path: "/tmp/exports/codegod_manifest.json",
+      submission_report: {
+        context: "export",
+        readiness: "ready",
+        summary: "Export is submission-ready under the current contract and style preset.",
+        output_count: 1,
+        output_filenames: ["curve.pdf"],
+        blockers: [],
+        checks: [],
+      },
+    }),
+    openPath: vi.fn().mockResolvedValue({
+      output_path: "/tmp/exports",
     }),
   };
 });
@@ -82,6 +113,9 @@ describe("WizardScreen", () => {
     vi.mocked(open).mockReset();
     vi.mocked(preflightRender).mockReset();
     vi.mocked(renderPreview).mockReset();
+    vi.mocked(exportRender).mockReset();
+    vi.mocked(openPath).mockReset();
+    vi.mocked(loadWizardDataFile).mockReset();
     vi.mocked(preflightRender).mockResolvedValue({
       input_path: "/tmp/curve.csv",
       sheet: 0,
@@ -99,6 +133,29 @@ describe("WizardScreen", () => {
       sheet: "Representative_Curve",
       previews: [],
     });
+    vi.mocked(exportRender).mockResolvedValue({
+      outputs: ["/tmp/exports/curve.pdf"],
+      output_dir: "/tmp/exports",
+      preview_outputs: ["/tmp/exports/curve.preview.png"],
+      artifact_paths: [
+        "/tmp/exports/codegod_normalized_options.json",
+        "/tmp/exports/codegod_manifest.json",
+      ],
+      manifest_path: "/tmp/exports/codegod_manifest.json",
+      submission_report: {
+        context: "export",
+        readiness: "ready",
+        summary: "Export is submission-ready under the current contract and style preset.",
+        output_count: 1,
+        output_filenames: ["curve.pdf"],
+        blockers: [],
+        checks: [],
+      },
+    });
+    vi.mocked(openPath).mockResolvedValue({
+      output_path: "/tmp/exports",
+    });
+    vi.mocked(loadWizardDataFile).mockResolvedValue(TEST_INSPECT_RESPONSE);
     useWizardStore.getState().reset();
     useWorkbenchStore.setState({
       lastScreen: "wizard",
@@ -162,7 +219,41 @@ describe("WizardScreen", () => {
     render(<WizardScreen meta={TEST_META} />);
 
     expect(screen.getByText("Show color bar")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Default")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Colorblind Safe")).toBeInTheDocument();
+  });
+
+  it("prompts before replacing the current plotting session when opening another data file", async () => {
+    useWizardStore.setState({
+      inputPath: "/tmp/current.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      outputs: ["/tmp/exports/current.pdf"],
+      exportResult: {
+        outputs: ["/tmp/exports/current.pdf"],
+        output_dir: "/tmp/exports",
+        preview_outputs: [],
+        artifact_paths: [],
+        manifest_path: null,
+      },
+    });
+    vi.mocked(open).mockResolvedValue("/tmp/new-data.xlsx");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining("replace the current Plot Builder session"),
+      );
+    });
+    expect(loadWizardDataFile).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
   });
 
   it("cleans heatmap-only options when switching back to a compatible curve template", () => {
@@ -201,6 +292,7 @@ describe("WizardScreen", () => {
       xscale: "linear",
       yscale: "linear",
       reverse_x: false,
+      style_preset: "default",
       palette_preset: "colorblind_safe",
     });
   });
@@ -242,6 +334,67 @@ describe("WizardScreen", () => {
 
     expect(screen.queryByRole("option", { name: "log" })).not.toBeInTheDocument();
     expect(screen.getByText("Tensile curves stay on linear x/y scales throughout recommendation, review, and render.")).toBeInTheDocument();
+  });
+
+  it("lets the user switch the public submission style from wizard options", () => {
+    useWizardStore.setState({
+      template: "curve",
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      },
+    });
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    fireEvent.change(screen.getByDisplayValue("Default"), {
+      target: { value: "nature" },
+    });
+
+    expect(useWizardStore.getState().options.style_preset).toBe("nature");
+    expect(screen.getAllByText("Nature").length).toBeGreaterThan(0);
+  });
+
+  it("shows the export bundle controls and opens the output folder after export", async () => {
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sidecarReady: true,
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+      },
+    });
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Export submission bundle" })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission bundle" }));
+
+    await waitFor(() => {
+      expect(exportRender).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.getByRole("button", { name: "Open output folder" })).toBeInTheDocument();
+    expect(screen.getByText("Manifest: codegod_manifest.json")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open output folder" }));
+
+    await waitFor(() => {
+      expect(openPath).toHaveBeenCalledWith("/tmp/exports");
+    });
   });
 
   it("automatically refreshes preview and preflight when options change quickly", async () => {
@@ -412,7 +565,7 @@ describe("WizardScreen", () => {
       vi.advanceTimersByTime(250);
     });
 
-    const exportButton = screen.getByRole("button", { name: "Export PDF" });
+    const exportButton = screen.getByRole("button", { name: "Export submission bundle" });
     expect(exportButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Use recommendation" }));
@@ -440,7 +593,7 @@ describe("WizardScreen", () => {
       }),
       expect.any(Object),
     );
-    expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Export submission bundle" })).toBeEnabled();
   });
 
   it("shows a visible error when the desktop file dialog is unavailable", async () => {

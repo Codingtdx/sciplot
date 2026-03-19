@@ -31,6 +31,9 @@ function asRenderOptions(payload: unknown): RenderOptionsPayload {
   if (typeof candidate.show_colorbar === "boolean") {
     next.show_colorbar = candidate.show_colorbar;
   }
+  if (typeof candidate.style_preset === "string") {
+    next.style_preset = candidate.style_preset;
+  }
   if (typeof candidate.palette_preset === "string") {
     next.palette_preset = candidate.palette_preset;
   }

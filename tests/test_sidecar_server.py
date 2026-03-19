@@ -4,8 +4,10 @@ from pathlib import Path
 
 import fitz
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
+from app.sidecar import server
 from app.sidecar.server import app
 from src.tensile_replicates import export_tensile_replicate_workbook
 
@@ -194,6 +196,40 @@ def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -
     assert payload["project"]["texts"][0]["group_id"] == "group-1"
 
 
+def test_save_and_open_project_round_trips_wizard_style_preset(tmp_path: Path) -> None:
+    project_path = tmp_path / "wizard.plotproject.json"
+    payload = {
+        "version": 1,
+        "mode": "wizard",
+        "wizard": {
+            "input_path": "/tmp/demo.csv",
+            "sheet": "Sheet1",
+            "template": "curve",
+            "options": {
+                "size": "60x55",
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+            },
+            "outputs": ["/tmp/demo_curve.pdf"],
+        },
+    }
+
+    save_response = client.post(
+        "/save-project",
+        json={"project_path": str(project_path), "data": payload},
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post(
+        "/open-project",
+        json={"project_path": str(project_path)},
+    )
+    assert open_response.status_code == 200
+    reopened = open_response.json()["data"]
+    assert reopened["wizard"]["options"]["style_preset"] == "nature"
+    assert reopened["wizard"]["options"]["palette_preset"] == "colorblind_safe"
+
+
 def test_open_project_rejects_legacy_composer_v1(tmp_path: Path) -> None:
     project_path = tmp_path / "legacy.plotproject.json"
     project_path.write_text(
@@ -277,7 +313,31 @@ def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path
     assert "BlendSet_bad.csv" in payload["warnings"][0]
 
 
-def test_render_preview_includes_advisory_qa_payload(tmp_path: Path) -> None:
+def test_preflight_render_includes_submission_report_and_style_preset(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    response = client.post(
+        "/preflight-render",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["options"]["style_preset"] == "nature"
+    assert payload["preflight"]["submission_report"]["style_preset"] == "nature"
+    assert payload["preflight"]["submission_report"]["context"] == "preflight"
+    assert payload["preflight"]["submission_report"]["checks"]
+
+
+def test_render_preview_includes_advisory_qa_payload_and_submission_report(tmp_path: Path) -> None:
     input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
 
     response = client.post(
@@ -286,16 +346,73 @@ def test_render_preview_includes_advisory_qa_payload(tmp_path: Path) -> None:
             "input_path": str(input_path),
             "sheet": 0,
             "template": "curve",
-            "options": {},
+            "options": {
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+            },
         },
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["previews"]
+    assert payload["submission_report"]["context"] == "preview"
+    assert payload["submission_report"]["style_preset"] == "nature"
     qa = payload["previews"][0]["qa"]
     assert qa["grade"] in {"excellent", "solid", "needs_cleanup"}
     assert "direct_series_labels" in qa["autofixes_applied"]
+
+
+def test_export_render_writes_bundle_artifacts_and_submission_report(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    output_dir = tmp_path / "exports"
+
+    response = client.post(
+        "/export-render",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+            },
+            "output_dir": str(output_dir),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["output_dir"] == str(output_dir)
+    assert payload["submission_report"]["context"] == "export"
+    assert Path(payload["outputs"][0]).exists()
+    assert all(Path(path).exists() for path in payload["preview_outputs"])
+    assert all(Path(path).exists() for path in payload["artifact_paths"])
+    assert {Path(path).name for path in payload["artifact_paths"]} == {
+        "codegod_normalized_options.json",
+        "codegod_inspection.json",
+        "codegod_preflight.json",
+        "codegod_submission_report.json",
+        "codegod_manifest.json",
+    }
+    assert Path(payload["manifest_path"]).exists()
+
+
+def test_open_path_endpoint_uses_host_launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "exports"
+    target.mkdir()
+    opened: list[Path] = []
+
+    monkeypatch.setattr(server, "_open_path_with_host", lambda path: opened.append(path))
+
+    response = client.post(
+        "/open-path",
+        json={"output_path": str(target)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["output_path"] == str(target)
+    assert opened == [target]
 
 
 def test_compose_preview_returns_cleanup_patch_without_blocking_export(tmp_path: Path) -> None:
@@ -358,6 +475,7 @@ def test_compose_preview_returns_cleanup_patch_without_blocking_export(tmp_path:
     assert payload["valid"] is True
     assert payload["validation_error"] is None
     assert payload["qa"]["issues"]
+    assert payload["submission_report"]["context"] == "composer"
     assert payload["suggested_project_patch"]
     assert payload["suggested_project_patch"][0]["kind"] == "text"
 

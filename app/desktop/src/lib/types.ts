@@ -15,6 +15,8 @@ export type WizardStep =
   | "preflight"
   | "export";
 
+export type RequestActivity = "idle" | "scheduled" | "running" | "ready" | "error";
+
 export type WorkbenchScreen = "tensile" | "wizard" | "composer" | "projects" | "settings";
 export type PdfImportMode = "graph" | "asset";
 export type ThemePreference = "system" | "light" | "dark";
@@ -40,6 +42,28 @@ export type QAReport = {
   autofixes_applied: string[];
 };
 
+export type SubmissionCheck = {
+  id: string;
+  status: "pass" | "advisory" | "warning" | "critical" | "pending" | string;
+  message: string;
+  metric_value?: number | string | null;
+  target?: number | string | null;
+  source?: string | null;
+};
+
+export type SubmissionReport = {
+  context: string;
+  readiness: "ready" | "review" | "blocked" | string;
+  summary: string;
+  template?: string | null;
+  style_preset?: StylePreset | null;
+  palette_preset?: PalettePreset | null;
+  output_count: number;
+  output_filenames: string[];
+  blockers: string[];
+  checks: SubmissionCheck[];
+};
+
 export type Recommendation = {
   template: TemplateName;
   reason: string;
@@ -49,6 +73,8 @@ export type Recommendation = {
   reverse_x?: boolean;
   baseline?: "none" | "linear_endpoints";
   show_colorbar?: boolean;
+  style_preset?: StylePreset;
+  palette_preset?: PalettePreset;
   use_sidecar?: boolean;
 };
 
@@ -65,6 +91,7 @@ export type PreflightResult = {
   warnings: string[];
   errors: string[];
   output_filenames: string[];
+  submission_report?: SubmissionReport | null;
 };
 
 export type RenderOptionsPayload = {
@@ -74,6 +101,7 @@ export type RenderOptionsPayload = {
   reverse_x?: boolean;
   baseline?: "none" | "linear_endpoints";
   show_colorbar?: boolean;
+  style_preset?: StylePreset;
   palette_preset?: PalettePreset;
   use_sidecar?: boolean | null;
 };
@@ -99,10 +127,16 @@ export type RenderPreviewResponse = {
   template: TemplateName;
   sheet: string | number;
   previews: PreviewItem[];
+  submission_report?: SubmissionReport | null;
 };
 
 export type ExportResponse = {
   outputs: string[];
+  output_dir: string;
+  preview_outputs?: string[];
+  artifact_paths?: string[];
+  manifest_path?: string | null;
+  submission_report?: SubmissionReport | null;
 };
 
 export type TensileMetricSummary = {
@@ -229,6 +263,7 @@ export type ComposerPreviewResponse = {
   validation_error: string | null;
   png_base64: string;
   qa?: QAReport | null;
+  submission_report?: SubmissionReport | null;
   suggested_project_patch?: ComposerSuggestedPatch[];
 };
 

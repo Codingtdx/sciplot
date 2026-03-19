@@ -30,6 +30,7 @@
 - 契约里的 `qa_profiles` 不是给终端用户看的评分表，而是内部 editorial policy / autofix 的唯一策略源；small panel legend、heatmap top strip、stat spacing、Composer cleanup patch 都应从这里读门槛。
 - `src/plot_contract.py` 负责 typed loader；Python 绘图逻辑、sidecar `/meta`、`/plot-contract`、smoke 校验都要读这一份。
 - GUI 只能消费 sidecar 返回的模板、尺寸、palette、默认值和标签，不要在前端再维护一套本地常量。
+- 单图渲染选项里的 `style_preset` 现在和 `palette_preset` 一样属于契约字段；可选投稿风格只认契约里的 `available_styles`，不要再引入第二套 `journal_target` 或前端私有风格枚举。
 - 项目文件的唯一合法入口是 sidecar 的校验/迁移层：保存走 `/save-project`，打开走 `/open-project`；不要在前端或脚本里直接信任任意 JSON payload。
 - 任何新增图模板、修改模板行为、增加特殊布局规则、调整模板默认值、允许尺寸、palette/style 选项、对齐规则或特例行为的改动，都视为“契约变更”。
 - 契约变更必须先更新 `src/plot_contract.json`，再重生成 `docs/plot_contract.md`，最后再改 Python、sidecar、desktop 实现；禁止只改绘图代码逻辑而不更新契约与说明。
@@ -38,10 +39,12 @@
 
 - CLI、GUI、旧脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
-- `render-preview` 与 `compose-preview` 可以返回 advisory QA / cleanup patch，但它们不是 blocker；真正阻止导出的一律仍走 preflight / Composer overlap 校验。
+- `preflight-render`、`render-preview`、`export-render`、`compose-preview` 现在都会返回统一的 `submission_report`；它是投稿检查摘要，不是新的 blocker 通道。真正阻止导出的一律仍走 preflight / Composer overlap 校验。
+- `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果改导出链路，别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
+- Wizard 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
@@ -51,6 +54,7 @@
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
+- 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
 

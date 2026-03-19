@@ -78,6 +78,18 @@
       "small_panel_width_mm": 60.0,
       "small_panel_height_mm": 55.0,
       "direct_label_max_series": 4,
+      "compact_direct_label_inset_fraction": 0.04,
+      "compact_direct_label_offset_pt": 4.0,
+      "compact_direct_label_search_band_fraction": 0.12,
+      "compact_tick_width_scale": 0.82,
+      "compact_tick_length_scale": 0.88,
+      "compact_legend_max_series": 3,
+      "compact_legend_columns": 2,
+      "compact_legend_font_scale": 0.92,
+      "compact_legend_handlelength": 1.35,
+      "compact_legend_handletextpad": 0.35,
+      "compact_legend_columnspacing": 0.8,
+      "compact_legend_borderpad": 0.15,
       "legend_area_ratio_warn": 0.055,
       "legend_area_ratio_fail": 0.07,
       "dense_marker_point_threshold": 24,
@@ -557,13 +569,15 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
         "size": "60x55",
         "xscale": "linear",
         "yscale": "linear",
-        "reverse_x": false
+        "reverse_x": false,
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -595,13 +609,15 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
         "size": "60x55",
         "xscale": "linear",
         "yscale": "linear",
-        "reverse_x": false
+        "reverse_x": false,
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -633,12 +649,14 @@
         "size",
         "reverse_x",
         "baseline",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
         "size": "60x55",
         "reverse_x": false,
-        "baseline": "none"
+        "baseline": "none",
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -667,6 +685,7 @@
         "size",
         "reverse_x",
         "baseline",
+        "style_preset",
         "palette_preset",
         "use_sidecar"
       ],
@@ -674,6 +693,7 @@
         "size": "60x110",
         "reverse_x": true,
         "baseline": "linear_endpoints",
+        "style_preset": "default",
         "use_sidecar": true
       },
       "available_styles": [
@@ -704,10 +724,12 @@
       ],
       "editable_options": [
         "size",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
-        "size": "60x55"
+        "size": "60x55",
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -737,10 +759,12 @@
       ],
       "editable_options": [
         "size",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
-        "size": "60x55"
+        "size": "60x55",
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -770,10 +794,12 @@
       ],
       "editable_options": [
         "size",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
-        "size": "60x55"
+        "size": "60x55",
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -807,13 +833,15 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
         "size": "60x55",
         "xscale": "linear",
         "yscale": "linear",
-        "reverse_x": false
+        "reverse_x": false,
+        "style_preset": "default"
       },
       "available_styles": [
         "default",
@@ -843,11 +871,13 @@
       "editable_options": [
         "size",
         "show_colorbar",
+        "style_preset",
         "palette_preset"
       ],
       "default_options": {
         "size": "60x55",
-        "show_colorbar": true
+        "show_colorbar": true,
+        "style_preset": "default"
       },
       "available_styles": [
         "default",

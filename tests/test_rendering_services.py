@@ -44,6 +44,28 @@ def _write_dense_curve_table(path: Path) -> Path:
     return path
 
 
+def _write_monotonic_curve_table(path: Path) -> Path:
+    import numpy as np
+
+    x = np.linspace(25.0, 220.0, 120)
+    rows = [
+        ["Temperature", "E'", "Temperature", "E'"],
+        ["°C", "MPa", "°C", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                3200 * np.exp(-value / 140.0) + 180.0,
+                value,
+                2800 * np.exp(-value / 150.0) + 220.0,
+            ]
+        )
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_tensile_curve_table(path: Path) -> Path:
     rows = [
         ["Strain", "Stress", "Strain", "Stress"],
@@ -157,12 +179,30 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
     assert preflight.errors == ()
+    assert preflight.submission_report is not None
+    assert preflight.submission_report.context == "preflight"
+    assert preflight.submission_report.style_preset == "default"
 
     rendered = build_rendered_plots("curve", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
     finally:
         close_rendered_plots(rendered)
+
+
+def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(
+        template="curve",
+        style_preset="nature",
+        palette_preset="colorblind_safe",
+    )
+    preflight = preflight_render_request("curve", input_path, 0, options)
+
+    assert options.style_preset == "nature"
+    assert preflight.submission_report is not None
+    assert preflight.submission_report.style_preset == "nature"
 
 
 def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) -> None:
@@ -295,6 +335,44 @@ def test_small_curve_render_prefers_direct_labels_when_they_fit(tmp_path: Path) 
         ax = plot.figure.axes[0]
         assert ax.get_legend() is None
         assert {text.get_text() for text in ax.texts} == {"Sample A", "Sample B"}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_small_monotonic_curve_uses_direct_label_fallback_when_edge_labels_fail(tmp_path: Path) -> None:
+    input_path = _write_monotonic_curve_table(tmp_path / "dma_like_curve.csv")
+
+    rendered = build_rendered_plots("curve", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        issue_ids = {issue.id for issue in plot.qa_report.issues}
+        assert plot.qa_report.grade in {"solid", "excellent"}
+        assert "direct_series_labels" in plot.qa_report.autofixes_applied
+        assert "legend_footprint" not in issue_ids
+        assert "series_identification" not in issue_ids
+        assert "stroke_hierarchy" not in issue_ids
+        ax = plot.figure.axes[0]
+        assert ax.get_legend() is None
+        assert {text.get_text() for text in ax.texts} == {"Sample A", "Sample B"}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_small_point_line_quality_clears_compact_editorial_checks(tmp_path: Path) -> None:
+    input_path = _write_temperature_sweep_table(tmp_path / "temperature.xlsx")
+
+    rendered = build_rendered_plots("point_line", input_path, yscale="log")
+    try:
+        assert rendered
+        for plot in rendered:
+            assert plot.qa_report is not None
+            issue_ids = {issue.id for issue in plot.qa_report.issues}
+            assert plot.qa_report.grade in {"solid", "excellent"}
+            assert "legend_footprint" not in issue_ids
+            assert "stroke_hierarchy" not in issue_ids
+            assert "series_identification" not in issue_ids
     finally:
         close_rendered_plots(rendered)
 

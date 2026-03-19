@@ -28,6 +28,7 @@ class RenderOptionsPayload(StrictModel):
     reverse_x: bool = False
     baseline: str | None = None
     show_colorbar: bool | None = None
+    style_preset: str = plot_style.DEFAULT_STYLE_PRESET
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET
     use_sidecar: bool | None = None
 
@@ -39,6 +40,7 @@ class SavedRenderOptionsPayload(StrictModel):
     reverse_x: bool | None = None
     baseline: str | None = None
     show_colorbar: bool | None = None
+    style_preset: str | None = None
     palette_preset: str | None = None
     use_sidecar: bool | None = None
 
@@ -55,6 +57,10 @@ class RenderRequest(FileRequest):
 
 class ExportRenderRequest(RenderRequest):
     output_dir: str | None = None
+
+
+class OpenPathRequest(StrictModel):
+    output_path: str
 
 
 class TensileReplicateRequest(StrictModel):
@@ -389,6 +395,7 @@ class PreflightResultResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     output_filenames: list[str] = Field(default_factory=list)
+    submission_report: SubmissionReportResponse | None = None
 
 
 class InspectFileResponse(StrictModel):
@@ -421,6 +428,28 @@ class QAReportResponse(StrictModel):
     autofixes_applied: list[str] = Field(default_factory=list)
 
 
+class SubmissionCheckResponse(StrictModel):
+    id: str
+    status: str
+    message: str
+    metric_value: float | str | None = None
+    target: float | str | None = None
+    source: str | None = None
+
+
+class SubmissionReportResponse(StrictModel):
+    context: str
+    readiness: str
+    summary: str
+    template: str | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
+    output_count: int = 0
+    output_filenames: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    checks: list[SubmissionCheckResponse] = Field(default_factory=list)
+
+
 class PreviewItemResponse(StrictModel):
     filename: str
     png_base64: str
@@ -431,10 +460,16 @@ class RenderPreviewResponse(StrictModel):
     template: str
     sheet: str | int
     previews: list[PreviewItemResponse]
+    submission_report: SubmissionReportResponse | None = None
 
 
 class ExportRenderResponse(StrictModel):
     outputs: list[str]
+    output_dir: str
+    preview_outputs: list[str] = Field(default_factory=list)
+    artifact_paths: list[str] = Field(default_factory=list)
+    manifest_path: str | None = None
+    submission_report: SubmissionReportResponse | None = None
 
 
 class HealthResponse(StrictModel):
@@ -457,6 +492,7 @@ class ComposerPreviewResponse(StrictModel):
     validation_error: str | None
     png_base64: str
     qa: QAReportResponse | None = None
+    submission_report: SubmissionReportResponse | None = None
     suggested_project_patch: list[ComposerSuggestedPatchResponse] = Field(default_factory=list)
 
 
@@ -552,7 +588,7 @@ class OpenProjectResponse(StrictModel):
 
 
 def serialize_dataclass(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return {key: serialize_dataclass(item) for key, item in asdict(value).items()}
     if isinstance(value, Path):
         return str(value)

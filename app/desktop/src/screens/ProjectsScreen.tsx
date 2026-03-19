@@ -6,6 +6,8 @@ import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/stor
 import type { RecentProjectEntry, WorkbenchMeta } from "../lib/types";
 import {
   AppMode,
+  confirmReplaceComposerSession,
+  confirmReplaceWizardSession,
   formatLeaf,
   formatRecentTimestamp,
   getErrorMessage,
@@ -29,6 +31,31 @@ export function ProjectsScreen({
   const [noticeTone, setNoticeTone] = useState<"success" | "warning">("success");
 
   const reopenRecent = async (entry: RecentProjectEntry) => {
+    const wizardState = useWizardStore.getState();
+    const composerState = useComposerStore.getState();
+    if (
+      entry.mode === "wizard" &&
+      !confirmReplaceWizardSession(
+        {
+          inputPath: wizardState.inputPath,
+          inspection: wizardState.inspection,
+          template: wizardState.template,
+          outputs: wizardState.outputs,
+          exportResult: wizardState.exportResult,
+        },
+        formatLeaf(entry.path),
+        entry.kind === "data" ? entry.path : undefined,
+      )
+    ) {
+      return;
+    }
+    if (
+      entry.mode === "composer" &&
+      !confirmReplaceComposerSession(composerState.project, formatLeaf(entry.path))
+    ) {
+      return;
+    }
+
     setActiveRecentId(entry.id);
     setNotice(null);
 

@@ -200,6 +200,17 @@ def _tick_label_bboxes(axis, renderer) -> list[transforms.Bbox]:
     ]
 
 
+def _axis_actual_tick_width(axis, *, fallback: float) -> float:
+    widths = [
+        float(line.get_markeredgewidth())
+        for line in axis.get_ticklines()
+        if line.get_visible() and float(line.get_markeredgewidth()) > 0.0
+    ]
+    if widths:
+        return max(widths)
+    return fallback
+
+
 def _text_outside_count(
     text_bboxes: Sequence[tuple[plt.Text, transforms.Bbox]],
     *,
@@ -338,8 +349,8 @@ def _analyze_curve_figure(
     if ax.lines:
         line_width = float(np.mean([line.get_linewidth() for line in ax.lines]))
         tick_width = max(
-            float(plt.rcParams["xtick.major.width"]),
-            float(plt.rcParams["ytick.major.width"]),
+            _axis_actual_tick_width(ax.xaxis, fallback=float(plt.rcParams["xtick.major.width"])),
+            _axis_actual_tick_width(ax.yaxis, fallback=float(plt.rcParams["ytick.major.width"])),
             1e-6,
         )
         hierarchy = max(line_width - tick_width, 0.0) / max(line_width, 1e-6)

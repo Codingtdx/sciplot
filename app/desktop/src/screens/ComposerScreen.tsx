@@ -33,7 +33,11 @@ import { openDialog, saveDialog } from "../lib/tauri-dialog";
 import { getCodeGodWebviewWindow } from "../lib/tauri-webview";
 import type { ComposerPanel, ComposerProject, ComposerText } from "../lib/types";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
-import { getErrorMessage, toDialogPaths } from "../lib/workbench";
+import {
+  confirmReplaceComposerSession,
+  getErrorMessage,
+  toDialogPaths,
+} from "../lib/workbench";
 import { ComposerCanvasSection } from "./composer/ComposerCanvasSection";
 import { ComposerInspectPanel } from "./composer/ComposerInspectPanel";
 import { ComposerInsertPanel } from "./composer/ComposerInsertPanel";
@@ -66,6 +70,7 @@ export function ComposerScreen() {
       setPreview: state.setPreview,
       setProject: state.setProject,
       setSelectedId: state.setSelectedId,
+      submissionReport: state.submissionReport,
       suggestedProjectPatch: state.suggestedProjectPatch,
       updatePanels: state.updatePanels,
       updateTexts: state.updateTexts,
@@ -185,6 +190,7 @@ export function ComposerScreen() {
         payload.png_base64,
         payload.validation_error ?? null,
         payload.qa ?? null,
+        payload.submission_report ?? null,
         payload.suggested_project_patch ?? [],
       );
       return;
@@ -834,6 +840,9 @@ export function ComposerScreen() {
     if (!path) {
       return;
     }
+    if (!confirmReplaceComposerSession(composer.project, path.split(/[/\\]/).pop() ?? path)) {
+      return;
+    }
 
     await runComposerTask(async () => {
       const project = await loadComposerProjectFile(composer, path);
@@ -1129,6 +1138,23 @@ export function ComposerScreen() {
                 Apply cleanup suggestions
               </button>
             </div>
+          </div>
+        )}
+
+        {composer.submissionReport && (
+          <div className="focus-panel">
+            <strong>Submission review</strong>
+            <span>{composer.submissionReport.summary}</span>
+            {composer.submissionReport.checks.some((check) => check.status !== "pass") && (
+              <ul className="bullet-list">
+                {composer.submissionReport.checks
+                  .filter((check) => check.status !== "pass")
+                  .slice(0, 4)
+                  .map((check) => (
+                    <li key={check.id}>{check.message}</li>
+                  ))}
+              </ul>
+            )}
           </div>
         )}
 

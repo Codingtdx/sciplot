@@ -20,6 +20,7 @@ const EDITABLE_OPTION_KEYS: EditableRenderOption[] = [
   "reverse_x",
   "baseline",
   "show_colorbar",
+  "style_preset",
   "palette_preset",
   "use_sidecar",
 ];
@@ -99,6 +100,9 @@ function readRenderOptions(
   }
   if (optionalBoolean(record.show_colorbar) !== undefined) {
     next.show_colorbar = record.show_colorbar as boolean;
+  }
+  if (optionalString(record.style_preset)) {
+    next.style_preset = record.style_preset as StylePreset;
   }
   if (optionalString(record.palette_preset)) {
     next.palette_preset = record.palette_preset as PalettePreset;

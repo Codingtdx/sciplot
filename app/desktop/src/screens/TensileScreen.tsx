@@ -16,6 +16,7 @@ import {
 } from "../lib/tensile-comparison";
 import type { WorkbenchMeta, WorkbenchScreen } from "../lib/types";
 import {
+  confirmReplaceWizardSession,
   defaultSiblingPath,
   formatLeaf,
   formatMetricValue,
@@ -78,6 +79,21 @@ export function TensileScreen({
   };
 
   const openWorkbookInPlotting = async (workbookPath: string, preferredSheet: string | number) => {
+    if (
+      !confirmReplaceWizardSession(
+        {
+          inputPath: wizard.inputPath,
+          inspection: wizard.inspection,
+          template: wizard.template,
+          outputs: wizard.outputs,
+          exportResult: wizard.exportResult,
+        },
+        formatLeaf(workbookPath),
+        workbookPath,
+      )
+    ) {
+      return;
+    }
     setError(null);
     setBusy(true);
     try {

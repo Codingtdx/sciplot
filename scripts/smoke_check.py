@@ -43,6 +43,7 @@ from src.composer import (
     two_up_editorial_panels_from_paths,
     validate_non_overlapping_panels,
 )
+from src.composer_qa import analyze_composer_project
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
 from src.plot_contract import load_plot_contract, validation_rule
 from src.plotting import (
@@ -1142,6 +1143,14 @@ def _assert_style_palette_presets(
     heatmap_path: Path,
     temp_path: Path,
 ) -> None:
+    contract = load_plot_contract()
+
+    def _allowed_palette(template_name: str, preferred: str) -> str:
+        template_spec = contract.templates[template_name]
+        if preferred in template_spec.available_palettes:
+            return preferred
+        return template_spec.available_palettes[-1]
+
     combos = [
         (
             "point_line",
@@ -1158,7 +1167,11 @@ def _assert_style_palette_presets(
         (
             "stacked_curve",
             ftir_path,
-            {"reverse_x": True, "style_preset": "default", "palette_preset": "materials_warm"},
+            {
+                "reverse_x": True,
+                "style_preset": "default",
+                "palette_preset": _allowed_palette("stacked_curve", "materials_warm"),
+            },
         ),
         (
             "segmented_stacked_curve",
@@ -1168,10 +1181,17 @@ def _assert_style_palette_presets(
                 "baseline": "linear_endpoints",
                 "use_sidecar": True,
                 "style_preset": "nature",
-                "palette_preset": "okabe_ito",
+                "palette_preset": _allowed_palette("segmented_stacked_curve", "okabe_ito"),
             },
         ),
-        ("heatmap", heatmap_path, {"style_preset": "default", "palette_preset": "materials_warm"}),
+        (
+            "heatmap",
+            heatmap_path,
+            {
+                "style_preset": "default",
+                "palette_preset": _allowed_palette("heatmap", "materials_warm"),
+            },
+        ),
     ]
 
     for template, input_path, options in combos:
@@ -1518,6 +1538,10 @@ def _assert_composer_workflow(outputs_dir: Path, base: Path) -> None:
         )
     ]
 
+    composer_qa, _ = analyze_composer_project(project)
+    if composer_qa.grade not in {"solid", "excellent"}:
+        raise AssertionError("Composer smoke project should reach at least a solid QA grade.")
+
     preview_png = compose_preview_png(project)
     if len(preview_png) < 1024:
         raise AssertionError("Composer preview should produce a non-trivial PNG payload.")
@@ -1637,13 +1661,25 @@ def _assert_editorial_policy_outputs(qa_by_output_key: dict[str, dict[str, objec
             raise AssertionError(f"Missing QA report for smoke output: {key}")
         return payload
 
+    def _issue_map(payload: dict[str, object]) -> dict[str, str]:
+        issues = payload.get("issues", [])
+        if not isinstance(issues, list):
+            return {}
+        return {
+            str(item.get("id")): str(item.get("severity"))
+            for item in issues
+            if isinstance(item, dict) and item.get("id") is not None
+        }
+
     tensile_curve = _report_for("curve/tensile_curve.pdf")
     tensile_autofixes = {str(item) for item in tensile_curve.get("autofixes_applied", [])}
     if "direct_series_labels" not in tensile_autofixes:
         raise AssertionError("Small tensile curve should prefer direct series labels when they fit cleanly.")
-    tensile_issue_ids = {str(item.get("id")) for item in tensile_curve.get("issues", []) if isinstance(item, dict)}
+    tensile_issue_ids = set(_issue_map(tensile_curve))
     if "series_identification" in tensile_issue_ids:
         raise AssertionError("Chosen tensile curve candidate should not lose series identification.")
+    if str(tensile_curve.get("grade")) != "excellent":
+        raise AssertionError("Tensile curve should remain excellent after compact-panel autofix selection.")
 
     heatmap_report = _report_for("heatmap/heatmap_heatmap.pdf")
     heatmap_autofixes = {str(item) for item in heatmap_report.get("autofixes_applied", [])}
@@ -1667,6 +1703,24 @@ def _assert_editorial_policy_outputs(qa_by_output_key: dict[str, dict[str, objec
         raise AssertionError("wide_nmr labels should remain non-overlapping after editorial review.")
     if "wide_nmr_reserve" in wide_issue_ids:
         raise AssertionError("wide_nmr reserve space should remain intact after editorial review.")
+
+    dma_curve = _report_for("curve/dma_curve.pdf")
+    if str(dma_curve.get("grade")) != "excellent":
+        raise AssertionError("Canonical compact curve output should stay excellent after submission autofix.")
+
+    for key, payload in qa_by_output_key.items():
+        if payload is None:
+            continue
+        grade = str(payload.get("grade"))
+        issue_map = _issue_map(payload)
+        if key.startswith(("curve/", "point_line/", "scatter/")):
+            if grade not in {"solid", "excellent"}:
+                raise AssertionError(f"{key} should reach at least a solid editorial grade in smoke.")
+            if issue_map.get("legend_footprint") == "critical":
+                raise AssertionError(f"{key} should not keep a critical legend footprint after compact-panel tuning.")
+            continue
+        if key.startswith(("bar/", "box/", "violin/", "heatmap/")) and grade not in {"solid", "excellent"}:
+            raise AssertionError(f"{key} should keep at least a solid editorial grade in smoke.")
 
 
 def _assert_wide_nmr_layout(bundle_path: Path) -> list[dict[str, object]]:

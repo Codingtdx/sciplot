@@ -4,6 +4,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { EMPTY_COMPOSER_PROJECT } from "../lib/composer";
 import { composePreviewWithOptions, importComposerPanels } from "../lib/api";
+import { loadComposerProjectFile } from "../lib/project-io";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import { ComposerScreen } from "./ComposerScreen";
 
@@ -57,6 +58,10 @@ vi.mock("../lib/api", async () => {
     panelThumbnail: vi.fn().mockResolvedValue(""),
   };
 });
+
+vi.mock("../lib/project-io", () => ({
+  loadComposerProjectFile: vi.fn(),
+}));
 
 function seedComposerProject() {
   useComposerStore.getState().setProject({
@@ -128,6 +133,8 @@ describe("ComposerScreen", () => {
     });
     vi.mocked(open).mockReset();
     vi.mocked(save).mockReset();
+    vi.mocked(loadComposerProjectFile).mockReset();
+    vi.mocked(loadComposerProjectFile).mockResolvedValue(EMPTY_COMPOSER_PROJECT);
   });
 
   it("surfaces preview failures to the user", async () => {
@@ -136,6 +143,25 @@ describe("ComposerScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("preview exploded")).toBeInTheDocument();
     });
+  });
+
+  it("prompts before replacing the current composer layout when opening a project", async () => {
+    seedComposerProject();
+    vi.mocked(open).mockResolvedValue("/tmp/layout.plotproject.json");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<ComposerScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open project" }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining("replace the current Composer layout"),
+      );
+    });
+    expect(loadComposerProjectFile).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
   });
 
   it("applies preview cleanup suggestions to the project", async () => {

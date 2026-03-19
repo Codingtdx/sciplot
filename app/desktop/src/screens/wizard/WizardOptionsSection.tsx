@@ -4,6 +4,7 @@ import type {
   TemplateName,
   WorkbenchMeta,
   WorkbenchPalette,
+  WorkbenchStyle,
   WorkbenchTemplate,
 } from "../../lib/types";
 
@@ -13,6 +14,7 @@ type Props = {
   currentTemplate: WorkbenchTemplate | null;
   options: RenderOptionsPayload;
   sizeOptions: Array<{ id: string; label: string }>;
+  styleOptions: WorkbenchStyle[];
   paletteOptions: WorkbenchPalette[];
   tensileCurveMode: boolean;
   onUpdateOptions(value: Partial<RenderOptionsPayload>): void;
@@ -24,10 +26,16 @@ export function WizardOptionsSection({
   currentTemplate,
   options,
   sizeOptions,
+  styleOptions,
   paletteOptions,
   tensileCurveMode,
   onUpdateOptions,
 }: Props) {
+  const selectedStyle =
+    styleOptions.find((choice) => choice.id === (options.style_preset ?? meta?.default_style)) ??
+    styleOptions[0] ??
+    null;
+
   return (
     <section className="work-card section-card wizard-pane">
       <div className="panel-heading">
@@ -35,7 +43,7 @@ export function WizardOptionsSection({
           <div className="card-kicker">Options</div>
           <h3>Key controls</h3>
         </div>
-        <InfoTip content="Keep this area small on purpose. Only the most useful controls stay visible by default." />
+        <InfoTip content="Keep this area small on purpose. Surface the few controls that materially change submission readiness." />
       </div>
       {!template ? (
         <div className="placeholder-card">
@@ -93,6 +101,27 @@ export function WizardOptionsSection({
                 >
                   <option value="linear">Linear</option>
                   {!tensileCurveMode && <option value="log">Log</option>}
+                </select>
+              </label>
+            )}
+
+            {currentTemplate?.editable_options.includes("style_preset") && (
+              <label>
+                <span className="field-label">Submission mode</span>
+                <select
+                  className="field"
+                  value={options.style_preset ?? meta?.default_style ?? ""}
+                  onChange={(event) =>
+                    onUpdateOptions({
+                      style_preset: event.target.value,
+                    })
+                  }
+                >
+                  {styleOptions.map((choice) => (
+                    <option key={choice.id} value={choice.id}>
+                      {choice.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             )}
@@ -155,6 +184,18 @@ export function WizardOptionsSection({
               <span>
                 Tensile curves stay on linear x/y scales throughout recommendation,
                 review, and render.
+              </span>
+            </div>
+          )}
+
+          {selectedStyle && (
+            <div className="focus-panel">
+              <strong>{selectedStyle.label}</strong>
+              <span>{selectedStyle.preset_note}</span>
+              <span>
+                {selectedStyle.hard_constraints
+                  ? "This mode keeps tighter editorial constraints for submission-facing output."
+                  : "This mode keeps the most forgiving defaults for stable everyday plotting."}
               </span>
             </div>
           )}

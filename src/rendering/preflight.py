@@ -19,6 +19,7 @@ from src.rendering.common import (
 )
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
 from src.rendering.recommendation import detect_point_line_bundle
+from src.submission import build_render_submission_report
 
 
 def preflight_render_request(
@@ -80,6 +81,14 @@ def preflight_render_request(
         warnings=tuple(warnings),
         errors=tuple(errors),
         output_filenames=preview_names,
+        submission_report=build_render_submission_report(
+            context="preflight",
+            template=template,
+            options=options,
+            output_filenames=preview_names,
+            blockers=errors,
+            warnings=warnings,
+        ),
     )
 
 

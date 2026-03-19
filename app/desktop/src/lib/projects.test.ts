@@ -14,6 +14,7 @@ describe("extractWizardProject", () => {
         options: {
           size: "60x55",
           reverse_x: true,
+          style_preset: "nature",
         },
         outputs: ["/tmp/demo_curve.pdf"],
       },
@@ -22,6 +23,7 @@ describe("extractWizardProject", () => {
     expect(project.mode).toBe("wizard");
     expect(project.wizard.sheet).toBe("Summary");
     expect(project.wizard.options.reverse_x).toBe(true);
+    expect(project.wizard.options.style_preset).toBe("nature");
     expect(project.wizard.outputs).toEqual(["/tmp/demo_curve.pdf"]);
   });
 
