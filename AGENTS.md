@@ -6,15 +6,18 @@
 
 - `src/`: 绘图内核、数据加载、布局规则、拉伸预处理、拼图后端。
 - `src/rendering/`: 绘图服务层；现在按 `inspect / recommendation / preflight / render / cache / options / io` 拆开，CLI 和 sidecar 都只应该调用这一层。
-- `src/plotting.py`: 仍保留核心绘图实现；如果只是复用绘图家族入口，优先从 `src/plotting_families/` 进入，不要继续把新调用点直接绑死到这个大文件。
-- `src/composer.py`: Composer v2 后端真相源；维护 `layout_grid / regions / slot / z_index / group_id / crop_rect / hidden`、拼图预览和可编辑 PDF 导出。
+- `src/plotting.py`: 仍保留核心绘图实现与公开绘图门面；如果只是复用绘图家族入口，优先从 `src/plotting_families/` 进入，不要继续把新调用点直接绑死到这个大文件。
+- `src/plotting_curves.py`: 曲线图族主流程实现，承接 `plot_curves / plot_scatter / curve template / legend` 等编排逻辑；外部兼容调用仍通过 `src/plotting.py` 暴露。
+- `src/plotting_stats.py`: 统计图族实现，承接 `box / bar / violin` 及其共享坐标规则；外部兼容调用仍通过 `src/plotting.py` 暴露。
+- `src/plotting_heatmap.py`: 热图实现，承接 heatmap 主图区与 colorbar 布局；外部兼容调用仍通过 `src/plotting.py` 暴露。
+- `src/composer.py`: Composer v2 后端公开入口与真相源门面；外部调用继续统一从这里 import。类型与常量在 `src/composer_types.py`，布局/导入/校验在 `src/composer_ops.py`，预览/导出在 `src/composer_render.py`。
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
 - `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `tensile / wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
 - `app/desktop/src/screens/composer/`: Composer 屏专属 hooks、面板组件和选择态/快捷键等 UI 行为模块；优先在这里继续拆分，不要再把导入、inspect、layers、快捷键逻辑重新堆回单个 `ComposerScreen.tsx`。
 - `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
-- `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；共享 token 和通用布局仍走主样式入口，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
+- `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。

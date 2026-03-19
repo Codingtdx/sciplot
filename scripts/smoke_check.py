@@ -48,8 +48,6 @@ from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
     _cap_visible_major_ticks,
     _format_axis_label,
-    _legend_candidates,
-    _place_legend_candidate,
     compute_shared_curve_x_layout,
     plot_bar,
     plot_box,
@@ -63,6 +61,7 @@ from src.plotting import (
     plot_wide_nmr,
     plot_xrd,
 )
+from src.plotting_curves import _legend_candidates, _place_legend_candidate
 from src.rheology_loader import load_frequency_sweep_metrics, load_temperature_sweep_metrics
 from src.tensile_replicates import export_tensile_replicate_workbook
 from src.text_normalization import normalize_label, normalize_unit
