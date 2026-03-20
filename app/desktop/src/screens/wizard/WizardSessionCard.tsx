@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type {
   RequestActivity,
   SubmissionReport,
@@ -52,7 +51,6 @@ export function WizardSessionCard({
         <div>
           <h3>Session</h3>
         </div>
-        <InfoTip content="This compact summary replaces the old duplicate status cards. Critical blockers still stay visible in the main flow." />
       </div>
       <div className="wizard-summary-list">
         <div className="wizard-summary-row">
@@ -68,32 +66,30 @@ export function WizardSessionCard({
           <strong>{templateLabel(meta, template)}</strong>
         </div>
         <div className="wizard-summary-row">
-          <span>Mode</span>
-          <strong>{styleLabel(meta, stylePreset)}</strong>
-        </div>
-        <div className="wizard-summary-row">
           <span>Status</span>
           <strong>{statusChip.label}</strong>
         </div>
         <div className="wizard-summary-row">
-          <span>Preview</span>
-          <strong>{previewActivity}</strong>
+          <span>Style</span>
+          <strong>{styleLabel(meta, stylePreset)}</strong>
         </div>
         <div className="wizard-summary-row">
-          <span>Preflight</span>
-          <strong>{preflightActivity}</strong>
+          <span>Checks</span>
+          <strong>
+            {previewActivity === "idle" && preflightActivity === "idle"
+              ? "Idle"
+              : `${previewActivity} / ${preflightActivity}`}
+          </strong>
         </div>
         <div className="wizard-summary-row">
           <span>Readiness</span>
           <strong>{submissionReport?.readiness ?? "-"}</strong>
         </div>
         <div className="wizard-summary-row">
-          <span>Previews</span>
-          <strong>{previewsCount}</strong>
-        </div>
-        <div className="wizard-summary-row">
-          <span>Exports</span>
-          <strong>{outputsCount}</strong>
+          <span>Preview / export</span>
+          <strong>
+            {previewsCount} / {outputsCount}
+          </strong>
         </div>
       </div>
 

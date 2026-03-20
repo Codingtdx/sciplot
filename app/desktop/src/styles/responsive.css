@@ -9,7 +9,7 @@
   }
 }
 
-@media (max-width: 1440px), (max-height: 900px) {
+@media (max-width: 1280px), (max-height: 760px) {
   .desk-layout {
     grid-template-columns: 1fr;
   }

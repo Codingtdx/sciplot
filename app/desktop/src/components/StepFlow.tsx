@@ -15,12 +15,10 @@ export function StepFlow({ current }: { current: WizardStep }) {
             className={`flow-step ${status}`}
             key={step.id}
             role="listitem"
+            title={step.hint}
           >
             <span className="flow-step-index">{String(index + 1).padStart(2, "0")}</span>
-            <span className="flow-step-copy">
-              <strong>{step.label}</strong>
-              <span className="flow-step-hint">{step.hint}</span>
-            </span>
+            <strong>{step.label}</strong>
           </div>
         );
       })}

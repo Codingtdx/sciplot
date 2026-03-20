@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type {
   RenderOptionsPayload,
   TemplateName,
@@ -40,18 +39,15 @@ export function WizardOptionsSection({
     <section className="work-card section-card wizard-pane">
       <div className="panel-heading">
         <div>
-          <div className="card-kicker">Options</div>
+          <div className="card-kicker">Adjust</div>
           <h3>Key controls</h3>
         </div>
-        <InfoTip content="Keep this area small on purpose. Surface the few controls that materially change submission readiness." />
       </div>
       {!template ? (
-        <div className="placeholder-card">
-          Choose a template to unlock size, axis, and export options.
-        </div>
+        <div className="placeholder-card">Pick a template.</div>
       ) : (
         <div className="wizard-section-stack">
-          <div className="field-grid wizard-tight-grid">
+          <div className="field-grid wizard-options-grid wizard-tight-grid">
             <label>
               <span className="field-label">Size</span>
               <select
@@ -179,30 +175,26 @@ export function WizardOptionsSection({
           </div>
 
           {tensileCurveMode && (
-            <div className="focus-panel">
-              <strong>Tensile axis lock</strong>
-              <span>
-                Tensile curves stay on linear x/y scales throughout recommendation,
-                review, and render.
-              </span>
-            </div>
+            <div className="hint-text">Tensile curves keep linear x/y scales.</div>
           )}
 
           {selectedStyle && (
-            <div className="focus-panel">
-              <strong>{selectedStyle.label}</strong>
-              <span>{selectedStyle.preset_note}</span>
-              <span>
-                {selectedStyle.hard_constraints
-                  ? "This mode keeps tighter editorial constraints for submission-facing output."
-                  : "This mode keeps the most forgiving defaults for stable everyday plotting."}
-              </span>
-            </div>
+            <details className="wizard-details">
+              <summary>{selectedStyle.label}</summary>
+              <div className="wizard-details-body">
+                <div>{selectedStyle.preset_note}</div>
+                <div>
+                  {selectedStyle.hard_constraints
+                    ? "Tighter editorial constraints stay on."
+                    : "Uses the most forgiving defaults."}
+                </div>
+              </div>
+            </details>
           )}
 
           {currentTemplate?.editable_options.includes("palette_preset") && (
-            <details>
-              <summary>More options</summary>
+            <details className="wizard-details">
+              <summary>Palette</summary>
               <div className="field-grid compact-grid advanced-grid wizard-tight-grid">
                 <label>
                   <span className="field-label">Palette</span>

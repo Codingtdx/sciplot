@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type {
   ExportResponse,
   PreflightResult,
@@ -70,18 +69,15 @@ export function WizardExportSection({
     <section className="work-card section-card wizard-pane">
       <div className="panel-heading">
         <div>
-          <div className="card-kicker">Review</div>
-          <h3>Submission review and export</h3>
+          <div className="card-kicker">Export</div>
+          <h3>Review and export</h3>
         </div>
-        <InfoTip content="Preview and preflight refresh automatically. Export writes the final PDF together with a manuscript-ready support bundle." />
       </div>
       <div className="wizard-section-stack">
         {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
         {!preflightRequestError && preflightBusy && (
           <div className="placeholder-card">
-            {preflightActivity === "scheduled"
-              ? "Queueing preflight..."
-              : "Refreshing preflight results..."}
+            {preflightActivity === "scheduled" ? "Queueing checks…" : "Refreshing checks…"}
           </div>
         )}
         {!preflightRequestError && !preflightBusy && preflight && (
@@ -96,13 +92,11 @@ export function WizardExportSection({
                 </ul>
               </div>
             ) : (
-              <div className="success-card">
-                Preflight passed. This figure is ready to export.
-              </div>
+              <div className="success-card">Ready to export.</div>
             )}
             {preflight.warnings.length > 0 && (
-              <details>
-                <summary>Preflight warnings</summary>
+              <details className="wizard-details">
+                <summary>{preflight.warnings.length} preflight warning(s)</summary>
                 <ul className="bullet-list">
                   {preflight.warnings.map((item) => (
                     <li key={item}>{item}</li>
@@ -113,20 +107,8 @@ export function WizardExportSection({
           </>
         )}
         {!preflight && !preflightBusy && !preflightRequestError && (
-          <div className="placeholder-card">
-            Preflight starts automatically once the file and template are ready.
-          </div>
+          <div className="placeholder-card">Checks start automatically.</div>
         )}
-
-        <div className="focus-panel">
-          <strong>Auto-check status</strong>
-          <span>
-            Preview: {previewActivity}. Preflight: {preflightActivity}.
-          </span>
-          <span>
-            Only hard blockers stop export. Editorial checks stay visible as review guidance.
-          </span>
-        </div>
 
         <div className="step-actions">
           <button
@@ -144,8 +126,8 @@ export function WizardExportSection({
           )}
         </div>
 
-        <div className="focus-panel">
-          <strong>{hasExportedOutputs ? "Final PDF outputs" : "Expected outputs"}</strong>
+        <details className="wizard-details" open={hasExportedOutputs}>
+          <summary>{hasExportedOutputs ? "Output files" : "Expected files"}</summary>
           {outputItems.length > 0 ? (
             <ul className="output-list">
               {outputItems.map((item) => (
@@ -153,33 +135,38 @@ export function WizardExportSection({
               ))}
             </ul>
           ) : (
-            <span>No output files are available yet.</span>
+            <div className="wizard-details-body">No files yet.</div>
           )}
-        </div>
+        </details>
 
         {submissionReport && (
-          <div className="focus-panel">
+          <div className="focus-panel wizard-readiness-panel">
             <strong>Submission review</strong>
             <span className={`status-pill ${readinessTone}`}>{readinessLabel}</span>
             <span>{submissionReport.summary}</span>
             {highlightedChecks.length > 0 && (
-              <ul className="bullet-list">
-                {highlightedChecks.map((check) => (
-                  <li key={check.id}>{check.message}</li>
-                ))}
-              </ul>
+              <details className="wizard-details">
+                <summary>{highlightedChecks.length} flagged check(s)</summary>
+                <ul className="bullet-list">
+                  {highlightedChecks.map((check) => (
+                    <li key={check.id}>{check.message}</li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         )}
 
         {exportResult && (
-          <div className="focus-panel">
-            <strong>Submission package</strong>
-            {outputDirectory && <span>Folder: {outputDirectory}</span>}
-            {artifacts.previewOutputs.length > 0 && (
-              <span>{artifacts.previewOutputs.length} preview PNG file(s) were written next to the PDFs.</span>
-            )}
-            {manifestPath && <span>Manifest: {formatLeaf(manifestPath)}</span>}
+          <details className="wizard-details" open>
+            <summary>Bundle files</summary>
+            <div className="wizard-details-body">
+              {outputDirectory && <div>Folder: {outputDirectory}</div>}
+              {artifacts.previewOutputs.length > 0 && (
+                <div>{artifacts.previewOutputs.length} preview PNG file(s) written.</div>
+              )}
+              {manifestPath && <div>Manifest: {formatLeaf(manifestPath)}</div>}
+            </div>
             {artifacts.reportArtifacts.length > 0 && (
               <ul className="bullet-list">
                 {artifacts.reportArtifacts.map((item) => (
@@ -187,7 +174,7 @@ export function WizardExportSection({
                 ))}
               </ul>
             )}
-          </div>
+          </details>
         )}
       </div>
     </section>

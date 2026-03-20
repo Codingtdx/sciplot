@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type { InputInspection, WorkbenchMeta } from "../../lib/types";
 import { templateLabel } from "../../lib/workbench";
 
@@ -12,15 +11,12 @@ export function WizardDetectSection({ inspection, meta }: Props) {
     <section className="work-card section-card wizard-pane">
       <div className="panel-heading">
         <div>
-          <div className="card-kicker">Detect</div>
+          <div className="card-kicker">Detected</div>
           <h3>Input fit</h3>
         </div>
-        <InfoTip content="The recommendation comes from the detected table structure, labels, units, and scale behavior." />
       </div>
       {!inspection ? (
-        <div className="placeholder-card">
-          Load a dataset to see the detected model and recommended template.
-        </div>
+        <div className="placeholder-card">Open data to detect the model.</div>
       ) : (
         <div className="wizard-section-stack">
           <div className="info-grid wizard-tight-grid">
@@ -33,23 +29,23 @@ export function WizardDetectSection({ inspection, meta }: Props) {
               <strong>{templateLabel(meta, inspection.recommendation.template)}</strong>
             </div>
           </div>
-          <div className="focus-panel">
-            <strong>Why this fit</strong>
-            <span>{inspection.recommendation.reason}</span>
-          </div>
+          <details className="wizard-details">
+            <summary>Why this choice</summary>
+            <div className="wizard-details-body">{inspection.recommendation.reason}</div>
+          </details>
           {inspection.warnings.length > 0 && (
-            <div className="warning-card">
-              <strong>Input warnings</strong>
+            <details className="wizard-details" open>
+              <summary>{inspection.warnings.length} input warning(s)</summary>
               <ul className="bullet-list">
                 {inspection.warnings.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-            </div>
+            </details>
           )}
           {inspection.signals.length > 0 && (
-            <details>
-              <summary>Detection signals</summary>
+            <details className="wizard-details">
+              <summary>{inspection.signals.length} detection signal(s)</summary>
               <ul className="bullet-list">
                 {inspection.signals.map((item) => (
                   <li key={item}>{item}</li>

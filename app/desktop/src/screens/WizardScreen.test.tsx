@@ -203,7 +203,7 @@ describe("WizardScreen", () => {
     expect(getTemplateButton("Curve")).toBeInTheDocument();
     expect(queryTemplateButton("Heatmap")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse all templates" }));
+    fireEvent.click(screen.getByRole("button", { name: "More types" }));
 
     const heatmapButton = getTemplateButton("Heatmap");
     expect(heatmapButton).toBeDisabled();
@@ -333,7 +333,7 @@ describe("WizardScreen", () => {
     });
 
     expect(screen.queryByRole("option", { name: "log" })).not.toBeInTheDocument();
-    expect(screen.getByText("Tensile curves stay on linear x/y scales throughout recommendation, review, and render.")).toBeInTheDocument();
+    expect(screen.getByText("Tensile curves keep linear x/y scales.")).toBeInTheDocument();
   });
 
   it("lets the user switch the public submission style from wizard options", () => {

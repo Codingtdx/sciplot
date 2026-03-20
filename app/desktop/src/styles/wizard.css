@@ -1,40 +1,47 @@
 .wizard-workspace-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .wizard-workspace-head {
   align-items: center;
 }
 
+.wizard-shell-head {
+  gap: 10px;
+}
+
+.wizard-shell-copy h2 {
+  margin: 2px 0 0;
+  font-size: 1.02rem;
+}
+
 .wizard-inline-chips {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 8px;
 }
 
 .wizard-pane-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-pane {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -42,7 +49,7 @@
 
 .wizard-pane h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.96rem;
 }
 
 .wizard-hero-card {
@@ -55,30 +62,30 @@
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-inline-field {
-  min-width: min(280px, 100%);
+  min-width: min(220px, 100%);
 }
 
 .wizard-callout-stack,
 .wizard-section-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-section-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .wizard-content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.88fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.8fr);
+  gap: 10px;
   align-items: start;
 }
 
@@ -90,7 +97,7 @@
 .wizard-main-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .wizard-status-card {
@@ -108,15 +115,15 @@
 
 .wizard-template-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px;
 }
 
 .wizard-template-chip {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 3px;
+  padding: 8px 10px;
   border-radius: calc(var(--radius-md) + 1px);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -130,13 +137,13 @@
 }
 
 .wizard-template-chip strong {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .wizard-template-chip span {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .wizard-template-chip:hover {
@@ -172,7 +179,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -192,14 +199,14 @@
 .wizard-compare-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-compare-item {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -209,7 +216,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-compare-head strong {
@@ -221,7 +228,34 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 1440px), (max-height: 900px) {
+.wizard-empty-state {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+}
+
+.wizard-options-grid {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+
+.wizard-details {
+  margin: 0;
+}
+
+.wizard-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.wizard-readiness-panel {
+  gap: 6px;
+}
+
+@media (max-width: 1280px), (max-height: 760px) {
   .wizard-content-grid {
     grid-template-columns: 1fr;
   }
@@ -235,7 +269,8 @@
   .wizard-content-grid,
   .wizard-pane-grid,
   .wizard-section-grid,
-  .wizard-template-grid {
+  .wizard-template-grid,
+  .wizard-options-grid {
     grid-template-columns: 1fr;
   }
 }

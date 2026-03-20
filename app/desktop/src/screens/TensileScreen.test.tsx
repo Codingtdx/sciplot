@@ -182,9 +182,7 @@ describe("TensileScreen", () => {
       );
     });
 
-    expect(
-      screen.getByText(/Prepared 2 replicate samples\. The representative curve comes from BlendSet_A\.csv/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Prepared 2 samples from BlendSet_A\.csv/)).toBeInTheDocument();
     expect(loadWizardDataFile).not.toHaveBeenCalled();
     expect(useTensileStore.getState().preprocessResult?.output_path).toBe(
       TEST_PREPROCESS_RESPONSE.output_path,

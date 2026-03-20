@@ -68,9 +68,6 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
       <div className="preview-toolbar">
         <div>
           <div className="preview-title">{current?.filename ?? "Preview"}</div>
-          <div className="preview-subtitle">
-            {current ? "Live preview" : "Updates automatically after template or option changes"}
-          </div>
         </div>
         <div className="preview-nav">
           <button

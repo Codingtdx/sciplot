@@ -213,9 +213,19 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
 
   const blockingErrors = wizard.preflight?.errors ?? [];
   const hasBlockingErrors = blockingErrors.length > 0 || Boolean(preflightRequestError);
+  const hasInput = Boolean(wizard.inputPath);
+  const hasInspection = wizard.inspection != null;
+  const hasTemplate = Boolean(wizard.template);
+  const showWorkspace = hasInput || hasInspection || hasTemplate;
+  const showReviewStage =
+    hasTemplate &&
+    (wizard.preflight != null ||
+      preflightBusy ||
+      Boolean(preflightRequestError) ||
+      wizard.outputs.length > 0);
   const canExport =
-    Boolean(wizard.inputPath) &&
-    Boolean(wizard.template) &&
+    hasInput &&
+    hasTemplate &&
     wizard.sidecarReady &&
     !wizard.busy &&
     !previewBusy &&
@@ -390,23 +400,19 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   return (
     <div className="desk-layout wizard-layout">
       <section className="desk-main wizard-main">
-        <article className="work-card hero-card wizard-workspace-card">
-          <div className="section-head wizard-workspace-head">
-            <div>
+        <article className="work-card hero-card wizard-workspace-card wizard-shell-card">
+          <div className="section-head wizard-workspace-head wizard-shell-head">
+            <div className="wizard-shell-copy">
               <div className="card-kicker">Plot Flow</div>
-              <h2>Single-figure workflow</h2>
-              <p>
-                Import, review, tune essentials, and export from one focused
-                workspace.
-              </p>
+              <h2>{hasInput ? formatLeaf(wizard.inputPath) : "Open a data file"}</h2>
             </div>
             <div className="wizard-inline-chips">
-              {wizard.inputPath && <span className="signal-tag">{formatLeaf(wizard.inputPath)}</span>}
+              {hasTemplate && (
+                <span className="signal-tag">{templateLabel(meta, wizard.template)}</span>
+              )}
               <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
             </div>
           </div>
-
-          <StepFlow current={wizard.step} />
 
           <div className="wizard-toolbar">
             <button className="primary-button" onClick={openDataFile} type="button">
@@ -439,6 +445,14 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
             )}
           </div>
 
+          {hasInput ? (
+            <StepFlow current={wizard.step} />
+          ) : (
+            <div className="placeholder-card wizard-empty-state">
+              Choose a CSV, TXT, TSV, or workbook to start.
+            </div>
+          )}
+
           {wizard.error && <div className="error-card">{wizard.error}</div>}
           {!wizard.sidecarReady && (
             <div className="warning-card">
@@ -448,80 +462,92 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
           )}
         </article>
 
-        <div className="wizard-content-grid">
-          <div className="wizard-main-stack">
-            <WizardDetectSection inspection={wizard.inspection} meta={meta} />
+        {showWorkspace && (
+          <div className="wizard-content-grid">
+            <div className="wizard-main-stack">
+              {hasInspection && (
+                <WizardDetectSection inspection={wizard.inspection} meta={meta} />
+              )}
 
-            <WizardTemplatesSection
-              compatibleTemplates={compatibleTemplates}
-              incompatibleTemplates={incompatibleTemplates}
-              inspection={wizard.inspection}
-              onSelectTemplate={updateWizardTemplate}
-              onToggleShowAllTemplates={() =>
-                setShowAllTemplates((current) => !current)
-              }
-              selectedTemplate={wizard.template}
-              showAllTemplates={showAllTemplates}
-            />
+              {hasInspection && (
+                <WizardTemplatesSection
+                  compatibleTemplates={compatibleTemplates}
+                  incompatibleTemplates={incompatibleTemplates}
+                  inspection={wizard.inspection}
+                  onSelectTemplate={updateWizardTemplate}
+                  onToggleShowAllTemplates={() =>
+                    setShowAllTemplates((current) => !current)
+                  }
+                  selectedTemplate={wizard.template}
+                  showAllTemplates={showAllTemplates}
+                />
+              )}
 
-            <WizardOptionsSection
-              currentTemplate={currentTemplate}
-              meta={meta}
-              onUpdateOptions={updateWizardOptions}
-              options={wizard.options}
-              paletteOptions={paletteOptions}
-              sizeOptions={sizeOptions}
-              styleOptions={styleOptions}
-              template={wizard.template}
-              tensileCurveMode={tensileCurveMode}
-            />
+              {hasTemplate && (
+                <WizardOptionsSection
+                  currentTemplate={currentTemplate}
+                  meta={meta}
+                  onUpdateOptions={updateWizardOptions}
+                  options={wizard.options}
+                  paletteOptions={paletteOptions}
+                  sizeOptions={sizeOptions}
+                  styleOptions={styleOptions}
+                  template={wizard.template}
+                  tensileCurveMode={tensileCurveMode}
+                />
+              )}
 
-            <WizardExportSection
-              blockingErrors={blockingErrors}
-              canExport={canExport}
-              exportResult={wizard.exportResult}
-              hasExportedOutputs={wizard.outputs.length > 0}
-              onExport={() => void runExport()}
-              onOpenOutputDir={() => void openOutputFolder()}
-              outputItems={expectedOutputs}
-              preflight={wizard.preflight}
-              preflightActivity={preflightActivity}
-              preflightBusy={preflightBusy}
-              preflightRequestError={preflightRequestError}
-              previewActivity={previewActivity}
-              submissionReport={wizard.submissionReport}
-            />
+              {showReviewStage && (
+                <WizardExportSection
+                  blockingErrors={blockingErrors}
+                  canExport={canExport}
+                  exportResult={wizard.exportResult}
+                  hasExportedOutputs={wizard.outputs.length > 0}
+                  onExport={() => void runExport()}
+                  onOpenOutputDir={() => void openOutputFolder()}
+                  outputItems={expectedOutputs}
+                  preflight={wizard.preflight}
+                  preflightActivity={preflightActivity}
+                  preflightBusy={preflightBusy}
+                  preflightRequestError={preflightRequestError}
+                  previewActivity={previewActivity}
+                  submissionReport={wizard.submissionReport}
+                />
+              )}
+            </div>
+
+            <aside className="desk-context wizard-context">
+              {hasTemplate && (
+                <PreviewPane
+                  busy={previewBusy}
+                  error={previewError}
+                  onChangeIndex={wizard.setPreviewIndex}
+                  previewIndex={wizard.previewIndex}
+                  previews={wizard.previews}
+                />
+              )}
+
+              <WizardSessionCard
+                blockingErrorsCount={blockingErrors.length}
+                hasBlockingErrors={hasBlockingErrors}
+                inputPath={wizard.inputPath}
+                inspectionWarningsCount={wizard.inspection?.warnings.length ?? 0}
+                meta={meta}
+                outputsCount={wizard.outputs.length}
+                preflightRequestError={preflightRequestError}
+                preflightActivity={preflightActivity}
+                preflightWarningsCount={wizard.preflight?.warnings.length ?? 0}
+                previewActivity={previewActivity}
+                previewsCount={wizard.previews.length}
+                sheet={wizard.sheet}
+                statusChip={statusChip}
+                stylePreset={wizard.options.style_preset ?? meta?.default_style ?? null}
+                submissionReport={wizard.submissionReport}
+                template={wizard.template}
+              />
+            </aside>
           </div>
-
-          <aside className="desk-context wizard-context">
-            <PreviewPane
-              busy={previewBusy}
-              error={previewError}
-              onChangeIndex={wizard.setPreviewIndex}
-              previewIndex={wizard.previewIndex}
-              previews={wizard.previews}
-            />
-
-            <WizardSessionCard
-              blockingErrorsCount={blockingErrors.length}
-              hasBlockingErrors={hasBlockingErrors}
-              inputPath={wizard.inputPath}
-              inspectionWarningsCount={wizard.inspection?.warnings.length ?? 0}
-              meta={meta}
-              outputsCount={wizard.outputs.length}
-              preflightRequestError={preflightRequestError}
-              preflightActivity={preflightActivity}
-              preflightWarningsCount={wizard.preflight?.warnings.length ?? 0}
-              previewActivity={previewActivity}
-              previewsCount={wizard.previews.length}
-              sheet={wizard.sheet}
-              statusChip={statusChip}
-              stylePreset={wizard.options.style_preset ?? meta?.default_style ?? null}
-              submissionReport={wizard.submissionReport}
-              template={wizard.template}
-            />
-          </aside>
-        </div>
+        )}
       </section>
     </div>
   );

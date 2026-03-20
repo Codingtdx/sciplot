@@ -55,16 +55,16 @@
   --placeholder-bg: rgba(255, 255, 255, 0.72);
   --placeholder-fg: rgba(16, 33, 51, 0.66);
   --overlay-bg: rgba(236, 243, 250, 0.78);
-  --radius-xl: clamp(18px, 1.8vw, 24px);
-  --radius-lg: clamp(15px, 1.4vw, 20px);
-  --radius-md: clamp(12px, 1vw, 16px);
-  --space-xl: clamp(18px, 1.6vw, 22px);
-  --space-lg: clamp(14px, 1.2vw, 18px);
-  --space-md: clamp(10px, 0.9vw, 14px);
-  --space-sm: clamp(8px, 0.7vw, 10px);
-  --title-size: clamp(1.5rem, 1.8vw, 1.95rem);
-  --subtitle-size: clamp(1rem, 1.18vw, 1.2rem);
-  --button-height: clamp(34px, 3vw, 38px);
+  --radius-xl: clamp(16px, 1.5vw, 22px);
+  --radius-lg: clamp(13px, 1.1vw, 18px);
+  --radius-md: clamp(10px, 0.8vw, 14px);
+  --space-xl: clamp(14px, 1.2vw, 18px);
+  --space-lg: clamp(10px, 0.9vw, 14px);
+  --space-md: clamp(8px, 0.7vw, 11px);
+  --space-sm: clamp(6px, 0.5vw, 8px);
+  --title-size: clamp(1.3rem, 1.45vw, 1.7rem);
+  --subtitle-size: clamp(0.96rem, 1vw, 1.08rem);
+  --button-height: clamp(30px, 2.4vw, 34px);
   --motion-fast: 160ms ease;
   --motion-medium: 220ms ease;
 }

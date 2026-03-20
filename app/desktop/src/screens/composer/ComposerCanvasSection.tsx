@@ -48,8 +48,7 @@ export function ComposerCanvasSection({
       <div className="section-head">
         <div>
           <div className="card-kicker">Layout Studio</div>
-          <h2>Arrange one editable figure sheet</h2>
-          <p>Graph PDFs snap into regions. Assets and text stay flexible on top of the layout grid.</p>
+          <h2>Composer canvas</h2>
         </div>
         <div className="metric-strip">
           <div className="metric-chip">
@@ -73,10 +72,10 @@ export function ComposerCanvasSection({
           Import asset
         </button>
         <button className="ghost-button" onClick={onQuickThreeUp} type="button">
-          Three-up preset
+          3-up preset
         </button>
         <button className="ghost-button" onClick={onExportComposer} type="button">
-          Export editable PDF
+          Export PDF
         </button>
       </div>
 
@@ -86,8 +85,8 @@ export function ComposerCanvasSection({
             <strong>Drop to import</strong>
             <span>
               {pdfImportMode === "graph"
-                ? "CodeGod graph PDFs in 60x55, 120x55, or 60x110 mm snap into matching grid regions."
-                : "PDF and raster files import as free assets that can crop, snap, stack, and export as editable content."}
+                ? "Graph PDFs in 60x55, 120x55, or 60x110 mm snap into matching regions."
+                : "PDF and raster files import as free assets."}
             </span>
           </div>
         </div>
@@ -108,10 +107,8 @@ export function ComposerCanvasSection({
 
         {project.panels.length === 0 && !busy && (
           <div className="composer-empty-state">
-            <strong>Start by importing graph PDFs or assets</strong>
-            <span>
-              Graph PDFs occupy grid-backed regions. Assets and text remain free-form and still export as editable layers.
-            </span>
+            <strong>Import graph PDFs or assets</strong>
+            <span>Graphs snap to regions. Assets and text stay free-form.</span>
           </div>
         )}
 

@@ -261,7 +261,6 @@ export default function App() {
           <div className="topbar-copy">
             <span className="eyebrow">{meta.eyebrow}</span>
             <h1>{meta.title}</h1>
-            <p>{meta.description}</p>
           </div>
 
           <div className="status-pills">

@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type { InputInspection, TemplateName, WorkbenchTemplate } from "../../lib/types";
 import { templateCompatibilityReason } from "../../lib/workbench";
 
@@ -25,15 +24,12 @@ export function WizardTemplatesSection({
     <section className="work-card section-card wizard-pane">
       <div className="panel-heading">
         <div>
-          <div className="card-kicker">Templates</div>
-          <h3>Compatible templates</h3>
+          <div className="card-kicker">Template</div>
+          <h3>Pick a chart type</h3>
         </div>
-        <InfoTip content="Only templates that match the detected input stay in the primary list. Incompatible templates remain disabled in the overflow list." />
       </div>
       {!inspection ? (
-        <div className="placeholder-card">
-          Template choices appear after the file has been inspected.
-        </div>
+        <div className="placeholder-card">Templates appear after inspect.</div>
       ) : (
         <div className="wizard-section-stack">
           <div className="wizard-template-grid">
@@ -48,7 +44,7 @@ export function WizardTemplatesSection({
                 <span>
                   {template.id === inspection.recommendation.template
                     ? "Recommended"
-                    : template.category.replace(/_/g, " ")}
+                    : "Compatible"}
                 </span>
               </button>
             ))}
@@ -56,7 +52,7 @@ export function WizardTemplatesSection({
           {incompatibleTemplates.length > 0 && (
             <>
               <button className="ghost-button" onClick={onToggleShowAllTemplates} type="button">
-                {showAllTemplates ? "Hide incompatible templates" : "Browse all templates"}
+                {showAllTemplates ? "Hide more types" : "More types"}
               </button>
               {showAllTemplates && (
                 <div className="wizard-section-stack">
@@ -72,7 +68,7 @@ export function WizardTemplatesSection({
                         type="button"
                       >
                         <strong>{template.label}</strong>
-                        <span>{template.category.replace(/_/g, " ")}</span>
+                        <span>Not compatible</span>
                       </button>
                     ))}
                   </div>

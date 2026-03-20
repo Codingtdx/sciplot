@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type { ComposerLayerItem } from "./useComposerSelectionState";
 
 type Props = {
@@ -36,9 +35,8 @@ export function ComposerLayersPanel({
     <article className="context-card">
       <div className="panel-heading">
         <div>
-          <h3>Layers and regions</h3>
+          <h3>Layers</h3>
         </div>
-        <InfoTip content="Shortcuts: Shift for multi-select, Alt-drag to duplicate, Cmd/Ctrl+C V D G, and arrow keys for position edits." />
       </div>
 
       <div className="context-list">
@@ -54,16 +52,12 @@ export function ComposerLayersPanel({
           <span>Validation</span>
           <strong>{validationError ? "Issues" : "Clear"}</strong>
         </div>
-        <div className="context-row">
-          <span>Shortcuts</span>
-          <strong>Shift / Ctrl-click / Alt-drag / Cmd+C V D G / Arrow keys</strong>
-        </div>
       </div>
 
       {selectedObjectCount > 0 && (
         <div className="inspector-stack">
           <div className="hint-text">
-            {selectedObjectCount} object(s) selected, including {selectedHiddenCount} hidden and {selectedLockedCount} locked.
+            {selectedObjectCount} selected · {selectedHiddenCount} hidden · {selectedLockedCount} locked
           </div>
           <div className="stacked-actions">
             <button

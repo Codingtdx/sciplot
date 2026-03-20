@@ -253,8 +253,7 @@ export function TensileScreen({
           <div className="section-head wizard-workspace-head">
             <div>
               <div className="card-kicker">Material Lab</div>
-              <h2>Tensile workspace</h2>
-              <p>Prepare raw runs, queue workbooks, and export a clean comparison set.</p>
+              <h2>Tensile queue</h2>
             </div>
             <div className="wizard-inline-chips">
               {tensile.preprocessResult && (
@@ -278,7 +277,7 @@ export function TensileScreen({
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Prepare</div>
-                  <h3>Build a workbook</h3>
+                  <h3>Build workbook</h3>
                 </div>
                 <InfoTip content="Preparing creates a workbook that can be reopened in Plot Builder or added to the comparison queue without switching screens automatically." />
               </div>
@@ -309,11 +308,11 @@ export function TensileScreen({
               </div>
 
               {!latestPreprocessResult ? (
-                <div className="placeholder-card">Select multiple raw CSV files to generate one reusable workbook.</div>
+                <div className="placeholder-card">Select raw CSV files to generate one workbook.</div>
               ) : (
                 <div className="wizard-callout-stack">
                   <div className="success-card">
-                    Prepared {latestPreprocessResult.sample_count} replicate samples. The representative curve comes from{" "}
+                    Prepared {latestPreprocessResult.sample_count} samples from{" "}
                     {latestPreprocessResult.representative_filename}.
                   </div>
                   <div className="summary-grid wizard-tight-grid">
@@ -352,13 +351,13 @@ export function TensileScreen({
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Compare</div>
-                  <h3>Export a comparison set</h3>
+                  <h3>Compare workbooks</h3>
                 </div>
                 <InfoTip content="Two or more prepared workbooks are required. The compare export always keeps the fixed 60 x 55 mm figure size." />
               </div>
               <div className="focus-panel">
                 <strong>{compareSourceCount} source(s) queued</strong>
-                <span>When at least two sources are ready, CodeGod exports one representative curve and six summary figures.</span>
+                <span>Export unlocks when at least two are queued.</span>
               </div>
               <div className="step-actions">
                 <button
@@ -388,7 +387,7 @@ export function TensileScreen({
               </div>
 
               {compareSourceCount === 0 ? (
-                <div className="placeholder-card">Prepare one source or add prepared workbooks, then export once at least two sources are queued.</div>
+                <div className="placeholder-card">Queue at least two workbooks to export.</div>
               ) : (
                 <div className="wizard-compare-list">
                   {tensile.comparisonSources.map((source, index) => (
@@ -498,7 +497,6 @@ export function TensileScreen({
                 <div>
                   <h3>Session</h3>
                 </div>
-                <InfoTip content="Preparing and comparing stay on this page. Plot Builder opens only when you choose to send a workbook there." />
               </div>
               <div className="wizard-summary-list">
                 <div className="wizard-summary-row">

@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import { describePanelSlot } from "../../lib/composer";
 import type { ComposerCropRect, ComposerPanel, ComposerProject, ComposerRegion, ComposerText } from "../../lib/types";
 import { boundRectForDrawable } from "./utils";
@@ -48,34 +47,34 @@ type Props = {
 };
 
 const ALIGNMENT_ACTIONS: Array<{ label: string; mode: AlignmentMode }> = [
-  { label: "Align left", mode: "left" },
-  { label: "Center horizontally", mode: "center" },
-  { label: "Align right", mode: "right" },
-  { label: "Align top", mode: "top" },
-  { label: "Center vertically", mode: "middle" },
-  { label: "Align bottom", mode: "bottom" },
+  { label: "Left", mode: "left" },
+  { label: "Center X", mode: "center" },
+  { label: "Right", mode: "right" },
+  { label: "Top", mode: "top" },
+  { label: "Center Y", mode: "middle" },
+  { label: "Bottom", mode: "bottom" },
 ];
 
 const DISTRIBUTION_ACTIONS: Array<{ label: string; axis: DistributionAxis }> = [
-  { label: "Distribute horizontally", axis: "horizontal" },
-  { label: "Distribute vertically", axis: "vertical" },
+  { label: "Distribute X", axis: "horizontal" },
+  { label: "Distribute Y", axis: "vertical" },
 ];
 
 const BINDING_PLACEMENT_ACTIONS: Array<{ label: string; mode: PlacementMode }> = [
-  { label: "Snap left", mode: "left" },
-  { label: "Center horizontally", mode: "hcenter" },
-  { label: "Snap right", mode: "right" },
-  { label: "Snap top", mode: "top" },
-  { label: "Align middle", mode: "middle" },
-  { label: "Snap bottom", mode: "bottom" },
-  { label: "Center in binding", mode: "center" },
+  { label: "Left", mode: "left" },
+  { label: "Center X", mode: "hcenter" },
+  { label: "Right", mode: "right" },
+  { label: "Top", mode: "top" },
+  { label: "Middle", mode: "middle" },
+  { label: "Bottom", mode: "bottom" },
+  { label: "Center", mode: "center" },
 ];
 
 const LAYER_ACTIONS: Array<{ label: string; action: LayerAction }> = [
-  { label: "Bring forward", action: "forward" },
-  { label: "Send backward", action: "backward" },
-  { label: "Bring to front", action: "front" },
-  { label: "Send to back", action: "back" },
+  { label: "Forward", action: "forward" },
+  { label: "Back", action: "backward" },
+  { label: "To front", action: "front" },
+  { label: "To back", action: "back" },
 ];
 
 function BindingOptions({
@@ -185,24 +184,21 @@ export function ComposerInspectPanel({
         <div>
           <h3>Selection</h3>
         </div>
-        <InfoTip content="Shift extends selection. Alt-drag duplicates objects. Arrow keys nudge free objects while graph objects continue to move by grid cell." />
       </div>
 
       {!hasSelection && (
-        <div className="placeholder-card">
-          Select a region, graph, asset, or text object to inspect and edit it here.
-        </div>
+        <div className="placeholder-card">Select a region, graph, asset, or text.</div>
       )}
 
       <div className="stacked-actions">
         <button className="ghost-button" disabled={!canCopySelection} onClick={onCopySelection} type="button">
-          Copy selection
+          Copy
         </button>
         <button className="ghost-button" disabled={!canPasteSelection} onClick={onPasteSelection} type="button">
-          Paste duplicate
+          Paste
         </button>
         <button className="ghost-button" disabled={!hasSelection} onClick={onDuplicateSelection} type="button">
-          Duplicate selection
+          Duplicate
         </button>
         <button
           className="ghost-button"
@@ -210,7 +206,7 @@ export function ComposerInspectPanel({
           onClick={onMergeSelectedEmptyCells}
           type="button"
         >
-          Merge empty cells
+          Merge cells
         </button>
         <button
           className="ghost-button"
@@ -218,7 +214,7 @@ export function ComposerInspectPanel({
           onClick={onUnmergeSelectedRegion}
           type="button"
         >
-          Split free region
+          Split region
         </button>
       </div>
 
@@ -285,7 +281,7 @@ export function ComposerInspectPanel({
           </div>
 
           <button className="ghost-button danger-button" onClick={onRemoveSelected} type="button">
-            Delete selection
+            Delete
           </button>
         </div>
       )}
@@ -320,7 +316,7 @@ export function ComposerInspectPanel({
 
           {selectedRegion.kind === "free" && (
             <button className="ghost-button danger-button" onClick={onUnmergeSelectedRegion} type="button">
-              Split this region
+              Split region
             </button>
           )}
         </div>
@@ -499,7 +495,7 @@ export function ComposerInspectPanel({
           </div>
 
           <button className="ghost-button danger-button" onClick={onRemoveSelected} type="button">
-            Delete panel
+            Delete
           </button>
         </div>
       )}
@@ -587,7 +583,7 @@ export function ComposerInspectPanel({
           </div>
 
           <button className="ghost-button danger-button" onClick={onRemoveSelected} type="button">
-            Delete text
+            Delete
           </button>
         </div>
       )}

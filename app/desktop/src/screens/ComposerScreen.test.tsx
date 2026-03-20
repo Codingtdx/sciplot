@@ -358,7 +358,7 @@ describe("ComposerScreen", () => {
     render(<ComposerScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
-    fireEvent.click(screen.getByRole("button", { name: "Align left" }));
+    fireEvent.click(screen.getByRole("button", { name: "Left" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -545,7 +545,7 @@ describe("ComposerScreen", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Snap bottom" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bottom" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -561,7 +561,7 @@ describe("ComposerScreen", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Duplicate selection" }));
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;
@@ -603,7 +603,7 @@ describe("ComposerScreen", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Snap left" }));
+    fireEvent.click(screen.getByRole("button", { name: "Left" }));
 
     await waitFor(() => {
       const project = useComposerStore.getState().project;

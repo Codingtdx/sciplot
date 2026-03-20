@@ -120,21 +120,11 @@ export function ProjectsScreen({
   return (
     <div className="desk-layout">
       <section className="desk-main">
-        <article className="work-card hero-card">
-          <div className="section-head hero-head">
-            <div>
-              <div className="card-kicker">History</div>
-              <h2>Jump back into recent work</h2>
-              <p>Recent plotting inputs and composer projects stay one click away.</p>
-            </div>
-          </div>
-        </article>
-
         <article className="work-card section-card">
           <div className="panel-heading">
             <div>
-              <div className="card-kicker">Recent files</div>
-              <h2>Continue where you left off</h2>
+              <div className="card-kicker">Recent</div>
+              <h2>Recent files</h2>
             </div>
             <InfoTip content="Plot Builder usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
           </div>
@@ -147,7 +137,7 @@ export function ProjectsScreen({
 
           <div className="layer-list">
             {recentProjects.length === 0 && (
-              <div className="placeholder-card">No recent files yet. Open a dataset or a composer project to start building history.</div>
+              <div className="placeholder-card">No recent files yet.</div>
             )}
 
             {recentProjects.map((entry) => (
@@ -198,10 +188,10 @@ export function ProjectsScreen({
           </div>
           <div className="step-actions compact-actions">
             <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
-              Open Plot Builder
+              Plot
             </button>
             <button className="ghost-button" onClick={() => onNavigate("composer")} type="button">
-              Open Composer
+              Composer
             </button>
           </div>
         </article>

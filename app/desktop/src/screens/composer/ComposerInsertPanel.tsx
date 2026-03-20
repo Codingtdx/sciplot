@@ -1,4 +1,3 @@
-import { InfoTip } from "../../components/InfoTip";
 import type { PdfImportMode } from "../../lib/types";
 
 type Props = {
@@ -26,9 +25,8 @@ export function ComposerInsertPanel({
     <article className="context-card">
       <div className="panel-heading">
         <div>
-          <h3>Insert and presets</h3>
+          <h3>Insert</h3>
         </div>
-        <InfoTip content="Use graph mode for CodeGod-standard graph PDFs. Use asset mode for PDFs and images that should stay free-form." />
       </div>
 
       <div className="mode-switch">
@@ -50,10 +48,10 @@ export function ComposerInsertPanel({
 
       <div className="stacked-actions">
         <button className="ghost-button" onClick={onQuickTwoUpEditorial} type="button">
-          Two-up + notes
+          2-up + notes
         </button>
         <button className="ghost-button" onClick={onAddText} type="button">
-          Add text
+          Text
         </button>
         <button className="ghost-button" onClick={onOpenProject} type="button">
           Open project
@@ -69,7 +67,7 @@ export function ComposerInsertPanel({
           onChange={(event) => onAutoLabelsChange(event.target.checked)}
           type="checkbox"
         />
-        <span>Auto a/b/c labels</span>
+        <span>Auto a/b/c</span>
       </label>
     </article>
   );
