@@ -991,7 +991,6 @@ export function ComposerScreen() {
           onImportGraph={importGraphPanels}
           onObjectSelection={selectComposerObjects}
           onProjectChange={setProject}
-          onQuickThreeUp={quickThreeUp}
           onSelect={(id, additive) => selectComposerItem(id, additive, "canvas")}
           onSelectedCellsChange={(cells, options) => {
             setSelectedCells(uniqueCells(cells));
@@ -1050,6 +1049,7 @@ export function ComposerScreen() {
             }
             onImportModeChange={setPdfImportMode}
             onOpenProject={openComposerProject}
+            onQuickThreeUp={quickThreeUp}
             onQuickTwoUpEditorial={quickTwoUpEditorial}
             onSaveProject={saveComposerProject}
           />

@@ -61,122 +61,150 @@ export function WizardExportSection({
       : submissionReport?.readiness === "ready"
         ? "good"
         : "accent";
+  const reviewLabel =
+    blockingErrors.length > 0 || preflightRequestError
+      ? "Fix blockers"
+      : hasExportedOutputs
+        ? "Exported"
+        : preflight
+          ? "Ready"
+          : preflightBusy
+            ? "Checking"
+            : "Pending";
+  const reviewTone =
+    blockingErrors.length > 0 || preflightRequestError
+      ? "warn"
+      : hasExportedOutputs || preflight
+        ? "good"
+        : "accent";
   const outputDirectory = exportResult?.output_dir ?? null;
   const manifestPath = exportResult?.manifest_path ?? null;
   const artifacts = groupArtifacts(exportResult);
+  const autoOpen =
+    Boolean(preflightRequestError) ||
+    blockingErrors.length > 0 ||
+    preflight !== null ||
+    hasExportedOutputs;
 
   return (
-    <section className="work-card section-card wizard-pane">
-      <div className="panel-heading">
-        <div>
-          <div className="card-kicker">Export</div>
-          <h3>Review and export</h3>
-        </div>
-      </div>
-      <div className="wizard-section-stack">
-        {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
-        {!preflightRequestError && preflightBusy && (
-          <div className="placeholder-card">
-            {preflightActivity === "scheduled" ? "Queueing checks…" : "Refreshing checks…"}
-          </div>
-        )}
-        {!preflightRequestError && !preflightBusy && preflight && (
-          <>
-            {blockingErrors.length > 0 ? (
-              <div className="error-card">
-                <strong>Export is blocked</strong>
-                <ul className="bullet-list">
-                  {blockingErrors.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="success-card">Ready to export.</div>
-            )}
-            {preflight.warnings.length > 0 && (
-              <details className="wizard-details">
-                <summary>{preflight.warnings.length} preflight warning(s)</summary>
-                <ul className="bullet-list">
-                  {preflight.warnings.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
-        )}
-        {!preflight && !preflightBusy && !preflightRequestError && (
-          <div className="placeholder-card">Checks start automatically.</div>
-        )}
+    <article className="context-card wizard-review-card">
+      <details className="wizard-review-details" open={autoOpen}>
+        <summary className="wizard-review-summary">
+          <span>Review and export</span>
+          <span className={`status-pill ${reviewTone}`}>{reviewLabel}</span>
+        </summary>
 
-        <div className="step-actions">
-          <button
-            className="primary-button"
-            disabled={!canExport}
-            onClick={onExport}
-            type="button"
-          >
-            Export submission bundle
-          </button>
-          {outputDirectory && (
-            <button className="ghost-button" onClick={onOpenOutputDir} type="button">
-              Open output folder
-            </button>
-          )}
-        </div>
+        <div className="wizard-section-stack">
+          {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
 
-        <details className="wizard-details" open={hasExportedOutputs}>
-          <summary>{hasExportedOutputs ? "Output files" : "Expected files"}</summary>
-          {outputItems.length > 0 ? (
-            <ul className="output-list">
-              {outputItems.map((item) => (
-                <li key={item}>{formatLeaf(item)}</li>
-              ))}
-            </ul>
-          ) : (
-            <div className="wizard-details-body">No files yet.</div>
-          )}
-        </details>
-
-        {submissionReport && (
-          <div className="focus-panel wizard-readiness-panel">
-            <strong>Submission review</strong>
-            <span className={`status-pill ${readinessTone}`}>{readinessLabel}</span>
-            <span>{submissionReport.summary}</span>
-            {highlightedChecks.length > 0 && (
-              <details className="wizard-details">
-                <summary>{highlightedChecks.length} flagged check(s)</summary>
-                <ul className="bullet-list">
-                  {highlightedChecks.map((check) => (
-                    <li key={check.id}>{check.message}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
-        )}
-
-        {exportResult && (
-          <details className="wizard-details" open>
-            <summary>Bundle files</summary>
-            <div className="wizard-details-body">
-              {outputDirectory && <div>Folder: {outputDirectory}</div>}
-              {artifacts.previewOutputs.length > 0 && (
-                <div>{artifacts.previewOutputs.length} preview PNG file(s) written.</div>
-              )}
-              {manifestPath && <div>Manifest: {formatLeaf(manifestPath)}</div>}
+          {!preflightRequestError && preflightBusy && (
+            <div className="placeholder-card">
+              {preflightActivity === "scheduled" ? "Queueing checks…" : "Refreshing checks…"}
             </div>
-            {artifacts.reportArtifacts.length > 0 && (
-              <ul className="bullet-list">
-                {artifacts.reportArtifacts.map((item) => (
+          )}
+
+          {!preflightRequestError && !preflightBusy && preflight && (
+            <>
+              {blockingErrors.length > 0 ? (
+                <div className="error-card">
+                  <strong>Export is blocked</strong>
+                  <ul className="bullet-list">
+                    {blockingErrors.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="success-card">Ready to export.</div>
+              )}
+
+              {preflight.warnings.length > 0 && (
+                <details className="wizard-details">
+                  <summary>{preflight.warnings.length} preflight warning(s)</summary>
+                  <ul className="bullet-list">
+                    {preflight.warnings.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
+
+          {!preflight && !preflightBusy && !preflightRequestError && (
+            <div className="placeholder-card">
+              {previewActivity === "ready" ? "Checks are lining up." : "Checks start automatically."}
+            </div>
+          )}
+
+          <div className="step-actions">
+            <button
+              className="primary-button"
+              disabled={!canExport}
+              onClick={onExport}
+              type="button"
+            >
+              Export submission bundle
+            </button>
+            {outputDirectory && (
+              <button className="ghost-button" onClick={onOpenOutputDir} type="button">
+                Open output folder
+              </button>
+            )}
+          </div>
+
+          <details className="wizard-details">
+            <summary>{hasExportedOutputs ? "Output files" : "Expected files"}</summary>
+            {outputItems.length > 0 ? (
+              <ul className="output-list">
+                {outputItems.map((item) => (
                   <li key={item}>{formatLeaf(item)}</li>
                 ))}
               </ul>
+            ) : (
+              <div className="wizard-details-body">No files yet.</div>
             )}
           </details>
-        )}
-      </div>
-    </section>
+
+          {submissionReport && (
+            <div className="focus-panel wizard-readiness-panel">
+              <strong>Submission review</strong>
+              <span className={`status-pill ${readinessTone}`}>{readinessLabel}</span>
+              <span>{submissionReport.summary}</span>
+              {highlightedChecks.length > 0 && (
+                <details className="wizard-details">
+                  <summary>{highlightedChecks.length} flagged check(s)</summary>
+                  <ul className="bullet-list">
+                    {highlightedChecks.map((check) => (
+                      <li key={check.id}>{check.message}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          {exportResult && (
+            <details className="wizard-details">
+              <summary>Bundle files</summary>
+              <div className="wizard-details-body">
+                {outputDirectory && <div>Folder: {outputDirectory}</div>}
+                {artifacts.previewOutputs.length > 0 && (
+                  <div>{artifacts.previewOutputs.length} preview PNG file(s) written.</div>
+                )}
+                {manifestPath && <div>Manifest: {formatLeaf(manifestPath)}</div>}
+              </div>
+              {artifacts.reportArtifacts.length > 0 && (
+                <ul className="bullet-list">
+                  {artifacts.reportArtifacts.map((item) => (
+                    <li key={item}>{formatLeaf(item)}</li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          )}
+        </div>
+      </details>
+    </article>
   );
 }

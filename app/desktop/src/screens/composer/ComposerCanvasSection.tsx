@@ -14,7 +14,6 @@ type Props = {
   thumbnails: Record<string, string>;
   onImportGraph: () => void;
   onImportAsset: () => void;
-  onQuickThreeUp: () => void;
   onExportComposer: () => void;
   onDuplicateDrawableStart: (id: string) => string | null;
   onObjectSelection: (ids: string[], additive?: boolean) => void;
@@ -35,7 +34,6 @@ export function ComposerCanvasSection({
   thumbnails,
   onImportGraph,
   onImportAsset,
-  onQuickThreeUp,
   onExportComposer,
   onDuplicateDrawableStart,
   onObjectSelection,
@@ -44,11 +42,11 @@ export function ComposerCanvasSection({
   onSelectedCellsChange,
 }: Props) {
   return (
-    <article className="work-card canvas-shell-card hero-card">
+    <article className="work-card canvas-shell-card">
       <div className="section-head">
         <div>
-          <div className="card-kicker">Layout Studio</div>
-          <h2>Composer canvas</h2>
+          <div className="card-kicker">Composer</div>
+          <h2>Canvas</h2>
         </div>
         <div className="metric-strip">
           <div className="metric-chip">
@@ -70,9 +68,6 @@ export function ComposerCanvasSection({
         </button>
         <button className="ghost-button" onClick={onImportAsset} type="button">
           Import asset
-        </button>
-        <button className="ghost-button" onClick={onQuickThreeUp} type="button">
-          3-up preset
         </button>
         <button className="ghost-button" onClick={onExportComposer} type="button">
           Export PDF

@@ -62,7 +62,7 @@ export function SettingsScreen({
   const validationRuleCount = contract ? Object.keys(contract.validation_rules).length : 0;
 
   return (
-    <div className="desk-layout">
+    <div className="desk-layout single-column">
       <section className="desk-main">
         <div className="summary-grid">
           <article className="work-card section-card">
@@ -82,6 +82,16 @@ export function SettingsScreen({
               >
                 {checking ? "Checking…" : "Check again"}
               </button>
+            </div>
+            <div className="context-list">
+              <div className="context-row">
+                <span>Recents</span>
+                <strong>{recentProjects.length}</strong>
+              </div>
+              <div className="context-row">
+                <span>PDF import mode</span>
+                <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
+              </div>
             </div>
           </article>
 
@@ -178,6 +188,27 @@ export function SettingsScreen({
                 />
                 <span>Remember last screen</span>
               </label>
+
+              <div className="context-list">
+                <div className="context-row">
+                  <span>Theme</span>
+                  <strong>
+                    {settings.theme_preference === "system"
+                      ? "Follow system"
+                      : settings.theme_preference === "light"
+                        ? "Light"
+                        : "Dark"}
+                  </strong>
+                </div>
+                <div className="context-row">
+                  <span>Auto-refresh</span>
+                  <strong>{settings.auto_status_poll ? "On" : "Off"}</strong>
+                </div>
+                <div className="context-row">
+                  <span>Remember screen</span>
+                  <strong>{settings.remember_last_screen ? "On" : "Off"}</strong>
+                </div>
+              </div>
             </div>
           </article>
 
@@ -212,44 +243,6 @@ export function SettingsScreen({
           </article>
         </div>
       </section>
-
-      <aside className="desk-context">
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <h3>Current state</h3>
-            </div>
-          </div>
-          <div className="context-list">
-            <div className="context-row">
-              <span>Recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
-            <div className="context-row">
-              <span>PDF import mode</span>
-              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Theme</span>
-              <strong>
-                {settings.theme_preference === "system"
-                  ? "Follow system"
-                  : settings.theme_preference === "light"
-                    ? "Light"
-                    : "Dark"}
-              </strong>
-            </div>
-            <div className="context-row">
-              <span>Auto-refresh</span>
-              <strong>{settings.auto_status_poll ? "On" : "Off"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Remember screen</span>
-              <strong>{settings.remember_last_screen ? "On" : "Off"}</strong>
-            </div>
-          </div>
-        </article>
-      </aside>
     </div>
   );
 }

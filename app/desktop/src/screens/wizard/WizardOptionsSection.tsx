@@ -36,11 +36,11 @@ export function WizardOptionsSection({
     null;
 
   return (
-    <section className="work-card section-card wizard-pane">
+    <section className="context-card wizard-pane">
       <div className="panel-heading">
         <div>
           <div className="card-kicker">Adjust</div>
-          <h3>Key controls</h3>
+          <h3>Controls</h3>
         </div>
       </div>
       {!template ? (

@@ -227,10 +227,12 @@ export default function App() {
     <div className="dashboard-shell">
       <aside className="nav-rail">
         <div className="rail-brand">
-          <div className="brand-mark">CG</div>
+          <div className="brand-mark">
+            <AppIcon name="spark" />
+          </div>
           <div className="rail-brand-text">
             <strong>CodeGod</strong>
-            <span>Desktop 5.0</span>
+            <span>Desktop</span>
           </div>
         </div>
 
@@ -251,8 +253,10 @@ export default function App() {
         </nav>
 
         <div className="rail-footer">
-          <div className={`rail-status-dot ${sidecarReady ? "online" : "offline"}`} />
-          <span>{sidecarReady ? "Sidecar ready" : "Sidecar offline"}</span>
+          <div className="rail-footer-line">
+            <div className={`rail-status-dot ${sidecarReady ? "online" : "offline"}`} />
+            <span>{sidecarReady ? "Sidecar ready" : "Sidecar offline"}</span>
+          </div>
         </div>
       </aside>
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PreviewPane } from "../components/PreviewPane";
-import { StepFlow } from "../components/StepFlow";
 import { exportRender, inspectFile, openPath } from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
@@ -18,6 +17,7 @@ import {
   publicPaletteChoices,
   publicStyleChoices,
   sizeChoices,
+  styleLabel,
   templateLabel,
   toDialogPaths,
 } from "../lib/workbench";
@@ -29,7 +29,6 @@ import {
   selectionFromInspection,
   templateMeta as wizardTemplateMeta,
 } from "../lib/wizard";
-import { WizardDetectSection } from "./wizard/WizardDetectSection";
 import { WizardExportSection } from "./wizard/WizardExportSection";
 import {
   deriveWizardStep,
@@ -39,7 +38,6 @@ import {
 import { WizardOptionsSection } from "./wizard/WizardOptionsSection";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
-import { WizardSessionCard } from "./wizard/WizardSessionCard";
 import { WizardTemplatesSection } from "./wizard/WizardTemplatesSection";
 
 export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
@@ -216,13 +214,17 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const hasInput = Boolean(wizard.inputPath);
   const hasInspection = wizard.inspection != null;
   const hasTemplate = Boolean(wizard.template);
-  const showWorkspace = hasInput || hasInspection || hasTemplate;
   const showReviewStage =
     hasTemplate &&
     (wizard.preflight != null ||
       preflightBusy ||
       Boolean(preflightRequestError) ||
       wizard.outputs.length > 0);
+  const wizardStage: "empty" | "edit" | "review" = !hasInput
+    ? "empty"
+    : showReviewStage
+      ? "review"
+      : "edit";
   const canExport =
     hasInput &&
     hasTemplate &&
@@ -286,6 +288,10 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   );
 
   const expectedOutputs = getExpectedWizardOutputs(wizard.outputs, wizard.preflight);
+  const selectedStyleLabel = styleLabel(
+    meta,
+    wizard.options.style_preset ?? meta?.default_style ?? null,
+  );
 
   const openDataFile = async () => {
     let path: string | undefined;
@@ -397,155 +403,243 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
   };
 
+  const summaryRows = [
+    {
+      label: "Sheet",
+      value:
+        typeof wizard.sheet === "string"
+          ? wizard.sheet
+          : wizard.sheetNames[wizard.sheet] ?? wizard.sheetNames[0] ?? "-",
+    },
+    {
+      label: "Model",
+      value: wizard.inspection?.model_label ?? "Waiting for inspect",
+    },
+    {
+      label: "Recommended",
+      value: wizard.inspection
+        ? templateLabel(meta, wizard.inspection.recommendation.template)
+        : "-",
+    },
+    {
+      label: "Style",
+      value: selectedStyleLabel,
+    },
+  ];
+
   return (
     <div className="desk-layout wizard-layout">
       <section className="desk-main wizard-main">
-        <article className="work-card hero-card wizard-workspace-card wizard-shell-card">
-          <div className="section-head wizard-workspace-head wizard-shell-head">
-            <div className="wizard-shell-copy">
-              <div className="card-kicker">Plot Flow</div>
-              <h2>{hasInput ? formatLeaf(wizard.inputPath) : "Open a data file"}</h2>
-            </div>
-            <div className="wizard-inline-chips">
-              {hasTemplate && (
-                <span className="signal-tag">{templateLabel(meta, wizard.template)}</span>
+        {wizardStage === "empty" ? (
+          <div className="wizard-empty-shell">
+            <article className="work-card hero-card wizard-empty-card">
+              <div className="wizard-empty-copy">
+                <div className="card-kicker">Plot</div>
+                <h2>Open a data file</h2>
+                <p>Start with CSV, TXT, TSV, XLSX, or XLSM data.</p>
+              </div>
+
+              <div className="wizard-inline-chips wizard-empty-chips">
+                <span className={`status-pill ${wizard.sidecarReady ? "good" : "warn"}`}>
+                  {wizard.sidecarReady ? "Sidecar ready" : "Sidecar offline"}
+                </span>
+                <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+              </div>
+
+              <div className="step-actions">
+                <button className="primary-button" onClick={openDataFile} type="button">
+                  Open data
+                </button>
+              </div>
+
+              {wizard.error && <div className="error-card">{wizard.error}</div>}
+              {!wizard.sidecarReady && (
+                <div className="warning-card">
+                  The Python sidecar is offline. Detection, preview, and export resume
+                  once it reconnects.
+                </div>
               )}
-              <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
-            </div>
+            </article>
           </div>
+        ) : (
+          <div className="wizard-stage-shell">
+            <article className="work-card wizard-stage-toolbar">
+              <div className="panel-heading wizard-stage-toolbar-head">
+                <div>
+                  <div className="card-kicker">Plot</div>
+                  <h2>{formatLeaf(wizard.inputPath)}</h2>
+                </div>
+                <div className="wizard-inline-chips">
+                  {hasTemplate && (
+                    <span className="signal-tag">{templateLabel(meta, wizard.template)}</span>
+                  )}
+                  <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+                </div>
+              </div>
 
-          <div className="wizard-toolbar">
-            <button className="primary-button" onClick={openDataFile} type="button">
-              Open data
-            </button>
-            {wizard.sheetNames.length > 1 && (
-              <label className="wizard-inline-field">
-                <span className="field-label">Sheet</span>
-                <select
-                  className="field"
-                  value={String(wizard.sheet)}
-                  onChange={(event) => void rerunInspect(event.target.value)}
-                >
-                  {wizard.sheetNames.map((name, index) => (
-                    <option key={name} value={name}>
-                      {index + 1}. {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {!recommendationApplied && wizard.inspection && (
-              <button
-                className="ghost-button"
-                onClick={applyRecommendedSelection}
-                type="button"
-              >
-                Use recommendation
-              </button>
-            )}
-          </div>
+              <div className="wizard-toolbar">
+                <button className="primary-button" onClick={openDataFile} type="button">
+                  Open data
+                </button>
+                {wizard.sheetNames.length > 1 && (
+                  <label className="wizard-inline-field">
+                    <span className="field-label">Sheet</span>
+                    <select
+                      className="field"
+                      value={String(wizard.sheet)}
+                      onChange={(event) => void rerunInspect(event.target.value)}
+                    >
+                      {wizard.sheetNames.map((name, index) => (
+                        <option key={name} value={name}>
+                          {index + 1}. {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {!recommendationApplied && wizard.inspection && (
+                  <button
+                    className="ghost-button"
+                    onClick={applyRecommendedSelection}
+                    type="button"
+                  >
+                    Use recommendation
+                  </button>
+                )}
+              </div>
+            </article>
 
-          {hasInput ? (
-            <StepFlow current={wizard.step} />
-          ) : (
-            <div className="placeholder-card wizard-empty-state">
-              Choose a CSV, TXT, TSV, or workbook to start.
+            <div className="wizard-stage-grid">
+              <div className="wizard-preview-column">
+                {hasTemplate ? (
+                  <PreviewPane
+                    busy={previewBusy}
+                    error={previewError}
+                    onChangeIndex={wizard.setPreviewIndex}
+                    previewIndex={wizard.previewIndex}
+                    previews={wizard.previews}
+                  />
+                ) : (
+                  <section className="preview-pane">
+                    <div className="preview-toolbar">
+                      <div className="preview-title">Preview</div>
+                    </div>
+                    <div className="preview-surface">
+                      <div className="placeholder-card">
+                        Select a compatible chart type to start previewing.
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              <aside className="wizard-rail">
+                <article className="context-card wizard-summary-card">
+                  <div className="panel-heading">
+                    <div>
+                      <h3>Summary</h3>
+                    </div>
+                    <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+                  </div>
+
+                  <div className="wizard-summary-list">
+                    {summaryRows.map((row) => (
+                      <div className="wizard-summary-row" key={row.label}>
+                        <span>{row.label}</span>
+                        <strong>{row.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  {wizard.error && <div className="error-card">{wizard.error}</div>}
+                  {!wizard.sidecarReady && (
+                    <div className="warning-card">
+                      The Python sidecar is offline. Existing state stays visible, but
+                      checks and export are paused.
+                    </div>
+                  )}
+
+                  {wizard.inspection && (
+                    <>
+                      <details className="wizard-details" open={wizardStage === "edit"}>
+                        <summary>Why this type</summary>
+                        <div className="wizard-details-body">
+                          {wizard.inspection.recommendation.reason}
+                        </div>
+                      </details>
+
+                      {wizard.inspection.warnings.length > 0 && (
+                        <details className="wizard-details">
+                          <summary>{wizard.inspection.warnings.length} input warning(s)</summary>
+                          <ul className="bullet-list">
+                            {wizard.inspection.warnings.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+
+                      {wizard.inspection.signals.length > 0 && (
+                        <details className="wizard-details">
+                          <summary>{wizard.inspection.signals.length} detection signal(s)</summary>
+                          <ul className="bullet-list">
+                            {wizard.inspection.signals.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </>
+                  )}
+                </article>
+
+                {hasInspection && (
+                  <WizardTemplatesSection
+                    compatibleTemplates={compatibleTemplates}
+                    incompatibleTemplates={incompatibleTemplates}
+                    inspection={wizard.inspection}
+                    onSelectTemplate={updateWizardTemplate}
+                    onToggleShowAllTemplates={() =>
+                      setShowAllTemplates((current) => !current)
+                    }
+                    selectedTemplate={wizard.template}
+                    showAllTemplates={showAllTemplates}
+                  />
+                )}
+
+                {hasTemplate && (
+                  <WizardOptionsSection
+                    currentTemplate={currentTemplate}
+                    meta={meta}
+                    onUpdateOptions={updateWizardOptions}
+                    options={wizard.options}
+                    paletteOptions={paletteOptions}
+                    sizeOptions={sizeOptions}
+                    styleOptions={styleOptions}
+                    template={wizard.template}
+                    tensileCurveMode={tensileCurveMode}
+                  />
+                )}
+
+                {showReviewStage && (
+                  <WizardExportSection
+                    blockingErrors={blockingErrors}
+                    canExport={canExport}
+                    exportResult={wizard.exportResult}
+                    hasExportedOutputs={wizard.outputs.length > 0}
+                    onExport={() => void runExport()}
+                    onOpenOutputDir={() => void openOutputFolder()}
+                    outputItems={expectedOutputs}
+                    preflight={wizard.preflight}
+                    preflightActivity={preflightActivity}
+                    preflightBusy={preflightBusy}
+                    preflightRequestError={preflightRequestError}
+                    previewActivity={previewActivity}
+                    submissionReport={wizard.submissionReport}
+                  />
+                )}
+              </aside>
             </div>
-          )}
-
-          {wizard.error && <div className="error-card">{wizard.error}</div>}
-          {!wizard.sidecarReady && (
-            <div className="warning-card">
-              The Python sidecar is offline. Detection, preview, and export resume
-              as soon as it reconnects.
-            </div>
-          )}
-        </article>
-
-        {showWorkspace && (
-          <div className="wizard-content-grid">
-            <div className="wizard-main-stack">
-              {hasInspection && (
-                <WizardDetectSection inspection={wizard.inspection} meta={meta} />
-              )}
-
-              {hasInspection && (
-                <WizardTemplatesSection
-                  compatibleTemplates={compatibleTemplates}
-                  incompatibleTemplates={incompatibleTemplates}
-                  inspection={wizard.inspection}
-                  onSelectTemplate={updateWizardTemplate}
-                  onToggleShowAllTemplates={() =>
-                    setShowAllTemplates((current) => !current)
-                  }
-                  selectedTemplate={wizard.template}
-                  showAllTemplates={showAllTemplates}
-                />
-              )}
-
-              {hasTemplate && (
-                <WizardOptionsSection
-                  currentTemplate={currentTemplate}
-                  meta={meta}
-                  onUpdateOptions={updateWizardOptions}
-                  options={wizard.options}
-                  paletteOptions={paletteOptions}
-                  sizeOptions={sizeOptions}
-                  styleOptions={styleOptions}
-                  template={wizard.template}
-                  tensileCurveMode={tensileCurveMode}
-                />
-              )}
-
-              {showReviewStage && (
-                <WizardExportSection
-                  blockingErrors={blockingErrors}
-                  canExport={canExport}
-                  exportResult={wizard.exportResult}
-                  hasExportedOutputs={wizard.outputs.length > 0}
-                  onExport={() => void runExport()}
-                  onOpenOutputDir={() => void openOutputFolder()}
-                  outputItems={expectedOutputs}
-                  preflight={wizard.preflight}
-                  preflightActivity={preflightActivity}
-                  preflightBusy={preflightBusy}
-                  preflightRequestError={preflightRequestError}
-                  previewActivity={previewActivity}
-                  submissionReport={wizard.submissionReport}
-                />
-              )}
-            </div>
-
-            <aside className="desk-context wizard-context">
-              {hasTemplate && (
-                <PreviewPane
-                  busy={previewBusy}
-                  error={previewError}
-                  onChangeIndex={wizard.setPreviewIndex}
-                  previewIndex={wizard.previewIndex}
-                  previews={wizard.previews}
-                />
-              )}
-
-              <WizardSessionCard
-                blockingErrorsCount={blockingErrors.length}
-                hasBlockingErrors={hasBlockingErrors}
-                inputPath={wizard.inputPath}
-                inspectionWarningsCount={wizard.inspection?.warnings.length ?? 0}
-                meta={meta}
-                outputsCount={wizard.outputs.length}
-                preflightRequestError={preflightRequestError}
-                preflightActivity={preflightActivity}
-                preflightWarningsCount={wizard.preflight?.warnings.length ?? 0}
-                previewActivity={previewActivity}
-                previewsCount={wizard.previews.length}
-                sheet={wizard.sheet}
-                statusChip={statusChip}
-                stylePreset={wizard.options.style_preset ?? meta?.default_style ?? null}
-                submissionReport={wizard.submissionReport}
-                template={wizard.template}
-              />
-            </aside>
           </div>
         )}
       </section>

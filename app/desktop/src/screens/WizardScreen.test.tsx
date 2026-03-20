@@ -169,6 +169,37 @@ describe("WizardScreen", () => {
     });
   });
 
+  it("shows only the import surface in the empty stage", () => {
+    render(<WizardScreen meta={TEST_META} />);
+
+    expect(screen.getByRole("button", { name: "Open data" })).toBeInTheDocument();
+    expect(screen.queryByText("Summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pick a chart type")).not.toBeInTheDocument();
+  });
+
+  it("uses a preview-first edit layout without the old session card", () => {
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+      },
+    });
+
+    render(<WizardScreen meta={TEST_META} />);
+
+    expect(screen.getByText("Summary")).toBeInTheDocument();
+    expect(screen.getByText("Why this type")).toBeInTheDocument();
+    expect(screen.queryByText("Session")).not.toBeInTheDocument();
+  });
+
   it("shows only compatible templates by default and disables incompatible ones under more templates", () => {
     useWizardStore.setState({
       inputPath: "/tmp/relaxation.xlsx",
@@ -212,6 +243,9 @@ describe("WizardScreen", () => {
 
   it("renders options from sidecar meta without local hardcoded lists", () => {
     useWizardStore.setState({
+      inputPath: "/tmp/heatmap.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
       template: "heatmap",
       options: {},
     });
@@ -338,6 +372,9 @@ describe("WizardScreen", () => {
 
   it("lets the user switch the public submission style from wizard options", () => {
     useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
       template: "curve",
       options: {
         size: "60x55",

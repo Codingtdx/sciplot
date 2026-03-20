@@ -168,7 +168,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={onNavigate} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Prepare tensile data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare CSVs" }));
 
     await waitFor(() => {
       expect(preprocessTensileReplicates).toHaveBeenCalledWith(
@@ -192,7 +192,7 @@ describe("TensileScreen", () => {
       TEST_PREPROCESS_RESPONSE.output_path,
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Open in Plot Builder" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Open latest in Plot" }));
 
     await waitFor(() => {
       expect(loadWizardDataFile).toHaveBeenCalledWith(
@@ -228,7 +228,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add prepared workbooks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add workbooks" }));
 
     await waitFor(() => {
       expect(inspectTensileWorkbook).toHaveBeenCalledTimes(2);

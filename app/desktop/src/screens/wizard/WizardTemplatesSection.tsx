@@ -21,11 +21,11 @@ export function WizardTemplatesSection({
   onToggleShowAllTemplates,
 }: Props) {
   return (
-    <section className="work-card section-card wizard-pane">
+    <section className="context-card wizard-pane">
       <div className="panel-heading">
         <div>
           <div className="card-kicker">Template</div>
-          <h3>Pick a chart type</h3>
+          <h3>Chart type</h3>
         </div>
       </div>
       {!inspection ? (

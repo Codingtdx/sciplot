@@ -118,7 +118,7 @@ export function ProjectsScreen({
   };
 
   return (
-    <div className="desk-layout">
+    <div className="desk-layout single-column">
       <section className="desk-main">
         <article className="work-card section-card">
           <div className="panel-heading">
@@ -126,7 +126,34 @@ export function ProjectsScreen({
               <div className="card-kicker">Recent</div>
               <h2>Recent files</h2>
             </div>
-            <InfoTip content="Plot Builder usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
+            <div className="step-actions">
+              <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
+                Plot
+              </button>
+              <button className="ghost-button" onClick={() => onNavigate("composer")} type="button">
+                Composer
+              </button>
+              <InfoTip content="Plot Builder usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
+            </div>
+          </div>
+
+          <div className="context-list">
+            <div className="context-row">
+              <span>Current plot file</span>
+              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
+            </div>
+            <div className="context-row">
+              <span>Plot step</span>
+              <strong>{getWizardStepLabel(wizard.step)}</strong>
+            </div>
+            <div className="context-row">
+              <span>Composer objects</span>
+              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>Recents</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
           </div>
 
           {notice && (
@@ -157,65 +184,23 @@ export function ProjectsScreen({
               </button>
             ))}
           </div>
+          {wizard.outputs.length > 0 && (
+            <details className="wizard-details">
+              <summary>Latest export</summary>
+              <div className="context-list">
+                <div className="context-row">
+                  <span>Outputs</span>
+                  <strong>{wizard.outputs.length}</strong>
+                </div>
+                <div className="context-row">
+                  <span>Last file</span>
+                  <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
+                </div>
+              </div>
+            </details>
+          )}
         </article>
       </section>
-
-      <aside className="desk-context">
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <h3>Session</h3>
-            </div>
-            <InfoTip content="This summary shows what is already loaded in the current desktop session, independent of the recent file list." />
-          </div>
-          <div className="context-list">
-            <div className="context-row">
-              <span>Plot file</span>
-              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
-            <div className="context-row">
-              <span>Plot step</span>
-              <strong>{getWizardStepLabel(wizard.step)}</strong>
-            </div>
-            <div className="context-row">
-              <span>Composer objects</span>
-              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
-            </div>
-          </div>
-          <div className="step-actions compact-actions">
-            <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
-              Plot
-            </button>
-            <button className="ghost-button" onClick={() => onNavigate("composer")} type="button">
-              Composer
-            </button>
-          </div>
-        </article>
-
-        {wizard.outputs.length > 0 && (
-          <article className="context-card">
-            <div className="panel-heading">
-              <div>
-                <h3>Latest export</h3>
-              </div>
-            </div>
-            <div className="context-list">
-              <div className="context-row">
-                <span>Outputs</span>
-                <strong>{wizard.outputs.length}</strong>
-              </div>
-              <div className="context-row">
-                <span>Last file</span>
-                <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
-              </div>
-            </div>
-          </article>
-        )}
-      </aside>
     </div>
   );
 }

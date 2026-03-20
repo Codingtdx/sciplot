@@ -1,20 +1,57 @@
-.wizard-workspace-card {
+.wizard-main {
+  min-height: 0;
+}
+
+.wizard-empty-shell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.wizard-empty-card {
+  width: min(460px, 100%);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  align-items: flex-start;
 }
 
-.wizard-workspace-head {
-  align-items: center;
+.wizard-empty-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.wizard-shell-head {
+.wizard-empty-copy h2 {
+  margin: 0;
+  font-size: 1.04rem;
+}
+
+.wizard-empty-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.wizard-empty-chips {
+  justify-content: flex-start;
+}
+
+.wizard-stage-shell {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
-.wizard-shell-copy h2 {
+.wizard-stage-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-stage-toolbar h2 {
   margin: 2px 0 0;
-  font-size: 1.02rem;
+  font-size: 1rem;
 }
 
 .wizard-inline-chips {
@@ -31,155 +68,53 @@
   gap: 8px;
 }
 
-.wizard-pane-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.wizard-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-soft);
-}
-
-.wizard-pane h3 {
-  margin: 0;
-  font-size: 0.96rem;
-}
-
-.wizard-hero-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.wizard-input-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 8px;
-}
-
 .wizard-inline-field {
-  min-width: min(220px, 100%);
+  min-width: min(200px, 100%);
 }
 
-.wizard-callout-stack,
-.wizard-section-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.wizard-section-grid {
+.wizard-stage-grid {
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.wizard-content-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.8fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(290px, 330px);
   gap: 10px;
   align-items: start;
 }
 
-.wizard-main-stack,
-.wizard-status-card {
+.wizard-preview-column,
+.wizard-rail {
   min-width: 0;
-}
-
-.wizard-main-stack {
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.wizard-status-card {
-  position: sticky;
-  top: 0;
+.wizard-preview-column .preview-pane {
+  height: min(100%, calc(100dvh - 178px));
 }
 
-.wizard-section-card {
-  min-height: 0;
-}
-
-.wizard-tight-grid {
+.wizard-summary-card,
+.wizard-review-card {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.wizard-template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 6px;
-}
-
-.wizard-template-chip {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 10px;
-  border-radius: calc(var(--radius-md) + 1px);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-soft);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease,
-    opacity 160ms ease;
-}
-
-.wizard-template-chip strong {
-  font-size: 13px;
-}
-
-.wizard-template-chip span {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.wizard-template-chip:hover {
-  transform: translateY(-1px);
-  border-color: var(--border-strong);
-  background: var(--primary-soft);
-}
-
-.wizard-template-chip.active {
-  border-color: var(--border-strong);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(45, 212, 191, 0.08));
+.wizard-rail .context-card {
   box-shadow: var(--shadow-sm);
-}
-
-.wizard-template-chip.disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
-
-.wizard-template-chip.disabled:hover {
-  transform: none;
-  border-color: var(--border-subtle);
-  background: var(--surface-soft);
 }
 
 .wizard-summary-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .wizard-summary-row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 7px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -194,6 +129,111 @@
 .wizard-summary-row strong {
   text-align: right;
   word-break: break-word;
+  font-size: 12px;
+}
+
+.wizard-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 6px;
+}
+
+.wizard-template-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 9px;
+  border-radius: calc(var(--radius-md) + 1px);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+.wizard-template-chip strong {
+  font-size: 12px;
+}
+
+.wizard-template-chip span {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.wizard-template-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background: var(--primary-soft);
+}
+
+.wizard-template-chip.active {
+  border-color: var(--border-strong);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.06));
+  box-shadow: var(--shadow-sm);
+}
+
+.wizard-template-chip.disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.wizard-template-chip.disabled:hover {
+  transform: none;
+  border-color: var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+.wizard-section-stack,
+.wizard-callout-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-options-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.wizard-tight-grid {
+  gap: 8px;
+}
+
+.wizard-details {
+  margin: 0;
+}
+
+.wizard-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.wizard-readiness-panel {
+  gap: 6px;
+}
+
+.wizard-review-details {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.wizard-review-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+}
+
+.wizard-review-summary::-webkit-details-marker {
+  display: none;
 }
 
 .wizard-compare-list {
@@ -205,8 +245,8 @@
 .wizard-compare-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 9px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -217,72 +257,39 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
+  cursor: pointer;
+  list-style: none;
 }
 
 .wizard-compare-head strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .wizard-compare-head span {
   color: var(--text-secondary);
 }
 
-.wizard-empty-state {
-  min-height: 72px;
-  display: grid;
-  place-items: center;
+.wizard-compare-head::-webkit-details-marker {
+  display: none;
 }
 
-.wizard-options-grid {
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-}
-
-.wizard-details {
-  margin: 0;
-}
-
-.wizard-details-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  color: var(--text-secondary);
-  line-height: 1.45;
-}
-
-.wizard-readiness-panel {
-  gap: 6px;
-}
-
-@media (max-width: 1280px), (max-height: 760px) {
-  .wizard-content-grid {
+@media (max-width: 1180px) {
+  .wizard-stage-grid {
     grid-template-columns: 1fr;
   }
 
-  .wizard-status-card {
-    position: static;
+  .wizard-preview-column .preview-pane {
+    height: auto;
+    min-height: 320px;
   }
 }
 
-@media (max-width: 1120px) {
-  .wizard-content-grid,
-  .wizard-pane-grid,
-  .wizard-section-grid,
-  .wizard-template-grid,
-  .wizard-options-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px), (max-height: 720px) {
-  .wizard-workspace-head {
-    align-items: flex-start;
-  }
-
-  .wizard-input-bar,
+@media (max-width: 760px) {
+  .wizard-inline-chips,
   .wizard-toolbar,
-  .wizard-summary-row {
+  .wizard-summary-row,
+  .wizard-review-summary {
     flex-direction: column;
     align-items: stretch;
   }

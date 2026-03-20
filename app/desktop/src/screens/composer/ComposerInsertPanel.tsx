@@ -5,6 +5,7 @@ type Props = {
   autoLabels: boolean;
   onImportModeChange: (mode: PdfImportMode) => void;
   onQuickTwoUpEditorial: () => void;
+  onQuickThreeUp: () => void;
   onAddText: () => void;
   onOpenProject: () => void;
   onSaveProject: () => void;
@@ -16,6 +17,7 @@ export function ComposerInsertPanel({
   autoLabels,
   onImportModeChange,
   onQuickTwoUpEditorial,
+  onQuickThreeUp,
   onAddText,
   onOpenProject,
   onSaveProject,
@@ -49,6 +51,9 @@ export function ComposerInsertPanel({
       <div className="stacked-actions">
         <button className="ghost-button" onClick={onQuickTwoUpEditorial} type="button">
           2-up + notes
+        </button>
+        <button className="ghost-button" onClick={onQuickThreeUp} type="button">
+          3-up preset
         </button>
         <button className="ghost-button" onClick={onAddText} type="button">
           Text
