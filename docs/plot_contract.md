@@ -1,4 +1,4 @@
-# CodeGod Plot Contract
+# SciPlot God Plot Contract
 
 - Version: `3`
 - Default style: `default`

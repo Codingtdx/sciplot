@@ -119,7 +119,7 @@ def _contextual_error_message(context: str, exc: Exception) -> str:
     lower = message.lower()
     if message in {
         "The project file is not valid JSON.",
-        "This is not a recognizable CodeGod project file.",
+        "This is not a recognizable SciPlot God project file.",
     }:
         return message
     if message.startswith("Invalid project file field:"):
@@ -143,8 +143,8 @@ def _contextual_error_message(context: str, exc: Exception) -> str:
         "preview": "Could not render the live preview.",
         "export": "Could not export the submission bundle.",
         "open_path": "Could not open the selected folder.",
-        "save_project": "Could not save this CodeGod project.",
-        "open_project": "Could not open this CodeGod project.",
+        "save_project": "Could not save this SciPlot God project.",
+        "open_project": "Could not open this SciPlot God project.",
         "tensile_preprocess": "Could not build the tensile workbook.",
         "tensile_workbook": "Could not inspect this tensile workbook.",
         "tensile_compare": "Could not export the tensile comparison bundle.",
@@ -196,7 +196,7 @@ def _bundle_manifest_payload(
     }
 
 
-app = FastAPI(title="CodeGod 5.0 Sidecar", version="5.0.0")
+app = FastAPI(title="SciPlot God Sidecar", version="5.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

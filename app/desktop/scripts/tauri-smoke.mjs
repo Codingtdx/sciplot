@@ -160,14 +160,14 @@ async function findNativeAppProcesses() {
     return [];
   }
   try {
-    const { stdout } = await execFileAsync("pgrep", ["-fal", "codegod-desktop"]);
+    const { stdout } = await execFileAsync("pgrep", ["-fal", "sciplot-god-desktop"]);
     return stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean)
       .filter(
         (line) =>
-          /(?:^|\s|\/)target\/debug\/codegod-desktop(?:\s|$)/.test(line) &&
+          /(?:^|\s|\/)target\/debug\/sciplot-god-desktop(?:\s|$)/.test(line) &&
           !/build_script_build|rustc|clang|cargo/.test(line),
       );
   } catch (error) {
@@ -175,41 +175,6 @@ async function findNativeAppProcesses() {
       return [];
     }
     throw error;
-  }
-}
-
-async function readMacWindowTitles() {
-  if (process.platform !== "darwin") {
-    return null;
-  }
-  const script = [
-    'tell application "System Events"',
-    'set outputLines to {}',
-    'repeat with processName in {"codegod-desktop", "CodeGod 5.0"}',
-    "if exists process processName then",
-    "tell process processName",
-    "try",
-    "repeat with windowName in (name of every window)",
-    "set end of outputLines to (windowName as string)",
-    "end repeat",
-    "end try",
-    "end tell",
-    "end if",
-    "end repeat",
-    "return outputLines as string",
-    "end tell",
-  ].join("\n");
-  try {
-    const { stdout } = await execFileAsync("osascript", ["-e", script], {
-      timeout: 4_000,
-    });
-    return stdout
-      .split(/,\s*/)
-      .map((value) => value.trim())
-      .filter(Boolean);
-  } catch (error) {
-    log(`无法读取 macOS 窗口标题，继续按进程级 smoke 通过: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
   }
 }
 
@@ -256,16 +221,9 @@ async function main() {
   }, { timeoutMs: 90_000, intervalMs: 750 });
 
   log("已捕获到 Tauri 原生进程，开始执行启动后检查。");
-  log("尝试读取原生窗口标题...");
-  const windowTitles = await readMacWindowTitles();
-  log("窗口标题检查结束。");
-
   log("Tauri 原生进程已启动。");
   for (const line of nativeProcesses) {
     log(`native: ${line}`);
-  }
-  if (windowTitles && windowTitles.length > 0) {
-    log(`windows: ${windowTitles.join(" | ")}`);
   }
 
   if (!(await httpOk(sidecarUrl)) || !(await httpOk(frontendUrl))) {

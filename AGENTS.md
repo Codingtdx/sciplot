@@ -1,4 +1,4 @@
-# CodeGod 开发入口说明
+# SciPlot God 开发入口说明
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
@@ -18,7 +18,7 @@
 - `app/desktop/src/screens/composer/`: Composer 屏专属 hooks、面板组件和选择态/快捷键等 UI 行为模块；优先在这里继续拆分，不要再把导入、inspect、layers、快捷键逻辑重新堆回单个 `ComposerScreen.tsx`。
 - `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
 - `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
-- `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
+- `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `sciplot-god-desktop` 进程已起来。
 - `Launch_Plotter.command`: 桌面端主启动器；只尝试启动当前 Tauri 开发宿主，失败时只提示改用 legacy 启动器，不再自动退回旧 GUI。
 - `Launch_Plotter_Legacy.command`: 显式旧入口；只在需要 `plot_wizard_gui.py` / `interactive_plot.py` 时手动使用，不再视为默认链路。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
@@ -71,7 +71,7 @@
 ## 拼图器约束
 
 - Composer 基础格固定为 `60 x 55 mm`，布局 frame 固定为 `180 x 165 mm`，画布仍是 `180 x 170 mm`。
-- `graph` 只指 CodeGod 标准图 PDF 的 graph 导入模式；允许的 graph 物理尺寸只有 `60x55`、`120x55`、`60x110 mm`。
+- `graph` 只指 SciPlot God 标准图 PDF 的 graph 导入模式；允许的 graph 物理尺寸只有 `60x55`、`120x55`、`60x110 mm`。
 - graph 几何必须由 `graph region` 推导，不能在前端或 sidecar 手动把 graph 改成脱格尺寸。
 - `60x110` graph region 默认自带 `structure slot`；slot 内的自由素材和文字要能跟随该 region 一起移动。
 - `free region` 只表示合并后的占格区域，不直接导出；真正导出的仍是 `panel / text` 这些 drawable。

@@ -286,7 +286,7 @@ def test_save_project_rejects_unknown_mode(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "This is not a recognizable CodeGod project file."
+    assert response.json()["detail"] == "This is not a recognizable SciPlot God project file."
 
 
 def test_preprocess_tensile_replicates_returns_string_output_path(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodeGod 5.0",
+  "productName": "SciPlot God",
   "version": "5.0.0",
   "identifier": "com.codegod.desktop",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "CodeGod 5.0",
+        "title": "SciPlot God",
         "width": 1440,
         "height": 900,
         "minWidth": 980,

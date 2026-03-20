@@ -1,8 +1,8 @@
 [package]
-name = "codegod-desktop"
+name = "sciplot-god-desktop"
 version = "5.0.0"
-description = "CodeGod 5.0 desktop"
-authors = ["CodeGod"]
+description = "SciPlot God desktop"
+authors = ["SciPlot God"]
 edition = "2021"
 
 [build-dependencies]

@@ -15,7 +15,7 @@ type WebviewWindowLike = {
   ): Promise<() => void> | (() => void);
 };
 
-export function getCodeGodWebviewWindow(): WebviewWindowLike {
+export function getSciPlotGodWebviewWindow(): WebviewWindowLike {
   try {
     const webviewWindow = getTauriWebviewWindow();
     if (webviewWindow && typeof webviewWindow.onDragDropEvent === "function") {

@@ -235,7 +235,7 @@ export function LaunchpadScreen({
       <section className="launchpad-hero hero-card work-card">
         <div className="launchpad-hero-main">
           <div className="launchpad-hero-copy">
-            <span className="eyebrow">CodeGod Desktop 6.5</span>
+            <span className="eyebrow">SciPlot God Desktop 6.5</span>
             <h1>Work in focused studios, not crowded admin panels.</h1>
             <p>
               Plot stays recommendation-first. Tensile prepares inputs without hijacking Plot.

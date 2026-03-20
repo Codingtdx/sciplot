@@ -30,7 +30,7 @@ import {
 } from "../lib/composer";
 import { loadComposerProjectFile } from "../lib/project-io";
 import { openDialog, saveDialog } from "../lib/tauri-dialog";
-import { getCodeGodWebviewWindow } from "../lib/tauri-webview";
+import { getSciPlotGodWebviewWindow } from "../lib/tauri-webview";
 import type { ComposerPanel, ComposerProject, ComposerText } from "../lib/types";
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import {
@@ -287,7 +287,7 @@ export function ComposerScreen() {
 
     async function attach() {
       try {
-        const webview = getCodeGodWebviewWindow();
+        const webview = getSciPlotGodWebviewWindow();
         unlisten = await webview.onDragDropEvent((event) => {
           if (disposed) {
             return;
@@ -804,8 +804,8 @@ export function ComposerScreen() {
 
   const saveComposerProject = async () => {
     const path = await readSavePath({
-      defaultPath: "codegod-composer-v2.plotproject.json",
-      filters: [{ name: "CodeGod Project", extensions: ["json"] }],
+      defaultPath: "sciplot-god-composer-v2.plotproject.json",
+      filters: [{ name: "SciPlot God Project", extensions: ["json"] }],
     });
     if (!path) {
       return;
@@ -833,7 +833,7 @@ export function ComposerScreen() {
       await readDialogPaths(
         {
           multiple: false,
-          filters: [{ name: "CodeGod Project", extensions: ["json"] }],
+          filters: [{ name: "SciPlot God Project", extensions: ["json"] }],
         },
         1,
       )

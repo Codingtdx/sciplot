@@ -2,6 +2,6 @@ from __future__ import annotations
 
 import matplotlib
 
-# All rendering in CodeGod is file/preview oriented, so a non-interactive
+# All rendering in SciPlot God is file/preview oriented, so a non-interactive
 # backend avoids macOS GUI backend crashes inside FastAPI worker threads.
 matplotlib.use("Agg", force=True)

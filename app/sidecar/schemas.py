@@ -662,7 +662,7 @@ def _normalize_composer_project(payload: dict[str, Any]) -> ComposerProjectDocum
 
 def normalize_project_document(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError("This is not a recognizable CodeGod project file.")
+        raise ValueError("This is not a recognizable SciPlot God project file.")
 
     mode = data.get("mode")
     if mode == "wizard":
@@ -684,7 +684,7 @@ def normalize_project_document(data: Any) -> dict[str, Any]:
         envelope = ComposerProjectEnvelope(version=COMPOSER_VERSION, mode="composer", project=normalized_project)
         return envelope.model_dump()
 
-    raise ValueError("This is not a recognizable CodeGod project file.")
+    raise ValueError("This is not a recognizable SciPlot God project file.")
 
 
 def save_project_document(project_path: str | Path, data: Any) -> Path:

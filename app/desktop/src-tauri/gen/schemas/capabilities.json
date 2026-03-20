@@ -1,1 +1,1 @@
-{"main-desktop":{"identifier":"main-desktop","description":"Allow the main CodeGod desktop window to use core IPC and native file dialogs.","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}
+{"main-desktop":{"identifier":"main-desktop","description":"Allow the main SciPlot God desktop window to use core IPC and native file dialogs.","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}
