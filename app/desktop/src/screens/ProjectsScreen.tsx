@@ -118,13 +118,13 @@ export function ProjectsScreen({
   };
 
   return (
-    <div className="desk-layout single-column">
+    <div className="desk-layout single-column recents-layout">
       <section className="desk-main">
-        <article className="work-card section-card">
+        <article className="work-card hero-card recents-hero-card">
           <div className="panel-heading">
             <div>
-              <div className="card-kicker">Recent</div>
-              <h2>Recent files</h2>
+              <div className="card-kicker">Recent Browser</div>
+              <h2>Recent files and project restores</h2>
             </div>
             <div className="step-actions">
               <button className="primary-button" onClick={() => onNavigate("/plot/import")} type="button">
@@ -135,6 +135,43 @@ export function ProjectsScreen({
               </button>
               <InfoTip content="Plot usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
             </div>
+          </div>
+
+          <div className="recents-summary-grid">
+            <div className="focus-panel">
+              <span>Current plot file</span>
+              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
+            </div>
+            <div className="focus-panel">
+              <span>Plot stage</span>
+              <strong>{getWizardStepLabel(wizard.step)}</strong>
+            </div>
+            <div className="focus-panel">
+              <span>Composer objects</span>
+              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
+            </div>
+            <div className="focus-panel">
+              <span>Remembered recents</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
+          </div>
+
+          {notice && (
+            <div className={noticeTone === "success" ? "success-card" : "warning-card"}>
+              {notice}
+            </div>
+          )}
+        </article>
+
+        <article className="work-card section-card recents-browser-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Assets</div>
+              <h2>Open directly</h2>
+            </div>
+            {wizard.outputs.length > 0 && (
+              <span className="signal-tag">{wizard.outputs.length} latest output(s)</span>
+            )}
           </div>
 
           <div className="context-list">
@@ -156,20 +193,14 @@ export function ProjectsScreen({
             </div>
           </div>
 
-          {notice && (
-            <div className={noticeTone === "success" ? "success-card" : "warning-card"}>
-              {notice}
-            </div>
-          )}
-
-          <div className="layer-list">
+          <div className="layer-list recents-browser-grid">
             {recentProjects.length === 0 && (
               <div className="placeholder-card">No recent files yet.</div>
             )}
 
             {recentProjects.map((entry) => (
               <button
-                className="layer-item recent-item"
+                className="layer-item recent-item recent-browser-item"
                 disabled={activeRecentId === entry.id}
                 key={entry.id}
                 onClick={() => void reopenRecent(entry)}
@@ -184,20 +215,13 @@ export function ProjectsScreen({
               </button>
             ))}
           </div>
+
           {wizard.outputs.length > 0 && (
-            <details className="wizard-details">
-              <summary>Latest export</summary>
-              <div className="context-list">
-                <div className="context-row">
-                  <span>Outputs</span>
-                  <strong>{wizard.outputs.length}</strong>
-                </div>
-                <div className="context-row">
-                  <span>Last file</span>
-                  <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
-                </div>
-              </div>
-            </details>
+            <div className="focus-panel">
+              <span>Latest export</span>
+              <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
+              <span>{wizard.outputs.length} output file(s) are still attached to the current Plot session.</span>
+            </div>
           )}
         </article>
       </section>

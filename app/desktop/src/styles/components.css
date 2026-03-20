@@ -1,7 +1,7 @@
 .work-card,
 .context-card,
 .preview-pane {
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   box-shadow: var(--shadow-md);
@@ -81,29 +81,29 @@
 .flow-strip {
   margin-top: 8px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
 }
 
 .flow-step {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 6px 8px;
-  border-radius: 12px;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 16px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
 }
 
 .flow-step.complete {
-  border-color: rgba(59, 130, 246, 0.18);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: color-mix(in srgb, var(--accent-signal) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-signal) 10%, transparent);
 }
 
 .flow-step.current {
   border-color: var(--border-strong);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(56, 189, 248, 0.14));
+  background: linear-gradient(135deg, var(--primary-soft-strong), color-mix(in srgb, var(--accent-coral) 14%, transparent));
   box-shadow: var(--shadow-sm);
 }
 
@@ -146,7 +146,7 @@
 .stacked-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .hero-actions {
@@ -219,13 +219,13 @@
   border: 1px solid var(--border-subtle);
   background: var(--surface-card-strong);
   color: var(--text-primary);
-  padding: 7px 9px;
+  padding: 8px 10px;
   outline: none;
 }
 
 .field:focus {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+  border-color: color-mix(in srgb, var(--primary-end) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-end) 18%, transparent);
 }
 
 .toggle-field {
@@ -289,14 +289,14 @@
 .ghost-button,
 .mode-button {
   min-height: var(--button-height);
-  padding: 0 11px;
+  padding: 0 13px;
   border-radius: 999px;
   cursor: pointer;
   transition:
-    transform 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    transform var(--motion-fast),
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .primary-button:hover,
@@ -309,7 +309,7 @@
   border: 0;
   background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
   color: white;
-  box-shadow: 0 10px 18px rgba(59, 130, 246, 0.18);
+  box-shadow: 0 14px 28px var(--theme-glow);
 }
 
 .ghost-button,
@@ -321,8 +321,8 @@
 
 .ghost-button.active-tone,
 .mode-button.active-tone {
-  border-color: rgba(255, 127, 93, 0.24);
-  background: linear-gradient(135deg, rgba(15, 118, 110, 0.14), rgba(255, 127, 93, 0.14));
+  border-color: color-mix(in srgb, var(--primary-end) 28%, transparent);
+  background: linear-gradient(135deg, var(--primary-soft-strong), color-mix(in srgb, var(--accent-coral) 14%, transparent));
 }
 
 .ghost-button:disabled,
@@ -419,7 +419,7 @@
   display: flex;
   flex-direction: column;
   min-height: clamp(220px, 36vh, 420px);
-  padding: 8px;
+  padding: 10px;
 }
 
 .preview-toolbar {
@@ -462,16 +462,16 @@
   overflow: auto;
   border: 1px solid var(--border-subtle);
   background: var(--surface-preview);
-  padding: 8px;
+  padding: 12px;
 }
 
 .preview-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-lg);
   cursor: zoom-in;
 }
 

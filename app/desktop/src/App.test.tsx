@@ -53,7 +53,8 @@ describe("App", () => {
       settings: {
         auto_status_poll: true,
         remember_last_screen: true,
-        theme_preference: "system",
+        appearance_mode: "system",
+        theme_preset_id: "paper-lab",
       },
     });
   });

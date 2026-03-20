@@ -32,7 +32,22 @@ export function WizardTemplatesSection({
         <div className="placeholder-card">Templates appear after inspect.</div>
       ) : (
         <div className="wizard-section-stack">
-          <div className="wizard-template-grid">
+          <button
+            className={`wizard-recommendation-card ${
+              selectedTemplate === inspection.recommendation.template ? "active" : ""
+            }`}
+            onClick={() => onSelectTemplate(inspection.recommendation.template)}
+            type="button"
+          >
+            <div className="wizard-recommendation-copy">
+              <span className="signal-tag">Recommended</span>
+              <strong>{compatibleTemplates.find((template) => template.id === inspection.recommendation.template)?.label ?? inspection.recommendation.template}</strong>
+              <span>{inspection.recommendation.reason}</span>
+            </div>
+            <span className="wizard-recommendation-action">Use this chart</span>
+          </button>
+
+          <div className="wizard-template-grid wizard-template-gallery">
             {compatibleTemplates.map((template) => (
               <button
                 className={`wizard-template-chip ${selectedTemplate === template.id ? "active" : ""}`}
@@ -46,6 +61,7 @@ export function WizardTemplatesSection({
                     ? "Recommended"
                     : "Compatible"}
                 </span>
+                <div className="wizard-template-chip-line" />
               </button>
             ))}
           </div>

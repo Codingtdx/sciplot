@@ -86,6 +86,7 @@ export function ComposerScreen() {
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [dropNoticeTone, setDropNoticeTone] = useState<"success" | "warning">("success");
   const [inspectorTab, setInspectorTab] = useState<"insert" | "inspect" | "layers">("insert");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedCells, setSelectedCells] = useState<CellRef[]>([]);
   const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
   const [clipboardReady, setClipboardReady] = useState(false);
@@ -973,12 +974,13 @@ export function ComposerScreen() {
   });
 
   return (
-    <div className="desk-layout">
+    <div className="desk-layout composer-studio-layout">
       <section className="desk-main">
         <ComposerCanvasSection
           busy={busy}
           dropActive={dropActive}
           highlightRegionIds={selectedHighlightRegionIds}
+          sidebarCollapsed={sidebarCollapsed}
           pdfImportMode={pdfImportMode}
           project={composer.project}
           selectedCells={selectedCells}
@@ -992,6 +994,7 @@ export function ComposerScreen() {
           onObjectSelection={selectComposerObjects}
           onProjectChange={setProject}
           onSelect={(id, additive) => selectComposerItem(id, additive, "canvas")}
+          onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
           onSelectedCellsChange={(cells, options) => {
             setSelectedCells(uniqueCells(cells));
             if (options?.preserveSelection) {
@@ -1003,7 +1006,7 @@ export function ComposerScreen() {
         />
       </section>
 
-      <aside className="desk-context">
+      <aside className={`desk-context composer-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <article className="context-card composer-tab-card">
           <div className="inspector-tab-strip" role="tablist" aria-label="Composer inspector tabs">
             <button

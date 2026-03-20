@@ -87,7 +87,7 @@ export function WizardExportSection({
     hasExportedOutputs;
 
   return (
-    <article className="context-card wizard-review-card">
+    <article className="context-card wizard-review-card wizard-export-card">
       <details className="wizard-review-details" open={autoOpen}>
         <summary className="wizard-review-summary">
           <span>Review and export</span>
@@ -95,6 +95,25 @@ export function WizardExportSection({
         </summary>
 
         <div className="wizard-section-stack">
+          <div className="wizard-export-summary-grid">
+            <div className="stat-tile">
+              <span>Readiness</span>
+              <strong>{readinessLabel}</strong>
+            </div>
+            <div className="stat-tile">
+              <span>Blockers</span>
+              <strong>{blockingErrors.length}</strong>
+            </div>
+            <div className="stat-tile">
+              <span>Expected files</span>
+              <strong>{outputItems.length}</strong>
+            </div>
+            <div className="stat-tile">
+              <span>Bundle folder</span>
+              <strong>{outputDirectory ? formatLeaf(outputDirectory) : "Pending export"}</strong>
+            </div>
+          </div>
+
           {preflightRequestError && <div className="error-card">{preflightRequestError}</div>}
 
           {!preflightRequestError && preflightBusy && (

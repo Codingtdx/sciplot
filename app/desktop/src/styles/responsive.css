@@ -9,41 +9,44 @@
   }
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1320px) {
   .launchpad-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .plot-stage-grid,
-  .desk-layout {
-    grid-template-columns: 1fr;
+  .launchpad-recent-grid,
+  .theme-gallery-grid,
+  .recents-browser-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .desk-context,
-  .plot-stage-rail {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+  .plot-stage-grid,
+  .desk-layout,
+  .composer-studio-layout {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 960px) {
-  .app-shell {
-    padding: 10px;
-  }
-
+@media (max-width: 1024px) {
   .app-topbar,
-  .launchpad-meta,
+  .launchpad-hero-main,
   .plot-stage-copy,
   .panel-heading,
-  .preview-toolbar {
+  .preview-toolbar,
+  .titlebar-heading {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .app-topbar-actions,
-  .status-pills {
+  .workspace-dock,
+  .titlebar-meta {
     justify-content: flex-start;
+  }
+
+  .launchpad-hero-visual {
+    width: 100%;
+    min-width: 0;
   }
 
   .launchpad-grid,
@@ -52,30 +55,46 @@
   .summary-grid,
   .wizard-template-grid,
   .desk-context,
-  .plot-stage-rail {
+  .plot-stage-rail,
+  .theme-gallery-grid,
+  .recents-browser-grid,
+  .launchpad-recent-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    padding: 10px;
+  }
+
   .app-topbar,
   .launchpad-hero,
   .plot-stage-card,
   .plot-import-card,
   .plot-sheet-card,
-  .launchpad-recents {
+  .launchpad-recents,
+  .settings-hero-card {
     padding: 16px;
   }
 
   .workspace-chip-row,
   .hero-actions,
-  .step-actions {
+  .step-actions,
+  .launchpad-stat-grid,
+  .plot-stage-metrics,
+  .tensile-task-grid {
     width: 100%;
   }
 
   .workspace-chip,
   .primary-button,
-  .ghost-button {
+  .ghost-button,
+  .mode-button {
     justify-content: center;
+  }
+
+  .launchpad-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -7,6 +7,7 @@ type Props = {
   pdfImportMode: PdfImportMode;
   busy: boolean;
   dropActive: boolean;
+  sidebarCollapsed: boolean;
   selectedCells: CellRef[];
   selectedId: string | null;
   selectedObjectIds: string[];
@@ -15,6 +16,7 @@ type Props = {
   onImportGraph: () => void;
   onImportAsset: () => void;
   onExportComposer: () => void;
+  onToggleSidebar: () => void;
   onDuplicateDrawableStart: (id: string) => string | null;
   onObjectSelection: (ids: string[], additive?: boolean) => void;
   onProjectChange: (project: ComposerProject) => void;
@@ -27,6 +29,7 @@ export function ComposerCanvasSection({
   pdfImportMode,
   busy,
   dropActive,
+  sidebarCollapsed,
   selectedCells,
   selectedId,
   selectedObjectIds,
@@ -35,6 +38,7 @@ export function ComposerCanvasSection({
   onImportGraph,
   onImportAsset,
   onExportComposer,
+  onToggleSidebar,
   onDuplicateDrawableStart,
   onObjectSelection,
   onProjectChange,
@@ -71,6 +75,9 @@ export function ComposerCanvasSection({
         </button>
         <button className="ghost-button" onClick={onExportComposer} type="button">
           Export PDF
+        </button>
+        <button className="ghost-button" onClick={onToggleSidebar} type="button">
+          {sidebarCollapsed ? "Show panels" : "Hide panels"}
         </button>
       </div>
 

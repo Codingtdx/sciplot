@@ -27,6 +27,7 @@ import type {
   ExportResponse,
 } from "./types";
 import { EMPTY_COMPOSER_PROJECT, normalizeComposerProject } from "./composer";
+import { DEFAULT_THEME_PRESET_BY_APPEARANCE, isThemePresetId } from "./themes";
 import {
   moveTensileComparisonSource as moveTensileComparisonSourceList,
   normalizeTensileComparisonSources,
@@ -137,7 +138,8 @@ const emptyProject: ComposerProject = {
 const defaultWorkbenchSettings: WorkbenchSettings = {
   auto_status_poll: true,
   remember_last_screen: true,
-  theme_preference: "system",
+  appearance_mode: "system",
+  theme_preset_id: DEFAULT_THEME_PRESET_BY_APPEARANCE.light,
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -369,19 +371,41 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       storage,
       merge: (persistedState, currentState) => {
         const persisted = persistedState as
-          | (Partial<WorkbenchState> & { lastScreen?: string })
+          | (Partial<WorkbenchState> & {
+              lastScreen?: string;
+              settings?: Partial<WorkbenchSettings> & {
+                theme_preference?: "system" | "light" | "dark";
+                appearance_mode?: "system" | "light" | "dark";
+                theme_preset_id?: string;
+              };
+            })
           | undefined;
         const lastRoute =
           normalizeWorkbenchRoute(persisted?.lastRoute) ??
           normalizeWorkbenchRoute(routeForLegacyScreen(persisted?.lastScreen)) ??
           currentState.lastRoute;
+        const appearanceMode =
+          persisted?.settings?.appearance_mode ??
+          persisted?.settings?.theme_preference ??
+          defaultWorkbenchSettings.appearance_mode;
+        const themePresetId = isThemePresetId(persisted?.settings?.theme_preset_id)
+          ? persisted.settings.theme_preset_id
+          : appearanceMode === "dark"
+            ? DEFAULT_THEME_PRESET_BY_APPEARANCE.dark
+            : DEFAULT_THEME_PRESET_BY_APPEARANCE.light;
         return {
           ...currentState,
           ...persisted,
           lastRoute,
           settings: {
             ...defaultWorkbenchSettings,
-            ...(persisted?.settings ?? {}),
+            auto_status_poll:
+              persisted?.settings?.auto_status_poll ?? defaultWorkbenchSettings.auto_status_poll,
+            remember_last_screen:
+              persisted?.settings?.remember_last_screen ??
+              defaultWorkbenchSettings.remember_last_screen,
+            appearance_mode: appearanceMode,
+            theme_preset_id: themePresetId,
           },
         };
       },

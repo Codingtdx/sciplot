@@ -518,7 +518,7 @@ export function WizardScreen({
   ];
 
   return (
-    <div className="plot-workspace">
+    <div className={`plot-workspace plot-stage-${routeStage}`}>
       <section className="plot-stage-card work-card hero-card">
         <div className="plot-stage-copy">
           <div>
@@ -539,6 +539,25 @@ export function WizardScreen({
 
         <StepFlow current={routeStage} />
 
+        <div className="plot-stage-metrics">
+          <div className="focus-panel">
+            <span>File</span>
+            <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Waiting for import"}</strong>
+          </div>
+          <div className="focus-panel">
+            <span>Recommended type</span>
+            <strong>
+              {wizard.inspection
+                ? templateLabel(meta, wizard.inspection.recommendation.template)
+                : "Pending inspect"}
+            </strong>
+          </div>
+          <div className="focus-panel">
+            <span>Current template</span>
+            <strong>{wizard.template ? templateLabel(meta, wizard.template) : "Not selected"}</strong>
+          </div>
+        </div>
+
         {wizard.error && <div className="error-card">{wizard.error}</div>}
         {!wizard.sidecarReady && (
           <div className="warning-card">
@@ -550,7 +569,7 @@ export function WizardScreen({
 
       {routeStage === "import" && (
         <div className="plot-stage-grid import-stage">
-          <section className="work-card plot-import-card">
+          <section className="work-card plot-import-card plot-import-canvas">
             <div className="panel-heading">
               <div>
                 <div className="card-kicker">Start</div>
@@ -563,7 +582,7 @@ export function WizardScreen({
               sheet selector next.
             </p>
 
-            <div className="hero-actions">
+            <div className="hero-actions plot-import-actions">
               <button className="primary-button" onClick={openDataFile} type="button">
                 Open data
               </button>
@@ -573,10 +592,16 @@ export function WizardScreen({
                 </button>
               )}
             </div>
+
+            <div className="plot-import-format-strip">
+              <span className="signal-tag">CSV / TXT / TSV</span>
+              <span className="signal-tag">XLSX / XLSM</span>
+              <span className="signal-tag">Inspect runs automatically</span>
+            </div>
           </section>
 
           <aside className="plot-stage-rail">
-            <article className="context-card">
+            <article className="context-card plot-session-overview-card">
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Session</div>
@@ -593,7 +618,7 @@ export function WizardScreen({
               </div>
             </article>
 
-            <article className="context-card">
+            <article className="context-card plot-import-recents-card">
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Recent</div>
@@ -604,7 +629,7 @@ export function WizardScreen({
               {recentDataFiles.length === 0 ? (
                 <div className="placeholder-card">No recent data files yet.</div>
               ) : (
-                <div className="launchpad-recent-list">
+                <div className="launchpad-recent-list plot-import-recent-list">
                   {recentDataFiles.slice(0, 4).map((entry) => (
                     <button
                       className="launchpad-recent-item"
@@ -681,8 +706,8 @@ export function WizardScreen({
       )}
 
       {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
-        <div className="plot-stage-grid">
-          <section className="plot-preview-column">
+        <div className="plot-stage-grid plot-studio-grid">
+          <section className="plot-preview-column plot-studio-preview">
             <section className="context-card plot-summary-card">
               <div className="panel-heading">
                 <div>

@@ -18,7 +18,10 @@ export function StepFlow({ current }: { current: PlotStage }) {
             title={step.hint}
           >
             <span className="flow-step-index">{String(index + 1).padStart(2, "0")}</span>
-            <strong>{step.label}</strong>
+            <div className="flow-step-copy">
+              <strong>{step.label}</strong>
+              <span className="flow-step-hint">{step.hint}</span>
+            </div>
           </div>
         );
       })}

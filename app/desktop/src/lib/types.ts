@@ -46,7 +46,29 @@ export type WorkbenchRoute =
   | "/recents"
   | "/settings";
 export type PdfImportMode = "graph" | "asset";
-export type ThemePreference = "system" | "light" | "dark";
+export type AppearanceMode = "system" | "light" | "dark";
+
+export type ThemePreference = AppearanceMode;
+
+export type ResolvedAppearance = "light" | "dark";
+
+export type ThemePresetId = string;
+
+export type ThemePresetPreview = {
+  background: string;
+  surface: string;
+  glow: string;
+  chip: string;
+};
+
+export type ThemePreset = {
+  id: ThemePresetId;
+  name: string;
+  appearance: ResolvedAppearance;
+  accent: string;
+  description: string;
+  preview: ThemePresetPreview;
+};
 
 export type PreviewItem = {
   filename: string;
@@ -321,7 +343,8 @@ export type RecentProjectEntry = {
 export type WorkbenchSettings = {
   auto_status_poll: boolean;
   remember_last_screen: boolean;
-  theme_preference: ThemePreference;
+  appearance_mode: AppearanceMode;
+  theme_preset_id: ThemePresetId;
 };
 
 export type GlobalFrame = {

@@ -6,11 +6,15 @@ import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import type {
   PlotContract,
-  ThemePreference,
   WorkbenchMeta,
   WorkbenchRoute,
   WorkbenchWorkspace,
 } from "./lib/types";
+import {
+  describeAppearanceMode,
+  resolveAppearance,
+  resolveThemePreset,
+} from "./lib/themes";
 import {
   WORKSPACE_ITEMS,
   WORKSPACE_META,
@@ -42,23 +46,6 @@ const SettingsScreen = lazy(async () => ({
   default: (await import("./screens/SettingsScreen")).SettingsScreen,
 }));
 
-function describeThemePreference(value: ThemePreference) {
-  if (value === "light") {
-    return "Light";
-  }
-  if (value === "dark") {
-    return "Dark";
-  }
-  return "System";
-}
-
-function resolvedTheme(preference: ThemePreference, prefersDark: boolean) {
-  if (preference === "light" || preference === "dark") {
-    return preference;
-  }
-  return prefersDark ? "dark" : "light";
-}
-
 function initialRoute(persistedRoute: WorkbenchRoute, rememberLastScreen: boolean) {
   if (typeof window !== "undefined") {
     const fromLocation = normalizeWorkbenchRoute(window.location.pathname);
@@ -76,11 +63,13 @@ export default function App() {
     (state) => state.settings.remember_last_screen,
   );
   const autoStatusPoll = useWorkbenchStore((state) => state.settings.auto_status_poll);
-  const themePreference = useWorkbenchStore((state) => state.settings.theme_preference);
+  const appearanceMode = useWorkbenchStore((state) => state.settings.appearance_mode);
+  const themePresetId = useWorkbenchStore((state) => state.settings.theme_preset_id);
   const recentProjectsCount = useWorkbenchStore((state) => state.recentProjects.length);
   const [route, setRoute] = useState<WorkbenchRoute>(() =>
     initialRoute(persistedRoute, rememberLastScreen),
   );
+  const [prefersDark, setPrefersDark] = useState(false);
   const [workbenchMeta, setWorkbenchMeta] = useState<WorkbenchMeta | null>(null);
   const [plotContract, setPlotContract] = useState<PlotContract | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
@@ -232,6 +221,9 @@ export default function App() {
     }
   }, [metaError, plotContract, sidecarReady, workbenchMeta]);
 
+  const resolvedAppearanceValue = resolveAppearance(appearanceMode, prefersDark);
+  const activeThemePreset = resolveThemePreset(themePresetId, resolvedAppearanceValue);
+
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return;
@@ -243,19 +235,24 @@ export default function App() {
         ? window.matchMedia("(prefers-color-scheme: dark)")
         : null;
 
-    const applyTheme = () => {
-      const theme = resolvedTheme(themePreference, Boolean(mediaQuery?.matches));
+    const syncPreference = () => {
+      const nextPrefersDark = Boolean(mediaQuery?.matches);
+      setPrefersDark(nextPrefersDark);
+      const theme = resolveAppearance(appearanceMode, nextPrefersDark);
+      const preset = resolveThemePreset(themePresetId, theme);
       root.dataset.theme = theme;
+      root.dataset.themePreset = preset.id;
       root.style.colorScheme = theme;
     };
 
-    applyTheme();
-    if (!mediaQuery || themePreference !== "system") {
+    syncPreference();
+
+    if (!mediaQuery) {
       return;
     }
 
     const handleChange = () => {
-      applyTheme();
+      syncPreference();
     };
 
     if (typeof mediaQuery.addEventListener === "function") {
@@ -269,10 +266,11 @@ export default function App() {
     return () => {
       mediaQuery.removeListener(handleChange);
     };
-  }, [themePreference]);
+  }, [appearanceMode, themePresetId]);
 
   const workspace = workspaceForRoute(route);
   const meta = WORKSPACE_META[workspace];
+  const currentPlotStage = plotStageFromRoute(route);
   const plotSessionActive = hasWizardSessionContent({
     inputPath: wizard.inputPath,
     inspection: wizard.inspection,
@@ -299,7 +297,7 @@ export default function App() {
                   ? "/recents"
                   : "/settings",
       })),
-    [plotSessionActive, wizard.stage],
+    [composerSessionActive, plotSessionActive, wizard.stage],
   );
 
   let secondaryStatusLabel = "Focus mode";
@@ -318,7 +316,7 @@ export default function App() {
   } else if (workspace === "recents") {
     secondaryStatusLabel = `${recentProjectsCount} recent files`;
   } else if (workspace === "settings") {
-    secondaryStatusLabel = `${describeThemePreference(themePreference)} Theme`;
+    secondaryStatusLabel = `${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`;
   } else if (plotSessionActive) {
     secondaryStatusLabel = `Plot session · ${getPlotStageLabel(wizard.stage)}`;
   } else if (composerSessionActive) {
@@ -326,7 +324,12 @@ export default function App() {
   }
 
   let content = (
-    <LaunchpadScreen sidecarReady={sidecarReady} onNavigate={navigate} />
+    <LaunchpadScreen
+      activeThemePresetName={activeThemePreset.name}
+      meta={workbenchMeta}
+      sidecarReady={sidecarReady}
+      onNavigate={navigate}
+    />
   );
 
   if (workspace === "plot") {
@@ -348,27 +351,51 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell ${workspace === "launchpad" ? "launchpad-mode" : "workspace-mode"}`}>
-      <header className="app-topbar">
-        <div className="app-topbar-brand">
+    <div
+      className={`app-shell ${workspace === "launchpad" ? "launchpad-mode" : "workspace-mode"}`}
+      data-workspace={workspace}
+    >
+      <header className="app-topbar app-titlebar">
+        <div className="app-topbar-brand titlebar-zone">
           <button className="brand-mark" onClick={() => navigate("/")} type="button">
             <AppIcon name="spark" />
           </button>
           <div className="brand-copy">
             <span className="eyebrow">{meta.eyebrow}</span>
-            <h1>{meta.title}</h1>
+            <div className="titlebar-heading">
+              <h1>{meta.title}</h1>
+              <span className="titlebar-status-copy">
+                {workspace === "plot"
+                  ? `${getPlotStageLabel(currentPlotStage)} stage`
+                  : secondaryStatusLabel}
+              </span>
+            </div>
+            <p className="titlebar-description">{meta.description}</p>
           </div>
         </div>
 
-        <div className="app-topbar-actions">
-          {workspace !== "launchpad" && (
-            <button className="ghost-button home-button" onClick={() => navigate("/")} type="button">
+        <div className="app-topbar-actions titlebar-zone">
+          <div className="titlebar-meta">
+            <button className="ghost-button titlebar-theme-button" onClick={() => navigate("/settings")} type="button">
+              <span>{activeThemePreset.name}</span>
+              <span className="titlebar-theme-subcopy">
+                {describeAppearanceMode(appearanceMode)}
+              </span>
+            </button>
+            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
+              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
+            </span>
+          </div>
+
+          <nav className="workspace-chip-row workspace-dock" aria-label="Workspaces">
+            <button
+              className={`workspace-chip workspace-home-chip ${workspace === "launchpad" ? "active" : ""}`}
+              onClick={() => navigate("/")}
+              type="button"
+            >
               <AppIcon name="home" />
               <span>Launchpad</span>
             </button>
-          )}
-
-          <div className="workspace-chip-row">
             {workspaceLinks.map((item) => {
               const active = workspace === item.workspace;
               return (
@@ -383,14 +410,7 @@ export default function App() {
                 </button>
               );
             })}
-          </div>
-
-          <div className="status-pills">
-            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
-            </span>
-            <span className="status-pill accent">{secondaryStatusLabel}</span>
-          </div>
+          </nav>
         </div>
       </header>
 
