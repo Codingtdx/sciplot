@@ -127,6 +127,7 @@ function mockWizardReload() {
         yscale: TEST_INSPECT_RESPONSE.inspection.recommendation.yscale,
         reverse_x: TEST_INSPECT_RESPONSE.inspection.recommendation.reverse_x,
       });
+      wizard.setStage("type");
       wizard.setStep("inspect");
       return TEST_INSPECT_RESPONSE;
     });
@@ -144,7 +145,7 @@ describe("TensileScreen", () => {
     useTensileStore.getState().reset();
     useWizardStore.getState().reset();
     useWorkbenchStore.setState({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [],
       settings: {
@@ -195,16 +196,16 @@ describe("TensileScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open latest in Plot" }));
 
     await waitFor(() => {
-      expect(loadWizardDataFile).toHaveBeenCalledWith(
-        expect.any(Object),
-        TEST_META,
-        TEST_PREPROCESS_RESPONSE.output_path,
-        TEST_PREPROCESS_RESPONSE.preferred_sheet,
-        "inspect",
-      );
-    });
+        expect(loadWizardDataFile).toHaveBeenCalledWith(
+          expect.any(Object),
+          TEST_META,
+          TEST_PREPROCESS_RESPONSE.output_path,
+          TEST_PREPROCESS_RESPONSE.preferred_sheet,
+          "type",
+        );
+      });
 
-    expect(onNavigate).toHaveBeenCalledWith("wizard");
+    expect(onNavigate).toHaveBeenCalledWith("/plot/type");
     expect(useWizardStore.getState().inputPath).toBe(TEST_PREPROCESS_RESPONSE.output_path);
   });
 

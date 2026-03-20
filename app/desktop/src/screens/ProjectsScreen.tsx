@@ -3,15 +3,15 @@ import { useState } from "react";
 import { InfoTip } from "../components/InfoTip";
 import { loadComposerProjectFile, loadWizardDataFile, loadWizardProjectFile } from "../lib/project-io";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/store";
-import type { RecentProjectEntry, WorkbenchMeta } from "../lib/types";
+import type { RecentProjectEntry, WorkbenchMeta, WorkbenchRoute } from "../lib/types";
 import {
-  AppMode,
   confirmReplaceComposerSession,
   confirmReplaceWizardSession,
   formatLeaf,
   formatRecentTimestamp,
   getErrorMessage,
   getWizardStepLabel,
+  plotRoute,
   templateLabel,
 } from "../lib/workbench";
 
@@ -20,7 +20,7 @@ export function ProjectsScreen({
   onNavigate,
 }: {
   meta: WorkbenchMeta | null;
-  onNavigate(mode: AppMode): void;
+  onNavigate(route: WorkbenchRoute): void;
 }) {
   const wizard = useWizardStore();
   const composer = useComposerStore();
@@ -75,7 +75,7 @@ export function ProjectsScreen({
         });
         setNoticeTone("success");
         setNotice(`Reopened data file: ${formatLeaf(inspected.input_path)}`);
-        onNavigate("wizard");
+        onNavigate(plotRoute(useWizardStore.getState().stage));
         return;
       }
 
@@ -94,7 +94,7 @@ export function ProjectsScreen({
         });
         setNoticeTone("success");
         setNotice(`Reopened plot project: ${formatLeaf(entry.path)}`);
-        onNavigate("wizard");
+        onNavigate(plotRoute(useWizardStore.getState().stage));
         return;
       }
 
@@ -108,7 +108,7 @@ export function ProjectsScreen({
       });
       setNoticeTone("success");
       setNotice(`Reopened composer project: ${formatLeaf(entry.path)}`);
-      onNavigate("composer");
+      onNavigate("/composer");
     } catch (error) {
       setNoticeTone("warning");
       setNotice(getErrorMessage(error));
@@ -127,13 +127,13 @@ export function ProjectsScreen({
               <h2>Recent files</h2>
             </div>
             <div className="step-actions">
-              <button className="primary-button" onClick={() => onNavigate("wizard")} type="button">
+              <button className="primary-button" onClick={() => onNavigate("/plot/import")} type="button">
                 Plot
               </button>
-              <button className="ghost-button" onClick={() => onNavigate("composer")} type="button">
+              <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
                 Composer
               </button>
-              <InfoTip content="Plot Builder usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
+              <InfoTip content="Plot usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
             </div>
           </div>
 
@@ -178,7 +178,7 @@ export function ProjectsScreen({
                 <strong>{entry.title}</strong>
                 <span>{entry.detail}</span>
                 <span className="recent-meta">
-                  {entry.mode === "wizard" ? "Plot Builder" : "Composer"} ·{" "}
+                  {entry.mode === "wizard" ? "Plot" : "Composer"} ·{" "}
                   {entry.kind === "data" ? "Data file" : "Project file"} · {formatRecentTimestamp(entry.updated_at)}
                 </span>
               </button>

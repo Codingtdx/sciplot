@@ -1,10 +1,14 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
 import { TEST_CONTRACT, TEST_META } from "./test/fixtures";
 import App from "./App";
+
+vi.mock("./screens/LaunchpadScreen", () => ({
+  LaunchpadScreen: () => <div>Launchpad Stub</div>,
+}));
 
 vi.mock("./screens/TensileScreen", () => ({
   TensileScreen: () => <div>Tensile Stub</div>,
@@ -43,7 +47,7 @@ describe("App", () => {
     useWizardStore.getState().reset();
     useComposerStore.getState().reset();
     useWorkbenchStore.setState({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [],
       settings: {
@@ -65,9 +69,7 @@ describe("App", () => {
     vi.mocked(getPlotContract)
       .mockRejectedValueOnce(new Error("sidecar offline"))
       .mockResolvedValue(TEST_CONTRACT);
-    vi.mocked(healthcheck)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
+    vi.mocked(healthcheck).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
     render(<App />);
 
@@ -120,7 +122,7 @@ describe("App", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
-  it("shows the tensile tab before the wizard tab in the navigation rail", async () => {
+  it("opens on launchpad and no longer renders the old navigation rail", async () => {
     vi.mocked(getWorkbenchMeta).mockResolvedValue(TEST_META);
     vi.mocked(getPlotContract).mockResolvedValue(TEST_CONTRACT);
     vi.mocked(healthcheck).mockResolvedValue(true);
@@ -132,10 +134,7 @@ describe("App", () => {
       await Promise.resolve();
     });
 
-    const labels = screen
-      .getAllByRole("button")
-      .map((button) => button.textContent?.replace(/\s+/g, " ").trim() ?? "")
-      .filter(Boolean);
-    expect(labels.indexOf("Tensile")).toBeLessThan(labels.indexOf("Plot"));
+    expect(screen.getByText("Launchpad Stub")).toBeInTheDocument();
+    expect(document.querySelector(".nav-rail")).toBeNull();
   });
 });

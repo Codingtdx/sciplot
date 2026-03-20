@@ -15,9 +15,36 @@ export type WizardStep =
   | "preflight"
   | "export";
 
+export type PlotStage = "import" | "sheet" | "type" | "tune" | "review" | "export";
+
 export type RequestActivity = "idle" | "scheduled" | "running" | "ready" | "error";
 
-export type WorkbenchScreen = "tensile" | "wizard" | "composer" | "projects" | "settings";
+export type WorkbenchScreen =
+  | "launchpad"
+  | "tensile"
+  | "wizard"
+  | "composer"
+  | "projects"
+  | "settings";
+export type WorkbenchWorkspace =
+  | "launchpad"
+  | "plot"
+  | "tensile"
+  | "composer"
+  | "recents"
+  | "settings";
+export type WorkbenchRoute =
+  | "/"
+  | "/plot/import"
+  | "/plot/sheet"
+  | "/plot/type"
+  | "/plot/tune"
+  | "/plot/review"
+  | "/plot/export"
+  | "/tensile"
+  | "/composer"
+  | "/recents"
+  | "/settings";
 export type PdfImportMode = "graph" | "asset";
 export type ThemePreference = "system" | "light" | "dark";
 

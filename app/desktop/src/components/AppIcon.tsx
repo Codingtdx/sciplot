@@ -1,4 +1,5 @@
 export type AppIconName =
+  | "home"
   | "tensile"
   | "plot"
   | "composer"
@@ -16,6 +17,13 @@ type Props = {
 
 function iconPath(name: AppIconName) {
   switch (name) {
+    case "home":
+      return (
+        <>
+          <path d="M4 11.5 12 5l8 6.5" />
+          <path d="M6.5 10.5V19h11v-8.5" />
+        </>
+      );
     case "tensile":
       return (
         <>

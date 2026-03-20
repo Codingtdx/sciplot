@@ -60,7 +60,7 @@ describe("workbench replacement guards", () => {
       ),
     ).toBe(false);
     expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining("replace the current Plot Builder session"),
+      expect.stringContaining("replace the current Plot session"),
     );
   });
 

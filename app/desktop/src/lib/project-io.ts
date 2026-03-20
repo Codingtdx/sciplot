@@ -5,6 +5,7 @@ import type {
   ComposerProject,
   InspectResponse,
   InputInspection,
+  PlotStage,
   RenderOptionsPayload,
   TemplateName,
   WizardProject,
@@ -12,6 +13,7 @@ import type {
   WorkbenchMeta,
 } from "./types";
 import { selectionFromInspection } from "./wizard";
+import { plotStageForWizardStep, wizardStepForStage } from "./workbench";
 
 type WizardStoreSnapshot = {
   busy: boolean;
@@ -24,6 +26,7 @@ type WizardStoreSnapshot = {
   setOutputs(value: string[]): void;
   setSheet(value: string | number): void;
   setSheetNames(value: string[]): void;
+  setStage(value: PlotStage): void;
   setStep(value: WizardStep): void;
   setTemplate(value: TemplateName | null): void;
 };
@@ -40,7 +43,7 @@ export function applyInspectionToWizard(
   overrides?: {
     template?: TemplateName | null;
     options?: RenderOptionsPayload;
-    nextStep?: WizardStep;
+    nextStage?: PlotStage;
   },
 ) {
   const selection = selectionFromInspection(meta, inspected.inspection, {
@@ -53,9 +56,9 @@ export function applyInspectionToWizard(
   wizard.setInspection(inspected.inspection);
   wizard.setTemplate(selection.template);
   wizard.setOptions(selection.options);
-  wizard.setStep(
-    overrides?.nextStep ?? (inspected.sheet_names.length > 1 ? "sheet" : "inspect"),
-  );
+  const nextStage = overrides?.nextStage ?? (inspected.sheet_names.length > 1 ? "sheet" : "type");
+  wizard.setStage(nextStage);
+  wizard.setStep(wizardStepForStage(nextStage));
 }
 
 export async function loadWizardDataFile(
@@ -63,17 +66,18 @@ export async function loadWizardDataFile(
   meta: WorkbenchMeta | null,
   filePath: string,
   initialSheet: string | number = 0,
-  nextStep?: WizardStep,
+  nextStage?: PlotStage,
 ): Promise<InspectResponse> {
   const keepBusy = wizard.busy;
   wizard.reset();
   wizard.setBusy(keepBusy);
   wizard.setError(null);
   wizard.setInputPath(filePath);
+  wizard.setStage("import");
   wizard.setStep("file");
 
   const inspected = await inspectFile(filePath, initialSheet);
-  applyInspectionToWizard(wizard, meta, inspected, { nextStep });
+  applyInspectionToWizard(wizard, meta, inspected, { nextStage });
   return inspected;
 }
 
@@ -96,7 +100,9 @@ export async function loadWizardProjectFile(
     options,
   });
   wizard.setOutputs(outputs ?? []);
-  wizard.setStep(outputs && outputs.length > 0 ? "export" : "options");
+  const nextStage = outputs && outputs.length > 0 ? "export" : plotStageForWizardStep("options");
+  wizard.setStage(nextStage);
+  wizard.setStep(wizardStepForStage(nextStage));
   return payload;
 }
 

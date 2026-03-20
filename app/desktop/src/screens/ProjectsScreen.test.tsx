@@ -16,7 +16,7 @@ describe("ProjectsScreen", () => {
     useWizardStore.getState().reset();
     useComposerStore.getState().reset();
     useWorkbenchStore.setState({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [
         {

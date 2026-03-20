@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { StepFlow } from "../components/StepFlow";
 import { PreviewPane } from "../components/PreviewPane";
 import { exportRender, inspectFile, openPath } from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
+import type { PlotStage, TemplateName, WorkbenchMeta, WorkbenchRoute } from "../lib/types";
 import { openDialog } from "../lib/tauri-dialog";
-import type { TemplateName, WorkbenchMeta } from "../lib/types";
 import {
+  PLOT_STAGE_COPY,
   compatibleTemplateChoices,
   confirmReplaceWizardSession,
   formatLeaf,
   getErrorMessage,
-  incompatibleTemplateChoices,
-  isTensileCurveModel,
+  plotRoute,
   publicPaletteChoices,
   publicStyleChoices,
   sizeChoices,
   styleLabel,
   templateLabel,
   toDialogPaths,
+  wizardStepForStage,
+  incompatibleTemplateChoices,
+  isTensileCurveModel,
 } from "../lib/workbench";
 import {
   areRenderOptionsEqual,
@@ -30,26 +34,73 @@ import {
   templateMeta as wizardTemplateMeta,
 } from "../lib/wizard";
 import { WizardExportSection } from "./wizard/WizardExportSection";
-import {
-  deriveWizardStep,
-  getExpectedWizardOutputs,
-  getWizardStatusChip,
-} from "./wizard/helpers";
 import { WizardOptionsSection } from "./wizard/WizardOptionsSection";
+import { WizardTemplatesSection } from "./wizard/WizardTemplatesSection";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
-import { WizardTemplatesSection } from "./wizard/WizardTemplatesSection";
 
-export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
+function statusForPlot(args: {
+  routeStage: PlotStage;
+  busy: boolean;
+  previewBusy: boolean;
+  preflightBusy: boolean;
+  hasBlockingErrors: boolean;
+  hasInspection: boolean;
+  hasInput: boolean;
+  outputsCount: number;
+}) {
+  if (!args.hasInput) {
+    return { label: "Waiting for a file", tone: "warn" as const };
+  }
+  if (args.busy) {
+    return { label: "Loading file", tone: "accent" as const };
+  }
+  if (args.preflightBusy) {
+    return { label: "Checking readiness", tone: "accent" as const };
+  }
+  if (args.previewBusy) {
+    return { label: "Refreshing preview", tone: "accent" as const };
+  }
+  if (args.outputsCount > 0 && args.routeStage === "export") {
+    return { label: "Export complete", tone: "good" as const };
+  }
+  if (args.hasBlockingErrors) {
+    return { label: "Fix blockers", tone: "warn" as const };
+  }
+  if (args.routeStage === "review" && args.hasInspection) {
+    return { label: "Reviewing export", tone: "accent" as const };
+  }
+  if (args.routeStage === "type" && args.hasInspection) {
+    return { label: "Recommendation ready", tone: "good" as const };
+  }
+  return { label: "In progress", tone: "accent" as const };
+}
+
+function outputItems(outputs: string[], expectedFilenames: string[]) {
+  if (outputs.length > 0) {
+    return outputs;
+  }
+  return expectedFilenames;
+}
+
+export function WizardScreen({
+  meta,
+  routeStage = useWizardStore.getState().stage,
+  onNavigate = () => {},
+}: {
+  meta: WorkbenchMeta | null;
+  routeStage?: PlotStage;
+  onNavigate?(route: WorkbenchRoute): void;
+}) {
   const wizard = useWizardStore(
     useShallow((state) => ({
       busy: state.busy,
       error: state.error,
+      exportResult: state.exportResult,
       inputPath: state.inputPath,
       inspection: state.inspection,
       options: state.options,
       outputs: state.outputs,
-      exportResult: state.exportResult,
       preflight: state.preflight,
       previewIndex: state.previewIndex,
       previews: state.previews,
@@ -66,18 +117,20 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       setPreviews: state.setPreviews,
       setSheet: state.setSheet,
       setSheetNames: state.setSheetNames,
+      setStage: state.setStage,
       setStep: state.setStep,
       setSubmissionReport: state.setSubmissionReport,
       setTemplate: state.setTemplate,
       sheet: state.sheet,
       sheetNames: state.sheetNames,
       sidecarReady: state.sidecarReady,
-      step: state.step,
+      stage: state.stage,
       submissionReport: state.submissionReport,
       template: state.template,
     })),
   );
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
+  const recentProjects = useWorkbenchStore((state) => state.recentProjects);
   const [showAllTemplates, setShowAllTemplates] = useState(false);
 
   const recommendation = wizard.inspection?.recommendation ?? null;
@@ -105,6 +158,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     recommendedSelection != null &&
     wizard.template === recommendedSelection.template &&
     areRenderOptionsEqual(wizard.options, recommendedSelection.options);
+  const recentDataFiles = recentProjects.filter((entry) => entry.mode === "wizard" && entry.kind === "data");
 
   const invalidateRenderState = () => {
     wizard.setPreflight(null);
@@ -117,40 +171,48 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.setError(getErrorMessage(error));
   };
 
-  const applyRecommendedSelection = () => {
-    if (!recommendedSelection) {
-      return;
-    }
-    invalidateRenderState();
-    wizard.setTemplate(recommendedSelection.template);
-    wizard.setOptions(recommendedSelection.options);
+  const goToStage = (stage: PlotStage) => {
+    wizard.setStage(stage);
+    wizard.setStep(wizardStepForStage(stage));
+    onNavigate(plotRoute(stage));
   };
 
-  const updateWizardTemplate = (value: TemplateName) => {
-    const nextTemplate = sanitizeTemplateId(
-      meta,
-      value,
-      recommendation?.template ?? wizard.template,
-    );
-    if (!nextTemplate) {
-      return;
+  useEffect(() => {
+    if (wizard.stage !== routeStage) {
+      wizard.setStage(routeStage);
+      wizard.setStep(wizardStepForStage(routeStage));
     }
-    invalidateRenderState();
-    wizard.setTemplate(nextTemplate);
-    wizard.setOptions(
-      sanitizeRenderOptions(meta, nextTemplate, wizard.options, wizard.inspection?.model),
-    );
-  };
+  }, [routeStage, wizard.setStage, wizard.setStep, wizard.stage]);
 
-  const updateWizardOptions = (value: Partial<typeof wizard.options>) => {
-    if (!wizard.template) {
+  useEffect(() => {
+    if (!wizard.inputPath && routeStage !== "import") {
+      goToStage("import");
       return;
     }
-    invalidateRenderState();
-    wizard.setOptions(
-      mergeRenderOptions(meta, wizard.template, wizard.options, value, wizard.inspection?.model),
-    );
-  };
+    if (wizard.inputPath && wizard.sheetNames.length <= 1 && routeStage === "sheet") {
+      goToStage("type");
+      return;
+    }
+    if (!wizard.inspection && (routeStage === "type" || routeStage === "tune" || routeStage === "review")) {
+      goToStage("import");
+      return;
+    }
+    if (!wizard.template && (routeStage === "tune" || routeStage === "review")) {
+      goToStage("type");
+      return;
+    }
+    if (routeStage === "export" && wizard.outputs.length === 0 && !wizard.exportResult) {
+      goToStage("review");
+    }
+  }, [
+    routeStage,
+    wizard.exportResult,
+    wizard.inputPath,
+    wizard.inspection,
+    wizard.outputs.length,
+    wizard.sheetNames.length,
+    wizard.template,
+  ]);
 
   useEffect(() => {
     const nextTemplate = sanitizeTemplateId(
@@ -184,11 +246,21 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     setShowAllTemplates(false);
   }, [wizard.inputPath, wizard.inspection?.model]);
 
+  const previewEnabled =
+    Boolean(wizard.inputPath) &&
+    Boolean(wizard.template) &&
+    (routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export");
+  const preflightEnabled =
+    Boolean(wizard.inputPath) &&
+    Boolean(wizard.template) &&
+    routeStage === "review";
+
   const {
     busy: previewBusy,
     error: previewError,
     activity: previewActivity,
   } = useWizardPreview({
+    enabled: previewEnabled,
     inputPath: wizard.inputPath,
     sheet: wizard.sheet,
     template: wizard.template,
@@ -201,6 +273,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     error: preflightRequestError,
     activity: preflightActivity,
   } = useWizardPreflight({
+    enabled: preflightEnabled,
     inputPath: wizard.inputPath,
     sheet: wizard.sheet,
     template: wizard.template,
@@ -214,17 +287,6 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   const hasInput = Boolean(wizard.inputPath);
   const hasInspection = wizard.inspection != null;
   const hasTemplate = Boolean(wizard.template);
-  const showReviewStage =
-    hasTemplate &&
-    (wizard.preflight != null ||
-      preflightBusy ||
-      Boolean(preflightRequestError) ||
-      wizard.outputs.length > 0);
-  const wizardStage: "empty" | "edit" | "review" = !hasInput
-    ? "empty"
-    : showReviewStage
-      ? "review"
-      : "edit";
   const canExport =
     hasInput &&
     hasTemplate &&
@@ -234,60 +296,21 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     !preflightBusy &&
     !hasBlockingErrors &&
     wizard.preflight !== null;
-
-  useEffect(() => {
-    const nextStep = deriveWizardStep({
-      inputPath: wizard.inputPath,
-      inspectionReady: wizard.inspection != null,
-      template: wizard.template,
-      autoChecking: previewBusy || preflightBusy,
-      preflightReady: wizard.preflight != null,
-      outputsCount: wizard.outputs.length,
-    });
-    if (wizard.step !== nextStep) {
-      wizard.setStep(nextStep);
-    }
-  }, [
-    preflightBusy,
+  const statusChip = statusForPlot({
+    routeStage,
+    busy: wizard.busy,
     previewBusy,
-    wizard.inputPath,
-    wizard.inspection,
-    wizard.outputs.length,
-    wizard.preflight,
-    wizard.setStep,
-    wizard.step,
-    wizard.template,
-  ]);
-
-  const statusChip = useMemo(
-    () =>
-      getWizardStatusChip({
-        inputPath: wizard.inputPath,
-        busy: wizard.busy,
-        previewBusy,
-        preflightBusy,
-        previewActivity,
-        preflightActivity,
-        hasBlockingErrors,
-        outputsCount: wizard.outputs.length,
-        preflightReady: wizard.preflight != null,
-        inspectionReady: wizard.inspection != null,
-      }),
-    [
-      hasBlockingErrors,
-      preflightBusy,
-      preflightActivity,
-      previewBusy,
-      previewActivity,
-      wizard.busy,
-      wizard.inputPath,
-      wizard.inspection,
-      wizard.outputs.length,
-      wizard.preflight,
-    ],
+    preflightBusy,
+    hasBlockingErrors,
+    hasInspection,
+    hasInput,
+    outputsCount: wizard.outputs.length,
+  });
+  const stageCopy = PLOT_STAGE_COPY[routeStage];
+  const expectedOutputs = outputItems(
+    wizard.outputs,
+    (wizard.preflight?.output_filenames ?? []).map((filename) => filename),
   );
-
-  const expectedOutputs = getExpectedWizardOutputs(wizard.outputs, wizard.preflight);
   const selectedStyleLabel = styleLabel(
     meta,
     wizard.options.style_preset ?? meta?.default_style ?? null,
@@ -340,6 +363,35 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
         title: formatLeaf(inspected.input_path),
         detail: `Data file · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
       });
+      goToStage(inspected.sheet_names.length > 1 ? "sheet" : "type");
+    } catch (error) {
+      wizard.setError(getErrorMessage(error));
+    } finally {
+      wizard.setBusy(false);
+    }
+  };
+
+  const reopenRecentData = async (path: string) => {
+    if (
+      !confirmReplaceWizardSession(
+        {
+          inputPath: wizard.inputPath,
+          inspection: wizard.inspection,
+          template: wizard.template,
+          outputs: wizard.outputs,
+          exportResult: wizard.exportResult,
+        },
+        formatLeaf(path),
+        path,
+      )
+    ) {
+      return;
+    }
+    wizard.setBusy(true);
+    wizard.setError(null);
+    try {
+      const inspected = await loadWizardDataFile(wizard, meta, path);
+      goToStage(inspected.sheet_names.length > 1 ? "sheet" : "type");
     } catch (error) {
       wizard.setError(getErrorMessage(error));
     } finally {
@@ -356,8 +408,9 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     wizard.setBusy(true);
     try {
       const inspected = await inspectFile(wizard.inputPath, sheetValue);
-      applyInspectionToWizard(wizard, meta, inspected, { nextStep: "inspect" });
+      applyInspectionToWizard(wizard, meta, inspected, { nextStage: "type" });
       invalidateRenderState();
+      goToStage("type");
     } catch (error) {
       wizard.setError(getErrorMessage(error));
     } finally {
@@ -382,7 +435,7 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       wizard.setOutputs(response.outputs);
       wizard.setExportResult(response);
       wizard.setSubmissionReport(response.submission_report ?? wizard.submissionReport);
-      wizard.setStep("export");
+      goToStage("export");
     } catch (error) {
       wizard.setError(getErrorMessage(error));
     } finally {
@@ -403,7 +456,46 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
     }
   };
 
+  const applyRecommendedSelection = () => {
+    if (!recommendedSelection) {
+      return;
+    }
+    invalidateRenderState();
+    wizard.setTemplate(recommendedSelection.template);
+    wizard.setOptions(recommendedSelection.options);
+  };
+
+  const updateWizardTemplate = (value: TemplateName) => {
+    const nextTemplate = sanitizeTemplateId(
+      meta,
+      value,
+      recommendation?.template ?? wizard.template,
+    );
+    if (!nextTemplate) {
+      return;
+    }
+    invalidateRenderState();
+    wizard.setTemplate(nextTemplate);
+    wizard.setOptions(
+      sanitizeRenderOptions(meta, nextTemplate, wizard.options, wizard.inspection?.model),
+    );
+  };
+
+  const updateWizardOptions = (value: Partial<typeof wizard.options>) => {
+    if (!wizard.template) {
+      return;
+    }
+    invalidateRenderState();
+    wizard.setOptions(
+      mergeRenderOptions(meta, wizard.template, wizard.options, value, wizard.inspection?.model),
+    );
+  };
+
   const summaryRows = [
+    {
+      label: "File",
+      value: wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file selected",
+    },
     {
       label: "Sheet",
       value:
@@ -416,10 +508,8 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
       value: wizard.inspection?.model_label ?? "Waiting for inspect",
     },
     {
-      label: "Recommended",
-      value: wizard.inspection
-        ? templateLabel(meta, wizard.inspection.recommendation.template)
-        : "-",
+      label: "Template",
+      value: wizard.template ? templateLabel(meta, wizard.template) : "Not selected",
     },
     {
       label: "Style",
@@ -428,46 +518,176 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
   ];
 
   return (
-    <div className="desk-layout wizard-layout">
-      <section className="desk-main wizard-main">
-        {wizardStage === "empty" ? (
-          <div className="wizard-empty-shell">
-            <article className="work-card hero-card wizard-empty-card">
-              <div className="wizard-empty-copy">
-                <div className="card-kicker">Plot</div>
-                <h2>Open a data file</h2>
-                <p>Start with CSV, TXT, TSV, XLSX, or XLSM data.</p>
-              </div>
+    <div className="plot-workspace">
+      <section className="plot-stage-card work-card hero-card">
+        <div className="plot-stage-copy">
+          <div>
+            <div className="card-kicker">Plot</div>
+            <h2>{stageCopy.title}</h2>
+            <p>{stageCopy.description}</p>
+          </div>
 
-              <div className="wizard-inline-chips wizard-empty-chips">
-                <span className={`status-pill ${wizard.sidecarReady ? "good" : "warn"}`}>
-                  {wizard.sidecarReady ? "Sidecar ready" : "Sidecar offline"}
-                </span>
-                <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
-              </div>
+          <div className="plot-stage-actions">
+            <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+            {routeStage !== "import" && (
+              <button className="ghost-button" onClick={() => goToStage("import")} type="button">
+                New file
+              </button>
+            )}
+          </div>
+        </div>
 
-              <div className="step-actions">
-                <button className="primary-button" onClick={openDataFile} type="button">
-                  Open data
+        <StepFlow current={routeStage} />
+
+        {wizard.error && <div className="error-card">{wizard.error}</div>}
+        {!wizard.sidecarReady && (
+          <div className="warning-card">
+            The Python sidecar is offline. Detection, preview, and export resume once it
+            reconnects.
+          </div>
+        )}
+      </section>
+
+      {routeStage === "import" && (
+        <div className="plot-stage-grid import-stage">
+          <section className="work-card plot-import-card">
+            <div className="panel-heading">
+              <div>
+                <div className="card-kicker">Start</div>
+                <h3>Open a data file</h3>
+              </div>
+            </div>
+
+            <p className="hint-text">
+              Start with CSV, TXT, TSV, XLSX, or XLSM data. Multi-sheet workbooks move to the
+              sheet selector next.
+            </p>
+
+            <div className="hero-actions">
+              <button className="primary-button" onClick={openDataFile} type="button">
+                Open data
+              </button>
+              {hasInput && (
+                <button className="ghost-button" onClick={() => goToStage("type")} type="button">
+                  Resume current session
                 </button>
+              )}
+            </div>
+          </section>
+
+          <aside className="plot-stage-rail">
+            <article className="context-card">
+              <div className="panel-heading">
+                <div>
+                  <div className="card-kicker">Session</div>
+                  <h3>Current plot session</h3>
+                </div>
+              </div>
+              <div className="wizard-summary-list">
+                {summaryRows.map((row) => (
+                  <div className="wizard-summary-row" key={row.label}>
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="context-card">
+              <div className="panel-heading">
+                <div>
+                  <div className="card-kicker">Recent</div>
+                  <h3>Recent data files</h3>
+                </div>
               </div>
 
-              {wizard.error && <div className="error-card">{wizard.error}</div>}
-              {!wizard.sidecarReady && (
-                <div className="warning-card">
-                  The Python sidecar is offline. Detection, preview, and export resume
-                  once it reconnects.
+              {recentDataFiles.length === 0 ? (
+                <div className="placeholder-card">No recent data files yet.</div>
+              ) : (
+                <div className="launchpad-recent-list">
+                  {recentDataFiles.slice(0, 4).map((entry) => (
+                    <button
+                      className="launchpad-recent-item"
+                      key={entry.id}
+                      onClick={() => void reopenRecentData(entry.path)}
+                      type="button"
+                    >
+                      <strong>{entry.title}</strong>
+                      <span>{entry.detail}</span>
+                    </button>
+                  ))}
                 </div>
               )}
             </article>
-          </div>
-        ) : (
-          <div className="wizard-stage-shell">
-            <article className="work-card wizard-stage-toolbar">
-              <div className="panel-heading wizard-stage-toolbar-head">
+          </aside>
+        </div>
+      )}
+
+      {routeStage === "sheet" && (
+        <div className="plot-stage-grid">
+          <section className="work-card plot-sheet-card">
+            <div className="panel-heading">
+              <div>
+                <div className="card-kicker">Sheet</div>
+                <h3>Select the workbook tab</h3>
+              </div>
+            </div>
+
+              <div className="sheet-choice-list">
+                {wizard.sheetNames.map((name) => {
+                  const active =
+                    wizard.sheet === name ||
+                    (typeof wizard.sheet === "number" && wizard.sheetNames[wizard.sheet] === name);
+                  return (
+                  <button
+                    className={`sheet-choice ${active ? "active" : ""}`}
+                    key={name}
+                    onClick={() => void rerunInspect(name)}
+                    type="button"
+                  >
+                    <strong>{name}</strong>
+                    <span>{active ? "Current sheet" : "Inspect this sheet"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <aside className="plot-stage-rail">
+            <article className="context-card">
+              <div className="panel-heading">
                 <div>
-                  <div className="card-kicker">Plot</div>
-                  <h2>{formatLeaf(wizard.inputPath)}</h2>
+                  <div className="card-kicker">Workbook</div>
+                  <h3>{formatLeaf(wizard.inputPath)}</h3>
+                </div>
+              </div>
+              <div className="wizard-summary-list">
+                <div className="wizard-summary-row">
+                  <span>Sheets</span>
+                  <strong>{wizard.sheetNames.length}</strong>
+                </div>
+                <div className="wizard-summary-row">
+                  <span>Current</span>
+                  <strong>
+                    {typeof wizard.sheet === "string"
+                      ? wizard.sheet
+                      : wizard.sheetNames[wizard.sheet] ?? wizard.sheetNames[0] ?? "-"}
+                  </strong>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </div>
+      )}
+
+      {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
+        <div className="plot-stage-grid">
+          <section className="plot-preview-column">
+            <section className="context-card plot-summary-card">
+              <div className="panel-heading">
+                <div>
+                  <div className="card-kicker">File</div>
+                  <h3>{formatLeaf(wizard.inputPath)}</h3>
                 </div>
                 <div className="wizard-inline-chips">
                   {hasTemplate && (
@@ -477,172 +697,233 @@ export function WizardScreen({ meta }: { meta: WorkbenchMeta | null }) {
                 </div>
               </div>
 
-              <div className="wizard-toolbar">
-                <button className="primary-button" onClick={openDataFile} type="button">
-                  Open data
-                </button>
-                {wizard.sheetNames.length > 1 && (
-                  <label className="wizard-inline-field">
-                    <span className="field-label">Sheet</span>
-                    <select
-                      className="field"
-                      value={String(wizard.sheet)}
-                      onChange={(event) => void rerunInspect(event.target.value)}
-                    >
-                      {wizard.sheetNames.map((name, index) => (
-                        <option key={name} value={name}>
-                          {index + 1}. {name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+              <div className="wizard-summary-list">
+                {summaryRows.map((row) => (
+                  <div className="wizard-summary-row" key={row.label}>
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              {wizard.sheetNames.length > 1 && (
+                <div className="hero-actions">
+                  <button className="ghost-button" onClick={() => goToStage("sheet")} type="button">
+                    Change sheet
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {hasTemplate ? (
+              <PreviewPane
+                busy={previewBusy}
+                error={previewError}
+                onChangeIndex={wizard.setPreviewIndex}
+                previewIndex={wizard.previewIndex}
+                previews={wizard.previews}
+              />
+            ) : (
+              <section className="preview-pane">
+                <div className="preview-toolbar">
+                  <div className="preview-title">Preview</div>
+                </div>
+                <div className="preview-surface">
+                  <div className="placeholder-card">
+                    Select a compatible chart type to start previewing.
+                  </div>
+                </div>
+              </section>
+            )}
+          </section>
+
+          <aside className="plot-stage-rail">
+            {routeStage === "type" && (
+              <>
+                {wizard.inspection && (
+                  <article className="context-card">
+                    <div className="panel-heading">
+                      <div>
+                        <div className="card-kicker">Detect</div>
+                        <h3>Why this chart type</h3>
+                      </div>
+                      {!recommendationApplied && (
+                        <button
+                          className="ghost-button"
+                          onClick={applyRecommendedSelection}
+                          type="button"
+                        >
+                          Use recommendation
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="wizard-details-body">
+                      <div>{wizard.inspection.recommendation.reason}</div>
+                    </div>
+
+                    {wizard.inspection.warnings.length > 0 && (
+                      <details className="wizard-details">
+                        <summary>{wizard.inspection.warnings.length} input warning(s)</summary>
+                        <ul className="bullet-list">
+                          {wizard.inspection.warnings.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </article>
                 )}
-                {!recommendationApplied && wizard.inspection && (
+
+                <WizardTemplatesSection
+                  compatibleTemplates={compatibleTemplates}
+                  incompatibleTemplates={incompatibleTemplates}
+                  inspection={wizard.inspection}
+                  onSelectTemplate={updateWizardTemplate}
+                  onToggleShowAllTemplates={() =>
+                    setShowAllTemplates((current) => !current)
+                  }
+                  selectedTemplate={wizard.template}
+                  showAllTemplates={showAllTemplates}
+                />
+
+                <div className="hero-actions">
                   <button
-                    className="ghost-button"
-                    onClick={applyRecommendedSelection}
+                    className="primary-button"
+                    disabled={!hasTemplate}
+                    onClick={() => goToStage("tune")}
                     type="button"
                   >
-                    Use recommendation
+                    Continue to tune
                   </button>
-                )}
-              </div>
-            </article>
+                </div>
+              </>
+            )}
 
-            <div className="wizard-stage-grid">
-              <div className="wizard-preview-column">
-                {hasTemplate ? (
-                  <PreviewPane
-                    busy={previewBusy}
-                    error={previewError}
-                    onChangeIndex={wizard.setPreviewIndex}
-                    previewIndex={wizard.previewIndex}
-                    previews={wizard.previews}
-                  />
-                ) : (
-                  <section className="preview-pane">
-                    <div className="preview-toolbar">
-                      <div className="preview-title">Preview</div>
-                    </div>
-                    <div className="preview-surface">
-                      <div className="placeholder-card">
-                        Select a compatible chart type to start previewing.
-                      </div>
-                    </div>
-                  </section>
-                )}
-              </div>
+            {routeStage === "tune" && (
+              <>
+                <WizardOptionsSection
+                  currentTemplate={currentTemplate}
+                  meta={meta}
+                  onUpdateOptions={updateWizardOptions}
+                  options={wizard.options}
+                  paletteOptions={paletteOptions}
+                  sizeOptions={sizeOptions}
+                  styleOptions={styleOptions}
+                  template={wizard.template}
+                  tensileCurveMode={tensileCurveMode}
+                />
 
-              <aside className="wizard-rail">
-                <article className="context-card wizard-summary-card">
+                <div className="hero-actions">
+                  <button className="ghost-button" onClick={() => goToStage("type")} type="button">
+                    Back to type
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={!hasTemplate}
+                    onClick={() => goToStage("review")}
+                    type="button"
+                  >
+                    Continue to review
+                  </button>
+                </div>
+              </>
+            )}
+
+            {routeStage === "review" && (
+              <>
+                <WizardExportSection
+                  blockingErrors={blockingErrors}
+                  canExport={canExport}
+                  exportResult={wizard.exportResult}
+                  hasExportedOutputs={wizard.outputs.length > 0}
+                  onExport={() => void runExport()}
+                  onOpenOutputDir={() => void openOutputFolder()}
+                  outputItems={expectedOutputs}
+                  preflight={wizard.preflight}
+                  preflightActivity={preflightActivity}
+                  preflightBusy={preflightBusy}
+                  preflightRequestError={preflightRequestError}
+                  previewActivity={previewActivity}
+                  submissionReport={wizard.submissionReport}
+                />
+
+                <div className="hero-actions">
+                  <button className="ghost-button" onClick={() => goToStage("tune")} type="button">
+                    Back to tune
+                  </button>
+                </div>
+              </>
+            )}
+
+            {routeStage === "export" && (
+              <>
+                <article className="context-card wizard-review-card">
                   <div className="panel-heading">
                     <div>
-                      <h3>Summary</h3>
+                      <div className="card-kicker">Export</div>
+                      <h3>Bundle complete</h3>
                     </div>
-                    <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+                    <span className="status-pill good">Ready</span>
                   </div>
 
-                  <div className="wizard-summary-list">
-                    {summaryRows.map((row) => (
-                      <div className="wizard-summary-row" key={row.label}>
-                        <span>{row.label}</span>
-                        <strong>{row.value}</strong>
+                  <div className="wizard-section-stack">
+                    <div className="success-card">
+                      Exported {wizard.outputs.length} file(s) to {formatLeaf(wizard.exportResult?.output_dir ?? "output")}.
+                    </div>
+
+                    <div className="step-actions">
+                      <button
+                        className="primary-button"
+                        disabled={!wizard.exportResult?.output_dir}
+                        onClick={() => void openOutputFolder()}
+                        type="button"
+                      >
+                        Open output folder
+                      </button>
+                      <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
+                        Open Composer
+                      </button>
+                      <button
+                        className="ghost-button"
+                        onClick={() => {
+                          wizard.reset();
+                          goToStage("import");
+                        }}
+                        type="button"
+                      >
+                        Start another plot
+                      </button>
+                    </div>
+
+                    <details className="wizard-details" open>
+                      <summary>Output files</summary>
+                      <ul className="output-list">
+                        {wizard.outputs.map((item) => (
+                          <li key={item}>{formatLeaf(item)}</li>
+                        ))}
+                      </ul>
+                    </details>
+
+                    {wizard.submissionReport && (
+                      <div className="focus-panel">
+                        <strong>Submission review</strong>
+                        <span>{wizard.submissionReport.summary}</span>
                       </div>
-                    ))}
+                    )}
                   </div>
-
-                  {wizard.error && <div className="error-card">{wizard.error}</div>}
-                  {!wizard.sidecarReady && (
-                    <div className="warning-card">
-                      The Python sidecar is offline. Existing state stays visible, but
-                      checks and export are paused.
-                    </div>
-                  )}
-
-                  {wizard.inspection && (
-                    <>
-                      <details className="wizard-details" open={wizardStage === "edit"}>
-                        <summary>Why this type</summary>
-                        <div className="wizard-details-body">
-                          {wizard.inspection.recommendation.reason}
-                        </div>
-                      </details>
-
-                      {wizard.inspection.warnings.length > 0 && (
-                        <details className="wizard-details">
-                          <summary>{wizard.inspection.warnings.length} input warning(s)</summary>
-                          <ul className="bullet-list">
-                            {wizard.inspection.warnings.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-
-                      {wizard.inspection.signals.length > 0 && (
-                        <details className="wizard-details">
-                          <summary>{wizard.inspection.signals.length} detection signal(s)</summary>
-                          <ul className="bullet-list">
-                            {wizard.inspection.signals.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                    </>
-                  )}
                 </article>
 
-                {hasInspection && (
-                  <WizardTemplatesSection
-                    compatibleTemplates={compatibleTemplates}
-                    incompatibleTemplates={incompatibleTemplates}
-                    inspection={wizard.inspection}
-                    onSelectTemplate={updateWizardTemplate}
-                    onToggleShowAllTemplates={() =>
-                      setShowAllTemplates((current) => !current)
-                    }
-                    selectedTemplate={wizard.template}
-                    showAllTemplates={showAllTemplates}
-                  />
-                )}
-
-                {hasTemplate && (
-                  <WizardOptionsSection
-                    currentTemplate={currentTemplate}
-                    meta={meta}
-                    onUpdateOptions={updateWizardOptions}
-                    options={wizard.options}
-                    paletteOptions={paletteOptions}
-                    sizeOptions={sizeOptions}
-                    styleOptions={styleOptions}
-                    template={wizard.template}
-                    tensileCurveMode={tensileCurveMode}
-                  />
-                )}
-
-                {showReviewStage && (
-                  <WizardExportSection
-                    blockingErrors={blockingErrors}
-                    canExport={canExport}
-                    exportResult={wizard.exportResult}
-                    hasExportedOutputs={wizard.outputs.length > 0}
-                    onExport={() => void runExport()}
-                    onOpenOutputDir={() => void openOutputFolder()}
-                    outputItems={expectedOutputs}
-                    preflight={wizard.preflight}
-                    preflightActivity={preflightActivity}
-                    preflightBusy={preflightBusy}
-                    preflightRequestError={preflightRequestError}
-                    previewActivity={previewActivity}
-                    submissionReport={wizard.submissionReport}
-                  />
-                )}
-              </aside>
-            </div>
-          </div>
-        )}
-      </section>
+                <div className="hero-actions">
+                  <button className="ghost-button" onClick={() => goToStage("review")} type="button">
+                    Re-open review
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

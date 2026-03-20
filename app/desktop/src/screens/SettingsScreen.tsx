@@ -49,7 +49,7 @@ export function SettingsScreen({
     }
 
     const labels = {
-      wizard: "Plot Builder session reset.",
+      wizard: "Plot session reset.",
       tensile: "Tensile workspace reset.",
       composer: "Composer workspace reset.",
       recent: "Recent file history cleared.",
@@ -186,7 +186,7 @@ export function SettingsScreen({
                   }
                   type="checkbox"
                 />
-                <span>Remember last screen</span>
+                <span>Remember last workspace</span>
               </label>
 
               <div className="context-list">
@@ -205,7 +205,7 @@ export function SettingsScreen({
                   <strong>{settings.auto_status_poll ? "On" : "Off"}</strong>
                 </div>
                 <div className="context-row">
-                  <span>Remember screen</span>
+                  <span>Remember workspace</span>
                   <strong>{settings.remember_last_screen ? "On" : "Off"}</strong>
                 </div>
               </div>
@@ -225,7 +225,7 @@ export function SettingsScreen({
 
             <div className="step-actions">
               <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
-                Reset Plot Builder
+                Reset Plot
               </button>
               <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
                 Reset Tensile

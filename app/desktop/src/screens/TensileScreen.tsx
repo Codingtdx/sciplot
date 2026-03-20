@@ -14,7 +14,7 @@ import {
   tensileComparisonSourceFromPreprocess,
   tensileComparisonSourceFromSummary,
 } from "../lib/tensile-comparison";
-import type { WorkbenchMeta, WorkbenchScreen } from "../lib/types";
+import type { WorkbenchMeta, WorkbenchRoute } from "../lib/types";
 import {
   confirmReplaceWizardSession,
   defaultSiblingPath,
@@ -35,7 +35,7 @@ export function TensileScreen({
   onNavigate,
 }: {
   meta: WorkbenchMeta | null;
-  onNavigate(mode: WorkbenchScreen): void;
+  onNavigate(route: WorkbenchRoute): void;
 }) {
   const tensile = useTensileStore(
     useShallow((state) => ({
@@ -97,7 +97,7 @@ export function TensileScreen({
     setError(null);
     setBusy(true);
     try {
-      const inspected = await loadWizardDataFile(wizard, meta, workbookPath, preferredSheet, "inspect");
+      const inspected = await loadWizardDataFile(wizard, meta, workbookPath, preferredSheet, "type");
       rememberProject({
         mode: "wizard",
         kind: "data",
@@ -105,7 +105,7 @@ export function TensileScreen({
         title: formatLeaf(workbookPath),
         detail: `Data file · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
       });
-      onNavigate("wizard");
+      onNavigate("/plot/type");
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
@@ -253,7 +253,7 @@ export function TensileScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Tensile</div>
-              <h2>Queue and export</h2>
+              <h2>Prepare and compare</h2>
             </div>
             <div className="wizard-inline-chips">
               <span className="signal-tag">{compareSourceCount} source(s)</span>

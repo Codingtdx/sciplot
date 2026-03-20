@@ -54,8 +54,9 @@
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
 - `Launch_Plotter.command` 只代表当前 Tauri 主链路；不要再把它改回自动回退 `plot_wizard_gui.py` / `interactive_plot.py`。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
-- 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
-- 单图 `wizard` 现在是单屏自动检查流：文件载入、sheet 切换、模板切换和参数修改后，前端都会自动触发 `inspect / render-preview / preflight`；不要再把主流程改回“多步翻页 + 手动点继续检查”。
+- 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / recents / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
+- 单图 `wizard` 流程默认是 staged workspace：`import -> sheet(按需) -> type -> tune -> review -> export`；不要把“保存/打开项目文件”重新堆成单图主入口，需要显式项目文件的主要仍是 `composer`。
+- `wizard` 的 `inspect` 仍在导入和切 sheet 后立即执行；`render-preview` 只在 `type / tune / review / export` 阶段活跃，`preflight` 只在 `review` 阶段活跃；不要再改回“单屏自动把所有检查全跑完”的心智模型。
 - `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
 - 拉伸整理和拉伸对比现在收敛到独立 `tensile` 工作台；`wizard` 只保留通用单图绘图流，不再承载 tensile preprocess / compare UI。
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
@@ -206,7 +207,7 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要把 `Launch_Plotter.command` 再改回“主入口失败就自动退回旧 GUI”的行为；legacy 流程必须由用户显式触发。
-- 不要把 wizard 再改回“先保存项目再继续”的心智模型；单图流程默认应该一屏完成导入、推荐、参数和导出。
+- 不要把 wizard 再改回“先保存项目再继续”或“所有内容都堆在一屏里”的心智模型；单图流程默认应该保持 `Launchpad -> staged plot workspace`。
 - 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。

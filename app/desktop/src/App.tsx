@@ -1,11 +1,31 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { AppIcon } from "./components/AppIcon";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
-import { AppMode, NAV_ITEMS, SCREEN_META, getWizardStepLabel } from "./lib/workbench";
-import type { PlotContract, ThemePreference, WorkbenchMeta } from "./lib/types";
+import type {
+  PlotContract,
+  ThemePreference,
+  WorkbenchMeta,
+  WorkbenchRoute,
+  WorkbenchWorkspace,
+} from "./lib/types";
+import {
+  WORKSPACE_ITEMS,
+  WORKSPACE_META,
+  getPlotStageLabel,
+  hasComposerSessionContent,
+  hasWizardSessionContent,
+  normalizeWorkbenchRoute,
+  plotRoute,
+  plotStageFromRoute,
+  workspaceForRoute,
+} from "./lib/workbench";
 
+const LaunchpadScreen = lazy(async () => ({
+  default: (await import("./screens/LaunchpadScreen")).LaunchpadScreen,
+}));
 const TensileScreen = lazy(async () => ({
   default: (await import("./screens/TensileScreen")).TensileScreen,
 }));
@@ -39,29 +59,48 @@ function resolvedTheme(preference: ThemePreference, prefersDark: boolean) {
   return prefersDark ? "dark" : "light";
 }
 
+function initialRoute(persistedRoute: WorkbenchRoute, rememberLastScreen: boolean) {
+  if (typeof window !== "undefined") {
+    const fromLocation = normalizeWorkbenchRoute(window.location.pathname);
+    if (fromLocation) {
+      return fromLocation;
+    }
+  }
+  return rememberLastScreen ? persistedRoute : "/";
+}
+
 export default function App() {
-  const persistedScreen = useWorkbenchStore((state) => state.lastScreen);
-  const setPersistedScreen = useWorkbenchStore((state) => state.setLastScreen);
+  const persistedRoute = useWorkbenchStore((state) => state.lastRoute);
+  const setPersistedRoute = useWorkbenchStore((state) => state.setLastRoute);
   const rememberLastScreen = useWorkbenchStore(
     (state) => state.settings.remember_last_screen,
   );
   const autoStatusPoll = useWorkbenchStore((state) => state.settings.auto_status_poll);
   const themePreference = useWorkbenchStore((state) => state.settings.theme_preference);
   const recentProjectsCount = useWorkbenchStore((state) => state.recentProjects.length);
-  const [mode, setMode] = useState<AppMode>(() =>
-    rememberLastScreen ? persistedScreen : "wizard",
+  const [route, setRoute] = useState<WorkbenchRoute>(() =>
+    initialRoute(persistedRoute, rememberLastScreen),
   );
   const [workbenchMeta, setWorkbenchMeta] = useState<WorkbenchMeta | null>(null);
   const [plotContract, setPlotContract] = useState<PlotContract | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
-  const wizardStep = useWizardStore((state) => state.step);
-  const wizardOutputsCount = useWizardStore((state) => state.outputs.length);
+  const wizard = useWizardStore(
+    useShallow((state) => ({
+      exportResult: state.exportResult,
+      inputPath: state.inputPath,
+      inspection: state.inspection,
+      outputsCount: state.outputs.length,
+      stage: state.stage,
+      template: state.template,
+    })),
+  );
   const tensileCompareCount = useTensileStore((state) => state.comparisonSources.length);
   const tensileOutputsCount = useTensileStore((state) => state.comparisonResult?.outputs.length ?? 0);
-  const composerPanelCount = useComposerStore((state) => state.project.panels.length);
-  const composerTextCount = useComposerStore((state) => state.project.texts.length);
+  const composerProject = useComposerStore((state) => state.project);
+  const composerPanelCount = composerProject.panels.length;
+  const composerTextCount = composerProject.texts.length;
   const workbenchLoadRef = useRef<Promise<void> | null>(null);
   const workbenchStateRef = useRef<{
     meta: WorkbenchMeta | null;
@@ -73,23 +112,50 @@ export default function App() {
     metaError: null,
   });
 
-  useEffect(() => {
-    if (rememberLastScreen) {
-      setMode(persistedScreen);
+  const navigate = (nextRoute: WorkbenchRoute, options?: { replace?: boolean }) => {
+    setRoute(nextRoute);
+    if (typeof window === "undefined" || window.location.pathname === nextRoute) {
+      return;
     }
-  }, [persistedScreen, rememberLastScreen]);
+    if (options?.replace) {
+      window.history.replaceState(window.history.state, "", nextRoute);
+      return;
+    }
+    window.history.pushState(window.history.state, "", nextRoute);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(normalizeWorkbenchRoute(window.location.pathname) ?? "/");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     if (rememberLastScreen) {
-      setPersistedScreen(mode);
+      setPersistedRoute(route);
+      return;
     }
-  }, [mode, rememberLastScreen, setPersistedScreen]);
+    if (persistedRoute !== "/") {
+      setPersistedRoute("/");
+    }
+  }, [persistedRoute, rememberLastScreen, route, setPersistedRoute]);
 
   useEffect(() => {
-    if (!rememberLastScreen && persistedScreen !== "wizard") {
-      setPersistedScreen("wizard");
+    if (!rememberLastScreen) {
+      return;
     }
-  }, [rememberLastScreen, persistedScreen, setPersistedScreen]);
+    const preferredRoute = persistedRoute;
+    if (route === preferredRoute) {
+      return;
+    }
+    if (typeof window !== "undefined" && window.location.pathname === "/") {
+      navigate(preferredRoute, { replace: true });
+    }
+  }, [persistedRoute, rememberLastScreen, route]);
 
   const loadWorkbenchData = () => {
     if (workbenchLoadRef.current) {
@@ -205,66 +271,118 @@ export default function App() {
     };
   }, [themePreference]);
 
-  const meta = SCREEN_META[mode];
+  const workspace = workspaceForRoute(route);
+  const meta = WORKSPACE_META[workspace];
+  const plotSessionActive = hasWizardSessionContent({
+    inputPath: wizard.inputPath,
+    inspection: wizard.inspection,
+    template: wizard.template,
+    outputs: wizard.outputsCount > 0 ? new Array(wizard.outputsCount).fill("") : [],
+    exportResult: wizard.exportResult,
+  });
+  const composerSessionActive = hasComposerSessionContent(composerProject);
 
-  let secondaryStatusLabel = `Step ${getWizardStepLabel(wizardStep)}`;
-  if (mode === "tensile") {
+  const workspaceLinks = useMemo(
+    () =>
+      WORKSPACE_ITEMS.map((item) => ({
+        ...item,
+        route:
+          item.workspace === "plot"
+            ? plotSessionActive
+              ? plotRoute(wizard.stage)
+              : "/plot/import"
+            : item.workspace === "tensile"
+              ? "/tensile"
+              : item.workspace === "composer"
+                ? "/composer"
+                : item.workspace === "recents"
+                  ? "/recents"
+                  : "/settings",
+      })),
+    [plotSessionActive, wizard.stage],
+  );
+
+  let secondaryStatusLabel = "Focus mode";
+  if (workspace === "plot") {
+    secondaryStatusLabel =
+      wizard.outputsCount > 0
+        ? `${getPlotStageLabel(wizard.stage)} / ${wizard.outputsCount} outputs`
+        : `${getPlotStageLabel(plotStageFromRoute(route))} stage`;
+  } else if (workspace === "tensile") {
     secondaryStatusLabel =
       tensileOutputsCount > 0
         ? `${tensileCompareCount} sources / ${tensileOutputsCount} outputs`
         : `${tensileCompareCount} sources queued`;
-  } else if (mode === "composer") {
+  } else if (workspace === "composer") {
     secondaryStatusLabel = `${composerPanelCount + composerTextCount} objects`;
-  } else if (mode === "projects") {
+  } else if (workspace === "recents") {
     secondaryStatusLabel = `${recentProjectsCount} recent files`;
-  } else if (mode === "settings") {
+  } else if (workspace === "settings") {
     secondaryStatusLabel = `${describeThemePreference(themePreference)} Theme`;
-  } else if (wizardOutputsCount > 0) {
-    secondaryStatusLabel = `${getWizardStepLabel(wizardStep)} / ${wizardOutputsCount} outputs`;
+  } else if (plotSessionActive) {
+    secondaryStatusLabel = `Plot session · ${getPlotStageLabel(wizard.stage)}`;
+  } else if (composerSessionActive) {
+    secondaryStatusLabel = "Composer session ready";
+  }
+
+  let content = (
+    <LaunchpadScreen sidecarReady={sidecarReady} onNavigate={navigate} />
+  );
+
+  if (workspace === "plot") {
+    content = (
+      <WizardScreen
+        meta={workbenchMeta}
+        onNavigate={navigate}
+        routeStage={plotStageFromRoute(route)}
+      />
+    );
+  } else if (workspace === "tensile") {
+    content = <TensileScreen meta={workbenchMeta} onNavigate={navigate} />;
+  } else if (workspace === "composer") {
+    content = <ComposerScreen />;
+  } else if (workspace === "recents") {
+    content = <ProjectsScreen meta={workbenchMeta} onNavigate={navigate} />;
+  } else if (workspace === "settings") {
+    content = <SettingsScreen contract={plotContract} meta={workbenchMeta} />;
   }
 
   return (
-    <div className="dashboard-shell">
-      <aside className="nav-rail">
-        <div className="rail-brand">
-          <div className="brand-mark">
+    <div className={`app-shell ${workspace === "launchpad" ? "launchpad-mode" : "workspace-mode"}`}>
+      <header className="app-topbar">
+        <div className="app-topbar-brand">
+          <button className="brand-mark" onClick={() => navigate("/")} type="button">
             <AppIcon name="spark" />
-          </div>
-          <div className="rail-brand-text">
-            <strong>CodeGod</strong>
-            <span>Desktop</span>
-          </div>
-        </div>
-
-        <nav className="nav-cluster">
-          {NAV_ITEMS.map((item) => (
-            <button
-              className={`nav-item ${mode === item.id ? "active" : ""}`}
-              key={item.id}
-              onClick={() => setMode(item.id)}
-              type="button"
-            >
-              <span className="nav-item-icon">
-                <AppIcon name={item.icon} />
-              </span>
-              <span className="nav-item-label">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="rail-footer">
-          <div className="rail-footer-line">
-            <div className={`rail-status-dot ${sidecarReady ? "online" : "offline"}`} />
-            <span>{sidecarReady ? "Sidecar ready" : "Sidecar offline"}</span>
-          </div>
-        </div>
-      </aside>
-
-      <section className="dashboard-frame">
-        <header className="dashboard-topbar">
-          <div className="topbar-copy">
+          </button>
+          <div className="brand-copy">
             <span className="eyebrow">{meta.eyebrow}</span>
             <h1>{meta.title}</h1>
+          </div>
+        </div>
+
+        <div className="app-topbar-actions">
+          {workspace !== "launchpad" && (
+            <button className="ghost-button home-button" onClick={() => navigate("/")} type="button">
+              <AppIcon name="home" />
+              <span>Launchpad</span>
+            </button>
+          )}
+
+          <div className="workspace-chip-row">
+            {workspaceLinks.map((item) => {
+              const active = workspace === item.workspace;
+              return (
+                <button
+                  className={`workspace-chip ${active ? "active" : ""}`}
+                  key={item.workspace}
+                  onClick={() => navigate(item.route)}
+                  type="button"
+                >
+                  <AppIcon name={item.icon} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="status-pills">
@@ -273,24 +391,16 @@ export default function App() {
             </span>
             <span className="status-pill accent">{secondaryStatusLabel}</span>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
+      {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
 
-        <main className="dashboard-main">
-          <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
-            {mode === "tensile" && <TensileScreen meta={workbenchMeta} onNavigate={setMode} />}
-            {mode === "wizard" && <WizardScreen meta={workbenchMeta} />}
-            {mode === "composer" && <ComposerScreen />}
-            {mode === "projects" && (
-              <ProjectsScreen meta={workbenchMeta} onNavigate={setMode} />
-            )}
-            {mode === "settings" && (
-              <SettingsScreen contract={plotContract} meta={workbenchMeta} />
-            )}
-          </Suspense>
-        </main>
-      </section>
+      <main className="app-main">
+        <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
+          {content}
+        </Suspense>
+      </main>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import type {
 import { getErrorMessage } from "../../lib/workbench";
 
 type Args = {
+  enabled?: boolean;
   inputPath: string;
   sheet: string | number;
   template: TemplateName | null;
@@ -20,11 +21,21 @@ type Args = {
   onSubmissionReport(report: SubmissionReport | null): void;
 };
 
+const preflightCache = new Map<
+  string,
+  { preflight: PreflightResult; report: SubmissionReport | null }
+>();
+const preflightInFlight = new Map<
+  string,
+  Promise<{ preflight: PreflightResult; report: SubmissionReport | null }>
+>();
+
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
 export function useWizardPreflight({
+  enabled = true,
   inputPath,
   sheet,
   template,
@@ -36,12 +47,6 @@ export function useWizardPreflight({
   error: string | null;
   activity: RequestActivity;
 } {
-  const cacheRef = useRef(
-    new Map<string, { preflight: PreflightResult; report: SubmissionReport | null }>(),
-  );
-  const inFlightRef = useRef(
-    new Map<string, Promise<{ preflight: PreflightResult; report: SubmissionReport | null }>>(),
-  );
   const latestRequestRef = useRef(0);
   const onPreflightRef = useRef(onPreflight);
   const onSubmissionReportRef = useRef(onSubmissionReport);
@@ -66,13 +71,19 @@ export function useWizardPreflight({
       return;
     }
 
+    if (!enabled) {
+      setActivity("idle");
+      setError(null);
+      return;
+    }
+
     const key = requestCacheKey("preflight-render", {
       inputPath,
       options,
       sheet,
       template,
     });
-    const cached = cacheRef.current.get(key);
+    const cached = preflightCache.get(key);
     if (cached) {
       setActivity("ready");
       setError(null);
@@ -89,7 +100,7 @@ export function useWizardPreflight({
       setActivity("running");
       setError(null);
 
-      const existing = inFlightRef.current.get(key);
+      const existing = preflightInFlight.get(key);
       const request =
         existing ??
         preflightRender(
@@ -103,14 +114,14 @@ export function useWizardPreflight({
           report: response.preflight.submission_report ?? null,
         }));
 
-      inFlightRef.current.set(key, request);
+      preflightInFlight.set(key, request);
 
       void request
         .then((response) => {
           if (latestRequestRef.current !== requestId || controller.signal.aborted) {
             return;
           }
-          cacheRef.current.set(key, response);
+          preflightCache.set(key, response);
           onPreflightRef.current(response.preflight);
           onSubmissionReportRef.current(response.report);
           setError(null);
@@ -126,8 +137,8 @@ export function useWizardPreflight({
           setActivity("error");
         })
         .finally(() => {
-          if (inFlightRef.current.get(key) === request) {
-            inFlightRef.current.delete(key);
+          if (preflightInFlight.get(key) === request) {
+            preflightInFlight.delete(key);
           }
         });
     }, 220);
@@ -136,7 +147,7 @@ export function useWizardPreflight({
       controller.abort();
       window.clearTimeout(handle);
     };
-  }, [inputPath, options, sheet, template]);
+  }, [enabled, inputPath, options, sheet, template]);
 
   return {
     busy: activity === "scheduled" || activity === "running",

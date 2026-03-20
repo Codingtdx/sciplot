@@ -122,7 +122,7 @@ describe("ComposerScreen", () => {
     dragDropHandler = null;
     useComposerStore.getState().reset();
     useWorkbenchStore.setState({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [],
       settings: {

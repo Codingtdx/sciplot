@@ -9,99 +9,73 @@
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1280px) {
+  .launchpad-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .plot-stage-grid,
   .desk-layout {
     grid-template-columns: 1fr;
   }
 
-  .desk-context {
+  .desk-context,
+  .plot-stage-rail {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
-
-  .preview-pane {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 960px) {
-  .dashboard-shell {
-    grid-template-columns: 1fr;
-    height: 100dvh;
+  .app-shell {
+    padding: 10px;
   }
 
-  .nav-rail {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    min-height: auto;
-  }
-
-  .rail-brand {
-    flex-direction: row;
-  }
-
-  .rail-brand-text {
+  .app-topbar,
+  .launchpad-meta,
+  .plot-stage-copy,
+  .panel-heading,
+  .preview-toolbar {
+    flex-direction: column;
     align-items: flex-start;
   }
 
-  .nav-cluster {
-    width: auto;
-    flex-direction: row;
-  }
-
-  .nav-item {
-    min-width: 88px;
-  }
-
-  .rail-footer {
-    display: none;
-  }
-
-  .dashboard-topbar {
-    flex-direction: column;
-  }
-
+  .app-topbar-actions,
   .status-pills {
     justify-content: flex-start;
-    max-width: none;
   }
 
-  .flow-strip,
-  .template-grid,
+  .launchpad-grid,
   .field-grid,
   .info-grid,
   .summary-grid,
-  .desk-context {
+  .wizard-template-grid,
+  .desk-context,
+  .plot-stage-rail {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 760px) {
-  .dashboard-shell {
-    padding: 10px;
-    gap: 10px;
+@media (max-width: 720px) {
+  .app-topbar,
+  .launchpad-hero,
+  .plot-stage-card,
+  .plot-import-card,
+  .plot-sheet-card,
+  .launchpad-recents {
+    padding: 16px;
   }
 
-  .dashboard-topbar,
-  .dashboard-main {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .nav-rail {
-    flex-direction: column;
-  }
-
-  .nav-cluster {
+  .workspace-chip-row,
+  .hero-actions,
+  .step-actions {
     width: 100%;
-    justify-content: space-between;
   }
 
-  .preview-toolbar,
-  .section-head,
-  .context-card-head {
-    flex-direction: column;
+  .workspace-chip,
+  .primary-button,
+  .ghost-button {
+    justify-content: center;
   }
 }

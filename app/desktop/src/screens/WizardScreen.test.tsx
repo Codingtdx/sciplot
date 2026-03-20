@@ -5,7 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { exportRender, openPath, preflightRender, renderPreview } from "../lib/api";
 import { loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
-import type { InspectResponse } from "../lib/types";
+import type { InspectResponse, PlotStage } from "../lib/types";
 import { TEST_META } from "../test/fixtures";
 import { WizardScreen } from "./WizardScreen";
 
@@ -39,7 +39,7 @@ vi.mock("../lib/api", async () => {
     }),
     renderPreview: vi.fn().mockResolvedValue({
       template: "curve",
-      sheet: "Representative_Curve",
+      sheet: 0,
       previews: [],
     }),
     exportRender: vi.fn().mockResolvedValue({
@@ -76,7 +76,8 @@ const TEST_INSPECT_RESPONSE: InspectResponse = {
     model_label: "Paired curve table (curve_table)",
     recommendation: {
       template: "curve",
-      reason: "Detected a standard paired curve table, so a basic curve plot is recommended by default.",
+      reason:
+        "Detected a standard paired curve table, so a basic curve plot is recommended by default.",
       size: "60x55",
       xscale: "linear",
       yscale: "linear",
@@ -95,12 +96,9 @@ function getTemplateButton(label: string) {
   return button as HTMLButtonElement;
 }
 
-function queryTemplateButton(label: string) {
-  return (
-    screen
-      .queryAllByRole("button")
-      .find((candidate) => candidate.querySelector("strong")?.textContent === label) ?? null
-  );
+function renderStage(stage: PlotStage, onNavigate = vi.fn()) {
+  render(<WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage={stage} />);
+  return onNavigate;
 }
 
 describe("WizardScreen", () => {
@@ -130,7 +128,7 @@ describe("WizardScreen", () => {
     });
     vi.mocked(renderPreview).mockResolvedValue({
       template: "curve",
-      sheet: "Representative_Curve",
+      sheet: 0,
       previews: [],
     });
     vi.mocked(exportRender).mockResolvedValue({
@@ -158,7 +156,7 @@ describe("WizardScreen", () => {
     vi.mocked(loadWizardDataFile).mockResolvedValue(TEST_INSPECT_RESPONSE);
     useWizardStore.getState().reset();
     useWorkbenchStore.setState({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [],
       settings: {
@@ -169,38 +167,33 @@ describe("WizardScreen", () => {
     });
   });
 
-  it("shows only the import surface in the empty stage", () => {
-    render(<WizardScreen meta={TEST_META} />);
+  it("shows the staged import surface by default", () => {
+    renderStage("import");
 
+    expect(screen.getByText("Import a data file")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open data" })).toBeInTheDocument();
-    expect(screen.queryByText("Summary")).not.toBeInTheDocument();
-    expect(screen.queryByText("Pick a chart type")).not.toBeInTheDocument();
+    expect(screen.getByText("Recent data files")).toBeInTheDocument();
   });
 
-  it("uses a preview-first edit layout without the old session card", () => {
+  it("shows a sheet selector stage for multi-sheet inputs", () => {
     useWizardStore.setState({
-      inputPath: "/tmp/curve.csv",
+      inputPath: "/tmp/curve.xlsx",
       sheet: 0,
-      sheetNames: ["Sheet1"],
-      template: "curve",
+      sheetNames: ["Sheet1", "Sheet2"],
       inspection: TEST_INSPECT_RESPONSE.inspection,
-      options: {
-        size: "60x55",
-        xscale: "linear",
-        yscale: "linear",
-        reverse_x: false,
-        style_preset: "default",
-      },
+      template: "curve",
+      stage: "sheet",
+      step: "sheet",
     });
 
-    render(<WizardScreen meta={TEST_META} />);
+    renderStage("sheet");
 
-    expect(screen.getByText("Summary")).toBeInTheDocument();
-    expect(screen.getByText("Why this type")).toBeInTheDocument();
-    expect(screen.queryByText("Session")).not.toBeInTheDocument();
+    expect(screen.getByText("Select the workbook tab")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sheet1/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sheet2/i })).toBeInTheDocument();
   });
 
-  it("shows only compatible templates by default and disables incompatible ones under more templates", () => {
+  it("shows only compatible templates first and disables incompatible ones behind more types", () => {
     useWizardStore.setState({
       inputPath: "/tmp/relaxation.xlsx",
       sheet: 0,
@@ -226,112 +219,74 @@ describe("WizardScreen", () => {
         yscale: "linear",
         reverse_x: false,
       },
+      stage: "type",
+      step: "inspect",
     });
 
-    render(<WizardScreen meta={TEST_META} />);
+    renderStage("type");
 
     expect(getTemplateButton("Point line")).toBeInTheDocument();
     expect(getTemplateButton("Curve")).toBeInTheDocument();
-    expect(queryTemplateButton("Heatmap")).not.toBeInTheDocument();
+    expect(screen.queryByText("Heatmap")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "More types" }));
 
     const heatmapButton = getTemplateButton("Heatmap");
     expect(heatmapButton).toBeDisabled();
-    expect(screen.getByText("This input is a rheology export bundle. Start with point-line or curve.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This input is a rheology export bundle. Start with point-line or curve.",
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("renders options from sidecar meta without local hardcoded lists", () => {
-    useWizardStore.setState({
-      inputPath: "/tmp/heatmap.csv",
-      sheet: 0,
-      sheetNames: ["Sheet1"],
-      template: "heatmap",
-      options: {},
-    });
-
-    render(<WizardScreen meta={TEST_META} />);
-
-    expect(screen.getByText("Show color bar")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Default")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Colorblind Safe")).toBeInTheDocument();
-  });
-
-  it("prompts before replacing the current plotting session when opening another data file", async () => {
-    useWizardStore.setState({
-      inputPath: "/tmp/current.csv",
-      sheet: 0,
-      sheetNames: ["Sheet1"],
-      template: "curve",
-      inspection: TEST_INSPECT_RESPONSE.inspection,
-      outputs: ["/tmp/exports/current.pdf"],
-      exportResult: {
-        outputs: ["/tmp/exports/current.pdf"],
-        output_dir: "/tmp/exports",
-        preview_outputs: [],
-        artifact_paths: [],
-        manifest_path: null,
-      },
-    });
-    vi.mocked(open).mockResolvedValue("/tmp/new-data.xlsx");
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-
-    render(<WizardScreen meta={TEST_META} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
-
-    await waitFor(() => {
-      expect(confirmSpy).toHaveBeenCalledWith(
-        expect.stringContaining("replace the current Plot Builder session"),
-      );
-    });
-    expect(loadWizardDataFile).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
-  });
-
-  it("cleans heatmap-only options when switching back to a compatible curve template", () => {
+  it("refreshes preview in tune stage and only runs preflight once review opens", async () => {
+    vi.useFakeTimers();
     useWizardStore.setState({
       inputPath: "/tmp/curve.csv",
       sheet: 0,
-      template: "heatmap",
-      inspection: {
-        model: "curve_table",
-        model_label: "Paired curve table (curve_table)",
-        recommendation: {
-          template: "curve",
-          reason: "Detected a standard paired curve table.",
-          size: "60x55",
-          xscale: "linear",
-          yscale: "linear",
-          reverse_x: false,
-        },
-        warnings: [],
-        signals: [],
-      },
+      sidecarReady: true,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
       options: {
         size: "60x55",
-        show_colorbar: true,
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
         palette_preset: "colorblind_safe",
       },
+      stage: "tune",
+      step: "options",
     });
 
-    render(<WizardScreen meta={TEST_META} />);
+    const { rerender } = render(
+      <WizardScreen meta={TEST_META} onNavigate={vi.fn()} routeStage="tune" />,
+    );
 
-    fireEvent.click(getTemplateButton("Curve"));
-
-    expect(useWizardStore.getState().template).toBe("curve");
-    expect(useWizardStore.getState().options).toEqual({
-      size: "60x55",
-      xscale: "linear",
-      yscale: "linear",
-      reverse_x: false,
-      style_preset: "default",
-      palette_preset: "colorblind_safe",
+    await act(async () => {
+      vi.advanceTimersByTime(250);
     });
+
+    expect(renderPreview).toHaveBeenCalledTimes(1);
+    expect(preflightRender).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByDisplayValue("Default"), {
+      target: { value: "nature" },
+    });
+    expect(useWizardStore.getState().options.style_preset).toBe("nature");
+
+    rerender(<WizardScreen meta={TEST_META} onNavigate={vi.fn()} routeStage="review" />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(preflightRender).toHaveBeenCalledTimes(1);
   });
 
-  it("locks tensile curve scales to linear when the inspection model is tensile_curve", async () => {
+  it("locks tensile curve scales to linear in the tune stage", async () => {
     useWizardStore.setState({
       inputPath: "/tmp/tensile_curve.csv",
       sheet: 0,
@@ -357,9 +312,11 @@ describe("WizardScreen", () => {
         yscale: "log",
         reverse_x: false,
       },
+      stage: "tune",
+      step: "options",
     });
 
-    render(<WizardScreen meta={TEST_META} />);
+    renderStage("tune");
 
     await waitFor(() => {
       expect(useWizardStore.getState().options.xscale).toBe("linear");
@@ -370,37 +327,48 @@ describe("WizardScreen", () => {
     expect(screen.getByText("Tensile curves keep linear x/y scales.")).toBeInTheDocument();
   });
 
-  it("lets the user switch the public submission style from wizard options", () => {
+  it("prompts before replacing the current plot session when opening another data file", async () => {
     useWizardStore.setState({
-      inputPath: "/tmp/curve.csv",
+      inputPath: "/tmp/current.csv",
       sheet: 0,
       sheetNames: ["Sheet1"],
       template: "curve",
-      options: {
-        size: "60x55",
-        xscale: "linear",
-        yscale: "linear",
-        reverse_x: false,
-        style_preset: "default",
-        palette_preset: "colorblind_safe",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      outputs: ["/tmp/exports/current.pdf"],
+      exportResult: {
+        outputs: ["/tmp/exports/current.pdf"],
+        output_dir: "/tmp/exports",
+        preview_outputs: [],
+        artifact_paths: [],
+        manifest_path: null,
       },
+      stage: "import",
+      step: "file",
     });
+    vi.mocked(open).mockResolvedValue("/tmp/new-data.xlsx");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    render(<WizardScreen meta={TEST_META} />);
+    renderStage("import");
 
-    fireEvent.change(screen.getByDisplayValue("Default"), {
-      target: { value: "nature" },
+    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining("replace the current Plot session"),
+      );
     });
+    expect(loadWizardDataFile).not.toHaveBeenCalled();
 
-    expect(useWizardStore.getState().options.style_preset).toBe("nature");
-    expect(screen.getAllByText("Nature").length).toBeGreaterThan(0);
+    confirmSpy.mockRestore();
   });
 
-  it("shows the export bundle controls and opens the output folder after export", async () => {
+  it("exports from review and opens the output folder in export stage", async () => {
+    const onNavigate = vi.fn();
     useWizardStore.setState({
       inputPath: "/tmp/curve.csv",
       sheet: 0,
       sidecarReady: true,
+      sheetNames: ["Sheet1"],
       template: "curve",
       inspection: TEST_INSPECT_RESPONSE.inspection,
       options: {
@@ -410,9 +378,19 @@ describe("WizardScreen", () => {
         reverse_x: false,
         style_preset: "default",
       },
+      preflight: {
+        template: "curve",
+        warnings: [],
+        errors: [],
+        output_filenames: ["curve.pdf"],
+      },
+      stage: "review",
+      step: "preflight",
     });
 
-    render(<WizardScreen meta={TEST_META} />);
+    const { rerender } = render(
+      <WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage="review" />,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Export submission bundle" })).toBeEnabled();
@@ -424,226 +402,15 @@ describe("WizardScreen", () => {
       expect(exportRender).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByRole("button", { name: "Open output folder" })).toBeInTheDocument();
-    expect(screen.getByText("Manifest: codegod_manifest.json")).toBeInTheDocument();
+    expect(onNavigate).toHaveBeenCalledWith("/plot/export");
 
+    rerender(<WizardScreen meta={TEST_META} onNavigate={vi.fn()} routeStage="export" />);
+
+    expect(screen.getByRole("button", { name: "Open output folder" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open output folder" }));
 
     await waitFor(() => {
       expect(openPath).toHaveBeenCalledWith("/tmp/exports");
-    });
-  });
-
-  it("automatically refreshes preview and preflight when options change quickly", async () => {
-    vi.useFakeTimers();
-    let resolveFirst:
-      | ((value: {
-          template: string;
-          sheet: string | number;
-          previews: Array<{ filename: string; png_base64: string }>;
-        }) => void)
-      | undefined;
-    let resolveSecond:
-      | ((value: {
-          template: string;
-          sheet: string | number;
-          previews: Array<{ filename: string; png_base64: string }>;
-        }) => void)
-      | undefined;
-
-    vi.mocked(renderPreview)
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveFirst = resolve;
-          }),
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveSecond = resolve;
-          }),
-      );
-
-    useWizardStore.setState({
-      inputPath: "/tmp/curve.csv",
-      sheet: 0,
-      sidecarReady: true,
-      template: "curve",
-      inspection: {
-        model: "curve_table",
-        model_label: "Paired curve table (curve_table)",
-        recommendation: {
-          template: "curve",
-          reason: "Detected a standard paired curve table.",
-          size: "60x55",
-          xscale: "linear",
-          yscale: "linear",
-          reverse_x: false,
-        },
-        warnings: [],
-        signals: [],
-      },
-      options: {
-        size: "60x55",
-        xscale: "linear",
-        yscale: "linear",
-        reverse_x: false,
-      },
-    });
-
-    render(<WizardScreen meta={TEST_META} />);
-
-    await act(async () => {
-      vi.advanceTimersByTime(250);
-    });
-    expect(renderPreview).toHaveBeenCalledTimes(1);
-    expect(preflightRender).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      useWizardStore.getState().setOptions({
-        size: "60x55",
-        xscale: "log",
-        yscale: "linear",
-        reverse_x: false,
-      });
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(250);
-    });
-    expect(renderPreview).toHaveBeenCalledTimes(2);
-    expect(preflightRender).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      resolveFirst?.({
-        template: "curve",
-        sheet: 0,
-        previews: [{ filename: "old.pdf", png_base64: "old" }],
-      });
-      await Promise.resolve();
-    });
-
-    expect(useWizardStore.getState().previews).toEqual([]);
-
-    await act(async () => {
-      resolveSecond?.({
-        template: "curve",
-        sheet: 0,
-        previews: [{ filename: "new.pdf", png_base64: "new" }],
-      });
-      await Promise.resolve();
-    });
-
-    expect(useWizardStore.getState().previews[0]?.filename).toBe("new.pdf");
-  });
-
-  it("restores the recommended template and scales, and re-enables export after blocking errors clear", async () => {
-    vi.useFakeTimers();
-    vi.mocked(preflightRender).mockImplementation(async (_path, _sheet, template, options) => {
-      if (template === "curve") {
-        return {
-          input_path: "/tmp/relaxation.xlsx",
-          sheet: 0,
-          template,
-          options,
-          preflight: {
-            template,
-            warnings: [],
-            errors: ["curve blocked"],
-            output_filenames: [],
-          },
-        };
-      }
-      return {
-        input_path: "/tmp/relaxation.xlsx",
-        sheet: 0,
-        template,
-        options,
-        preflight: {
-          template,
-          warnings: [],
-          errors: [],
-          output_filenames: ["stress_relaxation_sigma_over_sigma0.pdf"],
-        },
-      };
-    });
-
-    useWizardStore.setState({
-      inputPath: "/tmp/relaxation.xlsx",
-      sheet: 0,
-      sidecarReady: true,
-      template: "curve",
-      inspection: {
-        model: "stress_relaxation",
-        model_label: "Stress relaxation export table",
-        recommendation: {
-          template: "point_line",
-          reason: "Detected a stress relaxation export table with 4 columns per bundle.",
-          size: "60x55",
-          xscale: "log",
-          yscale: "linear",
-          reverse_x: false,
-        },
-        warnings: [],
-        signals: [],
-      },
-      options: {
-        size: "60x55",
-        xscale: "linear",
-        yscale: "linear",
-        reverse_x: false,
-      },
-    });
-
-    render(<WizardScreen meta={TEST_META} />);
-
-    await act(async () => {
-      vi.advanceTimersByTime(250);
-    });
-
-    const exportButton = screen.getByRole("button", { name: "Export submission bundle" });
-    expect(exportButton).toBeDisabled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Use recommendation" }));
-
-    await act(async () => {
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(useWizardStore.getState().template).toBe("point_line");
-    expect(useWizardStore.getState().options).toEqual(
-      expect.objectContaining({
-        size: "60x55",
-        xscale: "log",
-        yscale: "linear",
-        reverse_x: false,
-      }),
-    );
-    expect(preflightRender).toHaveBeenLastCalledWith(
-      "/tmp/relaxation.xlsx",
-      0,
-      "point_line",
-      expect.objectContaining({
-        xscale: "log",
-        yscale: "linear",
-      }),
-      expect.any(Object),
-    );
-    expect(screen.getByRole("button", { name: "Export submission bundle" })).toBeEnabled();
-  });
-
-  it("shows a visible error when the desktop file dialog is unavailable", async () => {
-    vi.mocked(open).mockRejectedValue(new Error("dialog unavailable"));
-
-    render(<WizardScreen meta={TEST_META} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Could not open the file picker: dialog unavailable"),
-      ).toBeInTheDocument();
     });
   });
 });

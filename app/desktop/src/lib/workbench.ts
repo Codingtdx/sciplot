@@ -2,52 +2,99 @@ import type { AppIconName } from "../components/AppIcon";
 import type {
   ComposerPanel,
   PalettePreset,
+  PlotStage,
   SizePreset,
   TemplateName,
-  WorkbenchTemplate,
-  WizardStep,
   WorkbenchMeta,
+  WorkbenchRoute,
   WorkbenchScreen,
+  WorkbenchTemplate,
+  WorkbenchWorkspace,
+  WizardStep,
 } from "./types";
 
-export type AppMode = WorkbenchScreen;
+export const PLOT_STAGE_ORDER: PlotStage[] = [
+  "import",
+  "sheet",
+  "type",
+  "tune",
+  "review",
+  "export",
+];
 
-export const NAV_ITEMS: Array<{
-  id: AppMode;
+export const PLOT_STAGE_ROUTES: Record<PlotStage, WorkbenchRoute> = {
+  import: "/plot/import",
+  sheet: "/plot/sheet",
+  type: "/plot/type",
+  tune: "/plot/tune",
+  review: "/plot/review",
+  export: "/plot/export",
+};
+
+export const WORKSPACE_HOME_ROUTES: Record<WorkbenchWorkspace, WorkbenchRoute> = {
+  launchpad: "/",
+  plot: "/plot/import",
+  tensile: "/tensile",
+  composer: "/composer",
+  recents: "/recents",
+  settings: "/settings",
+};
+
+export const APP_ROUTES: WorkbenchRoute[] = [
+  "/",
+  "/plot/import",
+  "/plot/sheet",
+  "/plot/type",
+  "/plot/tune",
+  "/plot/review",
+  "/plot/export",
+  "/tensile",
+  "/composer",
+  "/recents",
+  "/settings",
+];
+
+export const WORKSPACE_ITEMS: Array<{
+  workspace: WorkbenchWorkspace;
   label: string;
   icon: AppIconName;
 }> = [
-  { id: "tensile", label: "Tensile", icon: "tensile" },
-  { id: "wizard", label: "Plot", icon: "plot" },
-  { id: "composer", label: "Composer", icon: "composer" },
-  { id: "projects", label: "Recents", icon: "projects" },
-  { id: "settings", label: "Settings", icon: "settings" },
+  { workspace: "plot", label: "Plot", icon: "plot" },
+  { workspace: "tensile", label: "Tensile", icon: "tensile" },
+  { workspace: "composer", label: "Composer", icon: "composer" },
+  { workspace: "recents", label: "Recents", icon: "projects" },
+  { workspace: "settings", label: "Settings", icon: "settings" },
 ];
 
-export const SCREEN_META: Record<
-  AppMode,
+export const WORKSPACE_META: Record<
+  WorkbenchWorkspace,
   {
     eyebrow: string;
     title: string;
     description: string;
   }
 > = {
+  launchpad: {
+    eyebrow: "Desktop 6.0",
+    title: "Launchpad",
+    description: "Start a focused workspace, restore a session, or jump back into recent work.",
+  },
+  plot: {
+    eyebrow: "Figure Flow",
+    title: "Plot Workspace",
+    description: "Import data, pick the chart type, tune the essentials, and export the bundle.",
+  },
   tensile: {
     eyebrow: "Material Lab",
     title: "Tensile Workspace",
-    description: "Prepare raw tensile runs, queue workbooks, and export comparison figures.",
-  },
-  wizard: {
-    eyebrow: "Figure Flow",
-    title: "Plot Builder",
-    description: "Import data, review the recommendation, and export polished PDF figures.",
+    description: "Prepare raw tensile runs, queue workbooks, and hand curated inputs off to Plot.",
   },
   composer: {
     eyebrow: "Layout Studio",
     title: "Figure Composer",
     description: "Arrange figures, assets, and labels on one editable export canvas.",
   },
-  projects: {
+  recents: {
     eyebrow: "History",
     title: "Recent Files",
     description: "Jump back into recent plotting inputs, workbooks, and composer projects.",
@@ -59,56 +106,163 @@ export const SCREEN_META: Record<
   },
 };
 
-export const STEPS: Array<{
-  id: WizardStep;
+export const PLOT_STAGES: Array<{
+  id: PlotStage;
   label: string;
   hint: string;
 }> = [
-  { id: "file", label: "Import", hint: "Pick a file" },
-  { id: "sheet", label: "Sheet", hint: "Choose a tab" },
-  { id: "inspect", label: "Detect", hint: "Review the fit" },
-  { id: "template", label: "Template", hint: "Switch if needed" },
-  { id: "options", label: "Options", hint: "Adjust essentials" },
-  { id: "preflight", label: "Review", hint: "Resolve blockers" },
-  { id: "export", label: "Export", hint: "Make the PDF" },
+  { id: "import", label: "Import", hint: "Pick a file" },
+  { id: "sheet", label: "Sheet", hint: "Choose the source tab" },
+  { id: "type", label: "Type", hint: "Confirm the chart family" },
+  { id: "tune", label: "Tune", hint: "Adjust the essentials" },
+  { id: "review", label: "Review", hint: "Check readiness" },
+  { id: "export", label: "Export", hint: "Write the bundle" },
 ];
 
-export const STEP_COPY: Record<
-  WizardStep,
+export const PLOT_STAGE_COPY: Record<
+  PlotStage,
   {
     title: string;
     description: string;
   }
 > = {
-  file: {
+  import: {
     title: "Import a data file",
-    description: "The app inspects structure first and suggests the best starting template.",
+    description: "Start with raw data or a prepared workbook. The sidecar inspects structure first.",
   },
   sheet: {
-    title: "Choose a sheet",
-    description: "For multi-sheet workbooks, confirm the target tab before continuing.",
+    title: "Choose the source tab",
+    description: "Pick the workbook tab that should drive recommendation, preview, and export.",
   },
-  inspect: {
-    title: "Review the recommendation",
-    description: "Confirm the detected model, suggested template, and major warnings.",
+  type: {
+    title: "Confirm the chart type",
+    description: "Review the detected input model, recommendation, and all compatible templates.",
   },
-  template: {
-    title: "Switch template if needed",
-    description: "Change templates only when the recommended path does not fit the data.",
+  tune: {
+    title: "Tune the essentials",
+    description: "Set size, scales, style, and the most important template options before review.",
   },
-  options: {
-    title: "Adjust key options",
-    description: "Review size, axes, and a few essential settings before export.",
-  },
-  preflight: {
-    title: "Review before export",
-    description: "Clear blockers and warnings before generating the final PDF.",
+  review: {
+    title: "Review export readiness",
+    description: "Preview the figure, check blockers, and confirm the submission report.",
   },
   export: {
-    title: "Export complete",
-    description: "Check the outputs, keep iterating, or move to the next dataset.",
+    title: "Export the bundle",
+    description: "Open the output folder, move on to Composer, or start the next figure.",
   },
 };
+
+export function isWorkbenchRoute(value: string): value is WorkbenchRoute {
+  return APP_ROUTES.includes(value as WorkbenchRoute);
+}
+
+export function normalizeWorkbenchRoute(value: string | null | undefined): WorkbenchRoute | null {
+  if (!value) {
+    return null;
+  }
+  return isWorkbenchRoute(value) ? value : null;
+}
+
+export function routeForLegacyScreen(screen: string | null | undefined): WorkbenchRoute {
+  switch (screen) {
+    case "tensile":
+      return "/tensile";
+    case "composer":
+      return "/composer";
+    case "projects":
+      return "/recents";
+    case "settings":
+      return "/settings";
+    case "wizard":
+      return "/plot/import";
+    default:
+      return "/";
+  }
+}
+
+export function workspaceForRoute(route: WorkbenchRoute): WorkbenchWorkspace {
+  if (route === "/") {
+    return "launchpad";
+  }
+  if (route.startsWith("/plot/")) {
+    return "plot";
+  }
+  if (route === "/tensile") {
+    return "tensile";
+  }
+  if (route === "/composer") {
+    return "composer";
+  }
+  if (route === "/recents") {
+    return "recents";
+  }
+  return "settings";
+}
+
+export function screenForRoute(route: WorkbenchRoute): WorkbenchScreen {
+  const workspace = workspaceForRoute(route);
+  switch (workspace) {
+    case "launchpad":
+      return "launchpad";
+    case "plot":
+      return "wizard";
+    case "recents":
+      return "projects";
+    default:
+      return workspace;
+  }
+}
+
+export function plotRoute(stage: PlotStage): WorkbenchRoute {
+  return PLOT_STAGE_ROUTES[stage];
+}
+
+export function plotStageFromRoute(route: WorkbenchRoute): PlotStage {
+  if (route.startsWith("/plot/")) {
+    const stage = route.slice("/plot/".length);
+    if (PLOT_STAGE_ORDER.includes(stage as PlotStage)) {
+      return stage as PlotStage;
+    }
+  }
+  return "import";
+}
+
+export function plotStageForWizardStep(step: WizardStep): PlotStage {
+  switch (step) {
+    case "sheet":
+      return "sheet";
+    case "inspect":
+    case "template":
+      return "type";
+    case "options":
+      return "tune";
+    case "preflight":
+      return "review";
+    case "export":
+      return "export";
+    case "file":
+    default:
+      return "import";
+  }
+}
+
+export function wizardStepForStage(stage: PlotStage): WizardStep {
+  switch (stage) {
+    case "sheet":
+      return "sheet";
+    case "type":
+      return "inspect";
+    case "tune":
+      return "options";
+    case "review":
+      return "preflight";
+    case "export":
+      return "export";
+    case "import":
+    default:
+      return "file";
+  }
+}
 
 export function formatLeaf(path: string) {
   return path.split(/[/\\]/).pop() ?? path;
@@ -169,7 +323,11 @@ export function formatRecentTimestamp(value: string) {
 }
 
 export function getWizardStepLabel(step: WizardStep) {
-  return STEPS.find((item) => item.id === step)?.label ?? step;
+  return getPlotStageLabel(plotStageForWizardStep(step));
+}
+
+export function getPlotStageLabel(stage: PlotStage) {
+  return PLOT_STAGES.find((item) => item.id === stage)?.label ?? stage;
 }
 
 export function templateMeta(meta: WorkbenchMeta | null, template: TemplateName | null | undefined) {
@@ -183,7 +341,10 @@ export function templateLabel(meta: WorkbenchMeta | null, template: TemplateName
   return templateMeta(meta, template)?.label ?? template ?? "-";
 }
 
-export function paletteLabel(meta: WorkbenchMeta | null, palette: PalettePreset | string | null | undefined) {
+export function paletteLabel(
+  meta: WorkbenchMeta | null,
+  palette: PalettePreset | string | null | undefined,
+) {
   if (!meta || !palette) {
     return palette ?? "-";
   }
@@ -274,28 +435,37 @@ export function sizeChoices(meta: WorkbenchMeta | null, template: TemplateName |
   }
   return currentTemplate.allowed_sizes
     .map((sizeId) => meta.sizes.find((item) => item.id === sizeId))
-    .filter((item): item is { id: SizePreset; label: string; width_mm: number; height_mm: number } => Boolean(item));
+    .filter(
+      (
+        item,
+      ): item is { id: SizePreset; label: string; width_mm: number; height_mm: number } =>
+        Boolean(item),
+    );
 }
 
-export function publicPaletteChoices(meta: WorkbenchMeta | null, template: TemplateName | null | undefined) {
+export function publicPaletteChoices(
+  meta: WorkbenchMeta | null,
+  template: TemplateName | null | undefined,
+) {
   const currentTemplate = templateMeta(meta, template);
   if (!currentTemplate || !meta) {
     return [] as WorkbenchMeta["palettes"];
   }
   return meta.palettes.filter(
-    (item) =>
-      item.public && currentTemplate.available_palettes.includes(item.id),
+    (item) => item.public && currentTemplate.available_palettes.includes(item.id),
   );
 }
 
-export function publicStyleChoices(meta: WorkbenchMeta | null, template: TemplateName | null | undefined) {
+export function publicStyleChoices(
+  meta: WorkbenchMeta | null,
+  template: TemplateName | null | undefined,
+) {
   const currentTemplate = templateMeta(meta, template);
   if (!currentTemplate || !meta) {
     return [] as WorkbenchMeta["styles"];
   }
   return meta.styles.filter(
-    (item) =>
-      item.public && currentTemplate.available_styles.includes(item.id),
+    (item) => item.public && currentTemplate.available_styles.includes(item.id),
   );
 }
 
@@ -340,11 +510,7 @@ export function hasWizardSessionContent(session: WizardSessionSnapshot) {
 }
 
 export function hasComposerSessionContent(project: ComposerSessionSnapshot) {
-  return (
-    project.regions.length > 0 ||
-    project.panels.length > 0 ||
-    project.texts.length > 0
-  );
+  return project.regions.length > 0 || project.panels.length > 0 || project.texts.length > 0;
 }
 
 export function confirmReplaceWizardSession(
@@ -359,7 +525,7 @@ export function confirmReplaceWizardSession(
     return true;
   }
   return confirmSessionReplacement(
-    `Opening ${nextLabel} will replace the current Plot Builder session. Save the current project first if you need to keep it. Continue?`,
+    `Opening ${nextLabel} will replace the current Plot session. Save the current project first if you need to keep it. Continue?`,
   );
 }
 

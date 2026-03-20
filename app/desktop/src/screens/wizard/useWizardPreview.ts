@@ -11,6 +11,7 @@ import type {
 import { getErrorMessage } from "../../lib/workbench";
 
 type Args = {
+  enabled?: boolean;
   inputPath: string;
   sheet: string | number;
   template: TemplateName | null;
@@ -18,11 +19,15 @@ type Args = {
   onPreviews(previews: PreviewItem[]): void;
 };
 
+const previewCache = new Map<string, PreviewItem[]>();
+const previewInFlight = new Map<string, Promise<PreviewItem[]>>();
+
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
 export function useWizardPreview({
+  enabled = true,
   inputPath,
   sheet,
   template,
@@ -33,8 +38,6 @@ export function useWizardPreview({
   error: string | null;
   activity: RequestActivity;
 } {
-  const cacheRef = useRef(new Map<string, PreviewItem[]>());
-  const inFlightRef = useRef(new Map<string, Promise<PreviewItem[]>>());
   const latestRequestRef = useRef(0);
   const onPreviewsRef = useRef(onPreviews);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +56,19 @@ export function useWizardPreview({
       return;
     }
 
+    if (!enabled) {
+      setActivity("idle");
+      setError(null);
+      return;
+    }
+
     const key = requestCacheKey("render-preview", {
       inputPath,
       options,
       sheet,
       template,
     });
-    const cached = cacheRef.current.get(key);
+    const cached = previewCache.get(key);
     if (cached) {
       setActivity("ready");
       setError(null);
@@ -75,18 +84,18 @@ export function useWizardPreview({
       setActivity("running");
       setError(null);
 
-      const existing = inFlightRef.current.get(key);
+      const existing = previewInFlight.get(key);
       const request =
         existing ??
         renderPreview(inputPath, sheet, template, options, {
           signal: controller.signal,
         }).then((payload) => payload.previews);
 
-      inFlightRef.current.set(key, request);
+      previewInFlight.set(key, request);
 
       void request
         .then((previews) => {
-          cacheRef.current.set(key, previews);
+          previewCache.set(key, previews);
           if (latestRequestRef.current !== requestId || controller.signal.aborted) {
             return;
           }
@@ -103,8 +112,8 @@ export function useWizardPreview({
           setActivity("error");
         })
         .finally(() => {
-          if (inFlightRef.current.get(key) === request) {
-            inFlightRef.current.delete(key);
+          if (previewInFlight.get(key) === request) {
+            previewInFlight.delete(key);
           }
         });
     }, 220);
@@ -113,7 +122,7 @@ export function useWizardPreview({
       controller.abort();
       window.clearTimeout(handle);
     };
-  }, [inputPath, options, sheet, template]);
+  }, [enabled, inputPath, options, sheet, template]);
 
   return {
     busy: activity === "scheduled" || activity === "running",

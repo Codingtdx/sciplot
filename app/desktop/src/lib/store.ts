@@ -8,6 +8,7 @@ import type {
   ComposerText,
   InputInspection,
   PalettePreset,
+  PlotStage,
   QAReport,
   PdfImportMode,
   PreflightResult,
@@ -19,8 +20,9 @@ import type {
   TensileComparisonSource,
   TensileReplicateResponse,
   TemplateName,
-  WizardStep,
+  WorkbenchRoute,
   WorkbenchScreen,
+  WizardStep,
   WorkbenchSettings,
   ExportResponse,
 } from "./types";
@@ -30,6 +32,7 @@ import {
   normalizeTensileComparisonSources,
   upsertTensileComparisonSource,
 } from "./tensile-comparison";
+import { normalizeWorkbenchRoute, plotStageForWizardStep, routeForLegacyScreen } from "./workbench";
 
 type WizardState = {
   inputPath: string;
@@ -44,6 +47,7 @@ type WizardState = {
   outputs: string[];
   exportResult: ExportResponse | null;
   submissionReport: SubmissionReport | null;
+  stage: PlotStage;
   step: WizardStep;
   sidecarReady: boolean;
   busy: boolean;
@@ -61,6 +65,7 @@ type WizardState = {
   setOutputs(value: string[]): void;
   setExportResult(value: ExportResponse | null): void;
   setSubmissionReport(value: SubmissionReport | null): void;
+  setStage(value: PlotStage): void;
   setStep(value: WizardStep): void;
   setBusy(value: boolean): void;
   setError(value: string | null): void;
@@ -105,11 +110,12 @@ type ComposerState = {
 };
 
 type WorkbenchState = {
-  lastScreen: WorkbenchScreen;
+  lastScreen?: WorkbenchScreen;
+  lastRoute: WorkbenchRoute;
   pdfImportMode: PdfImportMode;
   recentProjects: RecentProjectEntry[];
   settings: WorkbenchSettings;
-  setLastScreen(value: WorkbenchScreen): void;
+  setLastRoute(value: WorkbenchRoute): void;
   setPdfImportMode(value: PdfImportMode): void;
   rememberProject(entry: Omit<RecentProjectEntry, "id" | "updated_at">): void;
   clearRecentProjects(): void;
@@ -149,6 +155,7 @@ export const useWizardStore = create<WizardState>()(
       outputs: [],
       exportResult: null,
       submissionReport: null,
+      stage: "import",
       step: "file",
       sidecarReady: false,
       busy: false,
@@ -166,6 +173,7 @@ export const useWizardStore = create<WizardState>()(
       setOutputs: (value) => set({ outputs: value }),
       setExportResult: (value) => set({ exportResult: value }),
       setSubmissionReport: (value) => set({ submissionReport: value }),
+      setStage: (value) => set({ stage: value }),
       setStep: (value) => set({ step: value }),
       setBusy: (value) => set({ busy: value }),
       setError: (value) => set({ error: value }),
@@ -183,6 +191,7 @@ export const useWizardStore = create<WizardState>()(
           outputs: [],
           exportResult: null,
           submissionReport: null,
+          stage: "import",
           step: "file",
           busy: false,
           error: null,
@@ -191,6 +200,16 @@ export const useWizardStore = create<WizardState>()(
     {
       name: "codegod-wizard-store",
       storage,
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<WizardState> | undefined;
+        return {
+          ...currentState,
+          ...persisted,
+          stage:
+            persisted?.stage ??
+            (persisted?.step ? plotStageForWizardStep(persisted.step) : currentState.stage),
+        };
+      },
       partialize: (state) => ({
         inputPath: state.inputPath,
         sheet: state.sheet,
@@ -202,6 +221,7 @@ export const useWizardStore = create<WizardState>()(
         outputs: state.outputs,
         exportResult: state.exportResult,
         submissionReport: state.submissionReport,
+        stage: state.stage,
         step: state.step,
       }),
     },
@@ -315,11 +335,11 @@ export const useComposerStore = create<ComposerState>()(
 export const useWorkbenchStore = create<WorkbenchState>()(
   persist(
     (set) => ({
-      lastScreen: "wizard",
+      lastRoute: "/",
       pdfImportMode: "graph",
       recentProjects: [],
       settings: { ...defaultWorkbenchSettings },
-      setLastScreen: (value) => set({ lastScreen: value }),
+      setLastRoute: (value) => set({ lastRoute: value }),
       setPdfImportMode: (value) => set({ pdfImportMode: value }),
       rememberProject: (entry) =>
         set((state) => {
@@ -348,10 +368,17 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       name: "codegod-workbench-store",
       storage,
       merge: (persistedState, currentState) => {
-        const persisted = persistedState as Partial<WorkbenchState> | undefined;
+        const persisted = persistedState as
+          | (Partial<WorkbenchState> & { lastScreen?: string })
+          | undefined;
+        const lastRoute =
+          normalizeWorkbenchRoute(persisted?.lastRoute) ??
+          normalizeWorkbenchRoute(routeForLegacyScreen(persisted?.lastScreen)) ??
+          currentState.lastRoute;
         return {
           ...currentState,
           ...persisted,
+          lastRoute,
           settings: {
             ...defaultWorkbenchSettings,
             ...(persisted?.settings ?? {}),
