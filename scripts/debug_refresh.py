@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -12,47 +12,26 @@ if str(ROOT) not in sys.path:
 
 from make_plot import render_template
 from scripts.smoke_check import (
+    _write_curve_table,
     _write_dma_curve_table,
     _write_heatmap_table,
+    _write_replicate_table,
     _write_stacked_curve_table,
     _write_tga_curve_table,
-    _write_curve_table,
-    _write_replicate_table,
     _write_wide_nmr_bundle,
 )
-
 
 DEBUG_OUTPUT_DIR = ROOT / "figures" / "debug_outputs"
 REVIEW_OUTPUT_DIR = ROOT / "figures" / "review_examples"
 TRASH_PATHS = [ROOT / "figures" / ".DS_Store"]
-
-REAL_DATA_JOBS = [
-    (
-        "box",
-        Path("/Users/dongxutian/Desktop/Polymer_Research/Tension/Tensile/PA-ADR-1/3 strength/箱线图/modulus/Raw_Data.xlsx"),
-        {},
-    ),
-    (
-        "bar",
-        Path("/Users/dongxutian/Desktop/Polymer_Research/Tension/Tensile/PA-ADR-1/3 strength/箱线图/modulus/Raw_Data.xlsx"),
-        {},
-    ),
-    (
-        "point_line",
-        Path("/Users/dongxutian/Library/CloudStorage/OneDrive-HKUST(Guangzhou)/1 Vitrimer/3 D PA/流变/freq/1/freq1.xlsx"),
-        {"xscale": "log", "yscale": "log"},
-    ),
-    (
-        "point_line",
-        Path("/Users/dongxutian/Library/CloudStorage/OneDrive-HKUST(Guangzhou)/1 Vitrimer/3 D PA/流变/temp/1/temp1.xlsx"),
-        {"yscale": "log"},
-    ),
-    (
-        "point_line",
-        Path("/Users/dongxutian/Library/CloudStorage/OneDrive-HKUST(Guangzhou)/1 Vitrimer/3 D PA/流变/stresss relaxation/1/stress relaxation.xlsx"),
-        {"xscale": "log"},
-    ),
+REAL_DATA_JOB_SPECS = [
+    ("box", "CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA", {}),
+    ("bar", "CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA", {}),
+    ("point_line", "CODEGOD_DEBUG_REFRESH_FREQ_SWEEP", {"xscale": "log", "yscale": "log"}),
+    ("point_line", "CODEGOD_DEBUG_REFRESH_TEMP_SWEEP", {"yscale": "log"}),
+    ("point_line", "CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION", {"xscale": "log"}),
 ]
+
 
 def _reset_directory(path: Path) -> None:
     if path.exists():
@@ -69,6 +48,21 @@ def _remove_data_dir_plots(paths: list[Path]) -> None:
         seen.add(plots_dir)
         if plots_dir.exists():
             shutil.rmtree(plots_dir)
+
+
+def _resolve_real_data_jobs() -> list[tuple[str, Path, dict[str, object]]]:
+    jobs: list[tuple[str, Path, dict[str, object]]] = []
+    for template, env_name, options in REAL_DATA_JOB_SPECS:
+        raw_path = os.environ.get(env_name)
+        if not raw_path:
+            print(f"skip real-data job: {template} ({env_name} not set)")
+            continue
+        input_path = Path(raw_path).expanduser()
+        if not input_path.exists():
+            print(f"skip real-data job: {template} ({env_name} missing file: {input_path})")
+            continue
+        jobs.append((template, input_path, dict(options)))
+    return jobs
 
 
 def _render_review_examples(output_dir: Path) -> list[Path]:
@@ -131,25 +125,26 @@ def _render_review_examples(output_dir: Path) -> list[Path]:
     return outputs
 
 
-def _render_real_data(output_dir: Path) -> list[Path]:
+def _render_real_data(output_dir: Path, jobs: list[tuple[str, Path, dict[str, object]]]) -> list[Path]:
     outputs: list[Path] = []
-    for template, input_path, options in REAL_DATA_JOBS:
-        if not input_path.exists():
-            raise FileNotFoundError(f"Missing expected real-data input: {input_path}")
+    for template, input_path, options in jobs:
+        print(f"run real-data job: {template} <- {input_path}")
         outputs.extend(render_template(template, input_path, output_dir, **options))
     return outputs
 
 
 def main() -> int:
+    real_data_jobs = _resolve_real_data_jobs()
+
     for path in TRASH_PATHS:
         path.unlink(missing_ok=True)
     _reset_directory(DEBUG_OUTPUT_DIR)
     _reset_directory(REVIEW_OUTPUT_DIR)
-    _remove_data_dir_plots([path for _, path, _ in REAL_DATA_JOBS])
+    _remove_data_dir_plots([path for _, path, _ in real_data_jobs])
 
     outputs = []
     outputs.extend(_render_review_examples(REVIEW_OUTPUT_DIR))
-    outputs.extend(_render_real_data(DEBUG_OUTPUT_DIR))
+    outputs.extend(_render_real_data(DEBUG_OUTPUT_DIR, real_data_jobs))
 
     for output in outputs:
         print(output.resolve())

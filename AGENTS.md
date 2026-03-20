@@ -19,8 +19,14 @@
 - `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
 - `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `codegod-desktop` 进程已起来。
+- `Launch_Plotter.command`: 桌面端主启动器；只尝试启动当前 Tauri 开发宿主，失败时只提示改用 legacy 启动器，不再自动退回旧 GUI。
+- `Launch_Plotter_Legacy.command`: 显式旧入口；只在需要 `plot_wizard_gui.py` / `interactive_plot.py` 时手动使用，不再视为默认链路。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
+- `scripts/debug_refresh.py`: 人工审图刷新脚本；始终重刷 review fixtures，真实数据输入统一走 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
+- `requirements.txt` + `requirements-constraints.txt`: Python 顶层依赖与已验证版本约束；统一用 `pip install -r requirements.txt` 安装，约束文件会自动生效。
+- `.python-version` / `.nvmrc`: 开发态固定语言版本；当前分别锁定 `Python 3.11` 与 `Node 20`。
+- `.ignore` / `.vscode/settings.json`: 搜索与 TODO 视图噪音排除入口；lockfile、缓存和构建产物默认不应再参与待办扫描。
 - `.pre-commit-config.yaml`: 本地提交前的轻量门禁。
 - `docs/plot_contract.md`: 从契约生成的人类可读绘图说明，不要手改。
 
@@ -46,6 +52,7 @@
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
 - Wizard 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
+- `Launch_Plotter.command` 只代表当前 Tauri 主链路；不要再把它改回自动回退 `plot_wizard_gui.py` / `interactive_plot.py`。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 单图 `wizard` 流程默认直接围绕“数据文件 -> 推荐 -> 导出”工作，不把“保存/打开项目文件”当主入口重新堆回页面；需要显式项目文件的主要是 `composer`。
 - 单图 `wizard` 现在是单屏自动检查流：文件载入、sheet 切换、模板切换和参数修改后，前端都会自动触发 `inspect / render-preview / preflight`；不要再把主流程改回“多步翻页 + 手动点继续检查”。
@@ -54,6 +61,8 @@
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
+- `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
+- Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
 - 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
@@ -196,6 +205,7 @@
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
+- 不要把 `Launch_Plotter.command` 再改回“主入口失败就自动退回旧 GUI”的行为；legacy 流程必须由用户显式触发。
 - 不要把 wizard 再改回“先保存项目再继续”的心智模型；单图流程默认应该一屏完成导入、推荐、参数和导出。
 - 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
@@ -210,6 +220,7 @@
 - 改 loader、inspect、preflight 或 render 时，要同时想到 `src/rendering/cache.py` 的缓存失效，不要让旧解析结果穿透到新请求。
 - 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 tensile 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
+- `scripts/debug_refresh.py` 的真实数据入口只认 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`；不要把个人绝对路径或私有目录结构写回仓库。
 
 ## 拉伸预处理夹具
 

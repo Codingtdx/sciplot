@@ -1,0 +1,29 @@
+{
+  "search.useIgnoreFiles": true,
+  "search.exclude": {
+    ".venv": true,
+    ".venv-*": true,
+    ".mypy_cache": true,
+    ".pytest_cache": true,
+    ".ruff_cache": true,
+    ".tmp": true,
+    "app/desktop/node_modules": true,
+    "app/desktop/dist": true,
+    "app/desktop/package-lock.json": true,
+    "app/desktop/src-tauri/Cargo.lock": true,
+    "app/desktop/src-tauri/target": true
+  },
+  "todo-tree.filtering.excludeGlobs": [
+    "**/.venv/**",
+    "**/.venv-*/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/.tmp/**",
+    "**/app/desktop/node_modules/**",
+    "**/app/desktop/dist/**",
+    "**/app/desktop/package-lock.json",
+    "**/app/desktop/src-tauri/Cargo.lock",
+    "**/app/desktop/src-tauri/target/**"
+  ]
+}

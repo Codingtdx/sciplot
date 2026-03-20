@@ -1,0 +1,11 @@
+app/desktop/package-lock.json
+app/desktop/src-tauri/Cargo.lock
+.venv/
+.venv-*/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+app/desktop/node_modules/
+app/desktop/dist/
+app/desktop/src-tauri/target/
+.tmp/

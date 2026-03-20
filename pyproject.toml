@@ -17,6 +17,7 @@ select = ["B", "E", "F", "I", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/smoke_check.py" = ["E402"]
+"scripts/debug_refresh.py" = ["E402"]
 
 [tool.coverage.run]
 source = ["src", "app/sidecar"]

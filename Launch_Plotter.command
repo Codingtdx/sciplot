@@ -2,11 +2,10 @@
 
 set -euo pipefail
 
-PROJECT_DIR="/Users/dongxutian/Documents/codegod"
+PROJECT_DIR="${0:A:h}"
 VENV_ACTIVATE="$PROJECT_DIR/.venv/bin/activate"
 DESKTOP_DIR="$PROJECT_DIR/app/desktop"
-GUI_SCRIPT_PATH="$PROJECT_DIR/plot_wizard_gui.py"
-FALLBACK_SCRIPT_PATH="$PROJECT_DIR/interactive_plot.py"
+LEGACY_LAUNCHER_PATH="$PROJECT_DIR/Launch_Plotter_Legacy.command"
 
 cd "$PROJECT_DIR"
 
@@ -17,39 +16,31 @@ if [[ ! -f "$VENV_ACTIVATE" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$GUI_SCRIPT_PATH" ]]; then
-  echo "Error: GUI plot script not found at $GUI_SCRIPT_PATH"
+if [[ ! -d "$DESKTOP_DIR" ]]; then
+  echo "Error: desktop app directory not found at $DESKTOP_DIR"
   echo "Press Enter to close..."
   read
   exit 1
 fi
 
 source "$VENV_ACTIVATE"
-if [[ -d "$DESKTOP_DIR" ]]; then
-  if [[ ! -d "$DESKTOP_DIR/node_modules" ]]; then
-    echo "Installing desktop app dependencies..."
+if [[ ! -d "$DESKTOP_DIR/node_modules" ]]; then
+  echo "Installing desktop app dependencies..."
+  if [[ -f "$DESKTOP_DIR/package-lock.json" ]]; then
+    (cd "$DESKTOP_DIR" && npm ci)
+  else
     (cd "$DESKTOP_DIR" && npm install)
   fi
-  if (cd "$DESKTOP_DIR" && npm run tauri dev); then
-    exit 0
-  fi
-  echo
-  echo "4.0 desktop launch failed. Falling back to Python GUI..."
 fi
 
-if ! python "$GUI_SCRIPT_PATH"; then
-  echo
-  echo "GUI launch failed. Falling back to terminal wizard..."
-  if [[ -f "$FALLBACK_SCRIPT_PATH" ]]; then
-    python "$FALLBACK_SCRIPT_PATH"
-  else
-    echo "Fallback script not found at $FALLBACK_SCRIPT_PATH"
-    echo "Press Enter to close..."
-    read
-    exit 1
-  fi
+if (cd "$DESKTOP_DIR" && npm run tauri dev); then
+  exit 0
 fi
 
 echo
+echo "Desktop Tauri launch failed."
+echo "For the legacy PySide / terminal flow, run:"
+echo "  $LEGACY_LAUNCHER_PATH"
 echo "Press Enter to close..."
 read
+exit 1

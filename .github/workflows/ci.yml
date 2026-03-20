@@ -28,7 +28,7 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt
-          .venv/bin/pip install pytest ruff mypy coverage httpx pre-commit
+          .venv/bin/pip install -c requirements-constraints.txt pytest ruff mypy coverage httpx pre-commit
 
       - name: Install desktop dependencies
         working-directory: app/desktop
@@ -50,13 +50,9 @@ jobs:
         working-directory: app/desktop
         run: npm test
 
-      - name: Install Playwright browser
+      - name: Desktop Tauri smoke
         working-directory: app/desktop
-        run: npm run e2e:install
-
-      - name: Desktop E2E
-        working-directory: app/desktop
-        run: npm run test:e2e
+        run: npm run test:e2e:tauri-smoke
 
       - name: Desktop build
         working-directory: app/desktop
