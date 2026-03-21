@@ -18,6 +18,7 @@ import {
 import {
   WORKSPACE_ITEMS,
   WORKSPACE_META,
+  formatLeaf,
   getPlotStageLabel,
   hasComposerSessionContent,
   hasWizardSessionContent,
@@ -87,6 +88,9 @@ export default function App() {
   );
   const tensileCompareCount = useTensileStore((state) => state.comparisonSources.length);
   const tensileOutputsCount = useTensileStore((state) => state.comparisonResult?.outputs.length ?? 0);
+  const tensileLatestWorkbook = useTensileStore(
+    (state) => state.preprocessResult?.output_path ?? "",
+  );
   const composerProject = useComposerStore((state) => state.project);
   const composerPanelCount = composerProject.panels.length;
   const composerTextCount = composerProject.texts.length;
@@ -323,6 +327,35 @@ export default function App() {
     secondaryStatusLabel = "Composer session ready";
   }
 
+  let activeItemLabel = "Next action";
+  let activeItemValue = "Choose a workspace and start working.";
+  if (workspace === "plot") {
+    activeItemLabel = "Active file";
+    activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file loaded";
+  } else if (workspace === "tensile") {
+    activeItemLabel = "Latest workbook";
+    activeItemValue = tensileLatestWorkbook ? formatLeaf(tensileLatestWorkbook) : "No workbook prepared";
+  } else if (workspace === "composer") {
+    activeItemLabel = "Canvas";
+    activeItemValue =
+      composerPanelCount + composerTextCount > 0
+        ? `${composerPanelCount + composerTextCount} visible objects in session`
+        : "No composition open";
+  } else if (workspace === "recents") {
+    activeItemLabel = "Restore";
+    activeItemValue =
+      recentProjectsCount > 0 ? `${recentProjectsCount} recent file(s) available` : "No recent files yet";
+  } else if (workspace === "settings") {
+    activeItemLabel = "Appearance";
+    activeItemValue = `${describeAppearanceMode(appearanceMode)} / ${activeThemePreset.name}`;
+  } else if (plotSessionActive) {
+    activeItemLabel = "Resume";
+    activeItemValue = `Plot · ${getPlotStageLabel(wizard.stage)}`;
+  } else if (composerSessionActive) {
+    activeItemLabel = "Resume";
+    activeItemValue = "Composer session ready";
+  }
+
   let content = (
     <LaunchpadScreen
       activeThemePresetName={activeThemePreset.name}
@@ -351,32 +384,78 @@ export default function App() {
   }
 
   return (
-    <div
-      className={`app-shell ${workspace === "launchpad" ? "launchpad-mode" : "workspace-mode"}`}
-      data-workspace={workspace}
-    >
-      <header className="app-topbar app-titlebar">
-        <div className="app-topbar-brand titlebar-zone">
-          <button className="brand-mark" onClick={() => navigate("/")} type="button">
+    <div className="app-shell" data-workspace={workspace}>
+      <aside className="app-sidebar">
+        <button
+          className={`sidebar-brand ${workspace === "launchpad" ? "active" : ""}`}
+          onClick={() => navigate("/")}
+          type="button"
+        >
+          <span className="sidebar-brand-mark">
             <AppIcon name="spark" />
-          </button>
-          <div className="brand-copy">
+          </span>
+          <span className="sidebar-brand-copy">
+            <strong>SciPlot God</strong>
+            <span>Focused desktop workspace</span>
+          </span>
+        </button>
+
+        <button
+          className={`sidebar-start-link ${workspace === "launchpad" ? "active" : ""}`}
+          onClick={() => navigate("/")}
+          type="button"
+        >
+          <AppIcon name="home" />
+          <span>Start</span>
+        </button>
+
+        <nav className="sidebar-nav" aria-label="Workspaces">
+          {workspaceLinks.map((item) => {
+            const active = workspace === item.workspace;
+            return (
+              <button
+                className={`sidebar-nav-item ${active ? "active" : ""}`}
+                key={item.workspace}
+                onClick={() => navigate(item.route)}
+                type="button"
+              >
+                <AppIcon name={item.icon} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <span>{plotSessionActive || composerSessionActive ? `${Number(plotSessionActive) + Number(composerSessionActive)} active session(s)` : "No active sessions"}</span>
+        </div>
+      </aside>
+
+      <div className="app-workspace-shell">
+        <header className="workspace-header">
+          <div className="workspace-header-copy">
             <span className="eyebrow">{meta.eyebrow}</span>
-            <div className="titlebar-heading">
+            <div className="workspace-header-title-row">
               <h1>{meta.title}</h1>
-              <span className="titlebar-status-copy">
+              <span className="workspace-header-inline-status">
                 {workspace === "plot"
                   ? `${getPlotStageLabel(currentPlotStage)} stage`
                   : secondaryStatusLabel}
               </span>
             </div>
-            <p className="titlebar-description">{meta.description}</p>
+            <p className="workspace-header-description">{meta.description}</p>
           </div>
-        </div>
 
-        <div className="app-topbar-actions titlebar-zone">
-          <div className="titlebar-meta">
-            <button className="ghost-button titlebar-theme-button" onClick={() => navigate("/settings")} type="button">
+          <div className="workspace-header-meta">
+            <div className="workspace-header-item">
+              <span>{activeItemLabel}</span>
+              <strong>{activeItemValue}</strong>
+            </div>
+            <button
+              className="ghost-button titlebar-theme-button"
+              onClick={() => navigate("/settings")}
+              type="button"
+            >
               <span>{activeThemePreset.name}</span>
               <span className="titlebar-theme-subcopy">
                 {describeAppearanceMode(appearanceMode)}
@@ -386,41 +465,16 @@ export default function App() {
               {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
             </span>
           </div>
+        </header>
 
-          <nav className="workspace-chip-row workspace-dock" aria-label="Workspaces">
-            <button
-              className={`workspace-chip workspace-home-chip ${workspace === "launchpad" ? "active" : ""}`}
-              onClick={() => navigate("/")}
-              type="button"
-            >
-              <AppIcon name="home" />
-              <span>Launchpad</span>
-            </button>
-            {workspaceLinks.map((item) => {
-              const active = workspace === item.workspace;
-              return (
-                <button
-                  className={`workspace-chip ${active ? "active" : ""}`}
-                  key={item.workspace}
-                  onClick={() => navigate(item.route)}
-                  type="button"
-                >
-                  <AppIcon name={item.icon} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </header>
+        {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
 
-      {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
-
-      <main className="app-main">
-        <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
-          {content}
-        </Suspense>
-      </main>
+        <main className="app-main">
+          <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
+            {content}
+          </Suspense>
+        </main>
+      </div>
     </div>
   );
 }

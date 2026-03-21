@@ -13,10 +13,8 @@ import type {
   RecentProjectEntry,
   WorkbenchMeta,
   WorkbenchRoute,
-  WorkbenchWorkspace,
 } from "../lib/types";
 import {
-  WORKSPACE_ITEMS,
   confirmReplaceComposerSession,
   confirmReplaceWizardSession,
   formatLeaf,
@@ -26,67 +24,6 @@ import {
   plotRoute,
   templateLabel,
 } from "../lib/workbench";
-
-const WORKSPACE_COPY: Record<
-  Exclude<WorkbenchWorkspace, "launchpad">,
-  {
-    eyebrow: string;
-    description: string;
-    accent: string;
-    signal: string;
-  }
-> = {
-  plot: {
-    eyebrow: "Guided Flow",
-    description: "Import data, confirm the recommended chart family, tune the essentials, and export.",
-    accent: "Recommendation-first",
-    signal: "Staged figure flow",
-  },
-  tensile: {
-    eyebrow: "Materials Desk",
-    description: "Prepare raw CSVs, queue workbook comparisons, and hand the result off to Plot.",
-    accent: "Two task cards",
-    signal: "Prepare + compare",
-  },
-  composer: {
-    eyebrow: "Canvas Studio",
-    description: "Arrange graphs, assets, and text on the 180 x 170 mm composition canvas.",
-    accent: "Canvas-first",
-    signal: "Studio layout",
-  },
-  recents: {
-    eyebrow: "Asset Browser",
-    description: "Browse recent inputs and project files, then reopen them directly from one surface.",
-    accent: "Direct reopen",
-    signal: "Fast restore",
-  },
-  settings: {
-    eyebrow: "Theme Gallery",
-    description: "Switch appearance modes, pick a curated preset, and keep runtime settings tidy.",
-    accent: "Curated presets",
-    signal: "Appearance control",
-  },
-};
-
-function launchRouteForWorkspace(
-  workspace: WorkbenchWorkspace,
-  hasPlotSession: boolean,
-  wizardStage: ReturnType<typeof useWizardStore.getState>["stage"],
-) {
-  if (workspace === "plot") {
-    return hasPlotSession ? plotRoute(wizardStage) : "/plot/import";
-  }
-  if (workspace === "tensile") {
-    return "/tensile";
-  }
-  if (workspace === "composer") {
-    return "/composer";
-  }
-  if (workspace === "recents") {
-    return "/recents";
-  }
-  return "/settings";
-}
 
 function recentSignal(entry: RecentProjectEntry) {
   return `${entry.mode === "wizard" ? "Plot" : "Composer"} · ${
@@ -131,6 +68,7 @@ export function LaunchpadScreen({
     exportResult: wizard.exportResult,
   });
   const hasComposerSession = hasComposerSessionContent(composerProject);
+  const latestRecent = recentProjects[0] ?? null;
 
   const reopenRecent = async (entry: RecentProjectEntry) => {
     const wizardState = useWizardStore.getState();
@@ -211,177 +149,212 @@ export function LaunchpadScreen({
     }
   };
 
-  const launchStats = [
-    {
-      label: "Appearance",
-      value: `${describeAppearanceMode(settings.appearance_mode)} / ${activeThemePresetName}`,
-    },
-    {
-      label: "Sidecar",
-      value: sidecarReady ? "Online and ready" : "Offline until Python reconnects",
-    },
-    {
-      label: "Sessions",
-      value: `${Number(hasPlotSession) + Number(hasComposerSession)} active`,
-    },
-    {
-      label: "Recents",
-      value: `${recentProjects.length} files remembered`,
-    },
-  ];
-
   return (
-    <div className="launchpad-shell">
-      <section className="launchpad-hero hero-card work-card">
-        <div className="launchpad-hero-main">
-          <div className="launchpad-hero-copy">
-            <span className="eyebrow">SciPlot God Desktop 6.5</span>
-            <h1>Work in focused studios, not crowded admin panels.</h1>
-            <p>
-              Plot stays recommendation-first. Tensile prepares inputs without hijacking Plot.
-              Composer keeps the canvas in the center. The whole desktop now carries a theme
-              gallery instead of a single light or dark toggle.
-            </p>
-
-            <div className="hero-actions">
-              <button className="primary-button" onClick={() => onNavigate("/plot/import")} type="button">
-                New plot
-              </button>
-              {hasPlotSession && (
-                <button
-                  className="ghost-button"
-                  onClick={() => onNavigate(plotRoute(wizard.stage))}
-                  type="button"
-                >
-                  Resume plot
-                </button>
-              )}
-              {hasComposerSession && (
-                <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
-                  Resume composer
-                </button>
-              )}
-              <button className="ghost-button" onClick={() => onNavigate("/settings")} type="button">
-                Theme gallery
-              </button>
+    <div className="desk-layout launchpad-workspace">
+      <section className="desk-main">
+        <article className="work-card section-card launchpad-start-panel">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Start</div>
+              <h2>Begin new work or restore an existing session</h2>
             </div>
+            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
+              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
+            </span>
           </div>
 
-          <div className="launchpad-hero-visual" aria-hidden="true">
-            <div className="launchpad-visual-card launchpad-visual-primary">
-              <span className="signal-tag">Plot</span>
-              <strong>Import → Type → Tune</strong>
-              <div className="launchpad-visual-lines">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-            <div className="launchpad-visual-stack">
-              <div className="launchpad-visual-card launchpad-visual-secondary">
-                <span className="signal-tag">Tensile</span>
-                <strong>Prepare raw CSVs</strong>
-              </div>
-              <div className="launchpad-visual-card launchpad-visual-tertiary">
-                <span className="signal-tag">Composer</span>
-                <strong>Canvas-first studio</strong>
-              </div>
-            </div>
-          </div>
-        </div>
+          <p className="hint-text">
+            Plot opens directly into its staged workflow. Composer opens on canvas. Recent files
+            and sessions stay one step away.
+          </p>
 
-        <div className="launchpad-stat-grid">
-          {launchStats.map((item) => (
-            <div className="launchpad-stat-card" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
+          {recentNotice && (
+            <div className={recentNoticeTone === "warning" ? "warning-card" : "success-card"}>
+              {recentNotice}
             </div>
-          ))}
-        </div>
-      </section>
+          )}
 
-      <section className="launchpad-grid">
-        {WORKSPACE_ITEMS.map((item) => {
-          const route = launchRouteForWorkspace(item.workspace, hasPlotSession, wizard.stage);
-          const cardCopy = WORKSPACE_COPY[item.workspace as Exclude<WorkbenchWorkspace, "launchpad">];
-          return (
+          <div className="launchpad-primary-actions">
             <button
-              className="launchpad-card work-card"
-              key={item.workspace}
-              onClick={() => onNavigate(route)}
+              className="launchpad-action-card launchpad-action-primary"
+              onClick={() => onNavigate("/plot/import")}
               type="button"
             >
-              <div className="launchpad-card-preview">
-                <div className="launchpad-card-head">
-                  <span className="launchpad-card-icon">
-                    <AppIcon name={item.icon} />
-                  </span>
-                  <span className="signal-tag">{cardCopy.eyebrow}</span>
-                </div>
-                <div className="launchpad-card-sparkline">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-
-              <div className="launchpad-card-body">
-                <strong>{item.label}</strong>
-                <span>{cardCopy.description}</span>
-              </div>
-
-              <div className="launchpad-card-foot">
-                <span>{cardCopy.accent}</span>
-                <strong>{cardCopy.signal}</strong>
-              </div>
+              <span className="launchpad-action-icon">
+                <AppIcon name="plot" />
+              </span>
+              <span className="launchpad-action-copy">
+                <strong>New Plot</strong>
+                <span>Import data and continue through import, type, tune, review, and export.</span>
+              </span>
             </button>
-          );
-        })}
-      </section>
 
-      <section className="launchpad-recents context-card">
-        <div className="panel-heading">
-          <div>
-            <div className="card-kicker">Recent Assets</div>
-            <h2>Reopen directly from Launchpad</h2>
+            <button
+              className="launchpad-action-card"
+              onClick={() => onNavigate("/composer")}
+              type="button"
+            >
+              <span className="launchpad-action-icon">
+                <AppIcon name="composer" />
+              </span>
+              <span className="launchpad-action-copy">
+                <strong>New Composition</strong>
+                <span>Open the canvas workspace and start arranging graph PDFs, assets, and text.</span>
+              </span>
+            </button>
+
+            <button
+              className="launchpad-action-card"
+              onClick={() =>
+                latestRecent ? void reopenRecent(latestRecent) : onNavigate("/tensile")
+              }
+              type="button"
+            >
+              <span className="launchpad-action-icon">
+                <AppIcon name={latestRecent ? "projects" : "tensile"} />
+              </span>
+              <span className="launchpad-action-copy">
+                <strong>{latestRecent ? "Open Latest Recent" : "Prepare Tensile"}</strong>
+                <span>
+                  {latestRecent
+                    ? `${latestRecent.title} · ${recentSignal(latestRecent)}`
+                    : "Prepare raw CSVs or compare prepared workbooks in the tensile workspace."}
+                </span>
+              </span>
+            </button>
           </div>
+
           <div className="step-actions">
-            <span className="signal-tag">{recentProjects.length} remembered</span>
+            <button className="ghost-button" onClick={() => onNavigate("/tensile")} type="button">
+              Tensile workspace
+            </button>
             <button className="ghost-button" onClick={() => onNavigate("/recents")} type="button">
-              Browse all
+              Browse recents
+            </button>
+            <button className="ghost-button" onClick={() => onNavigate("/settings")} type="button">
+              Settings
             </button>
           </div>
-        </div>
+        </article>
 
-        {recentNotice && (
-          <div className={recentNoticeTone === "warning" ? "warning-card" : "success-card"}>
-            {recentNotice}
-          </div>
-        )}
-
-        {recentProjects.length === 0 ? (
-          <div className="placeholder-card">No recent files yet.</div>
-        ) : (
-          <div className="launchpad-recent-grid">
-            {recentProjects.slice(0, 6).map((entry) => (
-              <button
-                className="launchpad-recent-item"
-                disabled={activeRecentId === entry.id}
-                key={entry.id}
-                onClick={() => void reopenRecent(entry)}
-                type="button"
-              >
-                <div className="launchpad-recent-head">
-                  <strong>{entry.title}</strong>
-                  <span className="signal-tag">{recentSignal(entry)}</span>
-                </div>
-                <span>{entry.detail}</span>
-                <span className="recent-meta">{formatRecentTimestamp(entry.updated_at)}</span>
+        <article className="work-card section-card launchpad-recents-panel">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Recents</div>
+              <h2>Recent files and project restores</h2>
+            </div>
+            <div className="step-actions">
+              <span className="signal-tag">{recentProjects.length} remembered</span>
+              <button className="ghost-button" onClick={() => onNavigate("/recents")} type="button">
+                View all
               </button>
-            ))}
+            </div>
           </div>
-        )}
+
+          {recentProjects.length === 0 ? (
+            <div className="placeholder-card">No recent files yet.</div>
+          ) : (
+            <div className="launchpad-recent-list">
+              {recentProjects.slice(0, 6).map((entry) => (
+                <button
+                  className="launchpad-recent-row"
+                  disabled={activeRecentId === entry.id}
+                  key={entry.id}
+                  onClick={() => void reopenRecent(entry)}
+                  type="button"
+                >
+                  <div className="launchpad-recent-row-head">
+                    <strong>{entry.title}</strong>
+                    <span className="signal-tag">{recentSignal(entry)}</span>
+                  </div>
+                  <span>{entry.detail}</span>
+                  <span className="recent-meta">{formatRecentTimestamp(entry.updated_at)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </article>
       </section>
+
+      <aside className="desk-context launchpad-context">
+        <article className="context-card launchpad-session-panel">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Continue</div>
+              <h3>Current workspace sessions</h3>
+            </div>
+          </div>
+
+          {!hasPlotSession && !hasComposerSession && (
+            <div className="placeholder-card">No active Plot or Composer session yet.</div>
+          )}
+
+          {hasPlotSession && (
+            <button
+              className="launchpad-session-item"
+              onClick={() => onNavigate(plotRoute(wizard.stage))}
+              type="button"
+            >
+              <div className="launchpad-session-head">
+                <strong>Plot</strong>
+                <span className="signal-tag">{wizard.stage}</span>
+              </div>
+              <span>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Current plotting session"}</span>
+              <span className="recent-meta">
+                {wizard.template ? templateLabel(meta, wizard.template) : "Template pending"}
+              </span>
+            </button>
+          )}
+
+          {hasComposerSession && (
+            <button
+              className="launchpad-session-item"
+              onClick={() => onNavigate("/composer")}
+              type="button"
+            >
+              <div className="launchpad-session-head">
+                <strong>Composer</strong>
+                <span className="signal-tag">
+                  {composerProject.panels.length + composerProject.texts.length} objects
+                </span>
+              </div>
+              <span>Return to the current composition canvas.</span>
+              <span className="recent-meta">
+                {composerProject.regions.length} regions · {composerProject.panels.length} panels ·{" "}
+                {composerProject.texts.length} text blocks
+              </span>
+            </button>
+          )}
+        </article>
+
+        <article className="context-card launchpad-status-panel">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Desk Status</div>
+              <h3>Lightweight context</h3>
+            </div>
+          </div>
+
+          <div className="context-list">
+            <div className="context-row">
+              <span>Appearance</span>
+              <strong>{describeAppearanceMode(settings.appearance_mode)}</strong>
+            </div>
+            <div className="context-row">
+              <span>Theme</span>
+              <strong>{activeThemePresetName}</strong>
+            </div>
+            <div className="context-row">
+              <span>Sidecar</span>
+              <strong>{sidecarReady ? "Online and ready" : "Waiting for Python"}</strong>
+            </div>
+            <div className="context-row">
+              <span>Recents</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
+          </div>
+        </article>
+      </aside>
     </div>
   );
 }

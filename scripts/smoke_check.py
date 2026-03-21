@@ -20,9 +20,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import to_hex
 
-import interactive_plot as wizard
 from make_plot import (
-    Recommendation,
     _resolve_render_options,
     build_rendered_plots,
     inspect_input_file,
@@ -768,37 +766,6 @@ def _assert_inspection_and_preflight(
         raise AssertionError("Missing sidecar preflight error should be rewritten into user-facing English copy.")
 
 
-def _assert_recent_defaults_state(base: Path) -> None:
-    original_state_path = wizard.STATE_PATH
-    try:
-        wizard.STATE_PATH = base / ".plot_wizard_state.json"
-        wizard._remember_defaults(
-            "heatmap",
-            {
-                "size": "120x55",
-                "show_colorbar": False,
-                "reverse_x": False,
-            },
-        )
-        recent = wizard._recent_defaults_for("heatmap")
-        if recent.get("size") != "120x55" or recent.get("show_colorbar") is not False:
-            raise AssertionError("Wizard should persist recent defaults per template.")
-
-        recommended = wizard._recommended_defaults(
-            "heatmap",
-            Recommendation(
-                template="heatmap",
-                reason="test",
-                size="60x55",
-                show_colorbar=True,
-            ),
-        )
-        if recommended.get("size") != "60x55" or recommended.get("show_colorbar") is not True:
-            raise AssertionError("Inspection recommendation should override saved recent defaults.")
-    finally:
-        wizard.STATE_PATH = original_state_path
-
-
 def _sorted_limits(bounds: tuple[float, float]) -> tuple[float, float]:
     return (min(bounds), max(bounds))
 
@@ -1218,7 +1185,7 @@ def _assert_style_palette_presets(
     finally:
         plt.close(mono_fig)
 
-    heatmap_table = wizard.inspect_input_file(heatmap_path)  # keep wizard import live for state tests
+    heatmap_table = inspect_input_file(heatmap_path)
     if heatmap_table.recommendation.template != "heatmap":
         raise AssertionError("Heatmap inspection should still recommend heatmap during style regression.")
     from src.data_loader import load_heatmap_table  # local import to keep top import list compact
@@ -1935,8 +1902,6 @@ def _run_smoke_workspace(base: Path) -> Path:
         ftir_path=ftir_path,
         wide_nmr_path=wide_nmr_path,
     )
-    _assert_recent_defaults_state(base)
-
     jobs = [
         ("bar", replicate_path, {}),
         ("box", replicate_path, {}),

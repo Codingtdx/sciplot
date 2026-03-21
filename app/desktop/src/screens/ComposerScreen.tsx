@@ -35,6 +35,7 @@ import type { ComposerPanel, ComposerProject, ComposerText } from "../lib/types"
 import { useComposerStore, useWorkbenchStore } from "../lib/store";
 import {
   confirmReplaceComposerSession,
+  formatLeaf,
   getErrorMessage,
   toDialogPaths,
 } from "../lib/workbench";
@@ -1007,6 +1008,37 @@ export function ComposerScreen() {
       </section>
 
       <aside className={`desk-context composer-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+        <article className="context-card composer-session-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Session</div>
+              <h3>Current composition</h3>
+            </div>
+            <span className="signal-tag">
+              {composer.project.panels.length + composer.project.texts.length} objects
+            </span>
+          </div>
+
+          <div className="context-list">
+            <div className="context-row">
+              <span>Regions</span>
+              <strong>{composer.project.regions.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>Selection</span>
+              <strong>{multiSelectedItems.length > 0 ? multiSelectedItems.length : "None"}</strong>
+            </div>
+            <div className="context-row">
+              <span>PDF import mode</span>
+              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
+            </div>
+            <div className="context-row">
+              <span>Latest export</span>
+              <strong>{exportPath ? formatLeaf(exportPath) : "Not exported"}</strong>
+            </div>
+          </div>
+        </article>
+
         <article className="context-card composer-tab-card">
           <div className="inspector-tab-strip" role="tablist" aria-label="Composer inspector tabs">
             <button

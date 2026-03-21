@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import { InfoTip } from "../components/InfoTip";
 import { loadComposerProjectFile, loadWizardDataFile, loadWizardProjectFile } from "../lib/project-io";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/store";
 import type { RecentProjectEntry, WorkbenchMeta, WorkbenchRoute } from "../lib/types";
@@ -29,6 +28,7 @@ export function ProjectsScreen({
   const [activeRecentId, setActiveRecentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeTone, setNoticeTone] = useState<"success" | "warning">("success");
+  const latestOutput = wizard.outputs[wizard.outputs.length - 1] ?? null;
 
   const reopenRecent = async (entry: RecentProjectEntry) => {
     const wizardState = useWizardStore.getState();
@@ -118,42 +118,15 @@ export function ProjectsScreen({
   };
 
   return (
-    <div className="desk-layout single-column recents-layout">
+    <div className="desk-layout recents-layout">
       <section className="desk-main">
-        <article className="work-card hero-card recents-hero-card">
+        <article className="work-card section-card recents-browser-card">
           <div className="panel-heading">
             <div>
-              <div className="card-kicker">Recent Browser</div>
-              <h2>Recent files and project restores</h2>
+              <div className="card-kicker">Recents</div>
+              <h2>Restore work directly from recent files and project sessions</h2>
             </div>
-            <div className="step-actions">
-              <button className="primary-button" onClick={() => onNavigate("/plot/import")} type="button">
-                Plot
-              </button>
-              <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
-                Composer
-              </button>
-              <InfoTip content="Plot usually starts from raw data files. Composer is the main flow that benefits from explicit project files." />
-            </div>
-          </div>
-
-          <div className="recents-summary-grid">
-            <div className="focus-panel">
-              <span>Current plot file</span>
-              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
-            </div>
-            <div className="focus-panel">
-              <span>Plot stage</span>
-              <strong>{getWizardStepLabel(wizard.step)}</strong>
-            </div>
-            <div className="focus-panel">
-              <span>Composer objects</span>
-              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
-            </div>
-            <div className="focus-panel">
-              <span>Remembered recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
+            <span className="signal-tag">{recentProjects.length} remembered</span>
           </div>
 
           {notice && (
@@ -161,37 +134,6 @@ export function ProjectsScreen({
               {notice}
             </div>
           )}
-        </article>
-
-        <article className="work-card section-card recents-browser-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Assets</div>
-              <h2>Open directly</h2>
-            </div>
-            {wizard.outputs.length > 0 && (
-              <span className="signal-tag">{wizard.outputs.length} latest output(s)</span>
-            )}
-          </div>
-
-          <div className="context-list">
-            <div className="context-row">
-              <span>Current plot file</span>
-              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Plot step</span>
-              <strong>{getWizardStepLabel(wizard.step)}</strong>
-            </div>
-            <div className="context-row">
-              <span>Composer objects</span>
-              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
-            </div>
-            <div className="context-row">
-              <span>Recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
-          </div>
 
           <div className="layer-list recents-browser-grid">
             {recentProjects.length === 0 && (
@@ -215,16 +157,56 @@ export function ProjectsScreen({
               </button>
             ))}
           </div>
-
-          {wizard.outputs.length > 0 && (
-            <div className="focus-panel">
-              <span>Latest export</span>
-              <strong>{formatLeaf(wizard.outputs[wizard.outputs.length - 1] ?? "-")}</strong>
-              <span>{wizard.outputs.length} output file(s) are still attached to the current Plot session.</span>
-            </div>
-          )}
         </article>
       </section>
+
+      <aside className="desk-context recents-context">
+        <article className="context-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Current Sessions</div>
+              <h3>What is already open</h3>
+            </div>
+          </div>
+
+          <div className="context-list">
+            <div className="context-row">
+              <span>Plot file</span>
+              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Not loaded"}</strong>
+            </div>
+            <div className="context-row">
+              <span>Plot step</span>
+              <strong>{getWizardStepLabel(wizard.step)}</strong>
+            </div>
+            <div className="context-row">
+              <span>Composer objects</span>
+              <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>Remembered recents</span>
+              <strong>{recentProjects.length}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="context-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Latest Export</div>
+              <h3>Plot output attached to this session</h3>
+            </div>
+          </div>
+
+          {latestOutput ? (
+            <div className="focus-panel">
+              <strong>{formatLeaf(latestOutput)}</strong>
+              <span>{wizard.outputs.length} output file(s) remain attached to the current Plot session.</span>
+            </div>
+          ) : (
+            <div className="placeholder-card">No exported plot attached to the current session.</div>
+          )}
+        </article>
+      </aside>
     </div>
   );
 }

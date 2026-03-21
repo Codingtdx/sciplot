@@ -10,11 +10,10 @@
 }
 
 @media (max-width: 1320px) {
-  .launchpad-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .launchpad-primary-actions {
+    grid-template-columns: 1fr;
   }
 
-  .launchpad-recent-grid,
   .theme-gallery-grid,
   .recents-browser-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -28,37 +27,50 @@
 }
 
 @media (max-width: 1024px) {
-  .app-topbar,
-  .launchpad-hero-main,
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .sidebar-brand {
+    width: auto;
+    min-width: 220px;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-footer {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .workspace-header,
   .plot-stage-copy,
   .panel-heading,
-  .preview-toolbar,
-  .titlebar-heading {
+  .preview-toolbar {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .app-topbar-actions,
-  .workspace-dock,
-  .titlebar-meta {
+  .workspace-header-meta {
     justify-content: flex-start;
   }
 
-  .launchpad-hero-visual {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .launchpad-grid,
   .field-grid,
   .info-grid,
   .summary-grid,
   .wizard-template-grid,
-  .desk-context,
   .plot-stage-rail,
   .theme-gallery-grid,
-  .recents-browser-grid,
-  .launchpad-recent-grid {
+  .recents-browser-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -68,33 +80,37 @@
     padding: 10px;
   }
 
-  .app-topbar,
-  .launchpad-hero,
+  .app-sidebar,
+  .workspace-header,
   .plot-stage-card,
   .plot-import-card,
   .plot-sheet-card,
-  .launchpad-recents,
-  .settings-hero-card {
+  .launchpad-start-panel,
+  .launchpad-recents-panel,
+  .recents-browser-card,
+  .tensile-command-card {
     padding: 16px;
   }
 
-  .workspace-chip-row,
   .hero-actions,
   .step-actions,
-  .launchpad-stat-grid,
   .plot-stage-metrics,
   .tensile-task-grid {
     width: 100%;
   }
 
-  .workspace-chip,
   .primary-button,
   .ghost-button,
   .mode-button {
     justify-content: center;
   }
 
-  .launchpad-grid {
-    grid-template-columns: 1fr;
+  .sidebar-brand,
+  .sidebar-start-link,
+  .sidebar-nav,
+  .sidebar-nav-item,
+  .workspace-header-item,
+  .titlebar-theme-button {
+    width: 100%;
   }
 }

@@ -105,33 +105,216 @@ export function SettingsScreen({
   };
 
   return (
-    <div className="desk-layout single-column settings-layout">
+    <div className="desk-layout settings-layout">
       <section className="desk-main">
-        <article className="work-card hero-card settings-hero-card">
+        <article className="work-card section-card settings-theme-gallery">
           <div className="panel-heading">
             <div>
-              <div className="card-kicker">Preferences</div>
-              <h2>Theme gallery and runtime controls</h2>
+              <div className="card-kicker">Appearance</div>
+              <h2>Choose the desktop appearance preset</h2>
             </div>
-            <div className="wizard-inline-chips">
-              <span className="signal-tag">{activePreset.name}</span>
-              <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-                {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
-              </span>
-            </div>
+            <InfoTip content="Appearance mode chooses light, dark, or system. Theme presets add a curated material language on top." />
           </div>
 
-          <div className="settings-hero-grid">
+          <div className="mode-switch theme-mode-switch">
+            <button
+              className={`mode-button ${settings.appearance_mode === "system" ? "active-tone" : ""}`}
+              onClick={() => selectAppearance("system")}
+              type="button"
+            >
+              System
+            </button>
+            <button
+              className={`mode-button ${settings.appearance_mode === "light" ? "active-tone" : ""}`}
+              onClick={() => selectAppearance("light")}
+              type="button"
+            >
+              Light
+            </button>
+            <button
+              className={`mode-button ${settings.appearance_mode === "dark" ? "active-tone" : ""}`}
+              onClick={() => selectAppearance("dark")}
+              type="button"
+            >
+              Dark
+            </button>
+          </div>
+
+          <div className="theme-gallery-grid">
+            {THEME_PRESETS.map((preset) => {
+              const active = settings.theme_preset_id === preset.id;
+              return (
+                <button
+                  className={`theme-preset-card ${active ? "active" : ""}`}
+                  key={preset.id}
+                  onClick={() =>
+                    updateSettings({
+                      appearance_mode: preset.appearance,
+                      theme_preset_id: preset.id,
+                    })
+                  }
+                  type="button"
+                >
+                  <div className="theme-preset-preview" style={themePreviewStyle(preset.id)}>
+                    <div
+                      className="theme-preset-surface"
+                      style={{ background: preset.preview.surface }}
+                    />
+                    <div
+                      className="theme-preset-chip"
+                      style={{ background: preset.preview.chip }}
+                    />
+                  </div>
+                  <div className="theme-preset-copy">
+                    <div className="theme-preset-head">
+                      <strong>{preset.name}</strong>
+                      <span className="signal-tag">{preset.accent}</span>
+                    </div>
+                    <span>{preset.description}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="work-card section-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Runtime</div>
+              <h2>Health and local behavior</h2>
+            </div>
+            <InfoTip content="These controls affect local desktop behavior only. They do not change the plot contract or backend defaults." />
+          </div>
+
+          <div className="inspector-stack">
+            <div className="context-list">
+              <div className="context-row">
+                <span>Recents</span>
+                <strong>{recentProjects.length}</strong>
+              </div>
+              <div className="context-row">
+                <span>PDF import mode</span>
+                <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
+              </div>
+              <div className="context-row">
+                <span>Composer canvas</span>
+                <strong>
+                  {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
+                </strong>
+              </div>
+            </div>
+
+            <div className="step-actions">
+              <button
+                className="primary-button"
+                disabled={checking}
+                onClick={() => void refreshSidecar()}
+                type="button"
+              >
+                {checking ? "Checking…" : "Check sidecar"}
+              </button>
+            </div>
+
+            <label className="toggle-field">
+              <input
+                checked={settings.auto_status_poll}
+                onChange={(event) =>
+                  updateSettings({ auto_status_poll: event.target.checked })
+                }
+                type="checkbox"
+              />
+              <span>Auto-refresh sidecar status</span>
+            </label>
+
+            <label className="toggle-field">
+              <input
+                checked={settings.remember_last_screen}
+                onChange={(event) =>
+                  updateSettings({ remember_last_screen: event.target.checked })
+                }
+                type="checkbox"
+              />
+              <span>Remember last workspace</span>
+            </label>
+          </div>
+        </article>
+
+        <article className="work-card section-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Maintenance</div>
+              <h2>Reset local state</h2>
+            </div>
+            <InfoTip content="These actions clear local desktop state only. Source data and exported files on disk are untouched." />
+          </div>
+
+          {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
+
+          <div className="step-actions">
+            <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
+              Reset Plot
+            </button>
+            <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
+              Reset Tensile
+            </button>
+            <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
+              Reset Composer
+            </button>
+            <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
+              Clear recents
+            </button>
+            <button className="ghost-button danger-button" onClick={() => runMaintenance("all")} type="button">
+              Reset everything
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <aside className="desk-context settings-context">
+        <article className="context-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Current</div>
+              <h3>Desktop appearance</h3>
+            </div>
+            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
+              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
+            </span>
+          </div>
+
+          <div className="wizard-section-stack">
             <div className="focus-panel">
               <span>Current preset</span>
               <strong>{activePreset.name}</strong>
               <span>{activePreset.description}</span>
             </div>
-            <div className="focus-panel">
-              <span>Appearance</span>
-              <strong>{appearanceSummary}</strong>
-              <span>Curated presets are stored locally and restored on the next launch.</span>
+            <div className="context-list">
+              <div className="context-row">
+                <span>Appearance</span>
+                <strong>{appearanceSummary}</strong>
+              </div>
+              <div className="context-row">
+                <span>Auto status poll</span>
+                <strong>{settings.auto_status_poll ? "Enabled" : "Disabled"}</strong>
+              </div>
+              <div className="context-row">
+                <span>Remember last workspace</span>
+                <strong>{settings.remember_last_screen ? "Enabled" : "Disabled"}</strong>
+              </div>
             </div>
+          </div>
+        </article>
+
+        <article className="context-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Contract</div>
+              <h3>Shared frame and validation</h3>
+            </div>
+          </div>
+
+          <div className="wizard-section-stack">
             <div className="focus-panel">
               <span>Plot frame</span>
               <strong>
@@ -141,172 +324,7 @@ export function SettingsScreen({
             </div>
           </div>
         </article>
-
-        <div className="summary-grid settings-summary-grid">
-          <article className="work-card section-card settings-theme-gallery">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Theme Gallery</div>
-                <h2>Curated presets</h2>
-              </div>
-              <InfoTip content="Appearance mode chooses light, dark, or system. Theme presets add a curated material language on top." />
-            </div>
-
-            <div className="mode-switch theme-mode-switch">
-              <button
-                className={`mode-button ${settings.appearance_mode === "system" ? "active-tone" : ""}`}
-                onClick={() => selectAppearance("system")}
-                type="button"
-              >
-                System
-              </button>
-              <button
-                className={`mode-button ${settings.appearance_mode === "light" ? "active-tone" : ""}`}
-                onClick={() => selectAppearance("light")}
-                type="button"
-              >
-                Light
-              </button>
-              <button
-                className={`mode-button ${settings.appearance_mode === "dark" ? "active-tone" : ""}`}
-                onClick={() => selectAppearance("dark")}
-                type="button"
-              >
-                Dark
-              </button>
-            </div>
-
-            <div className="theme-gallery-grid">
-              {THEME_PRESETS.map((preset) => {
-                const active = settings.theme_preset_id === preset.id;
-                return (
-                  <button
-                    className={`theme-preset-card ${active ? "active" : ""}`}
-                    key={preset.id}
-                    onClick={() =>
-                      updateSettings({
-                        appearance_mode: preset.appearance,
-                        theme_preset_id: preset.id,
-                      })
-                    }
-                    type="button"
-                  >
-                    <div className="theme-preset-preview" style={themePreviewStyle(preset.id)}>
-                      <div
-                        className="theme-preset-surface"
-                        style={{ background: preset.preview.surface }}
-                      />
-                      <div
-                        className="theme-preset-chip"
-                        style={{ background: preset.preview.chip }}
-                      />
-                    </div>
-                    <div className="theme-preset-copy">
-                      <div className="theme-preset-head">
-                        <strong>{preset.name}</strong>
-                        <span className="signal-tag">{preset.accent}</span>
-                      </div>
-                      <span>{preset.description}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-
-          <article className="work-card section-card">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Runtime</div>
-                <h2>Health and defaults</h2>
-              </div>
-              <InfoTip content="These controls affect local desktop behavior only. They do not change the plot contract or backend defaults." />
-            </div>
-
-            <div className="inspector-stack">
-              <div className="context-list">
-                <div className="context-row">
-                  <span>Recents</span>
-                  <strong>{recentProjects.length}</strong>
-                </div>
-                <div className="context-row">
-                  <span>PDF import mode</span>
-                  <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
-                </div>
-                <div className="context-row">
-                  <span>Composer canvas</span>
-                  <strong>
-                    {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
-                  </strong>
-                </div>
-              </div>
-
-              <div className="step-actions">
-                <button
-                  className="primary-button"
-                  disabled={checking}
-                  onClick={() => void refreshSidecar()}
-                  type="button"
-                >
-                  {checking ? "Checking…" : "Check sidecar"}
-                </button>
-              </div>
-
-              <label className="toggle-field">
-                <input
-                  checked={settings.auto_status_poll}
-                  onChange={(event) =>
-                    updateSettings({ auto_status_poll: event.target.checked })
-                  }
-                  type="checkbox"
-                />
-                <span>Auto-refresh sidecar status</span>
-              </label>
-
-              <label className="toggle-field">
-                <input
-                  checked={settings.remember_last_screen}
-                  onChange={(event) =>
-                    updateSettings({ remember_last_screen: event.target.checked })
-                  }
-                  type="checkbox"
-                />
-                <span>Remember last workspace</span>
-              </label>
-            </div>
-          </article>
-
-          <article className="work-card section-card">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Maintenance</div>
-                <h2>Reset local state</h2>
-              </div>
-              <InfoTip content="These actions clear local desktop state only. Source data and exported files on disk are untouched." />
-            </div>
-
-            {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
-
-            <div className="step-actions">
-              <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
-                Reset Plot
-              </button>
-              <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
-                Reset Tensile
-              </button>
-              <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
-                Reset Composer
-              </button>
-              <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
-                Clear recents
-              </button>
-              <button className="ghost-button danger-button" onClick={() => runMaintenance("all")} type="button">
-                Reset everything
-              </button>
-            </div>
-          </article>
-        </div>
-      </section>
+      </aside>
     </div>
   );
 }

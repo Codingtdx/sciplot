@@ -4,7 +4,7 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 120
 extend-exclude = [
   "app/desktop",
@@ -28,7 +28,7 @@ skip_empty = true
 show_missing = true
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 files = [
   "src/composer.py",
   "src/plot_contract.py",

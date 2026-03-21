@@ -7,7 +7,6 @@ import type {
   TemplateName,
   WorkbenchMeta,
   WorkbenchRoute,
-  WorkbenchScreen,
   WorkbenchTemplate,
   WorkbenchWorkspace,
   WizardStep,
@@ -29,15 +28,6 @@ export const PLOT_STAGE_ROUTES: Record<PlotStage, WorkbenchRoute> = {
   tune: "/plot/tune",
   review: "/plot/review",
   export: "/plot/export",
-};
-
-export const WORKSPACE_HOME_ROUTES: Record<WorkbenchWorkspace, WorkbenchRoute> = {
-  launchpad: "/",
-  plot: "/plot/import",
-  tensile: "/tensile",
-  composer: "/composer",
-  recents: "/recents",
-  settings: "/settings",
 };
 
 export const APP_ROUTES: WorkbenchRoute[] = [
@@ -75,34 +65,34 @@ export const WORKSPACE_META: Record<
   }
 > = {
   launchpad: {
-    eyebrow: "Desktop 6.0",
-    title: "Launchpad",
-    description: "Start a focused workspace, restore a session, or jump back into recent work.",
+    eyebrow: "Workspace Hub",
+    title: "Start",
+    description: "Start a task, resume current work, or restore a recent session.",
   },
   plot: {
     eyebrow: "Figure Flow",
-    title: "Plot Workspace",
-    description: "Import data, pick the chart type, tune the essentials, and export the bundle.",
+    title: "Plot",
+    description: "Run the staged plotting workflow from import through export.",
   },
   tensile: {
     eyebrow: "Material Lab",
-    title: "Tensile Workspace",
-    description: "Prepare raw tensile runs, queue workbooks, and hand curated inputs off to Plot.",
+    title: "Tensile",
+    description: "Prepare tensile workbooks, compare sources, and hand off curated inputs.",
   },
   composer: {
     eyebrow: "Layout Studio",
-    title: "Figure Composer",
-    description: "Arrange figures, assets, and labels on one editable export canvas.",
+    title: "Composer",
+    description: "Arrange graphs, assets, and text on the editable composition canvas.",
   },
   recents: {
     eyebrow: "History",
-    title: "Recent Files",
-    description: "Jump back into recent plotting inputs, workbooks, and composer projects.",
+    title: "Recents",
+    description: "Restore recent data files and project sessions without starting over.",
   },
   settings: {
     eyebrow: "Runtime",
     title: "Settings",
-    description: "Check sidecar health, tune preferences, and reset local workspace state.",
+    description: "Tune local desktop behavior, health checks, and reset actions.",
   },
 };
 
@@ -163,23 +153,6 @@ export function normalizeWorkbenchRoute(value: string | null | undefined): Workb
   return isWorkbenchRoute(value) ? value : null;
 }
 
-export function routeForLegacyScreen(screen: string | null | undefined): WorkbenchRoute {
-  switch (screen) {
-    case "tensile":
-      return "/tensile";
-    case "composer":
-      return "/composer";
-    case "projects":
-      return "/recents";
-    case "settings":
-      return "/settings";
-    case "wizard":
-      return "/plot/import";
-    default:
-      return "/";
-  }
-}
-
 export function workspaceForRoute(route: WorkbenchRoute): WorkbenchWorkspace {
   if (route === "/") {
     return "launchpad";
@@ -197,20 +170,6 @@ export function workspaceForRoute(route: WorkbenchRoute): WorkbenchWorkspace {
     return "recents";
   }
   return "settings";
-}
-
-export function screenForRoute(route: WorkbenchRoute): WorkbenchScreen {
-  const workspace = workspaceForRoute(route);
-  switch (workspace) {
-    case "launchpad":
-      return "launchpad";
-    case "plot":
-      return "wizard";
-    case "recents":
-      return "projects";
-    default:
-      return workspace;
-  }
 }
 
 export function plotRoute(stage: PlotStage): WorkbenchRoute {

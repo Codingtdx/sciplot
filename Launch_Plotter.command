@@ -5,7 +5,6 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 VENV_ACTIVATE="$PROJECT_DIR/.venv/bin/activate"
 DESKTOP_DIR="$PROJECT_DIR/app/desktop"
-LEGACY_LAUNCHER_PATH="$PROJECT_DIR/Launch_Plotter_Legacy.command"
 
 cd "$PROJECT_DIR"
 
@@ -39,8 +38,8 @@ fi
 
 echo
 echo "Desktop Tauri launch failed."
-echo "For the legacy PySide / terminal flow, run:"
-echo "  $LEGACY_LAUNCHER_PATH"
+echo "This repository no longer ships the legacy PySide / terminal launcher."
+echo "Please fix the Tauri runtime or desktop dependencies and rerun Launch_Plotter.command."
 echo "Press Enter to close..."
 read
 exit 1

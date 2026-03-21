@@ -19,13 +19,12 @@
 - `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
 - `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `sciplot-god-desktop` 进程已起来。
-- `Launch_Plotter.command`: 桌面端主启动器；只尝试启动当前 Tauri 开发宿主，失败时只提示改用 legacy 启动器，不再自动退回旧 GUI。
-- `Launch_Plotter_Legacy.command`: 显式旧入口；只在需要 `plot_wizard_gui.py` / `interactive_plot.py` 时手动使用，不再视为默认链路。
+- `Launch_Plotter.command`: 桌面端唯一启动器；只负责拉起当前 Tauri 开发宿主，失败时直接报错，不再提供任何 PySide / 终端 fallback。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
 - `scripts/debug_refresh.py`: 人工审图刷新脚本；始终重刷 review fixtures，真实数据输入统一走 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
-- `requirements.txt` + `requirements-constraints.txt`: Python 顶层依赖与已验证版本约束；统一用 `pip install -r requirements.txt` 安装，约束文件会自动生效。
-- `.python-version` / `.nvmrc`: 开发态固定语言版本；当前分别锁定 `Python 3.11` 与 `Node 20`。
+- `requirements.txt` + `requirements-constraints.txt`: Python 顶层依赖与版本约束；统一用 `pip install -r requirements.txt` 安装，约束文件会自动生效。
+- `.python-version` / `.nvmrc`: 开发态固定语言版本；当前分别锁定 `Python 3.14.3` 与 `Node 20`。
 - `.ignore` / `.vscode/settings.json`: 搜索与 TODO 视图噪音排除入口；lockfile、缓存和构建产物默认不应再参与待办扫描。
 - `.pre-commit-config.yaml`: 本地提交前的轻量门禁。
 - `docs/plot_contract.md`: 从契约生成的人类可读绘图说明，不要手改。
@@ -43,7 +42,7 @@
 
 ## 内部边界
 
-- CLI、GUI、旧脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
+- CLI、GUI、脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
 - `preflight-render`、`render-preview`、`export-render`、`compose-preview` 现在都会返回统一的 `submission_report`；它是投稿检查摘要，不是新的 blocker 通道。真正阻止导出的一律仍走 preflight / Composer overlap 校验。
 - `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果改导出链路，别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
@@ -52,7 +51,7 @@
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
 - Wizard 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
-- `Launch_Plotter.command` 只代表当前 Tauri 主链路；不要再把它改回自动回退 `plot_wizard_gui.py` / `interactive_plot.py`。
+- `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / recents / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
 - 单图 `wizard` 流程默认是 staged workspace：`import -> sheet(按需) -> type -> tune -> review -> export`；不要把“保存/打开项目文件”重新堆成单图主入口，需要显式项目文件的主要仍是 `composer`。
@@ -206,7 +205,7 @@
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
-- 不要把 `Launch_Plotter.command` 再改回“主入口失败就自动退回旧 GUI”的行为；legacy 流程必须由用户显式触发。
+- 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留 Tauri。
 - 不要把 wizard 再改回“先保存项目再继续”或“所有内容都堆在一屏里”的心智模型；单图流程默认应该保持 `Launchpad -> staged plot workspace`。
 - 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
 - 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。

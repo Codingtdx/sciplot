@@ -19,13 +19,6 @@ export type PlotStage = "import" | "sheet" | "type" | "tune" | "review" | "expor
 
 export type RequestActivity = "idle" | "scheduled" | "running" | "ready" | "error";
 
-export type WorkbenchScreen =
-  | "launchpad"
-  | "tensile"
-  | "wizard"
-  | "composer"
-  | "projects"
-  | "settings";
 export type WorkbenchWorkspace =
   | "launchpad"
   | "plot"

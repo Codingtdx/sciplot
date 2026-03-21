@@ -519,7 +519,7 @@ export function WizardScreen({
 
   return (
     <div className={`plot-workspace plot-stage-${routeStage}`}>
-      <section className="plot-stage-card work-card hero-card">
+      <section className="plot-stage-card work-card section-card">
         <div className="plot-stage-copy">
           <div>
             <div className="card-kicker">Plot</div>
@@ -632,7 +632,7 @@ export function WizardScreen({
                 <div className="launchpad-recent-list plot-import-recent-list">
                   {recentDataFiles.slice(0, 4).map((entry) => (
                     <button
-                      className="launchpad-recent-item"
+                      className="launchpad-recent-row"
                       key={entry.id}
                       onClick={() => void reopenRecentData(entry.path)}
                       type="button"

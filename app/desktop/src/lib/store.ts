@@ -21,7 +21,6 @@ import type {
   TensileReplicateResponse,
   TemplateName,
   WorkbenchRoute,
-  WorkbenchScreen,
   WizardStep,
   WorkbenchSettings,
   ExportResponse,
@@ -33,7 +32,7 @@ import {
   normalizeTensileComparisonSources,
   upsertTensileComparisonSource,
 } from "./tensile-comparison";
-import { normalizeWorkbenchRoute, plotStageForWizardStep, routeForLegacyScreen } from "./workbench";
+import { normalizeWorkbenchRoute, plotStageForWizardStep } from "./workbench";
 
 type WizardState = {
   inputPath: string;
@@ -111,7 +110,6 @@ type ComposerState = {
 };
 
 type WorkbenchState = {
-  lastScreen?: WorkbenchScreen;
   lastRoute: WorkbenchRoute;
   pdfImportMode: PdfImportMode;
   recentProjects: RecentProjectEntry[];
@@ -372,7 +370,6 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       merge: (persistedState, currentState) => {
         const persisted = persistedState as
           | (Partial<WorkbenchState> & {
-              lastScreen?: string;
               settings?: Partial<WorkbenchSettings> & {
                 theme_preference?: "system" | "light" | "dark";
                 appearance_mode?: "system" | "light" | "dark";
@@ -380,10 +377,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
               };
             })
           | undefined;
-        const lastRoute =
-          normalizeWorkbenchRoute(persisted?.lastRoute) ??
-          normalizeWorkbenchRoute(routeForLegacyScreen(persisted?.lastScreen)) ??
-          currentState.lastRoute;
+        const lastRoute = normalizeWorkbenchRoute(persisted?.lastRoute) ?? currentState.lastRoute;
         const appearanceMode =
           persisted?.settings?.appearance_mode ??
           persisted?.settings?.theme_preference ??
