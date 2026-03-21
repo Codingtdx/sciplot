@@ -40,7 +40,7 @@ export const APP_ROUTES: WorkbenchRoute[] = [
   "/plot/export",
   "/tensile",
   "/composer",
-  "/recents",
+  "/code-console",
   "/settings",
 ];
 
@@ -52,7 +52,7 @@ export const WORKSPACE_ITEMS: Array<{
   { workspace: "plot", label: "Plot", icon: "plot" },
   { workspace: "tensile", label: "Tensile", icon: "tensile" },
   { workspace: "composer", label: "Composer", icon: "composer" },
-  { workspace: "recents", label: "Recents", icon: "projects" },
+  { workspace: "code", label: "Code Console", icon: "code" },
   { workspace: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -84,10 +84,10 @@ export const WORKSPACE_META: Record<
     title: "Composer",
     description: "Arrange graphs, assets, and text on the editable composition canvas.",
   },
-  recents: {
-    eyebrow: "History",
-    title: "Recents",
-    description: "Restore recent data files and project sessions without starting over.",
+  code: {
+    eyebrow: "AI Bridge",
+    title: "Code Console",
+    description: "Generate AI-ready prompts and code scaffolds that stay inside the SciPlot God plotting contract.",
   },
   settings: {
     eyebrow: "Runtime",
@@ -166,8 +166,8 @@ export function workspaceForRoute(route: WorkbenchRoute): WorkbenchWorkspace {
   if (route === "/composer") {
     return "composer";
   }
-  if (route === "/recents") {
-    return "recents";
+  if (route === "/code-console") {
+    return "code";
   }
   return "settings";
 }

@@ -25,6 +25,8 @@ import type {
   WorkbenchSettings,
   ExportResponse,
 } from "./types";
+import type { CodeConsoleIntent } from "./code-console";
+import { DEFAULT_CODE_CONSOLE_DRAFT } from "./code-console";
 import { EMPTY_COMPOSER_PROJECT, normalizeComposerProject } from "./composer";
 import { DEFAULT_THEME_PRESET_BY_APPEARANCE, isThemePresetId } from "./themes";
 import {
@@ -119,6 +121,24 @@ type WorkbenchState = {
   rememberProject(entry: Omit<RecentProjectEntry, "id" | "updated_at">): void;
   clearRecentProjects(): void;
   updateSettings(value: Partial<WorkbenchSettings>): void;
+};
+
+type CodeConsoleState = {
+  intent: CodeConsoleIntent;
+  brief: string;
+  targetPath: string;
+  templateId: string;
+  sizeId: string;
+  stylePreset: string;
+  palettePreset: string;
+  setIntent(value: CodeConsoleIntent): void;
+  setBrief(value: string): void;
+  setTargetPath(value: string): void;
+  setTemplateId(value: string): void;
+  setSizeId(value: string): void;
+  setStylePreset(value: string): void;
+  setPalettePreset(value: string): void;
+  reset(): void;
 };
 
 const storage = createJSONStorage(() => localStorage);
@@ -403,6 +423,35 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           },
         };
       },
+    },
+  ),
+);
+
+export const useCodeConsoleStore = create<CodeConsoleState>()(
+  persist(
+    (set) => ({
+      ...DEFAULT_CODE_CONSOLE_DRAFT,
+      setIntent: (value) => set({ intent: value }),
+      setBrief: (value) => set({ brief: value }),
+      setTargetPath: (value) => set({ targetPath: value }),
+      setTemplateId: (value) => set({ templateId: value }),
+      setSizeId: (value) => set({ sizeId: value }),
+      setStylePreset: (value) => set({ stylePreset: value }),
+      setPalettePreset: (value) => set({ palettePreset: value }),
+      reset: () => set({ ...DEFAULT_CODE_CONSOLE_DRAFT }),
+    }),
+    {
+      name: "codegod-code-console-store",
+      storage,
+      partialize: (state) => ({
+        intent: state.intent,
+        brief: state.brief,
+        targetPath: state.targetPath,
+        templateId: state.templateId,
+        sizeId: state.sizeId,
+        stylePreset: state.stylePreset,
+        palettePreset: state.palettePreset,
+      }),
     },
   ),
 );

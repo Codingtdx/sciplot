@@ -3,6 +3,7 @@ export type AppIconName =
   | "tensile"
   | "plot"
   | "composer"
+  | "code"
   | "projects"
   | "settings"
   | "spark"
@@ -45,6 +46,14 @@ function iconPath(name: AppIconName) {
           <rect x="13" y="4" width="7" height="4.5" rx="1.5" />
           <rect x="13" y="10.5" width="7" height="9.5" rx="1.5" />
           <rect x="4" y="13" width="7" height="7" rx="1.5" />
+        </>
+      );
+    case "code":
+      return (
+        <>
+          <path d="M8.5 8 4.5 12l4 4" />
+          <path d="m15.5 8 4 4-4 4" />
+          <path d="m13.5 5-3 14" />
         </>
       );
     case "projects":

@@ -1,8 +1,14 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
-import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
+import {
+  useCodeConsoleStore,
+  useComposerStore,
+  useTensileStore,
+  useWizardStore,
+  useWorkbenchStore,
+} from "./lib/store";
 import { TEST_CONTRACT, TEST_META } from "./test/fixtures";
 import App from "./App";
 
@@ -22,8 +28,8 @@ vi.mock("./screens/ComposerScreen", () => ({
   ComposerScreen: () => <div>Composer Stub</div>,
 }));
 
-vi.mock("./screens/ProjectsScreen", () => ({
-  ProjectsScreen: () => <div>Projects Stub</div>,
+vi.mock("./screens/CodeConsoleScreen", () => ({
+  CodeConsoleScreen: () => <div>Code Console Stub</div>,
 }));
 
 vi.mock("./screens/SettingsScreen", () => ({
@@ -43,9 +49,11 @@ vi.mock("./lib/api", async () => {
 describe("App", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    window.history.replaceState(window.history.state, "", "/");
     useTensileStore.getState().reset();
     useWizardStore.getState().reset();
     useComposerStore.getState().reset();
+    useCodeConsoleStore.getState().reset();
     useWorkbenchStore.setState({
       lastRoute: "/",
       pdfImportMode: "graph",
@@ -137,5 +145,54 @@ describe("App", () => {
 
     expect(screen.getByText("Launchpad Stub")).toBeInTheDocument();
     expect(document.querySelector(".nav-rail")).toBeNull();
+  });
+
+  it("lets the Start button return to launchpad from Plot without bouncing back", async () => {
+    window.history.replaceState(window.history.state, "", "/plot/type");
+    vi.mocked(getWorkbenchMeta).mockResolvedValue(TEST_META);
+    vi.mocked(getPlotContract).mockResolvedValue(TEST_CONTRACT);
+    vi.mocked(healthcheck).mockResolvedValue(true);
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("Wizard Stub")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /start/i }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("Launchpad Stub")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("navigates to the code console workspace from the sidebar", async () => {
+    vi.mocked(getWorkbenchMeta).mockResolvedValue(TEST_META);
+    vi.mocked(getPlotContract).mockResolvedValue(TEST_CONTRACT);
+    vi.mocked(healthcheck).mockResolvedValue(true);
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /code console/i }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("Code Console Stub")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/code-console");
   });
 });

@@ -14,8 +14,7 @@
     grid-template-columns: 1fr;
   }
 
-  .theme-gallery-grid,
-  .recents-browser-grid {
+  .theme-gallery-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -67,10 +66,10 @@
   .field-grid,
   .info-grid,
   .summary-grid,
+  .code-console-field-grid,
   .wizard-template-grid,
   .plot-stage-rail,
-  .theme-gallery-grid,
-  .recents-browser-grid {
+  .theme-gallery-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -87,8 +86,9 @@
   .plot-sheet-card,
   .launchpad-start-panel,
   .launchpad-recents-panel,
-  .recents-browser-card,
-  .tensile-command-card {
+  .tensile-command-card,
+  .code-console-preview,
+  .code-console-scaffold {
     padding: 16px;
   }
 

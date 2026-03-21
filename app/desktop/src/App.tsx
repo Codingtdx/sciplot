@@ -3,12 +3,18 @@ import { useShallow } from "zustand/react/shallow";
 
 import { AppIcon } from "./components/AppIcon";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
-import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "./lib/store";
+import { codeConsoleIntentLabel } from "./lib/code-console";
+import {
+  useCodeConsoleStore,
+  useComposerStore,
+  useTensileStore,
+  useWizardStore,
+  useWorkbenchStore,
+} from "./lib/store";
 import type {
   PlotContract,
   WorkbenchMeta,
   WorkbenchRoute,
-  WorkbenchWorkspace,
 } from "./lib/types";
 import {
   describeAppearanceMode,
@@ -40,8 +46,8 @@ const WizardScreen = lazy(async () => ({
 const ComposerScreen = lazy(async () => ({
   default: (await import("./screens/ComposerScreen")).ComposerScreen,
 }));
-const ProjectsScreen = lazy(async () => ({
-  default: (await import("./screens/ProjectsScreen")).ProjectsScreen,
+const CodeConsoleScreen = lazy(async () => ({
+  default: (await import("./screens/CodeConsoleScreen")).CodeConsoleScreen,
 }));
 const SettingsScreen = lazy(async () => ({
   default: (await import("./screens/SettingsScreen")).SettingsScreen,
@@ -66,7 +72,6 @@ export default function App() {
   const autoStatusPoll = useWorkbenchStore((state) => state.settings.auto_status_poll);
   const appearanceMode = useWorkbenchStore((state) => state.settings.appearance_mode);
   const themePresetId = useWorkbenchStore((state) => state.settings.theme_preset_id);
-  const recentProjectsCount = useWorkbenchStore((state) => state.recentProjects.length);
   const [route, setRoute] = useState<WorkbenchRoute>(() =>
     initialRoute(persistedRoute, rememberLastScreen),
   );
@@ -94,6 +99,8 @@ export default function App() {
   const composerProject = useComposerStore((state) => state.project);
   const composerPanelCount = composerProject.panels.length;
   const composerTextCount = composerProject.texts.length;
+  const codeIntent = useCodeConsoleStore((state) => state.intent);
+  const codeBrief = useCodeConsoleStore((state) => state.brief);
   const workbenchLoadRef = useRef<Promise<void> | null>(null);
   const workbenchStateRef = useRef<{
     meta: WorkbenchMeta | null;
@@ -136,19 +143,6 @@ export default function App() {
       setPersistedRoute("/");
     }
   }, [persistedRoute, rememberLastScreen, route, setPersistedRoute]);
-
-  useEffect(() => {
-    if (!rememberLastScreen) {
-      return;
-    }
-    const preferredRoute = persistedRoute;
-    if (route === preferredRoute) {
-      return;
-    }
-    if (typeof window !== "undefined" && window.location.pathname === "/") {
-      navigate(preferredRoute, { replace: true });
-    }
-  }, [persistedRoute, rememberLastScreen, route]);
 
   const loadWorkbenchData = () => {
     if (workbenchLoadRef.current) {
@@ -297,11 +291,11 @@ export default function App() {
               ? "/tensile"
               : item.workspace === "composer"
                 ? "/composer"
-                : item.workspace === "recents"
-                  ? "/recents"
-                  : "/settings",
+                : item.workspace === "code"
+                  ? "/code-console"
+                : "/settings",
       })),
-    [composerSessionActive, plotSessionActive, wizard.stage],
+    [plotSessionActive, wizard.stage],
   );
 
   let secondaryStatusLabel = "Focus mode";
@@ -317,8 +311,10 @@ export default function App() {
         : `${tensileCompareCount} sources queued`;
   } else if (workspace === "composer") {
     secondaryStatusLabel = `${composerPanelCount + composerTextCount} objects`;
-  } else if (workspace === "recents") {
-    secondaryStatusLabel = `${recentProjectsCount} recent files`;
+  } else if (workspace === "code") {
+    secondaryStatusLabel = codeBrief.trim()
+      ? `${codeConsoleIntentLabel(codeIntent)} draft ready`
+      : "Prompt builder";
   } else if (workspace === "settings") {
     secondaryStatusLabel = `${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`;
   } else if (plotSessionActive) {
@@ -341,10 +337,9 @@ export default function App() {
       composerPanelCount + composerTextCount > 0
         ? `${composerPanelCount + composerTextCount} visible objects in session`
         : "No composition open";
-  } else if (workspace === "recents") {
-    activeItemLabel = "Restore";
-    activeItemValue =
-      recentProjectsCount > 0 ? `${recentProjectsCount} recent file(s) available` : "No recent files yet";
+  } else if (workspace === "code") {
+    activeItemLabel = "Task mode";
+    activeItemValue = codeConsoleIntentLabel(codeIntent);
   } else if (workspace === "settings") {
     activeItemLabel = "Appearance";
     activeItemValue = `${describeAppearanceMode(appearanceMode)} / ${activeThemePreset.name}`;
@@ -377,8 +372,8 @@ export default function App() {
     content = <TensileScreen meta={workbenchMeta} onNavigate={navigate} />;
   } else if (workspace === "composer") {
     content = <ComposerScreen />;
-  } else if (workspace === "recents") {
-    content = <ProjectsScreen meta={workbenchMeta} onNavigate={navigate} />;
+  } else if (workspace === "code") {
+    content = <CodeConsoleScreen contract={plotContract} meta={workbenchMeta} />;
   } else if (workspace === "settings") {
     content = <SettingsScreen contract={plotContract} meta={workbenchMeta} />;
   }

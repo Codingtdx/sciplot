@@ -14,7 +14,7 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `tensile / wizard / composer / projects / settings` 分层，尽量不要再把事实源硬编码回前端。
+- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `launchpad / tensile / wizard / composer / code-console / settings` 分层，尽量不要再把事实源硬编码回前端。
 - `app/desktop/src/screens/composer/`: Composer 屏专属 hooks、面板组件和选择态/快捷键等 UI 行为模块；优先在这里继续拆分，不要再把导入、inspect、layers、快捷键逻辑重新堆回单个 `ComposerScreen.tsx`。
 - `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
 - `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
@@ -53,14 +53,15 @@
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
 - `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
-- 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / recents / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
+- 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / code-console / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
 - 单图 `wizard` 流程默认是 staged workspace：`import -> sheet(按需) -> type -> tune -> review -> export`；不要把“保存/打开项目文件”重新堆成单图主入口，需要显式项目文件的主要仍是 `composer`。
 - `wizard` 的 `inspect` 仍在导入和切 sheet 后立即执行；`render-preview` 只在 `type / tune / review / export` 阶段活跃，`preflight` 只在 `review` 阶段活跃；不要再改回“单屏自动把所有检查全跑完”的心智模型。
 - `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
 - 拉伸整理和拉伸对比现在收敛到独立 `tensile` 工作台；`wizard` 只保留通用单图绘图流，不再承载 tensile preprocess / compare UI。
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
-- `projects` 屏现在是“最近记录”跳板，不是单图绘图的必经步骤；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
+- 最近记录现在由 `Launchpad` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
+- `code-console` 工作台只负责生成给外部 AI 使用的提示词和代码骨架，帮助其复用 SciPlot God 的尺寸、style/palette、导出和 renderer 入口；它不是新的绘图事实源，也不要把 contract 常量复制进前端。
 - `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
 - Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
 - 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。

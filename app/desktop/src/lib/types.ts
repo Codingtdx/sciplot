@@ -24,7 +24,7 @@ export type WorkbenchWorkspace =
   | "plot"
   | "tensile"
   | "composer"
-  | "recents"
+  | "code"
   | "settings";
 export type WorkbenchRoute =
   | "/"
@@ -36,7 +36,7 @@ export type WorkbenchRoute =
   | "/plot/export"
   | "/tensile"
   | "/composer"
-  | "/recents"
+  | "/code-console"
   | "/settings";
 export type PdfImportMode = "graph" | "asset";
 export type AppearanceMode = "system" | "light" | "dark";

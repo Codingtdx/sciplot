@@ -228,8 +228,12 @@ export function LaunchpadScreen({
             <button className="ghost-button" onClick={() => onNavigate("/tensile")} type="button">
               Tensile workspace
             </button>
-            <button className="ghost-button" onClick={() => onNavigate("/recents")} type="button">
-              Browse recents
+            <button
+              className="ghost-button"
+              onClick={() => onNavigate("/code-console")}
+              type="button"
+            >
+              Code Console
             </button>
             <button className="ghost-button" onClick={() => onNavigate("/settings")} type="button">
               Settings
@@ -243,12 +247,7 @@ export function LaunchpadScreen({
               <div className="card-kicker">Recents</div>
               <h2>Recent files and project restores</h2>
             </div>
-            <div className="step-actions">
-              <span className="signal-tag">{recentProjects.length} remembered</span>
-              <button className="ghost-button" onClick={() => onNavigate("/recents")} type="button">
-                View all
-              </button>
-            </div>
+            <span className="signal-tag">{recentProjects.length} remembered</span>
           </div>
 
           {recentProjects.length === 0 ? (

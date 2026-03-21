@@ -10,8 +10,8 @@
   --workspace-shell-glow: var(--workspace-composer);
 }
 
-.app-shell[data-workspace="recents"] {
-  --workspace-shell-glow: var(--workspace-recents);
+.app-shell[data-workspace="code"] {
+  --workspace-shell-glow: var(--workspace-code);
 }
 
 .app-shell[data-workspace="settings"] {
@@ -94,7 +94,8 @@
 .app-main {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .topbar-warning {
@@ -221,7 +222,6 @@
 }
 
 .settings-layout .desk-main,
-.recents-layout .desk-main,
 .tensile-layout .desk-main {
   gap: 12px;
 }
@@ -313,21 +313,99 @@
   gap: 10px;
 }
 
-.recents-browser-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.recent-browser-item {
-  min-height: 150px;
-}
-
 .tensile-task-card {
   min-height: 176px;
 }
 
 .composer-studio-layout {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+}
+
+.code-console-layout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 380px);
+}
+
+.code-console-builder-card,
+.code-console-preview-card,
+.code-console-defaults-card,
+.code-console-sources-card,
+.code-console-scaffold-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.code-console-intent-switch {
+  margin-top: 4px;
+}
+
+.code-console-intent-panel,
+.code-console-template-summary {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.code-console-field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.code-console-brief,
+.code-console-preview,
+.code-console-scaffold {
+  min-height: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-card-strong) 86%, var(--workspace-code) 14%);
+  color: var(--text-primary);
+  font-family:
+    "SFMono-Regular",
+    "JetBrains Mono",
+    "Menlo",
+    "Monaco",
+    monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-console-brief {
+  resize: vertical;
+}
+
+.code-console-preview,
+.code-console-scaffold {
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.code-console-preview {
+  min-height: 360px;
+}
+
+.code-console-scaffold {
+  min-height: 280px;
+}
+
+.code-console-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.code-console-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 20%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.code-console-path-list code {
+  font-size: 11px;
 }
 
 .composer-sidebar.collapsed {
@@ -547,7 +625,6 @@
 
 .launchpad-workspace .desk-main,
 .launchpad-context,
-.recents-context,
 .tensile-context,
 .settings-context {
   gap: 12px;
@@ -555,8 +632,7 @@
 
 .launchpad-start-panel,
 .launchpad-recents-panel,
-.tensile-command-card,
-.recents-browser-card {
+.tensile-command-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -672,6 +748,12 @@
   gap: 10px;
 }
 
-.recents-layout .desk-main {
-  gap: 12px;
+.settings-layout {
+  min-height: max-content;
+  padding-bottom: 20px;
+}
+
+.settings-layout .desk-main,
+.settings-context {
+  min-height: max-content;
 }
