@@ -94,6 +94,7 @@
 .app-main {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -106,7 +107,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: 100%;
+  min-height: 0;
 }
 
 .plot-stage-card {
@@ -122,7 +123,7 @@
 }
 
 .desk-layout {
-  min-height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 12px;
@@ -134,6 +135,7 @@
 .plot-preview-column,
 .plot-stage-rail {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -323,6 +325,7 @@
 
 .code-console-layout {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 380px);
+  align-items: start;
 }
 
 .code-console-builder-card,
@@ -333,6 +336,33 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.code-console-context-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.code-console-context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.code-console-context-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+.code-console-context-chip span {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .code-console-intent-switch {
@@ -348,6 +378,37 @@
 
 .code-console-field-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.code-console-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.toggle-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+
+.toggle-card input {
+  margin-top: 4px;
+}
+
+.toggle-card span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toggle-card small {
+  color: var(--text-secondary);
+  line-height: 1.45;
 }
 
 .code-console-brief,
@@ -376,7 +437,8 @@
 .code-console-scaffold {
   margin: 0;
   padding: 14px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -386,7 +448,28 @@
 }
 
 .code-console-scaffold {
-  min-height: 280px;
+  min-height: 220px;
+}
+
+.code-console-list-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.code-console-list-block h4 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.code-console-source-list code {
+  font-size: 11px;
+}
+
+.code-console-export-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .code-console-swatches {
@@ -413,15 +496,18 @@
 }
 
 .app-shell {
+  height: 100dvh;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
+  overflow: hidden;
 }
 
 .app-sidebar {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -533,6 +619,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .workspace-header {
@@ -610,12 +697,6 @@
 .workspace-header-item strong {
   font-size: 13px;
   word-break: break-word;
-}
-
-.app-main {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
 }
 
 .plot-stage-copy h2 {
@@ -749,11 +830,11 @@
 }
 
 .settings-layout {
-  min-height: max-content;
+  min-height: 0;
   padding-bottom: 20px;
 }
 
 .settings-layout .desk-main,
 .settings-context {
-  min-height: max-content;
+  min-height: 0;
 }

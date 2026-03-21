@@ -1,4 +1,6 @@
 import type {
+  CodeConsoleExportResponse,
+  CodeConsoleGenerateResponse,
   ComposerPreviewResponse,
   ComposerProject,
   ExportResponse,
@@ -13,7 +15,12 @@ import type {
   TensileReplicateResponse,
   WorkbenchMeta,
 } from "./types";
-import { coercePlotContract, coerceWorkbenchMeta } from "./runtime";
+import {
+  coerceCodeConsoleExportResponse,
+  coerceCodeConsoleGenerateResponse,
+  coercePlotContract,
+  coerceWorkbenchMeta,
+} from "./runtime";
 import { resolveSidecarUrl } from "./sidecar";
 
 const SIDECAR_URL = resolveSidecarUrl();
@@ -76,6 +83,54 @@ export async function getWorkbenchMeta(options: RequestOptions = {}): Promise<Wo
 
 export async function getPlotContract(options: RequestOptions = {}): Promise<PlotContract> {
   return coercePlotContract(await getJson<unknown>("/plot-contract", options));
+}
+
+export async function generateCodeConsole(
+  payload: {
+    intent: "custom_plot" | "patch_renderer" | "annotation_tweak";
+    brief: string;
+    base_template: string;
+    size?: string | null;
+    style_preset?: string | null;
+    palette_preset?: string | null;
+    target_path?: string | null;
+    input_path?: string | null;
+    sheet?: string | number | null;
+    project_path?: string | null;
+    include_data_context: boolean;
+    include_inspection_summary: boolean;
+    include_project_context: boolean;
+  },
+  options: RequestOptions = {},
+): Promise<CodeConsoleGenerateResponse> {
+  return coerceCodeConsoleGenerateResponse(
+    await postJson<unknown>("/code-console/generate", payload, options),
+  );
+}
+
+export async function exportCodeConsoleBundle(
+  payload: {
+    intent: "custom_plot" | "patch_renderer" | "annotation_tweak";
+    brief: string;
+    base_template: string;
+    size?: string | null;
+    style_preset?: string | null;
+    palette_preset?: string | null;
+    target_path?: string | null;
+    input_path?: string | null;
+    sheet?: string | number | null;
+    project_path?: string | null;
+    include_data_context: boolean;
+    include_inspection_summary: boolean;
+    include_project_context: boolean;
+    output_dir: string;
+    include_full_data: boolean;
+  },
+  options: RequestOptions = {},
+): Promise<CodeConsoleExportResponse> {
+  return coerceCodeConsoleExportResponse(
+    await postJson<unknown>("/code-console/export-bundle", payload, options),
+  );
 }
 
 export async function inspectFile(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import fitz
@@ -102,6 +103,110 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["input_path"] == str(input_path)
     assert payload["inspection"]["model"] == "curve_table"
     assert payload["inspection"]["recommendation"]["template"] == "curve"
+
+
+def test_code_console_generate_returns_lightweight_context_without_bound_data() -> None:
+    response = client.post(
+        "/code-console/generate",
+        json={
+            "intent": "custom_plot",
+            "brief": "实现一个带 broken axis 的特殊曲线图。",
+            "base_template": "curve",
+            "size": "60x55",
+            "style_preset": "default",
+            "palette_preset": "colorblind_safe",
+            "target_path": "src/rendering/custom_curve_helper.py",
+            "include_data_context": True,
+            "include_inspection_summary": True,
+            "include_project_context": False,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session"]["input_path"] is None
+    assert payload["data_context"]["available"] is False
+    assert payload["lightweight_bundle"]["includes_full_data"] is False
+    assert "not a standalone matplotlib demo" in payload["prompt_text"]
+    assert any(
+        source["id"] == "plot_contract" and "canonical plotting contract" in source["reason"]
+        for source in payload["truth_sources"]
+    )
+
+
+def test_code_console_export_bundle_writes_manifest_and_full_data_artifacts(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    project_path = tmp_path / "wizard.plotproject.json"
+    project_payload = {
+        "version": 1,
+        "mode": "wizard",
+        "wizard": {
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "size": "60x55",
+                "style_preset": "default",
+                "palette_preset": "colorblind_safe",
+            },
+            "outputs": [],
+        },
+    }
+    project_path.write_text(
+        json.dumps(project_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    response = client.post(
+        "/code-console/export-bundle",
+        json={
+            "intent": "custom_plot",
+            "brief": "实现一个 repo-native 的特殊曲线图 helper。",
+            "base_template": "curve",
+            "size": "60x55",
+            "style_preset": "default",
+            "palette_preset": "colorblind_safe",
+            "target_path": "src/rendering/custom_curve_helper.py",
+            "input_path": str(input_path),
+            "sheet": 0,
+            "project_path": str(project_path),
+            "include_data_context": True,
+            "include_inspection_summary": True,
+            "include_project_context": True,
+            "output_dir": str(tmp_path / "ai-bundles"),
+            "include_full_data": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    bundle_dir = Path(payload["bundle_dir"])
+    manifest_path = Path(payload["manifest_path"])
+    zip_path = Path(payload["zip_path"])
+
+    assert payload["includes_full_data"] is True
+    assert bundle_dir.exists()
+    assert manifest_path.exists()
+    assert zip_path.exists()
+    assert (bundle_dir / "normalized_full_data.csv").exists()
+    assert (bundle_dir / "normalized_full_data.json").exists()
+    assert (bundle_dir / "data_sample.csv").exists()
+    assert (bundle_dir / "ai_prompt.txt").exists()
+    assert (bundle_dir / "starter_scaffold.py").exists()
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["bundle_version"] == 1
+    assert manifest["generated_at"]
+    assert manifest["session"]["id"].startswith("session_")
+    assert manifest["project"]["id"].startswith("project_")
+    assert manifest["project"]["path"] == str(project_path)
+    assert manifest["contract"]["version"] >= 1
+    assert len(manifest["contract"]["sha256"]) == 64
+    assert manifest["includes_full_data"] is True
+    assert any(
+        source["id"] == "generated_bundle" and "canonical package" in source["reason"]
+        for source in payload["truth_sources"]
+    )
 
 
 def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -> None:

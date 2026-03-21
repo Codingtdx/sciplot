@@ -24,6 +24,7 @@ type WizardStoreSnapshot = {
   setInspection(value: InputInspection | null): void;
   setOptions(value: RenderOptionsPayload): void;
   setOutputs(value: string[]): void;
+  setProjectPath(value: string): void;
   setSheet(value: string | number): void;
   setSheetNames(value: string[]): void;
   setStage(value: PlotStage): void;
@@ -73,6 +74,7 @@ export async function loadWizardDataFile(
   wizard.setBusy(keepBusy);
   wizard.setError(null);
   wizard.setInputPath(filePath);
+  wizard.setProjectPath("");
   wizard.setStage("import");
   wizard.setStep("file");
 
@@ -90,6 +92,7 @@ export async function loadWizardProjectFile(
   wizard.reset();
   wizard.setBusy(keepBusy);
   wizard.setError(null);
+  wizard.setProjectPath(projectPath);
 
   const payload = extractWizardProject(await openProject(projectPath));
 

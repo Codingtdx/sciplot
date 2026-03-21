@@ -12,6 +12,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.sidecar.schemas import (
+    CodeConsoleExportRequest,
+    CodeConsoleExportResponse,
+    CodeConsoleGenerateRequest,
+    CodeConsoleGenerateResponse,
     ComposerImportRequest,
     ComposerPreviewResponse,
     ComposerProjectResponse,
@@ -68,8 +72,10 @@ from src.rendering import (
     close_rendered_plots,
     coerce_sheet,
     ensure_input_path,
+    export_code_console_bundle,
     export_rendered_plots,
     export_tensile_comparison_bundle,
+    generate_code_console_payload,
     inspect_input_file,
     inspect_tensile_workbook,
     list_sheet_names,
@@ -84,6 +90,18 @@ from src.tensile_replicates import export_tensile_replicate_workbook
 
 def _normalize_path(path_text: str) -> Path:
     return ensure_input_path(normalize_input_path_text(path_text))
+
+
+def _optional_input_path(path_text: str | None) -> Path | None:
+    if path_text is None or path_text.strip() == "":
+        return None
+    return _normalize_path(path_text)
+
+
+def _optional_project_path(path_text: str | None) -> Path | None:
+    if path_text is None or path_text.strip() == "":
+        return None
+    return Path(path_text).expanduser()
 
 
 def _options_from_payload(template: str, payload: RenderOptionsPayload):
@@ -142,6 +160,8 @@ def _contextual_error_message(context: str, exc: Exception) -> str:
         "preflight": "Could not finish the export preflight.",
         "preview": "Could not render the live preview.",
         "export": "Could not export the submission bundle.",
+        "code_console_generate": "Could not build the Code Console AI bridge context.",
+        "code_console_export": "Could not export the AI bundle.",
         "open_path": "Could not open the selected folder.",
         "save_project": "Could not save this SciPlot God project.",
         "open_project": "Could not open this SciPlot God project.",
@@ -229,6 +249,71 @@ def meta() -> MetaResponse:
 @app.get("/plot-contract", response_model=PlotContractResponse)
 def plot_contract() -> PlotContractResponse:
     return PlotContractResponse.model_validate(plot_contract_dict())
+
+
+@app.post("/code-console/generate", response_model=CodeConsoleGenerateResponse)
+def code_console_generate(request: CodeConsoleGenerateRequest) -> CodeConsoleGenerateResponse:
+    try:
+        input_path = _optional_input_path(request.input_path)
+        sheet = coerce_sheet(str(request.sheet)) if input_path is not None else None
+        project_path = _optional_project_path(request.project_path)
+        project_payload = None
+        if request.include_project_context and project_path is not None:
+            project_payload = load_project_document(project_path)
+        payload = generate_code_console_payload(
+            intent=request.intent,
+            brief=request.brief,
+            base_template=request.base_template,
+            size=request.size,
+            style_preset=request.style_preset,
+            palette_preset=request.palette_preset,
+            target_path=request.target_path,
+            input_path=input_path,
+            sheet=sheet,
+            project_path=project_path,
+            project_payload=project_payload,
+            include_data_context=request.include_data_context,
+            include_inspection_summary=request.include_inspection_summary,
+            include_project_context=request.include_project_context,
+        )
+        return CodeConsoleGenerateResponse.model_validate(payload)
+    except Exception as exc:
+        raise _http_bad_request("code_console_generate", exc) from exc
+
+
+@app.post("/code-console/export-bundle", response_model=CodeConsoleExportResponse)
+def code_console_export_bundle(request: CodeConsoleExportRequest) -> CodeConsoleExportResponse:
+    try:
+        input_path = _optional_input_path(request.input_path)
+        sheet = coerce_sheet(str(request.sheet)) if input_path is not None else None
+        project_path = _optional_project_path(request.project_path)
+        project_payload = None
+        if request.include_project_context and project_path is not None:
+            project_payload = load_project_document(project_path)
+        payload = generate_code_console_payload(
+            intent=request.intent,
+            brief=request.brief,
+            base_template=request.base_template,
+            size=request.size,
+            style_preset=request.style_preset,
+            palette_preset=request.palette_preset,
+            target_path=request.target_path,
+            input_path=input_path,
+            sheet=sheet,
+            project_path=project_path,
+            project_payload=project_payload,
+            include_data_context=request.include_data_context,
+            include_inspection_summary=request.include_inspection_summary,
+            include_project_context=request.include_project_context,
+        )
+        exported = export_code_console_bundle(
+            output_dir=Path(request.output_dir).expanduser(),
+            payload=payload,
+            include_full_data=request.include_full_data,
+        )
+        return CodeConsoleExportResponse.model_validate(exported)
+    except Exception as exc:
+        raise _http_bad_request("code_console_export", exc) from exc
 
 
 @app.post("/inspect-file", response_model=InspectFileResponse)

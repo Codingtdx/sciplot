@@ -1,4 +1,16 @@
 import type {
+  CodeConsoleColumnSummary,
+  CodeConsoleContractSummary,
+  CodeConsoleDataContext,
+  CodeConsoleDefaultsPanel,
+  CodeConsoleExportResponse,
+  CodeConsoleGenerateResponse,
+  CodeConsoleInspectionSummary,
+  CodeConsoleLightweightBundle,
+  CodeConsoleReasonedValue,
+  CodeConsoleRecommendationSummary,
+  CodeConsoleSessionSummary,
+  CodeConsoleTruthSource,
   EditableRenderOption,
   PalettePreset,
   PlotContract,
@@ -50,8 +62,19 @@ function requireNumber(value: unknown, label: string): number {
   return value;
 }
 
+function requireBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} is missing or invalid.`);
+  }
+  return value;
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && !Number.isNaN(value) ? value : undefined;
 }
 
 function optionalBoolean(value: unknown): boolean | undefined {
@@ -266,6 +289,144 @@ function readQaProfileMap(
   return next;
 }
 
+function readStringMatrix(value: unknown, label: string): unknown[][] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((row, rowIndex) => {
+    if (!Array.isArray(row)) {
+      throw new Error(`${label}[${rowIndex}] is not a valid row.`);
+    }
+    return [...row];
+  });
+}
+
+function readNumberRecord(value: unknown, label: string): Record<string, number> {
+  const record = requireRecord(value, label);
+  const next: Record<string, number> = {};
+  for (const [key, item] of Object.entries(record)) {
+    if (typeof item === "number" && !Number.isNaN(item)) {
+      next[key] = item;
+    }
+  }
+  return next;
+}
+
+function readLooseUnknownRecord(value: unknown, label: string): Record<string, unknown> {
+  return { ...requireRecord(value, label) };
+}
+
+function readCodeConsoleReasonedValue(value: unknown, label: string): CodeConsoleReasonedValue {
+  const record = requireRecord(value, label);
+  return {
+    label: requireString(record.label, `${label}.label`),
+    value: requireString(record.value, `${label}.value`),
+    reason: requireString(record.reason, `${label}.reason`),
+  };
+}
+
+function readCodeConsoleTruthSource(value: unknown, label: string): CodeConsoleTruthSource {
+  const record = requireRecord(value, label);
+  return {
+    id: requireString(record.id, `${label}.id`),
+    label: requireString(record.label, `${label}.label`),
+    path: record.path === null ? null : optionalString(record.path),
+    display_path: record.display_path === null ? null : optionalString(record.display_path),
+    kind: requireString(record.kind, `${label}.kind`),
+    available: requireBoolean(record.available, `${label}.available`),
+    reason: requireString(record.reason, `${label}.reason`),
+  };
+}
+
+function readCodeConsoleColumnSummary(value: unknown, label: string): CodeConsoleColumnSummary {
+  const record = requireRecord(value, label);
+  const headerPreview = Array.isArray(record.header_preview)
+    ? record.header_preview.map((item, index) => {
+        if (item === null) {
+          return null;
+        }
+        return requireString(item, `${label}.header_preview[${index}]`);
+      })
+    : [];
+  return {
+    name: requireString(record.name, `${label}.name`),
+    inferred_type: requireString(record.inferred_type, `${label}.inferred_type`),
+    non_empty_count: requireNumber(record.non_empty_count, `${label}.non_empty_count`),
+    missing_count: requireNumber(record.missing_count, `${label}.missing_count`),
+    header_preview: headerPreview,
+    min_value: record.min_value === null ? null : optionalNumber(record.min_value),
+    max_value: record.max_value === null ? null : optionalNumber(record.max_value),
+  };
+}
+
+function readCodeConsoleInspectionSummary(
+  value: unknown,
+  label: string,
+): CodeConsoleInspectionSummary {
+  const record = requireRecord(value, label);
+  return {
+    warnings: requireStringArray(record.warnings ?? [], `${label}.warnings`),
+    signals: requireStringArray(record.signals ?? [], `${label}.signals`),
+  };
+}
+
+function readCodeConsoleRecommendationSummary(
+  value: unknown,
+  label: string,
+): CodeConsoleRecommendationSummary {
+  const record = requireRecord(value, label);
+  return {
+    template: requireString(record.template, `${label}.template`) as TemplateName,
+    reason: requireString(record.reason, `${label}.reason`),
+    size: record.size === null ? null : optionalString(record.size),
+    style_preset:
+      record.style_preset === null ? null : (optionalString(record.style_preset) as StylePreset | undefined),
+    palette_preset:
+      record.palette_preset === null
+        ? null
+        : (optionalString(record.palette_preset) as PalettePreset | undefined),
+  };
+}
+
+function readCodeConsoleDataContext(value: unknown, label: string): CodeConsoleDataContext {
+  const record = requireRecord(value, label);
+  const columnSummaries = Array.isArray(record.column_summaries)
+    ? record.column_summaries.map((item, index) =>
+        readCodeConsoleColumnSummary(item, `${label}.column_summaries[${index}]`),
+      )
+    : [];
+  return {
+    available: requireBoolean(record.available, `${label}.available`),
+    model: record.model === null ? null : optionalString(record.model),
+    model_label: requireString(record.model_label, `${label}.model_label`),
+    raw_row_count: requireNumber(record.raw_row_count, `${label}.raw_row_count`),
+    raw_column_count: requireNumber(record.raw_column_count, `${label}.raw_column_count`),
+    column_names: requireStringArray(record.column_names ?? [], `${label}.column_names`),
+    normalized_columns: requireStringArray(
+      record.normalized_columns ?? [],
+      `${label}.normalized_columns`,
+    ),
+    column_summaries: columnSummaries,
+    sample_rows: readStringMatrix(record.sample_rows ?? [], `${label}.sample_rows`),
+    normalized_preview_rows: readStringMatrix(
+      record.normalized_preview_rows ?? [],
+      `${label}.normalized_preview_rows`,
+    ),
+    missing_summary: readNumberRecord(record.missing_summary ?? {}, `${label}.missing_summary`),
+    inspection: readCodeConsoleInspectionSummary(record.inspection ?? {}, `${label}.inspection`),
+    recommendation: readCodeConsoleRecommendationSummary(
+      record.recommendation ?? {},
+      `${label}.recommendation`,
+    ),
+    interpreted_summary: readLooseUnknownRecord(
+      record.interpreted_summary ?? {},
+      `${label}.interpreted_summary`,
+    ),
+    full_data_rows: requireNumber(record.full_data_rows, `${label}.full_data_rows`),
+    full_data_columns: requireNumber(record.full_data_columns, `${label}.full_data_columns`),
+  };
+}
+
 export function coerceWorkbenchMeta(value: unknown): WorkbenchMeta {
   const record = requireRecord(value, "Workbench meta");
   const defaults = requireRecord(record.defaults, "Workbench meta.defaults");
@@ -345,5 +506,173 @@ export function coercePlotContract(value: unknown): PlotContract {
     palettes: readLooseRecordMap(record.palettes ?? {}, "Plot contract.palettes"),
     templates: readLooseRecordMap(record.templates ?? {}, "Plot contract.templates"),
     validation_rules: readLooseRecordMap(record.validation_rules ?? {}, "Plot contract.validation_rules"),
+  };
+}
+
+export function coerceCodeConsoleGenerateResponse(value: unknown): CodeConsoleGenerateResponse {
+  const record = requireRecord(value, "Code Console generate response");
+  const contract = requireRecord(record.contract, "Code Console generate response.contract");
+  const session = requireRecord(record.session, "Code Console generate response.session");
+  const defaultsPanel = requireRecord(
+    record.defaults_panel,
+    "Code Console generate response.defaults_panel",
+  );
+  const truthSources = Array.isArray(record.truth_sources)
+    ? record.truth_sources.map((item, index) =>
+        readCodeConsoleTruthSource(item, `Code Console generate response.truth_sources[${index}]`),
+      )
+    : [];
+  const lockedByContract = Array.isArray(defaultsPanel.locked_by_contract)
+    ? defaultsPanel.locked_by_contract.map((item, index) =>
+        readCodeConsoleReasonedValue(
+          item,
+          `Code Console generate response.defaults_panel.locked_by_contract[${index}]`,
+        ),
+      )
+    : [];
+  const userSelectable = Array.isArray(defaultsPanel.user_selectable)
+    ? defaultsPanel.user_selectable.map((item, index) =>
+        readCodeConsoleReasonedValue(
+          item,
+          `Code Console generate response.defaults_panel.user_selectable[${index}]`,
+        ),
+      )
+    : [];
+  const derivedFromSession = Array.isArray(defaultsPanel.derived_from_session)
+    ? defaultsPanel.derived_from_session.map((item, index) =>
+        readCodeConsoleReasonedValue(
+          item,
+          `Code Console generate response.defaults_panel.derived_from_session[${index}]`,
+        ),
+      )
+    : [];
+  const lightweightBundleRecord = requireRecord(
+    record.lightweight_bundle,
+    "Code Console generate response.lightweight_bundle",
+  );
+
+  const contractSummary: CodeConsoleContractSummary = {
+    version: requireNumber(contract.version, "Code Console generate response.contract.version"),
+    sha256: requireString(contract.sha256, "Code Console generate response.contract.sha256"),
+    default_style: requireString(
+      contract.default_style,
+      "Code Console generate response.contract.default_style",
+    ) as StylePreset,
+    default_palette: requireString(
+      contract.default_palette,
+      "Code Console generate response.contract.default_palette",
+    ) as PalettePreset,
+  };
+
+  const sessionSummary: CodeConsoleSessionSummary = {
+    session_id: requireString(session.session_id, "Code Console generate response.session.session_id"),
+    session_source: requireString(
+      session.session_source,
+      "Code Console generate response.session.session_source",
+    ),
+    project_id: session.project_id === null ? null : optionalString(session.project_id),
+    project_path: session.project_path === null ? null : optionalString(session.project_path),
+    project_mode: session.project_mode === null ? null : optionalString(session.project_mode),
+    input_path: session.input_path === null ? null : optionalString(session.input_path),
+    input_display_path:
+      session.input_display_path === null ? null : optionalString(session.input_display_path),
+    input_filename: session.input_filename === null ? null : optionalString(session.input_filename),
+    sheet:
+      session.sheet === null
+        ? null
+        : typeof session.sheet === "string" || typeof session.sheet === "number"
+          ? session.sheet
+          : null,
+    sheet_names: requireStringArray(
+      session.sheet_names ?? [],
+      "Code Console generate response.session.sheet_names",
+    ),
+    template: requireString(session.template, "Code Console generate response.session.template") as TemplateName,
+    size_label: requireString(session.size_label, "Code Console generate response.session.size_label"),
+    size_id: requireString(session.size_id, "Code Console generate response.session.size_id") as SizePreset,
+    style_preset: requireString(
+      session.style_preset,
+      "Code Console generate response.session.style_preset",
+    ) as StylePreset,
+    palette_preset: requireString(
+      session.palette_preset,
+      "Code Console generate response.session.palette_preset",
+    ) as PalettePreset,
+    intent: requireString(session.intent, "Code Console generate response.session.intent"),
+    target_path: requireString(session.target_path, "Code Console generate response.session.target_path"),
+  };
+
+  const defaultsPanelSummary: CodeConsoleDefaultsPanel = {
+    locked_by_contract: lockedByContract,
+    user_selectable: userSelectable,
+    derived_from_session: derivedFromSession,
+  };
+
+  const lightweightBundle: CodeConsoleLightweightBundle = {
+    text: requireString(
+      lightweightBundleRecord.text,
+      "Code Console generate response.lightweight_bundle.text",
+    ),
+    includes_data_context: requireBoolean(
+      lightweightBundleRecord.includes_data_context,
+      "Code Console generate response.lightweight_bundle.includes_data_context",
+    ),
+    includes_inspection_summary: requireBoolean(
+      lightweightBundleRecord.includes_inspection_summary,
+      "Code Console generate response.lightweight_bundle.includes_inspection_summary",
+    ),
+    includes_project_context: requireBoolean(
+      lightweightBundleRecord.includes_project_context,
+      "Code Console generate response.lightweight_bundle.includes_project_context",
+    ),
+    includes_full_data: requireBoolean(
+      lightweightBundleRecord.includes_full_data,
+      "Code Console generate response.lightweight_bundle.includes_full_data",
+    ),
+  };
+
+  return {
+    bundle_version: requireNumber(record.bundle_version, "Code Console generate response.bundle_version"),
+    generated_at: requireString(record.generated_at, "Code Console generate response.generated_at"),
+    contract: contractSummary,
+    session: sessionSummary,
+    defaults_panel: defaultsPanelSummary,
+    truth_sources: truthSources,
+    data_context: readCodeConsoleDataContext(
+      record.data_context ?? {},
+      "Code Console generate response.data_context",
+    ),
+    prompt_text: requireString(record.prompt_text, "Code Console generate response.prompt_text"),
+    scaffold_text: requireString(
+      record.scaffold_text,
+      "Code Console generate response.scaffold_text",
+    ),
+    lightweight_bundle: lightweightBundle,
+  };
+}
+
+export function coerceCodeConsoleExportResponse(value: unknown): CodeConsoleExportResponse {
+  const record = requireRecord(value, "Code Console export response");
+  const truthSources = Array.isArray(record.truth_sources)
+    ? record.truth_sources.map((item, index) =>
+        readCodeConsoleTruthSource(item, `Code Console export response.truth_sources[${index}]`),
+      )
+    : [];
+  return {
+    bundle_dir: requireString(record.bundle_dir, "Code Console export response.bundle_dir"),
+    zip_path: requireString(record.zip_path, "Code Console export response.zip_path"),
+    manifest_path: requireString(
+      record.manifest_path,
+      "Code Console export response.manifest_path",
+    ),
+    exported_files: requireStringArray(
+      record.exported_files ?? [],
+      "Code Console export response.exported_files",
+    ),
+    includes_full_data: requireBoolean(
+      record.includes_full_data,
+      "Code Console export response.includes_full_data",
+    ),
+    truth_sources: truthSources,
   };
 }

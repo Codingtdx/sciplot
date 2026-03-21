@@ -38,6 +38,7 @@ import { normalizeWorkbenchRoute, plotStageForWizardStep } from "./workbench";
 
 type WizardState = {
   inputPath: string;
+  projectPath: string;
   sheet: string | number;
   sheetNames: string[];
   inspection: InputInspection | null;
@@ -56,6 +57,7 @@ type WizardState = {
   error: string | null;
   setSidecarReady(value: boolean): void;
   setInputPath(value: string): void;
+  setProjectPath(value: string): void;
   setSheet(value: string | number): void;
   setSheetNames(value: string[]): void;
   setInspection(value: InputInspection | null): void;
@@ -131,6 +133,10 @@ type CodeConsoleState = {
   sizeId: string;
   stylePreset: string;
   palettePreset: string;
+  includeDataContext: boolean;
+  includeInspectionSummary: boolean;
+  includeProjectContext: boolean;
+  includeFullDataBundle: boolean;
   setIntent(value: CodeConsoleIntent): void;
   setBrief(value: string): void;
   setTargetPath(value: string): void;
@@ -138,6 +144,10 @@ type CodeConsoleState = {
   setSizeId(value: string): void;
   setStylePreset(value: string): void;
   setPalettePreset(value: string): void;
+  setIncludeDataContext(value: boolean): void;
+  setIncludeInspectionSummary(value: boolean): void;
+  setIncludeProjectContext(value: boolean): void;
+  setIncludeFullDataBundle(value: boolean): void;
   reset(): void;
 };
 
@@ -164,6 +174,7 @@ export const useWizardStore = create<WizardState>()(
   persist(
     (set) => ({
       inputPath: "",
+      projectPath: "",
       sheet: 0,
       sheetNames: [],
       inspection: null,
@@ -182,6 +193,7 @@ export const useWizardStore = create<WizardState>()(
       error: null,
       setSidecarReady: (value) => set({ sidecarReady: value }),
       setInputPath: (value) => set({ inputPath: value }),
+      setProjectPath: (value) => set({ projectPath: value }),
       setSheet: (value) => set({ sheet: value }),
       setSheetNames: (value) => set({ sheetNames: value }),
       setInspection: (value) => set({ inspection: value }),
@@ -200,6 +212,7 @@ export const useWizardStore = create<WizardState>()(
       reset: () =>
         set({
           inputPath: "",
+          projectPath: "",
           sheet: 0,
           sheetNames: [],
           inspection: null,
@@ -232,6 +245,7 @@ export const useWizardStore = create<WizardState>()(
       },
       partialize: (state) => ({
         inputPath: state.inputPath,
+        projectPath: state.projectPath,
         sheet: state.sheet,
         sheetNames: state.sheetNames,
         inspection: state.inspection,
@@ -438,6 +452,10 @@ export const useCodeConsoleStore = create<CodeConsoleState>()(
       setSizeId: (value) => set({ sizeId: value }),
       setStylePreset: (value) => set({ stylePreset: value }),
       setPalettePreset: (value) => set({ palettePreset: value }),
+      setIncludeDataContext: (value) => set({ includeDataContext: value }),
+      setIncludeInspectionSummary: (value) => set({ includeInspectionSummary: value }),
+      setIncludeProjectContext: (value) => set({ includeProjectContext: value }),
+      setIncludeFullDataBundle: (value) => set({ includeFullDataBundle: value }),
       reset: () => set({ ...DEFAULT_CODE_CONSOLE_DRAFT }),
     }),
     {
@@ -451,6 +469,10 @@ export const useCodeConsoleStore = create<CodeConsoleState>()(
         sizeId: state.sizeId,
         stylePreset: state.stylePreset,
         palettePreset: state.palettePreset,
+        includeDataContext: state.includeDataContext,
+        includeInspectionSummary: state.includeInspectionSummary,
+        includeProjectContext: state.includeProjectContext,
+        includeFullDataBundle: state.includeFullDataBundle,
       }),
     },
   ),

@@ -419,3 +419,124 @@ export type PlotContract = {
   templates: Record<string, Record<string, unknown>>;
   validation_rules: Record<string, Record<string, unknown>>;
 };
+
+export type CodeConsoleReasonedValue = {
+  label: string;
+  value: string;
+  reason: string;
+};
+
+export type CodeConsoleTruthSource = {
+  id: string;
+  label: string;
+  path?: string | null;
+  display_path?: string | null;
+  kind: string;
+  available: boolean;
+  reason: string;
+};
+
+export type CodeConsoleContractSummary = {
+  version: number;
+  sha256: string;
+  default_style: StylePreset;
+  default_palette: PalettePreset;
+};
+
+export type CodeConsoleSessionSummary = {
+  session_id: string;
+  session_source: string;
+  project_id?: string | null;
+  project_path?: string | null;
+  project_mode?: string | null;
+  input_path?: string | null;
+  input_display_path?: string | null;
+  input_filename?: string | null;
+  sheet?: string | number | null;
+  sheet_names: string[];
+  template: TemplateName;
+  size_label: string;
+  size_id: SizePreset;
+  style_preset: StylePreset;
+  palette_preset: PalettePreset;
+  intent: string;
+  target_path: string;
+};
+
+export type CodeConsoleColumnSummary = {
+  name: string;
+  inferred_type: string;
+  non_empty_count: number;
+  missing_count: number;
+  header_preview: Array<string | null>;
+  min_value?: number | null;
+  max_value?: number | null;
+};
+
+export type CodeConsoleInspectionSummary = {
+  warnings: string[];
+  signals: string[];
+};
+
+export type CodeConsoleRecommendationSummary = {
+  template: TemplateName;
+  reason: string;
+  size?: SizePreset | null;
+  style_preset?: StylePreset | null;
+  palette_preset?: PalettePreset | null;
+};
+
+export type CodeConsoleDataContext = {
+  available: boolean;
+  model?: string | null;
+  model_label: string;
+  raw_row_count: number;
+  raw_column_count: number;
+  column_names: string[];
+  normalized_columns: string[];
+  column_summaries: CodeConsoleColumnSummary[];
+  sample_rows: unknown[][];
+  normalized_preview_rows: unknown[][];
+  missing_summary: Record<string, number>;
+  inspection: CodeConsoleInspectionSummary;
+  recommendation: CodeConsoleRecommendationSummary;
+  interpreted_summary: Record<string, unknown>;
+  full_data_rows: number;
+  full_data_columns: number;
+};
+
+export type CodeConsoleDefaultsPanel = {
+  locked_by_contract: CodeConsoleReasonedValue[];
+  user_selectable: CodeConsoleReasonedValue[];
+  derived_from_session: CodeConsoleReasonedValue[];
+};
+
+export type CodeConsoleLightweightBundle = {
+  text: string;
+  includes_data_context: boolean;
+  includes_inspection_summary: boolean;
+  includes_project_context: boolean;
+  includes_full_data: boolean;
+};
+
+export type CodeConsoleGenerateResponse = {
+  bundle_version: number;
+  generated_at: string;
+  contract: CodeConsoleContractSummary;
+  session: CodeConsoleSessionSummary;
+  defaults_panel: CodeConsoleDefaultsPanel;
+  truth_sources: CodeConsoleTruthSource[];
+  data_context: CodeConsoleDataContext;
+  prompt_text: string;
+  scaffold_text: string;
+  lightweight_bundle: CodeConsoleLightweightBundle;
+};
+
+export type CodeConsoleExportResponse = {
+  bundle_dir: string;
+  zip_path: string;
+  manifest_path: string;
+  exported_files: string[];
+  includes_full_data: boolean;
+  truth_sources: CodeConsoleTruthSource[];
+};

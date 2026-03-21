@@ -587,6 +587,148 @@ class OpenProjectResponse(StrictModel):
     data: WizardProjectDocument | ComposerProjectEnvelope
 
 
+class CodeConsoleGenerateRequest(StrictModel):
+    intent: Literal["custom_plot", "patch_renderer", "annotation_tweak"] = "custom_plot"
+    brief: str = ""
+    base_template: str
+    size: str | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
+    target_path: str | None = None
+    input_path: str | None = None
+    sheet: str | int | None = 0
+    project_path: str | None = None
+    include_data_context: bool = True
+    include_inspection_summary: bool = True
+    include_project_context: bool = False
+
+
+class CodeConsoleExportRequest(CodeConsoleGenerateRequest):
+    output_dir: str
+    include_full_data: bool = False
+
+
+class CodeConsoleReasonedValueResponse(StrictModel):
+    label: str
+    value: str
+    reason: str
+
+
+class CodeConsoleDefaultsPanelResponse(StrictModel):
+    locked_by_contract: list[CodeConsoleReasonedValueResponse]
+    user_selectable: list[CodeConsoleReasonedValueResponse]
+    derived_from_session: list[CodeConsoleReasonedValueResponse]
+
+
+class CodeConsoleTruthSourceResponse(StrictModel):
+    id: str
+    label: str
+    path: str | None = None
+    display_path: str | None = None
+    kind: str
+    available: bool
+    reason: str
+
+
+class CodeConsoleContractResponse(StrictModel):
+    version: int
+    sha256: str
+    default_style: str
+    default_palette: str
+
+
+class CodeConsoleSessionResponse(StrictModel):
+    session_id: str
+    session_source: str
+    project_id: str | None = None
+    project_path: str | None = None
+    project_mode: str | None = None
+    input_path: str | None = None
+    input_display_path: str | None = None
+    input_filename: str | None = None
+    sheet: str | int | None = None
+    sheet_names: list[str] = Field(default_factory=list)
+    template: str
+    size_label: str
+    size_id: str
+    style_preset: str
+    palette_preset: str
+    intent: str
+    target_path: str
+
+
+class CodeConsoleColumnSummaryResponse(StrictModel):
+    name: str
+    inferred_type: str
+    non_empty_count: int
+    missing_count: int
+    header_preview: list[str | None]
+    min_value: float | int | None = None
+    max_value: float | int | None = None
+
+
+class CodeConsoleInspectionSummaryResponse(StrictModel):
+    warnings: list[str]
+    signals: list[str]
+
+
+class CodeConsoleRecommendationSummaryResponse(StrictModel):
+    template: str
+    reason: str
+    size: str | None = None
+    style_preset: str | None = None
+    palette_preset: str | None = None
+
+
+class CodeConsoleDataContextResponse(StrictModel):
+    available: bool
+    model: str | None = None
+    model_label: str
+    raw_row_count: int
+    raw_column_count: int
+    column_names: list[str]
+    normalized_columns: list[str]
+    column_summaries: list[CodeConsoleColumnSummaryResponse]
+    sample_rows: list[list[Any]]
+    normalized_preview_rows: list[list[Any]]
+    missing_summary: dict[str, int]
+    inspection: CodeConsoleInspectionSummaryResponse
+    recommendation: CodeConsoleRecommendationSummaryResponse
+    interpreted_summary: dict[str, Any]
+    full_data_rows: int
+    full_data_columns: int
+
+
+class CodeConsoleLightweightBundleResponse(StrictModel):
+    text: str
+    includes_data_context: bool
+    includes_inspection_summary: bool
+    includes_project_context: bool
+    includes_full_data: bool
+
+
+class CodeConsoleGenerateResponse(StrictModel):
+    bundle_version: int
+    generated_at: str
+    contract: CodeConsoleContractResponse
+    session: CodeConsoleSessionResponse
+    defaults_panel: CodeConsoleDefaultsPanelResponse
+    truth_sources: list[CodeConsoleTruthSourceResponse]
+    data_context: CodeConsoleDataContextResponse
+    prompt_text: str
+    scaffold_text: str
+    lightweight_bundle: CodeConsoleLightweightBundleResponse
+
+
+class CodeConsoleExportResponse(StrictModel):
+    bundle_dir: str
+    zip_path: str
+    manifest_path: str
+    exported_files: list[str]
+    includes_full_data: bool
+    truth_sources: list[CodeConsoleTruthSourceResponse]
+
+
 def serialize_dataclass(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
         return {key: serialize_dataclass(item) for key, item in asdict(value).items()}

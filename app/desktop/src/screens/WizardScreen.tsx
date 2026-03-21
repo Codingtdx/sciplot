@@ -111,6 +111,7 @@ export function WizardScreen({
       setInspection: state.setInspection,
       setOptions: state.setOptions,
       setOutputs: state.setOutputs,
+      setProjectPath: state.setProjectPath,
       setExportResult: state.setExportResult,
       setPreflight: state.setPreflight,
       setPreviewIndex: state.setPreviewIndex,

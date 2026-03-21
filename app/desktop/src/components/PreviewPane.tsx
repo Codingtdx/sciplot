@@ -44,11 +44,23 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
   }, [zoomMode]);
 
   const cycleZoom = () => {
-    setZoomMode((mode) => (mode === "fit" ? "100" : "fit"));
+    setZoomMode("fit");
   };
 
   const handleWheel: React.WheelEventHandler<HTMLDivElement> = (event) => {
     if (!current) {
+      return;
+    }
+    if (!event.ctrlKey && !event.metaKey) {
+      const appMain = containerRef.current?.closest(".app-main");
+      if (appMain instanceof HTMLElement) {
+        appMain.scrollBy({
+          top: event.deltaY,
+          left: event.deltaX,
+          behavior: "auto",
+        });
+        event.preventDefault();
+      }
       return;
     }
     const modes: Array<"fit" | "100" | "150" | "200"> = ["fit", "100", "150", "200"];

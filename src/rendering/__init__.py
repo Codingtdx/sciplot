@@ -1,4 +1,9 @@
 from src.rendering.cache import clear_input_cache
+from src.rendering.code_console import (
+    AI_BUNDLE_VERSION,
+    export_code_console_bundle,
+    generate_code_console_payload,
+)
 from src.rendering.constants import (
     DEFAULT_SIZE_BY_TEMPLATE,
     PALETTE_PRESET_CHOICES,
@@ -40,6 +45,7 @@ from src.rendering.tensile_compare import (
 __all__ = [
     "DEFAULT_SIZE_BY_TEMPLATE",
     "InputInspection",
+    "AI_BUNDLE_VERSION",
     "PALETTE_PRESET_CHOICES",
     "PreflightResult",
     "Recommendation",
@@ -56,8 +62,10 @@ __all__ = [
     "coerce_sheet",
     "default_output_dir",
     "ensure_input_path",
+    "export_code_console_bundle",
     "export_rendered_plots",
     "export_tensile_comparison_bundle",
+    "generate_code_console_payload",
     "inspect_input_file",
     "inspect_tensile_workbook",
     "list_sheet_names",

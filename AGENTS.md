@@ -54,6 +54,8 @@
 - `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / code-console / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
+- 桌面端 workspace 默认只保留一个纵向滚动根：`app-main`。除非是明确设计的局部画布/代码横向预览，不要再给页面内部叠第二层默认纵向滚动容器。
+- `PreviewPane` 的普通滚轮应继续服务页面滚动；只有 `Ctrl/Cmd + wheel` 才用于缩放，双击回到 reset/fit。不要再让预览面板吞掉默认页面滚动。
 - 单图 `wizard` 流程默认是 staged workspace：`import -> sheet(按需) -> type -> tune -> review -> export`；不要把“保存/打开项目文件”重新堆成单图主入口，需要显式项目文件的主要仍是 `composer`。
 - `wizard` 的 `inspect` 仍在导入和切 sheet 后立即执行；`render-preview` 只在 `type / tune / review / export` 阶段活跃，`preflight` 只在 `review` 阶段活跃；不要再改回“单屏自动把所有检查全跑完”的心智模型。
 - `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
@@ -61,7 +63,8 @@
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - 最近记录现在由 `Launchpad` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
-- `code-console` 工作台只负责生成给外部 AI 使用的提示词和代码骨架，帮助其复用 SciPlot God 的尺寸、style/palette、导出和 renderer 入口；它不是新的绘图事实源，也不要把 contract 常量复制进前端。
+- `code-console` 工作台现在是 AI-assisted repository coding workspace：前端负责绑定当前 plot session / data / project 上下文并编排交互，sidecar 负责生成最终 prompt、starter scaffold、lightweight AI context bundle 和显式 opt-in 的 full-data AI bundle。
+- `code-console` / AI bundle 仍然不是新的绘图事实源；不要把 contract 常量、视觉默认值或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt/scaffold 正文。
 - `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
 - Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
 - 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
