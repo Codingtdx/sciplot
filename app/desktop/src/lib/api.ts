@@ -1,7 +1,11 @@
 import type {
   CodeConsoleExportResponse,
   CodeConsoleGenerateResponse,
+  CodeConsoleRunResponse,
   ComposerPreviewResponse,
+  DataTemplateCatalogResponse,
+  DataTemplateFolderResponse,
+  DataTemplateMaterializeResponse,
   ComposerProject,
   ExportResponse,
   InspectResponse,
@@ -16,8 +20,12 @@ import type {
   WorkbenchMeta,
 } from "./types";
 import {
+  coerceCodeConsoleRunResponse,
   coerceCodeConsoleExportResponse,
   coerceCodeConsoleGenerateResponse,
+  coerceDataTemplateCatalog,
+  coerceDataTemplateFolderResponse,
+  coerceDataTemplateMaterializeResponse,
   coercePlotContract,
   coerceWorkbenchMeta,
 } from "./runtime";
@@ -29,41 +37,88 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+type JsonRequestResult<T> = {
+  payload: T;
+  method: "GET" | "POST";
+  url: string;
+  status: number;
+  bodyText: string;
+};
+
+function shouldDebugSidecarRequest(path: string) {
+  return path === "/data-templates/folder" || path === "/open-path";
+}
+
+function formatResponseDebugBody(bodyText: string, payload: unknown) {
+  const trimmedText = bodyText.trim();
+  if (trimmedText !== "") {
+    return trimmedText;
+  }
+  if (payload && typeof payload === "object" && Object.keys(payload).length > 0) {
+    return JSON.stringify(payload);
+  }
+  return "(empty response body)";
+}
+
+async function requestJson<T>(
+  method: "GET" | "POST",
+  path: string,
+  body: unknown,
+  options: RequestOptions = {},
+): Promise<JsonRequestResult<T>> {
+  const url = `${SIDECAR_URL}${path}`;
+  if (shouldDebugSidecarRequest(path)) {
+    console.info("[sidecar]", {
+      sidecarBaseUrl: SIDECAR_URL,
+      method,
+      url,
+      requestBody: body,
+    });
+  }
+  const response = await fetch(url, {
+    method,
+    headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+    body: method === "POST" ? JSON.stringify(body) : undefined,
+    signal: options.signal,
+  });
+  const bodyText = await response.text();
+  const payload = bodyText === "" ? {} : await Promise.resolve().then(() => JSON.parse(bodyText)).catch(() => ({}));
+  if (shouldDebugSidecarRequest(path)) {
+    console.info("[sidecar]", {
+      sidecarBaseUrl: SIDECAR_URL,
+      method,
+      url,
+      responseStatus: response.status,
+      responseBody: formatResponseDebugBody(bodyText, payload),
+    });
+  }
+  if (!response.ok) {
+    throw new Error(
+      `${method} ${url} -> ${response.status} ${formatResponseDebugBody(
+        bodyText,
+        payload,
+      )} (sidecar base url: ${SIDECAR_URL})`,
+    );
+  }
+  return {
+    payload: payload as T,
+    method,
+    url,
+    status: response.status,
+    bodyText,
+  };
+}
+
 async function postJson<T>(
   path: string,
   body: unknown,
   options: RequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(`${SIDECAR_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: options.signal,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail =
-      typeof payload?.detail === "string"
-        ? payload.detail
-        : `Request failed: ${response.status}`;
-    throw new Error(detail);
-  }
-  return payload as T;
+  return (await requestJson<T>("POST", path, body, options)).payload;
 }
 
 async function getJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${SIDECAR_URL}${path}`, {
-    signal: options.signal,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail =
-      typeof payload?.detail === "string"
-        ? payload.detail
-        : `Request failed: ${response.status}`;
-    throw new Error(detail);
-  }
-  return payload as T;
+  return (await requestJson<T>("GET", path, null, options)).payload;
 }
 
 export async function healthcheck(options: RequestOptions = {}): Promise<boolean> {
@@ -85,11 +140,41 @@ export async function getPlotContract(options: RequestOptions = {}): Promise<Plo
   return coercePlotContract(await getJson<unknown>("/plot-contract", options));
 }
 
+export async function getDataTemplateCatalog(
+  options: RequestOptions = {},
+): Promise<DataTemplateCatalogResponse> {
+  return coerceDataTemplateCatalog(await getJson<unknown>("/data-templates", options));
+}
+
+export async function materializeDataTemplate(
+  payload: {
+    template_id: string;
+    variant: "example" | "blank";
+  },
+  options: RequestOptions = {},
+): Promise<DataTemplateMaterializeResponse> {
+  return coerceDataTemplateMaterializeResponse(
+    await postJson<unknown>("/data-templates/materialize", payload, options),
+  );
+}
+
+export async function materializeDataTemplateFolder(
+  payload: {
+    variant: "example" | "blank";
+  },
+  options: RequestOptions = {},
+): Promise<DataTemplateFolderResponse> {
+  return coerceDataTemplateFolderResponse(
+    await postJson<unknown>("/data-templates/folder", payload, options),
+  );
+}
+
 export async function generateCodeConsole(
   payload: {
     intent: "custom_plot" | "patch_renderer" | "annotation_tweak";
     brief: string;
     base_template: string;
+    options?: RenderOptionsPayload | null;
     size?: string | null;
     style_preset?: string | null;
     palette_preset?: string | null;
@@ -108,11 +193,29 @@ export async function generateCodeConsole(
   );
 }
 
+export async function runCodeConsole(
+  payload: {
+    code: string;
+    base_template: string;
+    options?: RenderOptionsPayload | null;
+    input_path: string;
+    sheet?: string | number | null;
+    project_path?: string | null;
+    include_project_context: boolean;
+  },
+  options: RequestOptions = {},
+): Promise<CodeConsoleRunResponse> {
+  return coerceCodeConsoleRunResponse(
+    await postJson<unknown>("/code-console/run", payload, options),
+  );
+}
+
 export async function exportCodeConsoleBundle(
   payload: {
     intent: "custom_plot" | "patch_renderer" | "annotation_tweak";
     brief: string;
     base_template: string;
+    options?: RenderOptionsPayload | null;
     size?: string | null;
     style_preset?: string | null;
     palette_preset?: string | null;

@@ -3,9 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { AppIcon } from "./components/AppIcon";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
-import { codeConsoleIntentLabel } from "./lib/code-console";
 import {
-  useCodeConsoleStore,
   useComposerStore,
   useTensileStore,
   useWizardStore,
@@ -99,8 +97,6 @@ export default function App() {
   const composerProject = useComposerStore((state) => state.project);
   const composerPanelCount = composerProject.panels.length;
   const composerTextCount = composerProject.texts.length;
-  const codeIntent = useCodeConsoleStore((state) => state.intent);
-  const codeBrief = useCodeConsoleStore((state) => state.brief);
   const workbenchLoadRef = useRef<Promise<void> | null>(null);
   const workbenchStateRef = useRef<{
     meta: WorkbenchMeta | null;
@@ -312,9 +308,7 @@ export default function App() {
   } else if (workspace === "composer") {
     secondaryStatusLabel = `${composerPanelCount + composerTextCount} objects`;
   } else if (workspace === "code") {
-    secondaryStatusLabel = codeBrief.trim()
-      ? `${codeConsoleIntentLabel(codeIntent)} draft ready`
-      : "Prompt builder";
+    secondaryStatusLabel = wizard.inputPath ? "Current plot context" : "Waiting for Plot session";
   } else if (workspace === "settings") {
     secondaryStatusLabel = `${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`;
   } else if (plotSessionActive) {
@@ -338,8 +332,8 @@ export default function App() {
         ? `${composerPanelCount + composerTextCount} visible objects in session`
         : "No composition open";
   } else if (workspace === "code") {
-    activeItemLabel = "Task mode";
-    activeItemValue = codeConsoleIntentLabel(codeIntent);
+    activeItemLabel = "Bound data";
+    activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No data bound";
   } else if (workspace === "settings") {
     activeItemLabel = "Appearance";
     activeItemValue = `${describeAppearanceMode(appearanceMode)} / ${activeThemePreset.name}`;
@@ -373,7 +367,7 @@ export default function App() {
   } else if (workspace === "composer") {
     content = <ComposerScreen />;
   } else if (workspace === "code") {
-    content = <CodeConsoleScreen contract={plotContract} meta={workbenchMeta} />;
+    content = <CodeConsoleScreen contract={plotContract} meta={workbenchMeta} onNavigate={navigate} />;
   } else if (workspace === "settings") {
     content = <SettingsScreen contract={plotContract} meta={workbenchMeta} />;
   }
@@ -464,7 +458,7 @@ export default function App() {
 
         {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
 
-        <main className="app-main">
+        <main className="app-main" data-scroll-root="workspace">
           <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
             {content}
           </Suspense>

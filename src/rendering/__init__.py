@@ -1,8 +1,10 @@
 from src.rendering.cache import clear_input_cache
 from src.rendering.code_console import (
     AI_BUNDLE_VERSION,
+    CODE_CONSOLE_RUN_TIMEOUT_SECONDS,
     export_code_console_bundle,
     generate_code_console_payload,
+    run_code_console_python,
 )
 from src.rendering.constants import (
     DEFAULT_SIZE_BY_TEMPLATE,
@@ -10,6 +12,12 @@ from src.rendering.constants import (
     SIZE_CHOICES,
     STYLE_PRESET_CHOICES,
     TEMPLATE_CHOICES,
+)
+from src.rendering.data_templates import (
+    data_template_catalog,
+    materialize_data_template,
+    materialize_data_template_folder,
+    plot_template_folder_catalog,
 )
 from src.rendering.io import (
     coerce_sheet,
@@ -46,6 +54,7 @@ __all__ = [
     "DEFAULT_SIZE_BY_TEMPLATE",
     "InputInspection",
     "AI_BUNDLE_VERSION",
+    "CODE_CONSOLE_RUN_TIMEOUT_SECONDS",
     "PALETTE_PRESET_CHOICES",
     "PreflightResult",
     "Recommendation",
@@ -60,6 +69,7 @@ __all__ = [
     "clear_input_cache",
     "close_rendered_plots",
     "coerce_sheet",
+    "data_template_catalog",
     "default_output_dir",
     "ensure_input_path",
     "export_code_console_bundle",
@@ -69,10 +79,14 @@ __all__ = [
     "inspect_input_file",
     "inspect_tensile_workbook",
     "list_sheet_names",
+    "materialize_data_template",
+    "materialize_data_template_folder",
     "normalize_input_path_text",
+    "plot_template_folder_catalog",
     "preflight_render_request",
     "render_template",
     "resolve_output_dir",
     "resolve_render_options",
+    "run_code_console_python",
     "validate_template_name",
 ]

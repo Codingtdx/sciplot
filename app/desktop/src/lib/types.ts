@@ -404,6 +404,53 @@ export type WorkbenchMeta = {
   default_palette: PalettePreset;
 };
 
+export type DataTemplateVariant = "example" | "blank";
+
+export type DataTemplateCatalogItem = {
+  chart_type: string;
+  label: string;
+  filename_stem: string;
+  template_id: string;
+  input_model: string;
+  source_template_id: string;
+  format_summary: string;
+};
+
+export type DataTemplateCatalogResponse = {
+  templates: DataTemplateCatalogItem[];
+};
+
+export type DataTemplateFolderFile = {
+  chart_type: string;
+  label: string;
+  template_id: string;
+  filename: string;
+  file_path: string;
+  input_model: string;
+  source_template_id: string;
+  format_summary: string;
+};
+
+export type DataTemplateMaterializeResponse = {
+  template_id: string;
+  variant: DataTemplateVariant;
+  label: string;
+  input_model: string;
+  typical_families: string[];
+  format_summary: string;
+  file_path: string;
+  filename: string;
+  sheet_name: string;
+};
+
+export type DataTemplateFolderResponse = {
+  variant: DataTemplateVariant;
+  folder_path: string;
+  folder_name: string;
+  chart_types: string[];
+  files: DataTemplateFolderFile[];
+};
+
 export type PlotContract = {
   version: number;
   defaults: {
@@ -459,6 +506,11 @@ export type CodeConsoleSessionSummary = {
   size_id: SizePreset;
   style_preset: StylePreset;
   palette_preset: PalettePreset;
+  xscale: "linear" | "log";
+  yscale: "linear" | "log";
+  reverse_x: boolean;
+  baseline: "none" | "linear_endpoints";
+  show_colorbar: boolean;
   intent: string;
   target_path: string;
 };
@@ -539,4 +591,22 @@ export type CodeConsoleExportResponse = {
   exported_files: string[];
   includes_full_data: boolean;
   truth_sources: CodeConsoleTruthSource[];
+};
+
+export type CodeConsoleGeneratedFile = {
+  path: string;
+  filename: string;
+  kind: string;
+};
+
+export type CodeConsoleRunResponse = {
+  generated_at: string;
+  output_dir: string;
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  timed_out: boolean;
+  duration_ms: number;
+  generated_files: CodeConsoleGeneratedFile[];
+  previews: PreviewItem[];
 };

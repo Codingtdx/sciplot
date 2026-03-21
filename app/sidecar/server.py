@@ -5,26 +5,35 @@ import os
 import subprocess
 import sys
 from base64 import b64encode
+from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 
 from app.sidecar.schemas import (
     CodeConsoleExportRequest,
     CodeConsoleExportResponse,
     CodeConsoleGenerateRequest,
     CodeConsoleGenerateResponse,
+    CodeConsoleRunRequest,
+    CodeConsoleRunResponse,
     ComposerImportRequest,
     ComposerPreviewResponse,
     ComposerProjectResponse,
     ComposerRequest,
+    DataTemplateCatalogResponse,
     ExportRenderRequest,
     ExportRenderResponse,
     FileRequest,
     HealthResponse,
     InspectFileResponse,
+    MaterializeDataTemplateFolderRequest,
+    MaterializeDataTemplateFolderResponse,
+    MaterializeDataTemplateRequest,
+    MaterializeDataTemplateResponse,
     MetaResponse,
     OpenPathRequest,
     OpenProjectRequest,
@@ -79,13 +88,23 @@ from src.rendering import (
     inspect_input_file,
     inspect_tensile_workbook,
     list_sheet_names,
+    materialize_data_template,
+    materialize_data_template_folder,
     normalize_input_path_text,
+    plot_template_folder_catalog,
     preflight_render_request,
     resolve_render_options,
+    run_code_console_python,
     validate_template_name,
 )
 from src.submission import build_composer_submission_report, build_render_submission_report
 from src.tensile_replicates import export_tensile_replicate_workbook
+
+CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
+    ("GET", "/meta"),
+    ("GET", "/plot-contract"),
+    ("POST", "/data-templates/folder"),
+)
 
 
 def _normalize_path(path_text: str) -> Path:
@@ -117,6 +136,27 @@ def _options_from_payload(template: str, payload: RenderOptionsPayload):
         palette_preset=payload.palette_preset,
         use_sidecar=payload.use_sidecar,
     )
+
+
+def _code_console_payload_options(request: CodeConsoleGenerateRequest) -> RenderOptionsPayload:
+    payload = request.options or RenderOptionsPayload()
+    return RenderOptionsPayload(
+        size=payload.size or request.size,
+        xscale=payload.xscale,
+        yscale=payload.yscale,
+        reverse_x=payload.reverse_x,
+        baseline=payload.baseline,
+        show_colorbar=payload.show_colorbar,
+        style_preset=payload.style_preset or request.style_preset or plot_style.DEFAULT_STYLE_PRESET,
+        palette_preset=payload.palette_preset
+        or request.palette_preset
+        or plot_style.DEFAULT_PALETTE_PRESET,
+        use_sidecar=payload.use_sidecar,
+    )
+
+
+def _resolved_code_console_options(request: CodeConsoleGenerateRequest):
+    return _options_from_payload(request.base_template, _code_console_payload_options(request))
 
 
 def _preview_artifact_path(output_dir: Path, filename: str) -> Path:
@@ -160,8 +200,10 @@ def _contextual_error_message(context: str, exc: Exception) -> str:
         "preflight": "Could not finish the export preflight.",
         "preview": "Could not render the live preview.",
         "export": "Could not export the submission bundle.",
-        "code_console_generate": "Could not build the Code Console AI bridge context.",
-        "code_console_export": "Could not export the AI bundle.",
+        "code_console_generate": "Could not build the Code Console prompt context.",
+        "code_console_export": "Could not export the Code Console context bundle.",
+        "code_console_run": "Could not run this repo-native Python snippet.",
+        "data_template": "Could not build the requested data template.",
         "open_path": "Could not open the selected folder.",
         "save_project": "Could not save this SciPlot God project.",
         "open_project": "Could not open this SciPlot God project.",
@@ -216,7 +258,36 @@ def _bundle_manifest_payload(
     }
 
 
-app = FastAPI(title="SciPlot God Sidecar", version="5.0.0")
+def _registered_route_signatures() -> list[tuple[str, str]]:
+    signatures: set[tuple[str, str]] = set()
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        for method in route.methods or ():
+            signatures.add((method, route.path))
+    return sorted(signatures, key=lambda item: (item[1], item[0]))
+
+
+def _assert_critical_sidecar_routes() -> list[tuple[str, str]]:
+    registered = set(_registered_route_signatures())
+    missing = [signature for signature in CRITICAL_SIDECAR_ROUTES if signature not in registered]
+    if missing:
+        missing_text = ", ".join(f"{method} {path}" for method, path in missing)
+        raise RuntimeError(f"Critical sidecar routes are missing: {missing_text}")
+    return sorted(registered & set(CRITICAL_SIDECAR_ROUTES), key=lambda item: (item[1], item[0]))
+
+
+@asynccontextmanager
+async def sidecar_lifespan(_: FastAPI):
+    matched = _assert_critical_sidecar_routes()
+    registered_text = ", ".join(f"{method} {path}" for method, path in _registered_route_signatures())
+    critical_text = ", ".join(f"{method} {path}" for method, path in matched)
+    print(f"[sidecar] registered routes: {registered_text}", flush=True)
+    print(f"[sidecar] critical routes ready: {critical_text}", flush=True)
+    yield
+
+
+app = FastAPI(title="SciPlot God Sidecar", version="5.0.0", lifespan=sidecar_lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -251,6 +322,33 @@ def plot_contract() -> PlotContractResponse:
     return PlotContractResponse.model_validate(plot_contract_dict())
 
 
+@app.get("/data-templates", response_model=DataTemplateCatalogResponse)
+def list_data_templates() -> DataTemplateCatalogResponse:
+    return DataTemplateCatalogResponse.model_validate({"templates": plot_template_folder_catalog()})
+
+
+@app.post("/data-templates/materialize", response_model=MaterializeDataTemplateResponse)
+def create_data_template(
+    request: MaterializeDataTemplateRequest,
+) -> MaterializeDataTemplateResponse:
+    try:
+        payload = materialize_data_template(request.template_id, variant=request.variant)
+        return MaterializeDataTemplateResponse.model_validate(payload)
+    except Exception as exc:
+        raise _http_bad_request("data_template", exc) from exc
+
+
+@app.post("/data-templates/folder", response_model=MaterializeDataTemplateFolderResponse)
+def create_data_template_folder(
+    request: MaterializeDataTemplateFolderRequest,
+) -> MaterializeDataTemplateFolderResponse:
+    try:
+        payload = materialize_data_template_folder(variant=request.variant)
+        return MaterializeDataTemplateFolderResponse.model_validate(payload)
+    except Exception as exc:
+        raise _http_bad_request("data_template", exc) from exc
+
+
 @app.post("/code-console/generate", response_model=CodeConsoleGenerateResponse)
 def code_console_generate(request: CodeConsoleGenerateRequest) -> CodeConsoleGenerateResponse:
     try:
@@ -260,13 +358,21 @@ def code_console_generate(request: CodeConsoleGenerateRequest) -> CodeConsoleGen
         project_payload = None
         if request.include_project_context and project_path is not None:
             project_payload = load_project_document(project_path)
+        payload_options = _code_console_payload_options(request)
+        options = _resolved_code_console_options(request)
         payload = generate_code_console_payload(
             intent=request.intent,
             brief=request.brief,
             base_template=request.base_template,
-            size=request.size,
-            style_preset=request.style_preset,
-            palette_preset=request.palette_preset,
+            size=payload_options.size,
+            xscale=options.xscale,
+            yscale=options.yscale,
+            reverse_x=options.reverse_x,
+            baseline=options.baseline,
+            show_colorbar=options.show_colorbar,
+            style_preset=options.style_preset,
+            palette_preset=options.palette_preset,
+            use_sidecar=options.use_sidecar,
             target_path=request.target_path,
             input_path=input_path,
             sheet=sheet,
@@ -290,13 +396,21 @@ def code_console_export_bundle(request: CodeConsoleExportRequest) -> CodeConsole
         project_payload = None
         if request.include_project_context and project_path is not None:
             project_payload = load_project_document(project_path)
+        payload_options = _code_console_payload_options(request)
+        options = _resolved_code_console_options(request)
         payload = generate_code_console_payload(
             intent=request.intent,
             brief=request.brief,
             base_template=request.base_template,
-            size=request.size,
-            style_preset=request.style_preset,
-            palette_preset=request.palette_preset,
+            size=payload_options.size,
+            xscale=options.xscale,
+            yscale=options.yscale,
+            reverse_x=options.reverse_x,
+            baseline=options.baseline,
+            show_colorbar=options.show_colorbar,
+            style_preset=options.style_preset,
+            palette_preset=options.palette_preset,
+            use_sidecar=options.use_sidecar,
             target_path=request.target_path,
             input_path=input_path,
             sheet=sheet,
@@ -314,6 +428,45 @@ def code_console_export_bundle(request: CodeConsoleExportRequest) -> CodeConsole
         return CodeConsoleExportResponse.model_validate(exported)
     except Exception as exc:
         raise _http_bad_request("code_console_export", exc) from exc
+
+
+@app.post("/code-console/run", response_model=CodeConsoleRunResponse)
+def code_console_run(request: CodeConsoleRunRequest) -> CodeConsoleRunResponse:
+    try:
+        input_path = _normalize_path(request.input_path)
+        sheet = coerce_sheet(str(request.sheet))
+        project_path = _optional_project_path(request.project_path)
+        project_payload = None
+        if request.include_project_context and project_path is not None:
+            project_payload = load_project_document(project_path)
+        payload_options = request.options or RenderOptionsPayload()
+        options = _options_from_payload(request.base_template, payload_options)
+        payload = generate_code_console_payload(
+            intent="custom_plot",
+            brief="",
+            base_template=request.base_template,
+            size=payload_options.size,
+            xscale=options.xscale,
+            yscale=options.yscale,
+            reverse_x=options.reverse_x,
+            baseline=options.baseline,
+            show_colorbar=options.show_colorbar,
+            style_preset=options.style_preset,
+            palette_preset=options.palette_preset,
+            use_sidecar=options.use_sidecar,
+            target_path="",
+            input_path=input_path,
+            sheet=sheet,
+            project_path=project_path,
+            project_payload=project_payload,
+            include_data_context=True,
+            include_inspection_summary=True,
+            include_project_context=request.include_project_context,
+        )
+        result = run_code_console_python(request.code, payload=payload)
+        return CodeConsoleRunResponse.model_validate(result)
+    except Exception as exc:
+        raise _http_bad_request("code_console_run", exc) from exc
 
 
 @app.post("/inspect-file", response_model=InspectFileResponse)
@@ -662,7 +815,6 @@ def composer_import_panels(request: ComposerImportRequest) -> ComposerProjectRes
         return ComposerProjectResponse.model_validate(serialize_dataclass(next_project))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
 
 def main() -> None:
     import uvicorn

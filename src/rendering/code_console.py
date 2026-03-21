@@ -2,14 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
 import zipfile
+from base64 import b64encode
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import mkdtemp
+from time import perf_counter
 from typing import Any
 
 import pandas as pd
 
 from src import plot_style
+from src.composer_render import panel_thumbnail_png
 from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup
 from src.plot_contract import CONTRACT_PATH, load_plot_contract, template_contract
 from src.rendering.cache import (
@@ -30,6 +37,8 @@ from src.text_normalization import slugify_label
 
 AI_BUNDLE_VERSION = 1
 _BUNDLE_TIMESTAMP_FORMAT = "%Y%m%dT%H%M%SZ"
+CODE_CONSOLE_RUN_TIMEOUT_SECONDS = 20
+CODE_CONSOLE_PREVIEW_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}
 
 _TRUSTED_REPO_FILES: tuple[dict[str, str], ...] = (
     {
@@ -144,6 +153,14 @@ def _clean_cell(value: object) -> object:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _subprocess_text(value: bytes | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def _numeric_or_none(value: object) -> float | int | None:
@@ -731,7 +748,11 @@ def _prompt_text(
 ) -> str:
     task_brief = brief.strip() or "Replace this with the requested special plot or renderer tweak."
     lines = [
-        "You are writing Python plotting code inside the SciPlot God repository, not a standalone matplotlib demo.",
+        (
+            "You are writing Python plotting code inside the SciPlot God repository. "
+            "Treat this as an incremental modification of the current plot, not a "
+            "standalone matplotlib demo or a from-scratch rewrite."
+        ),
         "",
         "Repository constraints:",
         "- The only plotting truth source is `src/plot_contract.json`.",
@@ -748,10 +769,16 @@ def _prompt_text(
         "Current task:",
         f"- mode: {_intent_label(intent)}",
         f"- request: {task_brief}",
+        "- Start from the current plot session and current data context instead of rebuilding the figure from zero.",
+        "- Aim for a special plot path or a visual micro-adjustment layered onto the current SciPlot God behavior.",
         f"- base template: {session['template']}",
         f"- target size: {session['size_label']}",
         f"- style_preset: {session['style_preset']}",
         f"- palette_preset: {session['palette_preset']}",
+        f"- xscale / yscale: {session['xscale']} / {session['yscale']}",
+        f"- reverse_x: {session['reverse_x']}",
+        f"- baseline: {session['baseline']}",
+        f"- show_colorbar: {session['show_colorbar']}",
         f"- suggested file target: {target_path}",
     ]
 
@@ -787,16 +814,30 @@ def _prompt_text(
     for source in truth_sources:
         display_path = source.get("display_path") or source.get("label")
         lines.append(f"- {display_path}: {source.get('reason', '')}")
+    lines.extend(
+        [
+            "",
+            "Runner contract:",
+            "- The pasted code will run in a repo-native Python runner from the repository root.",
+            "- Save any generated previews, PDFs, or helper outputs only under `OUTPUT_DIR`.",
+            (
+                "- The runner exposes `OUTPUT_DIR`, `INPUT_PATH`, `CURRENT_SHEET`, "
+                "`CURRENT_TEMPLATE`, `CURRENT_OPTIONS`, `CURRENT_INSPECTION`, "
+                "`CURRENT_RECOMMENDATION`, and `CURRENT_DATA_CONTEXT`."
+            ),
+        ]
+    )
     lines.extend(["", "Implementation strategy:"])
     lines.extend(f"- {bullet}" for bullet in _implementation_bullets(intent))
     lines.extend(
         [
             "",
             "Output requirements:",
-            "- First explain which project entry points you are reusing.",
-            "- Then produce repo-native Python code, not a detached demo script.",
+            "- Return paste-ready Python code that can run inside the repo-native Code Console runner.",
+            "- Do not wrap the Python code in Markdown fences.",
+            "- Reuse project entry points instead of writing a detached demo script.",
             "- Keep the implementation compatible with the sidecar/rendering boundary.",
-            "- Include a minimal runnable example that still lives inside the project style system.",
+            "- Write generated outputs under `OUTPUT_DIR` only.",
         ]
     )
     return "\n".join(lines)
@@ -892,8 +933,14 @@ def generate_code_console_payload(
     brief: str,
     base_template: str,
     size: str | None,
+    xscale: str | None = None,
+    yscale: str | None = None,
+    reverse_x: bool | None = None,
+    baseline: str | None = None,
+    show_colorbar: bool | None = None,
     style_preset: str | None,
     palette_preset: str | None,
+    use_sidecar: bool | None = None,
     target_path: str | None,
     input_path: Path | None,
     sheet: str | int | None,
@@ -907,8 +954,14 @@ def generate_code_console_payload(
     options = resolve_render_options(
         template=template,
         size=size,
+        xscale=xscale,
+        yscale=yscale,
+        reverse_x=bool(reverse_x),
+        baseline=baseline,
+        show_colorbar=show_colorbar,
         style_preset=style_preset or plot_style.DEFAULT_STYLE_PRESET,
         palette_preset=palette_preset or plot_style.DEFAULT_PALETTE_PRESET,
+        use_sidecar=use_sidecar,
     )
     normalized_target_path = (target_path or "").strip() or _default_target_path(intent, template)
     normalized_sheet = sheet if sheet is not None else 0
@@ -1015,6 +1068,11 @@ def generate_code_console_payload(
         "size_id": size or template_contract(template).default_size,
         "style_preset": options.style_preset,
         "palette_preset": options.palette_preset,
+        "xscale": options.xscale,
+        "yscale": options.yscale,
+        "reverse_x": options.reverse_x,
+        "baseline": options.baseline,
+        "show_colorbar": options.show_colorbar,
         "intent": intent,
         "target_path": normalized_target_path,
     }
@@ -1067,6 +1125,193 @@ def generate_code_console_payload(
             "includes_project_context": include_project_context and project_path is not None,
             "includes_full_data": False,
         },
+    }
+
+
+def _bootstrap_context(payload: dict[str, Any], *, output_dir: Path) -> dict[str, Any]:
+    data_context = payload["data_context"]
+    return {
+        "repo_root": str(_repo_root()),
+        "output_dir": str(output_dir),
+        "contract": payload["contract"],
+        "session": payload["session"],
+        "input_path": payload["session"].get("input_path"),
+        "sheet": payload["session"].get("sheet"),
+        "template": payload["session"].get("template"),
+        "options": {
+            "size": payload["session"].get("size_id"),
+            "style_preset": payload["session"].get("style_preset"),
+            "palette_preset": payload["session"].get("palette_preset"),
+            "xscale": payload["session"].get("xscale"),
+            "yscale": payload["session"].get("yscale"),
+            "reverse_x": payload["session"].get("reverse_x"),
+            "baseline": payload["session"].get("baseline"),
+            "show_colorbar": payload["session"].get("show_colorbar"),
+        },
+        "inspection": data_context.get("inspection"),
+        "recommendation": data_context.get("recommendation"),
+        "data_context": data_context,
+        "truth_sources": payload["truth_sources"],
+    }
+
+
+def _write_bootstrap_files(run_dir: Path, *, payload: dict[str, Any], output_dir: Path, code: str) -> Path:
+    context_path = run_dir / "context.json"
+    user_code_path = run_dir / "user_code.py"
+    runner_path = run_dir / "run_user_code.py"
+    _write_json(context_path, _bootstrap_context(payload, output_dir=output_dir))
+    _write_text(user_code_path, code)
+    _write_text(
+        runner_path,
+        "\n".join(
+            [
+                "from __future__ import annotations",
+                "",
+                "import json",
+                "from pathlib import Path",
+                "",
+                "RUN_DIR = Path(__file__).resolve().parent",
+                "BOOTSTRAP = json.loads((RUN_DIR / 'context.json').read_text(encoding='utf-8'))",
+                "REPO_ROOT = Path(BOOTSTRAP['repo_root'])",
+                "OUTPUT_DIR = Path(BOOTSTRAP['output_dir'])",
+                "OUTPUT_DIR.mkdir(parents=True, exist_ok=True)",
+                "INPUT_PATH = Path(BOOTSTRAP['input_path']) if BOOTSTRAP.get('input_path') else None",
+                "CURRENT_SHEET = BOOTSTRAP.get('sheet')",
+                "CURRENT_TEMPLATE = BOOTSTRAP['template']",
+                "CURRENT_OPTIONS = BOOTSTRAP['options']",
+                "CURRENT_CONTRACT = BOOTSTRAP['contract']",
+                "CURRENT_SESSION = BOOTSTRAP['session']",
+                "CURRENT_INSPECTION = BOOTSTRAP.get('inspection')",
+                "CURRENT_RECOMMENDATION = BOOTSTRAP.get('recommendation')",
+                "CURRENT_DATA_CONTEXT = BOOTSTRAP['data_context']",
+                "CURRENT_TRUTH_SOURCES = BOOTSTRAP['truth_sources']",
+                "",
+                "def output_path(filename: str) -> Path:",
+                "    root = OUTPUT_DIR.resolve()",
+                "    target = (root / filename).resolve()",
+                "    if target != root and root not in target.parents:",
+                "        raise ValueError('Generated files must stay inside OUTPUT_DIR.')",
+                "    target.parent.mkdir(parents=True, exist_ok=True)",
+                "    return target",
+                "",
+                "globals_dict = {",
+                "    '__name__': '__main__',",
+                "    'REPO_ROOT': REPO_ROOT,",
+                "    'OUTPUT_DIR': OUTPUT_DIR,",
+                "    'INPUT_PATH': INPUT_PATH,",
+                "    'CURRENT_SHEET': CURRENT_SHEET,",
+                "    'CURRENT_TEMPLATE': CURRENT_TEMPLATE,",
+                "    'CURRENT_OPTIONS': CURRENT_OPTIONS,",
+                "    'CURRENT_CONTRACT': CURRENT_CONTRACT,",
+                "    'CURRENT_SESSION': CURRENT_SESSION,",
+                "    'CURRENT_INSPECTION': CURRENT_INSPECTION,",
+                "    'CURRENT_RECOMMENDATION': CURRENT_RECOMMENDATION,",
+                "    'CURRENT_DATA_CONTEXT': CURRENT_DATA_CONTEXT,",
+                "    'CURRENT_TRUTH_SOURCES': CURRENT_TRUTH_SOURCES,",
+                "    'output_path': output_path,",
+                "}",
+                "source = (RUN_DIR / 'user_code.py').read_text(encoding='utf-8')",
+                "exec(compile(source, str(RUN_DIR / 'user_code.py'), 'exec'), globals_dict, globals_dict)",
+            ]
+        ),
+    )
+    return runner_path
+
+
+def _generated_files(output_dir: Path) -> list[Path]:
+    return sorted(
+        [path for path in output_dir.rglob("*") if path.is_file()],
+        key=lambda path: path.relative_to(output_dir).as_posix(),
+    )
+
+
+def _preview_items(output_dir: Path) -> list[dict[str, object]]:
+    previews: list[dict[str, object]] = []
+    for path in _generated_files(output_dir):
+        if path.suffix.lower() not in CODE_CONSOLE_PREVIEW_SUFFIXES:
+            continue
+        try:
+            png_bytes = panel_thumbnail_png(path, max_side_px=960)
+        except Exception:
+            continue
+        previews.append(
+            {
+                "filename": path.name,
+                "png_base64": b64encode(png_bytes).decode("ascii"),
+                "qa": None,
+            }
+        )
+    return previews
+
+
+def run_code_console_python(code: str, *, payload: dict[str, Any]) -> dict[str, Any]:
+    if not code.strip():
+        raise ValueError("Paste Python code before running the repo-native runner.")
+
+    run_dir = Path(mkdtemp(prefix="codegod-code-console-run-"))
+    output_dir = run_dir / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    runner_path = _write_bootstrap_files(
+        run_dir,
+        payload=payload,
+        output_dir=output_dir,
+        code=code,
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "CODEGOD_REPO_ROOT": str(_repo_root()),
+            "CODEGOD_OUTPUT_DIR": str(output_dir),
+            "CODEGOD_INPUT_PATH": payload["session"].get("input_path") or "",
+            "CODEGOD_SHEET": str(payload["session"].get("sheet") or ""),
+            "CODEGOD_TEMPLATE": str(payload["session"].get("template") or ""),
+        }
+    )
+
+    timed_out = False
+    start = perf_counter()
+    stdout = ""
+    stderr = ""
+    exit_code = 0
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(runner_path)],
+            cwd=_repo_root(),
+            capture_output=True,
+            text=True,
+            timeout=CODE_CONSOLE_RUN_TIMEOUT_SECONDS,
+            env=env,
+            check=False,
+        )
+        stdout = completed.stdout
+        stderr = completed.stderr
+        exit_code = completed.returncode
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        stdout = _subprocess_text(exc.stdout)
+        stderr = _subprocess_text(exc.stderr)
+        stderr = f"{stderr}\nRunner timed out after {CODE_CONSOLE_RUN_TIMEOUT_SECONDS} seconds.".strip()
+        exit_code = 124
+
+    duration_ms = int(round((perf_counter() - start) * 1000))
+    generated_files = _generated_files(output_dir)
+    return {
+        "generated_at": _now_utc_iso(),
+        "output_dir": str(output_dir),
+        "stdout": stdout,
+        "stderr": stderr,
+        "exit_code": exit_code,
+        "timed_out": timed_out,
+        "duration_ms": duration_ms,
+        "generated_files": [
+            {
+                "path": str(path),
+                "filename": path.name,
+                "kind": path.suffix.lower().lstrip(".") or "file",
+            }
+            for path in generated_files
+        ],
+        "previews": _preview_items(output_dir),
     }
 
 
@@ -1275,6 +1520,8 @@ def export_code_console_bundle(
 
 __all__ = [
     "AI_BUNDLE_VERSION",
+    "CODE_CONSOLE_RUN_TIMEOUT_SECONDS",
     "export_code_console_bundle",
     "generate_code_console_payload",
+    "run_code_console_python",
 ]

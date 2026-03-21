@@ -85,9 +85,9 @@ export const WORKSPACE_META: Record<
     description: "Arrange graphs, assets, and text on the editable composition canvas.",
   },
   code: {
-    eyebrow: "AI Bridge",
+    eyebrow: "Repo Runner",
     title: "Code Console",
-    description: "Generate AI-ready prompts and code scaffolds that stay inside the SciPlot God plotting contract.",
+    description: "Package the current Plot context, copy the fixed project prompt, and run repo-native Python snippets locally.",
   },
   settings: {
     eyebrow: "Runtime",

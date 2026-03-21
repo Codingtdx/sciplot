@@ -3,10 +3,22 @@ import { useShallow } from "zustand/react/shallow";
 
 import { StepFlow } from "../components/StepFlow";
 import { PreviewPane } from "../components/PreviewPane";
-import { exportRender, inspectFile, openPath } from "../lib/api";
+import {
+  exportRender,
+  inspectFile,
+  materializeDataTemplateFolder,
+  openPath,
+} from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
-import type { PlotStage, TemplateName, WorkbenchMeta, WorkbenchRoute } from "../lib/types";
+import type {
+  DataTemplateFolderResponse,
+  DataTemplateVariant,
+  PlotStage,
+  TemplateName,
+  WorkbenchMeta,
+  WorkbenchRoute,
+} from "../lib/types";
 import { openDialog } from "../lib/tauri-dialog";
 import {
   PLOT_STAGE_COPY,
@@ -35,6 +47,7 @@ import {
 } from "../lib/wizard";
 import { WizardExportSection } from "./wizard/WizardExportSection";
 import { WizardOptionsSection } from "./wizard/WizardOptionsSection";
+import { WizardDataTemplatesSection } from "./wizard/WizardDataTemplatesSection";
 import { WizardTemplatesSection } from "./wizard/WizardTemplatesSection";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
@@ -81,6 +94,40 @@ function outputItems(outputs: string[], expectedFilenames: string[]) {
     return outputs;
   }
   return expectedFilenames;
+}
+
+function validateTemplateFolderResponse(response: DataTemplateFolderResponse) {
+  if (response.folder_path.trim() === "" || response.folder_name.trim() === "") {
+    throw new Error(`Template folder path is invalid: ${response.folder_path || "(empty path)"}`);
+  }
+  if (response.files.length === 0) {
+    throw new Error("Template file generation failed: sidecar returned no workbook files.");
+  }
+  for (const templateFile of response.files) {
+    if (templateFile.filename.trim() === "" || templateFile.file_path.trim() === "") {
+      throw new Error(
+        `Template file generation failed: ${templateFile.chart_type} is missing its filename or path.`,
+      );
+    }
+  }
+}
+
+function formatTemplateBuildError(error: unknown) {
+  const detail = getErrorMessage(error).trim();
+  if (detail.includes(" -> http://") || detail.includes(" -> https://") || detail.includes(" -> ")) {
+    return detail;
+  }
+  if (
+    detail.startsWith("Template folder path is invalid:")
+    || detail.startsWith("Template file generation failed:")
+  ) {
+    return detail;
+  }
+  return `Sidecar materialize failed: ${detail}`;
+}
+
+function formatTemplateOpenError(error: unknown) {
+  return `Template folder generated, but opening it failed: ${getErrorMessage(error).trim()}`;
 }
 
 export function WizardScreen({
@@ -133,6 +180,12 @@ export function WizardScreen({
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const recentProjects = useWorkbenchStore((state) => state.recentProjects);
   const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [templateFolderBusy, setTemplateFolderBusy] = useState(false);
+  const [templateBuildError, setTemplateBuildError] = useState<string | null>(null);
+  const [templateOpenError, setTemplateOpenError] = useState<string | null>(null);
+  const [latestTemplateFolder, setLatestTemplateFolder] = useState<DataTemplateFolderResponse | null>(
+    null,
+  );
 
   const recommendation = wizard.inspection?.recommendation ?? null;
   const tensileCurveMode = isTensileCurveModel(wizard.inspection?.model);
@@ -372,6 +425,39 @@ export function WizardScreen({
     }
   };
 
+  const openTemplateFolder = async (variant: DataTemplateVariant) => {
+    setTemplateBuildError(null);
+    setTemplateOpenError(null);
+    setLatestTemplateFolder(null);
+    setTemplateFolderBusy(true);
+    try {
+      const response = await materializeDataTemplateFolder({ variant });
+      validateTemplateFolderResponse(response);
+      setLatestTemplateFolder(response);
+      try {
+        await openPath(response.folder_path);
+      } catch (error) {
+        setTemplateOpenError(formatTemplateOpenError(error));
+      }
+    } catch (error) {
+      setTemplateBuildError(formatTemplateBuildError(error));
+    } finally {
+      setTemplateFolderBusy(false);
+    }
+  };
+
+  const reopenTemplateFolder = async () => {
+    if (!latestTemplateFolder) {
+      return;
+    }
+    setTemplateOpenError(null);
+    try {
+      await openPath(latestTemplateFolder.folder_path);
+    } catch (error) {
+      setTemplateOpenError(formatTemplateOpenError(error));
+    }
+  };
+
   const reopenRecentData = async (path: string) => {
     if (
       !confirmReplaceWizardSession(
@@ -599,6 +685,15 @@ export function WizardScreen({
               <span className="signal-tag">XLSX / XLSM</span>
               <span className="signal-tag">Inspect runs automatically</span>
             </div>
+
+            <WizardDataTemplatesSection
+              buildError={templateBuildError}
+              openError={templateOpenError}
+              latestTemplateFolder={latestTemplateFolder}
+              loading={templateFolderBusy}
+              onBuildFolder={(variant) => void openTemplateFolder(variant)}
+              onOpenTemplateFolder={() => void reopenTemplateFolder()}
+            />
           </section>
 
           <aside className="plot-stage-rail">

@@ -13,8 +13,15 @@ const npmCommand = isWindows ? "npm.cmd" : "npm";
 const pythonCommand = isWindows
   ? path.join(repoRoot, ".venv", "Scripts", "python.exe")
   : path.join(repoRoot, ".venv", "bin", "python");
-const sidecarUrl = "http://127.0.0.1:8765/health";
+const sidecarBaseUrl = "http://127.0.0.1:8765";
+const sidecarUrl = `${sidecarBaseUrl}/health`;
+const sidecarOpenapiUrl = `${sidecarBaseUrl}/openapi.json`;
 const frontendUrl = "http://127.0.0.1:1420/";
+const requiredSidecarRoutes = [
+  { method: "get", path: "/meta" },
+  { method: "get", path: "/plot-contract" },
+  { method: "post", path: "/data-templates/folder" },
+];
 const tauriConfig = JSON.stringify({
   build: {
     beforeDevCommand: "true",
@@ -135,9 +142,59 @@ async function waitFor(description, predicate, options = {}) {
   throw new Error(`${description} 超时。`);
 }
 
-async function ensureService(name, url, factory) {
+async function sidecarHasRequiredRoutes() {
+  try {
+    const response = await fetch(sidecarOpenapiUrl);
+    if (!response.ok) {
+      return false;
+    }
+    const payload = await response.json();
+    const paths = payload?.paths ?? {};
+    return requiredSidecarRoutes.every(({ method, path }) => Boolean(paths?.[path]?.[method]));
+  } catch {
+    return false;
+  }
+}
+
+async function killSidecarListeners() {
+  if (isWindows) {
+    return;
+  }
+  try {
+    const { stdout } = await execFileAsync("lsof", ["-t", "-iTCP:8765", "-sTCP:LISTEN"]);
+    const pids = stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (pids.length === 0) {
+      return;
+    }
+    log(`清理不兼容 Sidecar 监听进程: ${pids.join(", ")}`);
+    for (const pid of pids) {
+      try {
+        await execFileAsync("kill", ["-TERM", pid]);
+      } catch {}
+    }
+    await sleep(500);
+    if (await httpOk(sidecarUrl)) {
+      for (const pid of pids) {
+        try {
+          await execFileAsync("kill", ["-KILL", pid]);
+        } catch {}
+      }
+      await sleep(500);
+    }
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === 1) {
+      return;
+    }
+    throw error;
+  }
+}
+
+async function ensureService(name, url, factory, readinessCheck = () => httpOk(url)) {
   log(`检查 ${name}...`);
-  if (await httpOk(url)) {
+  if (await readinessCheck()) {
     log(`${name} 已存在，复用当前服务。`);
     return null;
   }
@@ -149,7 +206,7 @@ async function ensureService(name, url, factory) {
     if (handle.child.exitCode !== null) {
       throw new Error(`${name} 提前退出。\n${summarizeLogs(handle)}`);
     }
-    return httpOk(url);
+    return readinessCheck();
   });
   log(`${name} 已启动。`);
   return handle;
@@ -187,8 +244,16 @@ async function main() {
     });
   }
 
-  const sidecarHandle = await ensureService("Sidecar", sidecarUrl, () =>
-    spawnManaged("sidecar", pythonCommand, ["-m", "app.sidecar.server"], repoRoot),
+  if ((await httpOk(sidecarUrl)) && !(await sidecarHasRequiredRoutes())) {
+    log("已发现不兼容的旧 Sidecar，准备替换。");
+    await killSidecarListeners();
+  }
+
+  const sidecarHandle = await ensureService(
+    "Sidecar",
+    sidecarUrl,
+    () => spawnManaged("sidecar", pythonCommand, ["-m", "app.sidecar.server"], repoRoot),
+    sidecarHasRequiredRoutes,
   );
   if (sidecarHandle) {
     log("Sidecar 使用仓库内 FastAPI 实例。");
@@ -226,7 +291,7 @@ async function main() {
     log(`native: ${line}`);
   }
 
-  if (!(await httpOk(sidecarUrl)) || !(await httpOk(frontendUrl))) {
+  if (!(await sidecarHasRequiredRoutes()) || !(await httpOk(frontendUrl))) {
     throw new Error("Tauri 启动后，前端或 sidecar 健康检查失败。");
   }
 

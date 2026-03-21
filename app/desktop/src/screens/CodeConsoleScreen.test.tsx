@@ -2,32 +2,24 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMocks = vi.hoisted(() => ({
-  exportCodeConsoleBundle: vi.fn(),
   generateCodeConsole: vi.fn(),
   openPath: vi.fn(),
-}));
-const dialogMocks = vi.hoisted(() => ({
-  openDialog: vi.fn(),
+  runCodeConsole: vi.fn(),
 }));
 const writeText = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../lib/api", () => ({
-  exportCodeConsoleBundle: apiMocks.exportCodeConsoleBundle,
   generateCodeConsole: apiMocks.generateCodeConsole,
   openPath: apiMocks.openPath,
+  runCodeConsole: apiMocks.runCodeConsole,
 }));
 
-vi.mock("../lib/tauri-dialog", () => ({
-  openDialog: dialogMocks.openDialog,
-}));
-
-import { useCodeConsoleStore, useWizardStore } from "../lib/store";
+import { useWizardStore } from "../lib/store";
 import { TEST_CONTRACT, TEST_META } from "../test/fixtures";
 import { CodeConsoleScreen } from "./CodeConsoleScreen";
 
 describe("CodeConsoleScreen", () => {
   beforeEach(() => {
-    useCodeConsoleStore.getState().reset();
     useWizardStore.getState().reset();
     useWizardStore.getState().setSidecarReady(true);
     Object.defineProperty(navigator, "clipboard", {
@@ -40,13 +32,27 @@ describe("CodeConsoleScreen", () => {
 
   afterEach(() => {
     apiMocks.generateCodeConsole.mockReset();
-    apiMocks.exportCodeConsoleBundle.mockReset();
     apiMocks.openPath.mockReset();
-    dialogMocks.openDialog.mockReset();
+    apiMocks.runCodeConsole.mockReset();
     writeText.mockClear();
   });
 
-  it("backs the generate request with the current plot session and renders sidecar output", async () => {
+  it("keeps the no-data state simple and sends the user back to Plot", () => {
+    const onNavigate = vi.fn();
+
+    render(<CodeConsoleScreen contract={TEST_CONTRACT} meta={TEST_META} onNavigate={onNavigate} />);
+
+    expect(screen.getByText("Start from Plot first")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Open a data file in Plot, confirm the current chart type/i),
+    ).toBeInTheDocument();
+    expect(apiMocks.generateCodeConsole).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Plot" }));
+    expect(onNavigate).toHaveBeenCalledWith("/plot/import");
+  });
+
+  it("auto-generates the fixed prompt from the current Plot session and copies it", async () => {
     act(() => {
       useWizardStore.getState().setInputPath("/tmp/session_curve.csv");
       useWizardStore.getState().setSheet("Sheet1");
@@ -66,6 +72,10 @@ describe("CodeConsoleScreen", () => {
       useWizardStore.getState().setTemplate("point_line");
       useWizardStore.getState().setOptions({
         size: "120x55",
+        xscale: "log",
+        yscale: "linear",
+        reverse_x: true,
+        baseline: "linear_endpoints",
         style_preset: "nature",
         palette_preset: "colorblind_safe",
       });
@@ -93,6 +103,11 @@ describe("CodeConsoleScreen", () => {
         size_id: "120x55",
         style_preset: "nature",
         palette_preset: "colorblind_safe",
+        xscale: "log",
+        yscale: "linear",
+        reverse_x: true,
+        baseline: "linear_endpoints",
+        show_colorbar: false,
         intent: "custom_plot",
         target_path: "src/rendering/custom_point_line_helper.py",
       },
@@ -132,12 +147,12 @@ describe("CodeConsoleScreen", () => {
           style_preset: "nature",
           palette_preset: "colorblind_safe",
         },
-        interpreted_summary: {},
+        interpreted_summary: { roles: { x: "Time", y: "Stress" } },
         full_data_rows: 10,
         full_data_columns: 3,
       },
-      prompt_text: "repo-native prompt",
-      scaffold_text: "repo-native scaffold",
+      prompt_text: "repo-native incremental prompt",
+      scaffold_text: "unused scaffold",
       lightweight_bundle: {
         text: "lightweight context",
         includes_data_context: true,
@@ -149,60 +164,198 @@ describe("CodeConsoleScreen", () => {
 
     render(<CodeConsoleScreen contract={TEST_CONTRACT} meta={TEST_META} />);
 
-    fireEvent.change(screen.getByLabelText("Code console brief"), {
-      target: { value: "做一个 repo-native 的 broken axis point-line 图。" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Generate AI bridge" }));
-
     await waitFor(() => expect(apiMocks.generateCodeConsole).toHaveBeenCalledTimes(1));
     expect(apiMocks.generateCodeConsole.mock.calls[0]?.[0]).toMatchObject({
+      intent: "custom_plot",
+      brief: "",
       base_template: "point_line",
-      size: "120x55",
-      style_preset: "nature",
-      palette_preset: "colorblind_safe",
       input_path: "/tmp/session_curve.csv",
       sheet: "Sheet1",
       include_data_context: true,
       include_inspection_summary: true,
+      include_project_context: false,
+      options: {
+        size: "120x55",
+        xscale: "log",
+        yscale: "linear",
+        reverse_x: true,
+        baseline: "linear_endpoints",
+        style_preset: "nature",
+        palette_preset: "colorblind_safe",
+      },
     });
-    expect(screen.getByLabelText("Generated AI prompt")).toHaveTextContent("repo-native prompt");
-    expect(screen.getByLabelText("Generated Python scaffold")).toHaveTextContent(
-      "repo-native scaffold",
+
+    expect(screen.getByText("Use the active Plot session as the source of truth")).toBeInTheDocument();
+    expect(screen.getByLabelText("Generated AI prompt")).toHaveTextContent(
+      "repo-native incremental prompt",
+    );
+
+    const details = screen.getByText("Context details").closest("details");
+    expect(details?.open).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy prompt" }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("repo-native incremental prompt"),
     );
   });
 
-  it("keeps full-data export opt-in and disables data context toggles when no data is bound", async () => {
-    dialogMocks.openDialog.mockResolvedValue("/tmp/ai-bundle");
-    apiMocks.exportCodeConsoleBundle.mockResolvedValue({
-      bundle_dir: "/tmp/ai-bundle/bundle",
-      zip_path: "/tmp/ai-bundle/bundle.zip",
-      manifest_path: "/tmp/ai-bundle/bundle/manifest.json",
-      exported_files: [],
-      includes_full_data: true,
+  it("runs pasted Python in the repo-native runner and surfaces outputs", async () => {
+    act(() => {
+      useWizardStore.getState().setInputPath("/tmp/session_curve.csv");
+      useWizardStore.getState().setSheet(0);
+      useWizardStore.getState().setProjectPath("/tmp/current.plotproject.json");
+      useWizardStore.getState().setInspection({
+        model: "curve_table",
+        model_label: "Curve table",
+        recommendation: {
+          template: "curve",
+          reason: "Default curve.",
+          size: "60x55",
+          style_preset: "default",
+          palette_preset: "colorblind_safe",
+        },
+        warnings: [],
+        signals: [],
+      });
+      useWizardStore.getState().setTemplate("curve");
+      useWizardStore.getState().setOptions({
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      });
+    });
+
+    apiMocks.generateCodeConsole.mockResolvedValue({
+      bundle_version: 1,
+      generated_at: "2026-03-21T12:00:00Z",
+      contract: {
+        version: 1,
+        sha256: "a".repeat(64),
+        default_style: "default",
+        default_palette: "colorblind_safe",
+      },
+      session: {
+        session_id: "session_demo",
+        session_source: "wizard",
+        input_path: "/tmp/session_curve.csv",
+        input_display_path: "session_curve.csv",
+        input_filename: "session_curve.csv",
+        sheet: 0,
+        sheet_names: ["Sheet1"],
+        template: "curve",
+        size_label: "60 x 55 mm",
+        size_id: "60x55",
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        baseline: "none",
+        show_colorbar: false,
+        intent: "custom_plot",
+        target_path: "src/rendering/custom_curve_helper.py",
+      },
+      defaults_panel: {
+        locked_by_contract: [],
+        user_selectable: [],
+        derived_from_session: [],
+      },
       truth_sources: [],
+      data_context: {
+        available: true,
+        model: "curve_table",
+        model_label: "Curve table",
+        raw_row_count: 10,
+        raw_column_count: 4,
+        column_names: ["Time", "Stress"],
+        normalized_columns: ["sample", "x", "y"],
+        column_summaries: [],
+        sample_rows: [],
+        normalized_preview_rows: [],
+        missing_summary: { empty_cells: 0, rows: 10, columns: 4 },
+        inspection: { warnings: [], signals: [] },
+        recommendation: {
+          template: "curve",
+          reason: "Default curve.",
+          size: "60x55",
+          style_preset: "default",
+          palette_preset: "colorblind_safe",
+        },
+        interpreted_summary: {},
+        full_data_rows: 10,
+        full_data_columns: 3,
+      },
+      prompt_text: "repo-native incremental prompt",
+      scaffold_text: "unused scaffold",
+      lightweight_bundle: {
+        text: "lightweight context",
+        includes_data_context: true,
+        includes_inspection_summary: true,
+        includes_project_context: true,
+        includes_full_data: false,
+      },
+    });
+    apiMocks.runCodeConsole.mockResolvedValue({
+      generated_at: "2026-03-21T12:03:00Z",
+      output_dir: "/tmp/code-console/session_demo",
+      stdout: "render ok",
+      stderr: "",
+      exit_code: 0,
+      timed_out: false,
+      duration_ms: 321,
+      generated_files: [
+        {
+          path: "/tmp/code-console/session_demo/outputs/custom_curve.pdf",
+          filename: "custom_curve.pdf",
+          kind: "pdf",
+        },
+      ],
+      previews: [
+        {
+          filename: "custom_curve.preview.png",
+          png_base64: "aGVsbG8=",
+          qa: null,
+        },
+      ],
     });
 
     render(<CodeConsoleScreen contract={TEST_CONTRACT} meta={TEST_META} />);
 
-    expect(screen.getByText(/No current data file is bound to Plot/i)).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /Attach current data context/i })).toBeDisabled();
+    await waitFor(() => expect(apiMocks.generateCodeConsole).toHaveBeenCalledTimes(1));
 
-    act(() => {
-      useWizardStore.getState().setInputPath("/tmp/session_curve.csv");
-      useWizardStore.getState().setSheet(0);
-      useWizardStore.getState().setProjectPath("/tmp/session.plotproject.json");
+    fireEvent.change(screen.getByLabelText("Code console runner input"), {
+      target: { value: "print('render ok')" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Opt in to full-data export/i }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Attach current project context/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Export full-data bundle" }));
-
-    await waitFor(() => expect(apiMocks.exportCodeConsoleBundle).toHaveBeenCalledTimes(1));
-    expect(apiMocks.exportCodeConsoleBundle.mock.calls[0]?.[0]).toMatchObject({
-      include_full_data: true,
-      project_path: "/tmp/session.plotproject.json",
+    await waitFor(() => expect(apiMocks.runCodeConsole).toHaveBeenCalledTimes(1));
+    expect(apiMocks.runCodeConsole.mock.calls[0]?.[0]).toMatchObject({
+      code: "print('render ok')",
+      base_template: "curve",
+      input_path: "/tmp/session_curve.csv",
+      sheet: 0,
+      project_path: "/tmp/current.plotproject.json",
       include_project_context: true,
-      output_dir: "/tmp/ai-bundle",
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      },
     });
+
+    expect(screen.getByText("render ok")).toBeInTheDocument();
+    expect(screen.getByText("custom_curve.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/exit 0 · 321 ms · 1 file/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open output folder" }));
+    await waitFor(() =>
+      expect(apiMocks.openPath).toHaveBeenCalledWith("/tmp/code-console/session_demo"),
+    );
   });
 });

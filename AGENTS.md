@@ -22,6 +22,7 @@
 - `Launch_Plotter.command`: 桌面端唯一启动器；只负责拉起当前 Tauri 开发宿主，失败时直接报错，不再提供任何 PySide / 终端 fallback。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
 - `scripts/debug_refresh.py`: 人工审图刷新脚本；始终重刷 review fixtures，真实数据输入统一走 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`。
+- `scripts/clean_repo.py`: 仓库级清理入口；默认清掉缓存、`.DS_Store`、临时目录、桌面构建产物和 `.venv-*` 这类备份环境，只有显式传 `--include-node-modules` 才会进一步删掉桌面端依赖目录。
 - `pyproject.toml`: Python 工具配置入口；`pytest / ruff / mypy / coverage` 都从这里读配置。
 - `requirements.txt` + `requirements-constraints.txt`: Python 顶层依赖与版本约束；统一用 `pip install -r requirements.txt` 安装，约束文件会自动生效。
 - `.python-version` / `.nvmrc`: 开发态固定语言版本；当前分别锁定 `Python 3.14.3` 与 `Node 20`。
@@ -63,8 +64,11 @@
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - 最近记录现在由 `Launchpad` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
-- `code-console` 工作台现在是 AI-assisted repository coding workspace：前端负责绑定当前 plot session / data / project 上下文并编排交互，sidecar 负责生成最终 prompt、starter scaffold、lightweight AI context bundle 和显式 opt-in 的 full-data AI bundle。
-- `code-console` / AI bundle 仍然不是新的绘图事实源；不要把 contract 常量、视觉默认值或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt/scaffold 正文。
+- `wizard` 导入阶段现在可以一键触发 sidecar materialize `example template folder / blank template folder`；文件夹里按图类型落真实 workbook 文件。这些模板和 folder 只是输入模板、格式引导与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
+- `code-console` 工作台现在收敛为“当前图上下文打包器 + repo-native Python runner”：前端负责绑定当前 plot session / data / project 上下文、展示固定 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
+- `code-console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
+- `code-console` 的主流程是 `Copy prompt -> Ask external AI -> Paste code -> Run`；无数据状态只保留回到 Plot 的 CTA，不再在 GUI 里提供复杂需求 builder 退化路径。
+- `code-console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。
 - `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
 - Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
 - 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
@@ -125,11 +129,16 @@
 3. 契约变更后，立即更新文档：
    - `.venv/bin/python scripts/generate_plot_contract_docs.py`
 4. 再同步改 Python、sidecar、desktop 实现，并确认 sidecar `/meta` 与 GUI 选项一致。
-5. 最后跑对应回归，不要跳过 smoke、build、test、check。
-6. 任何改动只要影响开发说明、运行约束、目录职责、验证命令、接口边界或项目工作流，必须在同一轮同步更新本说明；不要把文档更新留到“之后再补”。
+5. 代码改动完成后，先运行 `.venv/bin/python scripts/clean_repo.py` 清理缓存、`.DS_Store`、临时目录、桌面构建产物和 `.venv-*` 备份环境；只有明确接受重装成本时，才额外显式传 `--include-node-modules`。
+6. 再跑对应回归，不要跳过 smoke、build、test、check。
+7. 任何改动只要影响开发说明、运行约束、目录职责、验证命令、接口边界或项目工作流，必须在同一轮同步更新本说明；不要把文档更新留到“之后再补”。
 
 ## 验证命令
 
+- 开发缓存清理：
+  - `.venv/bin/python scripts/clean_repo.py`
+- 开发缓存清理预演：
+  - `.venv/bin/python scripts/clean_repo.py --dry-run`
 - Python 静态检查：
   - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
 - Python 类型检查：
@@ -225,6 +234,7 @@
 - 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 tensile 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
 - `scripts/debug_refresh.py` 的真实数据入口只认 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`；不要把个人绝对路径或私有目录结构写回仓库。
+- `scripts/clean_repo.py` 默认不应删除当前激活的 `.venv`；如果要清 `app/desktop/node_modules/`，必须显式传 `--include-node-modules`，不要把“重装成本高”的依赖目录做成隐式默认删除项。
 
 ## 拉伸预处理夹具
 

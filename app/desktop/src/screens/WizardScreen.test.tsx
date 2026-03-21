@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { exportRender, openPath, preflightRender, renderPreview } from "../lib/api";
+import {
+  exportRender,
+  materializeDataTemplateFolder,
+  openPath,
+  preflightRender,
+  renderPreview,
+} from "../lib/api";
 import { loadWizardDataFile } from "../lib/project-io";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type { InspectResponse, PlotStage } from "../lib/types";
@@ -64,6 +70,7 @@ vi.mock("../lib/api", async () => {
     openPath: vi.fn().mockResolvedValue({
       output_path: "/tmp/exports",
     }),
+    materializeDataTemplateFolder: vi.fn(),
   };
 });
 
@@ -113,6 +120,7 @@ describe("WizardScreen", () => {
     vi.mocked(renderPreview).mockReset();
     vi.mocked(exportRender).mockReset();
     vi.mocked(openPath).mockReset();
+    vi.mocked(materializeDataTemplateFolder).mockReset();
     vi.mocked(loadWizardDataFile).mockReset();
     vi.mocked(preflightRender).mockResolvedValue({
       input_path: "/tmp/curve.csv",
@@ -153,6 +161,34 @@ describe("WizardScreen", () => {
     vi.mocked(openPath).mockResolvedValue({
       output_path: "/tmp/exports",
     });
+    vi.mocked(materializeDataTemplateFolder).mockResolvedValue({
+      variant: "blank",
+      folder_path: "/tmp/templates/codegod-blank-template-folder-demo",
+      folder_name: "codegod-blank-template-folder-demo",
+      chart_types: ["curve", "scatter", "bar", "boxplot", "heatmap"],
+      files: [
+        {
+          chart_type: "curve",
+          label: "Curve",
+          template_id: "curve",
+          filename: "curve_blank.xlsx",
+          file_path: "/tmp/templates/codegod-blank-template-folder-demo/curve_blank.xlsx",
+          input_model: "curve_table",
+          source_template_id: "curve_table",
+          format_summary: "Paired x/y columns with units and sample headers.",
+        },
+        {
+          chart_type: "boxplot",
+          label: "Boxplot",
+          template_id: "box",
+          filename: "boxplot_blank.xlsx",
+          file_path: "/tmp/templates/codegod-blank-template-folder-demo/boxplot_blank.xlsx",
+          input_model: "replicate_table",
+          source_template_id: "replicate_table",
+          format_summary: "Replicate columns with shared value labels and units.",
+        },
+      ],
+    });
     vi.mocked(loadWizardDataFile).mockResolvedValue(TEST_INSPECT_RESPONSE);
     useWizardStore.getState().reset();
     useWorkbenchStore.setState({
@@ -173,7 +209,117 @@ describe("WizardScreen", () => {
 
     expect(screen.getByText("Import a data file")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open example template folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open blank template folder" })).toBeInTheDocument();
     expect(screen.getByText("Recent data files")).toBeInTheDocument();
+  });
+
+  it("builds and opens a blank template folder directly from the import stage", async () => {
+    renderStage("import");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+
+    await waitFor(() => expect(materializeDataTemplateFolder).toHaveBeenCalledTimes(1));
+    expect(materializeDataTemplateFolder).toHaveBeenCalledWith({
+      variant: "blank",
+    });
+    expect(openPath).toHaveBeenCalledWith("/tmp/templates/codegod-blank-template-folder-demo");
+    expect(screen.getByText("codegod-blank-template-folder-demo")).toBeInTheDocument();
+    expect(
+      screen.getByText("/tmp/templates/codegod-blank-template-folder-demo"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 template files generated")).toBeInTheDocument();
+    expect(screen.getByText("curve_blank.xlsx")).toBeInTheDocument();
+    expect(screen.getByText("boxplot_blank.xlsx")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open template folder again" }));
+    await waitFor(() =>
+      expect(openPath).toHaveBeenCalledWith("/tmp/templates/codegod-blank-template-folder-demo"),
+    );
+    expect(loadWizardDataFile).not.toHaveBeenCalled();
+  });
+
+  it("shows loading immediately while the template folder is being materialized", async () => {
+    let resolveFolder:
+      | ((value: Awaited<ReturnType<typeof materializeDataTemplateFolder>>) => void)
+      | undefined;
+    vi.mocked(materializeDataTemplateFolder).mockImplementation(
+      () =>
+        new Promise<Awaited<ReturnType<typeof materializeDataTemplateFolder>>>((resolve) => {
+          resolveFolder = resolve;
+        }),
+    );
+
+    renderStage("import");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open example template folder" }));
+
+    expect(screen.getAllByRole("button", { name: "Building…" })).toHaveLength(2);
+
+    await act(async () => {
+      resolveFolder?.({
+        variant: "example",
+        folder_path: "/tmp/templates/codegod-example-template-folder-demo",
+        folder_name: "codegod-example-template-folder-demo",
+        chart_types: ["curve", "boxplot"],
+        files: [
+          {
+            chart_type: "curve",
+            label: "Curve",
+            template_id: "curve",
+            filename: "curve_example.xlsx",
+            file_path: "/tmp/templates/codegod-example-template-folder-demo/curve_example.xlsx",
+            input_model: "curve_table",
+            source_template_id: "curve_table",
+            format_summary: "Paired x/y columns with units and sample headers.",
+          },
+          {
+            chart_type: "boxplot",
+            label: "Boxplot",
+            template_id: "box",
+            filename: "boxplot_example.xlsx",
+            file_path: "/tmp/templates/codegod-example-template-folder-demo/boxplot_example.xlsx",
+            input_model: "replicate_table",
+            source_template_id: "replicate_table",
+            format_summary: "Replicate columns with shared value labels and units.",
+          },
+        ],
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("codegod-example-template-folder-demo")).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the success state when opening the generated template folder fails", async () => {
+    vi.mocked(openPath).mockRejectedValueOnce(new Error("Not Found"));
+
+    renderStage("import");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("codegod-blank-template-folder-demo")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("curve_blank.xlsx")).toBeInTheDocument();
+    expect(
+      screen.getByText("Template folder generated, but opening it failed: Not Found"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a build error without leaving a stale success state when materialize fails", async () => {
+    vi.mocked(materializeDataTemplateFolder).mockRejectedValueOnce(new Error("Not Found"));
+
+    renderStage("import");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Sidecar materialize failed: Not Found")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("codegod-blank-template-folder-demo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open template folder again" })).not.toBeInTheDocument();
   });
 
   it("shows a sheet selector stage for multi-sheet inputs", () => {

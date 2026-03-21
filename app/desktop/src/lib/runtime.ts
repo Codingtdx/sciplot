@@ -4,16 +4,24 @@ import type {
   CodeConsoleDataContext,
   CodeConsoleDefaultsPanel,
   CodeConsoleExportResponse,
+  CodeConsoleGeneratedFile,
   CodeConsoleGenerateResponse,
   CodeConsoleInspectionSummary,
   CodeConsoleLightweightBundle,
   CodeConsoleReasonedValue,
   CodeConsoleRecommendationSummary,
+  CodeConsoleRunResponse,
   CodeConsoleSessionSummary,
   CodeConsoleTruthSource,
+  DataTemplateCatalogItem,
+  DataTemplateCatalogResponse,
+  DataTemplateFolderFile,
+  DataTemplateFolderResponse,
+  DataTemplateMaterializeResponse,
   EditableRenderOption,
   PalettePreset,
   PlotContract,
+  PreviewItem,
   RenderOptionsPayload,
   SizePreset,
   StylePreset,
@@ -427,6 +435,45 @@ function readCodeConsoleDataContext(value: unknown, label: string): CodeConsoleD
   };
 }
 
+function readPreviewItem(value: unknown, label: string): PreviewItem {
+  const record = requireRecord(value, label);
+  return {
+    filename: requireString(record.filename, `${label}.filename`),
+    png_base64: requireString(record.png_base64, `${label}.png_base64`),
+    qa: null,
+  };
+}
+
+function readDataTemplateCatalogItem(value: unknown, label: string): DataTemplateCatalogItem {
+  const record = requireRecord(value, label);
+  return {
+    chart_type: requireString(record.chart_type, `${label}.chart_type`),
+    label: requireString(record.label, `${label}.label`),
+    filename_stem: requireString(record.filename_stem, `${label}.filename_stem`),
+    template_id: requireString(record.template_id, `${label}.template_id`),
+    input_model: requireString(record.input_model, `${label}.input_model`),
+    source_template_id: requireString(
+      record.source_template_id,
+      `${label}.source_template_id`,
+    ),
+    format_summary: requireString(record.format_summary, `${label}.format_summary`),
+  };
+}
+
+function readDataTemplateFolderFile(value: unknown, label: string): DataTemplateFolderFile {
+  const record = requireRecord(value, label);
+  return {
+    chart_type: requireString(record.chart_type, `${label}.chart_type`),
+    label: requireString(record.label, `${label}.label`),
+    template_id: requireString(record.template_id, `${label}.template_id`),
+    filename: requireString(record.filename, `${label}.filename`),
+    file_path: requireString(record.file_path, `${label}.file_path`),
+    input_model: requireString(record.input_model, `${label}.input_model`),
+    source_template_id: requireString(record.source_template_id, `${label}.source_template_id`),
+    format_summary: requireString(record.format_summary, `${label}.format_summary`),
+  };
+}
+
 export function coerceWorkbenchMeta(value: unknown): WorkbenchMeta {
   const record = requireRecord(value, "Workbench meta");
   const defaults = requireRecord(record.defaults, "Workbench meta.defaults");
@@ -506,6 +553,90 @@ export function coercePlotContract(value: unknown): PlotContract {
     palettes: readLooseRecordMap(record.palettes ?? {}, "Plot contract.palettes"),
     templates: readLooseRecordMap(record.templates ?? {}, "Plot contract.templates"),
     validation_rules: readLooseRecordMap(record.validation_rules ?? {}, "Plot contract.validation_rules"),
+  };
+}
+
+export function coerceDataTemplateCatalog(value: unknown): DataTemplateCatalogResponse {
+  const record = requireRecord(value, "Data template catalog response");
+  return {
+    templates: Array.isArray(record.templates)
+      ? record.templates.map((item, index) =>
+          readDataTemplateCatalogItem(item, `Data template catalog response.templates[${index}]`),
+        )
+      : [],
+  };
+}
+
+export function coerceDataTemplateMaterializeResponse(
+  value: unknown,
+): DataTemplateMaterializeResponse {
+  const record = requireRecord(value, "Materialize data template response");
+  const variant = requireString(record.variant, "Materialize data template response.variant");
+  if (variant !== "example" && variant !== "blank") {
+    throw new Error("Materialize data template response.variant is missing or invalid.");
+  }
+  return {
+    template_id: requireString(
+      record.template_id,
+      "Materialize data template response.template_id",
+    ),
+    variant,
+    label: requireString(record.label, "Materialize data template response.label"),
+    input_model: requireString(
+      record.input_model,
+      "Materialize data template response.input_model",
+    ),
+    typical_families: requireStringArray(
+      record.typical_families ?? [],
+      "Materialize data template response.typical_families",
+    ),
+    format_summary: requireString(
+      record.format_summary,
+      "Materialize data template response.format_summary",
+    ),
+    file_path: requireString(
+      record.file_path,
+      "Materialize data template response.file_path",
+    ),
+    filename: requireString(record.filename, "Materialize data template response.filename"),
+    sheet_name: requireString(
+      record.sheet_name,
+      "Materialize data template response.sheet_name",
+    ),
+  };
+}
+
+export function coerceDataTemplateFolderResponse(value: unknown): DataTemplateFolderResponse {
+  const record = requireRecord(value, "Materialize data template folder response");
+  const variant = requireString(
+    record.variant,
+    "Materialize data template folder response.variant",
+  );
+  if (variant !== "example" && variant !== "blank") {
+    throw new Error("Materialize data template folder response.variant is missing or invalid.");
+  }
+  return {
+    variant,
+    folder_path: requireString(
+      record.folder_path,
+      "Materialize data template folder response.folder_path",
+    ),
+    folder_name: requireString(
+      record.folder_name,
+      "Materialize data template folder response.folder_name",
+    ),
+    chart_types: requireStringArray(
+      record.chart_types ?? [],
+      "Materialize data template folder response.chart_types",
+    ),
+    files: Array.isArray(record.files)
+      ? record.files.map((item, index) =>
+          readDataTemplateFolderFile(
+            item,
+            `Materialize data template folder response.files[${index}]`,
+          ),
+        )
+      : [],
   };
 }
 
@@ -598,6 +729,17 @@ export function coerceCodeConsoleGenerateResponse(value: unknown): CodeConsoleGe
       session.palette_preset,
       "Code Console generate response.session.palette_preset",
     ) as PalettePreset,
+    xscale: optionalScale(session.xscale) ?? "linear",
+    yscale: optionalScale(session.yscale) ?? "linear",
+    reverse_x: requireBoolean(
+      session.reverse_x,
+      "Code Console generate response.session.reverse_x",
+    ),
+    baseline: optionalBaseline(session.baseline) ?? "none",
+    show_colorbar: requireBoolean(
+      session.show_colorbar,
+      "Code Console generate response.session.show_colorbar",
+    ),
     intent: requireString(session.intent, "Code Console generate response.session.intent"),
     target_path: requireString(session.target_path, "Code Console generate response.session.target_path"),
   };
@@ -674,5 +816,38 @@ export function coerceCodeConsoleExportResponse(value: unknown): CodeConsoleExpo
       "Code Console export response.includes_full_data",
     ),
     truth_sources: truthSources,
+  };
+}
+
+export function coerceCodeConsoleRunResponse(value: unknown): CodeConsoleRunResponse {
+  const record = requireRecord(value, "Code Console run response");
+  const generatedFiles = Array.isArray(record.generated_files)
+    ? record.generated_files.map((item, index): CodeConsoleGeneratedFile => {
+        const file = requireRecord(item, `Code Console run response.generated_files[${index}]`);
+        return {
+          path: requireString(file.path, `Code Console run response.generated_files[${index}].path`),
+          filename: requireString(
+            file.filename,
+            `Code Console run response.generated_files[${index}].filename`,
+          ),
+          kind: requireString(file.kind, `Code Console run response.generated_files[${index}].kind`),
+        };
+      })
+    : [];
+  const previews = Array.isArray(record.previews)
+    ? record.previews.map((item, index) =>
+        readPreviewItem(item, `Code Console run response.previews[${index}]`),
+      )
+    : [];
+  return {
+    generated_at: requireString(record.generated_at, "Code Console run response.generated_at"),
+    output_dir: requireString(record.output_dir, "Code Console run response.output_dir"),
+    stdout: typeof record.stdout === "string" ? record.stdout : "",
+    stderr: typeof record.stderr === "string" ? record.stderr : "",
+    exit_code: requireNumber(record.exit_code, "Code Console run response.exit_code"),
+    timed_out: requireBoolean(record.timed_out, "Code Console run response.timed_out"),
+    duration_ms: requireNumber(record.duration_ms, "Code Console run response.duration_ms"),
+    generated_files: generatedFiles,
+    previews,
   };
 }

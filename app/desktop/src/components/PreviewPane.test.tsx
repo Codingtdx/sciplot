@@ -13,7 +13,7 @@ describe("PreviewPane", () => {
     const scrollBy = vi.fn();
 
     render(
-      <div className="app-main">
+      <div className="app-main" data-scroll-root="workspace">
         <PreviewPane
           busy={false}
           error={null}
@@ -47,7 +47,7 @@ describe("PreviewPane", () => {
 
   it("zooms only on Ctrl/Cmd plus wheel and double click resets to fit", () => {
     render(
-      <div className="app-main">
+      <div className="app-main" data-scroll-root="workspace">
         <PreviewPane
           busy={false}
           error={null}

@@ -248,6 +248,60 @@ class MetaResponse(StrictModel):
     default_palette: str
 
 
+class DataTemplateSummaryResponse(StrictModel):
+    chart_type: str
+    label: str
+    filename_stem: str
+    template_id: str
+    input_model: str
+    source_template_id: str
+    format_summary: str
+
+
+class DataTemplateCatalogResponse(StrictModel):
+    templates: list[DataTemplateSummaryResponse]
+
+
+class MaterializeDataTemplateRequest(StrictModel):
+    template_id: str
+    variant: Literal["example", "blank"]
+
+
+class MaterializeDataTemplateResponse(StrictModel):
+    template_id: str
+    variant: Literal["example", "blank"]
+    label: str
+    input_model: str
+    typical_families: list[str]
+    format_summary: str
+    file_path: str
+    filename: str
+    sheet_name: str
+
+
+class DataTemplateFolderFileResponse(StrictModel):
+    chart_type: str
+    label: str
+    template_id: str
+    filename: str
+    file_path: str
+    input_model: str
+    source_template_id: str
+    format_summary: str
+
+
+class MaterializeDataTemplateFolderRequest(StrictModel):
+    variant: Literal["example", "blank"]
+
+
+class MaterializeDataTemplateFolderResponse(StrictModel):
+    variant: Literal["example", "blank"]
+    folder_path: str
+    folder_name: str
+    chart_types: list[str]
+    files: list[DataTemplateFolderFileResponse]
+
+
 class PlotContractAliasesResponse(StrictModel):
     style_presets: dict[str, str]
 
@@ -591,6 +645,7 @@ class CodeConsoleGenerateRequest(StrictModel):
     intent: Literal["custom_plot", "patch_renderer", "annotation_tweak"] = "custom_plot"
     brief: str = ""
     base_template: str
+    options: RenderOptionsPayload | None = None
     size: str | None = None
     style_preset: str | None = None
     palette_preset: str | None = None
@@ -653,6 +708,11 @@ class CodeConsoleSessionResponse(StrictModel):
     size_id: str
     style_preset: str
     palette_preset: str
+    xscale: str
+    yscale: str
+    reverse_x: bool
+    baseline: str
+    show_colorbar: bool
     intent: str
     target_path: str
 
@@ -727,6 +787,34 @@ class CodeConsoleExportResponse(StrictModel):
     exported_files: list[str]
     includes_full_data: bool
     truth_sources: list[CodeConsoleTruthSourceResponse]
+
+
+class CodeConsoleRunRequest(StrictModel):
+    code: str
+    base_template: str
+    options: RenderOptionsPayload | None = None
+    input_path: str
+    sheet: str | int = 0
+    project_path: str | None = None
+    include_project_context: bool = False
+
+
+class CodeConsoleGeneratedFileResponse(StrictModel):
+    path: str
+    filename: str
+    kind: str
+
+
+class CodeConsoleRunResponse(StrictModel):
+    generated_at: str
+    output_dir: str
+    stdout: str
+    stderr: str
+    exit_code: int
+    timed_out: bool
+    duration_ms: int
+    generated_files: list[CodeConsoleGeneratedFileResponse]
+    previews: list[PreviewItemResponse]
 
 
 def serialize_dataclass(value: Any) -> Any:

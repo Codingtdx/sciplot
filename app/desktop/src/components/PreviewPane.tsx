@@ -48,11 +48,8 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
   };
 
   const handleWheel: React.WheelEventHandler<HTMLDivElement> = (event) => {
-    if (!current) {
-      return;
-    }
     if (!event.ctrlKey && !event.metaKey) {
-      const appMain = containerRef.current?.closest(".app-main");
+      const appMain = containerRef.current?.closest<HTMLElement>("[data-scroll-root='workspace']");
       if (appMain instanceof HTMLElement) {
         appMain.scrollBy({
           top: event.deltaY,
@@ -61,6 +58,9 @@ export function PreviewPane({ previews, previewIndex, onChangeIndex, busy, error
         });
         event.preventDefault();
       }
+      return;
+    }
+    if (!current) {
       return;
     }
     const modes: Array<"fit" | "100" | "150" | "200"> = ["fit", "100", "150", "200"];

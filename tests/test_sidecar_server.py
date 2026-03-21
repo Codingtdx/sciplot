@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.sidecar import server
 from app.sidecar.server import app
+from src.rendering import code_console as code_console_module
 from src.tensile_replicates import export_tensile_replicate_workbook
 
 client = TestClient(app)
@@ -88,6 +89,16 @@ def test_plot_contract_endpoint_exposes_validation_rules() -> None:
     assert "validation_rules" in payload
     assert "templates" in payload
     assert "curve" in payload["templates"]
+
+
+def test_openapi_exposes_required_template_folder_route() -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "get" in payload["paths"]["/meta"]
+    assert "get" in payload["paths"]["/plot-contract"]
+    assert "post" in payload["paths"]["/data-templates/folder"]
 
 
 def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> None:
@@ -207,6 +218,189 @@ def test_code_console_export_bundle_writes_manifest_and_full_data_artifacts(tmp_
         source["id"] == "generated_bundle" and "canonical package" in source["reason"]
         for source in payload["truth_sources"]
     )
+
+
+def test_data_template_catalog_and_materialize_flow() -> None:
+    response = client.get("/data-templates")
+
+    assert response.status_code == 200
+    payload = response.json()
+    template_ids = {item["chart_type"] for item in payload["templates"]}
+    assert {
+        "curve",
+        "point_line",
+        "scatter",
+        "stacked_curve",
+        "segmented_stacked_curve",
+        "bar",
+        "boxplot",
+        "violin",
+        "heatmap",
+    }.issubset(template_ids)
+
+    materialized = client.post(
+        "/data-templates/materialize",
+        json={"template_id": "curve_table", "variant": "blank"},
+    )
+
+    assert materialized.status_code == 200
+    template_payload = materialized.json()
+    template_path = Path(template_payload["file_path"])
+    assert template_payload["variant"] == "blank"
+    assert template_payload["sheet_name"] == "Template"
+    assert template_path.exists()
+
+    workbook = pd.ExcelFile(template_path)
+    assert workbook.sheet_names == ["Template", "README"]
+    template_sheet = workbook.parse("Template", header=None)
+    assert template_sheet.iloc[0, 0] == "X label"
+    assert template_sheet.iloc[2, 0] == "Sample 1"
+
+
+def test_data_template_folder_materializes_chart_type_files() -> None:
+    response = client.post(
+        "/data-templates/folder",
+        json={"variant": "example"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    folder_path = Path(payload["folder_path"])
+    assert payload["variant"] == "example"
+    assert folder_path.exists()
+    assert folder_path.is_dir()
+    filenames = {item["filename"] for item in payload["files"]}
+    assert {
+        "curve_example.xlsx",
+        "point_line_example.xlsx",
+        "scatter_example.xlsx",
+        "stacked_curve_example.xlsx",
+        "segmented_stacked_curve_example.xlsx",
+        "bar_example.xlsx",
+        "boxplot_example.xlsx",
+        "violin_example.xlsx",
+        "heatmap_example.xlsx",
+    }.issubset(filenames)
+    assert all(Path(item["file_path"]).parent == folder_path for item in payload["files"])
+
+    curve_example = next(
+        Path(item["file_path"])
+        for item in payload["files"]
+        if item["filename"] == "curve_example.xlsx"
+    )
+    workbook = pd.ExcelFile(curve_example)
+    assert workbook.sheet_names == ["Template", "README"]
+    workbook.close()
+
+    blank_response = client.post(
+        "/data-templates/folder",
+        json={"variant": "blank"},
+    )
+
+    assert blank_response.status_code == 200
+    blank_payload = blank_response.json()
+    blank_folder_path = Path(blank_payload["folder_path"])
+    assert blank_folder_path.exists()
+    assert all(Path(item["file_path"]).exists() for item in blank_payload["files"])
+
+    boxplot_blank = next(
+        Path(item["file_path"])
+        for item in blank_payload["files"]
+        if item["filename"] == "boxplot_blank.xlsx"
+    )
+    blank_workbook = pd.ExcelFile(boxplot_blank)
+    assert blank_workbook.sheet_names == ["Template", "README"]
+    blank_workbook.close()
+
+
+def test_data_template_folder_surfaces_materialize_validation_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def broken_materialize(*, variant: str) -> dict[str, object]:
+        raise FileNotFoundError(f"Template file generation failed: {variant}")
+
+    monkeypatch.setattr(server, "materialize_data_template_folder", broken_materialize)
+
+    response = client.post(
+        "/data-templates/folder",
+        json={"variant": "example"},
+    )
+
+    assert response.status_code == 400
+    assert "Template file generation failed: example" in response.json()["detail"]
+
+
+def test_code_console_runner_returns_generated_files_and_preview(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    response = client.post(
+        "/code-console/run",
+        json={
+            "code": "\n".join(
+                [
+                    "from pathlib import Path",
+                    "import matplotlib.pyplot as plt",
+                    "print(INPUT_PATH.name)",
+                    "Path(output_path('notes.txt')).write_text('runner ok', encoding='utf-8')",
+                    "fig, ax = plt.subplots()",
+                    "ax.plot([0, 1], [0, 1])",
+                    "fig.savefig(output_path('runner_preview.png'))",
+                    "plt.close(fig)",
+                ]
+            ),
+            "base_template": "curve",
+            "options": {
+                "size": "60x55",
+                "style_preset": "default",
+                "palette_preset": "colorblind_safe",
+            },
+            "input_path": str(input_path),
+            "sheet": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["exit_code"] == 0
+    assert payload["timed_out"] is False
+    assert payload["duration_ms"] >= 0
+    assert payload["stdout"].strip() == "curve.csv"
+    assert payload["stderr"] == ""
+    assert Path(payload["output_dir"]).exists()
+    assert all(Path(item["path"]).is_relative_to(Path(payload["output_dir"])) for item in payload["generated_files"])
+    assert {item["filename"] for item in payload["generated_files"]} == {
+        "notes.txt",
+        "runner_preview.png",
+    }
+    assert payload["previews"]
+    assert payload["previews"][0]["filename"] == "runner_preview.png"
+
+
+def test_code_console_runner_times_out(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    monkeypatch.setattr(code_console_module, "CODE_CONSOLE_RUN_TIMEOUT_SECONDS", 1)
+
+    response = client.post(
+        "/code-console/run",
+        json={
+            "code": "import time\ntime.sleep(2)",
+            "base_template": "curve",
+            "options": {
+                "size": "60x55",
+                "style_preset": "default",
+                "palette_preset": "colorblind_safe",
+            },
+            "input_path": str(input_path),
+            "sheet": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["exit_code"] == 124
+    assert payload["timed_out"] is True
+    assert "timed out after 1 seconds" in payload["stderr"]
+    assert payload["generated_files"] == []
 
 
 def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -> None:
