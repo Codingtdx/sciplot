@@ -9,7 +9,6 @@ import zipfile
 from base64 import b64encode
 from datetime import UTC, datetime
 from pathlib import Path
-from tempfile import mkdtemp
 from time import perf_counter
 from typing import Any
 
@@ -29,6 +28,7 @@ from src.rendering.cache import (
     read_raw_table_cached,
 )
 from src.rendering.io import list_sheet_names
+from src.rendering.local_storage import create_managed_code_console_run_dir
 from src.rendering.models import InputInspection, RenderOptions
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.recommendation import detect_point_line_bundle, inspect_input_file
@@ -1248,7 +1248,7 @@ def run_code_console_python(code: str, *, payload: dict[str, Any]) -> dict[str, 
     if not code.strip():
         raise ValueError("Paste Python code before running the repo-native runner.")
 
-    run_dir = Path(mkdtemp(prefix="codegod-code-console-run-"))
+    run_dir = create_managed_code_console_run_dir(payload.get("session", {}))
     output_dir = run_dir / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
     runner_path = _write_bootstrap_files(

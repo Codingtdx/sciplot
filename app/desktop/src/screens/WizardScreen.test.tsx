@@ -209,15 +209,15 @@ describe("WizardScreen", () => {
 
     expect(screen.getByText("Import a data file")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open data" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open example template folder" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open blank template folder" })).toBeInTheDocument();
-    expect(screen.getByText("Recent data files")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open example folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open blank folder" })).toBeInTheDocument();
+    expect(screen.getByText("Recent data")).toBeInTheDocument();
   });
 
   it("builds and opens a blank template folder directly from the import stage", async () => {
     renderStage("import");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open blank folder" }));
 
     await waitFor(() => expect(materializeDataTemplateFolder).toHaveBeenCalledTimes(1));
     expect(materializeDataTemplateFolder).toHaveBeenCalledWith({
@@ -228,11 +228,11 @@ describe("WizardScreen", () => {
     expect(
       screen.getByText("/tmp/templates/codegod-blank-template-folder-demo"),
     ).toBeInTheDocument();
-    expect(screen.getByText("2 template files generated")).toBeInTheDocument();
+    expect(screen.getByText("2 template files ready")).toBeInTheDocument();
     expect(screen.getByText("curve_blank.xlsx")).toBeInTheDocument();
     expect(screen.getByText("boxplot_blank.xlsx")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open template folder again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open folder again" }));
     await waitFor(() =>
       expect(openPath).toHaveBeenCalledWith("/tmp/templates/codegod-blank-template-folder-demo"),
     );
@@ -252,9 +252,9 @@ describe("WizardScreen", () => {
 
     renderStage("import");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open example template folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open example folder" }));
 
-    expect(screen.getAllByRole("button", { name: "Building…" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Refreshing…" })).toHaveLength(2);
 
     await act(async () => {
       resolveFolder?.({
@@ -297,7 +297,7 @@ describe("WizardScreen", () => {
 
     renderStage("import");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open blank folder" }));
 
     await waitFor(() =>
       expect(screen.getByText("codegod-blank-template-folder-demo")).toBeInTheDocument(),
@@ -313,13 +313,13 @@ describe("WizardScreen", () => {
 
     renderStage("import");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blank template folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open blank folder" }));
 
     await waitFor(() =>
       expect(screen.getByText("Sidecar materialize failed: Not Found")).toBeInTheDocument(),
     );
     expect(screen.queryByText("codegod-blank-template-folder-demo")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open template folder again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open folder again" })).not.toBeInTheDocument();
   });
 
   it("shows a sheet selector stage for multi-sheet inputs", () => {
@@ -598,10 +598,10 @@ describe("WizardScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Export submission bundle" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Export bundle" })).toBeEnabled();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Export submission bundle" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export bundle" }));
 
     await waitFor(() => {
       expect(exportRender).toHaveBeenCalledTimes(1);

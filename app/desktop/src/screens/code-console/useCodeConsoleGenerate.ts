@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { generateCodeConsole } from "../../lib/api";
 import { requestCacheKey } from "../../lib/sidecar";
@@ -20,7 +20,7 @@ export function useCodeConsoleGenerate() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CodeConsoleGenerateResponse | null>(null);
 
-  const generate = async (request: GenerateRequest) => {
+  const generate = useCallback(async (request: GenerateRequest) => {
     controllerRef.current?.abort();
     const requestId = latestRequestRef.current + 1;
     latestRequestRef.current = requestId;
@@ -71,21 +71,23 @@ export function useCodeConsoleGenerate() {
         controllerRef.current = null;
       }
     }
-  };
+  }, []);
 
-  return {
+  const reset = useCallback(() => {
+    latestRequestRef.current += 1;
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    setResult(null);
+    setError(null);
+    setActivity("idle");
+  }, []);
+
+  return useMemo(() => ({
     activity,
     busy: activity === "scheduled" || activity === "running",
     error,
     generate,
-    reset() {
-      latestRequestRef.current += 1;
-      controllerRef.current?.abort();
-      controllerRef.current = null;
-      setResult(null);
-      setError(null);
-      setActivity("idle");
-    },
+    reset,
     result,
-  };
+  }), [activity, error, generate, reset, result]);
 }

@@ -9,6 +9,8 @@ import type {
   ComposerProject,
   ExportResponse,
   InspectResponse,
+  ManagedStorageCleanupResponse,
+  ManagedStorageStatus,
   PlotContract,
   PreflightResponse,
   RenderOptionsPayload,
@@ -26,6 +28,8 @@ import {
   coerceDataTemplateCatalog,
   coerceDataTemplateFolderResponse,
   coerceDataTemplateMaterializeResponse,
+  coerceManagedStorageCleanupResponse,
+  coerceManagedStorageStatus,
   coercePlotContract,
   coerceWorkbenchMeta,
 } from "./runtime";
@@ -166,6 +170,23 @@ export async function materializeDataTemplateFolder(
 ): Promise<DataTemplateFolderResponse> {
   return coerceDataTemplateFolderResponse(
     await postJson<unknown>("/data-templates/folder", payload, options),
+  );
+}
+
+export async function getManagedStorage(
+  options: RequestOptions = {},
+): Promise<ManagedStorageStatus> {
+  return coerceManagedStorageStatus(await getJson<unknown>("/managed-storage", options));
+}
+
+export async function cleanupManagedStorage(
+  payload: {
+    strategy?: "all" | "stale";
+  } = {},
+  options: RequestOptions = {},
+): Promise<ManagedStorageCleanupResponse> {
+  return coerceManagedStorageCleanupResponse(
+    await postJson<unknown>("/managed-storage/cleanup", payload, options),
   );
 }
 

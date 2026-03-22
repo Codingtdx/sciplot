@@ -150,13 +150,9 @@ export function LaunchpadScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Start</div>
-              <h2>Begin new work or restore an existing session</h2>
+              <h2>Open a workspace</h2>
             </div>
           </div>
-
-          <p className="hint-text">
-            Plot opens directly into its staged workflow. Composer opens on canvas. Recents stay one step away.
-          </p>
 
           {recentNotice && (
             <div className={recentNoticeTone === "warning" ? "warning-card" : "success-card"}>
@@ -174,8 +170,8 @@ export function LaunchpadScreen({
                 <AppIcon name="plot" />
               </span>
               <span className="launchpad-action-copy">
-                <strong>New Plot</strong>
-                <span>Import data and continue through import, type, tune, review, and export.</span>
+                <strong>Plot</strong>
+                <span>Import data and move through the staged plotting flow.</span>
               </span>
             </button>
 
@@ -188,8 +184,8 @@ export function LaunchpadScreen({
                 <AppIcon name="composer" />
               </span>
               <span className="launchpad-action-copy">
-                <strong>New Composition</strong>
-                <span>Open the canvas workspace and start arranging graph PDFs, assets, and text.</span>
+                <strong>Composer</strong>
+                <span>Arrange graph PDFs, assets, and text on canvas.</span>
               </span>
             </button>
 
@@ -204,11 +200,11 @@ export function LaunchpadScreen({
                 <AppIcon name={latestRecent ? "projects" : "tensile"} />
               </span>
               <span className="launchpad-action-copy">
-                <strong>{latestRecent ? "Open Latest Recent" : "Prepare Tensile"}</strong>
+                <strong>{latestRecent ? "Latest recent" : "Tensile"}</strong>
                 <span>
                   {latestRecent
                     ? `${latestRecent.title} · ${recentSignal(latestRecent)}`
-                    : "Prepare raw CSVs or compare prepared workbooks in the tensile workspace."}
+                    : "Prepare raw CSVs or compare prepared workbooks."}
                 </span>
               </span>
             </button>
@@ -235,7 +231,7 @@ export function LaunchpadScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Recents</div>
-              <h2>Recent files and project restores</h2>
+              <h2>Recent files</h2>
             </div>
             <span className="signal-tag">{recentProjects.length} remembered</span>
           </div>
@@ -270,7 +266,7 @@ export function LaunchpadScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Continue</div>
-              <h3>Current workspace sessions</h3>
+              <h3>Current sessions</h3>
             </div>
           </div>
 

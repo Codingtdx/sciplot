@@ -27,6 +27,11 @@ from src.rendering.io import (
     normalize_input_path_text,
     resolve_output_dir,
 )
+from src.rendering.local_storage import (
+    cleanup_managed_storage,
+    managed_storage_snapshot,
+    prepare_managed_plot_export_dir,
+)
 from src.rendering.models import (
     InputInspection,
     PreflightResult,
@@ -81,12 +86,15 @@ __all__ = [
     "list_sheet_names",
     "materialize_data_template",
     "materialize_data_template_folder",
+    "managed_storage_snapshot",
     "normalize_input_path_text",
     "plot_template_folder_catalog",
     "preflight_render_request",
+    "prepare_managed_plot_export_dir",
     "render_template",
     "resolve_output_dir",
     "resolve_render_options",
     "run_code_console_python",
+    "cleanup_managed_storage",
     "validate_template_name",
 ]

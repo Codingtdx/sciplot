@@ -30,6 +30,9 @@ from app.sidecar.schemas import (
     FileRequest,
     HealthResponse,
     InspectFileResponse,
+    ManagedStorageCleanupRequest,
+    ManagedStorageCleanupResponse,
+    ManagedStorageStatusResponse,
     MaterializeDataTemplateFolderRequest,
     MaterializeDataTemplateFolderResponse,
     MaterializeDataTemplateRequest,
@@ -78,6 +81,7 @@ from src.rendering import (
     SIZE_CHOICES,
     TEMPLATE_CHOICES,
     build_rendered_plots,
+    cleanup_managed_storage,
     close_rendered_plots,
     coerce_sheet,
     ensure_input_path,
@@ -88,11 +92,13 @@ from src.rendering import (
     inspect_input_file,
     inspect_tensile_workbook,
     list_sheet_names,
+    managed_storage_snapshot,
     materialize_data_template,
     materialize_data_template_folder,
     normalize_input_path_text,
     plot_template_folder_catalog,
     preflight_render_request,
+    prepare_managed_plot_export_dir,
     resolve_render_options,
     run_code_console_python,
     validate_template_name,
@@ -349,6 +355,26 @@ def create_data_template_folder(
         raise _http_bad_request("data_template", exc) from exc
 
 
+@app.get("/managed-storage", response_model=ManagedStorageStatusResponse)
+def managed_storage_status() -> ManagedStorageStatusResponse:
+    try:
+        payload = managed_storage_snapshot()
+        return ManagedStorageStatusResponse.model_validate(payload)
+    except Exception as exc:
+        raise _http_bad_request("managed_storage", exc) from exc
+
+
+@app.post("/managed-storage/cleanup", response_model=ManagedStorageCleanupResponse)
+def cleanup_managed_storage_endpoint(
+    request: ManagedStorageCleanupRequest,
+) -> ManagedStorageCleanupResponse:
+    try:
+        payload = cleanup_managed_storage(strategy=request.strategy)
+        return ManagedStorageCleanupResponse.model_validate(payload)
+    except Exception as exc:
+        raise _http_bad_request("managed_storage", exc) from exc
+
+
 @app.post("/code-console/generate", response_model=CodeConsoleGenerateResponse)
 def code_console_generate(request: CodeConsoleGenerateRequest) -> CodeConsoleGenerateResponse:
     try:
@@ -563,7 +589,11 @@ def export_render(request: ExportRenderRequest) -> ExportRenderResponse:
         template = validate_template_name(request.template)
         sheet = coerce_sheet(str(request.sheet))
         payload_options = request.options
-        output_dir = Path(request.output_dir).expanduser() if request.output_dir else (input_path.parent / "plots")
+        output_dir = (
+            Path(request.output_dir).expanduser()
+            if request.output_dir
+            else prepare_managed_plot_export_dir(input_path, sheet=sheet, template=template)
+        )
         output_dir.mkdir(parents=True, exist_ok=True)
         resolved_options = _options_from_payload(template, payload_options)
         inspection = inspect_input_file(input_path, sheet)

@@ -46,7 +46,7 @@
 - CLI、GUI、脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
 - `preflight-render`、`render-preview`、`export-render`、`compose-preview` 现在都会返回统一的 `submission_report`；它是投稿检查摘要，不是新的 blocker 通道。真正阻止导出的一律仍走 preflight / Composer overlap 校验。
-- `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果改导出链路，别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
+- `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果 GUI 没传显式 `output_dir`，sidecar 默认写到 app-managed `plot_exports` 目录，只有用户明确选目录时才落到用户指定路径。改导出链路时别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
@@ -64,11 +64,12 @@
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
 - 最近记录现在由 `Launchpad` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
-- `wizard` 导入阶段现在可以一键触发 sidecar materialize `example template folder / blank template folder`；文件夹里按图类型落真实 workbook 文件。这些模板和 folder 只是输入模板、格式引导与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
-- `code-console` 工作台现在收敛为“当前图上下文打包器 + repo-native Python runner”：前端负责绑定当前 plot session / data / project 上下文、展示固定 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
+- `wizard` 导入阶段现在可以一键触发 sidecar materialize `example template folder / blank template folder`；这些 workbook 要写到 app-managed stable 目录并按需覆盖刷新，不能再每次动作都散落新的 temp folder。这些模板和 folder 只是输入模板、格式引导与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
+- `code-console` 工作台现在收敛为“数据绑定/inspect + chart type 选择 + prompt 复制器 + repo-native Python runner”：前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
 - `code-console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
-- `code-console` 的主流程是 `Copy prompt -> Ask external AI -> Paste code -> Run`；无数据状态只保留回到 Plot 的 CTA，不再在 GUI 里提供复杂需求 builder 退化路径。
-- `code-console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。
+- `code-console` 的主流程是 `Load data or reuse Plot data -> inspect -> choose chart type -> Copy prompt -> Ask external AI -> Paste code -> Run`；默认不要把长 prompt body 常驻铺满页面，也不要把 Console 做成第二套重配置表单。
+- `code-console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。runner 的 managed run/output 目录要走 app-managed cache/data 路径并做 retention/cleanup，不能无上限堆积。
+- `settings` 现在应提供轻量的 app-managed 文件入口和清理入口，用于 reveal/refresh/prune template folders、managed plot exports 和 code-console runs；这类清理只作用于 app-generated artifacts，不能干扰用户显式选择的导出目录。
 - `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
 - Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
 - 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。

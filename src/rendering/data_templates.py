@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from tempfile import mkdtemp
+from typing import Literal, cast
 
 import pandas as pd
+
+from src.rendering.local_storage import (
+    managed_single_template_root,
+    managed_template_folder_path,
+)
 
 TEMPLATE_SHEET_NAME = "Template"
 README_SHEET_NAME = "README"
@@ -486,11 +492,11 @@ def _resolve_spec(template_id: str) -> DataTemplateSpec:
     raise ValueError(f"Unknown data template: {template_id}")
 
 
-def _normalize_variant(variant: str) -> str:
+def _normalize_variant(variant: str) -> Literal["example", "blank"]:
     normalized_variant = variant.strip().lower()
     if normalized_variant not in {"example", "blank"}:
         raise ValueError(f"Unsupported data template variant: {variant}")
-    return normalized_variant
+    return cast(Literal["example", "blank"], normalized_variant)
 
 
 def _write_workbook(output_path: Path, workbook: dict[str, pd.DataFrame]) -> None:
@@ -542,7 +548,7 @@ def materialize_data_template(
     normalized_variant = _normalize_variant(variant)
     workbook_factory = spec.build_example if normalized_variant == "example" else spec.build_blank
     workbook = workbook_factory()
-    output_dir = Path(mkdtemp(prefix="codegod-data-template-"))
+    output_dir = managed_single_template_root(normalized_variant)
     output_path = output_dir / f"{spec.id}_{normalized_variant}_template.xlsx"
     _write_workbook(output_path, workbook)
     _validate_materialized_folder(output_dir, [output_path])
@@ -583,7 +589,12 @@ def materialize_data_template_folder(
     variant: str,
 ) -> dict[str, object]:
     normalized_variant = _normalize_variant(variant)
-    folder_path = Path(mkdtemp(prefix=f"codegod-{normalized_variant}-template-folder-"))
+    folder_path = managed_template_folder_path(normalized_variant)
+    for child in folder_path.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink(missing_ok=True)
     files: list[dict[str, object]] = []
     output_paths: list[Path] = []
     for spec in PLOT_TEMPLATE_FILE_SPECS:

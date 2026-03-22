@@ -152,7 +152,7 @@ export function WizardExportSection({
 
           {!preflight && !preflightBusy && !preflightRequestError && (
             <div className="placeholder-card">
-              {previewActivity === "ready" ? "Checks are lining up." : "Checks start automatically."}
+              {previewActivity === "ready" ? "Checks are ready." : "Checks start automatically."}
             </div>
           )}
 
@@ -163,7 +163,7 @@ export function WizardExportSection({
               onClick={onExport}
               type="button"
             >
-              Export submission bundle
+              Export bundle
             </button>
             {outputDirectory && (
               <button className="ghost-button" onClick={onOpenOutputDir} type="button">
@@ -209,7 +209,7 @@ export function WizardExportSection({
               <div className="wizard-details-body">
                 {outputDirectory && <div>Folder: {outputDirectory}</div>}
                 {artifacts.previewOutputs.length > 0 && (
-                  <div>{artifacts.previewOutputs.length} preview PNG file(s) written.</div>
+                  <div>{artifacts.previewOutputs.length} preview PNG file(s).</div>
                 )}
                 {manifestPath && <div>Manifest: {formatLeaf(manifestPath)}</div>}
               </div>

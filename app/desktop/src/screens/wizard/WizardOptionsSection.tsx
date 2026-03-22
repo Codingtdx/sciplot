@@ -50,7 +50,7 @@ export function WizardOptionsSection({
           <div className="wizard-options-core">
             <div className="wizard-options-heading">
               <strong>Core controls</strong>
-              <span>Keep the preview large and adjust only the essentials first.</span>
+              <span>Adjust only what matters.</span>
             </div>
 
             <div className="field-grid wizard-options-grid wizard-tight-grid">
@@ -148,7 +148,7 @@ export function WizardOptionsSection({
           )}
 
           {selectedStyle && (
-            <details className="wizard-details" open>
+            <details className="wizard-details">
               <summary>Current style preset</summary>
               <div className="wizard-details-body">
                 <div>
@@ -157,8 +157,8 @@ export function WizardOptionsSection({
                 <div>{selectedStyle.preset_note}</div>
                 <div>
                   {selectedStyle.hard_constraints
-                    ? "Tighter editorial constraints stay on."
-                    : "Uses the most forgiving defaults."}
+                    ? "Editorial constraints stay on."
+                    : "Uses the default relaxed mode."}
                 </div>
               </div>
             </details>

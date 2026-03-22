@@ -32,7 +32,6 @@ import {
   publicPaletteChoices,
   publicStyleChoices,
   sizeChoices,
-  styleLabel,
   templateLabel,
   toDialogPaths,
   wizardStepForStage,
@@ -367,10 +366,6 @@ export function WizardScreen({
     wizard.outputs,
     (wizard.preflight?.output_filenames ?? []).map((filename) => filename),
   );
-  const selectedStyleLabel = styleLabel(
-    meta,
-    wizard.options.style_preset ?? meta?.default_style ?? null,
-  );
   const stepFlowSteps = useMemo<StepFlowItem[]>(() => {
     const currentIndex = PLOT_STAGE_ORDER.indexOf(routeStage);
     return PLOT_STAGES.map((step, index) => {
@@ -635,10 +630,6 @@ export function WizardScreen({
       label: "Template",
       value: wizard.template ? templateLabel(meta, wizard.template) : "Not selected",
     },
-    {
-      label: "Style",
-      value: selectedStyleLabel,
-    },
   ];
 
   return (
@@ -669,11 +660,9 @@ export function WizardScreen({
             <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Waiting for import"}</strong>
           </div>
           <div className="stat-tile">
-            <span>Recommended type</span>
+            <span>Model</span>
             <strong>
-              {wizard.inspection
-                ? templateLabel(meta, wizard.inspection.recommendation.template)
-                : "Pending inspect"}
+              {wizard.inspection ? wizard.inspection.model_label : "Pending inspect"}
             </strong>
           </div>
           <div className="stat-tile">
@@ -700,11 +689,6 @@ export function WizardScreen({
                 <h3>Open a data file</h3>
               </div>
             </div>
-
-            <p className="hint-text">
-              Start with CSV, TXT, TSV, XLSX, or XLSM data. Multi-sheet workbooks move to the
-              sheet selector next.
-            </p>
 
             <div className="hero-actions plot-import-actions">
               <button className="primary-button" onClick={openDataFile} type="button">
@@ -738,12 +722,12 @@ export function WizardScreen({
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Session</div>
-                  <h3>Current plot session</h3>
+                  <h3>Current session</h3>
                 </div>
               </div>
-              <div className="wizard-summary-list">
+              <div className="summary-grid wizard-tight-grid">
                 {summaryRows.map((row) => (
-                  <div className="wizard-summary-row" key={row.label}>
+                  <div className="stat-tile" key={row.label}>
                     <span>{row.label}</span>
                     <strong>{row.value}</strong>
                   </div>
@@ -755,7 +739,7 @@ export function WizardScreen({
               <div className="panel-heading">
                 <div>
                   <div className="card-kicker">Recent</div>
-                  <h3>Recent data files</h3>
+                  <h3>Recent data</h3>
                 </div>
               </div>
 
@@ -854,9 +838,9 @@ export function WizardScreen({
                 </div>
               </div>
 
-              <div className="wizard-summary-list">
+              <div className="summary-grid wizard-tight-grid">
                 {summaryRows.map((row) => (
-                  <div className="wizard-summary-row" key={row.label}>
+                  <div className="stat-tile" key={row.label}>
                     <span>{row.label}</span>
                     <strong>{row.value}</strong>
                   </div>
@@ -902,7 +886,7 @@ export function WizardScreen({
                     <div className="panel-heading">
                       <div>
                         <div className="card-kicker">Detect</div>
-                        <h3>Why this chart type</h3>
+                        <h3>Recommendation</h3>
                       </div>
                       {!recommendationApplied && (
                         <button

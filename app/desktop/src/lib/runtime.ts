@@ -18,6 +18,8 @@ import type {
   DataTemplateFolderFile,
   DataTemplateFolderResponse,
   DataTemplateMaterializeResponse,
+  ManagedStorageCleanupResponse,
+  ManagedStorageStatus,
   EditableRenderOption,
   PalettePreset,
   PlotContract,
@@ -637,6 +639,91 @@ export function coerceDataTemplateFolderResponse(value: unknown): DataTemplateFo
           ),
         )
       : [],
+  };
+}
+
+function readManagedStorageStatus(
+  value: unknown,
+  label: string,
+): ManagedStorageStatus {
+  const record = requireRecord(value, label);
+  return {
+    root_path: requireString(record.root_path, `${label}.root_path`),
+    data_root: requireString(record.data_root, `${label}.data_root`),
+    cache_root: requireString(record.cache_root, `${label}.cache_root`),
+    example_templates_path: requireString(
+      record.example_templates_path,
+      `${label}.example_templates_path`,
+    ),
+    blank_templates_path: requireString(
+      record.blank_templates_path,
+      `${label}.blank_templates_path`,
+    ),
+    single_example_templates_path: requireString(
+      record.single_example_templates_path,
+      `${label}.single_example_templates_path`,
+    ),
+    single_blank_templates_path: requireString(
+      record.single_blank_templates_path,
+      `${label}.single_blank_templates_path`,
+    ),
+    plot_exports_path: requireString(
+      record.plot_exports_path,
+      `${label}.plot_exports_path`,
+    ),
+    code_console_runs_path: requireString(
+      record.code_console_runs_path,
+      `${label}.code_console_runs_path`,
+    ),
+    example_template_file_count: requireNumber(
+      record.example_template_file_count,
+      `${label}.example_template_file_count`,
+    ),
+    blank_template_file_count: requireNumber(
+      record.blank_template_file_count,
+      `${label}.blank_template_file_count`,
+    ),
+    single_template_file_count: requireNumber(
+      record.single_template_file_count,
+      `${label}.single_template_file_count`,
+    ),
+    plot_export_dir_count: requireNumber(
+      record.plot_export_dir_count,
+      `${label}.plot_export_dir_count`,
+    ),
+    code_console_run_dir_count: requireNumber(
+      record.code_console_run_dir_count,
+      `${label}.code_console_run_dir_count`,
+    ),
+  };
+}
+
+export function coerceManagedStorageStatus(value: unknown): ManagedStorageStatus {
+  return readManagedStorageStatus(value, "Managed storage status");
+}
+
+export function coerceManagedStorageCleanupResponse(
+  value: unknown,
+): ManagedStorageCleanupResponse {
+  const record = requireRecord(value, "Managed storage cleanup response");
+  const strategy = requireString(
+    record.strategy,
+    "Managed storage cleanup response.strategy",
+  );
+  if (strategy !== "all" && strategy !== "stale") {
+    throw new Error("Managed storage cleanup response.strategy is missing or invalid.");
+  }
+  return {
+    ...readManagedStorageStatus(record, "Managed storage cleanup response"),
+    strategy,
+    removed_files: requireNumber(
+      record.removed_files,
+      "Managed storage cleanup response.removed_files",
+    ),
+    removed_directories: requireNumber(
+      record.removed_directories,
+      "Managed storage cleanup response.removed_directories",
+    ),
   };
 }
 

@@ -451,6 +451,29 @@ export type DataTemplateFolderResponse = {
   files: DataTemplateFolderFile[];
 };
 
+export type ManagedStorageStatus = {
+  root_path: string;
+  data_root: string;
+  cache_root: string;
+  example_templates_path: string;
+  blank_templates_path: string;
+  single_example_templates_path: string;
+  single_blank_templates_path: string;
+  plot_exports_path: string;
+  code_console_runs_path: string;
+  example_template_file_count: number;
+  blank_template_file_count: number;
+  single_template_file_count: number;
+  plot_export_dir_count: number;
+  code_console_run_dir_count: number;
+};
+
+export type ManagedStorageCleanupResponse = ManagedStorageStatus & {
+  strategy: "all" | "stale";
+  removed_files: number;
+  removed_directories: number;
+};
+
 export type PlotContract = {
   version: number;
   defaults: {

@@ -35,14 +35,9 @@ export function WizardDataTemplatesSection({
       <div className="panel-heading">
         <div>
           <div className="card-kicker">Templates</div>
-          <h3>Open an example or blank template folder</h3>
+          <h3>Template files</h3>
         </div>
       </div>
-
-      <p className="hint-text">
-        One click generates a folder of chart-type templates. Open a workbook, paste your data,
-        then come back and import it into Plot.
-      </p>
 
       <div className="hero-actions">
         <button
@@ -51,7 +46,7 @@ export function WizardDataTemplatesSection({
           onClick={() => onBuildFolder("example")}
           type="button"
         >
-          {loading ? "Building…" : "Open example template folder"}
+          {loading ? "Refreshing…" : "Open example folder"}
         </button>
         <button
           className="ghost-button"
@@ -59,7 +54,7 @@ export function WizardDataTemplatesSection({
           onClick={() => onBuildFolder("blank")}
           type="button"
         >
-          {loading ? "Building…" : "Open blank template folder"}
+          {loading ? "Refreshing…" : "Open blank folder"}
         </button>
       </div>
 
@@ -73,7 +68,7 @@ export function WizardDataTemplatesSection({
             <span className="wizard-template-folder-path">
               <code>{latestTemplateFolder.folder_path}</code>
             </span>
-            <span>{latestTemplateFolder.files.length} template files generated</span>
+            <span>{latestTemplateFolder.files.length} template files ready</span>
             <div className="wizard-template-file-list" aria-label="Generated template files">
               {latestTemplateFolder.files.map((templateFile) => (
                 <code key={templateFile.file_path}>{templateFile.filename}</code>
@@ -85,7 +80,7 @@ export function WizardDataTemplatesSection({
 
           <div className="step-actions">
             <button className="primary-button" onClick={onOpenTemplateFolder} type="button">
-              Open template folder again
+              Open folder again
             </button>
           </div>
         </div>

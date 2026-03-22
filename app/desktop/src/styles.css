@@ -45,25 +45,25 @@
   --workspace-recents: rgba(148, 163, 184, 0.14);
   --workspace-settings: rgba(255, 127, 93, 0.14);
   --app-bg:
-    radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.16), transparent 28%),
-    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.14), transparent 32%),
-    linear-gradient(180deg, #f3eee5 0%, #e8e1d5 35%, #dfd8cd 100%);
-  --app-bg-solid: #e7e0d4;
+    radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.1), transparent 24%),
+    radial-gradient(circle at 100% 0%, rgba(251, 113, 133, 0.08), transparent 26%),
+    linear-gradient(180deg, #f0ebe2 0%, #e7e0d4 42%, #ddd6ca 100%);
+  --app-bg-solid: #e5ded2;
   --text-primary: #18191d;
   --text-secondary: rgba(24, 25, 29, 0.74);
   --text-muted: rgba(24, 25, 29, 0.55);
   --text-strong: #0f1115;
-  --surface-main: rgba(252, 249, 244, 0.72);
-  --surface-card: rgba(255, 253, 249, 0.84);
-  --surface-card-strong: rgba(255, 253, 249, 0.96);
+  --surface-main: rgba(252, 249, 244, 0.78);
+  --surface-card: rgba(255, 252, 247, 0.9);
+  --surface-card-strong: rgba(255, 253, 249, 0.97);
   --surface-soft: rgba(255, 255, 255, 0.58);
   --surface-accent:
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(243, 236, 228, 0.94));
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(243, 236, 228, 0.96));
   --surface-focus:
-    linear-gradient(180deg, rgba(227, 246, 241, 0.94), rgba(252, 248, 243, 0.96));
+    linear-gradient(180deg, rgba(227, 246, 241, 0.9), rgba(252, 248, 243, 0.96));
   --surface-hero:
-    radial-gradient(circle at top right, rgba(255, 129, 93, 0.15), transparent 26%),
-    radial-gradient(circle at 12% 20%, rgba(13, 148, 136, 0.16), transparent 30%),
+    radial-gradient(circle at top right, rgba(255, 129, 93, 0.12), transparent 22%),
+    radial-gradient(circle at 12% 20%, rgba(13, 148, 136, 0.12), transparent 24%),
     linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(243, 236, 228, 0.96));
   --surface-preview:
     linear-gradient(180deg, rgba(240, 234, 225, 0.9), rgba(251, 247, 241, 0.98));
@@ -72,10 +72,10 @@
     linear-gradient(180deg, rgba(233, 226, 216, 0.92), rgba(247, 242, 236, 0.98));
   --border-subtle: rgba(88, 72, 54, 0.12);
   --border-strong: rgba(15, 118, 110, 0.24);
-  --shadow-xl: 0 36px 90px rgba(44, 35, 28, 0.14);
-  --shadow-lg: 0 26px 72px rgba(44, 35, 28, 0.12);
-  --shadow-md: 0 16px 40px rgba(44, 35, 28, 0.1);
-  --shadow-sm: 0 10px 24px rgba(44, 35, 28, 0.08);
+  --shadow-xl: 0 22px 56px rgba(44, 35, 28, 0.12);
+  --shadow-lg: 0 18px 42px rgba(44, 35, 28, 0.11);
+  --shadow-md: 0 12px 28px rgba(44, 35, 28, 0.09);
+  --shadow-sm: 0 6px 16px rgba(44, 35, 28, 0.07);
   --tooltip-bg: rgba(255, 251, 246, 0.98);
   --tooltip-border: rgba(88, 72, 54, 0.18);
   --primary-soft: rgba(13, 148, 136, 0.1);
@@ -89,19 +89,28 @@
   --placeholder-bg: rgba(255, 255, 255, 0.56);
   --placeholder-fg: rgba(24, 25, 29, 0.65);
   --overlay-bg: rgba(250, 247, 241, 0.78);
-  --radius-2xl: 30px;
-  --radius-xl: 24px;
-  --radius-lg: 18px;
-  --radius-md: 14px;
-  --radius-sm: 10px;
-  --space-2xl: 28px;
-  --space-xl: 22px;
-  --space-lg: 16px;
-  --space-md: 12px;
-  --space-sm: 8px;
-  --title-size: clamp(2.4rem, 3vw, 3.6rem);
-  --subtitle-size: clamp(1.04rem, 1.1vw, 1.18rem);
-  --button-height: 36px;
+  --radius-2xl: 22px;
+  --radius-xl: 18px;
+  --radius-lg: 14px;
+  --radius-md: 11px;
+  --radius-sm: 8px;
+  --space-2xl: 20px;
+  --space-xl: 16px;
+  --space-lg: 12px;
+  --space-md: 10px;
+  --space-sm: 6px;
+  --text-app-title: 0.95rem;
+  --text-screen-title: clamp(1.3rem, 1.9vw, 1.55rem);
+  --text-section-title: 1rem;
+  --text-card-title: 0.9rem;
+  --text-body: 0.81rem;
+  --text-secondary-size: 0.75rem;
+  --text-caption: 0.69rem;
+  --title-size: clamp(1.8rem, 2.2vw, 2.4rem);
+  --subtitle-size: 1rem;
+  --button-height: 34px;
+  --input-height: 32px;
+  --header-height: 78px;
   --motion-fast: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-medium: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-slow: 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -137,10 +146,10 @@
     linear-gradient(180deg, rgba(9, 14, 20, 0.98), rgba(12, 17, 23, 1));
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(20, 184, 166, 0.22);
-  --shadow-xl: 0 36px 90px rgba(0, 0, 0, 0.42);
-  --shadow-lg: 0 26px 72px rgba(0, 0, 0, 0.34);
-  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.28);
-  --shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-xl: 0 22px 56px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 18px 42px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.18);
   --tooltip-bg: rgba(16, 24, 30, 0.98);
   --tooltip-border: rgba(255, 255, 255, 0.1);
   --success-bg: rgba(21, 128, 61, 0.2);

@@ -67,32 +67,32 @@ export const WORKSPACE_META: Record<
   launchpad: {
     eyebrow: "Workspace Hub",
     title: "Start",
-    description: "Start a task, resume current work, or restore a recent session.",
+    description: "Start work or resume a session.",
   },
   plot: {
     eyebrow: "Figure Flow",
     title: "Plot",
-    description: "Run the staged plotting workflow from import through export.",
+    description: "Import, tune, review, and export.",
   },
   tensile: {
     eyebrow: "Material Lab",
     title: "Tensile",
-    description: "Prepare tensile workbooks, compare sources, and hand off curated inputs.",
+    description: "Prepare and compare tensile workbooks.",
   },
   composer: {
     eyebrow: "Layout Studio",
     title: "Composer",
-    description: "Arrange graphs, assets, and text on the editable composition canvas.",
+    description: "Compose graphs, assets, and text.",
   },
   code: {
     eyebrow: "Repo Runner",
     title: "Code Console",
-    description: "Package the current Plot context, copy the fixed project prompt, and run repo-native Python snippets locally.",
+    description: "Bind data, copy prompt, run code.",
   },
   settings: {
     eyebrow: "Runtime",
     title: "Settings",
-    description: "Tune local desktop behavior, health checks, and reset actions.",
+    description: "Appearance, runtime, and cleanup.",
   },
 };
 
@@ -118,27 +118,27 @@ export const PLOT_STAGE_COPY: Record<
 > = {
   import: {
     title: "Import a data file",
-    description: "Start with raw data or a prepared workbook. The sidecar inspects structure first.",
+    description: "Open data. Inspect runs first.",
   },
   sheet: {
     title: "Choose the source tab",
-    description: "Pick the workbook tab that should drive recommendation, preview, and export.",
+    description: "Pick the sheet to inspect and render.",
   },
   type: {
     title: "Confirm the chart type",
-    description: "Review the detected input model, recommendation, and all compatible templates.",
+    description: "Use the recommendation or choose a compatible template.",
   },
   tune: {
     title: "Tune the essentials",
-    description: "Set size, scales, style, and the most important template options before review.",
+    description: "Adjust the key rendering options.",
   },
   review: {
     title: "Review export readiness",
-    description: "Preview the figure, check blockers, and confirm the submission report.",
+    description: "Preview, check blockers, then export.",
   },
   export: {
     title: "Export the bundle",
-    description: "Open the output folder, move on to Composer, or start the next figure.",
+    description: "Open output, continue to Composer, or start the next plot.",
   },
 };
 

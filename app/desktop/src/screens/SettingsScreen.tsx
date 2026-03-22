@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { InfoTip } from "../components/InfoTip";
-import { healthcheck } from "../lib/api";
-import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } from "../lib/store";
+import {
+  cleanupManagedStorage,
+  getManagedStorage,
+  healthcheck,
+  openPath,
+} from "../lib/api";
+import {
+  useComposerStore,
+  useTensileStore,
+  useWizardStore,
+  useWorkbenchStore,
+} from "../lib/store";
 import {
   DEFAULT_THEME_PRESET_BY_APPEARANCE,
   THEME_PRESETS,
@@ -10,10 +19,12 @@ import {
 } from "../lib/themes";
 import type {
   AppearanceMode,
+  ManagedStorageStatus,
   PlotContract,
   ThemePresetId,
   WorkbenchMeta,
 } from "../lib/types";
+import { getErrorMessage } from "../lib/workbench";
 
 function themePreviewStyle(presetId: ThemePresetId) {
   const preset = themePresetById(presetId);
@@ -33,6 +44,7 @@ export function SettingsScreen({
   meta: WorkbenchMeta | null;
   contract: PlotContract | null;
 }) {
+  const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
   const resetWizard = useWizardStore((state) => state.reset);
   const resetComposer = useComposerStore((state) => state.reset);
@@ -45,13 +57,39 @@ export function SettingsScreen({
   const clearRecentProjects = useWorkbenchStore((state) => state.clearRecentProjects);
   const [checking, setChecking] = useState(false);
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+  const [managedStorage, setManagedStorage] = useState<ManagedStorageStatus | null>(null);
+  const [storageBusy, setStorageBusy] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   const validationRuleCount = contract ? Object.keys(contract.validation_rules).length : 0;
+
+  const loadManagedFiles = async () => {
+    setStorageBusy(true);
+    setStorageError(null);
+    try {
+      setManagedStorage(await getManagedStorage());
+    } catch (error) {
+      setStorageError(getErrorMessage(error));
+    } finally {
+      setStorageBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!sidecarReady) {
+      return;
+    }
+    void loadManagedFiles();
+  }, [sidecarReady]);
 
   const refreshSidecar = async () => {
     setChecking(true);
     try {
-      setSidecarReady(await healthcheck());
+      const nextReady = await healthcheck();
+      setSidecarReady(nextReady);
+      if (nextReady) {
+        await loadManagedFiles();
+      }
     } finally {
       setChecking(false);
     }
@@ -76,7 +114,7 @@ export function SettingsScreen({
       tensile: "Tensile workspace reset.",
       composer: "Composer workspace reset.",
       recent: "Recent file history cleared.",
-      all: "All workspace state and recent history cleared.",
+      all: "Workspace state and recent history cleared.",
     } as const;
 
     setMaintenanceNotice(labels[action]);
@@ -97,6 +135,46 @@ export function SettingsScreen({
     updateSettings({ appearance_mode: value });
   };
 
+  const openManagedPath = async (path: string) => {
+    try {
+      await openPath(path);
+    } catch (error) {
+      setStorageError(getErrorMessage(error));
+    }
+  };
+
+  const clearManagedFiles = async () => {
+    setStorageBusy(true);
+    setStorageError(null);
+    try {
+      const response = await cleanupManagedStorage({ strategy: "all" });
+      setManagedStorage(response);
+      setMaintenanceNotice(
+        `Removed ${response.removed_files} file(s) and ${response.removed_directories} folder(s) from managed storage.`,
+      );
+    } catch (error) {
+      setStorageError(getErrorMessage(error));
+    } finally {
+      setStorageBusy(false);
+    }
+  };
+
+  const pruneManagedFiles = async () => {
+    setStorageBusy(true);
+    setStorageError(null);
+    try {
+      const response = await cleanupManagedStorage({ strategy: "stale" });
+      setManagedStorage(response);
+      setMaintenanceNotice(
+        `Pruned ${response.removed_files} file(s) and ${response.removed_directories} folder(s) from managed storage.`,
+      );
+    } catch (error) {
+      setStorageError(getErrorMessage(error));
+    } finally {
+      setStorageBusy(false);
+    }
+  };
+
   return (
     <div className="desk-layout settings-layout">
       <section className="desk-main">
@@ -104,9 +182,8 @@ export function SettingsScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Appearance</div>
-              <h2>Choose the desktop appearance preset</h2>
+              <h2>Theme</h2>
             </div>
-            <InfoTip content="Appearance mode chooses light, dark, or system. Theme presets add a curated material language on top." />
           </div>
 
           <div className="mode-switch theme-mode-switch">
@@ -175,41 +252,43 @@ export function SettingsScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Runtime</div>
-              <h2>Health and local behavior</h2>
+              <h2>Desktop behavior</h2>
             </div>
-            <InfoTip content="These controls affect local desktop behavior only. They do not change the plot contract or backend defaults." />
+            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
+              {sidecarReady ? "Sidecar online" : "Sidecar offline"}
+            </span>
           </div>
 
-          <div className="inspector-stack">
-            <div className="context-list">
-              <div className="context-row">
-                <span>Recents</span>
-                <strong>{recentProjects.length}</strong>
-              </div>
-              <div className="context-row">
-                <span>PDF import mode</span>
-                <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
-              </div>
-              <div className="context-row">
-                <span>Composer canvas</span>
-                <strong>
-                  {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
-                </strong>
-              </div>
+          <div className="context-list">
+            <div className="context-row">
+              <span>Recents</span>
+              <strong>{recentProjects.length}</strong>
             </div>
-
-            <div className="step-actions">
-              <button
-                className="primary-button"
-                disabled={checking}
-                onClick={() => void refreshSidecar()}
-                type="button"
-              >
-                {checking ? "Checking…" : "Check sidecar"}
-              </button>
+            <div className="context-row">
+              <span>PDF import mode</span>
+              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
             </div>
+            <div className="context-row">
+              <span>Composer canvas</span>
+              <strong>
+                {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
+              </strong>
+            </div>
+          </div>
 
-            <label className="toggle-field">
+          <div className="step-actions">
+            <button
+              className="primary-button"
+              disabled={checking}
+              onClick={() => void refreshSidecar()}
+              type="button"
+            >
+              {checking ? "Checking…" : "Check sidecar"}
+            </button>
+          </div>
+
+          <div className="summary-grid wizard-tight-grid">
+            <label className="toggle-field wizard-option-card">
               <input
                 checked={settings.auto_status_poll}
                 onChange={(event) =>
@@ -220,7 +299,7 @@ export function SettingsScreen({
               <span>Auto-refresh sidecar status</span>
             </label>
 
-            <label className="toggle-field">
+            <label className="toggle-field wizard-option-card">
               <input
                 checked={settings.remember_last_screen}
                 onChange={(event) =>
@@ -236,10 +315,114 @@ export function SettingsScreen({
         <article className="work-card section-card">
           <div className="panel-heading">
             <div>
-              <div className="card-kicker">Maintenance</div>
-              <h2>Reset local state</h2>
+              <div className="card-kicker">Local Files</div>
+              <h2>Managed app files</h2>
             </div>
-            <InfoTip content="These actions clear local desktop state only. Source data and exported files on disk are untouched." />
+          </div>
+
+          {storageError && <div className="warning-card">{storageError}</div>}
+
+          {managedStorage ? (
+            <>
+              <div className="summary-grid wizard-tight-grid">
+                <div className="stat-tile">
+                  <span>Template files</span>
+                  <strong>
+                    {managedStorage.example_template_file_count +
+                      managedStorage.blank_template_file_count +
+                      managedStorage.single_template_file_count}
+                  </strong>
+                </div>
+                <div className="stat-tile">
+                  <span>Managed exports</span>
+                  <strong>{managedStorage.plot_export_dir_count}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>Code runs</span>
+                  <strong>{managedStorage.code_console_run_dir_count}</strong>
+                </div>
+                <div className="stat-tile">
+                  <span>Status</span>
+                  <strong>{storageBusy ? "Working" : "Ready"}</strong>
+                </div>
+              </div>
+
+              <div className="step-actions">
+                <button
+                  className="ghost-button"
+                  disabled={storageBusy || !sidecarReady}
+                  onClick={() => void loadManagedFiles()}
+                  type="button"
+                >
+                  Refresh
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={storageBusy}
+                  onClick={() => void openManagedPath(managedStorage.data_root)}
+                  type="button"
+                >
+                  Open app data
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={storageBusy}
+                  onClick={() => void openManagedPath(managedStorage.plot_exports_path)}
+                  type="button"
+                >
+                  Open exports
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={storageBusy}
+                  onClick={() => void openManagedPath(managedStorage.code_console_runs_path)}
+                  type="button"
+                >
+                  Open run cache
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={storageBusy || !sidecarReady}
+                  onClick={() => void pruneManagedFiles()}
+                  type="button"
+                >
+                  Prune stale
+                </button>
+                <button
+                  className="ghost-button danger-button"
+                  disabled={storageBusy || !sidecarReady}
+                  onClick={() => void clearManagedFiles()}
+                  type="button"
+                >
+                  Clean app files
+                </button>
+              </div>
+
+              <details className="wizard-details">
+                <summary>Managed paths</summary>
+                <div className="wizard-details-body">
+                  <div>Templates: {managedStorage.example_templates_path}</div>
+                  <div>Blank templates: {managedStorage.blank_templates_path}</div>
+                  <div>Managed exports: {managedStorage.plot_exports_path}</div>
+                  <div>Code runs: {managedStorage.code_console_runs_path}</div>
+                </div>
+              </details>
+            </>
+          ) : (
+            <div className="placeholder-card">
+              {storageBusy
+                ? "Loading managed storage…"
+                : "Managed file status appears here when the sidecar is available."}
+            </div>
+          )}
+        </article>
+
+        <article className="work-card section-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Maintenance</div>
+              <h2>Reset workspace state</h2>
+            </div>
           </div>
 
           {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
@@ -257,8 +440,12 @@ export function SettingsScreen({
             <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
               Clear recents
             </button>
-            <button className="ghost-button danger-button" onClick={() => runMaintenance("all")} type="button">
-              Reset everything
+            <button
+              className="ghost-button danger-button"
+              onClick={() => runMaintenance("all")}
+              type="button"
+            >
+              Reset all
             </button>
           </div>
         </article>
@@ -269,7 +456,7 @@ export function SettingsScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Contract</div>
-              <h3>Shared frame and validation</h3>
+              <h3>Shared frame</h3>
             </div>
           </div>
 

@@ -17,7 +17,7 @@
 .wizard-inline-chips,
 .wizard-toolbar {
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .plot-import-card,
@@ -26,7 +26,7 @@
 .wizard-review-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .wizard-summary-list,
@@ -36,14 +36,14 @@
 .wizard-options-core {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-summary-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: 4px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -59,13 +59,13 @@
   max-width: 60%;
   text-align: right;
   word-break: break-word;
-  font-size: 12px;
+  font-size: var(--text-body);
 }
 
 .wizard-template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(144px, 1fr));
+  gap: 6px;
 }
 
 .wizard-template-gallery {
@@ -104,8 +104,8 @@
 .wizard-recommendation-card {
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 13px;
+  gap: 10px;
+  padding: 10px;
   background:
     radial-gradient(circle at top right, var(--theme-glow-strong), transparent 42%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-card-strong) 90%, transparent), color-mix(in srgb, var(--primary-soft) 30%, transparent));
@@ -123,20 +123,21 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .wizard-recommendation-copy strong {
-  font-size: 14px;
+  font-size: var(--text-body);
 }
 
 .wizard-recommendation-copy span:last-child {
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: 1.35;
+  font-size: var(--text-secondary-size);
 }
 
 .wizard-recommendation-action {
-  font-size: 11px;
+  font-size: var(--text-caption);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -145,21 +146,21 @@
 .sheet-choice {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 12px;
+  gap: 4px;
+  padding: 9px;
   text-align: left;
 }
 
 .wizard-template-chip strong,
 .sheet-choice strong {
-  font-size: 13px;
+  font-size: var(--text-body);
 }
 
 .wizard-template-chip span,
 .sheet-choice span {
-  font-size: 11px;
+  font-size: var(--text-caption);
   color: var(--text-muted);
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .wizard-template-chip-line {
@@ -187,14 +188,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-data-template-card,
 .wizard-template-library-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-template-folder-path code,
@@ -210,18 +211,18 @@
 .wizard-template-file-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .wizard-template-file-list code {
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-card) 80%, var(--surface-soft) 20%);
 }
 
 .wizard-template-library-card {
-  padding: 12px;
+  padding: 10px;
   text-align: left;
   border-radius: calc(var(--radius-lg) + 1px);
   border: 1px solid var(--border-subtle);
@@ -242,23 +243,23 @@
 
 .wizard-template-library-card span {
   color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: var(--text-caption);
+  line-height: 1.35;
 }
 
 .wizard-options-grid {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
 }
 
 .wizard-tight-grid {
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-option-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
+  gap: 4px;
+  padding: 8px;
 }
 
 .wizard-option-card.toggle-field {
@@ -268,13 +269,13 @@
 
 .wizard-options-heading {
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   align-items: baseline;
 }
 
 .wizard-options-heading span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-caption);
 }
 
 .wizard-details {
@@ -284,13 +285,14 @@
 .wizard-details-body {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.35;
+  font-size: var(--text-body);
 }
 
 .wizard-readiness-panel {
-  gap: 6px;
+  gap: 4px;
 }
 
 .wizard-review-details {
@@ -302,7 +304,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   list-style: none;
 }
 

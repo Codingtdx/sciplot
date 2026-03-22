@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+import src.rendering.data_templates as data_templates_module
 from app.sidecar import server
 from app.sidecar.server import app
 from src.rendering import code_console as code_console_module
@@ -66,6 +67,55 @@ def _write_tensile_workbook(path: Path, *, group_name: str = "BlendSet") -> Path
         group_name=group_name,
     )
     return path
+
+
+def _managed_storage_snapshot(base: Path) -> dict[str, object]:
+    return {
+        "root_path": str(base),
+        "data_root": str(base / "data"),
+        "cache_root": str(base / "cache"),
+        "example_templates_path": str(base / "data" / "templates" / "folders" / "example"),
+        "blank_templates_path": str(base / "data" / "templates" / "folders" / "blank"),
+        "single_example_templates_path": str(base / "data" / "templates" / "single" / "example"),
+        "single_blank_templates_path": str(base / "data" / "templates" / "single" / "blank"),
+        "plot_exports_path": str(base / "data" / "plot_exports"),
+        "code_console_runs_path": str(base / "cache" / "code_console" / "runs"),
+        "example_template_file_count": 4,
+        "blank_template_file_count": 4,
+        "single_template_file_count": 2,
+        "plot_export_dir_count": 3,
+        "code_console_run_dir_count": 2,
+    }
+
+
+def _use_managed_template_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def folder_root(variant: str) -> Path:
+        path = tmp_path / "managed_templates" / "folders" / variant
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def single_root(variant: str) -> Path:
+        path = tmp_path / "managed_templates" / "single" / variant
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    monkeypatch.setattr(data_templates_module, "managed_template_folder_path", folder_root)
+    monkeypatch.setattr(data_templates_module, "managed_single_template_root", single_root)
+
+
+def _use_managed_run_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    counter = {"value": 0}
+
+    def create_run_dir(_session: dict[str, object]) -> Path:
+        counter["value"] += 1
+        path = tmp_path / "managed_runs" / f"run-{counter['value']}"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    monkeypatch.setattr(code_console_module, "create_managed_code_console_run_dir", create_run_dir)
 
 
 def test_meta_endpoint_returns_contract_backed_payload() -> None:
@@ -220,7 +270,11 @@ def test_code_console_export_bundle_writes_manifest_and_full_data_artifacts(tmp_
     )
 
 
-def test_data_template_catalog_and_materialize_flow() -> None:
+def test_data_template_catalog_and_materialize_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_managed_template_roots(monkeypatch, tmp_path)
     response = client.get("/data-templates")
 
     assert response.status_code == 200
@@ -257,7 +311,11 @@ def test_data_template_catalog_and_materialize_flow() -> None:
     assert template_sheet.iloc[2, 0] == "Sample 1"
 
 
-def test_data_template_folder_materializes_chart_type_files() -> None:
+def test_data_template_folder_materializes_chart_type_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_managed_template_roots(monkeypatch, tmp_path)
     response = client.post(
         "/data-templates/folder",
         json={"variant": "example"},
@@ -330,7 +388,11 @@ def test_data_template_folder_surfaces_materialize_validation_errors(
     assert "Template file generation failed: example" in response.json()["detail"]
 
 
-def test_code_console_runner_returns_generated_files_and_preview(tmp_path: Path) -> None:
+def test_code_console_runner_returns_generated_files_and_preview(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_managed_run_root(monkeypatch, tmp_path)
     input_path = _write_curve_table(tmp_path / "curve.csv")
 
     response = client.post(
@@ -367,7 +429,10 @@ def test_code_console_runner_returns_generated_files_and_preview(tmp_path: Path)
     assert payload["stdout"].strip() == "curve.csv"
     assert payload["stderr"] == ""
     assert Path(payload["output_dir"]).exists()
-    assert all(Path(item["path"]).is_relative_to(Path(payload["output_dir"])) for item in payload["generated_files"])
+    assert all(
+        Path(item["path"]).is_relative_to(Path(payload["output_dir"]))
+        for item in payload["generated_files"]
+    )
     assert {item["filename"] for item in payload["generated_files"]} == {
         "notes.txt",
         "runner_preview.png",
@@ -376,7 +441,11 @@ def test_code_console_runner_returns_generated_files_and_preview(tmp_path: Path)
     assert payload["previews"][0]["filename"] == "runner_preview.png"
 
 
-def test_code_console_runner_times_out(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_code_console_runner_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _use_managed_run_root(monkeypatch, tmp_path)
     input_path = _write_curve_table(tmp_path / "curve.csv")
     monkeypatch.setattr(code_console_module, "CODE_CONSOLE_RUN_TIMEOUT_SECONDS", 1)
 
@@ -401,6 +470,80 @@ def test_code_console_runner_times_out(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert payload["timed_out"] is True
     assert "timed out after 1 seconds" in payload["stderr"]
     assert payload["generated_files"] == []
+
+
+def test_managed_storage_status_endpoint_returns_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot = _managed_storage_snapshot(tmp_path / "managed")
+    monkeypatch.setattr(server, "managed_storage_snapshot", lambda: snapshot)
+
+    response = client.get("/managed-storage")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data_root"] == snapshot["data_root"]
+    assert payload["plot_export_dir_count"] == 3
+
+
+def test_managed_storage_cleanup_endpoint_returns_cleanup_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot = _managed_storage_snapshot(tmp_path / "managed")
+
+    def cleanup(*, strategy: str = "all") -> dict[str, object]:
+        return {
+            **snapshot,
+            "strategy": strategy,
+            "removed_files": 7,
+            "removed_directories": 2,
+        }
+
+    monkeypatch.setattr(server, "cleanup_managed_storage", cleanup)
+
+    response = client.post("/managed-storage/cleanup", json={"strategy": "stale"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["strategy"] == "stale"
+    assert payload["removed_files"] == 7
+    assert payload["removed_directories"] == 2
+
+
+def test_export_render_uses_managed_storage_when_output_dir_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    managed_output_dir = tmp_path / "managed_exports" / "curve_sheet1"
+
+    monkeypatch.setattr(
+        server,
+        "prepare_managed_plot_export_dir",
+        lambda _input_path, *, sheet, template: managed_output_dir,
+    )
+
+    response = client.post(
+        "/export-render",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "size": "60x55",
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["output_dir"] == str(managed_output_dir)
+    assert Path(payload["output_dir"]).exists()
+    assert all(Path(path).exists() for path in payload["artifact_paths"])
 
 
 def test_save_and_open_project_round_trips_composer_v2_payload(tmp_path: Path) -> None:

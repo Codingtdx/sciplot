@@ -230,7 +230,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add workbooks" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Add workbooks" })[0]!);
 
     await waitFor(() => {
       expect(inspectTensileWorkbook).toHaveBeenCalledTimes(2);

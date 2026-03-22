@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { InfoTip } from "../components/InfoTip";
 import {
   exportTensileComparison,
   inspectTensileWorkbook,
@@ -25,10 +24,6 @@ import {
   templateLabel,
   toDialogPaths,
 } from "../lib/workbench";
-
-function representativeSheetName(sheetNames: string[]) {
-  return sheetNames.includes("Representative_Curve") ? "Representative_Curve" : (sheetNames[0] ?? 0);
-}
 
 export function TensileScreen({
   meta,
@@ -254,7 +249,7 @@ export function TensileScreen({
           <div className="panel-heading">
             <div>
               <div className="card-kicker">Tensile</div>
-              <h2>Prepare raw CSVs, compare prepared workbooks, then hand off to Plot</h2>
+              <h2>Prepare or compare tensile workbooks</h2>
             </div>
             <div className="wizard-inline-chips">
               <span className="signal-tag">{compareSourceCount} source(s)</span>
@@ -273,10 +268,7 @@ export function TensileScreen({
             <article className="focus-panel tensile-task-card">
               <span>Prepare raw CSV</span>
               <strong>Generate one workbook from replicate CSV files.</strong>
-              <span>
-                Use this when you want a clean tensile workbook with representative curves and
-                metrics before handing it to Plot.
-              </span>
+              <span>Build a clean workbook before opening it in Plot.</span>
               <div className="step-actions">
                 <button
                   className="primary-button"
@@ -306,11 +298,8 @@ export function TensileScreen({
 
             <article className="focus-panel tensile-task-card">
               <span>Compare workbooks</span>
-              <strong>Queue prepared workbooks and export the comparison bundle.</strong>
-              <span>
-                Comparison export unlocks when at least two sources are queued and keeps the fixed
-                60 x 55 mm figure size.
-              </span>
+              <strong>Queue prepared workbooks and export the comparison set.</strong>
+              <span>Export unlocks when at least two sources are queued.</span>
               <div className="step-actions">
                 <button
                   className="primary-button"
@@ -318,7 +307,7 @@ export function TensileScreen({
                   onClick={() => void addTensileComparisonWorkbooks()}
                   type="button"
                 >
-                  Queue workbooks
+                  Add workbooks
                 </button>
               </div>
             </article>
@@ -383,12 +372,11 @@ export function TensileScreen({
                 <div className="card-kicker">Queue</div>
                 <h3>Compare workbooks</h3>
               </div>
-              <InfoTip content="Two or more prepared workbooks are required. The compare export always keeps the fixed 60 x 55 mm figure size." />
             </div>
 
             <div className="focus-panel">
               <strong>{compareSourceCount} source(s) queued</strong>
-              <span>Export unlocks when at least two are queued.</span>
+              <span>Export unlocks at two sources.</span>
             </div>
 
             <div className="step-actions">
@@ -441,7 +429,9 @@ export function TensileScreen({
                           onClick={() =>
                             void openWorkbookInPlotting(
                               source.workbook_path,
-                              representativeSheetName(source.sheet_names),
+                              source.sheet_names.includes("Representative_Curve")
+                                ? "Representative_Curve"
+                                : (source.sheet_names[0] ?? 0),
                             )
                           }
                           type="button"

@@ -302,6 +302,33 @@ class MaterializeDataTemplateFolderResponse(StrictModel):
     files: list[DataTemplateFolderFileResponse]
 
 
+class ManagedStorageStatusResponse(StrictModel):
+    root_path: str
+    data_root: str
+    cache_root: str
+    example_templates_path: str
+    blank_templates_path: str
+    single_example_templates_path: str
+    single_blank_templates_path: str
+    plot_exports_path: str
+    code_console_runs_path: str
+    example_template_file_count: int
+    blank_template_file_count: int
+    single_template_file_count: int
+    plot_export_dir_count: int
+    code_console_run_dir_count: int
+
+
+class ManagedStorageCleanupRequest(StrictModel):
+    strategy: Literal["all", "stale"] = "all"
+
+
+class ManagedStorageCleanupResponse(ManagedStorageStatusResponse):
+    strategy: Literal["all", "stale"]
+    removed_files: int
+    removed_directories: int
+
+
 class PlotContractAliasesResponse(StrictModel):
     style_presets: dict[str, str]
 
