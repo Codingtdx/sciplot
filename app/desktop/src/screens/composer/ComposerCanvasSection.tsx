@@ -50,7 +50,7 @@ export function ComposerCanvasSection({
       <div className="section-head">
         <div>
           <div className="card-kicker">Composer</div>
-          <h2>Canvas workspace</h2>
+          <h2>Canvas</h2>
         </div>
         <div className="metric-strip">
           <div className="metric-chip">

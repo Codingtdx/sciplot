@@ -132,11 +132,18 @@ export function CodeConsoleScreen({
 
   const generated = generateState.result;
   const session = generated?.session ?? null;
-  const promptText =
-    generated?.prompt_text ??
-    "Finish the current Plot setup first so Code Console can generate the fixed project prompt.";
+  const promptText = (generated?.prompt_text ?? "").trim();
+  const promptError =
+    generateState.error ??
+    (!generateState.busy && generated && promptText.length === 0
+      ? "The fixed project prompt resolved empty. Refresh the current Plot context and try again."
+      : null);
+  const promptReady = promptText.length > 0;
 
   const handleCopyPrompt = async () => {
+    if (!promptReady) {
+      return;
+    }
     try {
       await copyTextToClipboard(promptText);
       setNoticeTone("success");
@@ -222,9 +229,6 @@ export function CodeConsoleScreen({
             <div className="card-kicker">Current plot context</div>
             <h2>Use the active Plot session as the source of truth</h2>
           </div>
-          <span className={`status-pill ${wizard.sidecarReady ? "good" : "warn"}`}>
-            {wizard.sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
-          </span>
         </div>
 
         <div className="code-console-context-grid">
@@ -258,62 +262,194 @@ export function CodeConsoleScreen({
               {session?.yscale ?? wizard.options.yscale ?? "linear"}
             </strong>
           </div>
-          <div className="code-console-context-chip">
-            <span>Inspect model</span>
-            <strong>{generated?.data_context.model_label ?? wizard.inspection?.model_label ?? "-"}</strong>
-          </div>
-          <div className="code-console-context-chip">
-            <span>Recommended template</span>
-            <strong>
-              {templateLabel(meta, generated?.data_context.recommendation.template ?? wizard.inspection?.recommendation.template)}
-            </strong>
-          </div>
         </div>
       </section>
 
-      <section className="work-card section-card code-console-prompt-card">
-        <div className="panel-heading">
-          <div>
-            <div className="card-kicker">Project prompt for external AI</div>
-            <h2>Copy this fixed prompt, then add your real request outside the app</h2>
+      {!wizard.sidecarReady && (
+        <div className="warning-card">
+          The sidecar is offline. Prompt generation and the Python runner stay unavailable until it reconnects.
+        </div>
+      )}
+
+      {notice && (
+        <div className={noticeTone === "warning" ? "warning-card" : "success-card"}>{notice}</div>
+      )}
+
+      <div className="code-console-main-grid">
+        <section className="work-card section-card code-console-prompt-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Project prompt for external AI</div>
+              <h2>Copy the fixed prompt, then add your real request outside the app</h2>
+            </div>
+            <button
+              className="ghost-button"
+              disabled={generateState.busy || !promptReady}
+              onClick={() => void handleCopyPrompt()}
+              type="button"
+            >
+              Copy prompt
+            </button>
           </div>
-          <button
-            className="ghost-button"
-            disabled={generateState.busy || !generated}
-            onClick={() => void handleCopyPrompt()}
-            type="button"
+
+          <p className="hint-text">
+            Main flow: copy the fixed project prompt, ask the external AI for a repo-native change,
+            then paste the returned Python into the runner.
+          </p>
+
+          {promptError && <div className="warning-card">{promptError}</div>}
+
+          <pre aria-label="Generated AI prompt" className="code-console-preview">
+            {generateState.busy
+              ? "Refreshing the fixed project prompt from the current Plot context…"
+              : promptReady
+                ? promptText
+                : "The fixed project prompt will appear here once the current Plot context resolves."}
+          </pre>
+        </section>
+
+        <section className="work-card section-card code-console-terminal-card">
+          <div className="panel-heading">
+            <div>
+              <div className="card-kicker">Code terminal</div>
+              <h2>Paste code and run it in the repo-native Python runner</h2>
+            </div>
+            <span className="signal-tag">20s timeout · OUTPUT_DIR only</span>
+          </div>
+
+          <p className="hint-text">
+            The runner executes from the repository root, captures stdout and stderr, and only scans the controlled output directory for generated files.
+          </p>
+
+          {runError && <div className="warning-card">{runError}</div>}
+          {runResult?.timed_out && (
+            <div className="warning-card">
+              The last run hit the timeout. Reduce the workload or save fewer outputs per run.
+            </div>
+          )}
+
+          <label>
+            <span className="field-label">Python code</span>
+            <textarea
+              aria-label="Code console runner input"
+              className="field code-console-editor"
+              onChange={(event) => setCode(event.target.value)}
+              rows={12}
+              value={code}
+            />
+          </label>
+
+          <div className="step-actions">
+            <button
+              className="primary-button"
+              disabled={runBusy || !wizard.sidecarReady}
+              onClick={() => void handleRun()}
+              type="button"
+            >
+              {runBusy ? "Running…" : "Run"}
+            </button>
+            <button
+              className="ghost-button"
+              onClick={() => setCode(DEFAULT_RUNNER_CODE)}
+              type="button"
+            >
+              Clear code
+            </button>
+            <button className="ghost-button" onClick={() => setRunResult(null)} type="button">
+              Clear output
+            </button>
+            <button
+              className="ghost-button"
+              disabled={!runResult}
+              onClick={() => runResult && void handleOpenPath(runResult.output_dir)}
+              type="button"
+            >
+              Open output folder
+            </button>
+          </div>
+
+          <div className="focus-panel">
+            <span>Runner status</span>
+            <strong>{runSummary(runResult)}</strong>
+          </div>
+
+          <details
+            className="context-card wizard-details code-console-run-details"
+            open={Boolean(runResult || runError)}
           >
-            Copy prompt
-          </button>
-        </div>
+            <summary>Runner output</summary>
 
-        <p className="hint-text">
-          Main flow: copy the fixed project prompt, ask the external AI for a repo-native change,
-          paste the returned Python here, then run it in the repository sandbox.
-        </p>
+            <div className="wizard-section-stack">
+              <div className="code-console-output-grid">
+                <div className="code-console-output-card">
+                  <h4>stdout</h4>
+                  <pre className="code-console-terminal-pre">{runResult?.stdout || "(empty)"}</pre>
+                </div>
+                <div className="code-console-output-card">
+                  <h4>stderr</h4>
+                  <pre className="code-console-terminal-pre">{runResult?.stderr || "(empty)"}</pre>
+                </div>
+              </div>
 
-        {!wizard.sidecarReady && (
-          <div className="warning-card">
-            The sidecar is offline. Prompt generation and the Python runner stay unavailable until
-            it reconnects.
-          </div>
-        )}
+              <div className="code-console-list-block">
+                <h4>Generated files</h4>
+                {runResult?.generated_files.length ? (
+                  <div className="launchpad-recent-list">
+                    {runResult.generated_files.map((file) => (
+                      <button
+                        className="launchpad-recent-row"
+                        key={file.path}
+                        onClick={() => void handleOpenPath(file.path)}
+                        type="button"
+                      >
+                        <strong>{file.filename}</strong>
+                        <span>
+                          {file.kind} · {formatLeaf(file.path)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="placeholder-card">Generated files will appear here after a successful run.</div>
+                )}
+              </div>
 
-        {generateState.error && <div className="warning-card">{generateState.error}</div>}
-        {notice && (
-          <div className={noticeTone === "warning" ? "warning-card" : "success-card"}>{notice}</div>
-        )}
-
-        <pre aria-label="Generated AI prompt" className="code-console-preview">
-          {generateState.busy ? "Refreshing the fixed project prompt from the current Plot context…" : promptText}
-        </pre>
-      </section>
+              {runResult?.previews.length ? (
+                <PreviewPane
+                  busy={false}
+                  error={null}
+                  onChangeIndex={setPreviewIndex}
+                  previewIndex={previewIndex}
+                  previews={runResult.previews}
+                />
+              ) : (
+                <div className="placeholder-card">
+                  Preview images appear here after the runner writes PNG or PDF outputs.
+                </div>
+              )}
+            </div>
+          </details>
+        </section>
+      </div>
 
       <details className="context-card wizard-details code-console-details">
         <summary>Context details</summary>
 
         <div className="wizard-section-stack">
           <div className="context-list">
+            <div className="context-row">
+              <span>Inspect model</span>
+              <strong>{generated?.data_context.model_label ?? wizard.inspection?.model_label ?? "-"}</strong>
+            </div>
+            <div className="context-row">
+              <span>Recommended template</span>
+              <strong>
+                {templateLabel(
+                  meta,
+                  generated?.data_context.recommendation.template ?? wizard.inspection?.recommendation.template,
+                )}
+              </strong>
+            </div>
             <div className="context-row">
               <span>Reverse x</span>
               <strong>{String(session?.reverse_x ?? wizard.options.reverse_x ?? false)}</strong>
@@ -385,121 +521,6 @@ export function CodeConsoleScreen({
           </div>
         </div>
       </details>
-
-      <section className="work-card section-card code-console-terminal-card">
-        <div className="panel-heading">
-          <div>
-            <div className="card-kicker">Code terminal</div>
-            <h2>Paste code and run it in the repo-native Python runner</h2>
-          </div>
-          <span className="signal-tag">20s timeout · OUTPUT_DIR only</span>
-        </div>
-
-        <p className="hint-text">
-          The runner executes Python from the repository root, captures stdout and stderr, and only
-          scans the controlled output directory for generated files and previews.
-        </p>
-
-        {runError && <div className="warning-card">{runError}</div>}
-        {runResult?.timed_out && (
-          <div className="warning-card">
-            The last run hit the timeout. Reduce the workload or save fewer outputs per run.
-          </div>
-        )}
-
-        <label>
-          <span className="field-label">Python code</span>
-          <textarea
-            aria-label="Code console runner input"
-            className="field code-console-editor"
-            onChange={(event) => setCode(event.target.value)}
-            rows={14}
-            value={code}
-          />
-        </label>
-
-        <div className="step-actions">
-          <button
-            className="primary-button"
-            disabled={runBusy || !wizard.sidecarReady}
-            onClick={() => void handleRun()}
-            type="button"
-          >
-            {runBusy ? "Running…" : "Run"}
-          </button>
-          <button
-            className="ghost-button"
-            onClick={() => setCode(DEFAULT_RUNNER_CODE)}
-            type="button"
-          >
-            Clear code
-          </button>
-          <button className="ghost-button" onClick={() => setRunResult(null)} type="button">
-            Clear output
-          </button>
-          <button
-            className="ghost-button"
-            disabled={!runResult}
-            onClick={() => runResult && void handleOpenPath(runResult.output_dir)}
-            type="button"
-          >
-            Open output folder
-          </button>
-        </div>
-
-        <div className="focus-panel">
-          <span>Runner status</span>
-          <strong>{runSummary(runResult)}</strong>
-        </div>
-
-        <div className="code-console-output-grid">
-          <div className="code-console-output-card">
-            <h4>stdout</h4>
-            <pre className="code-console-terminal-pre">{runResult?.stdout || "(empty)"}</pre>
-          </div>
-          <div className="code-console-output-card">
-            <h4>stderr</h4>
-            <pre className="code-console-terminal-pre">{runResult?.stderr || "(empty)"}</pre>
-          </div>
-        </div>
-
-        <div className="code-console-list-block">
-          <h4>Generated files</h4>
-          {runResult?.generated_files.length ? (
-            <div className="launchpad-recent-list">
-              {runResult.generated_files.map((file) => (
-                <button
-                  className="launchpad-recent-row"
-                  key={file.path}
-                  onClick={() => void handleOpenPath(file.path)}
-                  type="button"
-                >
-                  <strong>{file.filename}</strong>
-                  <span>{file.kind} · {formatLeaf(file.path)}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="placeholder-card">
-              Generated files will appear here after the repo-native runner writes into OUTPUT_DIR.
-            </div>
-          )}
-        </div>
-
-        {runResult?.previews.length ? (
-          <PreviewPane
-            busy={false}
-            error={null}
-            onChangeIndex={setPreviewIndex}
-            previewIndex={previewIndex}
-            previews={runResult.previews}
-          />
-        ) : (
-          <div className="placeholder-card">
-            Preview images appear after the runner writes PNG or PDF outputs into OUTPUT_DIR.
-          </div>
-        )}
-      </section>
     </div>
   );
 }

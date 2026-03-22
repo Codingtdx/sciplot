@@ -347,9 +347,7 @@ export default function App() {
 
   let content = (
     <LaunchpadScreen
-      activeThemePresetName={activeThemePreset.name}
       meta={workbenchMeta}
-      sidecarReady={sidecarReady}
       onNavigate={navigate}
     />
   );

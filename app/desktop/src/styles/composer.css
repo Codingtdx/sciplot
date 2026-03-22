@@ -1,20 +1,20 @@
 .canvas-shell-card {
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   background:
     radial-gradient(circle at top right, var(--workspace-composer), transparent 42%),
     var(--surface-card);
 }
 
 .canvas-toolbar {
-  margin: 8px 0 10px;
+  margin: 6px 0 8px;
 }
 
 .composer-main {
   position: relative;
-  min-height: clamp(320px, 52vh, 660px);
+  min-height: clamp(340px, 58vh, 700px);
   display: grid;
   place-items: center;
-  padding: 10px;
+  padding: 8px;
   border-radius: calc(var(--radius-xl) + 2px);
   border: 1px solid var(--border-subtle);
   background: var(--surface-canvas);
@@ -24,7 +24,7 @@
   max-width: 100%;
   max-height: 100%;
   overflow: auto;
-  padding: 6px;
+  padding: 4px;
 }
 
 .composer-stage {
@@ -33,9 +33,9 @@
 
 .composer-status {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  padding: 6px 10px;
+  right: 10px;
+  bottom: 10px;
+  padding: 5px 9px;
   border-radius: 999px;
   background: var(--surface-card-strong);
   border: 1px solid var(--border-strong);
@@ -44,7 +44,7 @@
 
 .composer-drop-overlay {
   position: absolute;
-  inset: 10px;
+  inset: 8px;
   display: none;
   align-items: center;
   justify-content: center;
@@ -62,8 +62,8 @@
 
 .composer-drop-card,
 .composer-empty-state {
-  width: min(440px, calc(100% - 48px));
-  padding: 16px 18px;
+  width: min(380px, calc(100% - 40px));
+  padding: 14px 16px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-card-strong);
   box-shadow: var(--shadow-lg);
@@ -82,7 +82,7 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 4px;
+  padding: 3px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
   border-radius: 999px;
@@ -96,7 +96,7 @@
 }
 
 .composer-tab-card {
-  padding: 6px;
+  padding: 5px;
 }
 
 .inspector-tab-strip {
@@ -134,7 +134,7 @@
 
 .composer-inspector-group {
   border-top: 1px solid var(--border-subtle);
-  padding-top: 6px;
+  padding-top: 5px;
 }
 
 .composer-inspector-group summary {
@@ -147,11 +147,11 @@
 }
 
 .composer-sidebar {
-  gap: 10px;
+  gap: 8px;
 }
 
 @media (max-width: 1280px) {
   .composer-main {
-    min-height: clamp(300px, 40vh, 500px);
+    min-height: clamp(300px, 46vh, 540px);
   }
 }

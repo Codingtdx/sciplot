@@ -340,6 +340,64 @@ describe("WizardScreen", () => {
     expect(screen.getByRole("button", { name: /Sheet2/i })).toBeInTheDocument();
   });
 
+  it("lets completed steps navigate backward without wiping the current session", () => {
+    const onNavigate = vi.fn();
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      template: "curve",
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      },
+      preflight: {
+        template: "curve",
+        warnings: [],
+        errors: [],
+        output_filenames: ["curve.pdf"],
+      },
+      stage: "review",
+      step: "preflight",
+    });
+
+    const { rerender } = render(
+      <WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage="review" />,
+    );
+
+    const tuneStep = screen.getByRole("button", { name: "Plot step Tune" });
+    const reviewStep = screen.getByRole("button", { name: "Plot step Review" });
+    const exportStep = screen.getByRole("button", { name: "Plot step Export" });
+
+    expect(tuneStep).toBeEnabled();
+    expect(reviewStep).toHaveAttribute("aria-current", "step");
+    expect(exportStep).toBeDisabled();
+
+    fireEvent.click(tuneStep);
+
+    expect(onNavigate).toHaveBeenCalledWith("/plot/tune");
+    expect(useWizardStore.getState().inputPath).toBe("/tmp/curve.csv");
+    expect(useWizardStore.getState().sheet).toBe(0);
+    expect(useWizardStore.getState().template).toBe("curve");
+    expect(useWizardStore.getState().options).toMatchObject({
+      size: "60x55",
+      xscale: "linear",
+      yscale: "linear",
+      reverse_x: false,
+      style_preset: "default",
+      palette_preset: "colorblind_safe",
+    });
+
+    rerender(<WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage="tune" />);
+
+    expect(useWizardStore.getState().stage).toBe("tune");
+  });
+
   it("shows only compatible templates first and disables incompatible ones behind more types", () => {
     useWizardStore.setState({
       inputPath: "/tmp/relaxation.xlsx",

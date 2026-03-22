@@ -26,7 +26,7 @@
 .wizard-review-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .wizard-summary-list,
@@ -36,14 +36,14 @@
 .wizard-options-core {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-summary-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -65,7 +65,7 @@
 .wizard-template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-template-gallery {
@@ -104,8 +104,8 @@
 .wizard-recommendation-card {
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding: 13px;
   background:
     radial-gradient(circle at top right, var(--theme-glow-strong), transparent 42%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-card-strong) 90%, transparent), color-mix(in srgb, var(--primary-soft) 30%, transparent));
@@ -123,11 +123,11 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .wizard-recommendation-copy strong {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .wizard-recommendation-copy span:last-child {
@@ -145,8 +145,8 @@
 .sheet-choice {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px;
+  gap: 5px;
+  padding: 12px;
   text-align: left;
 }
 
@@ -187,14 +187,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-data-template-card,
 .wizard-template-library-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-template-folder-path code,
@@ -210,7 +210,7 @@
 .wizard-template-file-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wizard-template-file-list code {
@@ -221,7 +221,7 @@
 }
 
 .wizard-template-library-card {
-  padding: 14px;
+  padding: 12px;
   text-align: left;
   border-radius: calc(var(--radius-lg) + 1px);
   border: 1px solid var(--border-subtle);
@@ -251,14 +251,14 @@
 }
 
 .wizard-tight-grid {
-  gap: 10px;
+  gap: 8px;
 }
 
 .wizard-option-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  gap: 6px;
+  padding: 10px;
 }
 
 .wizard-option-card.toggle-field {
@@ -268,7 +268,7 @@
 
 .wizard-options-heading {
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: baseline;
 }
 
@@ -284,13 +284,13 @@
 .wizard-details-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .wizard-readiness-panel {
-  gap: 8px;
+  gap: 6px;
 }
 
 .wizard-review-details {

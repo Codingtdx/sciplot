@@ -60,8 +60,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
-  padding: 0 11px;
+  min-height: 24px;
+  padding: 0 9px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -110,7 +110,7 @@
 .plot-workspace {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
   width: 100%;
 }
@@ -118,8 +118,8 @@
 .plot-stage-card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 18px;
 }
 .recent-meta {
   margin-top: 8px;
@@ -132,7 +132,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: 12px;
+  gap: 10px;
   align-content: start;
   align-items: start;
 }
@@ -145,7 +145,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .plot-stage-grid {
@@ -153,7 +153,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(320px, 400px);
-  gap: 12px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -165,13 +165,13 @@
 .plot-import-card,
 .plot-sheet-card,
 .plot-summary-card {
-  padding: 20px;
+  padding: 16px;
 }
 
 .plot-stage-copy {
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .plot-stage-copy h2 {
@@ -182,19 +182,19 @@
 .plot-stage-actions,
 .plot-stage-metrics {
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .plot-stage-metrics {
-  gap: 10px;
+  gap: 8px;
 }
 
 .plot-stage-metrics .focus-panel {
-  flex: 1 1 180px;
+  flex: 1 1 160px;
 }
 
 .plot-import-canvas {
-  min-height: 360px;
+  min-height: 312px;
   justify-content: center;
   background:
     radial-gradient(circle at top right, var(--theme-glow-strong), transparent 36%),
@@ -202,13 +202,13 @@
 }
 
 .plot-import-actions {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .plot-import-format-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
 }
 
@@ -223,7 +223,7 @@
 }
 
 .plot-studio-preview {
-  gap: 12px;
+  gap: 10px;
 }
 
 .plot-session-overview-card,
@@ -233,12 +233,12 @@
 
 .settings-layout .desk-main,
 .tensile-layout .desk-main {
-  gap: 12px;
+  gap: 10px;
 }
 
 .tensile-task-grid,
 .theme-gallery-grid {
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -247,7 +247,7 @@
 }
 
 .theme-mode-switch {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .theme-gallery-grid {
@@ -256,7 +256,7 @@
 }
 
 .theme-preset-card {
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -283,7 +283,7 @@
 
 .theme-preset-preview {
   position: relative;
-  min-height: 120px;
+  min-height: 92px;
   border-radius: calc(var(--radius-xl) - 6px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   overflow: hidden;
@@ -291,10 +291,10 @@
 
 .theme-preset-surface {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  top: 18px;
-  bottom: 28px;
+  left: 14px;
+  right: 14px;
+  top: 14px;
+  bottom: 22px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
@@ -302,18 +302,18 @@
 
 .theme-preset-chip {
   position: absolute;
-  width: 86px;
-  height: 12px;
-  left: 20px;
-  bottom: 16px;
+  width: 74px;
+  height: 10px;
+  left: 18px;
+  bottom: 12px;
   border-radius: 999px;
 }
 
 .theme-preset-copy {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .theme-preset-head {
@@ -324,11 +324,18 @@
 }
 
 .tensile-task-card {
-  min-height: 176px;
+  min-height: 152px;
 }
 
 .composer-studio-layout {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+}
+
+.code-console-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 10px;
+  align-items: start;
 }
 
 .code-console-layout {
@@ -342,7 +349,7 @@
 .code-console-terminal-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .code-console-builder-card,
@@ -358,20 +365,20 @@
 .code-console-context-bar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .code-console-context-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .code-console-context-chip {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
+  gap: 3px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -453,7 +460,7 @@
 .code-console-preview,
 .code-console-scaffold {
   margin: 0;
-  padding: 14px;
+  padding: 12px;
   overflow-x: auto;
   overflow-y: visible;
   white-space: pre-wrap;
@@ -461,21 +468,21 @@
 }
 
 .code-console-preview {
-  min-height: 360px;
+  min-height: 200px;
 }
 
 .code-console-prompt-card .code-console-preview {
-  min-height: 220px;
+  min-height: 180px;
 }
 
 .code-console-scaffold {
-  min-height: 220px;
+  min-height: 180px;
 }
 
 .code-console-editor {
-  min-height: 280px;
+  min-height: 220px;
   resize: vertical;
-  padding: 14px;
+  padding: 12px;
   font-family:
     "SFMono-Regular",
     "JetBrains Mono",
@@ -489,7 +496,7 @@
 .code-console-output-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .code-console-output-card {
@@ -506,9 +513,9 @@
 
 .code-console-terminal-pre {
   margin: 0;
-  min-height: 180px;
-  max-height: 280px;
-  padding: 14px;
+  min-height: 120px;
+  max-height: 220px;
+  padding: 12px;
   overflow: auto;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
@@ -574,9 +581,9 @@
   height: 100dvh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
-  gap: 14px;
-  padding: 14px;
+  grid-template-columns: 214px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
   overflow: hidden;
 }
 
@@ -585,8 +592,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 12px;
   border-radius: calc(var(--radius-xl) - 2px);
   border: 1px solid var(--border-subtle);
   background:
@@ -616,7 +623,7 @@
 }
 
 .sidebar-brand {
-  padding: 8px;
+  padding: 7px;
 }
 
 .sidebar-brand:hover,
@@ -636,8 +643,8 @@
 }
 
 .sidebar-brand-mark {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   border-radius: 14px;
@@ -658,7 +665,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .sidebar-brand-copy strong {
@@ -673,18 +680,18 @@
 
 .sidebar-start-link,
 .sidebar-nav-item {
-  padding: 11px 12px;
+  padding: 10px 11px;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .sidebar-footer {
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -693,7 +700,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
 }
 
@@ -702,7 +709,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 13px 16px;
   border-radius: calc(var(--radius-xl) - 2px);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
@@ -713,7 +720,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .workspace-header-title-row {
@@ -726,7 +733,7 @@
 .workspace-header-copy h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.2rem, 1.5vw, 1.5rem);
+  font-size: clamp(1.12rem, 1.4vw, 1.4rem);
   letter-spacing: -0.04em;
 }
 
@@ -736,29 +743,29 @@
 }
 
 .workspace-header-inline-status {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .workspace-header-description {
   margin: 0;
   max-width: 64ch;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .workspace-header-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .workspace-header-item {
-  min-width: 220px;
+  min-width: 188px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 3px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
@@ -770,7 +777,7 @@
 }
 
 .workspace-header-item strong {
-  font-size: 13px;
+  font-size: 12px;
   word-break: break-word;
 }
 
@@ -783,7 +790,7 @@
 .launchpad-context,
 .tensile-context,
 .settings-context {
-  gap: 12px;
+  gap: 10px;
 }
 
 .launchpad-start-panel,
@@ -791,21 +798,21 @@
 .tensile-command-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px;
+  gap: 10px;
+  padding: 16px;
 }
 
 .launchpad-primary-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .launchpad-action-card {
   width: 100%;
   display: flex;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 13px;
   text-align: left;
   border-radius: calc(var(--radius-lg) + 1px);
   border: 1px solid var(--border-subtle);
@@ -833,8 +840,8 @@
 }
 
 .launchpad-action-icon {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border-radius: 14px;
@@ -852,22 +859,23 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .launchpad-action-copy strong {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .launchpad-action-copy span {
   color: var(--text-secondary);
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .launchpad-recent-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .launchpad-recent-row,
@@ -875,8 +883,8 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px;
+  gap: 3px;
+  padding: 11px 12px;
   text-align: left;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
@@ -901,7 +909,7 @@
 .launchpad-status-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .settings-layout {

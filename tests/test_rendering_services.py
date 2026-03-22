@@ -205,6 +205,12 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
     assert preflight.submission_report.style_preset == "nature"
 
 
+def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified() -> None:
+    options = resolve_render_options(template="segmented_stacked_curve")
+
+    assert options.reverse_x is True
+
+
 def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) -> None:
     input_path = _write_tensile_curve_table(tmp_path / "tensile_curve.csv")
 
@@ -335,6 +341,21 @@ def test_small_curve_render_prefers_direct_labels_when_they_fit(tmp_path: Path) 
         ax = plot.figure.axes[0]
         assert ax.get_legend() is None
         assert {text.get_text() for text in ax.texts} == {"Sample A", "Sample B"}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_large_curve_render_keeps_legend_when_direct_labels_are_not_preferred(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
+
+    rendered = build_rendered_plots("curve", input_path, size="120x55")
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        ax = plot.figure.axes[0]
+        assert ax.get_legend() is not None
+        assert {text.get_text() for text in ax.texts} == set()
     finally:
         close_rendered_plots(rendered)
 

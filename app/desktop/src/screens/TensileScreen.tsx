@@ -313,20 +313,12 @@ export function TensileScreen({
               </span>
               <div className="step-actions">
                 <button
-                  className="ghost-button"
+                  className="primary-button"
                   disabled={busy}
                   onClick={() => void addTensileComparisonWorkbooks()}
                   type="button"
                 >
                   Queue workbooks
-                </button>
-                <button
-                  className="primary-button"
-                  disabled={!canExportComparison}
-                  onClick={() => void runTensileComparisonExport()}
-                  type="button"
-                >
-                  Export queue
                 </button>
               </div>
             </article>
@@ -380,9 +372,7 @@ export function TensileScreen({
           </article>
         ) : (
           <article className="work-card section-card">
-            <div className="placeholder-card">
-              Select raw CSV files to generate one prepared workbook.
-            </div>
+            <div className="placeholder-card">Select raw CSV files to generate one prepared workbook.</div>
           </article>
         )}
 

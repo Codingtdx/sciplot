@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { StepFlow } from "../components/StepFlow";
+import { StepFlow, type StepFlowItem } from "../components/StepFlow";
 import { PreviewPane } from "../components/PreviewPane";
 import {
   exportRender,
@@ -22,6 +22,8 @@ import type {
 import { openDialog } from "../lib/tauri-dialog";
 import {
   PLOT_STAGE_COPY,
+  PLOT_STAGE_ORDER,
+  PLOT_STAGES,
   compatibleTemplateChoices,
   confirmReplaceWizardSession,
   formatLeaf,
@@ -369,6 +371,41 @@ export function WizardScreen({
     meta,
     wizard.options.style_preset ?? meta?.default_style ?? null,
   );
+  const stepFlowSteps = useMemo<StepFlowItem[]>(() => {
+    const currentIndex = PLOT_STAGE_ORDER.indexOf(routeStage);
+    return PLOT_STAGES.map((step, index) => {
+      const reachable =
+        step.id === "import" ||
+        (step.id === "sheet" && hasInput && wizard.sheetNames.length > 1) ||
+        (step.id === "type" && hasInspection) ||
+        (step.id === "tune" && hasTemplate) ||
+        (step.id === "review" && hasTemplate) ||
+        (step.id === "export" &&
+          hasTemplate &&
+          (routeStage === "export" || wizard.preflight !== null || wizard.outputs.length > 0));
+      const status =
+        step.id === routeStage
+          ? "current"
+          : !reachable
+            ? "disabled"
+            : index < currentIndex
+              ? "complete"
+              : "upcoming";
+      return {
+        ...step,
+        status,
+        onSelect: status === "complete" ? () => goToStage(step.id) : null,
+      };
+    });
+  }, [
+    hasInput,
+    hasInspection,
+    hasTemplate,
+    routeStage,
+    wizard.outputs.length,
+    wizard.preflight,
+    wizard.sheetNames.length,
+  ]);
 
   const openDataFile = async () => {
     let path: string | undefined;
@@ -624,14 +661,14 @@ export function WizardScreen({
           </div>
         </div>
 
-        <StepFlow current={routeStage} />
+        <StepFlow steps={stepFlowSteps} />
 
         <div className="plot-stage-metrics">
-          <div className="focus-panel">
+          <div className="stat-tile">
             <span>File</span>
             <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Waiting for import"}</strong>
           </div>
-          <div className="focus-panel">
+          <div className="stat-tile">
             <span>Recommended type</span>
             <strong>
               {wizard.inspection
@@ -639,7 +676,7 @@ export function WizardScreen({
                 : "Pending inspect"}
             </strong>
           </div>
-          <div className="focus-panel">
+          <div className="stat-tile">
             <span>Current template</span>
             <strong>{wizard.template ? templateLabel(meta, wizard.template) : "Not selected"}</strong>
           </div>
@@ -814,7 +851,6 @@ export function WizardScreen({
                   {hasTemplate && (
                     <span className="signal-tag">{templateLabel(meta, wizard.template)}</span>
                   )}
-                  <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
                 </div>
               </div>
 

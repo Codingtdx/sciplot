@@ -8,7 +8,6 @@ import { getErrorMessage } from "../../lib/workbench";
 type GenerateRequest = Parameters<typeof generateCodeConsole>[0];
 
 const responseCache = new Map<string, CodeConsoleGenerateResponse>();
-const responseInFlight = new Map<string, Promise<CodeConsoleGenerateResponse>>();
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -16,12 +15,15 @@ function isAbortError(error: unknown): boolean {
 
 export function useCodeConsoleGenerate() {
   const controllerRef = useRef<AbortController | null>(null);
+  const latestRequestRef = useRef(0);
   const [activity, setActivity] = useState<RequestActivity>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CodeConsoleGenerateResponse | null>(null);
 
   const generate = async (request: GenerateRequest) => {
     controllerRef.current?.abort();
+    const requestId = latestRequestRef.current + 1;
+    latestRequestRef.current = requestId;
     const key = requestCacheKey("code-console-generate", request);
     const cached = responseCache.get(key);
     if (cached) {
@@ -33,21 +35,15 @@ export function useCodeConsoleGenerate() {
 
     const controller = new AbortController();
     controllerRef.current = controller;
-    setActivity("scheduled");
+    setResult(null);
     setError(null);
-
-    const existing = responseInFlight.get(key);
-    const job =
-      existing ??
-      generateCodeConsole(request, {
-        signal: controller.signal,
-      });
-    responseInFlight.set(key, job);
     setActivity("running");
 
     try {
-      const response = await job;
-      if (controller.signal.aborted) {
+      const response = await generateCodeConsole(request, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || latestRequestRef.current !== requestId) {
         return null;
       }
       responseCache.set(key, response);
@@ -57,15 +53,20 @@ export function useCodeConsoleGenerate() {
       return response;
     } catch (requestError) {
       if (isAbortError(requestError)) {
+        if (latestRequestRef.current === requestId) {
+          setActivity("idle");
+          setError(null);
+        }
         return null;
       }
+      if (latestRequestRef.current !== requestId) {
+        return null;
+      }
+      setResult(null);
       setError(getErrorMessage(requestError));
       setActivity("error");
       return null;
     } finally {
-      if (responseInFlight.get(key) === job) {
-        responseInFlight.delete(key);
-      }
       if (controllerRef.current === controller) {
         controllerRef.current = null;
       }
@@ -78,6 +79,7 @@ export function useCodeConsoleGenerate() {
     error,
     generate,
     reset() {
+      latestRequestRef.current += 1;
       controllerRef.current?.abort();
       controllerRef.current = null;
       setResult(null);

@@ -101,7 +101,7 @@
   --space-sm: 8px;
   --title-size: clamp(2.4rem, 3vw, 3.6rem);
   --subtitle-size: clamp(1.04rem, 1.1vw, 1.18rem);
-  --button-height: 40px;
+  --button-height: 36px;
   --motion-fast: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-medium: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --motion-slow: 360ms cubic-bezier(0.2, 0.8, 0.2, 1);

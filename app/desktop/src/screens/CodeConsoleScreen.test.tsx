@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +18,79 @@ vi.mock("../lib/api", () => ({
 import { useWizardStore } from "../lib/store";
 import { TEST_CONTRACT, TEST_META } from "../test/fixtures";
 import { CodeConsoleScreen } from "./CodeConsoleScreen";
+
+function makeGenerateResponse(promptText = "repo-native incremental prompt") {
+  return {
+    bundle_version: 1,
+    generated_at: "2026-03-21T12:00:00Z",
+    contract: {
+      version: 1,
+      sha256: "a".repeat(64),
+      default_style: "default",
+      default_palette: "colorblind_safe",
+    },
+    session: {
+      session_id: "session_demo",
+      session_source: "wizard",
+      input_path: "/tmp/session_curve.csv",
+      input_display_path: "session_curve.csv",
+      input_filename: "session_curve.csv",
+      sheet: "Sheet1",
+      sheet_names: ["Sheet1"],
+      template: "curve",
+      size_label: "60 x 55 mm",
+      size_id: "60x55",
+      style_preset: "default",
+      palette_preset: "colorblind_safe",
+      xscale: "linear",
+      yscale: "linear",
+      reverse_x: false,
+      baseline: "none",
+      show_colorbar: false,
+      intent: "custom_plot",
+      target_path: "src/rendering/custom_curve_helper.py",
+    },
+    defaults_panel: {
+      locked_by_contract: [],
+      user_selectable: [],
+      derived_from_session: [],
+    },
+    truth_sources: [],
+    data_context: {
+      available: true,
+      model: "curve_table",
+      model_label: "Curve table",
+      raw_row_count: 10,
+      raw_column_count: 4,
+      column_names: ["Time", "Stress"],
+      normalized_columns: ["sample", "x", "y"],
+      column_summaries: [],
+      sample_rows: [],
+      normalized_preview_rows: [],
+      missing_summary: { empty_cells: 0, rows: 10, columns: 4 },
+      inspection: { warnings: [], signals: [] },
+      recommendation: {
+        template: "curve",
+        reason: "Default curve.",
+        size: "60x55",
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      },
+      interpreted_summary: {},
+      full_data_rows: 10,
+      full_data_columns: 3,
+    },
+    prompt_text: promptText,
+    scaffold_text: "unused scaffold",
+    lightweight_bundle: {
+      text: "lightweight context",
+      includes_data_context: true,
+      includes_inspection_summary: true,
+      includes_project_context: false,
+      includes_full_data: false,
+    },
+  };
+}
 
 describe("CodeConsoleScreen", () => {
   beforeEach(() => {
@@ -197,6 +271,102 @@ describe("CodeConsoleScreen", () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith("repo-native incremental prompt"),
     );
+  });
+
+  it("recovers prompt generation after an aborted same-context request", async () => {
+    act(() => {
+      useWizardStore.getState().setInputPath("/tmp/strict_mode_curve.csv");
+      useWizardStore.getState().setSheet("Sheet1");
+      useWizardStore.getState().setInspection({
+        model: "curve_table",
+        model_label: "Curve table",
+        recommendation: {
+          template: "curve",
+          reason: "Default curve.",
+          size: "60x55",
+          style_preset: "default",
+          palette_preset: "colorblind_safe",
+        },
+        warnings: [],
+        signals: [],
+      });
+      useWizardStore.getState().setTemplate("curve");
+      useWizardStore.getState().setOptions({
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      });
+    });
+
+    let requestCount = 0;
+    apiMocks.generateCodeConsole.mockImplementation((_request, init?: { signal?: AbortSignal }) => {
+      requestCount += 1;
+      if (requestCount === 1) {
+        return new Promise((_, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        });
+      }
+      return Promise.resolve(makeGenerateResponse("strict-mode prompt"));
+    });
+
+    render(
+      <StrictMode>
+        <CodeConsoleScreen contract={TEST_CONTRACT} meta={TEST_META} />
+      </StrictMode>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Generated AI prompt")).toHaveTextContent("strict-mode prompt"),
+    );
+    expect(screen.getByRole("button", { name: "Copy prompt" })).toBeEnabled();
+    expect(apiMocks.generateCodeConsole).toHaveBeenCalled();
+  });
+
+  it("shows an explicit error and disables copy when the fixed prompt resolves empty", async () => {
+    act(() => {
+      useWizardStore.getState().setInputPath("/tmp/empty_prompt_curve.csv");
+      useWizardStore.getState().setSheet("Sheet1");
+      useWizardStore.getState().setInspection({
+        model: "curve_table",
+        model_label: "Curve table",
+        recommendation: {
+          template: "curve",
+          reason: "Default curve.",
+          size: "60x55",
+          style_preset: "default",
+          palette_preset: "colorblind_safe",
+        },
+        warnings: [],
+        signals: [],
+      });
+      useWizardStore.getState().setTemplate("curve");
+      useWizardStore.getState().setOptions({
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      });
+    });
+
+    apiMocks.generateCodeConsole.mockResolvedValue(makeGenerateResponse("   "));
+
+    render(<CodeConsoleScreen contract={TEST_CONTRACT} meta={TEST_META} />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "The fixed project prompt resolved empty. Refresh the current Plot context and try again.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Copy prompt" })).toBeDisabled();
   });
 
   it("runs pasted Python in the repo-native runner and surfaces outputs", async () => {

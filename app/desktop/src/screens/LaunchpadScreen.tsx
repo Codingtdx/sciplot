@@ -8,7 +8,6 @@ import {
   loadWizardProjectFile,
 } from "../lib/project-io";
 import { useComposerStore, useWizardStore, useWorkbenchStore } from "../lib/store";
-import { describeAppearanceMode } from "../lib/themes";
 import type {
   RecentProjectEntry,
   WorkbenchMeta,
@@ -32,14 +31,10 @@ function recentSignal(entry: RecentProjectEntry) {
 }
 
 export function LaunchpadScreen({
-  activeThemePresetName,
   meta,
-  sidecarReady,
   onNavigate,
 }: {
-  activeThemePresetName: string;
   meta: WorkbenchMeta | null;
-  sidecarReady: boolean;
   onNavigate(route: WorkbenchRoute): void;
 }) {
   const wizard = useWizardStore(
@@ -54,7 +49,6 @@ export function LaunchpadScreen({
   );
   const composerProject = useComposerStore((state) => state.project);
   const recentProjects = useWorkbenchStore((state) => state.recentProjects);
-  const settings = useWorkbenchStore((state) => state.settings);
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [activeRecentId, setActiveRecentId] = useState<string | null>(null);
   const [recentNotice, setRecentNotice] = useState<string | null>(null);
@@ -158,14 +152,10 @@ export function LaunchpadScreen({
               <div className="card-kicker">Start</div>
               <h2>Begin new work or restore an existing session</h2>
             </div>
-            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
-            </span>
           </div>
 
           <p className="hint-text">
-            Plot opens directly into its staged workflow. Composer opens on canvas. Recent files
-            and sessions stay one step away.
+            Plot opens directly into its staged workflow. Composer opens on canvas. Recents stay one step away.
           </p>
 
           {recentNotice && (
@@ -324,34 +314,6 @@ export function LaunchpadScreen({
               </span>
             </button>
           )}
-        </article>
-
-        <article className="context-card launchpad-status-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Desk Status</div>
-              <h3>Lightweight context</h3>
-            </div>
-          </div>
-
-          <div className="context-list">
-            <div className="context-row">
-              <span>Appearance</span>
-              <strong>{describeAppearanceMode(settings.appearance_mode)}</strong>
-            </div>
-            <div className="context-row">
-              <span>Theme</span>
-              <strong>{activeThemePresetName}</strong>
-            </div>
-            <div className="context-row">
-              <span>Sidecar</span>
-              <strong>{sidecarReady ? "Online and ready" : "Waiting for Python"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
-          </div>
         </article>
       </aside>
     </div>

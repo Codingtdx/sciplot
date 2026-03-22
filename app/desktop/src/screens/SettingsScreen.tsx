@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { InfoTip } from "../components/InfoTip";
 import { healthcheck } from "../lib/api";
@@ -6,7 +6,6 @@ import { useComposerStore, useTensileStore, useWizardStore, useWorkbenchStore } 
 import {
   DEFAULT_THEME_PRESET_BY_APPEARANCE,
   THEME_PRESETS,
-  describeAppearanceMode,
   themePresetById,
 } from "../lib/themes";
 import type {
@@ -34,7 +33,6 @@ export function SettingsScreen({
   meta: WorkbenchMeta | null;
   contract: PlotContract | null;
 }) {
-  const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
   const resetWizard = useWizardStore((state) => state.reset);
   const resetComposer = useComposerStore((state) => state.reset);
@@ -49,11 +47,6 @@ export function SettingsScreen({
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
 
   const validationRuleCount = contract ? Object.keys(contract.validation_rules).length : 0;
-  const activePreset = themePresetById(settings.theme_preset_id) ?? THEME_PRESETS[0];
-  const appearanceSummary = useMemo(
-    () => `${describeAppearanceMode(settings.appearance_mode)} appearance`,
-    [settings.appearance_mode],
-  );
 
   const refreshSidecar = async () => {
     setChecking(true);
@@ -272,40 +265,6 @@ export function SettingsScreen({
       </section>
 
       <aside className="desk-context settings-context">
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Current</div>
-              <h3>Desktop appearance</h3>
-            </div>
-            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
-            </span>
-          </div>
-
-          <div className="wizard-section-stack">
-            <div className="focus-panel">
-              <span>Current preset</span>
-              <strong>{activePreset.name}</strong>
-              <span>{activePreset.description}</span>
-            </div>
-            <div className="context-list">
-              <div className="context-row">
-                <span>Appearance</span>
-                <strong>{appearanceSummary}</strong>
-              </div>
-              <div className="context-row">
-                <span>Auto status poll</span>
-                <strong>{settings.auto_status_poll ? "Enabled" : "Disabled"}</strong>
-              </div>
-              <div className="context-row">
-                <span>Remember last workspace</span>
-                <strong>{settings.remember_last_screen ? "Enabled" : "Disabled"}</strong>
-              </div>
-            </div>
-          </div>
-        </article>
-
         <article className="context-card">
           <div className="panel-heading">
             <div>
