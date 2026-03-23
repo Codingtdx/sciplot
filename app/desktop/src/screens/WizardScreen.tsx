@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { StepFlow } from "../components/StepFlow";
@@ -40,8 +40,12 @@ import {
 import { useWizardActions } from "./wizard/useWizardActions";
 import { WizardImportStage } from "./wizard/WizardImportStage";
 import { useWizardRecentDataAction } from "./wizard/useWizardRecentDataAction";
+import { WizardStudioExportRail } from "./wizard/WizardStudioExportRail";
+import { WizardStudioReviewRail } from "./wizard/WizardStudioReviewRail";
 import { WizardSheetStage } from "./wizard/WizardSheetStage";
 import { WizardStudioStage } from "./wizard/WizardStudioStage";
+import { WizardStudioTuneRail } from "./wizard/WizardStudioTuneRail";
+import { WizardStudioTypeRail } from "./wizard/WizardStudioTypeRail";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
 import { useWizardStageRouting } from "./wizard/useWizardStageRouting";
@@ -343,6 +347,75 @@ export function WizardScreen({
     template: wizard.template,
     meta,
   });
+  let studioRailContent: ReactNode = null;
+  if (routeStage === "type") {
+    studioRailContent = (
+      <WizardStudioTypeRail
+        compatibleTemplates={compatibleTemplates}
+        hasTemplate={hasTemplate}
+        incompatibleTemplates={incompatibleTemplates}
+        inspection={wizard.inspection}
+        onApplyRecommendedSelection={applyRecommendedSelection}
+        onContinueToTune={() => goToStage("tune")}
+        onSelectTemplate={updateWizardTemplate}
+        onToggleShowAllTemplates={() => setShowAllTemplates((current) => !current)}
+        recommendationApplied={recommendationApplied}
+        selectedTemplate={wizard.template}
+        showAllTemplates={showAllTemplates}
+      />
+    );
+  } else if (routeStage === "tune") {
+    studioRailContent = (
+      <WizardStudioTuneRail
+        currentTemplate={currentTemplate}
+        hasTemplate={hasTemplate}
+        meta={meta}
+        onBackToType={() => goToStage("type")}
+        onContinueToReview={() => goToStage("review")}
+        onUpdateOptions={updateWizardOptions}
+        options={wizard.options}
+        paletteOptions={paletteOptions}
+        sizeOptions={sizeOptions}
+        styleOptions={styleOptions}
+        template={wizard.template}
+        tensileCurveMode={tensileCurveMode}
+      />
+    );
+  } else if (routeStage === "review") {
+    studioRailContent = (
+      <WizardStudioReviewRail
+        blockingErrors={blockingErrors}
+        canExport={canExport}
+        exportResult={wizard.exportResult}
+        hasExportedOutputs={wizard.outputs.length > 0}
+        onBackToTune={() => goToStage("tune")}
+        onExport={() => void runExport()}
+        onOpenOutputFolder={() => void openOutputFolder()}
+        outputItems={expectedOutputs}
+        preflight={wizard.preflight}
+        preflightActivity={preflightActivity}
+        preflightBusy={preflightBusy}
+        preflightRequestError={preflightRequestError}
+        previewActivity={previewActivity}
+        submissionReport={wizard.submissionReport}
+      />
+    );
+  } else if (routeStage === "export") {
+    studioRailContent = (
+      <WizardStudioExportRail
+        onOpenComposer={() => onNavigate("/composer")}
+        onOpenOutputFolder={() => void openOutputFolder()}
+        onReopenReview={() => goToStage("review")}
+        onStartAnotherPlot={() => {
+          wizard.reset();
+          goToStage("import");
+        }}
+        outputDir={wizard.exportResult?.output_dir ?? null}
+        outputs={wizard.outputs}
+        submissionReport={wizard.submissionReport}
+      />
+    );
+  }
 
   return (
     <div className={`plot-workspace plot-stage-${routeStage}`}>
@@ -420,37 +493,19 @@ export function WizardScreen({
 
       {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
         <WizardStudioStage
-          blockingErrors={blockingErrors}
-          canExport={canExport}
-          compatibleTemplates={compatibleTemplates}
-          currentTemplate={currentTemplate}
-          expectedOutputs={expectedOutputs}
           hasTemplate={hasTemplate}
-          incompatibleTemplates={incompatibleTemplates}
+          inputPath={wizard.inputPath}
           meta={meta}
-          onApplyRecommendedSelection={applyRecommendedSelection}
-          onGoToStage={goToStage}
-          onNavigate={onNavigate}
-          onOpenOutputFolder={() => void openOutputFolder()}
-          onRunExport={() => void runExport()}
-          onSelectTemplate={updateWizardTemplate}
-          onToggleShowAllTemplates={() => setShowAllTemplates((current) => !current)}
-          onUpdateOptions={updateWizardOptions}
-          paletteOptions={paletteOptions}
-          preflightActivity={preflightActivity}
-          preflightBusy={preflightBusy}
-          preflightRequestError={preflightRequestError}
-          previewActivity={previewActivity}
+          onChangePreviewIndex={wizard.setPreviewIndex}
+          onChangeSheet={() => goToStage("sheet")}
+          previewIndex={wizard.previewIndex}
+          previews={wizard.previews}
           previewBusy={previewBusy}
           previewError={previewError}
-          recommendationApplied={recommendationApplied}
-          routeStage={routeStage}
-          showAllTemplates={showAllTemplates}
-          sizeOptions={sizeOptions}
-          styleOptions={styleOptions}
+          railContent={studioRailContent}
+          sheetNamesLength={wizard.sheetNames.length}
           summaryRows={summaryRows}
-          tensileCurveMode={tensileCurveMode}
-          wizard={wizard}
+          template={wizard.template}
         />
       )}
     </div>

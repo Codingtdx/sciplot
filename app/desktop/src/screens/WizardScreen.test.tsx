@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 import {
   exportRender,
+  inspectFile,
   materializeDataTemplateFolder,
   openPath,
   preflightRender,
@@ -48,6 +49,7 @@ vi.mock("../lib/api", async () => {
       sheet: 0,
       previews: [],
     }),
+    inspectFile: vi.fn(),
     exportRender: vi.fn().mockResolvedValue({
       outputs: ["/tmp/exports/curve.pdf"],
       output_dir: "/tmp/exports",
@@ -118,6 +120,7 @@ describe("WizardScreen", () => {
     vi.mocked(open).mockReset();
     vi.mocked(preflightRender).mockReset();
     vi.mocked(renderPreview).mockReset();
+    vi.mocked(inspectFile).mockReset();
     vi.mocked(exportRender).mockReset();
     vi.mocked(openPath).mockReset();
     vi.mocked(materializeDataTemplateFolder).mockReset();
@@ -139,6 +142,7 @@ describe("WizardScreen", () => {
       sheet: 0,
       previews: [],
     });
+    vi.mocked(inspectFile).mockResolvedValue(TEST_INSPECT_RESPONSE);
     vi.mocked(exportRender).mockResolvedValue({
       outputs: ["/tmp/exports/curve.pdf"],
       output_dir: "/tmp/exports",
@@ -606,6 +610,142 @@ describe("WizardScreen", () => {
     );
 
     confirmSpy.mockRestore();
+  });
+
+  it("opens data successfully, remembers it, and routes to sheet when inspect reports multiple sheets", async () => {
+    const onNavigate = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    useWizardStore.setState({
+      inputPath: "/tmp/current.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      stage: "import",
+      step: "file",
+    });
+    vi.mocked(open).mockResolvedValue("/tmp/new-data.xlsx");
+    vi.mocked(loadWizardDataFile).mockResolvedValue({
+      ...TEST_INSPECT_RESPONSE,
+      input_path: "/tmp/new-data.xlsx",
+      sheet_names: ["Sheet1", "Sheet2"],
+    });
+
+    renderStage("import", onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
+
+    await waitFor(() => {
+      expect(loadWizardDataFile).toHaveBeenCalledWith(
+        expect.any(Object),
+        TEST_META,
+        "/tmp/new-data.xlsx",
+      );
+    });
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining("replace the current Plot session"),
+    );
+    expect(onNavigate).toHaveBeenCalledWith("/plot/sheet");
+    expect(useWorkbenchStore.getState().recentProjects[0]).toMatchObject({
+      mode: "wizard",
+      kind: "data",
+      path: "/tmp/new-data.xlsx",
+      title: "new-data.xlsx",
+      detail: "Data file · 2 sheets · Curve",
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("opens data successfully and routes to type for single-sheet inspect while bypassing confirm on same path", async () => {
+    const onNavigate = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    useWizardStore.setState({
+      inputPath: "/tmp/new-data.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      stage: "import",
+      step: "file",
+    });
+    vi.mocked(open).mockResolvedValue("/tmp/new-data.csv");
+    vi.mocked(loadWizardDataFile).mockResolvedValue({
+      ...TEST_INSPECT_RESPONSE,
+      input_path: "/tmp/new-data.csv",
+      sheet_names: ["Sheet1"],
+    });
+
+    renderStage("import", onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
+
+    await waitFor(() => {
+      expect(loadWizardDataFile).toHaveBeenCalledWith(
+        expect.any(Object),
+        TEST_META,
+        "/tmp/new-data.csv",
+      );
+    });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onNavigate).toHaveBeenCalledWith("/plot/type");
+
+    confirmSpy.mockRestore();
+  });
+
+  it("reruns inspect from sheet stage, clears render artifacts, and routes to type", async () => {
+    const onNavigate = vi.fn();
+    useWizardStore.setState({
+      inputPath: "/tmp/multi.xlsx",
+      sheet: 0,
+      sheetNames: ["Sheet1", "Sheet2"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      preflight: {
+        template: "curve",
+        warnings: [],
+        errors: [],
+        output_filenames: ["curve.pdf"],
+      },
+      outputs: ["/tmp/exports/curve.pdf"],
+      exportResult: {
+        outputs: ["/tmp/exports/curve.pdf"],
+        output_dir: "/tmp/exports",
+        preview_outputs: ["/tmp/exports/curve.preview.png"],
+        artifact_paths: ["/tmp/exports/codegod_manifest.json"],
+        manifest_path: "/tmp/exports/codegod_manifest.json",
+      },
+      submissionReport: {
+        context: "export",
+        readiness: "ready",
+        summary: "ready",
+        output_count: 1,
+        output_filenames: ["curve.pdf"],
+        blockers: [],
+        checks: [],
+      },
+      stage: "sheet",
+      step: "sheet",
+    });
+    vi.mocked(inspectFile).mockResolvedValue({
+      ...TEST_INSPECT_RESPONSE,
+      input_path: "/tmp/multi.xlsx",
+      sheet: "Sheet2",
+      sheet_names: ["Sheet1", "Sheet2"],
+    });
+
+    renderStage("sheet", onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: /Sheet2/i }));
+
+    await waitFor(() => {
+      expect(inspectFile).toHaveBeenCalledWith("/tmp/multi.xlsx", "Sheet2");
+    });
+    expect(useWizardStore.getState().preflight).toBeNull();
+    expect(useWizardStore.getState().outputs).toEqual([]);
+    expect(useWizardStore.getState().exportResult).toBeNull();
+    expect(useWizardStore.getState().submissionReport).toBeNull();
+    expect(onNavigate).toHaveBeenCalledWith("/plot/type");
   });
 
   it("exports from review and opens the output folder in export stage", async () => {
