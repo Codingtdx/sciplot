@@ -567,6 +567,47 @@ describe("WizardScreen", () => {
     confirmSpy.mockRestore();
   });
 
+  it("reopens recent data from import stage and routes to sheet when inspect finds multiple sheets", async () => {
+    const onNavigate = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    useWorkbenchStore.setState({
+      recentProjects: [
+        {
+          id: "recent-wizard-data-1",
+          mode: "wizard",
+          kind: "data",
+          path: "/tmp/recent-curve.xlsx",
+          title: "recent-curve.xlsx",
+          detail: "Data file · 2 sheets · Curve",
+          updated_at: "2026-03-24T00:00:00.000Z",
+        },
+      ],
+    });
+    vi.mocked(loadWizardDataFile).mockResolvedValue({
+      ...TEST_INSPECT_RESPONSE,
+      input_path: "/tmp/recent-curve.xlsx",
+      sheet_names: ["Sheet1", "Sheet2"],
+    });
+
+    renderStage("import", onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: /recent-curve\.xlsx/i }));
+
+    await waitFor(() => {
+      expect(loadWizardDataFile).toHaveBeenCalledWith(
+        expect.any(Object),
+        TEST_META,
+        "/tmp/recent-curve.xlsx",
+      );
+    });
+    expect(onNavigate).toHaveBeenCalledWith("/plot/sheet");
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining("replace the current Plot session"),
+    );
+
+    confirmSpy.mockRestore();
+  });
+
   it("exports from review and opens the output folder in export stage", async () => {
     const onNavigate = vi.fn();
     useWizardStore.setState({

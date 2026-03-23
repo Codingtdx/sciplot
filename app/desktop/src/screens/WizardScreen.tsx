@@ -1,31 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { StepFlow, type StepFlowItem } from "../components/StepFlow";
-import { PreviewPane } from "../components/PreviewPane";
-import {
-  exportRender,
-  inspectFile,
-  materializeDataTemplateFolder,
-  openPath,
-} from "../lib/api";
-import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
+import { StepFlow } from "../components/StepFlow";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type {
-  DataTemplateFolderResponse,
-  DataTemplateVariant,
   PlotStage,
   TemplateName,
   WorkbenchMeta,
   WorkbenchRoute,
 } from "../lib/types";
-import { openDialog } from "../lib/tauri-dialog";
 import {
   PLOT_STAGE_COPY,
-  PLOT_STAGE_ORDER,
-  PLOT_STAGES,
   compatibleTemplateChoices,
-  confirmReplaceWizardSession,
   formatLeaf,
   getErrorMessage,
   plotRoute,
@@ -33,7 +19,6 @@ import {
   publicStyleChoices,
   sizeChoices,
   templateLabel,
-  toDialogPaths,
   wizardStepForStage,
   incompatibleTemplateChoices,
   isTensileCurveModel,
@@ -46,90 +31,21 @@ import {
   selectionFromInspection,
   templateMeta as wizardTemplateMeta,
 } from "../lib/wizard";
-import { WizardExportSection } from "./wizard/WizardExportSection";
-import { WizardOptionsSection } from "./wizard/WizardOptionsSection";
-import { WizardDataTemplatesSection } from "./wizard/WizardDataTemplatesSection";
-import { WizardTemplatesSection } from "./wizard/WizardTemplatesSection";
+import {
+  buildWizardStepFlowItems,
+  buildWizardSummaryRows,
+  getExpectedWizardOutputs,
+  getWizardStatusForPlot,
+} from "./wizard/helpers";
+import { useWizardActions } from "./wizard/useWizardActions";
+import { WizardImportStage } from "./wizard/WizardImportStage";
+import { useWizardRecentDataAction } from "./wizard/useWizardRecentDataAction";
+import { WizardSheetStage } from "./wizard/WizardSheetStage";
+import { WizardStudioStage } from "./wizard/WizardStudioStage";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
-
-function statusForPlot(args: {
-  routeStage: PlotStage;
-  busy: boolean;
-  previewBusy: boolean;
-  preflightBusy: boolean;
-  hasBlockingErrors: boolean;
-  hasInspection: boolean;
-  hasInput: boolean;
-  outputsCount: number;
-}) {
-  if (!args.hasInput) {
-    return { label: "Waiting for a file", tone: "warn" as const };
-  }
-  if (args.busy) {
-    return { label: "Loading file", tone: "accent" as const };
-  }
-  if (args.preflightBusy) {
-    return { label: "Checking readiness", tone: "accent" as const };
-  }
-  if (args.previewBusy) {
-    return { label: "Refreshing preview", tone: "accent" as const };
-  }
-  if (args.outputsCount > 0 && args.routeStage === "export") {
-    return { label: "Export complete", tone: "good" as const };
-  }
-  if (args.hasBlockingErrors) {
-    return { label: "Fix blockers", tone: "warn" as const };
-  }
-  if (args.routeStage === "review" && args.hasInspection) {
-    return { label: "Reviewing export", tone: "accent" as const };
-  }
-  if (args.routeStage === "type" && args.hasInspection) {
-    return { label: "Recommendation ready", tone: "good" as const };
-  }
-  return { label: "In progress", tone: "accent" as const };
-}
-
-function outputItems(outputs: string[], expectedFilenames: string[]) {
-  if (outputs.length > 0) {
-    return outputs;
-  }
-  return expectedFilenames;
-}
-
-function validateTemplateFolderResponse(response: DataTemplateFolderResponse) {
-  if (response.folder_path.trim() === "" || response.folder_name.trim() === "") {
-    throw new Error(`Template folder path is invalid: ${response.folder_path || "(empty path)"}`);
-  }
-  if (response.files.length === 0) {
-    throw new Error("Template file generation failed: sidecar returned no workbook files.");
-  }
-  for (const templateFile of response.files) {
-    if (templateFile.filename.trim() === "" || templateFile.file_path.trim() === "") {
-      throw new Error(
-        `Template file generation failed: ${templateFile.chart_type} is missing its filename or path.`,
-      );
-    }
-  }
-}
-
-function formatTemplateBuildError(error: unknown) {
-  const detail = getErrorMessage(error).trim();
-  if (detail.includes(" -> http://") || detail.includes(" -> https://") || detail.includes(" -> ")) {
-    return detail;
-  }
-  if (
-    detail.startsWith("Template folder path is invalid:")
-    || detail.startsWith("Template file generation failed:")
-  ) {
-    return detail;
-  }
-  return `Sidecar materialize failed: ${detail}`;
-}
-
-function formatTemplateOpenError(error: unknown) {
-  return `Template folder generated, but opening it failed: ${getErrorMessage(error).trim()}`;
-}
+import { useWizardStageRouting } from "./wizard/useWizardStageRouting";
+import { useWizardWorkflowActions } from "./wizard/useWizardWorkflowActions";
 
 export function WizardScreen({
   meta,
@@ -181,12 +97,6 @@ export function WizardScreen({
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const recentProjects = useWorkbenchStore((state) => state.recentProjects);
   const [showAllTemplates, setShowAllTemplates] = useState(false);
-  const [templateFolderBusy, setTemplateFolderBusy] = useState(false);
-  const [templateBuildError, setTemplateBuildError] = useState<string | null>(null);
-  const [templateOpenError, setTemplateOpenError] = useState<string | null>(null);
-  const [latestTemplateFolder, setLatestTemplateFolder] = useState<DataTemplateFolderResponse | null>(
-    null,
-  );
 
   const recommendation = wizard.inspection?.recommendation ?? null;
   const tensileCurveMode = isTensileCurveModel(wizard.inspection?.model);
@@ -232,42 +142,19 @@ export function WizardScreen({
     onNavigate(plotRoute(stage));
   };
 
-  useEffect(() => {
-    if (wizard.stage !== routeStage) {
-      wizard.setStage(routeStage);
-      wizard.setStep(wizardStepForStage(routeStage));
-    }
-  }, [routeStage, wizard.setStage, wizard.setStep, wizard.stage]);
-
-  useEffect(() => {
-    if (!wizard.inputPath && routeStage !== "import") {
-      goToStage("import");
-      return;
-    }
-    if (wizard.inputPath && wizard.sheetNames.length <= 1 && routeStage === "sheet") {
-      goToStage("type");
-      return;
-    }
-    if (!wizard.inspection && (routeStage === "type" || routeStage === "tune" || routeStage === "review")) {
-      goToStage("import");
-      return;
-    }
-    if (!wizard.template && (routeStage === "tune" || routeStage === "review")) {
-      goToStage("type");
-      return;
-    }
-    if (routeStage === "export" && wizard.outputs.length === 0 && !wizard.exportResult) {
-      goToStage("review");
-    }
-  }, [
+  useWizardStageRouting({
     routeStage,
-    wizard.exportResult,
-    wizard.inputPath,
-    wizard.inspection,
-    wizard.outputs.length,
-    wizard.sheetNames.length,
-    wizard.template,
-  ]);
+    stage: wizard.stage,
+    inputPath: wizard.inputPath,
+    sheetNamesLength: wizard.sheetNames.length,
+    inspection: wizard.inspection,
+    template: wizard.template,
+    outputsLength: wizard.outputs.length,
+    exportResult: wizard.exportResult,
+    setStage: wizard.setStage,
+    setStep: wizard.setStep,
+    goToStage,
+  });
 
   useEffect(() => {
     const nextTemplate = sanitizeTemplateId(
@@ -351,7 +238,7 @@ export function WizardScreen({
     !preflightBusy &&
     !hasBlockingErrors &&
     wizard.preflight !== null;
-  const statusChip = statusForPlot({
+  const statusChip = getWizardStatusForPlot({
     routeStage,
     busy: wizard.busy,
     previewBusy,
@@ -362,37 +249,17 @@ export function WizardScreen({
     outputsCount: wizard.outputs.length,
   });
   const stageCopy = PLOT_STAGE_COPY[routeStage];
-  const expectedOutputs = outputItems(
-    wizard.outputs,
-    (wizard.preflight?.output_filenames ?? []).map((filename) => filename),
-  );
-  const stepFlowSteps = useMemo<StepFlowItem[]>(() => {
-    const currentIndex = PLOT_STAGE_ORDER.indexOf(routeStage);
-    return PLOT_STAGES.map((step, index) => {
-      const reachable =
-        step.id === "import" ||
-        (step.id === "sheet" && hasInput && wizard.sheetNames.length > 1) ||
-        (step.id === "type" && hasInspection) ||
-        (step.id === "tune" && hasTemplate) ||
-        (step.id === "review" && hasTemplate) ||
-        (step.id === "export" &&
-          hasTemplate &&
-          (routeStage === "export" || wizard.preflight !== null || wizard.outputs.length > 0));
-      const status =
-        step.id === routeStage
-          ? "current"
-          : !reachable
-            ? "disabled"
-            : index < currentIndex
-              ? "complete"
-              : "upcoming";
-      return {
-        ...step,
-        status,
-        onSelect: status === "complete" ? () => goToStage(step.id) : null,
-      };
-    });
-  }, [
+  const expectedOutputs = getExpectedWizardOutputs(wizard.outputs, wizard.preflight);
+  const stepFlowSteps = useMemo(() => buildWizardStepFlowItems({
+    routeStage,
+    hasInput,
+    hasInspection,
+    hasTemplate,
+    sheetNamesLength: wizard.sheetNames.length,
+    preflight: wizard.preflight,
+    outputsLength: wizard.outputs.length,
+    onSelectStage: goToStage,
+  }), [
     hasInput,
     hasInspection,
     hasTemplate,
@@ -402,178 +269,36 @@ export function WizardScreen({
     wizard.sheetNames.length,
   ]);
 
-  const openDataFile = async () => {
-    let path: string | undefined;
-    wizard.setError(null);
-    try {
-      const selected = await openDialog({
-        multiple: false,
-        filters: [
-          {
-            name: "Data",
-            extensions: ["csv", "txt", "tsv", "xlsx", "xlsm"],
-          },
-        ],
-      });
-      path = toDialogPaths(selected, 1)[0];
-    } catch (error) {
-      showDialogError(error);
-      return;
-    }
-    if (!path) {
-      return;
-    }
-    if (
-      !confirmReplaceWizardSession(
-        {
-          inputPath: wizard.inputPath,
-          inspection: wizard.inspection,
-          template: wizard.template,
-          outputs: wizard.outputs,
-          exportResult: wizard.exportResult,
-        },
-        formatLeaf(path),
-        path,
-      )
-    ) {
-      return;
-    }
-
-    wizard.setBusy(true);
-    try {
-      const inspected = await loadWizardDataFile(wizard, meta, path);
-      rememberProject({
-        mode: "wizard",
-        kind: "data",
-        path: inspected.input_path,
-        title: formatLeaf(inspected.input_path),
-        detail: `Data file · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, inspected.inspection.recommendation.template)}`,
-      });
-      goToStage(inspected.sheet_names.length > 1 ? "sheet" : "type");
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
-  const openTemplateFolder = async (variant: DataTemplateVariant) => {
-    setTemplateBuildError(null);
-    setTemplateOpenError(null);
-    setLatestTemplateFolder(null);
-    setTemplateFolderBusy(true);
-    try {
-      const response = await materializeDataTemplateFolder({ variant });
-      validateTemplateFolderResponse(response);
-      setLatestTemplateFolder(response);
-      try {
-        await openPath(response.folder_path);
-      } catch (error) {
-        setTemplateOpenError(formatTemplateOpenError(error));
-      }
-    } catch (error) {
-      setTemplateBuildError(formatTemplateBuildError(error));
-    } finally {
-      setTemplateFolderBusy(false);
-    }
-  };
-
-  const reopenTemplateFolder = async () => {
-    if (!latestTemplateFolder) {
-      return;
-    }
-    setTemplateOpenError(null);
-    try {
-      await openPath(latestTemplateFolder.folder_path);
-    } catch (error) {
-      setTemplateOpenError(formatTemplateOpenError(error));
-    }
-  };
-
-  const reopenRecentData = async (path: string) => {
-    if (
-      !confirmReplaceWizardSession(
-        {
-          inputPath: wizard.inputPath,
-          inspection: wizard.inspection,
-          template: wizard.template,
-          outputs: wizard.outputs,
-          exportResult: wizard.exportResult,
-        },
-        formatLeaf(path),
-        path,
-      )
-    ) {
-      return;
-    }
-    wizard.setBusy(true);
-    wizard.setError(null);
-    try {
-      const inspected = await loadWizardDataFile(wizard, meta, path);
-      goToStage(inspected.sheet_names.length > 1 ? "sheet" : "type");
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
-  const rerunInspect = async (sheetValue: string | number) => {
-    if (!wizard.inputPath) {
-      return;
-    }
-
-    wizard.setError(null);
-    wizard.setBusy(true);
-    try {
-      const inspected = await inspectFile(wizard.inputPath, sheetValue);
-      applyInspectionToWizard(wizard, meta, inspected, { nextStage: "type" });
-      invalidateRenderState();
-      goToStage("type");
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
-  const runExport = async () => {
-    if (!wizard.inputPath || !wizard.template || !wizard.preflight || hasBlockingErrors) {
-      return;
-    }
-
-    wizard.setError(null);
-    wizard.setBusy(true);
-    try {
-      const response = await exportRender(
-        wizard.inputPath,
-        wizard.sheet,
-        wizard.template,
-        wizard.options,
-      );
-      wizard.setOutputs(response.outputs);
-      wizard.setExportResult(response);
-      wizard.setSubmissionReport(response.submission_report ?? wizard.submissionReport);
-      goToStage("export");
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    } finally {
-      wizard.setBusy(false);
-    }
-  };
-
-  const openOutputFolder = async () => {
-    const target = wizard.exportResult?.output_dir;
-    if (!target) {
-      return;
-    }
-    wizard.setError(null);
-    try {
-      await openPath(target);
-    } catch (error) {
-      wizard.setError(getErrorMessage(error));
-    }
-  };
+  const {
+    templateFolderBusy,
+    templateBuildError,
+    templateOpenError,
+    latestTemplateFolder,
+    openTemplateFolder,
+    reopenTemplateFolder,
+    openOutputFolder,
+  } = useWizardActions({
+    exportOutputDir: wizard.exportResult?.output_dir,
+    setGlobalError: wizard.setError,
+  });
+  const { reopenRecentData } = useWizardRecentDataAction({
+    wizard,
+    meta,
+    goToStage,
+  });
+  const {
+    openDataFile,
+    rerunInspect,
+    runExport,
+  } = useWizardWorkflowActions({
+    wizard,
+    meta,
+    hasBlockingErrors,
+    rememberProject,
+    goToStage,
+    invalidateRenderState,
+    onDialogError: showDialogError,
+  });
 
   const applyRecommendedSelection = () => {
     if (!recommendedSelection) {
@@ -610,27 +335,14 @@ export function WizardScreen({
     );
   };
 
-  const summaryRows = [
-    {
-      label: "File",
-      value: wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file selected",
-    },
-    {
-      label: "Sheet",
-      value:
-        typeof wizard.sheet === "string"
-          ? wizard.sheet
-          : wizard.sheetNames[wizard.sheet] ?? wizard.sheetNames[0] ?? "-",
-    },
-    {
-      label: "Model",
-      value: wizard.inspection?.model_label ?? "Waiting for inspect",
-    },
-    {
-      label: "Template",
-      value: wizard.template ? templateLabel(meta, wizard.template) : "Not selected",
-    },
-  ];
+  const summaryRows = buildWizardSummaryRows({
+    inputPath: wizard.inputPath,
+    sheet: wizard.sheet,
+    sheetNames: wizard.sheetNames,
+    inspection: wizard.inspection,
+    template: wizard.template,
+    meta,
+  });
 
   return (
     <div className={`plot-workspace plot-stage-${routeStage}`}>
@@ -681,389 +393,65 @@ export function WizardScreen({
       </section>
 
       {routeStage === "import" && (
-        <div className="plot-stage-grid import-stage">
-          <section className="work-card plot-import-card plot-import-canvas">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Start</div>
-                <h3>Open a data file</h3>
-              </div>
-            </div>
-
-            <div className="hero-actions plot-import-actions">
-              <button className="primary-button" onClick={openDataFile} type="button">
-                Open data
-              </button>
-              {hasInput && (
-                <button className="ghost-button" onClick={() => goToStage("type")} type="button">
-                  Resume current session
-                </button>
-              )}
-            </div>
-
-            <div className="plot-import-format-strip">
-              <span className="signal-tag">CSV / TXT / TSV</span>
-              <span className="signal-tag">XLSX / XLSM</span>
-              <span className="signal-tag">Inspect runs automatically</span>
-            </div>
-
-            <WizardDataTemplatesSection
-              buildError={templateBuildError}
-              openError={templateOpenError}
-              latestTemplateFolder={latestTemplateFolder}
-              loading={templateFolderBusy}
-              onBuildFolder={(variant) => void openTemplateFolder(variant)}
-              onOpenTemplateFolder={() => void reopenTemplateFolder()}
-            />
-          </section>
-
-          <aside className="plot-stage-rail">
-            <article className="context-card plot-session-overview-card">
-              <div className="panel-heading">
-                <div>
-                  <div className="card-kicker">Session</div>
-                  <h3>Current session</h3>
-                </div>
-              </div>
-              <div className="summary-grid wizard-tight-grid">
-                {summaryRows.map((row) => (
-                  <div className="stat-tile" key={row.label}>
-                    <span>{row.label}</span>
-                    <strong>{row.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="context-card plot-import-recents-card">
-              <div className="panel-heading">
-                <div>
-                  <div className="card-kicker">Recent</div>
-                  <h3>Recent data</h3>
-                </div>
-              </div>
-
-              {recentDataFiles.length === 0 ? (
-                <div className="placeholder-card">No recent data files yet.</div>
-              ) : (
-                <div className="launchpad-recent-list plot-import-recent-list">
-                  {recentDataFiles.slice(0, 4).map((entry) => (
-                    <button
-                      className="launchpad-recent-row"
-                      key={entry.id}
-                      onClick={() => void reopenRecentData(entry.path)}
-                      type="button"
-                    >
-                      <strong>{entry.title}</strong>
-                      <span>{entry.detail}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </article>
-          </aside>
-        </div>
+        <WizardImportStage
+          hasInput={hasInput}
+          latestTemplateFolder={latestTemplateFolder}
+          onBuildTemplateFolder={(variant) => void openTemplateFolder(variant)}
+          onOpenDataFile={() => void openDataFile()}
+          onReopenRecentData={(path) => void reopenRecentData(path)}
+          onReopenTemplateFolder={() => void reopenTemplateFolder()}
+          onResumeCurrentSession={() => goToStage("type")}
+          recentDataFiles={recentDataFiles}
+          summaryRows={summaryRows}
+          templateBuildError={templateBuildError}
+          templateFolderBusy={templateFolderBusy}
+          templateOpenError={templateOpenError}
+        />
       )}
 
       {routeStage === "sheet" && (
-        <div className="plot-stage-grid">
-          <section className="work-card plot-sheet-card">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Sheet</div>
-                <h3>Select the workbook tab</h3>
-              </div>
-            </div>
-
-              <div className="sheet-choice-list">
-                {wizard.sheetNames.map((name) => {
-                  const active =
-                    wizard.sheet === name ||
-                    (typeof wizard.sheet === "number" && wizard.sheetNames[wizard.sheet] === name);
-                  return (
-                  <button
-                    className={`sheet-choice ${active ? "active" : ""}`}
-                    key={name}
-                    onClick={() => void rerunInspect(name)}
-                    type="button"
-                  >
-                    <strong>{name}</strong>
-                    <span>{active ? "Current sheet" : "Inspect this sheet"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <aside className="plot-stage-rail">
-            <article className="context-card">
-              <div className="panel-heading">
-                <div>
-                  <div className="card-kicker">Workbook</div>
-                  <h3>{formatLeaf(wizard.inputPath)}</h3>
-                </div>
-              </div>
-              <div className="wizard-summary-list">
-                <div className="wizard-summary-row">
-                  <span>Sheets</span>
-                  <strong>{wizard.sheetNames.length}</strong>
-                </div>
-                <div className="wizard-summary-row">
-                  <span>Current</span>
-                  <strong>
-                    {typeof wizard.sheet === "string"
-                      ? wizard.sheet
-                      : wizard.sheetNames[wizard.sheet] ?? wizard.sheetNames[0] ?? "-"}
-                  </strong>
-                </div>
-              </div>
-            </article>
-          </aside>
-        </div>
+        <WizardSheetStage
+          inputPath={wizard.inputPath}
+          onInspectSheet={(sheetValue) => void rerunInspect(sheetValue)}
+          sheet={wizard.sheet}
+          sheetNames={wizard.sheetNames}
+        />
       )}
 
       {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
-        <div className="plot-stage-grid plot-studio-grid">
-          <section className="plot-preview-column plot-studio-preview">
-            <section className="context-card plot-summary-card">
-              <div className="panel-heading">
-                <div>
-                  <div className="card-kicker">File</div>
-                  <h3>{formatLeaf(wizard.inputPath)}</h3>
-                </div>
-                <div className="wizard-inline-chips">
-                  {hasTemplate && (
-                    <span className="signal-tag">{templateLabel(meta, wizard.template)}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="summary-grid wizard-tight-grid">
-                {summaryRows.map((row) => (
-                  <div className="stat-tile" key={row.label}>
-                    <span>{row.label}</span>
-                    <strong>{row.value}</strong>
-                  </div>
-                ))}
-              </div>
-
-              {wizard.sheetNames.length > 1 && (
-                <div className="hero-actions">
-                  <button className="ghost-button" onClick={() => goToStage("sheet")} type="button">
-                    Change sheet
-                  </button>
-                </div>
-              )}
-            </section>
-
-            {hasTemplate ? (
-              <PreviewPane
-                busy={previewBusy}
-                error={previewError}
-                onChangeIndex={wizard.setPreviewIndex}
-                previewIndex={wizard.previewIndex}
-                previews={wizard.previews}
-              />
-            ) : (
-              <section className="preview-pane">
-                <div className="preview-toolbar">
-                  <div className="preview-title">Preview</div>
-                </div>
-                <div className="preview-surface">
-                  <div className="placeholder-card">
-                    Select a compatible chart type to start previewing.
-                  </div>
-                </div>
-              </section>
-            )}
-          </section>
-
-          <aside className="plot-stage-rail">
-            {routeStage === "type" && (
-              <>
-                {wizard.inspection && (
-                  <article className="context-card">
-                    <div className="panel-heading">
-                      <div>
-                        <div className="card-kicker">Detect</div>
-                        <h3>Recommendation</h3>
-                      </div>
-                      {!recommendationApplied && (
-                        <button
-                          className="ghost-button"
-                          onClick={applyRecommendedSelection}
-                          type="button"
-                        >
-                          Use recommendation
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="wizard-details-body">
-                      <div>{wizard.inspection.recommendation.reason}</div>
-                    </div>
-
-                    {wizard.inspection.warnings.length > 0 && (
-                      <details className="wizard-details">
-                        <summary>{wizard.inspection.warnings.length} input warning(s)</summary>
-                        <ul className="bullet-list">
-                          {wizard.inspection.warnings.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
-                  </article>
-                )}
-
-                <WizardTemplatesSection
-                  compatibleTemplates={compatibleTemplates}
-                  incompatibleTemplates={incompatibleTemplates}
-                  inspection={wizard.inspection}
-                  onSelectTemplate={updateWizardTemplate}
-                  onToggleShowAllTemplates={() =>
-                    setShowAllTemplates((current) => !current)
-                  }
-                  selectedTemplate={wizard.template}
-                  showAllTemplates={showAllTemplates}
-                />
-
-                <div className="hero-actions">
-                  <button
-                    className="primary-button"
-                    disabled={!hasTemplate}
-                    onClick={() => goToStage("tune")}
-                    type="button"
-                  >
-                    Continue to tune
-                  </button>
-                </div>
-              </>
-            )}
-
-            {routeStage === "tune" && (
-              <>
-                <WizardOptionsSection
-                  currentTemplate={currentTemplate}
-                  meta={meta}
-                  onUpdateOptions={updateWizardOptions}
-                  options={wizard.options}
-                  paletteOptions={paletteOptions}
-                  sizeOptions={sizeOptions}
-                  styleOptions={styleOptions}
-                  template={wizard.template}
-                  tensileCurveMode={tensileCurveMode}
-                />
-
-                <div className="hero-actions">
-                  <button className="ghost-button" onClick={() => goToStage("type")} type="button">
-                    Back to type
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={!hasTemplate}
-                    onClick={() => goToStage("review")}
-                    type="button"
-                  >
-                    Continue to review
-                  </button>
-                </div>
-              </>
-            )}
-
-            {routeStage === "review" && (
-              <>
-                <WizardExportSection
-                  blockingErrors={blockingErrors}
-                  canExport={canExport}
-                  exportResult={wizard.exportResult}
-                  hasExportedOutputs={wizard.outputs.length > 0}
-                  onExport={() => void runExport()}
-                  onOpenOutputDir={() => void openOutputFolder()}
-                  outputItems={expectedOutputs}
-                  preflight={wizard.preflight}
-                  preflightActivity={preflightActivity}
-                  preflightBusy={preflightBusy}
-                  preflightRequestError={preflightRequestError}
-                  previewActivity={previewActivity}
-                  submissionReport={wizard.submissionReport}
-                />
-
-                <div className="hero-actions">
-                  <button className="ghost-button" onClick={() => goToStage("tune")} type="button">
-                    Back to tune
-                  </button>
-                </div>
-              </>
-            )}
-
-            {routeStage === "export" && (
-              <>
-                <article className="context-card wizard-review-card">
-                  <div className="panel-heading">
-                    <div>
-                      <div className="card-kicker">Export</div>
-                      <h3>Bundle complete</h3>
-                    </div>
-                    <span className="status-pill good">Ready</span>
-                  </div>
-
-                  <div className="wizard-section-stack">
-                    <div className="success-card">
-                      Exported {wizard.outputs.length} file(s) to {formatLeaf(wizard.exportResult?.output_dir ?? "output")}.
-                    </div>
-
-                    <div className="step-actions">
-                      <button
-                        className="primary-button"
-                        disabled={!wizard.exportResult?.output_dir}
-                        onClick={() => void openOutputFolder()}
-                        type="button"
-                      >
-                        Open output folder
-                      </button>
-                      <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
-                        Open Composer
-                      </button>
-                      <button
-                        className="ghost-button"
-                        onClick={() => {
-                          wizard.reset();
-                          goToStage("import");
-                        }}
-                        type="button"
-                      >
-                        Start another plot
-                      </button>
-                    </div>
-
-                    <details className="wizard-details" open>
-                      <summary>Output files</summary>
-                      <ul className="output-list">
-                        {wizard.outputs.map((item) => (
-                          <li key={item}>{formatLeaf(item)}</li>
-                        ))}
-                      </ul>
-                    </details>
-
-                    {wizard.submissionReport && (
-                      <div className="focus-panel">
-                        <strong>Submission review</strong>
-                        <span>{wizard.submissionReport.summary}</span>
-                      </div>
-                    )}
-                  </div>
-                </article>
-
-                <div className="hero-actions">
-                  <button className="ghost-button" onClick={() => goToStage("review")} type="button">
-                    Re-open review
-                  </button>
-                </div>
-              </>
-            )}
-          </aside>
-        </div>
+        <WizardStudioStage
+          blockingErrors={blockingErrors}
+          canExport={canExport}
+          compatibleTemplates={compatibleTemplates}
+          currentTemplate={currentTemplate}
+          expectedOutputs={expectedOutputs}
+          hasTemplate={hasTemplate}
+          incompatibleTemplates={incompatibleTemplates}
+          meta={meta}
+          onApplyRecommendedSelection={applyRecommendedSelection}
+          onGoToStage={goToStage}
+          onNavigate={onNavigate}
+          onOpenOutputFolder={() => void openOutputFolder()}
+          onRunExport={() => void runExport()}
+          onSelectTemplate={updateWizardTemplate}
+          onToggleShowAllTemplates={() => setShowAllTemplates((current) => !current)}
+          onUpdateOptions={updateWizardOptions}
+          paletteOptions={paletteOptions}
+          preflightActivity={preflightActivity}
+          preflightBusy={preflightBusy}
+          preflightRequestError={preflightRequestError}
+          previewActivity={previewActivity}
+          previewBusy={previewBusy}
+          previewError={previewError}
+          recommendationApplied={recommendationApplied}
+          routeStage={routeStage}
+          showAllTemplates={showAllTemplates}
+          sizeOptions={sizeOptions}
+          styleOptions={styleOptions}
+          summaryRows={summaryRows}
+          tensileCurveMode={tensileCurveMode}
+          wizard={wizard}
+        />
       )}
     </div>
   );
