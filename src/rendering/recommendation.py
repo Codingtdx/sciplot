@@ -31,14 +31,6 @@ from src.rendering.recommender_models import TemplateRecommendation
 from src.wide_nmr import wide_nmr_sidecar_path
 
 
-def clean_text(value: object) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, float) and pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
 def model_label(model: str) -> str:
     labels = {
         "curve_table": "Paired curve table (curve_table)",
