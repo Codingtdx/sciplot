@@ -270,7 +270,12 @@ export default function App() {
 
   const workspace = workspaceForRoute(route);
   const studioWorkspace =
-    workspace === "launchpad" || workspace === "plot" || workspace === "composer";
+    workspace === "launchpad" ||
+    workspace === "plot" ||
+    workspace === "composer" ||
+    workspace === "code" ||
+    workspace === "tensile" ||
+    workspace === "settings";
   const meta = WORKSPACE_META[workspace];
   const currentPlotStage = plotStageFromRoute(route);
   const importFocus = workspace === "plot" && currentPlotStage === "import";

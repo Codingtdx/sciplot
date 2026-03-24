@@ -81,37 +81,42 @@ export function WizardExportSection({
   const outputDirectory = exportResult?.output_dir ?? null;
   const manifestPath = exportResult?.manifest_path ?? null;
   const artifacts = groupArtifacts(exportResult);
-  const autoOpen =
-    Boolean(preflightRequestError) ||
-    blockingErrors.length > 0 ||
-    preflight !== null ||
-    hasExportedOutputs;
 
   return (
     <article className="context-card wizard-review-card wizard-export-card">
-      <details className="wizard-review-details" open={autoOpen}>
-        <summary className="wizard-review-summary">
-          <span>Review and export</span>
-          <span className={`status-pill ${reviewTone}`}>{reviewLabel}</span>
-        </summary>
+      <div className="panel-heading">
+        <div>
+          <div className="card-kicker">Review</div>
+          <h3>Ready to deliver</h3>
+        </div>
+        <span className={`status-pill ${reviewTone}`}>{reviewLabel}</span>
+      </div>
 
-        <div className="wizard-section-stack">
-          <div className="wizard-export-summary-grid">
-            <div className="stat-tile">
-              <span>Readiness</span>
-              <strong>{readinessLabel}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>Blockers</span>
-              <strong>{blockingErrors.length}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>Expected files</span>
-              <strong>{outputItems.length}</strong>
-            </div>
-            <div className="stat-tile">
-              <span>Bundle folder</span>
-              <strong>{outputDirectory ? formatLeaf(outputDirectory) : "Pending export"}</strong>
+      <div className="wizard-review-summary-grid">
+        <div className="stat-tile">
+          <span>Readiness</span>
+          <strong>{readinessLabel}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Blockers</span>
+          <strong>{blockingErrors.length}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Expected files</span>
+          <strong>{outputItems.length}</strong>
+        </div>
+        <div className="stat-tile">
+          <span>Bundle folder</span>
+          <strong>{outputDirectory ? formatLeaf(outputDirectory) : "Pending export"}</strong>
+        </div>
+      </div>
+
+      <div className="wizard-module-stack">
+        <section className="wizard-module-card">
+          <div className="wizard-module-head">
+            <div>
+              <strong>Readiness</strong>
+              <span>Final checks stay visible and structured.</span>
             </div>
           </div>
 
@@ -139,14 +144,14 @@ export function WizardExportSection({
               )}
 
               {preflight.warnings.length > 0 && (
-                <details className="wizard-details">
-                  <summary>{preflight.warnings.length} preflight warning(s)</summary>
+                <div className="wizard-module-note">
+                  <strong>{preflight.warnings.length} warning(s)</strong>
                   <ul className="bullet-list">
                     {preflight.warnings.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
-                </details>
+                </div>
               )}
             </>
           )}
@@ -156,6 +161,15 @@ export function WizardExportSection({
               {previewActivity === "ready" ? "Checks are ready." : "Checks start automatically."}
             </div>
           )}
+        </section>
+
+        <section className="wizard-module-card">
+          <div className="wizard-module-head">
+            <div>
+              <strong>Outputs and delivery</strong>
+              <span>Export bundle, folder, and generated files.</span>
+            </div>
+          </div>
 
           <CompactToolbar label="Review export actions">
             <button
@@ -173,8 +187,8 @@ export function WizardExportSection({
             )}
           </CompactToolbar>
 
-          <details className="wizard-details">
-            <summary>{hasExportedOutputs ? "Output files" : "Expected files"}</summary>
+          <div className="wizard-module-note">
+            <strong>{hasExportedOutputs ? "Output files" : "Expected files"}</strong>
             {outputItems.length > 0 ? (
               <ul className="output-list">
                 {outputItems.map((item) => (
@@ -182,31 +196,13 @@ export function WizardExportSection({
                 ))}
               </ul>
             ) : (
-              <div className="wizard-details-body">No files yet.</div>
+              <span>No files yet.</span>
             )}
-          </details>
-
-          {submissionReport && (
-            <div className="focus-panel wizard-readiness-panel">
-              <strong>Submission review</strong>
-              <span className={`status-pill ${readinessTone}`}>{readinessLabel}</span>
-              <span>{submissionReport.summary}</span>
-              {highlightedChecks.length > 0 && (
-                <details className="wizard-details">
-                  <summary>{highlightedChecks.length} flagged check(s)</summary>
-                  <ul className="bullet-list">
-                    {highlightedChecks.map((check) => (
-                      <li key={check.id}>{check.message}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
+          </div>
 
           {exportResult && (
-            <details className="wizard-details">
-              <summary>Bundle files</summary>
+            <div className="wizard-module-note">
+              <strong>Bundle files</strong>
               <div className="wizard-details-body">
                 {outputDirectory && <div>Folder: {outputDirectory}</div>}
                 {artifacts.previewOutputs.length > 0 && (
@@ -221,10 +217,35 @@ export function WizardExportSection({
                   ))}
                 </ul>
               )}
-            </details>
+            </div>
           )}
-        </div>
-      </details>
+        </section>
+
+        {submissionReport && (
+          <section className="wizard-module-card">
+            <div className="wizard-module-head">
+              <div>
+                <strong>Submission report</strong>
+                <span>Delivery checks and editorial summary.</span>
+              </div>
+              <span className={`status-pill ${readinessTone}`}>{readinessLabel}</span>
+            </div>
+            <div className="wizard-module-note">
+              <span>{submissionReport.summary}</span>
+            </div>
+            {highlightedChecks.length > 0 && (
+              <div className="wizard-check-list">
+                {highlightedChecks.map((check) => (
+                  <div className="wizard-check-row" key={check.id}>
+                    <strong>{check.status}</strong>
+                    <span>{check.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </article>
   );
 }

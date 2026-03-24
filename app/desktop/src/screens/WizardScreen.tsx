@@ -1,12 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { StepFlow } from "../components/StepFlow";
-import {
-  CompactToolbar,
-  InspectorPanel,
-  SectionHeader,
-} from "../components/workbench/V2Primitives";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type {
   PlotStage,
@@ -15,10 +9,8 @@ import type {
   WorkbenchRoute,
 } from "../lib/types";
 import {
-  PLOT_STAGE_COPY,
   compatibleTemplateChoices,
   getErrorMessage,
-  getPlotStageLabel,
   plotRoute,
   publicPaletteChoices,
   publicStyleChoices,
@@ -36,19 +28,13 @@ import {
   templateMeta as wizardTemplateMeta,
 } from "../lib/wizard";
 import {
-  buildWizardStepFlowItems,
-  buildWizardSummaryRows,
   getExpectedWizardOutputs,
-  getWizardStatusForPlot,
 } from "./wizard/helpers";
 import { useWizardActions } from "./wizard/useWizardActions";
 import { WizardImportStage } from "./wizard/WizardImportStage";
 import { useWizardRecentDataAction } from "./wizard/useWizardRecentDataAction";
-import { WizardStudioExportRail } from "./wizard/WizardStudioExportRail";
-import { WizardStudioReviewRail } from "./wizard/WizardStudioReviewRail";
 import { WizardSheetStage } from "./wizard/WizardSheetStage";
 import { WizardStudioStage } from "./wizard/WizardStudioStage";
-import { WizardStudioTuneRail } from "./wizard/WizardStudioTuneRail";
 import { WizardTypeStage } from "./wizard/WizardTypeStage";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
@@ -208,7 +194,6 @@ export function WizardScreen({
   const {
     busy: previewBusy,
     error: previewError,
-    activity: previewActivity,
   } = useWizardPreview({
     enabled: previewEnabled,
     inputPath: wizard.inputPath,
@@ -221,7 +206,6 @@ export function WizardScreen({
   const {
     busy: preflightBusy,
     error: preflightRequestError,
-    activity: preflightActivity,
   } = useWizardPreflight({
     enabled: preflightEnabled,
     inputPath: wizard.inputPath,
@@ -246,37 +230,7 @@ export function WizardScreen({
     !preflightBusy &&
     !hasBlockingErrors &&
     wizard.preflight !== null;
-  const statusChip = getWizardStatusForPlot({
-    routeStage,
-    busy: wizard.busy,
-    previewBusy,
-    preflightBusy,
-    hasBlockingErrors,
-    hasInspection,
-    hasInput,
-    outputsCount: wizard.outputs.length,
-  });
-  const stageCopy = PLOT_STAGE_COPY[routeStage];
-  const showStudioStage = (["type", "tune", "review", "export"] as PlotStage[]).includes(routeStage);
   const expectedOutputs = getExpectedWizardOutputs(wizard.outputs, wizard.preflight);
-  const stepFlowSteps = useMemo(() => buildWizardStepFlowItems({
-    routeStage,
-    hasInput,
-    hasInspection,
-    hasTemplate,
-    sheetNamesLength: wizard.sheetNames.length,
-    preflight: wizard.preflight,
-    outputsLength: wizard.outputs.length,
-    onSelectStage: goToStage,
-  }), [
-    hasInput,
-    hasInspection,
-    hasTemplate,
-    routeStage,
-    wizard.outputs.length,
-    wizard.preflight,
-    wizard.sheetNames.length,
-  ]);
 
   const {
     templateFolderBusy,
@@ -344,68 +298,6 @@ export function WizardScreen({
     );
   };
 
-  const summaryRows = buildWizardSummaryRows({
-    inputPath: wizard.inputPath,
-    sheet: wizard.sheet,
-    sheetNames: wizard.sheetNames,
-    inspection: wizard.inspection,
-    template: wizard.template,
-    meta,
-  });
-  let studioRailContent: ReactNode = null;
-  if (routeStage === "tune") {
-    studioRailContent = (
-      <WizardStudioTuneRail
-        currentTemplate={currentTemplate}
-        hasTemplate={hasTemplate}
-        meta={meta}
-        onBackToType={() => goToStage("type")}
-        onContinueToReview={() => goToStage("review")}
-        onUpdateOptions={updateWizardOptions}
-        options={wizard.options}
-        paletteOptions={paletteOptions}
-        sizeOptions={sizeOptions}
-        styleOptions={styleOptions}
-        template={wizard.template}
-        tensileCurveMode={tensileCurveMode}
-      />
-    );
-  } else if (routeStage === "review") {
-    studioRailContent = (
-      <WizardStudioReviewRail
-        blockingErrors={blockingErrors}
-        canExport={canExport}
-        exportResult={wizard.exportResult}
-        hasExportedOutputs={wizard.outputs.length > 0}
-        onBackToTune={() => goToStage("tune")}
-        onExport={() => void runExport()}
-        onOpenOutputFolder={() => void openOutputFolder()}
-        outputItems={expectedOutputs}
-        preflight={wizard.preflight}
-        preflightActivity={preflightActivity}
-        preflightBusy={preflightBusy}
-        preflightRequestError={preflightRequestError}
-        previewActivity={previewActivity}
-        submissionReport={wizard.submissionReport}
-      />
-    );
-  } else if (routeStage === "export") {
-    studioRailContent = (
-      <WizardStudioExportRail
-        onOpenComposer={() => onNavigate("/composer")}
-        onOpenOutputFolder={() => void openOutputFolder()}
-        onReopenReview={() => goToStage("review")}
-        onStartAnotherPlot={() => {
-          wizard.reset();
-          goToStage("import");
-        }}
-        outputDir={wizard.exportResult?.output_dir ?? null}
-        outputs={wizard.outputs}
-        submissionReport={wizard.submissionReport}
-      />
-    );
-  }
-
   if (routeStage === "type") {
     return (
       <div className="plot-workspace plot-stage-type plot-type-route-v2">
@@ -458,82 +350,62 @@ export function WizardScreen({
     );
   }
 
-  return (
-    <div className={`plot-workspace plot-stage-${routeStage} plot-v2-layout`}>
-      <aside className="plot-v2-steps">
-        <InspectorPanel
-          extra={<span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>}
-          kicker="Plot"
-          title="Workflow steps"
-        >
-          <span className="hint-text">{getPlotStageLabel(routeStage)} stage</span>
-          <CompactToolbar>
-            <button className="ghost-button" onClick={() => goToStage("import")} type="button">
-              New file
-            </button>
-            {routeStage !== "sheet" && wizard.sheetNames.length > 1 && (
-              <button className="ghost-button" onClick={() => goToStage("sheet")} type="button">
-                Sheet
-              </button>
-            )}
-          </CompactToolbar>
-          <StepFlow steps={stepFlowSteps} />
-        </InspectorPanel>
-      </aside>
-
-      <section className="plot-v2-main">
-        <SectionHeader
-          kicker="Active Step"
-          title={stageCopy.title}
-          description={stageCopy.description}
+  if (routeStage === "sheet") {
+    return (
+      <div className="plot-workspace plot-stage-sheet plot-sheet-v2">
+        <WizardSheetStage
+          inputPath={wizard.inputPath}
+          onInspectSheet={(sheetValue) => void rerunInspect(sheetValue)}
+          sheet={wizard.sheet}
+          sheetNames={wizard.sheetNames}
         />
+      </div>
+    );
+  }
 
-        {routeStage === "sheet" && (
-          <WizardSheetStage
-            inputPath={wizard.inputPath}
-            onInspectSheet={(sheetValue) => void rerunInspect(sheetValue)}
-            sheet={wizard.sheet}
-            sheetNames={wizard.sheetNames}
-          />
-        )}
-
-        {showStudioStage && (
-          <WizardStudioStage
-            hasTemplate={hasTemplate}
-            meta={meta}
-            onChangePreviewIndex={wizard.setPreviewIndex}
-            onChangeSheet={() => goToStage("sheet")}
-            previewIndex={wizard.previewIndex}
-            previews={wizard.previews}
-            previewBusy={previewBusy}
-            previewError={previewError}
-            railContent={studioRailContent}
-            sheetNamesLength={wizard.sheetNames.length}
-            template={wizard.template}
-          />
-        )}
-      </section>
-
-      <aside className="plot-v2-inspector">
-        <InspectorPanel kicker="Inspector" title="Current plot context">
-          <div className="wizard-summary-list">
-            {summaryRows.map((row) => (
-              <div className="wizard-summary-row" key={row.label}>
-                <span>{row.label}</span>
-                <strong>{row.value}</strong>
-              </div>
-            ))}
-          </div>
-
-          {wizard.error && <div className="error-card">{wizard.error}</div>}
-          {!wizard.sidecarReady && (
-            <div className="warning-card">
-              The Python sidecar is offline. Detection, preview, and export resume once it reconnects.
-            </div>
-          )}
-
-        </InspectorPanel>
-      </aside>
-    </div>
+  return (
+    <WizardStudioStage
+      blockingErrors={blockingErrors}
+      canExport={canExport}
+      currentTemplate={currentTemplate}
+      exportResult={wizard.exportResult}
+      hasExportedOutputs={wizard.outputs.length > 0}
+      hasTemplate={hasTemplate}
+      inputPath={wizard.inputPath}
+      inspection={wizard.inspection}
+      meta={meta}
+      onBackToReview={() => goToStage("review")}
+      onBackToTune={() => goToStage("tune")}
+      onBackToType={() => goToStage("type")}
+      onChangePreviewIndex={wizard.setPreviewIndex}
+      onChangeSheet={() => goToStage("sheet")}
+      onContinueToReview={() => goToStage("review")}
+      onExport={() => void runExport()}
+      onOpenComposer={() => onNavigate("/composer")}
+      onOpenOutputFolder={() => void openOutputFolder()}
+      onStartAnotherPlot={() => {
+        wizard.reset();
+        goToStage("import");
+      }}
+      onUpdateOptions={updateWizardOptions}
+      options={wizard.options}
+      outputItems={expectedOutputs}
+      outputsLength={wizard.outputs.length}
+      paletteOptions={paletteOptions}
+      preflight={wizard.preflight}
+      preflightBusy={preflightBusy}
+      preflightRequestError={preflightRequestError}
+      previewBusy={previewBusy}
+      previewError={previewError}
+      previewIndex={wizard.previewIndex}
+      previews={wizard.previews}
+      routeStage={routeStage}
+      sheetNamesLength={wizard.sheetNames.length}
+      sizeOptions={sizeOptions}
+      styleOptions={styleOptions}
+      submissionReport={wizard.submissionReport}
+      template={wizard.template}
+      tensileCurveMode={tensileCurveMode}
+    />
   );
 }

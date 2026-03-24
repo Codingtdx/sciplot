@@ -89,6 +89,14 @@ export function SettingsScreen({
   const [storageError, setStorageError] = useState<string | null>(null);
 
   const validationRuleCount = contract ? Object.keys(contract.validation_rules).length : 0;
+  const totalManagedArtifacts = managedStorage
+    ? managedStorage.example_template_file_count +
+      managedStorage.blank_template_file_count +
+      managedStorage.single_template_file_count +
+      managedStorage.plot_export_dir_count +
+      managedStorage.code_console_run_dir_count
+    : 0;
+  const activeCategory = SETTINGS_CATEGORIES.find((item) => item.id === category);
 
   const loadManagedFiles = async () => {
     setStorageBusy(true);
@@ -203,26 +211,65 @@ export function SettingsScreen({
   };
 
   return (
-    <div className="settings-v2-layout">
-      <aside className="settings-v2-nav">
-        <InspectorPanel kicker="Categories" title="Settings">
-          <div className="settings-v2-nav-list">
-            {SETTINGS_CATEGORIES.map((item) => (
-              <button
-                className={`settings-v2-nav-item ${category === item.id ? "active" : ""}`}
-                key={item.id}
-                onClick={() => setCategory(item.id)}
-                type="button"
-              >
-                <strong>{item.label}</strong>
-                <span>{item.description}</span>
-              </button>
-            ))}
+    <div className="settings-v2-page">
+      <section className="work-card section-card settings-v2-hero">
+        <SectionHeader
+          kicker="Settings"
+          title="Runtime and workspace controls"
+          description="Calm controls for appearance, sidecar, files, and maintenance."
+        />
+        <div className="settings-v2-summary-grid" aria-label="Settings summary">
+          <div className="settings-v2-summary-card">
+            <span>Appearance</span>
+            <strong>
+              {settings.appearance_mode === "system"
+                ? "System"
+                : settings.appearance_mode === "light"
+                  ? "Light"
+                  : "Dark"}
+              {" / "}
+              {themePresetById(settings.theme_preset_id)?.name ?? "Preset"}
+            </strong>
+            <p>Theme and contrast follow the product baseline.</p>
           </div>
-        </InspectorPanel>
-      </aside>
+          <div className="settings-v2-summary-card">
+            <span>Sidecar</span>
+            <strong>{sidecarReady ? "Online" : "Offline"}</strong>
+            <p>{validationRuleCount} contract rule(s) active in runtime checks.</p>
+          </div>
+          <div className="settings-v2-summary-card">
+            <span>Managed files</span>
+            <strong>{managedStorage ? `${totalManagedArtifacts} tracked artifact(s)` : "Not loaded"}</strong>
+            <p>{storageBusy ? "Refreshing managed storage status." : "Templates, exports, and run cache."}</p>
+          </div>
+          <div className="settings-v2-summary-card">
+            <span>Current section</span>
+            <strong>{activeCategory?.label ?? "Settings"}</strong>
+            <p>{activeCategory?.description ?? "Select a category to edit."}</p>
+          </div>
+        </div>
+      </section>
 
-      <section className="settings-v2-detail">
+      <div className="settings-v2-layout">
+        <aside className="settings-v2-nav">
+          <InspectorPanel kicker="Categories" title="Settings">
+            <div className="settings-v2-nav-list">
+              {SETTINGS_CATEGORIES.map((item) => (
+                <button
+                  className={`settings-v2-nav-item ${category === item.id ? "active" : ""}`}
+                  key={item.id}
+                  onClick={() => setCategory(item.id)}
+                  type="button"
+                >
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
+                </button>
+              ))}
+            </div>
+          </InspectorPanel>
+        </aside>
+
+        <section className="settings-v2-detail">
         {category === "appearance" && (
           <section className="work-card section-card">
             <SectionHeader
@@ -539,7 +586,14 @@ export function SettingsScreen({
             </div>
           </section>
         )}
-      </section>
+        </section>
+      </div>
+
+      <footer className="plot-flow-footer settings-v2-footer">
+        <span>{activeCategory?.label ?? "Settings"} section active</span>
+        <span>{sidecarReady ? "Sidecar online" : "Sidecar offline"}</span>
+        <span>{managedStorage ? `${totalManagedArtifacts} managed artifact(s)` : "Managed storage not loaded"}</span>
+      </footer>
     </div>
   );
 }
