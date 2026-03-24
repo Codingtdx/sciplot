@@ -467,6 +467,12 @@ export function CodeConsoleScreen({
       : bindingSource === "local"
         ? "Loaded here"
         : "Not bound";
+  const bindingSourceSummaryLabel =
+    bindingSource === "plot"
+      ? "Plot session"
+      : bindingSource === "local"
+        ? "Local file"
+        : "No binding";
   const runnerReady = bindingReady && wizard.sidecarReady;
 
   return (
@@ -483,7 +489,36 @@ export function CodeConsoleScreen({
         </div>
       )}
 
-      <section className="work-card section-card code-console-v2-topbar">
+      <section className="work-card section-card code-console-v2-hero">
+        <SectionHeader
+          kicker="Code Console"
+          title="Integrated advanced workspace"
+          description="Bind data context, review recommendations, and run repo-native Python."
+        />
+
+        <div className="code-console-v2-summary-grid" aria-label="Code Console summary">
+          <div className="code-console-v2-summary-card">
+            <span>Source</span>
+            <strong>{bindingSourceSummaryLabel}</strong>
+            <p>{inputPath ? `Bound file: ${formatLeaf(inputPath)}` : "No file bound yet."}</p>
+          </div>
+          <div className="code-console-v2-summary-card">
+            <span>Template</span>
+            <strong>{template ? templateLabel(meta, template) : "Not selected"}</strong>
+            <p>{currentSizeLabel} · {currentStyleLabel} · {currentPaletteLabel}</p>
+          </div>
+          <div className="code-console-v2-summary-card">
+            <span>Runner</span>
+            <strong>{runnerReady ? "Ready to run" : "Waiting for binding"}</strong>
+            <p>{wizard.sidecarReady ? "Repo-native Python available." : "Sidecar is offline."}</p>
+          </div>
+          <div className="code-console-v2-summary-card">
+            <span>Prompt</span>
+            <strong>{showPrompt ? "Visible" : "Hidden"}</strong>
+            <p>{generated ? "Generated on demand from the current context." : "Copies only when requested."}</p>
+          </div>
+        </div>
+
         <CompactToolbar label="Code Console toolbar">
           <button
             className="ghost-button"
@@ -561,6 +596,7 @@ export function CodeConsoleScreen({
           <SectionHeader
             kicker="Prompt drawer"
             title="Generated AI prompt"
+            description="Prompt stays secondary and opens only when needed."
           />
           <pre aria-label="Generated AI prompt" className="code-console-preview">
             {generateBusy
@@ -824,7 +860,7 @@ export function CodeConsoleScreen({
               title="Logs and artifacts"
             />
 
-            {runError && <div className="warning-card">{runError}</div>}
+            {runError && <div className="error-card">{runError}</div>}
             {runResult?.timed_out && (
               <div className="warning-card">
                 The last run hit the timeout. Reduce the workload or save fewer outputs per run.
@@ -918,6 +954,12 @@ export function CodeConsoleScreen({
           </section>
         </section>
       </div>
+
+      <footer className="plot-flow-footer code-console-v2-footer">
+        <span>{bindingReady ? `Bound: ${templateLabel(meta, template)}` : "No bound template yet"}</span>
+        <span>{runResult ? `Last run exit ${runResult.exit_code}` : "No run executed"}</span>
+        <span>{runResult?.generated_files.length ?? 0} generated artifact(s)</span>
+      </footer>
     </div>
   );
 }

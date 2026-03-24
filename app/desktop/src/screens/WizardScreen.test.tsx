@@ -379,7 +379,7 @@ describe("WizardScreen", () => {
     expect(screen.getByRole("button", { name: /Sheet2/i })).toBeInTheDocument();
   });
 
-  it("lets completed steps navigate backward without wiping the current session", () => {
+  it("uses the lightweight flow footer for tune, review, and export navigation", () => {
     const onNavigate = vi.fn();
     useWizardStore.setState({
       inputPath: "/tmp/curve.csv",
@@ -409,15 +409,11 @@ describe("WizardScreen", () => {
       <WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage="review" />,
     );
 
-    const tuneStep = screen.getByRole("button", { name: "Plot step Tune" });
-    const reviewStep = screen.getByRole("button", { name: "Plot step Review" });
-    const exportStep = screen.getByRole("button", { name: "Plot step Export" });
+    expect(screen.getByRole("heading", { name: "Readiness check", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Workflow steps")).not.toBeInTheDocument();
+    expect(screen.queryByText("Current plot context")).not.toBeInTheDocument();
 
-    expect(tuneStep).toBeEnabled();
-    expect(reviewStep).toHaveAttribute("aria-current", "step");
-    expect(exportStep).toBeDisabled();
-
-    fireEvent.click(tuneStep);
+    fireEvent.click(screen.getByRole("button", { name: "Back to tune" }));
 
     expect(onNavigate).toHaveBeenCalledWith("/plot/tune");
     expect(useWizardStore.getState().inputPath).toBe("/tmp/curve.csv");
@@ -435,6 +431,7 @@ describe("WizardScreen", () => {
     rerender(<WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage="tune" />);
 
     expect(useWizardStore.getState().stage).toBe("tune");
+    expect(screen.getByRole("button", { name: "Continue to review" })).toBeEnabled();
   });
 
   it("shows only compatible templates first and disables incompatible ones behind more types", () => {
@@ -615,7 +612,7 @@ describe("WizardScreen", () => {
     });
 
     expect(screen.queryByRole("option", { name: "log" })).not.toBeInTheDocument();
-    expect(screen.getByText("Tensile curves keep linear x/y scales.")).toBeInTheDocument();
+    expect(screen.getAllByText("Tensile curves keep linear x/y scales.").length).toBeGreaterThan(0);
   });
 
   it("prompts before replacing the current plot session when opening another data file", async () => {
@@ -874,8 +871,9 @@ describe("WizardScreen", () => {
 
     rerender(<WizardScreen meta={TEST_META} onNavigate={vi.fn()} routeStage="export" />);
 
-    expect(screen.getByRole("button", { name: "Open output folder" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open output folder" }));
+    const openOutputButtons = screen.getAllByRole("button", { name: "Open output folder" });
+    expect(openOutputButtons.length).toBeGreaterThan(0);
+    fireEvent.click(openOutputButtons[0]);
 
     await waitFor(() => {
       expect(openPath).toHaveBeenCalledWith("/tmp/exports");

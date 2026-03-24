@@ -111,7 +111,7 @@ export function useWizardPreflight({
           { signal: controller.signal },
         ).then((response) => ({
           preflight: response.preflight,
-          report: response.preflight.submission_report ?? null,
+          report: response.preflight?.submission_report ?? null,
         }));
 
       preflightInFlight.set(key, request);

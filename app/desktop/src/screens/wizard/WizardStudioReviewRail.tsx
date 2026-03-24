@@ -7,7 +7,13 @@ import type {
 import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { WizardExportSection } from "./WizardExportSection";
 
+type SummaryRow = {
+  label: string;
+  value: string;
+};
+
 type Props = {
+  summaryRows: SummaryRow[];
   blockingErrors: string[];
   canExport: boolean;
   exportResult: ExportResponse | null;
@@ -25,6 +31,7 @@ type Props = {
 };
 
 export function WizardStudioReviewRail({
+  summaryRows,
   blockingErrors,
   canExport,
   exportResult,
@@ -42,6 +49,25 @@ export function WizardStudioReviewRail({
 }: Props) {
   return (
     <>
+      <article className="context-card wizard-review-context-card">
+        <div className="panel-heading">
+          <div>
+            <div className="card-kicker">Context</div>
+            <h3>Selected figure</h3>
+          </div>
+          <span className="status-pill accent">Ready to review</span>
+        </div>
+
+        <div className="wizard-review-context-grid">
+          {summaryRows.map((row) => (
+            <div className="wizard-review-context-row" key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+          ))}
+        </div>
+      </article>
+
       <WizardExportSection
         blockingErrors={blockingErrors}
         canExport={canExport}
