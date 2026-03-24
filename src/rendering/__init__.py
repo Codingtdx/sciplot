@@ -19,6 +19,7 @@ from src.rendering.data_templates import (
     materialize_data_template_folder,
     plot_template_folder_catalog,
 )
+from src.rendering.dataset_models import NormalizedDataset, build_normalized_dataset
 from src.rendering.io import (
     coerce_sheet,
     default_output_dir,
@@ -43,6 +44,7 @@ from src.rendering.models import (
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.preflight import preflight_render_request
 from src.rendering.recommendation import inspect_input_file
+from src.rendering.recommender_models import TemplateRecommendation
 from src.rendering.render import (
     TEMPLATE_RENDERERS,
     build_rendered_plots,
@@ -59,10 +61,12 @@ __all__ = [
     "DEFAULT_SIZE_BY_TEMPLATE",
     "InputInspection",
     "AI_BUNDLE_VERSION",
+    "NormalizedDataset",
     "CODE_CONSOLE_RUN_TIMEOUT_SECONDS",
     "PALETTE_PRESET_CHOICES",
     "PreflightResult",
     "Recommendation",
+    "TemplateRecommendation",
     "RenderOptions",
     "RenderedPlot",
     "SIZE_CHOICES",
@@ -71,6 +75,7 @@ __all__ = [
     "TEMPLATE_RENDERERS",
     "TemplateRenderer",
     "build_rendered_plots",
+    "build_normalized_dataset",
     "clear_input_cache",
     "close_rendered_plots",
     "coerce_sheet",

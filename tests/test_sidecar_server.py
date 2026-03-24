@@ -31,6 +31,19 @@ def _write_curve_table(path: Path) -> Path:
     return path
 
 
+def _write_replicate_table(path: Path) -> Path:
+    rows = [
+        ["Tensile modulus", "", ""],
+        ["Blend A", "Blend B", "Blend C"],
+        ["MPa", "MPa", "MPa"],
+        [510.13, 567.91, 544.10],
+        [501.10, 501.49, 549.54],
+        [549.61, 549.61, 562.07],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_dense_curve_table(path: Path) -> Path:
     import numpy as np
 
@@ -126,6 +139,7 @@ def test_meta_endpoint_returns_contract_backed_payload() -> None:
     assert payload["template_ids"]
     assert payload["size_ids"]
     assert payload["palette_preset_ids"]
+    assert payload["visual_themes"]
     assert len(payload["templates"]) == len(payload["template_ids"])
 
 
@@ -164,6 +178,27 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["input_path"] == str(input_path)
     assert payload["inspection"]["model"] == "curve_table"
     assert payload["inspection"]["recommendation"]["template"] == "curve"
+    assert len(payload["inspection"]["recommendations"]) == 5
+    assert payload["inspection"]["recommendations"][0]["template_id"] == "curve"
+    assert payload["inspection"]["recommendations"][1]["template_id"] == "point_line"
+
+
+def test_inspect_file_replicate_model_keeps_legacy_recommendation_field(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicate.csv")
+
+    response = client.post(
+        "/inspect-file",
+        json={"input_path": str(input_path), "sheet": 0},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["inspection"]["model"] == "replicate_table"
+    assert payload["inspection"]["recommendation"]["template"] == "box"
+    template_ids = [item["template_id"] for item in payload["inspection"]["recommendations"]]
+    assert template_ids[0] == "box"
+    assert "distribution_compare" in template_ids
+    assert "grouped_bar_compare" in template_ids
 
 
 def test_code_console_generate_returns_lightweight_context_without_bound_data() -> None:
@@ -651,6 +686,7 @@ def test_save_and_open_project_round_trips_wizard_style_preset(tmp_path: Path) -
                 "size": "60x55",
                 "style_preset": "nature",
                 "palette_preset": "colorblind_safe",
+                "visual_theme_id": "soft_grid",
             },
             "outputs": ["/tmp/demo_curve.pdf"],
         },
@@ -670,6 +706,7 @@ def test_save_and_open_project_round_trips_wizard_style_preset(tmp_path: Path) -
     reopened = open_response.json()["data"]
     assert reopened["wizard"]["options"]["style_preset"] == "nature"
     assert reopened["wizard"]["options"]["palette_preset"] == "colorblind_safe"
+    assert reopened["wizard"]["options"]["visual_theme_id"] == "soft_grid"
 
 
 def test_open_project_rejects_legacy_composer_v1(tmp_path: Path) -> None:

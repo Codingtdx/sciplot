@@ -53,6 +53,23 @@ export const TEST_META: WorkbenchMeta = {
       swatches: ["#111827"],
     },
   ],
+  visual_themes: [
+    {
+      id: "clean_light",
+      label: "Clean Light",
+      description: "A minimal soft theme with plain surfaces and no visible grid.",
+    },
+    {
+      id: "soft_grid",
+      label: "Soft Grid",
+      description: "A quiet grid-forward theme for technical figures that need light structure.",
+    },
+    {
+      id: "presentation_like",
+      label: "Presentation Like",
+      description: "A slightly warmer theme tuned for slides and talk-friendly contrast.",
+    },
+  ],
   templates: [
     {
       id: "point_line",

@@ -33,6 +33,7 @@ from src.rendering import (
     materialize_data_template_folder,
     plot_template_folder_catalog,
 )
+from src.rendering.themes import visual_theme_catalog_payload
 
 
 def create_meta_storage_router(
@@ -57,6 +58,7 @@ def create_meta_storage_router(
                 "template_ids": list(TEMPLATE_CHOICES),
                 "size_ids": list(SIZE_CHOICES),
                 "palette_preset_ids": list(PALETTE_PRESET_CHOICES),
+                "visual_themes": visual_theme_catalog_payload(),
                 "default_style": plot_style.DEFAULT_STYLE_PRESET,
                 "default_palette": plot_style.DEFAULT_PALETTE_PRESET,
             }

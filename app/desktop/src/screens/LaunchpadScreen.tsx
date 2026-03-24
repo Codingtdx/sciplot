@@ -201,7 +201,7 @@ export function LaunchpadScreen({
           {hasPlotSession && (
             <CompactListRow
               onSelect={() => onNavigate(plotRoute(wizard.stage))}
-              right={<span className="signal-tag">{wizard.stage}</span>}
+              right={<span className="wb-inline-meta">{wizard.stage}</span>}
               subtitle={wizard.inputPath ? formatLeaf(wizard.inputPath) : "Current plotting session"}
               title={`Plot · ${wizard.template ? templateLabel(meta, wizard.template) : "Template pending"}`}
             />
@@ -210,11 +210,7 @@ export function LaunchpadScreen({
           {hasComposerSession && (
             <CompactListRow
               onSelect={() => onNavigate("/composer")}
-              right={
-                <span className="signal-tag">
-                  {composerProject.panels.length + composerProject.texts.length} objects
-                </span>
-              }
+              right={<span className="wb-inline-meta">{composerProject.panels.length + composerProject.texts.length} objects</span>}
               subtitle={`${composerProject.regions.length} regions · ${composerProject.panels.length} panels · ${composerProject.texts.length} text`}
               title="Composer"
             />
@@ -240,7 +236,7 @@ export function LaunchpadScreen({
                   disabled={activeRecentId === entry.id}
                   key={entry.id}
                   onSelect={() => void reopenRecent(entry)}
-                  right={<span className="signal-tag">{recentSignal(entry)}</span>}
+                  right={<span className="wb-inline-meta">{recentSignal(entry)}</span>}
                   subtitle={`${entry.detail} · ${formatRecentTimestamp(entry.updated_at)}`}
                   title={entry.title}
                 />

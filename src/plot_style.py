@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from src import mpl_backend  # noqa: F401
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 import scienceplots  # noqa: F401
 import seaborn as sns
+from matplotlib.figure import Figure
+
+from src import mpl_backend  # noqa: F401
 from src.plot_contract import (
     load_plot_contract,
     normalize_style_alias,
@@ -15,7 +17,6 @@ from src.plot_contract import (
     public_style_names,
     style_names,
 )
-
 
 _CONTRACT = load_plot_contract()
 
@@ -275,6 +276,8 @@ def current_typography() -> TypographySpec:
 def apply_style(
     style_preset: str = DEFAULT_STYLE_PRESET,
     palette_preset: str = DEFAULT_PALETTE_PRESET,
+    *,
+    soft_overrides: Mapping[str, object] | None = None,
 ) -> None:
     global _CURRENT_STYLE_PRESET, _CURRENT_PALETTE_PRESET
 
@@ -334,6 +337,8 @@ def apply_style(
             "legend.frameon": style_spec.annotation.legend_frameon,
         },
     )
+    if soft_overrides:
+        plt.rcParams.update(dict(soft_overrides))
 
 
 def use_nature_style() -> None:

@@ -269,8 +269,11 @@ export default function App() {
   }, [appearanceMode, themePresetId]);
 
   const workspace = workspaceForRoute(route);
+  const studioWorkspace =
+    workspace === "launchpad" || workspace === "plot" || workspace === "composer";
   const meta = WORKSPACE_META[workspace];
   const currentPlotStage = plotStageFromRoute(route);
+  const importFocus = workspace === "plot" && currentPlotStage === "import";
   const plotSessionActive = hasWizardSessionContent({
     inputPath: wizard.inputPath,
     inspection: wizard.inspection,
@@ -342,7 +345,7 @@ export default function App() {
   let activeItemLabel = "Next action";
   let activeItemValue = "Choose a workspace and start working.";
   if (workspace === "plot") {
-    activeItemLabel = "Active file";
+    activeItemLabel = importFocus ? "Source" : "Active file";
     activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file loaded";
   } else if (workspace === "tensile") {
     activeItemLabel = "Latest workbook";
@@ -376,6 +379,23 @@ export default function App() {
       ];
     }
     if (workspace === "plot") {
+      if (importFocus) {
+        return [
+          {
+            id: "plot-continue",
+            label: "Continue",
+            kind: "primary" as const,
+            disabled: !wizard.inputPath,
+            onSelect: () => navigate("/plot/type"),
+          },
+          {
+            id: "plot-review",
+            label: "Review",
+            disabled: !wizard.inputPath,
+            onSelect: () => navigate("/plot/review"),
+          },
+        ];
+      }
       return [
         { id: "plot-import", label: "Import", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
         { id: "plot-review", label: "Review", onSelect: () => navigate("/plot/review") },
@@ -410,6 +430,13 @@ export default function App() {
     ];
   })();
 
+  const shellClassName = [
+    studioWorkspace ? "wb-studio-shell" : "",
+    importFocus ? "wb-import-focus" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   let content = (
     <LaunchpadScreen
       meta={workbenchMeta}
@@ -437,6 +464,7 @@ export default function App() {
 
   return (
     <WorkbenchShell
+      className={shellClassName}
       commandBar={
         <CommandBar
           actions={commandActions}
@@ -446,7 +474,7 @@ export default function App() {
           objectValue={activeItemValue}
           runtimeStatusLabel={sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
           runtimeTone={sidecarReady ? "good" : "warn"}
-          sessionLabel={secondaryStatusLabel}
+          sessionLabel={importFocus ? undefined : secondaryStatusLabel}
         />
       }
       content={
@@ -462,15 +490,16 @@ export default function App() {
       rail={
         <IconRail
           brandLabel="SciPlot God"
-          footer={
+          footer={importFocus ? null : (
             <span>
               {plotSessionActive || composerSessionActive
                 ? `${Number(plotSessionActive) + Number(composerSessionActive)} active`
                 : "Idle"}
             </span>
-          }
+          )}
           items={railItems}
           onBrandSelect={() => navigate("/")}
+          variant={importFocus ? "icon" : studioWorkspace ? "text" : "icon"}
         />
       }
       statusBar={

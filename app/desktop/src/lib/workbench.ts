@@ -317,6 +317,17 @@ export function styleLabel(meta: WorkbenchMeta | null, style: string | null | un
   return meta.styles.find((item) => item.id === style)?.label ?? style;
 }
 
+export function visualThemeLabel(meta: WorkbenchMeta | null, visualTheme: string | null | undefined) {
+  if (!meta || !visualTheme) {
+    return visualTheme ?? "-";
+  }
+  return meta.visual_themes.find((item) => item.id === visualTheme)?.label ?? visualTheme;
+}
+
+export function visualThemeChoices(meta: WorkbenchMeta | null) {
+  return meta?.visual_themes ?? [];
+}
+
 export function templateChoices(meta: WorkbenchMeta | null) {
   return meta?.templates ?? [];
 }
@@ -325,10 +336,33 @@ const COMPATIBLE_TEMPLATE_IDS: Record<string, TemplateName[]> = {
   frequency_sweep: ["point_line", "curve"],
   temperature_sweep: ["point_line", "curve"],
   stress_relaxation: ["point_line", "curve"],
-  tensile_curve: ["curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"],
-  curve_table: ["curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"],
-  replicate_table: ["bar", "box", "violin"],
-  heatmap_table: ["heatmap"],
+  tensile_curve: [
+    "curve",
+    "point_line",
+    "replicate_curves_with_band",
+    "stacked_curve",
+    "segmented_stacked_curve",
+    "scatter",
+    "scatter_with_fit",
+  ],
+  curve_table: [
+    "curve",
+    "point_line",
+    "replicate_curves_with_band",
+    "stacked_curve",
+    "segmented_stacked_curve",
+    "scatter",
+    "scatter_with_fit",
+  ],
+  replicate_table: [
+    "distribution_compare",
+    "grouped_bar_compare",
+    "histogram_density",
+    "box",
+    "violin",
+    "bar",
+  ],
+  heatmap_table: ["heatmap", "annotated_heatmap"],
 };
 
 export function isTensileCurveModel(model: string | null | undefined) {
@@ -379,9 +413,9 @@ export function templateCompatibilityReason(model: string | null | undefined) {
     case "curve_table":
       return "This input is a paired curve table. Start with curve-family templates.";
     case "replicate_table":
-      return "This input is a replicate summary table. Start with bar, box, or violin.";
+      return "This input is a replicate summary table. Start with distribution, grouped-bar, histogram-density, or classic stats templates.";
     case "heatmap_table":
-      return "This input is an XYZ heatmap table. Start with the heatmap template.";
+      return "This input is an XYZ heatmap table. Start with heatmap templates.";
     default:
       return "The current input structure is not compatible with this template.";
   }

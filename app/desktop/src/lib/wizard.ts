@@ -5,6 +5,7 @@ import type {
   SizePreset,
   StylePreset,
   TemplateName,
+  TemplateRecommendation,
   WorkbenchMeta,
   WorkbenchTemplate,
 } from "./types";
@@ -19,6 +20,7 @@ const ALL_RENDER_OPTION_KEYS = [
   "style_preset",
   "palette_preset",
   "use_sidecar",
+  "visual_theme_id",
 ] as const satisfies Array<keyof RenderOptionsPayload>;
 
 function templateIds(meta: WorkbenchMeta | null): TemplateName[] {
@@ -38,6 +40,54 @@ export function templateMeta(
     return null;
   }
   return meta.templates.find((item) => item.id === template) ?? null;
+}
+
+export type RankedInspectionRecommendation = {
+  template: WorkbenchTemplate;
+  recommendation: TemplateRecommendation;
+};
+
+function inspectionRecommendationFallback(inspection: InputInspection): TemplateRecommendation {
+  return {
+    template_id: inspection.recommendation.template,
+    score: 100,
+    why_hard_match: [inspection.recommendation.reason],
+    why_soft_prior: [],
+    inferred_mapping: {},
+    optional_enhancements: [],
+    preview_config_summary: {
+      size: inspection.recommendation.size,
+      xscale: inspection.recommendation.xscale,
+      yscale: inspection.recommendation.yscale,
+      reverse_x: inspection.recommendation.reverse_x,
+      baseline: inspection.recommendation.baseline,
+      show_colorbar: inspection.recommendation.show_colorbar,
+      style_preset: inspection.recommendation.style_preset,
+      palette_preset: inspection.recommendation.palette_preset,
+      use_sidecar: inspection.recommendation.use_sidecar,
+    },
+  };
+}
+
+export function inspectionRecommendationChoices(
+  meta: WorkbenchMeta | null,
+  inspection: InputInspection | null,
+  limit = 5,
+): RankedInspectionRecommendation[] {
+  if (!inspection) {
+    return [];
+  }
+  const rankedRecommendations = inspection.recommendations?.length
+    ? inspection.recommendations
+    : [inspectionRecommendationFallback(inspection)];
+
+  return rankedRecommendations
+    .slice(0, limit)
+    .map((recommendation) => {
+      const template = templateMeta(meta, recommendation.template_id);
+      return template ? { template, recommendation } : null;
+    })
+    .filter((item): item is RankedInspectionRecommendation => Boolean(item));
 }
 
 export function sanitizeTemplateId(
@@ -91,6 +141,20 @@ function pickAllowedPalette(
     return meta.default_palette;
   }
   return available[0];
+}
+
+function pickAllowedVisualTheme(
+  meta: WorkbenchMeta | null,
+  candidate: string | null | undefined,
+): string | undefined {
+  const available = meta?.visual_themes ?? [];
+  if (!candidate) {
+    return undefined;
+  }
+  if (available.length === 0) {
+    return candidate;
+  }
+  return available.some((item) => item.id === candidate) ? candidate : undefined;
 }
 
 function pickAllowedStyle(
@@ -162,6 +226,10 @@ export function sanitizeRenderOptions(
   }
   if (allowed.has("use_sidecar") && typeof source.use_sidecar === "boolean") {
     next.use_sidecar = source.use_sidecar;
+  }
+  const visualThemeId = pickAllowedVisualTheme(meta, source.visual_theme_id);
+  if (visualThemeId) {
+    next.visual_theme_id = visualThemeId;
   }
   if (inputModel === "tensile_curve") {
     if (allowed.has("xscale")) {

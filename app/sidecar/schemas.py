@@ -31,6 +31,7 @@ class RenderOptionsPayload(StrictModel):
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET
     use_sidecar: bool | None = None
+    visual_theme_id: str | None = None
 
 
 class SavedRenderOptionsPayload(StrictModel):
@@ -43,6 +44,7 @@ class SavedRenderOptionsPayload(StrictModel):
     style_preset: str | None = None
     palette_preset: str | None = None
     use_sidecar: bool | None = None
+    visual_theme_id: str | None = None
 
 
 class FileRequest(StrictModel):
@@ -220,6 +222,12 @@ class WorkbenchPaletteResponse(StrictModel):
     swatches: list[str]
 
 
+class WorkbenchVisualThemeResponse(StrictModel):
+    id: str
+    label: str
+    description: str
+
+
 class WorkbenchTemplateResponse(StrictModel):
     id: str
     label: str
@@ -240,6 +248,7 @@ class MetaResponse(StrictModel):
     sizes: list[WorkbenchSizeResponse]
     styles: list[WorkbenchStyleResponse]
     palettes: list[WorkbenchPaletteResponse]
+    visual_themes: list[WorkbenchVisualThemeResponse] = Field(default_factory=list)
     templates: list[WorkbenchTemplateResponse]
     template_ids: list[str]
     size_ids: list[str]
@@ -463,10 +472,21 @@ class RecommendationResponse(StrictModel):
     use_sidecar: bool | None = None
 
 
+class TemplateRecommendationResponse(StrictModel):
+    template_id: str
+    score: float
+    why_hard_match: list[str] = Field(default_factory=list)
+    why_soft_prior: list[str] = Field(default_factory=list)
+    inferred_mapping: dict[str, str] = Field(default_factory=dict)
+    optional_enhancements: list[str] = Field(default_factory=list)
+    preview_config_summary: dict[str, Any] = Field(default_factory=dict)
+
+
 class InputInspectionResponse(StrictModel):
     model: str
     model_label: str
     recommendation: RecommendationResponse
+    recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     signals: list[str] = Field(default_factory=list)
 

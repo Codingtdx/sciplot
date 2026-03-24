@@ -39,14 +39,16 @@ export function WorkbenchShell({
   commandBar,
   content,
   statusBar,
+  className = "",
 }: {
   rail: ReactNode;
   commandBar: ReactNode;
   content: ReactNode;
   statusBar?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="app-shell-v2">
+    <div className={`app-shell-v2 ${className}`.trim()}>
       {rail}
       <div className="wb-workspace">
         {commandBar}
@@ -96,17 +98,20 @@ export function IconRail({
   items,
   footer,
   onBrandSelect,
+  variant = "icon",
 }: {
   brandLabel: string;
   railLabel?: string;
   items: RailItem[];
   footer?: ReactNode;
   onBrandSelect(): void;
+  variant?: "icon" | "text";
 }) {
+  const showLabels = variant === "text";
   return (
-    <aside className="wb-icon-rail" aria-label={railLabel}>
+    <aside className={`wb-icon-rail ${showLabels ? "text" : ""}`.trim()} aria-label={railLabel}>
       <button
-        className="wb-rail-brand"
+        className={`wb-rail-brand ${showLabels ? "text" : ""}`.trim()}
         onClick={onBrandSelect}
         title={brandLabel}
         type="button"
@@ -114,21 +119,21 @@ export function IconRail({
         <span className="wb-rail-brand-mark">
           <AppIcon name="spark" />
         </span>
-        <span className="wb-sr-only">{brandLabel}</span>
+        {showLabels ? <span className="wb-rail-label">{brandLabel}</span> : <span className="wb-sr-only">{brandLabel}</span>}
       </button>
 
       <nav className="wb-rail-nav" aria-label="Modules">
         {items.map((item) => (
           <button
             aria-current={item.active ? "page" : undefined}
-            className={`wb-rail-item ${item.active ? "active" : ""}`}
+            className={`wb-rail-item ${showLabels ? "text" : ""} ${item.active ? "active" : ""}`.trim()}
             key={item.id}
             onClick={item.onSelect}
             title={item.label}
             type="button"
           >
             <AppIcon name={item.icon} />
-            <span className="wb-sr-only">{item.label}</span>
+            {showLabels ? <span className="wb-rail-label">{item.label}</span> : <span className="wb-sr-only">{item.label}</span>}
           </button>
         ))}
       </nav>

@@ -49,7 +49,7 @@ import { WizardStudioReviewRail } from "./wizard/WizardStudioReviewRail";
 import { WizardSheetStage } from "./wizard/WizardSheetStage";
 import { WizardStudioStage } from "./wizard/WizardStudioStage";
 import { WizardStudioTuneRail } from "./wizard/WizardStudioTuneRail";
-import { WizardStudioTypeRail } from "./wizard/WizardStudioTypeRail";
+import { WizardTypeStage } from "./wizard/WizardTypeStage";
 import { useWizardPreflight } from "./wizard/useWizardPreflight";
 import { useWizardPreview } from "./wizard/useWizardPreview";
 import { useWizardStageRouting } from "./wizard/useWizardStageRouting";
@@ -204,6 +204,7 @@ export function WizardScreen({
     Boolean(wizard.inputPath) &&
     Boolean(wizard.template) &&
     routeStage === "review";
+  const showStudioStage = routeStage !== "import" && routeStage !== "sheet";
 
   const {
     busy: previewBusy,
@@ -352,23 +353,7 @@ export function WizardScreen({
     meta,
   });
   let studioRailContent: ReactNode = null;
-  if (routeStage === "type") {
-    studioRailContent = (
-      <WizardStudioTypeRail
-        compatibleTemplates={compatibleTemplates}
-        hasTemplate={hasTemplate}
-        incompatibleTemplates={incompatibleTemplates}
-        inspection={wizard.inspection}
-        onApplyRecommendedSelection={applyRecommendedSelection}
-        onContinueToTune={() => goToStage("tune")}
-        onSelectTemplate={updateWizardTemplate}
-        onToggleShowAllTemplates={() => setShowAllTemplates((current) => !current)}
-        recommendationApplied={recommendationApplied}
-        selectedTemplate={wizard.template}
-        showAllTemplates={showAllTemplates}
-      />
-    );
-  } else if (routeStage === "tune") {
+  if (routeStage === "tune") {
     studioRailContent = (
       <WizardStudioTuneRail
         currentTemplate={currentTemplate}
@@ -421,6 +406,58 @@ export function WizardScreen({
     );
   }
 
+  if (routeStage === "type") {
+    return (
+      <div className="plot-workspace plot-stage-type plot-type-route-v2">
+        <WizardTypeStage
+          compatibleTemplates={compatibleTemplates}
+          hasTemplate={hasTemplate}
+          incompatibleTemplates={incompatibleTemplates}
+          inputPath={wizard.inputPath}
+          inspection={wizard.inspection}
+          meta={meta}
+          onApplyRecommendedSelection={applyRecommendedSelection}
+          onChangePreviewIndex={wizard.setPreviewIndex}
+          onChangeSheet={() => goToStage("sheet")}
+          onContinueToTune={() => goToStage("tune")}
+          onSelectTemplate={updateWizardTemplate}
+          onToggleShowAllTemplates={() => setShowAllTemplates((current) => !current)}
+          previewBusy={previewBusy}
+          previewError={previewError}
+          previewIndex={wizard.previewIndex}
+          previews={wizard.previews}
+          recommendationApplied={recommendationApplied}
+          selectedTemplate={wizard.template}
+          sheetNamesLength={wizard.sheetNames.length}
+          showAllTemplates={showAllTemplates}
+        />
+      </div>
+    );
+  }
+
+  if (routeStage === "import") {
+    return (
+      <div className="plot-workspace plot-stage-import plot-import-route-v2">
+        <WizardImportStage
+          error={wizard.error}
+          hasInput={hasInput}
+          inputPath={wizard.inputPath}
+          latestTemplateFolder={latestTemplateFolder}
+          onBuildTemplateFolder={(variant) => void openTemplateFolder(variant)}
+          onOpenDataFile={() => void openDataFile()}
+          onReopenRecentData={(path) => void reopenRecentData(path)}
+          onReopenTemplateFolder={() => void reopenTemplateFolder()}
+          onResumeCurrentSession={() => goToStage("type")}
+          recentDataFiles={recentDataFiles}
+          sidecarReady={wizard.sidecarReady}
+          templateBuildError={templateBuildError}
+          templateFolderBusy={templateFolderBusy}
+          templateOpenError={templateOpenError}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`plot-workspace plot-stage-${routeStage} plot-v2-layout`}>
       <aside className="plot-v2-steps">
@@ -431,11 +468,9 @@ export function WizardScreen({
         >
           <span className="hint-text">{getPlotStageLabel(routeStage)} stage</span>
           <CompactToolbar>
-            {routeStage !== "import" && (
-              <button className="ghost-button" onClick={() => goToStage("import")} type="button">
-                New file
-              </button>
-            )}
+            <button className="ghost-button" onClick={() => goToStage("import")} type="button">
+              New file
+            </button>
             {routeStage !== "sheet" && wizard.sheetNames.length > 1 && (
               <button className="ghost-button" onClick={() => goToStage("sheet")} type="button">
                 Sheet
@@ -453,22 +488,6 @@ export function WizardScreen({
           description={stageCopy.description}
         />
 
-        {routeStage === "import" && (
-          <WizardImportStage
-            hasInput={hasInput}
-            latestTemplateFolder={latestTemplateFolder}
-            onBuildTemplateFolder={(variant) => void openTemplateFolder(variant)}
-            onOpenDataFile={() => void openDataFile()}
-            onReopenRecentData={(path) => void reopenRecentData(path)}
-            onReopenTemplateFolder={() => void reopenTemplateFolder()}
-            onResumeCurrentSession={() => goToStage("type")}
-            recentDataFiles={recentDataFiles}
-            templateBuildError={templateBuildError}
-            templateFolderBusy={templateFolderBusy}
-            templateOpenError={templateOpenError}
-          />
-        )}
-
         {routeStage === "sheet" && (
           <WizardSheetStage
             inputPath={wizard.inputPath}
@@ -478,7 +497,7 @@ export function WizardScreen({
           />
         )}
 
-        {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
+        {showStudioStage && (
           <WizardStudioStage
             hasTemplate={hasTemplate}
             meta={meta}

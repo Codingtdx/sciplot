@@ -12,7 +12,7 @@ from src import (
 )
 from src.plot_contract import qa_profile
 from src.plot_style import save_pdf
-from src.plotting import _place_series_edge_labels
+from src.plotting import _format_axis_label, _place_series_edge_labels
 from src.plotting_families.curve_family import plot_curves, plot_scatter
 from src.plotting_families.heatmap_family import plot_heatmap
 from src.plotting_families.layout_helpers import compute_shared_curve_x_layout
@@ -24,13 +24,16 @@ from src.rendering.cache import (
     load_replicate_table_cached,
 )
 from src.rendering.common import (
+    aligned_replicate_band,
     load_rheology_bundle_series,
     load_segmented_config,
     looks_like_tensile_curve,
     predict_bar_box_slug,
     rheology_output_filenames,
+    summarize_replicate_distribution,
     validate_series_scales,
 )
+from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName, TemplateRenderer
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.qa import (
@@ -39,7 +42,8 @@ from src.rendering.qa import (
     apply_curve_autofix,
     recommend_curve_autofix,
 )
-from src.rendering.recommendation import detect_point_line_bundle
+from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
+from src.rendering.themes import visual_theme_soft_overrides
 
 
 @dataclass(frozen=True)
@@ -775,9 +779,9 @@ def _render_rheology_bundle(
 
 
 def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(bundle, "curve", input_path, sheet, options)
+    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(normalized_dataset.model, "curve", input_path, sheet, options)
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
@@ -794,9 +798,9 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
 
 
 def _render_point_line(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(bundle, "point_line", input_path, sheet, options)
+    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(normalized_dataset.model, "point_line", input_path, sheet, options)
 
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
@@ -935,6 +939,187 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
     ]
 
 
+def _render_grouped_bar_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if len(groups) < 2:
+        raise ValueError("grouped_bar_compare requires at least two replicate groups.")
+    stats_profile = _stats_profile(groups)
+    fig, _ = plot_bar(
+        groups,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        bar_width=max(0.2, stats_profile.bar_width * 0.9),
+        spacing_scale=max(1.02, stats_profile.spacing_scale),
+        capsize=stats_profile.capsize,
+        show_raw_points=True,
+        raw_point_size=max(stats_profile.raw_point_size, 10.0),
+        raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
+    )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_grouped_bar_compare.pdf",
+            figure=fig,
+            template="grouped_bar_compare",
+            options=options,
+            autofixes_applied=(
+                "stats_spacing_profile",
+                "bar_capsize_profile",
+                "bar_raw_points_overlay",
+                "grouped_bar_compare_profile",
+            ),
+        )
+    ]
+
+
+def _distribution_compare_variant(groups) -> tuple[str, str]:
+    group_count = len(groups)
+    replicate_counts = [len(group.data) for group in groups]
+    min_replicates = min(replicate_counts) if replicate_counts else 0
+    if group_count >= 6:
+        return ("box", "Many groups default to box for cleaner side-by-side spread comparison.")
+    if group_count <= 4 and min_replicates >= 6:
+        return ("violin", "Higher replicate density with fewer groups defaults to violin for shape visibility.")
+    return ("strip_box", "Moderate group/replicate density defaults to strip+box for balanced spread and readability.")
+
+
+def _render_distribution_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if len(groups) < 2:
+        raise ValueError("distribution_compare requires at least two replicate groups.")
+    stats_profile = _stats_profile(groups)
+    variant, _ = _distribution_compare_variant(groups)
+    autofixes = ["stats_spacing_profile", f"distribution_variant_{variant}"]
+
+    if variant == "violin":
+        fig, _ = plot_violin(
+            groups,
+            width_mm=options.width_mm,
+            height_mm=options.height_mm,
+            violin_width=stats_profile.violin_width,
+            spacing_scale=stats_profile.spacing_scale,
+        )
+    else:
+        fig, ax = plot_box(
+            groups,
+            width_mm=options.width_mm,
+            height_mm=options.height_mm,
+            box_width=stats_profile.box_width,
+            spacing_scale=stats_profile.spacing_scale,
+        )
+        if variant == "strip_box":
+            for collection in ax.collections:
+                sizes = np.asarray(collection.get_sizes(), dtype=float)
+                if sizes.size:
+                    collection.set_sizes(np.maximum(sizes, stats_profile.raw_point_size))
+                collection.set_alpha(max(stats_profile.raw_point_alpha, 0.8))
+            autofixes.append("strip_point_overlay_emphasis")
+
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_distribution_compare.pdf",
+            figure=fig,
+            template="distribution_compare",
+            options=options,
+            autofixes_applied=tuple(autofixes),
+        )
+    ]
+
+
+def _gaussian_density(values: np.ndarray, x_grid: np.ndarray) -> np.ndarray:
+    if values.size == 0:
+        return np.zeros_like(x_grid)
+    std = float(np.std(values, ddof=1)) if values.size > 1 else 0.0
+    iqr = float(np.subtract(*np.percentile(values, [75, 25]))) if values.size > 1 else 0.0
+    robust_scale = min(std, iqr / 1.34) if std > 0 and iqr > 0 else max(std, iqr / 1.34, 0.0)
+    if robust_scale <= 0:
+        robust_scale = max(abs(float(values.mean())), 1.0) * 0.08
+    bandwidth = max(1e-6, 1.06 * robust_scale * (values.size ** (-1.0 / 5.0)))
+    z = (x_grid[:, None] - values[None, :]) / bandwidth
+    kernel = np.exp(-0.5 * z * z) / np.sqrt(2.0 * np.pi)
+    return kernel.mean(axis=1) / bandwidth
+
+
+def _render_histogram_density(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+
+    summary = summarize_replicate_distribution(groups)
+    fig, ax = plot_style.create_panel_figure(width_mm=options.width_mm, height_mm=options.height_mm)
+    palette = plot_style.get_categorical_palette(options.palette_preset, n_colors=len(groups))
+    all_values: list[np.ndarray] = []
+    density_max = 0.0
+
+    for group in groups:
+        values = group.data.to_numpy(dtype=float)
+        values = values[np.isfinite(values)]
+        if values.size:
+            all_values.append(values)
+    if not all_values:
+        raise ValueError("No valid groups were found in the replicate table.")
+
+    pooled = np.concatenate(all_values)
+    if summary.pooled_unique_count <= max(6, int(round(summary.total_points * 0.35))):
+        bin_count = int(max(4, min(18, summary.pooled_unique_count + 1)))
+        discrete_binning = True
+    else:
+        bin_count = int(min(24, max(8, round(np.sqrt(max(pooled.size, 1))))))
+        discrete_binning = False
+
+    for color, group, values in zip(palette, groups, all_values, strict=True):
+        ax.hist(
+            values,
+            bins=bin_count,
+            density=True,
+            alpha=min(plot_style.current_stroke().fill_alpha, 0.28),
+            color=color,
+            edgecolor=color,
+            linewidth=0.8,
+            label=group.group,
+        )
+        x_min = float(values.min())
+        x_max = float(values.max())
+        if np.isclose(x_min, x_max):
+            span = max(abs(x_min), 1.0) * 0.08
+            x_grid = np.linspace(x_min - span, x_max + span, 160)
+        else:
+            x_grid = np.linspace(x_min, x_max, 160)
+        density = _gaussian_density(values, x_grid)
+        density_max = max(density_max, float(np.max(density)) if density.size else 0.0)
+        ax.plot(
+            x_grid,
+            density,
+            color=color,
+            linewidth=max(1.0, plot_style.current_stroke().line_width_pt),
+            alpha=min(0.96, plot_style.current_stroke().line_alpha + 0.15),
+            zorder=3.4,
+        )
+
+    first = groups[0]
+    ax.set_xlabel(_format_axis_label(first.value_label, first.value_unit))
+    ax.set_ylabel("Density")
+    if len(groups) > 1:
+        ax.legend(loc="best", frameon=False)
+    if density_max > 0:
+        ax.set_ylim(bottom=0.0, top=density_max * 1.16)
+    else:
+        ax.set_ylim(bottom=0.0)
+
+    autofixes = ["histogram_density_overlay"]
+    if discrete_binning:
+        autofixes.append("histogram_discrete_binning")
+
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_histogram_density.pdf",
+            figure=fig,
+            template="histogram_density",
+            options=options,
+            autofixes_applied=tuple(autofixes),
+        )
+    ]
+
+
 def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
@@ -950,6 +1135,133 @@ def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) 
             base_kwargs={"axis_mode": axis_mode},
         )
     ]
+
+
+def _fit_line_xy(series_list) -> tuple[np.ndarray, np.ndarray, str]:
+    x_blocks: list[np.ndarray] = []
+    y_blocks: list[np.ndarray] = []
+    for series in series_list:
+        frame = series.data.dropna(subset=["x", "y"])
+        if frame.empty:
+            continue
+        x_values = frame["x"].to_numpy(dtype=float)
+        y_values = frame["y"].to_numpy(dtype=float)
+        valid = np.isfinite(x_values) & np.isfinite(y_values)
+        if np.any(valid):
+            x_blocks.append(x_values[valid])
+            y_blocks.append(y_values[valid])
+    if not x_blocks:
+        raise ValueError("No valid X/Y series found.")
+    x_all = np.concatenate(x_blocks)
+    y_all = np.concatenate(y_blocks)
+    if x_all.size < 2:
+        raise ValueError("At least two points are required to compute a deterministic linear fit.")
+    if np.allclose(x_all, x_all[0]):
+        raise ValueError("Linear fit cannot be computed when all x values are identical.")
+    slope, intercept = np.polyfit(x_all, y_all, 1)
+    x_line = np.linspace(float(np.min(x_all)), float(np.max(x_all)), 120, dtype=float)
+    y_line = slope * x_line + intercept
+    return x_line, y_line, f"fit: y = {slope:.3g}x + {intercept:.3g}"
+
+
+def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    rendered = _render_curve_like_plot(
+        filename=f"{input_path.stem}_scatter_with_fit.pdf",
+        template="scatter_with_fit",
+        series_list=series_list,
+        options=options,
+        show_markers=False,
+        scatter=True,
+        base_kwargs={"axis_mode": axis_mode},
+    )
+    ax = rendered.figure.axes[0]
+    x_line, y_line, fit_label = _fit_line_xy(series_list)
+    stroke = plot_style.current_stroke()
+    ax.plot(
+        x_line,
+        y_line,
+        color="black",
+        linewidth=max(0.8, stroke.line_width_pt * 0.95),
+        alpha=min(0.9, stroke.line_alpha),
+        linestyle="--",
+        label=fit_label,
+        zorder=3.2,
+    )
+    if ax.get_legend() is None:
+        ax.legend(loc="best", frameon=False)
+    rendered = _rendered_plot_with_qa(
+        filename=rendered.filename,
+        figure=rendered.figure,
+        template="scatter_with_fit",
+        options=options,
+        autofixes_applied=(
+            tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
+        )
+        + ("deterministic_linear_fit_overlay",),
+    )
+    return [rendered]
+
+
+def _render_replicate_curves_with_band(
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+) -> list[RenderedPlot]:
+    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        raise ValueError("replicate_curves_with_band is not supported for rheology export bundles.")
+
+    series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    rendered = _render_curve_like_plot(
+        filename=f"{input_path.stem}_replicate_curves_with_band.pdf",
+        template="replicate_curves_with_band",
+        series_list=series_list,
+        options=options,
+        show_markers=False,
+        base_kwargs={"axis_mode": axis_mode},
+    )
+    ax = rendered.figure.axes[0]
+    x_band, mean_band, std_band = aligned_replicate_band(series_list)
+    color = plot_style.get_categorical_palette(n_colors=1)[0]
+    lower = mean_band - std_band
+    upper = mean_band + std_band
+    ax.fill_between(
+        x_band,
+        lower,
+        upper,
+        color=color,
+        alpha=min(0.22, plot_style.current_stroke().max_fill_alpha),
+        linewidth=0.0,
+        zorder=2.0,
+        label="mean ±1σ band",
+    )
+    ax.plot(
+        x_band,
+        mean_band,
+        color=color,
+        linewidth=max(1.0, plot_style.current_stroke().line_width_pt),
+        linestyle="-",
+        zorder=3.6,
+        label="mean curve",
+    )
+    if ax.get_legend() is None:
+        ax.legend(loc="best", frameon=False)
+    rendered = _rendered_plot_with_qa(
+        filename=rendered.filename,
+        figure=rendered.figure,
+        template="replicate_curves_with_band",
+        options=options,
+        autofixes_applied=(
+            tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
+        )
+        + ("replicate_mean_band_overlay",),
+    )
+    return [rendered]
 
 
 def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
@@ -982,16 +1294,80 @@ def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) 
     ]
 
 
+def _render_annotated_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    table = load_heatmap_table_cached(input_path, sheet)
+    layout = _heatmap_editorial_layout()
+    fig, ax = plot_heatmap(
+        table,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        show_colorbar=options.show_colorbar,
+        palette_preset=options.palette_preset,
+        colorbar_layout={
+            "colorbar_x_offset_fraction": layout.colorbar_x_offset_fraction,
+            "colorbar_width_fraction": layout.colorbar_width_fraction,
+            "colorbar_y_offset_fraction": layout.colorbar_y_offset_fraction,
+            "colorbar_height_fraction": layout.colorbar_height_fraction,
+        },
+        colorbar_tick_count=layout.colorbar_tick_count,
+        colorbar_label_gap_pt=layout.label_gap_pt,
+    )
+    matrix = table.data.pivot(index="y", columns="x", values="z")
+    row_labels = list(matrix.index.tolist())
+    col_labels = list(matrix.columns.tolist())
+    values = matrix.to_numpy(dtype=float)
+    if values.size:
+        finite = values[np.isfinite(values)]
+        mid = float(np.median(finite)) if finite.size else 0.0
+    else:
+        mid = 0.0
+    for y_idx, _ in enumerate(row_labels):
+        for x_idx, _ in enumerate(col_labels):
+            value = values[y_idx, x_idx]
+            if not np.isfinite(value):
+                continue
+            ax.text(
+                x_idx + 0.5,
+                y_idx + 0.5,
+                f"{value:.3g}",
+                ha="center",
+                va="center",
+                fontsize=5.2,
+                color="white" if value >= mid else "black",
+                zorder=4.2,
+            )
+    ax.set_xlabel(_format_axis_label(table.x_label, table.x_unit))
+    ax.set_ylabel(_format_axis_label(table.y_label, table.y_unit))
+    autofixes = ["annotated_heatmap_labels"]
+    if options.show_colorbar:
+        autofixes.append("heatmap_colorbar_tuned")
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{input_path.stem}_annotated_heatmap.pdf",
+            figure=fig,
+            template="annotated_heatmap",
+            options=options,
+            autofixes_applied=tuple(autofixes),
+        )
+    ]
+
+
 TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "curve": TemplateRenderer(render=_render_curve),
     "point_line": TemplateRenderer(render=_render_point_line),
+    "replicate_curves_with_band": TemplateRenderer(render=_render_replicate_curves_with_band),
     "stacked_curve": TemplateRenderer(render=_render_stacked_curve),
     "segmented_stacked_curve": TemplateRenderer(render=_render_segmented_stacked_curve),
     "bar": TemplateRenderer(render=_render_bar),
     "box": TemplateRenderer(render=_render_box),
     "violin": TemplateRenderer(render=_render_violin),
+    "grouped_bar_compare": TemplateRenderer(render=_render_grouped_bar_compare),
+    "distribution_compare": TemplateRenderer(render=_render_distribution_compare),
+    "histogram_density": TemplateRenderer(render=_render_histogram_density),
     "scatter": TemplateRenderer(render=_render_scatter),
+    "scatter_with_fit": TemplateRenderer(render=_render_scatter_with_fit),
     "heatmap": TemplateRenderer(render=_render_heatmap),
+    "annotated_heatmap": TemplateRenderer(render=_render_annotated_heatmap),
 }
 
 
@@ -1027,6 +1403,7 @@ def build_rendered_plots(
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
+    visual_theme_id: str | None = None,
 ) -> list[RenderedPlot]:
     validated_template = validate_template_name(template)
     options = resolve_render_options(
@@ -1040,8 +1417,14 @@ def build_rendered_plots(
         style_preset=style_preset,
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
+        visual_theme_id=visual_theme_id,
     )
-    plot_style.apply_style(options.style_preset, options.palette_preset)
+    style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
+    plot_style.apply_style(
+        style_bundle.publication_profile_id,
+        options.palette_preset,
+        soft_overrides=style_bundle.resolved_soft or visual_theme_soft_overrides(options.visual_theme_id),
+    )
     renderer = TEMPLATE_RENDERERS[validated_template]
     return renderer.render(input_path, sheet, options)
 
@@ -1061,6 +1444,7 @@ def render_template(
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
+    visual_theme_id: str | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
         template,
@@ -1075,6 +1459,7 @@ def render_template(
         style_preset=style_preset,
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
+        visual_theme_id=visual_theme_id,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
 

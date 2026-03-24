@@ -3,8 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
+
+if TYPE_CHECKING:
+    from src.rendering.recommender_models import TemplateRecommendation
 
 TemplateName = str
 OutputMode = str
@@ -23,6 +27,7 @@ class RenderOptions:
     style_preset: str
     palette_preset: str
     use_sidecar: bool | None = None
+    visual_theme_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +104,7 @@ class InputInspection:
     model: str
     model_label: str
     recommendation: Recommendation
+    recommendations: tuple[TemplateRecommendation, ...] = ()
     warnings: tuple[str, ...] = ()
     signals: tuple[str, ...] = ()
 

@@ -15,6 +15,7 @@ describe("extractWizardProject", () => {
           size: "60x55",
           reverse_x: true,
           style_preset: "nature",
+          visual_theme_id: "soft_grid",
         },
         outputs: ["/tmp/demo_curve.pdf"],
       },
@@ -24,6 +25,7 @@ describe("extractWizardProject", () => {
     expect(project.wizard.sheet).toBe("Summary");
     expect(project.wizard.options.reverse_x).toBe(true);
     expect(project.wizard.options.style_preset).toBe("nature");
+    expect(project.wizard.options.visual_theme_id).toBe("soft_grid");
     expect(project.wizard.outputs).toEqual(["/tmp/demo_curve.pdf"]);
   });
 

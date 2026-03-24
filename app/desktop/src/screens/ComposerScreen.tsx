@@ -1184,7 +1184,6 @@ export function ComposerScreen() {
 
       <aside className="composer-v2-right">
         <InspectorPanel
-          extra={<span className={`status-pill ${hasSelection ? "good" : "warn"}`}>{hasSelection ? "Selection active" : "No selection"}</span>}
           kicker="Inspect"
           title="Properties and layout"
         >

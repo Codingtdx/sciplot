@@ -165,7 +165,10 @@ def _replicate_blank_workbook() -> dict[str, pd.DataFrame]:
             "Paste replicate values under each group column from row 4 onward.",
             "Keep A1 as the shared y-axis label, row 2 as group names, and row 3 as units.",
             "Add more groups by appending columns.",
-            "This blank template is inspect-ready for bar, box, and violin families.",
+            (
+                "This blank template is inspect-ready for bar, box, violin, and "
+                "replicate-distribution comparison families."
+            ),
         ],
     )
 
@@ -330,7 +333,15 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         id="curve_table",
         label="Curve Table",
         input_model="curve_table",
-        typical_families=("curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"),
+        typical_families=(
+            "curve",
+            "point_line",
+            "replicate_curves_with_band",
+            "stacked_curve",
+            "segmented_stacked_curve",
+            "scatter",
+            "scatter_with_fit",
+        ),
         format_summary="Rows 1 to 3 define labels, units, and sample names; row 4 onward stores numeric X/Y pairs.",
         build_example=_curve_example_workbook,
         build_blank=_curve_blank_workbook,
@@ -339,7 +350,15 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         id="tensile_curve",
         label="Tensile Curve",
         input_model="tensile_curve",
-        typical_families=("curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"),
+        typical_families=(
+            "curve",
+            "point_line",
+            "replicate_curves_with_band",
+            "stacked_curve",
+            "segmented_stacked_curve",
+            "scatter",
+            "scatter_with_fit",
+        ),
         format_summary=(
             "Rows 1 to 3 define tensile Strain/Stress headers; row 4 onward stores "
             "numeric stress-strain pairs."
@@ -351,7 +370,14 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         id="replicate_table",
         label="Replicate Table",
         input_model="replicate_table",
-        typical_families=("bar", "box", "violin"),
+        typical_families=(
+            "distribution_compare",
+            "grouped_bar_compare",
+            "histogram_density",
+            "box",
+            "violin",
+            "bar",
+        ),
         format_summary=(
             "Cell A1 stores the shared value label, row 2 groups, row 3 units, "
             "and row 4 onward replicate values."
@@ -363,7 +389,7 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         id="heatmap_table",
         label="Heatmap Table",
         input_model="heatmap_table",
-        typical_families=("heatmap",),
+        typical_families=("heatmap", "annotated_heatmap"),
         format_summary="Row 1 must stay X/Y/Z, row 2 labels, row 3 units, and row 4 onward long-form XYZ rows.",
         build_example=_heatmap_example_workbook,
         build_blank=_heatmap_blank_workbook,
