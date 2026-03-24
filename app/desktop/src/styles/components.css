@@ -173,17 +173,10 @@
   color: var(--text-muted);
 }
 
-.hero-actions,
-.step-actions,
-.canvas-toolbar,
 .stacked-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.hero-actions {
-  margin-top: 4px;
 }
 
 .step-block,
@@ -197,7 +190,6 @@
 .stat-tile,
 .preview-surface,
 .composer-drop-card,
-.composer-empty-state,
 .field,
 .mode-switch,
 .layer-item {
@@ -221,8 +213,7 @@
 .focus-panel span,
 .hint-text,
 .placeholder-card,
-.composer-drop-card span,
-.composer-empty-state span {
+.composer-drop-card span {
   color: var(--text-secondary);
   line-height: 1.35;
 }

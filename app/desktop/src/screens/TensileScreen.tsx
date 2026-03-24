@@ -24,6 +24,12 @@ import {
   templateLabel,
   toDialogPaths,
 } from "../lib/workbench";
+import {
+  CompactListRow,
+  CompactToolbar,
+  InspectorPanel,
+  SectionHeader,
+} from "../components/workbench/V2Primitives";
 
 export function TensileScreen({
   meta,
@@ -49,26 +55,35 @@ export function TensileScreen({
   const rememberProject = useWorkbenchStore((state) => state.rememberProject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rawCsvQueue, setRawCsvQueue] = useState<string[]>([]);
 
   const compareSourceCount = tensile.comparisonSources.length;
+  const canPrepareWorkbook = rawCsvQueue.length > 0 && !busy;
   const canExportComparison = compareSourceCount >= 2 && !busy;
   const latestPreprocessResult = tensile.preprocessResult;
   const latestComparisonResult = tensile.comparisonResult;
+  const handoffTarget =
+    latestPreprocessResult?.output_path ??
+    tensile.comparisonSources[0]?.workbook_path ??
+    wizard.inputPath;
   const statusChip = useMemo(() => {
     if (busy) {
-      return { label: "Processing", tone: "accent" };
+      return { label: "Processing", tone: "accent" as const };
     }
     if (error) {
-      return { label: "Needs attention", tone: "warn" };
+      return { label: "Needs attention", tone: "warn" as const };
     }
     if (tensile.comparisonResult) {
-      return { label: "Comparison exported", tone: "good" };
+      return { label: "Comparison exported", tone: "good" as const };
     }
     if (tensile.preprocessResult) {
-      return { label: "Workbook prepared", tone: "accent" };
+      return { label: "Workbook prepared", tone: "accent" as const };
     }
-    return { label: "Waiting for input", tone: "warn" };
-  }, [busy, error, tensile.comparisonResult, tensile.preprocessResult]);
+    if (rawCsvQueue.length > 0) {
+      return { label: "Queue ready", tone: "accent" as const };
+    }
+    return { label: "Waiting for input", tone: "warn" as const };
+  }, [busy, error, rawCsvQueue.length, tensile.comparisonResult, tensile.preprocessResult]);
 
   const showDialogError = (cause: unknown) => {
     setError(getErrorMessage(cause));
@@ -109,29 +124,34 @@ export function TensileScreen({
     }
   };
 
-  const runTensilePreprocess = async () => {
-    let filePaths: string[] = [];
+  const importRawCsvs = async () => {
     setError(null);
     try {
       const selected = await openDialog({
         multiple: true,
         filters: [{ name: "Tensile CSV", extensions: ["csv", "CSV"] }],
       });
-      filePaths = toDialogPaths(selected);
+      const filePaths = toDialogPaths(selected);
+      if (filePaths.length === 0) {
+        return;
+      }
+      setRawCsvQueue(filePaths);
     } catch (cause) {
       showDialogError(cause);
-      return;
     }
-    if (filePaths.length === 0) {
-      return;
-    }
+  };
 
-    const inferredGroupName = inferTensileGroupName(filePaths);
+  const prepareQueuedCsvs = async () => {
+    if (rawCsvQueue.length === 0) {
+      return;
+    }
+    const inferredGroupName = inferTensileGroupName(rawCsvQueue);
     let destination: string | null = null;
+    setError(null);
     try {
       destination = await saveDialog({
         defaultPath: defaultSiblingPath(
-          filePaths[0],
+          rawCsvQueue[0],
           `${inferredGroupName}_plot_wizard_template.xlsx`,
         ),
         filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
@@ -147,7 +167,7 @@ export function TensileScreen({
     tensile.setPreprocessResult(null);
     setBusy(true);
     try {
-      const result = await preprocessTensileReplicates(filePaths, destination, inferredGroupName);
+      const result = await preprocessTensileReplicates(rawCsvQueue, destination, inferredGroupName);
       tensile.setPreprocessResult(result);
       tensile.addComparisonSource(tensileComparisonSourceFromPreprocess(result));
       rememberProject({
@@ -157,6 +177,7 @@ export function TensileScreen({
         title: formatLeaf(result.output_path),
         detail: `Tensile prep · ${result.sample_count} replicates · Prepared workbook`,
       });
+      setRawCsvQueue([]);
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
@@ -164,7 +185,7 @@ export function TensileScreen({
     }
   };
 
-  const addTensileComparisonWorkbooks = async () => {
+  const addPreparedWorkbooks = async () => {
     let workbookPaths: string[] = [];
     setError(null);
     try {
@@ -242,20 +263,64 @@ export function TensileScreen({
     }
   };
 
+  const nextActionText = (() => {
+    if (rawCsvQueue.length > 0) {
+      return "Prepare queued CSV files into one workbook.";
+    }
+    if (compareSourceCount >= 2) {
+      return "Export comparison set for the queued workbooks.";
+    }
+    if (latestPreprocessResult) {
+      return "Open the prepared workbook in Plot or add more prepared workbooks.";
+    }
+    return "Import raw tensile CSV files to start a prep queue.";
+  })();
+
   return (
-    <div className="desk-layout tensile-layout">
-      <section className="desk-main">
-        <article className="work-card section-card tensile-command-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Tensile</div>
-              <h2>Prepare or compare tensile workbooks</h2>
-            </div>
-            <div className="wizard-inline-chips">
-              <span className="signal-tag">{compareSourceCount} source(s)</span>
-              <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
-            </div>
-          </div>
+    <div className="tensile-v2-layout">
+      <section className="tensile-v2-main">
+        <section className="work-card section-card tensile-v2-topbar">
+          <SectionHeader
+            actions={<span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>}
+            kicker="Tensile"
+            title="Queue-oriented prep workbench"
+            description="Prepare workbook inputs and export comparison bundles."
+          />
+
+          <CompactToolbar label="Tensile action bar">
+            <button
+              className="ghost-button"
+              disabled={busy}
+              onClick={() => void importRawCsvs()}
+              type="button"
+            >
+              Import CSVs
+            </button>
+            <button
+              className="primary-button"
+              disabled={!canPrepareWorkbook}
+              onClick={() => void prepareQueuedCsvs()}
+              type="button"
+            >
+              Prepare workbook
+            </button>
+            <button
+              className="ghost-button"
+              disabled={busy}
+              onClick={() => void addPreparedWorkbooks()}
+              type="button"
+            >
+              Add prepared workbook
+            </button>
+            <button
+              className="primary-button"
+              disabled={!canExportComparison}
+              onClick={() => void runTensileComparisonExport()}
+              type="button"
+            >
+              Export comparison set
+            </button>
+          </CompactToolbar>
 
           {error && <div className="error-card">{error}</div>}
           {!wizard.sidecarReady && (
@@ -263,130 +328,91 @@ export function TensileScreen({
               The Python sidecar is offline. Prepare, inspect, and compare actions resume once it reconnects.
             </div>
           )}
+        </section>
 
-          <div className="tensile-task-grid">
-            <article className="focus-panel tensile-task-card">
-              <span>Prepare raw CSV</span>
-              <strong>Generate one workbook from replicate CSV files.</strong>
-              <span>Build a clean workbook before opening it in Plot.</span>
-              <div className="step-actions">
-                <button
-                  className="primary-button"
-                  disabled={busy}
-                  onClick={() => void runTensilePreprocess()}
-                  type="button"
-                >
-                  Prepare CSVs
-                </button>
-                {latestPreprocessResult && (
-                  <button
-                    className="ghost-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void openWorkbookInPlotting(
-                        latestPreprocessResult.output_path,
-                        latestPreprocessResult.preferred_sheet,
-                      )
-                    }
-                    type="button"
-                  >
-                    Open latest in Plot
-                  </button>
-                )}
-              </div>
-            </article>
-
-            <article className="focus-panel tensile-task-card">
-              <span>Compare workbooks</span>
-              <strong>Queue prepared workbooks and export the comparison set.</strong>
-              <span>Export unlocks when at least two sources are queued.</span>
-              <div className="step-actions">
-                <button
-                  className="primary-button"
-                  disabled={busy}
-                  onClick={() => void addTensileComparisonWorkbooks()}
-                  type="button"
-                >
-                  Add workbooks
-                </button>
-              </div>
-            </article>
-          </div>
-        </article>
-
-        {latestPreprocessResult ? (
-          <article className="work-card section-card">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Prepared Workbook</div>
-                <h3>Latest output</h3>
-              </div>
-              <span className="signal-tag">{latestPreprocessResult.sample_count} replicates</span>
-            </div>
-
-            <div className="wizard-section-stack">
-              <div className="success-card">
-                Prepared {latestPreprocessResult.sample_count} samples from{" "}
-                {latestPreprocessResult.representative_filename}.
-              </div>
-              <div className="summary-grid wizard-tight-grid">
-                <div className="stat-tile">
-                  <span>Workbook</span>
-                  <strong>{formatLeaf(latestPreprocessResult.output_path)}</strong>
-                </div>
-                <div className="stat-tile">
-                  <span>Preferred sheet</span>
-                  <strong>{latestPreprocessResult.preferred_sheet}</strong>
-                </div>
-                {latestPreprocessResult.metrics.map((metric) => (
-                  <div className="stat-tile" key={metric.label}>
-                    <span>{metric.label}</span>
-                    <strong>
-                      {formatMetricValue(metric.mean)} ± {formatMetricValue(metric.std)} {metric.unit}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-              {latestPreprocessResult.warnings.length > 0 && (
-                <details className="wizard-details">
-                  <summary>Skipped files</summary>
-                  <ul className="bullet-list">
-                    {latestPreprocessResult.warnings.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          </article>
-        ) : (
-          <article className="work-card section-card">
-            <div className="placeholder-card">Select raw CSV files to generate one prepared workbook.</div>
-          </article>
-        )}
-
-        <section className="work-card section-card wizard-pane">
-          <div className="wizard-section-stack">
-            <div className="panel-heading">
-              <div>
-                <div className="card-kicker">Queue</div>
-                <h3>Compare workbooks</h3>
-              </div>
-            </div>
-
-            <div className="focus-panel">
-              <strong>{compareSourceCount} source(s) queued</strong>
-              <span>Export unlocks at two sources.</span>
-            </div>
-
-            <div className="step-actions">
+        <div className="tensile-v2-queues">
+          <section className="work-card section-card tensile-v2-queue">
+            <SectionHeader
+              kicker="Sources"
+              title="Raw CSV queue"
+              description={`${rawCsvQueue.length} file(s) queued for preprocessing`}
+            />
+            <CompactToolbar label="Raw queue actions">
+              <button className="ghost-button" disabled={busy} onClick={() => setRawCsvQueue([])} type="button">
+                Clear queue
+              </button>
               <button
                 className="ghost-button"
-                disabled={busy}
-                onClick={() => void addTensileComparisonWorkbooks()}
+                disabled={!canPrepareWorkbook}
+                onClick={() => void prepareQueuedCsvs()}
                 type="button"
               >
-                Add workbooks
+                Run prepare
+              </button>
+            </CompactToolbar>
+            {rawCsvQueue.length === 0 ? (
+              <div className="placeholder-card">No raw CSV files queued.</div>
+            ) : (
+              <div className="launchpad-v2-list">
+                {rawCsvQueue.map((path) => (
+                  <CompactListRow
+                    key={path}
+                    onSelect={() => setRawCsvQueue((current) => current.filter((item) => item !== path))}
+                    right={<span className="signal-tag">Remove</span>}
+                    subtitle={path}
+                    title={formatLeaf(path)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {latestPreprocessResult && (
+              <details className="wizard-details">
+                <summary>Latest prepared workbook</summary>
+                <div className="wizard-section-stack">
+                  <div className="context-list">
+                    <div className="context-row">
+                      <span>Workbook</span>
+                      <strong>{formatLeaf(latestPreprocessResult.output_path)}</strong>
+                    </div>
+                    <div className="context-row">
+                      <span>Preferred sheet</span>
+                      <strong>{latestPreprocessResult.preferred_sheet}</strong>
+                    </div>
+                    <div className="context-row">
+                      <span>Samples</span>
+                      <strong>{latestPreprocessResult.sample_count}</strong>
+                    </div>
+                  </div>
+                  <CompactToolbar label="Prepared workbook actions">
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void openWorkbookInPlotting(
+                          latestPreprocessResult.output_path,
+                          latestPreprocessResult.preferred_sheet,
+                        )
+                      }
+                      type="button"
+                    >
+                      Open latest in Plot
+                    </button>
+                  </CompactToolbar>
+                </div>
+              </details>
+            )}
+          </section>
+
+          <section className="work-card section-card tensile-v2-queue">
+            <SectionHeader
+              kicker="Prepared queue"
+              title="Workbook comparison queue"
+              description={`${compareSourceCount} source(s) queued`}
+            />
+            <CompactToolbar label="Prepared queue actions">
+              <button className="ghost-button" disabled={busy} onClick={() => void addPreparedWorkbooks()} type="button">
+                Add prepared workbook
               </button>
               <button
                 className="ghost-button"
@@ -396,6 +422,163 @@ export function TensileScreen({
               >
                 Clear queue
               </button>
+            </CompactToolbar>
+
+            {compareSourceCount === 0 ? (
+              <div className="placeholder-card">Queue at least two prepared workbooks to export.</div>
+            ) : (
+              <div className="launchpad-v2-list">
+                {tensile.comparisonSources.map((source, index) => (
+                  <article className="tensile-v2-queue-row" key={source.workbook_path}>
+                    <CompactListRow
+                      right={<span className="signal-tag">{source.sample_count} replicates</span>}
+                      subtitle={source.workbook_path}
+                      title={source.label}
+                    />
+                    <CompactToolbar label={`Queue actions for ${source.label}`}>
+                      <button
+                        className="ghost-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void openWorkbookInPlotting(
+                            source.workbook_path,
+                            source.sheet_names.includes("Representative_Curve")
+                              ? "Representative_Curve"
+                              : (source.sheet_names[0] ?? 0),
+                          )
+                        }
+                        type="button"
+                      >
+                        Open in Plot
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={busy || index === 0}
+                        onClick={() => tensile.moveComparisonSource(source.workbook_path, -1)}
+                        type="button"
+                      >
+                        Move up
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={busy || index === compareSourceCount - 1}
+                        onClick={() => tensile.moveComparisonSource(source.workbook_path, 1)}
+                        type="button"
+                      >
+                        Move down
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={busy}
+                        onClick={() => tensile.removeComparisonSource(source.workbook_path)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </CompactToolbar>
+                    <div className="summary-grid wizard-tight-grid">
+                      {source.metrics.map((metric) => (
+                        <div className="stat-tile" key={`${source.workbook_path}:${metric.label}`}>
+                          <span>{metric.label}</span>
+                          <strong>
+                            {formatMetricValue(metric.mean)} ± {formatMetricValue(metric.std)} {metric.unit}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {latestComparisonResult && (
+              <details className="wizard-details">
+                <summary>Latest comparison export</summary>
+                <div className="wizard-section-stack">
+                  <div className="context-list">
+                    <div className="context-row">
+                      <span>Bundle folder</span>
+                      <strong>{formatLeaf(latestComparisonResult.bundle_dir)}</strong>
+                    </div>
+                    <div className="context-row">
+                      <span>Summary workbook</span>
+                      <strong>{formatLeaf(latestComparisonResult.comparison_workbook_path)}</strong>
+                    </div>
+                    <div className="context-row">
+                      <span>Outputs</span>
+                      <strong>{latestComparisonResult.outputs.length}</strong>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
+          </section>
+        </div>
+      </section>
+
+      <aside className="tensile-v2-inspector">
+        <InspectorPanel
+          extra={<span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>}
+          kicker="Session"
+          title="Current tensile session"
+        >
+          <div className="context-list">
+            <div className="context-row">
+              <span>Queued CSV files</span>
+              <strong>{rawCsvQueue.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>Queued workbooks</span>
+              <strong>{compareSourceCount}</strong>
+            </div>
+            <div className="context-row">
+              <span>Comparison outputs</span>
+              <strong>{latestComparisonResult?.outputs.length ?? 0}</strong>
+            </div>
+            <div className="context-row">
+              <span>Handoff target</span>
+              <strong>{handoffTarget ? formatLeaf(handoffTarget) : "Idle"}</strong>
+            </div>
+          </div>
+        </InspectorPanel>
+
+        <InspectorPanel kicker="Next action" title="Suggested next operation">
+          <div className="focus-panel">
+            <strong>{nextActionText}</strong>
+            <span>Backward navigation and Plot handoff preserve current state.</span>
+          </div>
+          <CompactToolbar label="Next action shortcuts">
+            {rawCsvQueue.length > 0 && (
+              <button
+                className="primary-button"
+                disabled={!canPrepareWorkbook}
+                onClick={() => void prepareQueuedCsvs()}
+                type="button"
+              >
+                Prepare workbook
+              </button>
+            )}
+            {rawCsvQueue.length === 0 && !latestPreprocessResult && (
+              <button className="primary-button" disabled={busy} onClick={() => void importRawCsvs()} type="button">
+                Import CSVs
+              </button>
+            )}
+            {latestPreprocessResult && (
+              <button
+                className="ghost-button"
+                disabled={busy}
+                onClick={() =>
+                  void openWorkbookInPlotting(
+                    latestPreprocessResult.output_path,
+                    latestPreprocessResult.preferred_sheet,
+                  )
+                }
+                type="button"
+              >
+                Continue in Plot
+              </button>
+            )}
+            {compareSourceCount >= 2 && (
               <button
                 className="primary-button"
                 disabled={!canExportComparison}
@@ -404,198 +587,9 @@ export function TensileScreen({
               >
                 Export comparison set
               </button>
-            </div>
-
-            {compareSourceCount === 0 ? (
-              <div className="placeholder-card">Queue at least two workbooks to export.</div>
-            ) : (
-              <div className="wizard-compare-list">
-                {tensile.comparisonSources.map((source, index) => (
-                  <details className="wizard-compare-item" key={source.workbook_path}>
-                    <summary className="wizard-compare-head">
-                      <div>
-                        <strong>{source.label}</strong>
-                        <span>
-                          {formatLeaf(source.workbook_path)} · {source.sample_count} replicates
-                        </span>
-                      </div>
-                    </summary>
-
-                    <div className="wizard-section-stack">
-                      <div className="step-actions">
-                        <button
-                          className="ghost-button"
-                          disabled={busy}
-                          onClick={() =>
-                            void openWorkbookInPlotting(
-                              source.workbook_path,
-                              source.sheet_names.includes("Representative_Curve")
-                                ? "Representative_Curve"
-                                : (source.sheet_names[0] ?? 0),
-                            )
-                          }
-                          type="button"
-                        >
-                          Open in Plot
-                        </button>
-                        <button
-                          className="ghost-button"
-                          disabled={busy || index === 0}
-                          onClick={() => tensile.moveComparisonSource(source.workbook_path, -1)}
-                          type="button"
-                        >
-                          Move up
-                        </button>
-                        <button
-                          className="ghost-button"
-                          disabled={busy || index === compareSourceCount - 1}
-                          onClick={() => tensile.moveComparisonSource(source.workbook_path, 1)}
-                          type="button"
-                        >
-                          Move down
-                        </button>
-                        <button
-                          className="ghost-button"
-                          disabled={busy}
-                          onClick={() => tensile.removeComparisonSource(source.workbook_path)}
-                          type="button"
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      <div className="summary-grid wizard-tight-grid">
-                        {source.metrics.map((metric) => (
-                          <div
-                            className="stat-tile"
-                            key={`${source.workbook_path}:${metric.label}`}
-                          >
-                            <span>{metric.label}</span>
-                            <strong>
-                              {formatMetricValue(metric.mean)} ± {formatMetricValue(metric.std)}{" "}
-                              {metric.unit}
-                            </strong>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </details>
-                ))}
-              </div>
             )}
-
-            {latestComparisonResult && (
-              <details className="wizard-details">
-                <summary>Latest comparison export</summary>
-                <div className="wizard-callout-stack">
-                  <div className="success-card">
-                    Exported {latestComparisonResult.outputs.length} outputs for{" "}
-                    {latestComparisonResult.labels.length} sources.
-                  </div>
-                  <div className="summary-grid wizard-tight-grid">
-                    <div className="stat-tile">
-                      <span>Bundle folder</span>
-                      <strong>{formatLeaf(latestComparisonResult.bundle_dir)}</strong>
-                    </div>
-                    <div className="stat-tile">
-                      <span>Summary workbook</span>
-                      <strong>{formatLeaf(latestComparisonResult.comparison_workbook_path)}</strong>
-                    </div>
-                    <div className="stat-tile">
-                      <span>Sources</span>
-                      <strong>{latestComparisonResult.labels.length}</strong>
-                    </div>
-                    <div className="stat-tile">
-                      <span>Outputs</span>
-                      <strong>{latestComparisonResult.outputs.length}</strong>
-                    </div>
-                  </div>
-                  <details className="wizard-details">
-                    <summary>Output files</summary>
-                    <ul className="output-list">
-                      {latestComparisonResult.outputs.map((item) => (
-                        <li key={item}>{formatLeaf(item)}</li>
-                      ))}
-                    </ul>
-                  </details>
-                </div>
-              </details>
-            )}
-          </div>
-        </section>
-      </section>
-
-      <aside className="desk-context tensile-context">
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Status</div>
-              <h3>Current tensile session</h3>
-            </div>
-            <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
-          </div>
-
-          <div className="context-list">
-            <div className="context-row">
-              <span>Prepared workbook</span>
-              <strong>
-                {latestPreprocessResult ? formatLeaf(latestPreprocessResult.output_path) : "Not prepared"}
-              </strong>
-            </div>
-            <div className="context-row">
-              <span>Queued sources</span>
-              <strong>{compareSourceCount}</strong>
-            </div>
-            <div className="context-row">
-              <span>Comparison outputs</span>
-              <strong>{latestComparisonResult?.outputs.length ?? 0}</strong>
-            </div>
-            <div className="context-row">
-              <span>Plot handoff</span>
-              <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Idle"}</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Next Step</div>
-              <h3>Move a prepared workbook into Plot</h3>
-            </div>
-          </div>
-
-          {latestPreprocessResult ? (
-            <div className="wizard-section-stack">
-              <div className="focus-panel">
-                <strong>{formatLeaf(latestPreprocessResult.output_path)}</strong>
-                <span>
-                  Use the preferred sheet to continue with inspect, preflight, preview, and export in
-                  Plot.
-                </span>
-              </div>
-              <div className="step-actions">
-                <button
-                  className="primary-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void openWorkbookInPlotting(
-                      latestPreprocessResult.output_path,
-                      latestPreprocessResult.preferred_sheet,
-                    )
-                  }
-                  type="button"
-                >
-                  Continue in Plot
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="placeholder-card">
-              Prepare one workbook first, then continue in Plot only when you choose to.
-            </div>
-          )}
-        </article>
+          </CompactToolbar>
+        </InspectorPanel>
       </aside>
     </div>
   );

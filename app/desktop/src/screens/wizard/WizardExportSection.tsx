@@ -4,6 +4,7 @@ import type {
   RequestActivity,
   SubmissionReport,
 } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { formatLeaf } from "../../lib/workbench";
 
 type Props = {
@@ -156,7 +157,7 @@ export function WizardExportSection({
             </div>
           )}
 
-          <div className="step-actions">
+          <CompactToolbar label="Review export actions">
             <button
               className="primary-button"
               disabled={!canExport}
@@ -170,7 +171,7 @@ export function WizardExportSection({
                 Open output folder
               </button>
             )}
-          </div>
+          </CompactToolbar>
 
           <details className="wizard-details">
             <summary>{hasExportedOutputs ? "Output files" : "Expected files"}</summary>

@@ -1,25 +1,19 @@
 import type { ReactNode } from "react";
 
 import { PreviewPane } from "../../components/PreviewPane";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import type {
   PreviewItem,
   TemplateName,
   WorkbenchMeta,
 } from "../../lib/types";
-import { formatLeaf, templateLabel } from "../../lib/workbench";
-
-type SummaryRow = {
-  label: string;
-  value: string;
-};
+import { templateLabel } from "../../lib/workbench";
 
 type Props = {
-  inputPath: string;
   sheetNamesLength: number;
   template: TemplateName | null;
   hasTemplate: boolean;
   meta: WorkbenchMeta | null;
-  summaryRows: SummaryRow[];
   previewBusy: boolean;
   previewError: string | null;
   previewIndex: number;
@@ -30,12 +24,10 @@ type Props = {
 };
 
 export function WizardStudioStage({
-  inputPath,
   sheetNamesLength,
   template,
   hasTemplate,
   meta,
-  summaryRows,
   previewBusy,
   previewError,
   previewIndex,
@@ -45,38 +37,25 @@ export function WizardStudioStage({
   railContent,
 }: Props) {
   return (
-    <div className="plot-stage-grid plot-studio-grid">
-      <section className="plot-preview-column plot-studio-preview">
-        <section className="context-card plot-summary-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">File</div>
-              <h3>{formatLeaf(inputPath)}</h3>
-            </div>
-            <div className="wizard-inline-chips">
-              {hasTemplate && (
-                <span className="signal-tag">{templateLabel(meta, template)}</span>
-              )}
-            </div>
+    <div className="plot-studio-v2">
+      <section className="plot-studio-controls work-card">
+        <div className="panel-heading">
+          <div>
+            <div className="card-kicker">Step Controls</div>
+            <h3>{hasTemplate ? templateLabel(meta, template) : "Template selection required"}</h3>
           </div>
+        </div>
+        {railContent}
+      </section>
 
-          <div className="summary-grid wizard-tight-grid">
-            {summaryRows.map((row) => (
-              <div className="stat-tile" key={row.label}>
-                <span>{row.label}</span>
-                <strong>{row.value}</strong>
-              </div>
-            ))}
-          </div>
-
+      <section className="plot-studio-preview-column">
+        <CompactToolbar label="Plot preview controls">
           {sheetNamesLength > 1 && (
-            <div className="hero-actions">
-              <button className="ghost-button" onClick={onChangeSheet} type="button">
-                Change sheet
-              </button>
-            </div>
+            <button className="ghost-button" onClick={onChangeSheet} type="button">
+              Change sheet
+            </button>
           )}
-        </section>
+        </CompactToolbar>
 
         {hasTemplate ? (
           <PreviewPane
@@ -99,8 +78,6 @@ export function WizardStudioStage({
           </section>
         )}
       </section>
-
-      <aside className="plot-stage-rail">{railContent}</aside>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type {
   RequestActivity,
   SubmissionReport,
 } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { WizardExportSection } from "./WizardExportSection";
 
 type Props = {
@@ -57,11 +58,11 @@ export function WizardStudioReviewRail({
         submissionReport={submissionReport}
       />
 
-      <div className="hero-actions">
+      <CompactToolbar label="Review stage actions">
         <button className="ghost-button" onClick={onBackToTune} type="button">
           Back to tune
         </button>
-      </div>
+      </CompactToolbar>
     </>
   );
 }

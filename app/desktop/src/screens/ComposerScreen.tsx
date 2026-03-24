@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { useShallow } from "zustand/react/shallow";
 
@@ -39,9 +39,13 @@ import {
   getErrorMessage,
   toDialogPaths,
 } from "../lib/workbench";
+import {
+  CompactToolbar,
+  InspectorPanel,
+  SegmentedControl,
+} from "../components/workbench/V2Primitives";
 import { ComposerCanvasSection } from "./composer/ComposerCanvasSection";
 import { ComposerInspectPanel } from "./composer/ComposerInspectPanel";
-import { ComposerInsertPanel } from "./composer/ComposerInsertPanel";
 import { ComposerLayersPanel } from "./composer/ComposerLayersPanel";
 import { useComposerKeyboardShortcuts } from "./composer/useComposerKeyboardShortcuts";
 import { useComposerPreview } from "./composer/useComposerPreview";
@@ -86,15 +90,14 @@ export function ComposerScreen() {
   const [dropActive, setDropActive] = useState(false);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [dropNoticeTone, setDropNoticeTone] = useState<"success" | "warning">("success");
-  const [inspectorTab, setInspectorTab] = useState<"insert" | "inspect" | "layers">("insert");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [leftPanelTab, setLeftPanelTab] = useState<"assets" | "objects" | "presets" | "pages">("assets");
+  const [canvasZoom, setCanvasZoom] = useState(100);
   const [selectedCells, setSelectedCells] = useState<CellRef[]>([]);
   const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
   const [clipboardReady, setClipboardReady] = useState(false);
   const projectRef = useRef(composer.project);
   const selectedRegionRef = useRef<string | null>(null);
   const clipboardRef = useRef<ComposerClipboard | null>(null);
-  const keepInspectorTabRef = useRef(false);
 
   const visiblePanels = useMemo(
     () => composer.project.panels.filter((panel) => !panel.hidden),
@@ -124,9 +127,6 @@ export function ComposerScreen() {
 
   const canCopySelection = hasSelection;
   const canPasteSelection = clipboardReady;
-  const selectionSignature = selectedRegion
-    ? `region:${selectedRegion.id}`
-    : selectedObjectIds.slice().sort().join("|");
   const cropValue = selectedPanel?.crop_rect ?? { x: 0, y: 0, width: 1, height: 1 };
   const selectedDrawableBinding = selectedPanel
     ? bindingValueForDrawable(selectedPanel)
@@ -138,20 +138,6 @@ export function ComposerScreen() {
     setDropNotice(message);
     setDropNoticeTone(tone);
   };
-
-  useEffect(() => {
-    if (!selectionSignature) {
-      keepInspectorTabRef.current = false;
-      return;
-    }
-    if (keepInspectorTabRef.current) {
-      keepInspectorTabRef.current = false;
-      return;
-    }
-    if (inspectorTab !== "inspect") {
-      setInspectorTab("inspect");
-    }
-  }, [selectionSignature]);
 
   const readDialogPaths = async (
     options: Parameters<typeof openDialog>[0],
@@ -885,7 +871,9 @@ export function ComposerScreen() {
     additive = false,
     source: "canvas" | "layers" | "other" = "other",
   ) => {
-    keepInspectorTabRef.current = source === "layers" && additive;
+    if (source === "layers") {
+      setLeftPanelTab("objects");
+    }
     if (id == null) {
       composer.setSelectedId(null);
       setSelectedCells([]);
@@ -917,7 +905,6 @@ export function ComposerScreen() {
   };
 
   const selectComposerObjects = (ids: string[], additive = false) => {
-    keepInspectorTabRef.current = false;
     const known = ids.filter(
       (id) =>
         composer.project.panels.some((item) => item.id === id) ||
@@ -955,6 +942,38 @@ export function ComposerScreen() {
     setProject(distributeDrawables(composer.project, selectedObjectIds, axis));
   };
 
+  const setAutoLabels = (checked: boolean) => {
+    composer.setProject({
+      ...composer.project,
+      auto_labels: checked,
+    });
+  };
+
+  const setNextZoom = (direction: "in" | "out") => {
+    const options = [75, 100, 125];
+    const currentIndex = options.indexOf(canvasZoom);
+    if (currentIndex < 0) {
+      setCanvasZoom(100);
+      return;
+    }
+    const nextIndex =
+      direction === "in"
+        ? Math.min(options.length - 1, currentIndex + 1)
+        : Math.max(0, currentIndex - 1);
+    setCanvasZoom(options[nextIndex]);
+  };
+
+  const focusRegionFrameTools = () => {
+    setLeftPanelTab("objects");
+    showComposerNotice(
+      "Select empty cells on canvas, then use Merge cells or Split region in the inspector.",
+    );
+  };
+
+  const focusArrangeTools = () => {
+    showComposerNotice("Use the Inspect panel Arrange section for align/distribute actions.");
+  };
+
   useComposerKeyboardShortcuts({
     canCopySelection,
     canPasteSelection,
@@ -975,13 +994,164 @@ export function ComposerScreen() {
   });
 
   return (
-    <div className="desk-layout composer-studio-layout">
-      <section className="desk-main">
+    <div className="composer-v2-layout">
+      <aside className="composer-v2-left">
+        <InspectorPanel kicker="Library" title="Assets · Objects · Presets · Pages">
+          <SegmentedControl<"assets" | "objects" | "presets" | "pages">
+            label="Composer left panel tabs"
+            onChange={(value) => setLeftPanelTab(value)}
+            options={[
+              { id: "assets", label: "Assets" },
+              { id: "objects", label: "Objects" },
+              { id: "presets", label: "Presets" },
+              { id: "pages", label: "Pages" },
+            ]}
+            value={leftPanelTab}
+          />
+        </InspectorPanel>
+
+        {leftPanelTab === "assets" && (
+          <InspectorPanel kicker="Assets" title="Import and place">
+            <div className="mode-switch">
+              <button
+                className={`mode-button ${pdfImportMode === "graph" ? "active" : ""}`}
+                onClick={() => setPdfImportMode("graph")}
+                type="button"
+              >
+                PDF as graph
+              </button>
+              <button
+                className={`mode-button ${pdfImportMode === "asset" ? "active" : ""}`}
+                onClick={() => setPdfImportMode("asset")}
+                type="button"
+              >
+                PDF as asset
+              </button>
+            </div>
+
+            <CompactToolbar label="Composer import actions">
+              <button className="primary-button" onClick={() => void importGraphPanels()} type="button">
+                Import graph
+              </button>
+              <button className="ghost-button" onClick={() => void importAssetPanels()} type="button">
+                Import asset
+              </button>
+              <button className="ghost-button" onClick={addText} type="button">
+                Text
+              </button>
+            </CompactToolbar>
+          </InspectorPanel>
+        )}
+
+        {leftPanelTab === "objects" && (
+          <ComposerLayersPanel
+            currentSelectedId={composer.selectedId}
+            layerItems={layerItems}
+            selectedHiddenCount={selectedHiddenCount}
+            selectedLockedCount={selectedLockedCount}
+            selectedObjectCount={multiSelectedItems.length}
+            selectedObjectIds={selectedObjectIds}
+            slotRegionCount={slotRegions.length}
+            validationError={composer.validationError}
+            onHideSelected={() => updateSelectedDrawableFlags({ hidden: true })}
+            onLockSelected={() => updateSelectedDrawableFlags({ locked: true })}
+            onSelectItem={(id, type, additive) => {
+              if (type === "region") {
+                selectComposerItem(id, false, "layers");
+                return;
+              }
+              selectComposerItem(id, additive, "layers");
+            }}
+            onShowSelected={() => updateSelectedDrawableFlags({ hidden: false })}
+            onUnlockSelected={() => updateSelectedDrawableFlags({ locked: false })}
+          />
+        )}
+
+        {leftPanelTab === "presets" && (
+          <InspectorPanel kicker="Presets" title="Quick layout presets">
+            <CompactToolbar label="Composer preset actions">
+              <button className="ghost-button" onClick={() => void quickTwoUpEditorial()} type="button">
+                2-up + notes
+              </button>
+              <button className="ghost-button" onClick={() => void quickThreeUp()} type="button">
+                3-up preset
+              </button>
+            </CompactToolbar>
+            <label className="toggle-field">
+              <input
+                checked={composer.project.auto_labels}
+                onChange={(event) => setAutoLabels(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Auto a/b/c labels</span>
+            </label>
+          </InspectorPanel>
+        )}
+
+        {leftPanelTab === "pages" && (
+          <InspectorPanel kicker="Pages" title="Project and page controls">
+            <div className="context-list">
+              <div className="context-row">
+                <span>Page size</span>
+                <strong>
+                  {composer.project.canvas_width_mm} x {composer.project.canvas_height_mm} mm
+                </strong>
+              </div>
+              <div className="context-row">
+                <span>Frame</span>
+                <strong>
+                  {composer.project.layout_grid.frame_width_mm} x {composer.project.layout_grid.frame_height_mm} mm
+                </strong>
+              </div>
+              <div className="context-row">
+                <span>Objects</span>
+                <strong>{composer.project.panels.length + composer.project.texts.length}</strong>
+              </div>
+            </div>
+            <CompactToolbar label="Composer project actions">
+              <button className="ghost-button" onClick={() => void openComposerProject()} type="button">
+                Open project
+              </button>
+              <button className="ghost-button" onClick={() => void saveComposerProject()} type="button">
+                Save project
+              </button>
+            </CompactToolbar>
+          </InspectorPanel>
+        )}
+      </aside>
+
+      <section className="composer-v2-center" style={{ "--composer-zoom": `${canvasZoom / 100}` } as CSSProperties}>
+        <CompactToolbar label="Composer canvas toolbar">
+          <button className="ghost-button" onClick={() => selectComposerItem(null, false, "other")} type="button">
+            Select
+          </button>
+          <button className="ghost-button" onClick={focusRegionFrameTools} type="button">
+            Region / frame
+          </button>
+          <button className="ghost-button" onClick={addText} type="button">
+            Text
+          </button>
+          <button className="ghost-button" onClick={() => void importGraphPanels()} type="button">
+            Import PDF
+          </button>
+          <button className="ghost-button" onClick={focusArrangeTools} type="button">
+            Arrange
+          </button>
+          <button className="ghost-button" onClick={() => setNextZoom("out")} type="button">
+            Zoom -
+          </button>
+          <button className="ghost-button" onClick={() => setNextZoom("in")} type="button">
+            Zoom +
+          </button>
+          <button className="primary-button" onClick={() => void exportComposer()} type="button">
+            Export
+          </button>
+        </CompactToolbar>
+
         <ComposerCanvasSection
           busy={busy}
           dropActive={dropActive}
           highlightRegionIds={selectedHighlightRegionIds}
-          sidebarCollapsed={sidebarCollapsed}
           pdfImportMode={pdfImportMode}
           project={composer.project}
           selectedCells={selectedCells}
@@ -989,13 +1159,9 @@ export function ComposerScreen() {
           selectedObjectIds={selectedObjectIds}
           thumbnails={thumbnailMap}
           onDuplicateDrawableStart={duplicateDrawableForDrag}
-          onExportComposer={exportComposer}
-          onImportAsset={importAssetPanels}
-          onImportGraph={importGraphPanels}
           onObjectSelection={selectComposerObjects}
           onProjectChange={setProject}
           onSelect={(id, additive) => selectComposerItem(id, additive, "canvas")}
-          onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
           onSelectedCellsChange={(cells, options) => {
             setSelectedCells(uniqueCells(cells));
             if (options?.preserveSelection) {
@@ -1005,92 +1171,23 @@ export function ComposerScreen() {
             setSelectedObjectIds([]);
           }}
         />
+
+        <div className="composer-v2-status">
+          <span>
+            Canvas {composer.project.canvas_width_mm} x {composer.project.canvas_height_mm} mm
+          </span>
+          <span>Zoom {canvasZoom}%</span>
+          <span>Selection {multiSelectedItems.length}</span>
+          <span>Snap/grid 0.5 mm</span>
+        </div>
       </section>
 
-      <aside className={`desk-context composer-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
-        <article className="context-card composer-session-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Session</div>
-              <h3>Current composition</h3>
-            </div>
-            <span className="signal-tag">
-              {composer.project.panels.length + composer.project.texts.length} objects
-            </span>
-          </div>
-
-          <div className="context-list">
-            <div className="context-row">
-              <span>Regions</span>
-              <strong>{composer.project.regions.length}</strong>
-            </div>
-            <div className="context-row">
-              <span>Selection</span>
-              <strong>{multiSelectedItems.length > 0 ? multiSelectedItems.length : "None"}</strong>
-            </div>
-            <div className="context-row">
-              <span>PDF import mode</span>
-              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Latest export</span>
-              <strong>{exportPath ? formatLeaf(exportPath) : "Not exported"}</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="context-card composer-tab-card">
-          <div className="inspector-tab-strip" role="tablist" aria-label="Composer inspector tabs">
-            <button
-              aria-selected={inspectorTab === "insert"}
-              className={`inspector-tab ${inspectorTab === "insert" ? "active" : ""}`}
-              onClick={() => setInspectorTab("insert")}
-              role="tab"
-              type="button"
-            >
-              Insert
-            </button>
-            <button
-              aria-selected={inspectorTab === "inspect"}
-              className={`inspector-tab ${inspectorTab === "inspect" ? "active" : ""}`}
-              onClick={() => setInspectorTab("inspect")}
-              role="tab"
-              type="button"
-            >
-              Inspect
-            </button>
-            <button
-              aria-selected={inspectorTab === "layers"}
-              className={`inspector-tab ${inspectorTab === "layers" ? "active" : ""}`}
-              onClick={() => setInspectorTab("layers")}
-              role="tab"
-              type="button"
-            >
-              Layers
-            </button>
-          </div>
-        </article>
-
-        {inspectorTab === "insert" && (
-          <ComposerInsertPanel
-            autoLabels={composer.project.auto_labels}
-            pdfImportMode={pdfImportMode}
-            onAddText={addText}
-            onAutoLabelsChange={(checked) =>
-              composer.setProject({
-                ...composer.project,
-                auto_labels: checked,
-              })
-            }
-            onImportModeChange={setPdfImportMode}
-            onOpenProject={openComposerProject}
-            onQuickThreeUp={quickThreeUp}
-            onQuickTwoUpEditorial={quickTwoUpEditorial}
-            onSaveProject={saveComposerProject}
-          />
-        )}
-
-        {inspectorTab === "inspect" && (
+      <aside className="composer-v2-right">
+        <InspectorPanel
+          extra={<span className={`status-pill ${hasSelection ? "good" : "warn"}`}>{hasSelection ? "Selection active" : "No selection"}</span>}
+          kicker="Inspect"
+          title="Properties and layout"
+        >
           <ComposerInspectPanel
             canCopySelection={canCopySelection}
             canGroupSelection={canGroupSelection}
@@ -1137,68 +1234,65 @@ export function ComposerScreen() {
             onUpdateSelectedPanel={updateSelectedPanel}
             onUpdateSelectedText={updateSelectedText}
           />
-        )}
+        </InspectorPanel>
 
-        {inspectorTab === "layers" && (
-          <ComposerLayersPanel
-            currentSelectedId={composer.selectedId}
-            layerItems={layerItems}
-            selectedHiddenCount={selectedHiddenCount}
-            selectedLockedCount={selectedLockedCount}
-            selectedObjectCount={multiSelectedItems.length}
-            selectedObjectIds={selectedObjectIds}
-            slotRegionCount={slotRegions.length}
-            validationError={composer.validationError}
-            onHideSelected={() => updateSelectedDrawableFlags({ hidden: true })}
-            onLockSelected={() => updateSelectedDrawableFlags({ locked: true })}
-            onSelectItem={(id, type, additive) => {
-              if (type === "region") {
-                selectComposerItem(id, false, "layers");
-                return;
-              }
-              selectComposerItem(id, additive, "layers");
-            }}
-            onShowSelected={() => updateSelectedDrawableFlags({ hidden: false })}
-            onUnlockSelected={() => updateSelectedDrawableFlags({ locked: false })}
-          />
-        )}
+        <InspectorPanel kicker="Export" title="Output and review">
+          <div className="context-list">
+            <div className="context-row">
+              <span>Regions</span>
+              <strong>{composer.project.regions.length}</strong>
+            </div>
+            <div className="context-row">
+              <span>Latest export</span>
+              <strong>{exportPath ? formatLeaf(exportPath) : "Not exported"}</strong>
+            </div>
+          </div>
 
-        {composer.validationError && <div className="warning-card">{composer.validationError}</div>}
+          <CompactToolbar label="Composer export actions">
+            <button className="primary-button" onClick={() => void exportComposer()} type="button">
+              Export PDF
+            </button>
+            <button className="ghost-button" onClick={() => void openComposerProject()} type="button">
+              Open project
+            </button>
+            <button className="ghost-button" onClick={() => void saveComposerProject()} type="button">
+              Save project
+            </button>
+          </CompactToolbar>
 
-        {!composer.validationError && composer.suggestedProjectPatch.length > 0 && (
-          <div className="warning-card">
-            <div>Preview found a few layout cleanups that can be applied safely.</div>
-            <div className="stacked-actions">
+          {!composer.validationError && composer.suggestedProjectPatch.length > 0 && (
+            <div className="warning-card">
+              <div>Preview found a few layout cleanups that can be applied safely.</div>
               <button className="ghost-button" onClick={applyPreviewCleanup} type="button">
                 Apply cleanup suggestions
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {composer.submissionReport && (
-          <div className="focus-panel">
-            <strong>Submission review</strong>
-            <span>{composer.submissionReport.summary}</span>
-            {composer.submissionReport.checks.some((check) => check.status !== "pass") && (
-              <ul className="bullet-list">
-                {composer.submissionReport.checks
-                  .filter((check) => check.status !== "pass")
-                  .slice(0, 4)
-                  .map((check) => (
-                    <li key={check.id}>{check.message}</li>
-                  ))}
-              </ul>
-            )}
-          </div>
-        )}
+          {composer.submissionReport && (
+            <div className="focus-panel">
+              <strong>Submission review</strong>
+              <span>{composer.submissionReport.summary}</span>
+              {composer.submissionReport.checks.some((check) => check.status !== "pass") && (
+                <ul className="bullet-list">
+                  {composer.submissionReport.checks
+                    .filter((check) => check.status !== "pass")
+                    .slice(0, 4)
+                    .map((check) => (
+                      <li key={check.id}>{check.message}</li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </InspectorPanel>
 
+        {composer.validationError && <div className="warning-card">{composer.validationError}</div>}
         {dropNotice && (
           <div className={dropNoticeTone === "warning" ? "warning-card" : "success-card"}>
             {dropNotice}
           </div>
         )}
-
         {exportPath && <div className="success-card">Exported: {exportPath}</div>}
       </aside>
     </div>

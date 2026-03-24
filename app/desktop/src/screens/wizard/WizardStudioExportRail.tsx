@@ -1,4 +1,5 @@
 import type { SubmissionReport } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { formatLeaf } from "../../lib/workbench";
 
 type Props = {
@@ -36,7 +37,7 @@ export function WizardStudioExportRail({
             Exported {outputs.length} file(s) to {formatLeaf(outputDir ?? "output")}.
           </div>
 
-          <div className="step-actions">
+          <CompactToolbar label="Export stage actions">
             <button
               className="primary-button"
               disabled={!outputDir}
@@ -55,7 +56,7 @@ export function WizardStudioExportRail({
             >
               Start another plot
             </button>
-          </div>
+          </CompactToolbar>
 
           <details className="wizard-details" open>
             <summary>Output files</summary>
@@ -75,11 +76,11 @@ export function WizardStudioExportRail({
         </div>
       </article>
 
-      <div className="hero-actions">
+      <CompactToolbar label="Export stage navigation">
         <button className="ghost-button" onClick={onReopenReview} type="button">
           Re-open review
         </button>
-      </div>
+      </CompactToolbar>
     </>
   );
 }

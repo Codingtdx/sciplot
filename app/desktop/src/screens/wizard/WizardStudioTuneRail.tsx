@@ -6,6 +6,7 @@ import type {
   WorkbenchStyle,
   WorkbenchTemplate,
 } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { WizardOptionsSection } from "./WizardOptionsSection";
 
 type Props = {
@@ -51,7 +52,7 @@ export function WizardStudioTuneRail({
         tensileCurveMode={tensileCurveMode}
       />
 
-      <div className="hero-actions">
+      <CompactToolbar label="Tune stage actions">
         <button className="ghost-button" onClick={onBackToType} type="button">
           Back to type
         </button>
@@ -63,7 +64,7 @@ export function WizardStudioTuneRail({
         >
           Continue to review
         </button>
-      </div>
+      </CompactToolbar>
     </>
   );
 }

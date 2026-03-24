@@ -170,7 +170,11 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={onNavigate} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Prepare CSVs" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Import CSVs" })[0]!);
+    await waitFor(() => {
+      expect(screen.getByText("BlendSet_A.csv")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Prepare workbook" })[0]!);
 
     await waitFor(() => {
       expect(preprocessTensileReplicates).toHaveBeenCalledWith(
@@ -184,7 +188,7 @@ describe("TensileScreen", () => {
       );
     });
 
-    expect(screen.getByText(/Prepared 2 samples from BlendSet_A\.csv/)).toBeInTheDocument();
+    expect(screen.getByText("Latest prepared workbook")).toBeInTheDocument();
     expect(loadWizardDataFile).not.toHaveBeenCalled();
     expect(useTensileStore.getState().preprocessResult?.output_path).toBe(
       TEST_PREPROCESS_RESPONSE.output_path,
@@ -230,7 +234,7 @@ describe("TensileScreen", () => {
 
     render(<TensileScreen meta={TEST_META} onNavigate={vi.fn()} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Add workbooks" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Add prepared workbook" })[0]!);
 
     await waitFor(() => {
       expect(inspectTensileWorkbook).toHaveBeenCalledTimes(2);
@@ -264,7 +268,7 @@ describe("TensileScreen", () => {
 
     const moveDownButtons = screen.getAllByRole("button", { name: "Move down" });
     fireEvent.click(moveDownButtons[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Export comparison set" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Export comparison set" })[0]!);
 
     await waitFor(() => {
       expect(exportTensileComparison).toHaveBeenCalledWith(
@@ -273,7 +277,7 @@ describe("TensileScreen", () => {
       );
     });
 
-    expect(screen.getByText(/7 outputs/)).toBeInTheDocument();
+    expect(screen.getByText("Latest comparison export")).toBeInTheDocument();
     expect(useWorkbenchStore.getState().recentProjects[0]?.path).toBe(
       TEST_TENSILE_COMPARE_RESPONSE.comparison_workbook_path,
     );

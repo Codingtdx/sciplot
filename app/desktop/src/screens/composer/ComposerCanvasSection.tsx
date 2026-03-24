@@ -7,16 +7,11 @@ type Props = {
   pdfImportMode: PdfImportMode;
   busy: boolean;
   dropActive: boolean;
-  sidebarCollapsed: boolean;
   selectedCells: CellRef[];
   selectedId: string | null;
   selectedObjectIds: string[];
   highlightRegionIds: string[];
   thumbnails: Record<string, string>;
-  onImportGraph: () => void;
-  onImportAsset: () => void;
-  onExportComposer: () => void;
-  onToggleSidebar: () => void;
   onDuplicateDrawableStart: (id: string) => string | null;
   onObjectSelection: (ids: string[], additive?: boolean) => void;
   onProjectChange: (project: ComposerProject) => void;
@@ -29,16 +24,11 @@ export function ComposerCanvasSection({
   pdfImportMode,
   busy,
   dropActive,
-  sidebarCollapsed,
   selectedCells,
   selectedId,
   selectedObjectIds,
   highlightRegionIds,
   thumbnails,
-  onImportGraph,
-  onImportAsset,
-  onExportComposer,
-  onToggleSidebar,
   onDuplicateDrawableStart,
   onObjectSelection,
   onProjectChange,
@@ -46,41 +36,7 @@ export function ComposerCanvasSection({
   onSelectedCellsChange,
 }: Props) {
   return (
-    <article className="work-card canvas-shell-card">
-      <div className="section-head">
-        <div>
-          <div className="card-kicker">Composer</div>
-          <h2>Canvas</h2>
-        </div>
-        <div className="metric-strip">
-          <div className="metric-chip">
-            <span>Frame</span>
-            <strong>180 x 165 mm</strong>
-          </div>
-          <div className="metric-chip">
-            <span>Regions / objects</span>
-            <strong>
-              {project.regions.length} / {project.panels.length + project.texts.length}
-            </strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="canvas-toolbar">
-        <button className="primary-button" onClick={onImportGraph} type="button">
-          Import graph
-        </button>
-        <button className="ghost-button" onClick={onImportAsset} type="button">
-          Import asset
-        </button>
-        <button className="ghost-button" onClick={onExportComposer} type="button">
-          Export PDF
-        </button>
-        <button className="ghost-button" onClick={onToggleSidebar} type="button">
-          {sidebarCollapsed ? "Show panels" : "Hide panels"}
-        </button>
-      </div>
-
+    <section className="composer-canvas-v2">
       <div className="composer-main">
         <div className={`composer-drop-overlay ${dropActive ? "visible" : ""}`}>
           <div className="composer-drop-card">
@@ -107,15 +63,12 @@ export function ComposerCanvasSection({
           onSelectedCellsChange={onSelectedCellsChange}
         />
 
-        {project.panels.length === 0 && !busy && (
-          <div className="composer-empty-state">
-            <strong>Import graph PDFs or assets</strong>
-            <span>Graphs snap to regions. Assets and text stay free-form.</span>
-          </div>
+        {project.panels.length === 0 && project.texts.length === 0 && !busy && (
+          <div className="composer-empty-hint">Import graph PDFs or assets to start composing.</div>
         )}
 
         {busy && <div className="composer-status">Updating…</div>}
       </div>
-    </article>
+    </section>
   );
 }

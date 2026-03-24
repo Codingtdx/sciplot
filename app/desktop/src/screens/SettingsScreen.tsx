@@ -25,6 +25,33 @@ import type {
   WorkbenchMeta,
 } from "../lib/types";
 import { getErrorMessage } from "../lib/workbench";
+import {
+  CompactToolbar,
+  InspectorPanel,
+  SectionHeader,
+  SettingsRow,
+} from "../components/workbench/V2Primitives";
+
+type SettingsCategory =
+  | "appearance"
+  | "workspace"
+  | "runtime"
+  | "sidecar"
+  | "files"
+  | "advanced";
+
+const SETTINGS_CATEGORIES: Array<{
+  id: SettingsCategory;
+  label: string;
+  description: string;
+}> = [
+  { id: "appearance", label: "Appearance", description: "Theme and visual mode" },
+  { id: "workspace", label: "Workspace", description: "Session defaults and recents" },
+  { id: "runtime", label: "Runtime", description: "Desktop behavior toggles" },
+  { id: "sidecar", label: "Sidecar", description: "Service health and contract info" },
+  { id: "files", label: "Files", description: "Managed local files and cache" },
+  { id: "advanced", label: "Advanced", description: "Reset and destructive actions" },
+];
 
 function themePreviewStyle(presetId: ThemePresetId) {
   const preset = themePresetById(presetId);
@@ -33,7 +60,6 @@ function themePreviewStyle(presetId: ThemePresetId) {
   }
   return {
     background: preset.preview.background,
-    boxShadow: `0 20px 40px ${preset.preview.glow}`,
   };
 }
 
@@ -55,6 +81,7 @@ export function SettingsScreen({
   const settings = useWorkbenchStore((state) => state.settings);
   const updateSettings = useWorkbenchStore((state) => state.updateSettings);
   const clearRecentProjects = useWorkbenchStore((state) => state.clearRecentProjects);
+  const [category, setCategory] = useState<SettingsCategory>("appearance");
   const [checking, setChecking] = useState(false);
   const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
   const [managedStorage, setManagedStorage] = useState<ManagedStorageStatus | null>(null);
@@ -176,218 +203,323 @@ export function SettingsScreen({
   };
 
   return (
-    <div className="desk-layout settings-layout">
-      <section className="desk-main">
-        <article className="work-card section-card settings-theme-gallery">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Appearance</div>
-              <h2>Theme</h2>
+    <div className="settings-v2-layout">
+      <aside className="settings-v2-nav">
+        <InspectorPanel kicker="Categories" title="Settings">
+          <div className="settings-v2-nav-list">
+            {SETTINGS_CATEGORIES.map((item) => (
+              <button
+                className={`settings-v2-nav-item ${category === item.id ? "active" : ""}`}
+                key={item.id}
+                onClick={() => setCategory(item.id)}
+                type="button"
+              >
+                <strong>{item.label}</strong>
+                <span>{item.description}</span>
+              </button>
+            ))}
+          </div>
+        </InspectorPanel>
+      </aside>
+
+      <section className="settings-v2-detail">
+        {category === "appearance" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              kicker="Appearance"
+              title="Theme and visual mode"
+              description="Compact preset previews and color mode selection."
+            />
+
+            <div className="mode-switch theme-mode-switch">
+              <button
+                className={`mode-button ${settings.appearance_mode === "system" ? "active-tone" : ""}`}
+                onClick={() => selectAppearance("system")}
+                type="button"
+              >
+                System
+              </button>
+              <button
+                className={`mode-button ${settings.appearance_mode === "light" ? "active-tone" : ""}`}
+                onClick={() => selectAppearance("light")}
+                type="button"
+              >
+                Light
+              </button>
+              <button
+                className={`mode-button ${settings.appearance_mode === "dark" ? "active-tone" : ""}`}
+                onClick={() => selectAppearance("dark")}
+                type="button"
+              >
+                Dark
+              </button>
             </div>
-          </div>
 
-          <div className="mode-switch theme-mode-switch">
-            <button
-              className={`mode-button ${settings.appearance_mode === "system" ? "active-tone" : ""}`}
-              onClick={() => selectAppearance("system")}
-              type="button"
-            >
-              System
-            </button>
-            <button
-              className={`mode-button ${settings.appearance_mode === "light" ? "active-tone" : ""}`}
-              onClick={() => selectAppearance("light")}
-              type="button"
-            >
-              Light
-            </button>
-            <button
-              className={`mode-button ${settings.appearance_mode === "dark" ? "active-tone" : ""}`}
-              onClick={() => selectAppearance("dark")}
-              type="button"
-            >
-              Dark
-            </button>
-          </div>
-
-          <div className="theme-gallery-grid">
-            {THEME_PRESETS.map((preset) => {
-              const active = settings.theme_preset_id === preset.id;
-              return (
-                <button
-                  className={`theme-preset-card ${active ? "active" : ""}`}
-                  key={preset.id}
-                  onClick={() =>
-                    updateSettings({
-                      appearance_mode: preset.appearance,
-                      theme_preset_id: preset.id,
-                    })
-                  }
-                  type="button"
-                >
-                  <div className="theme-preset-preview" style={themePreviewStyle(preset.id)}>
-                    <div
-                      className="theme-preset-surface"
-                      style={{ background: preset.preview.surface }}
-                    />
-                    <div
-                      className="theme-preset-chip"
-                      style={{ background: preset.preview.chip }}
-                    />
-                  </div>
-                  <div className="theme-preset-copy">
-                    <div className="theme-preset-head">
-                      <strong>{preset.name}</strong>
-                      <span className="signal-tag">{preset.accent}</span>
+            <div className="settings-v2-theme-list">
+              {THEME_PRESETS.map((preset) => {
+                const active = settings.theme_preset_id === preset.id;
+                return (
+                  <button
+                    className={`settings-v2-theme-item ${active ? "active" : ""}`}
+                    key={preset.id}
+                    onClick={() =>
+                      updateSettings({
+                        appearance_mode: preset.appearance,
+                        theme_preset_id: preset.id,
+                      })
+                    }
+                    type="button"
+                  >
+                    <div className="settings-v2-theme-preview" style={themePreviewStyle(preset.id)}>
+                      <div className="settings-v2-theme-surface" style={{ background: preset.preview.surface }} />
+                      <div className="settings-v2-theme-chip" style={{ background: preset.preview.chip }} />
                     </div>
-                    <span>{preset.description}</span>
-                  </div>
+                    <div className="settings-v2-theme-copy">
+                      <strong>{preset.name}</strong>
+                      <span>{preset.description}</span>
+                    </div>
+                    <span className="signal-tag">{preset.accent}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {category === "workspace" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              kicker="Workspace"
+              title="Session defaults and recents"
+              description="Control how workspaces restore between launches."
+            />
+
+            <div className="wizard-section-stack">
+              <SettingsRow
+                control={
+                  <input
+                    checked={settings.remember_last_screen}
+                    onChange={(event) => updateSettings({ remember_last_screen: event.target.checked })}
+                    type="checkbox"
+                  />
+                }
+                description="Reopen the last active module on launch."
+                label="Remember last workspace"
+              />
+              <SettingsRow
+                control={<strong>{recentProjects.length}</strong>}
+                description="Saved data/project entries available in Start."
+                label="Recent records"
+              />
+              <CompactToolbar label="Workspace actions">
+                <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
+                  Clear recents
                 </button>
-              );
-            })}
-          </div>
-        </article>
-
-        <article className="work-card section-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Runtime</div>
-              <h2>Desktop behavior</h2>
+              </CompactToolbar>
             </div>
-            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-              {sidecarReady ? "Sidecar online" : "Sidecar offline"}
-            </span>
-          </div>
+          </section>
+        )}
 
-          <div className="context-list">
-            <div className="context-row">
-              <span>Recents</span>
-              <strong>{recentProjects.length}</strong>
-            </div>
-            <div className="context-row">
-              <span>PDF import mode</span>
-              <strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>
-            </div>
-            <div className="context-row">
-              <span>Composer canvas</span>
-              <strong>
-                {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
-              </strong>
-            </div>
-          </div>
+        {category === "runtime" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              kicker="Runtime"
+              title="Desktop behavior"
+              description="Compact runtime toggles and state."
+            />
 
-          <div className="step-actions">
-            <button
-              className="primary-button"
-              disabled={checking}
-              onClick={() => void refreshSidecar()}
-              type="button"
-            >
-              {checking ? "Checking…" : "Check sidecar"}
-            </button>
-          </div>
-
-          <div className="summary-grid wizard-tight-grid">
-            <label className="toggle-field wizard-option-card">
-              <input
-                checked={settings.auto_status_poll}
-                onChange={(event) =>
-                  updateSettings({ auto_status_poll: event.target.checked })
+            <div className="wizard-section-stack">
+              <SettingsRow
+                control={
+                  <input
+                    checked={settings.auto_status_poll}
+                    onChange={(event) => updateSettings({ auto_status_poll: event.target.checked })}
+                    type="checkbox"
+                  />
                 }
-                type="checkbox"
+                description="Refresh sidecar status periodically."
+                label="Auto-refresh sidecar status"
               />
-              <span>Auto-refresh sidecar status</span>
-            </label>
-
-            <label className="toggle-field wizard-option-card">
-              <input
-                checked={settings.remember_last_screen}
-                onChange={(event) =>
-                  updateSettings({ remember_last_screen: event.target.checked })
-                }
-                type="checkbox"
+              <SettingsRow
+                control={<strong>{pdfImportMode === "graph" ? "Graph" : "Asset"}</strong>}
+                description="Default Composer PDF import behavior."
+                label="Composer PDF import mode"
               />
-              <span>Remember last workspace</span>
-            </label>
-          </div>
-        </article>
-
-        <article className="work-card section-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Local Files</div>
-              <h2>Managed app files</h2>
-            </div>
-          </div>
-
-          {storageError && <div className="warning-card">{storageError}</div>}
-
-          {managedStorage ? (
-            <>
-              <div className="summary-grid wizard-tight-grid">
-                <div className="stat-tile">
-                  <span>Template files</span>
+              <SettingsRow
+                control={
                   <strong>
-                    {managedStorage.example_template_file_count +
-                      managedStorage.blank_template_file_count +
-                      managedStorage.single_template_file_count}
+                    {composerProject.canvas_width_mm} x {composerProject.canvas_height_mm} mm
                   </strong>
-                </div>
-                <div className="stat-tile">
-                  <span>Managed exports</span>
-                  <strong>{managedStorage.plot_export_dir_count}</strong>
-                </div>
-                <div className="stat-tile">
-                  <span>Code runs</span>
-                  <strong>{managedStorage.code_console_run_dir_count}</strong>
-                </div>
-                <div className="stat-tile">
-                  <span>Status</span>
-                  <strong>{storageBusy ? "Working" : "Ready"}</strong>
-                </div>
-              </div>
+                }
+                description="Current Composer canvas size."
+                label="Composer canvas"
+              />
+            </div>
+          </section>
+        )}
 
-              <div className="step-actions">
-                <button
-                  className="ghost-button"
-                  disabled={storageBusy || !sidecarReady}
-                  onClick={() => void loadManagedFiles()}
-                  type="button"
-                >
-                  Refresh
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={storageBusy}
-                  onClick={() => void openManagedPath(managedStorage.data_root)}
-                  type="button"
-                >
-                  Open app data
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={storageBusy}
-                  onClick={() => void openManagedPath(managedStorage.plot_exports_path)}
-                  type="button"
-                >
-                  Open exports
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={storageBusy}
-                  onClick={() => void openManagedPath(managedStorage.code_console_runs_path)}
-                  type="button"
-                >
-                  Open run cache
-                </button>
-                <button
-                  className="ghost-button"
-                  disabled={storageBusy || !sidecarReady}
-                  onClick={() => void pruneManagedFiles()}
-                  type="button"
-                >
-                  Prune stale
-                </button>
+        {category === "sidecar" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              actions={
+                <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
+                  {sidecarReady ? "Sidecar online" : "Sidecar offline"}
+                </span>
+              }
+              kicker="Sidecar"
+              title="Health and contract context"
+              description="Service status, refresh control, and shared contract frame."
+            />
+
+            <CompactToolbar label="Sidecar actions">
+              <button
+                className="primary-button"
+                disabled={checking}
+                onClick={() => void refreshSidecar()}
+                type="button"
+              >
+                {checking ? "Checking…" : "Check sidecar"}
+              </button>
+            </CompactToolbar>
+            <div className="focus-panel">
+              <span>Plot frame</span>
+              <strong>
+                {meta?.global_frame.panel_width_mm ?? 60} x {meta?.global_frame.panel_height_mm ?? 55} mm
+              </strong>
+              <span>{validationRuleCount} contract-backed validation rule(s).</span>
+            </div>
+          </section>
+        )}
+
+        {category === "files" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              kicker="Files"
+              title="Managed local files"
+              description="Inspect app-managed templates, exports, and run cache."
+            />
+
+            {storageError && <div className="warning-card">{storageError}</div>}
+
+            {managedStorage ? (
+              <div className="wizard-section-stack">
+                <div className="summary-grid wizard-tight-grid">
+                  <div className="stat-tile">
+                    <span>Template files</span>
+                    <strong>
+                      {managedStorage.example_template_file_count +
+                        managedStorage.blank_template_file_count +
+                        managedStorage.single_template_file_count}
+                    </strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Managed exports</span>
+                    <strong>{managedStorage.plot_export_dir_count}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Code runs</span>
+                    <strong>{managedStorage.code_console_run_dir_count}</strong>
+                  </div>
+                  <div className="stat-tile">
+                    <span>Status</span>
+                    <strong>{storageBusy ? "Working" : "Ready"}</strong>
+                  </div>
+                </div>
+
+                <CompactToolbar label="Managed file actions">
+                  <button
+                    className="ghost-button"
+                    disabled={storageBusy || !sidecarReady}
+                    onClick={() => void loadManagedFiles()}
+                    type="button"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={storageBusy}
+                    onClick={() => void openManagedPath(managedStorage.data_root)}
+                    type="button"
+                  >
+                    Open app data
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={storageBusy}
+                    onClick={() => void openManagedPath(managedStorage.plot_exports_path)}
+                    type="button"
+                  >
+                    Open exports
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={storageBusy}
+                    onClick={() => void openManagedPath(managedStorage.code_console_runs_path)}
+                    type="button"
+                  >
+                    Open run cache
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={storageBusy || !sidecarReady}
+                    onClick={() => void pruneManagedFiles()}
+                    type="button"
+                  >
+                    Prune stale
+                  </button>
+                </CompactToolbar>
+              </div>
+            ) : (
+              <div className="placeholder-card">
+                {storageBusy
+                  ? "Loading managed storage…"
+                  : "Managed file status appears here when the sidecar is available."}
+              </div>
+            )}
+          </section>
+        )}
+
+        {category === "advanced" && (
+          <section className="work-card section-card">
+            <SectionHeader
+              kicker="Advanced"
+              title="Maintenance and destructive actions"
+              description="Reset states and run full managed-file cleanup."
+            />
+
+            {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
+            {storageError && <div className="warning-card">{storageError}</div>}
+
+            <div className="wizard-section-stack">
+              <SettingsRow
+                control={
+                  <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
+                    Reset Plot
+                  </button>
+                }
+                description="Clear current Plot workspace state."
+                label="Plot state"
+              />
+              <SettingsRow
+                control={
+                  <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
+                    Reset Tensile
+                  </button>
+                }
+                description="Clear current Tensile queue/session state."
+                label="Tensile state"
+              />
+              <SettingsRow
+                control={
+                  <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
+                    Reset Composer
+                  </button>
+                }
+                description="Clear current Composer canvas state."
+                label="Composer state"
+              />
+
+              <CompactToolbar label="Danger actions">
                 <button
                   className="ghost-button danger-button"
                   disabled={storageBusy || !sidecarReady}
@@ -396,81 +528,18 @@ export function SettingsScreen({
                 >
                   Clean app files
                 </button>
-              </div>
-
-              <details className="wizard-details">
-                <summary>Managed paths</summary>
-                <div className="wizard-details-body">
-                  <div>Templates: {managedStorage.example_templates_path}</div>
-                  <div>Blank templates: {managedStorage.blank_templates_path}</div>
-                  <div>Managed exports: {managedStorage.plot_exports_path}</div>
-                  <div>Code runs: {managedStorage.code_console_runs_path}</div>
-                </div>
-              </details>
-            </>
-          ) : (
-            <div className="placeholder-card">
-              {storageBusy
-                ? "Loading managed storage…"
-                : "Managed file status appears here when the sidecar is available."}
+                <button
+                  className="ghost-button danger-button"
+                  onClick={() => runMaintenance("all")}
+                  type="button"
+                >
+                  Reset all
+                </button>
+              </CompactToolbar>
             </div>
-          )}
-        </article>
-
-        <article className="work-card section-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Maintenance</div>
-              <h2>Reset workspace state</h2>
-            </div>
-          </div>
-
-          {maintenanceNotice && <div className="success-card">{maintenanceNotice}</div>}
-
-          <div className="step-actions">
-            <button className="ghost-button" onClick={() => runMaintenance("wizard")} type="button">
-              Reset Plot
-            </button>
-            <button className="ghost-button" onClick={() => runMaintenance("tensile")} type="button">
-              Reset Tensile
-            </button>
-            <button className="ghost-button" onClick={() => runMaintenance("composer")} type="button">
-              Reset Composer
-            </button>
-            <button className="ghost-button" onClick={() => runMaintenance("recent")} type="button">
-              Clear recents
-            </button>
-            <button
-              className="ghost-button danger-button"
-              onClick={() => runMaintenance("all")}
-              type="button"
-            >
-              Reset all
-            </button>
-          </div>
-        </article>
+          </section>
+        )}
       </section>
-
-      <aside className="desk-context settings-context">
-        <article className="context-card">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Contract</div>
-              <h3>Shared frame</h3>
-            </div>
-          </div>
-
-          <div className="wizard-section-stack">
-            <div className="focus-panel">
-              <span>Plot frame</span>
-              <strong>
-                {meta?.global_frame.panel_width_mm ?? 60} x {meta?.global_frame.panel_height_mm ?? 55} mm
-              </strong>
-              <span>{validationRuleCount} contract-backed validation rule(s).</span>
-            </div>
-          </div>
-        </article>
-      </aside>
     </div>
   );
 }

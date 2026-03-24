@@ -1,7 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { AppIcon } from "./components/AppIcon";
+import {
+  CommandBar,
+  ContentPane,
+  IconRail,
+  StatusBar,
+  WorkbenchShell,
+} from "./components/workbench/V2Primitives";
 import { getPlotContract, getWorkbenchMeta, healthcheck } from "./lib/api";
 import {
   useComposerStore,
@@ -293,6 +299,22 @@ export default function App() {
       })),
     [plotSessionActive, wizard.stage],
   );
+  const railItems = [
+    {
+      id: "start",
+      label: "Start",
+      icon: "home" as const,
+      active: workspace === "launchpad",
+      onSelect: () => navigate("/"),
+    },
+    ...workspaceLinks.map((item) => ({
+      id: item.workspace,
+      label: item.label,
+      icon: item.icon,
+      active: workspace === item.workspace,
+      onSelect: () => navigate(item.route),
+    })),
+  ];
 
   let secondaryStatusLabel = "Focus mode";
   if (workspace === "plot") {
@@ -345,6 +367,49 @@ export default function App() {
     activeItemValue = "Composer session ready";
   }
 
+  const commandActions = (() => {
+    if (workspace === "launchpad") {
+      return [
+        { id: "plot-new", label: "New Plot", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+        { id: "open-composer", label: "Composer", onSelect: () => navigate("/composer") },
+        { id: "open-settings", label: "Settings", onSelect: () => navigate("/settings") },
+      ];
+    }
+    if (workspace === "plot") {
+      return [
+        { id: "plot-import", label: "Import", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+        { id: "plot-review", label: "Review", onSelect: () => navigate("/plot/review") },
+        { id: "plot-composer", label: "Composer", onSelect: () => navigate("/composer") },
+      ];
+    }
+    if (workspace === "tensile") {
+      return [
+        { id: "tensile-plot", label: "Plot", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+        { id: "tensile-code", label: "Code Console", onSelect: () => navigate("/code-console") },
+        { id: "tensile-settings", label: "Settings", onSelect: () => navigate("/settings") },
+      ];
+    }
+    if (workspace === "composer") {
+      return [
+        { id: "composer-open", label: "Start", onSelect: () => navigate("/") },
+        { id: "composer-plot", label: "Plot", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+        { id: "composer-settings", label: "Settings", onSelect: () => navigate("/settings") },
+      ];
+    }
+    if (workspace === "code") {
+      return [
+        { id: "code-plot", label: "Plot", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+        { id: "code-composer", label: "Composer", onSelect: () => navigate("/composer") },
+        { id: "code-settings", label: "Settings", onSelect: () => navigate("/settings") },
+      ];
+    }
+    return [
+      { id: "settings-start", label: "Start", onSelect: () => navigate("/") },
+      { id: "settings-plot", label: "Plot", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
+      { id: "settings-composer", label: "Composer", onSelect: () => navigate("/composer") },
+    ];
+  })();
+
   let content = (
     <LaunchpadScreen
       meta={workbenchMeta}
@@ -371,97 +436,49 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell" data-workspace={workspace}>
-      <aside className="app-sidebar">
-        <button
-          className={`sidebar-brand ${workspace === "launchpad" ? "active" : ""}`}
-          onClick={() => navigate("/")}
-          type="button"
-        >
-          <span className="sidebar-brand-mark">
-            <AppIcon name="spark" />
-          </span>
-          <span className="sidebar-brand-copy">
-            <strong>SciPlot God</strong>
-            <span>Focused desktop workspace</span>
-          </span>
-        </button>
-
-        <button
-          className={`sidebar-start-link ${workspace === "launchpad" ? "active" : ""}`}
-          onClick={() => navigate("/")}
-          type="button"
-        >
-          <AppIcon name="home" />
-          <span>Start</span>
-        </button>
-
-        <nav className="sidebar-nav" aria-label="Workspaces">
-          {workspaceLinks.map((item) => {
-            const active = workspace === item.workspace;
-            return (
-              <button
-                className={`sidebar-nav-item ${active ? "active" : ""}`}
-                key={item.workspace}
-                onClick={() => navigate(item.route)}
-                type="button"
-              >
-                <AppIcon name={item.icon} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-footer">
-          <span>{plotSessionActive || composerSessionActive ? `${Number(plotSessionActive) + Number(composerSessionActive)} active session(s)` : "No active sessions"}</span>
-        </div>
-      </aside>
-
-      <div className="app-workspace-shell">
-        <header className="workspace-header">
-          <div className="workspace-header-copy">
-            <span className="eyebrow">{meta.eyebrow}</span>
-            <div className="workspace-header-title-row">
-              <h1>{meta.title}</h1>
-              <span className="workspace-header-inline-status">
-                {workspace === "plot"
-                  ? `${getPlotStageLabel(currentPlotStage)} stage`
-                  : secondaryStatusLabel}
-              </span>
-            </div>
-            <p className="workspace-header-description">{meta.description}</p>
-          </div>
-
-          <div className="workspace-header-meta">
-            <div className="workspace-header-item">
-              <span>{activeItemLabel}</span>
-              <strong>{activeItemValue}</strong>
-            </div>
-            <button
-              className="ghost-button titlebar-theme-button"
-              onClick={() => navigate("/settings")}
-              type="button"
-            >
-              <span>{activeThemePreset.name}</span>
-              <span className="titlebar-theme-subcopy">
-                {describeAppearanceMode(appearanceMode)}
-              </span>
-            </button>
-            <span className={`status-pill ${sidecarReady ? "good" : "warn"}`}>
-              {sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
+    <WorkbenchShell
+      commandBar={
+        <CommandBar
+          actions={commandActions}
+          moduleLabel={workspace === "plot" ? `${meta.eyebrow} · ${getPlotStageLabel(currentPlotStage)}` : meta.eyebrow}
+          moduleTitle={meta.title}
+          objectLabel={activeItemLabel}
+          objectValue={activeItemValue}
+          runtimeStatusLabel={sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
+          runtimeTone={sidecarReady ? "good" : "warn"}
+          sessionLabel={secondaryStatusLabel}
+        />
+      }
+      content={
+        <>
+          {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
+          <ContentPane className="app-main wb-legacy-content">
+            <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
+              {content}
+            </Suspense>
+          </ContentPane>
+        </>
+      }
+      rail={
+        <IconRail
+          brandLabel="SciPlot God"
+          footer={
+            <span>
+              {plotSessionActive || composerSessionActive
+                ? `${Number(plotSessionActive) + Number(composerSessionActive)} active`
+                : "Idle"}
             </span>
-          </div>
-        </header>
-
-        {metaError && <div className="warning-card topbar-warning">{metaError}</div>}
-
-        <main className="app-main" data-scroll-root="workspace">
-          <Suspense fallback={<div className="placeholder-card">Loading workspace…</div>}>
-            {content}
-          </Suspense>
-        </main>
-      </div>
-    </div>
+          }
+          items={railItems}
+          onBrandSelect={() => navigate("/")}
+        />
+      }
+      statusBar={
+        <StatusBar
+          left={`${meta.title} · ${secondaryStatusLabel}`}
+          right={`Appearance: ${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`}
+        />
+      }
+    />
   );
 }

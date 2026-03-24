@@ -2,6 +2,7 @@ import type {
   DataTemplateFolderResponse,
   DataTemplateVariant,
 } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 
 type Props = {
   loading: boolean;
@@ -39,7 +40,7 @@ export function WizardDataTemplatesSection({
         </div>
       </div>
 
-      <div className="hero-actions">
+      <CompactToolbar label="Template folder actions">
         <button
           className="ghost-button"
           disabled={loading}
@@ -56,7 +57,7 @@ export function WizardDataTemplatesSection({
         >
           {loading ? "Refreshing…" : "Open blank folder"}
         </button>
-      </div>
+      </CompactToolbar>
 
       {buildError && <div className="warning-card">{buildError}</div>}
 
@@ -78,11 +79,11 @@ export function WizardDataTemplatesSection({
 
           {openError && <div className="warning-card">{openError}</div>}
 
-          <div className="step-actions">
+          <CompactToolbar label="Template folder reopen action">
             <button className="primary-button" onClick={onOpenTemplateFolder} type="button">
               Open folder again
             </button>
-          </div>
+          </CompactToolbar>
         </div>
       )}
     </article>

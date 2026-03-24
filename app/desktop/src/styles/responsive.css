@@ -14,10 +14,6 @@
     grid-template-columns: 1fr;
   }
 
-  .theme-gallery-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .plot-stage-grid,
   .desk-layout,
   .composer-studio-layout {
@@ -72,8 +68,7 @@
   .code-console-check-grid,
   .code-console-field-grid,
   .wizard-template-grid,
-  .plot-stage-rail,
-  .theme-gallery-grid {
+  .plot-stage-rail {
     grid-template-columns: 1fr;
   }
 }
@@ -90,16 +85,12 @@
   .plot-sheet-card,
   .launchpad-start-panel,
   .launchpad-recents-panel,
-  .tensile-command-card,
   .code-console-preview,
   .code-console-scaffold {
     padding: 16px;
   }
 
-  .hero-actions,
-  .step-actions,
-  .plot-stage-metrics,
-  .tensile-task-grid {
+  .plot-stage-metrics {
     width: 100%;
   }
 

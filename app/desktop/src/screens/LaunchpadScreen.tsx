@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { AppIcon } from "../components/AppIcon";
+import {
+  CompactListRow,
+  CompactToolbar,
+  EmptyState,
+  SectionHeader,
+} from "../components/workbench/V2Primitives";
 import {
   loadComposerProjectFile,
   loadWizardDataFile,
@@ -62,7 +67,6 @@ export function LaunchpadScreen({
     exportResult: wizard.exportResult,
   });
   const hasComposerSession = hasComposerSessionContent(composerProject);
-  const latestRecent = recentProjects[0] ?? null;
 
   const reopenRecent = async (entry: RecentProjectEntry) => {
     const wizardState = useWizardStore.getState();
@@ -144,174 +148,107 @@ export function LaunchpadScreen({
   };
 
   return (
-    <div className="desk-layout launchpad-workspace">
-      <section className="desk-main">
-        <article className="work-card section-card launchpad-start-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Start</div>
-              <h2>Open a workspace</h2>
-            </div>
+    <div className="launchpad-v2-home">
+      <section className="work-card section-card launchpad-v2-actions">
+        <SectionHeader
+          kicker="Start"
+          title="Quick actions"
+          description="Open data or jump directly back into an active workspace."
+        />
+
+        {recentNotice && (
+          <div className={recentNoticeTone === "warning" ? "warning-card" : "success-card"}>
+            {recentNotice}
           </div>
+        )}
 
-          {recentNotice && (
-            <div className={recentNoticeTone === "warning" ? "warning-card" : "success-card"}>
-              {recentNotice}
-            </div>
-          )}
-
-          <div className="launchpad-primary-actions">
-            <button
-              className="launchpad-action-card launchpad-action-primary"
-              onClick={() => onNavigate("/plot/import")}
-              type="button"
-            >
-              <span className="launchpad-action-icon">
-                <AppIcon name="plot" />
-              </span>
-              <span className="launchpad-action-copy">
-                <strong>Plot</strong>
-                <span>Import data and move through the staged plotting flow.</span>
-              </span>
-            </button>
-
-            <button
-              className="launchpad-action-card"
-              onClick={() => onNavigate("/composer")}
-              type="button"
-            >
-              <span className="launchpad-action-icon">
-                <AppIcon name="composer" />
-              </span>
-              <span className="launchpad-action-copy">
-                <strong>Composer</strong>
-                <span>Arrange graph PDFs, assets, and text on canvas.</span>
-              </span>
-            </button>
-
-            <button
-              className="launchpad-action-card"
-              onClick={() =>
-                latestRecent ? void reopenRecent(latestRecent) : onNavigate("/tensile")
-              }
-              type="button"
-            >
-              <span className="launchpad-action-icon">
-                <AppIcon name={latestRecent ? "projects" : "tensile"} />
-              </span>
-              <span className="launchpad-action-copy">
-                <strong>{latestRecent ? "Latest recent" : "Tensile"}</strong>
-                <span>
-                  {latestRecent
-                    ? `${latestRecent.title} · ${recentSignal(latestRecent)}`
-                    : "Prepare raw CSVs or compare prepared workbooks."}
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <div className="step-actions">
-            <button className="ghost-button" onClick={() => onNavigate("/tensile")} type="button">
-              Tensile workspace
-            </button>
-            <button
-              className="ghost-button"
-              onClick={() => onNavigate("/code-console")}
-              type="button"
-            >
-              Code Console
-            </button>
-            <button className="ghost-button" onClick={() => onNavigate("/settings")} type="button">
-              Settings
-            </button>
-          </div>
-        </article>
-
-        <article className="work-card section-card launchpad-recents-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Recents</div>
-              <h2>Recent files</h2>
-            </div>
-            <span className="signal-tag">{recentProjects.length} remembered</span>
-          </div>
-
-          {recentProjects.length === 0 ? (
-            <div className="placeholder-card">No recent files yet.</div>
-          ) : (
-            <div className="launchpad-recent-list">
-              {recentProjects.slice(0, 6).map((entry) => (
-                <button
-                  className="launchpad-recent-row"
-                  disabled={activeRecentId === entry.id}
-                  key={entry.id}
-                  onClick={() => void reopenRecent(entry)}
-                  type="button"
-                >
-                  <div className="launchpad-recent-row-head">
-                    <strong>{entry.title}</strong>
-                    <span className="signal-tag">{recentSignal(entry)}</span>
-                  </div>
-                  <span>{entry.detail}</span>
-                  <span className="recent-meta">{formatRecentTimestamp(entry.updated_at)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </article>
+        <CompactToolbar label="Home quick actions">
+          <button className="primary-button prominent" onClick={() => onNavigate("/plot/import")} type="button">
+            Open data
+          </button>
+          <button
+            className="ghost-button"
+            disabled={!hasPlotSession}
+            onClick={() => onNavigate(plotRoute(wizard.stage))}
+            type="button"
+          >
+            Resume last Plot session
+          </button>
+          <button className="ghost-button" onClick={() => onNavigate("/composer")} type="button">
+            Open Composer
+          </button>
+          <button className="ghost-button" onClick={() => onNavigate("/code-console")} type="button">
+            Open Code Console
+          </button>
+        </CompactToolbar>
       </section>
 
-      <aside className="desk-context launchpad-context">
-        <article className="context-card launchpad-session-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="card-kicker">Continue</div>
-              <h3>Current sessions</h3>
-            </div>
-          </div>
+      <div className="launchpad-v2-grid">
+        <section className="work-card section-card launchpad-v2-sessions">
+          <SectionHeader
+            kicker="Sessions"
+            title="Recent sessions"
+            description="Continue where you left off."
+          />
 
           {!hasPlotSession && !hasComposerSession && (
-            <div className="placeholder-card">No active Plot or Composer session yet.</div>
+            <EmptyState
+              description="Start a Plot or Composer workspace to create a resumable session."
+              title="No active sessions"
+            />
           )}
 
           {hasPlotSession && (
-            <button
-              className="launchpad-session-item"
-              onClick={() => onNavigate(plotRoute(wizard.stage))}
-              type="button"
-            >
-              <div className="launchpad-session-head">
-                <strong>Plot</strong>
-                <span className="signal-tag">{wizard.stage}</span>
-              </div>
-              <span>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Current plotting session"}</span>
-              <span className="recent-meta">
-                {wizard.template ? templateLabel(meta, wizard.template) : "Template pending"}
-              </span>
-            </button>
+            <CompactListRow
+              onSelect={() => onNavigate(plotRoute(wizard.stage))}
+              right={<span className="signal-tag">{wizard.stage}</span>}
+              subtitle={wizard.inputPath ? formatLeaf(wizard.inputPath) : "Current plotting session"}
+              title={`Plot · ${wizard.template ? templateLabel(meta, wizard.template) : "Template pending"}`}
+            />
           )}
 
           {hasComposerSession && (
-            <button
-              className="launchpad-session-item"
-              onClick={() => onNavigate("/composer")}
-              type="button"
-            >
-              <div className="launchpad-session-head">
-                <strong>Composer</strong>
+            <CompactListRow
+              onSelect={() => onNavigate("/composer")}
+              right={
                 <span className="signal-tag">
                   {composerProject.panels.length + composerProject.texts.length} objects
                 </span>
-              </div>
-              <span>Return to the current composition canvas.</span>
-              <span className="recent-meta">
-                {composerProject.regions.length} regions · {composerProject.panels.length} panels ·{" "}
-                {composerProject.texts.length} text blocks
-              </span>
-            </button>
+              }
+              subtitle={`${composerProject.regions.length} regions · ${composerProject.panels.length} panels · ${composerProject.texts.length} text`}
+              title="Composer"
+            />
           )}
-        </article>
-      </aside>
+        </section>
+
+        <section className="work-card section-card launchpad-v2-files">
+          <SectionHeader
+            kicker="Files"
+            title="Recent files"
+            description={`${recentProjects.length} remembered`}
+          />
+
+          {recentProjects.length === 0 ? (
+            <EmptyState
+              description="Recent data and project files appear here after opening or exporting."
+              title="No recent files"
+            />
+          ) : (
+            <div className="launchpad-v2-list">
+              {recentProjects.slice(0, 8).map((entry) => (
+                <CompactListRow
+                  disabled={activeRecentId === entry.id}
+                  key={entry.id}
+                  onSelect={() => void reopenRecent(entry)}
+                  right={<span className="signal-tag">{recentSignal(entry)}</span>}
+                  subtitle={`${entry.detail} · ${formatRecentTimestamp(entry.updated_at)}`}
+                  title={entry.title}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

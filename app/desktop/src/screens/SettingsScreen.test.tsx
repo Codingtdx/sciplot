@@ -69,6 +69,7 @@ describe("SettingsScreen", () => {
 
   it("shows contract-backed frame information", () => {
     render(<SettingsScreen contract={TEST_CONTRACT} meta={TEST_META} />);
+    fireEvent.click(screen.getByRole("button", { name: /Sidecar/i }));
 
     expect(screen.getByText("60 x 55 mm")).toBeInTheDocument();
     expect(screen.getByText("2 contract-backed validation rule(s).")).toBeInTheDocument();
@@ -100,12 +101,12 @@ describe("SettingsScreen", () => {
     await waitFor(() =>
       expect(apiMocks.getManagedStorage).toHaveBeenCalledTimes(1),
     );
+    fireEvent.click(screen.getByRole("button", { name: /Files/i }));
 
     expect(screen.getByRole("button", { name: "Open app data" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open exports" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open run cache" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prune stale" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Clean app files" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Open exports" }));
     expect(apiMocks.openPath).toHaveBeenCalledWith("/tmp/sciplot-god/data/plot_exports");
@@ -115,6 +116,9 @@ describe("SettingsScreen", () => {
     await waitFor(() =>
       expect(apiMocks.cleanupManagedStorage).toHaveBeenCalledWith({ strategy: "stale" }),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    expect(screen.getByRole("button", { name: "Clean app files" })).toBeInTheDocument();
     expect(
       screen.getByText("Pruned 3 file(s) and 1 folder(s) from managed storage."),
     ).toBeInTheDocument();

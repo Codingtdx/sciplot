@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { StepFlow } from "../components/StepFlow";
+import {
+  CompactToolbar,
+  InspectorPanel,
+  SectionHeader,
+} from "../components/workbench/V2Primitives";
 import { useWizardStore, useWorkbenchStore } from "../lib/store";
 import type {
   PlotStage,
@@ -12,13 +17,12 @@ import type {
 import {
   PLOT_STAGE_COPY,
   compatibleTemplateChoices,
-  formatLeaf,
   getErrorMessage,
+  getPlotStageLabel,
   plotRoute,
   publicPaletteChoices,
   publicStyleChoices,
   sizeChoices,
-  templateLabel,
   wizardStepForStage,
   incompatibleTemplateChoices,
   isTensileCurveModel,
@@ -418,96 +422,99 @@ export function WizardScreen({
   }
 
   return (
-    <div className={`plot-workspace plot-stage-${routeStage}`}>
-      <section className="plot-stage-card work-card section-card">
-        <div className="plot-stage-copy">
-          <div>
-            <div className="card-kicker">Plot</div>
-            <h2>{stageCopy.title}</h2>
-            <p>{stageCopy.description}</p>
-          </div>
-
-          <div className="plot-stage-actions">
-            <span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>
+    <div className={`plot-workspace plot-stage-${routeStage} plot-v2-layout`}>
+      <aside className="plot-v2-steps">
+        <InspectorPanel
+          extra={<span className={`status-pill ${statusChip.tone}`}>{statusChip.label}</span>}
+          kicker="Plot"
+          title="Workflow steps"
+        >
+          <span className="hint-text">{getPlotStageLabel(routeStage)} stage</span>
+          <CompactToolbar>
             {routeStage !== "import" && (
               <button className="ghost-button" onClick={() => goToStage("import")} type="button">
                 New file
               </button>
             )}
-          </div>
-        </div>
+            {routeStage !== "sheet" && wizard.sheetNames.length > 1 && (
+              <button className="ghost-button" onClick={() => goToStage("sheet")} type="button">
+                Sheet
+              </button>
+            )}
+          </CompactToolbar>
+          <StepFlow steps={stepFlowSteps} />
+        </InspectorPanel>
+      </aside>
 
-        <StepFlow steps={stepFlowSteps} />
+      <section className="plot-v2-main">
+        <SectionHeader
+          kicker="Active Step"
+          title={stageCopy.title}
+          description={stageCopy.description}
+        />
 
-        <div className="plot-stage-metrics">
-          <div className="stat-tile">
-            <span>File</span>
-            <strong>{wizard.inputPath ? formatLeaf(wizard.inputPath) : "Waiting for import"}</strong>
-          </div>
-          <div className="stat-tile">
-            <span>Model</span>
-            <strong>
-              {wizard.inspection ? wizard.inspection.model_label : "Pending inspect"}
-            </strong>
-          </div>
-          <div className="stat-tile">
-            <span>Current template</span>
-            <strong>{wizard.template ? templateLabel(meta, wizard.template) : "Not selected"}</strong>
-          </div>
-        </div>
+        {routeStage === "import" && (
+          <WizardImportStage
+            hasInput={hasInput}
+            latestTemplateFolder={latestTemplateFolder}
+            onBuildTemplateFolder={(variant) => void openTemplateFolder(variant)}
+            onOpenDataFile={() => void openDataFile()}
+            onReopenRecentData={(path) => void reopenRecentData(path)}
+            onReopenTemplateFolder={() => void reopenTemplateFolder()}
+            onResumeCurrentSession={() => goToStage("type")}
+            recentDataFiles={recentDataFiles}
+            templateBuildError={templateBuildError}
+            templateFolderBusy={templateFolderBusy}
+            templateOpenError={templateOpenError}
+          />
+        )}
 
-        {wizard.error && <div className="error-card">{wizard.error}</div>}
-        {!wizard.sidecarReady && (
-          <div className="warning-card">
-            The Python sidecar is offline. Detection, preview, and export resume once it
-            reconnects.
-          </div>
+        {routeStage === "sheet" && (
+          <WizardSheetStage
+            inputPath={wizard.inputPath}
+            onInspectSheet={(sheetValue) => void rerunInspect(sheetValue)}
+            sheet={wizard.sheet}
+            sheetNames={wizard.sheetNames}
+          />
+        )}
+
+        {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
+          <WizardStudioStage
+            hasTemplate={hasTemplate}
+            meta={meta}
+            onChangePreviewIndex={wizard.setPreviewIndex}
+            onChangeSheet={() => goToStage("sheet")}
+            previewIndex={wizard.previewIndex}
+            previews={wizard.previews}
+            previewBusy={previewBusy}
+            previewError={previewError}
+            railContent={studioRailContent}
+            sheetNamesLength={wizard.sheetNames.length}
+            template={wizard.template}
+          />
         )}
       </section>
 
-      {routeStage === "import" && (
-        <WizardImportStage
-          hasInput={hasInput}
-          latestTemplateFolder={latestTemplateFolder}
-          onBuildTemplateFolder={(variant) => void openTemplateFolder(variant)}
-          onOpenDataFile={() => void openDataFile()}
-          onReopenRecentData={(path) => void reopenRecentData(path)}
-          onReopenTemplateFolder={() => void reopenTemplateFolder()}
-          onResumeCurrentSession={() => goToStage("type")}
-          recentDataFiles={recentDataFiles}
-          summaryRows={summaryRows}
-          templateBuildError={templateBuildError}
-          templateFolderBusy={templateFolderBusy}
-          templateOpenError={templateOpenError}
-        />
-      )}
+      <aside className="plot-v2-inspector">
+        <InspectorPanel kicker="Inspector" title="Current plot context">
+          <div className="wizard-summary-list">
+            {summaryRows.map((row) => (
+              <div className="wizard-summary-row" key={row.label}>
+                <span>{row.label}</span>
+                <strong>{row.value}</strong>
+              </div>
+            ))}
+          </div>
 
-      {routeStage === "sheet" && (
-        <WizardSheetStage
-          inputPath={wizard.inputPath}
-          onInspectSheet={(sheetValue) => void rerunInspect(sheetValue)}
-          sheet={wizard.sheet}
-          sheetNames={wizard.sheetNames}
-        />
-      )}
+          {wizard.error && <div className="error-card">{wizard.error}</div>}
+          {!wizard.sidecarReady && (
+            <div className="warning-card">
+              The Python sidecar is offline. Detection, preview, and export resume once it reconnects.
+            </div>
+          )}
 
-      {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
-        <WizardStudioStage
-          hasTemplate={hasTemplate}
-          inputPath={wizard.inputPath}
-          meta={meta}
-          onChangePreviewIndex={wizard.setPreviewIndex}
-          onChangeSheet={() => goToStage("sheet")}
-          previewIndex={wizard.previewIndex}
-          previews={wizard.previews}
-          previewBusy={previewBusy}
-          previewError={previewError}
-          railContent={studioRailContent}
-          sheetNamesLength={wizard.sheetNames.length}
-          summaryRows={summaryRows}
-          template={wizard.template}
-        />
-      )}
+        </InspectorPanel>
+      </aside>
     </div>
   );
 }

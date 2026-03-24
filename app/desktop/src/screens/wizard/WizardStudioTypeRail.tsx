@@ -1,4 +1,5 @@
 import type { InputInspection, TemplateName, WorkbenchTemplate } from "../../lib/types";
+import { CompactToolbar } from "../../components/workbench/V2Primitives";
 import { WizardTemplatesSection } from "./WizardTemplatesSection";
 
 type Props = {
@@ -75,7 +76,7 @@ export function WizardStudioTypeRail({
         showAllTemplates={showAllTemplates}
       />
 
-      <div className="hero-actions">
+      <CompactToolbar label="Type stage actions">
         <button
           className="primary-button"
           disabled={!hasTemplate}
@@ -84,7 +85,7 @@ export function WizardStudioTypeRail({
         >
           Continue to tune
         </button>
-      </div>
+      </CompactToolbar>
     </>
   );
 }

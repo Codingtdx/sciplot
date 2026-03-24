@@ -382,9 +382,9 @@ describe("ComposerScreen", () => {
       expect(project.panels.find((panel) => panel.id === "asset-2")?.group_id).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
-    fireEvent.click(screen.getByRole("tab", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Assets" }));
 
     await waitFor(() => {
       const tile = screen.getByText("Selected").closest(".stat-tile");
@@ -433,10 +433,10 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }), { ctrlKey: true });
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }), { ctrlKey: true });
-    fireEvent.click(screen.getByRole("tab", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Assets" }));
 
     await waitFor(() => {
       const tile = screen.getByText("Selected").closest(".stat-tile");
@@ -451,7 +451,7 @@ describe("ComposerScreen", () => {
     render(<ComposerScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: "Lock selected" }));
 
     await waitFor(() => {
@@ -475,7 +475,7 @@ describe("ComposerScreen", () => {
     render(<ComposerScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Mock Marquee Select" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: "Hide selected" }));
 
     await waitFor(() => {
@@ -498,7 +498,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
@@ -522,7 +522,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "Fit to binding" }));
@@ -544,7 +544,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.click(screen.getByRole("button", { name: "Bottom" }));
 
@@ -560,7 +560,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
     fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
 
@@ -580,7 +580,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
     fireEvent.keyDown(window, { key: "c", ctrlKey: true });
     fireEvent.keyDown(window, { key: "v", ctrlKey: true });
@@ -602,7 +602,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-1\.png/i }));
     fireEvent.click(screen.getByRole("button", { name: "Left" }));
 
@@ -636,7 +636,7 @@ describe("ComposerScreen", () => {
 
     render(<ComposerScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Layers" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Objects" }));
     fireEvent.click(screen.getByRole("button", { name: /asset-2\.png/i }));
     fireEvent.click(screen.getByLabelText("Hide object"));
 

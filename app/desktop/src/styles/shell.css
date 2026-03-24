@@ -26,9 +26,7 @@
 .plot-stage-card,
 .plot-stage-copy,
 .plot-stage-actions,
-.plot-stage-metrics,
-.theme-gallery-grid,
-.tensile-task-grid {
+.plot-stage-metrics {
   display: flex;
 }
 
@@ -231,100 +229,8 @@
   min-height: 0;
 }
 
-.settings-layout .desk-main,
-.tensile-layout .desk-main {
-  gap: 8px;
-}
-
-.tensile-task-grid,
-.theme-gallery-grid {
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tensile-task-card {
-  flex: 1 1 220px;
-}
-
 .theme-mode-switch {
   margin-top: 2px;
-}
-
-.theme-gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.theme-preset-card {
-  padding: 9px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-soft);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    transform var(--motion-fast),
-    border-color var(--motion-fast),
-    box-shadow var(--motion-fast),
-    background var(--motion-fast);
-}
-
-.theme-preset-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.theme-preset-card.active {
-  border-color: color-mix(in srgb, var(--primary-end) 30%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-card-strong) 92%, transparent), color-mix(in srgb, var(--primary-soft) 30%, transparent));
-  box-shadow: var(--shadow-sm);
-}
-
-.theme-preset-preview {
-  position: relative;
-  min-height: 64px;
-  border-radius: calc(var(--radius-xl) - 8px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  overflow: hidden;
-}
-
-.theme-preset-surface {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  top: 10px;
-  bottom: 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-}
-
-.theme-preset-chip {
-  position: absolute;
-  width: 56px;
-  height: 8px;
-  left: 14px;
-  bottom: 8px;
-  border-radius: 999px;
-}
-
-.theme-preset-copy {
-  margin-top: 7px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.theme-preset-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.tensile-task-card {
-  min-height: 122px;
 }
 
 .composer-studio-layout {
@@ -731,15 +637,12 @@
 }
 
 .launchpad-workspace .desk-main,
-.launchpad-context,
-.tensile-context,
-.settings-context {
+.launchpad-context {
   gap: 8px;
 }
 
 .launchpad-start-panel,
-.launchpad-recents-panel,
-.tensile-command-card {
+.launchpad-recents-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -854,14 +757,4 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.settings-layout {
-  min-height: 0;
-  padding-bottom: 14px;
-}
-
-.settings-layout .desk-main,
-.settings-context {
-  min-height: 0;
 }
