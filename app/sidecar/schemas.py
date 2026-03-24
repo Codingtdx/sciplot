@@ -463,10 +463,21 @@ class RecommendationResponse(StrictModel):
     use_sidecar: bool | None = None
 
 
+class TemplateRecommendationResponse(StrictModel):
+    template_id: str
+    score: float
+    why_hard_match: list[str] = Field(default_factory=list)
+    why_soft_prior: list[str] = Field(default_factory=list)
+    inferred_mapping: dict[str, str] = Field(default_factory=dict)
+    optional_enhancements: list[str] = Field(default_factory=list)
+    preview_config_summary: dict[str, Any] = Field(default_factory=dict)
+
+
 class InputInspectionResponse(StrictModel):
     model: str
     model_label: str
     recommendation: RecommendationResponse
+    recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     signals: list[str] = Field(default_factory=list)
 

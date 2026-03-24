@@ -164,6 +164,7 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["input_path"] == str(input_path)
     assert payload["inspection"]["model"] == "curve_table"
     assert payload["inspection"]["recommendation"]["template"] == "curve"
+    assert payload["inspection"]["recommendations"][0]["template_id"] == "curve"
 
 
 def test_code_console_generate_returns_lightweight_context_without_bound_data() -> None:

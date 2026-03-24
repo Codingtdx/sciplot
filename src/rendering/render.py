@@ -31,6 +31,7 @@ from src.rendering.common import (
     rheology_output_filenames,
     validate_series_scales,
 )
+from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName, TemplateRenderer
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.qa import (
@@ -39,7 +40,6 @@ from src.rendering.qa import (
     apply_curve_autofix,
     recommend_curve_autofix,
 )
-from src.rendering.recommendation import detect_point_line_bundle
 
 
 @dataclass(frozen=True)
@@ -775,9 +775,9 @@ def _render_rheology_bundle(
 
 
 def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(bundle, "curve", input_path, sheet, options)
+    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(normalized_dataset.model, "curve", input_path, sheet, options)
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
@@ -794,9 +794,9 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
 
 
 def _render_point_line(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(bundle, "point_line", input_path, sheet, options)
+    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+        return _render_rheology_bundle(normalized_dataset.model, "point_line", input_path, sheet, options)
 
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)

@@ -27,11 +27,12 @@ from src.rendering.cache import (
     load_temperature_sweep_metrics_cached,
     read_raw_table_cached,
 )
+from src.rendering.dataset_models import NormalizedDataset, build_normalized_dataset
 from src.rendering.io import list_sheet_names
 from src.rendering.local_storage import create_managed_code_console_run_dir
 from src.rendering.models import InputInspection, RenderOptions
 from src.rendering.options import resolve_render_options, validate_template_name
-from src.rendering.recommendation import detect_point_line_bundle, inspect_input_file
+from src.rendering.recommendation import inspect_input_file
 from src.rheology_loader import RheologySeries
 from src.text_normalization import slugify_label
 
@@ -394,19 +395,25 @@ def _normalized_dataset(
     input_path: Path,
     sheet: str | int,
     inspection: InputInspection,
+    normalized_dataset: NormalizedDataset | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
-    if inspection.model in {"curve_table", "tensile_curve"}:
+    dataset = normalized_dataset
+    if dataset is None and input_path is not None:
+        dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
+
+    model = dataset.model if dataset is not None else inspection.model
+    if model in {"curve_table", "tensile_curve"}:
         series_list = load_curve_table_cached(input_path, sheet)
         return _build_curve_frame(series_list), _curve_summary(series_list)
-    if inspection.model == "replicate_table":
+    if model == "replicate_table":
         groups = load_replicate_table_cached(input_path, sheet)
         return _build_replicate_frame(groups), _replicate_summary(groups)
-    if inspection.model == "heatmap_table":
+    if model == "heatmap_table":
         table = load_heatmap_table_cached(input_path, sheet)
         return _build_heatmap_frame(table), _heatmap_summary(table)
 
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+    bundle = model if model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"} else None
+    if bundle is not None:
         series_map = _series_map_for_bundle(bundle, input_path, sheet)
         return _build_rheology_frame(series_map), _rheology_summary(series_map)
 
@@ -968,13 +975,16 @@ def generate_code_console_payload(
     inspection: InputInspection | None = None
     data_context: dict[str, object] | None = None
     sheet_names: list[str] = []
+    normalized_dataset: NormalizedDataset | None = None
     if input_path is not None:
         inspection = inspect_input_file(input_path, normalized_sheet)
+        normalized_dataset = build_normalized_dataset(input_path, normalized_sheet, model=inspection.model)
         raw = read_raw_table_cached(input_path, normalized_sheet)
         normalized_frame, interpreted_summary = _normalized_dataset(
             input_path,
             normalized_sheet,
             inspection,
+            normalized_dataset,
         )
         sheet_names = list_sheet_names(input_path)
         data_context = {
@@ -1348,16 +1358,22 @@ def _normalized_frame_for_export(
     input_path: Path,
     sheet: str | int,
     model: str | None,
+    normalized_dataset: NormalizedDataset | None = None,
 ) -> pd.DataFrame:
-    if model in {"curve_table", "tensile_curve"}:
+    dataset = normalized_dataset
+    if dataset is None and model is not None:
+        dataset = build_normalized_dataset(input_path, sheet, model=model)
+    resolved_model = dataset.model if dataset is not None else model
+
+    if resolved_model in {"curve_table", "tensile_curve"}:
         return _build_curve_frame(load_curve_table_cached(input_path, sheet))
-    if model == "replicate_table":
+    if resolved_model == "replicate_table":
         return _build_replicate_frame(load_replicate_table_cached(input_path, sheet))
-    if model == "heatmap_table":
+    if resolved_model == "heatmap_table":
         return _build_heatmap_frame(load_heatmap_table_cached(input_path, sheet))
 
-    bundle = detect_point_line_bundle(input_path, sheet)
-    if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+    bundle = resolved_model if resolved_model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"} else None
+    if bundle is not None:
         return _build_rheology_frame(_series_map_for_bundle(bundle, input_path, sheet))
 
     return _build_curve_frame(load_curve_table_cached(input_path, sheet))
@@ -1433,10 +1449,12 @@ def export_code_console_bundle(
         raw = read_raw_table_cached(input_path, sheet)
         raw_sample_path = bundle_dir / "data_sample.csv"
         _write_csv(raw_sample_path, raw.head(20))
+        normalized_dataset = payload.get("normalized_dataset")
         normalized = _normalized_frame_for_export(
             input_path,
             sheet,
             payload["data_context"].get("model"),
+            normalized_dataset if isinstance(normalized_dataset, NormalizedDataset) else None,
         )
         normalized_csv_path = bundle_dir / "normalized_full_data.csv"
         normalized_json_path = bundle_dir / "normalized_full_data.json"

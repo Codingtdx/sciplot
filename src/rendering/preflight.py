@@ -17,8 +17,8 @@ from src.rendering.common import (
     validate_rheology_bundle_scales,
     validate_series_scales,
 )
+from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
-from src.rendering.recommendation import detect_point_line_bundle
 from src.submission import build_render_submission_report
 
 
@@ -30,13 +30,19 @@ def preflight_render_request(
 ) -> PreflightResult:
     warnings: list[str] = list(style_preflight_warnings(options))
     errors: list[str] = []
-    bundle = detect_point_line_bundle(input_path, sheet) if template in {"point_line", "curve"} else None
+    normalized_dataset = (
+        build_normalized_dataset(input_path, sheet) if template in {"point_line", "curve"} else None
+    )
 
     try:
         if template in {"point_line", "curve"}:
-            if bundle in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
+            if normalized_dataset and normalized_dataset.model in {
+                "frequency_sweep",
+                "temperature_sweep",
+                "stress_relaxation",
+            }:
                 validate_rheology_bundle_scales(
-                    bundle,
+                    normalized_dataset.model,
                     input_path,
                     sheet,
                     xscale=options.xscale,
@@ -71,7 +77,12 @@ def preflight_render_request(
         errors.append(humanize_preflight_exception(exc))
 
     if not errors:
-        preview_names = preview_output_filenames(template, input_path, sheet, bundle)
+        preview_names = preview_output_filenames(
+            template,
+            input_path,
+            sheet,
+            normalized_dataset.model if normalized_dataset else None,
+        )
         append_multi_output_warning(warnings, preview_names)
     else:
         preview_names = ()

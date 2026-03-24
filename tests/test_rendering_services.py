@@ -6,12 +6,14 @@ import pandas as pd
 import pytest
 
 from src.rendering import (
+    build_normalized_dataset,
     build_rendered_plots,
     close_rendered_plots,
     inspect_input_file,
     preflight_render_request,
     resolve_render_options,
 )
+from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -87,6 +89,20 @@ def _write_replicate_table(path: Path) -> Path:
         [510.13, 567.91, 544.10],
         [501.10, 501.49, 549.54],
         [549.61, 549.61, 562.07],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_heatmap_table(path: Path) -> Path:
+    rows = [
+        ["X", "Y", "Z"],
+        ["mm", "mm", "a.u."],
+        ["Sample A", "Sample A", "Sample A"],
+        [0, 0, 0.1],
+        [0, 1, 0.2],
+        [1, 0, 0.3],
+        [1, 1, 0.4],
     ]
     pd.DataFrame(rows).to_csv(path, header=False, index=False)
     return path
@@ -175,6 +191,8 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
 
     inspection = inspect_input_file(input_path)
     assert inspection.recommendation.template == "curve"
+    assert len(inspection.recommendations) == 1
+    assert inspection.recommendations[0].template_id == "curve"
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
@@ -203,6 +221,42 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
     assert options.style_preset == "nature"
     assert preflight.submission_report is not None
     assert preflight.submission_report.style_preset == "nature"
+
+
+@pytest.mark.parametrize(
+    ("writer", "filename", "expected_model", "expected_shapes"),
+    [
+        (_write_curve_table, "curve.csv", "curve_table", ("curve_like",)),
+        (_write_tensile_curve_table, "tensile.csv", "tensile_curve", ("curve_like",)),
+        (_write_replicate_table, "replicates.csv", "replicate_table", ("replicate_table", "distribution")),
+        (_write_frequency_sweep_table, "frequency.xlsx", "frequency_sweep", ("curve_like",)),
+        (_write_heatmap_table, "heatmap.csv", "heatmap_table", ("matrix",)),
+    ],
+)
+def test_normalized_dataset_builder_reuses_model_and_shape_signals(
+    tmp_path: Path,
+    writer,
+    filename: str,
+    expected_model: str,
+    expected_shapes: tuple[str, ...],
+) -> None:
+    input_path = writer(tmp_path / filename)
+
+    dataset = build_normalized_dataset(input_path)
+
+    assert dataset.model == expected_model
+    assert dataset.data_shapes == expected_shapes
+    assert dataset.raw_rows > 0
+    assert dataset.raw_cols > 0
+
+
+def test_style_composer_uses_contract_backed_protected_keys() -> None:
+    bundle = DEFAULT_STYLE_COMPOSER.compose("default", None)
+
+    assert bundle.publication_profile_id == "default"
+    assert bundle.protected_keys
+    assert any(key.startswith("typography.") for key in bundle.protected_keys)
+    assert "typography.font_size_pt" in bundle.protected_keys
 
 
 def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified() -> None:
