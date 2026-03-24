@@ -113,6 +113,7 @@ export function WizardTypeStage({
   const sourceLabel = inputPath ? formatLeaf(inputPath) : "No source loaded";
   const activeTemplate = selectedTemplate ?? inspection?.recommendation.template ?? topRecommendations[0]?.id ?? null;
   const activeTemplateLabel = hasTemplate ? templateLabel(meta, selectedTemplate) : "Suggested template";
+  const primaryTemplateId = inspection?.recommendation.template ?? topRecommendations[0]?.id ?? null;
 
   return (
     <div className="plot-type-studio">
@@ -124,9 +125,6 @@ export function WizardTypeStage({
         <div className="plot-type-header-source">
           <span>Source</span>
           <strong title={sourceLabel}>{sourceLabel}</strong>
-          <span title={inspection?.model_label ?? "Awaiting inspect"}>
-            {inspection ? inspection.model_label : "Awaiting inspect"}
-          </span>
         </div>
       </header>
 
@@ -151,14 +149,16 @@ export function WizardTypeStage({
                   const recommended = inspection.recommendation.template === template.id;
                   return (
                     <article
-                      className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${recommended ? "recommended" : ""}`}
+                      className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${recommended ? "recommended" : ""} ${
+                        template.id === primaryTemplateId ? "primary" : ""
+                      }`}
                       key={template.id}
                     >
                       <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} aria-hidden="true" />
                       <div className="plot-type-recommendation-copy">
                         <div className="plot-type-recommendation-title-row">
                           <strong>{template.label}</strong>
-                          <span>{recommended ? "Recommended" : "Compatible"}</span>
+                          <span>{template.id === primaryTemplateId ? "Primary recommendation" : recommended ? "Recommended" : "Compatible"}</span>
                         </div>
                         <p>{recommendationReason(template, inspection)}</p>
                         <div className="plot-type-recommendation-hint">{templateHint(template, inspection)}</div>
@@ -269,19 +269,25 @@ export function WizardTypeStage({
                     <span>{hasTemplate ? "Ready to tune" : "Choose one"}</span>
                   </div>
                 </div>
-                <div className="plot-type-compare-thumbs">
-                  {topRecommendations.slice(0, 3).map((template) => (
-                    <button
-                      className={`plot-type-compare-thumb ${selectedTemplate === template.id ? "selected" : ""}`}
-                      key={template.id}
-                      onClick={() => onSelectTemplate(template.id)}
-                      type="button"
-                    >
-                      <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} />
-                      <strong>{template.label}</strong>
-                      <span>{template.default_size}</span>
-                    </button>
-                  ))}
+                <div className="plot-type-compare-stage">
+                  <div className="plot-type-compare-stage-head">
+                    <span>Shortlist</span>
+                    <strong>Compare the top three quickly</strong>
+                  </div>
+                  <div className="plot-type-compare-thumbs">
+                    {topRecommendations.slice(0, 3).map((template) => (
+                      <button
+                        className={`plot-type-compare-thumb ${selectedTemplate === template.id ? "selected" : ""}`}
+                        key={template.id}
+                        onClick={() => onSelectTemplate(template.id)}
+                        type="button"
+                      >
+                        <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} />
+                        <strong>{template.label}</strong>
+                        <span>{template.default_size}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : hasTemplate ? (

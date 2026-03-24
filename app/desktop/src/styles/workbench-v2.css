@@ -1380,7 +1380,7 @@ textarea.field {
 .plot-type-pane-head h2 {
   margin: 0;
   font-size: 18px;
-  color: #20364f;
+  color: #1b314a;
 }
 
 .plot-type-pane-head p {
@@ -1433,14 +1433,39 @@ textarea.field {
 }
 
 .plot-type-recommendation-card.selected {
-  border-color: #b9cde6;
-  background: #f4f8ff;
+  border-color: #97b4d4;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+  box-shadow: 0 3px 12px rgba(87, 118, 166, 0.09);
 }
 
 .plot-type-recommendation-card.recommended {
   background:
     radial-gradient(circle at top right, rgba(97, 198, 255, 0.08), transparent 42%),
     linear-gradient(180deg, #fbfdff 0%, #f7faff 100%);
+}
+
+.plot-type-recommendation-card.primary {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  padding: 12px;
+  border-color: #9fbbe0;
+  background:
+    radial-gradient(circle at top right, rgba(97, 198, 255, 0.12), transparent 36%),
+    linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+  box-shadow: 0 4px 16px rgba(87, 118, 166, 0.1);
+}
+
+.plot-type-recommendation-card.primary .plot-type-recommendation-copy p {
+  color: #4d6887;
+}
+
+.plot-type-recommendation-card.primary .plot-type-recommendation-title-row span {
+  color: #4d6f98;
+  font-weight: 600;
+}
+
+.plot-type-recommendation-card.primary .plot-type-card-thumb {
+  width: 96px;
+  height: 66px;
 }
 
 .plot-type-recommendation-copy {
@@ -1459,12 +1484,12 @@ textarea.field {
 
 .plot-type-recommendation-title-row strong {
   font-size: 13px;
-  color: #1d334d;
+  color: #18304a;
 }
 
 .plot-type-recommendation-title-row span {
   font-size: 11px;
-  color: #69829f;
+  color: #5d7591;
   white-space: nowrap;
 }
 
@@ -1478,7 +1503,7 @@ textarea.field {
 .plot-type-recommendation-hint {
   font-size: 11px;
   line-height: 1.3;
-  color: #7287a2;
+  color: #5f7590;
 }
 
 .plot-type-recommendation-meta {
@@ -1496,7 +1521,7 @@ textarea.field {
   border: 1px solid #d1dcec;
   background: #ffffff;
   font-size: 11px;
-  color: #6a829e;
+  color: #5c7592;
 }
 
 .plot-type-card-thumb {
@@ -1578,7 +1603,7 @@ textarea.field {
 .plot-type-section-head h4 {
   margin: 0;
   font-size: 14px;
-  color: #20364f;
+  color: #1b314a;
 }
 
 .plot-type-alt-list,
@@ -1604,8 +1629,9 @@ textarea.field {
 .plot-type-preview-tab {
   height: 30px;
   padding: 0 8px;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-bottom-color: transparent;
+  border-radius: 999px;
   background: transparent;
   color: #5f7692;
   font-size: 12px;
@@ -1613,8 +1639,10 @@ textarea.field {
 }
 
 .plot-type-preview-tab.active {
-  color: #1f3652;
-  border-bottom-color: #7f9dc7;
+  color: #18314c;
+  border-color: #b5cbe4;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
 }
 
 .plot-type-preview-surface {
@@ -1636,10 +1664,11 @@ textarea.field {
 }
 
 .plot-type-compare-focus {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #d3dfef;
-  background: #ffffff;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #cddced;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1647,12 +1676,14 @@ textarea.field {
 
 .plot-type-compare-focus span {
   font-size: 11px;
-  color: #748ba4;
+  color: #607893;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .plot-type-compare-focus strong {
   font-size: 13px;
-  color: #1f3550;
+  color: #18314c;
 }
 
 .plot-type-compare-focus p {
@@ -1677,7 +1708,36 @@ textarea.field {
   border: 1px solid #d1dcec;
   background: #ffffff;
   font-size: 11px;
+  color: #59718e;
+}
+
+.plot-type-compare-stage {
+  min-height: 0;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #d5e1ef;
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.92) 0%, rgba(245, 249, 255, 0.98) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plot-type-compare-stage-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plot-type-compare-stage-head span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: #6a829e;
+}
+
+.plot-type-compare-stage-head strong {
+  font-size: 12px;
+  color: #20344d;
 }
 
 .plot-type-compare-thumbs {
@@ -1710,8 +1770,9 @@ textarea.field {
 }
 
 .plot-type-compare-thumb.selected {
-  border-color: #b9cde6;
-  background: #f4f8ff;
+  border-color: #8eaed4;
+  background: linear-gradient(180deg, #f4f8ff 0%, #eef4ff 100%);
+  box-shadow: 0 2px 10px rgba(87, 118, 166, 0.1);
 }
 
 .plot-type-compare-thumb .plot-type-card-thumb {
@@ -1740,10 +1801,10 @@ textarea.field {
   align-items: center;
   padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid #d0dcec;
-  background: #ffffff;
+  border: 1px solid #c9d9ea;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
   font-size: 11px;
-  color: #647c97;
+  color: #566d88;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
