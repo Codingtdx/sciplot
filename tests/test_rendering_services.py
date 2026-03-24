@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from matplotlib import rcParams
+from matplotlib.colors import to_hex
 
+from src import plot_style
 from src.rendering import (
     build_normalized_dataset,
     build_rendered_plots,
@@ -14,6 +17,7 @@ from src.rendering import (
     resolve_render_options,
 )
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
+from src.rendering.themes import visual_theme_ids, visual_theme_soft_overrides
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -24,6 +28,19 @@ def _write_curve_table(path: Path) -> Path:
         [0, 1.0, 0, 2.0],
         [1, 1.3, 1, 2.4],
         [2, 1.5, 2, 2.8],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_multi_curve_table(path: Path) -> Path:
+    rows = [
+        ["Time", "Stress", "Time", "Stress", "Time", "Stress", "Time", "Stress"],
+        ["s", "MPa", "s", "MPa", "s", "MPa", "s", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B", "Sample C", "Sample C", "Sample D", "Sample D"],
+        [0, 1.0, 0, 2.0, 0, 2.2, 0, 2.4],
+        [1, 1.3, 1, 2.4, 1, 2.5, 1, 2.6],
+        [2, 1.5, 2, 2.8, 2, 2.9, 2, 3.1],
     ]
     pd.DataFrame(rows).to_csv(path, header=False, index=False)
     return path
@@ -89,6 +106,69 @@ def _write_replicate_table(path: Path) -> Path:
         [510.13, 567.91, 544.10],
         [501.10, 501.49, 549.54],
         [549.61, 549.61, 562.07],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_dense_replicate_table(path: Path) -> Path:
+    rows = [
+        ["Storage modulus", "", ""],
+        ["Blend A", "Blend B", "Blend C"],
+        ["MPa", "MPa", "MPa"],
+        [480, 520, 500],
+        [495, 534, 512],
+        [502, 541, 521],
+        [510, 548, 529],
+        [517, 553, 536],
+        [523, 559, 541],
+        [530, 565, 548],
+        [538, 571, 552],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_many_group_replicate_table(path: Path) -> Path:
+    rows = [
+        ["Storage modulus", "", "", "", "", ""],
+        ["A", "B", "C", "D", "E", "F"],
+        ["MPa", "MPa", "MPa", "MPa", "MPa", "MPa"],
+        [420, 438, 455, 462, 470, 482],
+        [426, 445, 461, 468, 476, 488],
+        [431, 451, 466, 473, 481, 492],
+        [435, 456, 471, 478, 486, 497],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_discrete_replicate_table(path: Path) -> Path:
+    rows = [
+        ["Hardness", "", ""],
+        ["Blend A", "Blend B", "Blend C"],
+        ["a.u.", "a.u.", "a.u."],
+        [0, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+        [1, 1, 2],
+        [2, 2, 2],
+        [2, 2, 2],
+        [2, 3, 3],
+        [3, 3, 3],
+        [3, 3, 3],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_poorly_aligned_curve_table(path: Path) -> Path:
+    rows = [
+        ["Time", "Stress", "Time", "Stress"],
+        ["s", "MPa", "s", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+        [0.0, 1.0, 0.0, 1.2],
+        [0.0, 1.1, 0.0, 1.4],
     ]
     pd.DataFrame(rows).to_csv(path, header=False, index=False)
     return path
@@ -191,8 +271,10 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
 
     inspection = inspect_input_file(input_path)
     assert inspection.recommendation.template == "curve"
-    assert len(inspection.recommendations) == 1
+    assert len(inspection.recommendations) == 5
     assert inspection.recommendations[0].template_id == "curve"
+    assert inspection.recommendations[1].template_id == "point_line"
+    assert inspection.recommendations[0].why_soft_prior
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
@@ -251,12 +333,57 @@ def test_normalized_dataset_builder_reuses_model_and_shape_signals(
 
 
 def test_style_composer_uses_contract_backed_protected_keys() -> None:
-    bundle = DEFAULT_STYLE_COMPOSER.compose("default", None)
+    default_bundle = DEFAULT_STYLE_COMPOSER.compose("default", None)
+    bundle = DEFAULT_STYLE_COMPOSER.compose("default", "soft_grid")
 
+    assert default_bundle.resolved_soft == {}
     assert bundle.publication_profile_id == "default"
     assert bundle.protected_keys
     assert any(key.startswith("typography.") for key in bundle.protected_keys)
     assert "typography.font_size_pt" in bundle.protected_keys
+    assert bundle.visual_theme_id == "soft_grid"
+    assert bundle.resolved_soft == visual_theme_soft_overrides("soft_grid")
+
+
+def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> None:
+    try:
+        plot_style.apply_style(
+            "default",
+            "colorblind_safe",
+            soft_overrides=visual_theme_soft_overrides("soft_grid"),
+        )
+        assert rcParams["axes.grid"] is True
+        assert rcParams["legend.frameon"] is True
+        assert to_hex(rcParams["figure.facecolor"]) == "#fbfcfd"
+    finally:
+        plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+
+def test_visual_themes_do_not_mutate_protected_publication_typography_defaults() -> None:
+    protected_font_size = DEFAULT_STYLE_COMPOSER.compose("default", None).resolved_hard["typography"]["font_size_pt"]
+    protected_legend_size = DEFAULT_STYLE_COMPOSER.compose("default", None).resolved_hard["typography"][
+        "legend_font_size_pt"
+    ]
+
+    try:
+        for theme_id in visual_theme_ids():
+            overrides = visual_theme_soft_overrides(theme_id)
+            assert "font.size" not in overrides
+            assert "legend.fontsize" not in overrides
+            plot_style.apply_style("default", "colorblind_safe", soft_overrides=overrides)
+            assert rcParams["font.size"] == protected_font_size
+            assert rcParams["legend.fontsize"] == protected_legend_size
+    finally:
+        plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+
+def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
+    options = resolve_render_options(template="curve", visual_theme_id="presentation_like")
+
+    assert options.visual_theme_id == "presentation_like"
+
+    with pytest.raises(ValueError, match="Unknown visual theme"):
+        resolve_render_options(template="curve", visual_theme_id="not-a-theme")
 
 
 def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified() -> None:
@@ -381,6 +508,210 @@ def test_bar_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
     finally:
         close_rendered_plots(rendered)
+
+
+def test_replicate_inspection_keeps_single_recommendation_compatibility_default(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    inspection = inspect_input_file(input_path)
+
+    assert inspection.model == "replicate_table"
+    assert inspection.recommendation.template == "box"
+    assert inspection.recommendations
+    assert inspection.recommendations[0].template_id == "box"
+    assert {"distribution_compare", "grouped_bar_compare"}.issubset(
+        {item.template_id for item in inspection.recommendations}
+    )
+
+
+def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="grouped_bar_compare")
+    preflight = preflight_render_request("grouped_bar_compare", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_compare.pdf",)
+
+    rendered = build_rendered_plots("grouped_bar_compare", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "grouped_bar_compare_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_distribution_compare_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="distribution_compare")
+    preflight = preflight_render_request("distribution_compare", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_distribution_compare.pdf",)
+
+    rendered = build_rendered_plots("distribution_compare", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "distribution_variant_strip_box" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_histogram_density_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="histogram_density")
+    preflight = preflight_render_request("histogram_density", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_histogram_density.pdf",)
+
+    rendered = build_rendered_plots("histogram_density", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "histogram_density_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_histogram_density_preflight_warns_on_sparse_replicates(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="histogram_density")
+    preflight = preflight_render_request("histogram_density", input_path, 0, options)
+
+    assert preflight.errors == ()
+    assert any("less stable with sparse replicates" in warning for warning in preflight.warnings)
+
+
+def test_histogram_density_render_uses_discrete_binning_autofix_for_discrete_values(tmp_path: Path) -> None:
+    input_path = _write_discrete_replicate_table(tmp_path / "discrete_replicates.csv")
+
+    rendered = build_rendered_plots("histogram_density", input_path)
+    try:
+        assert len(rendered) == 1
+        assert rendered[0].qa_report is not None
+        assert "histogram_discrete_binning" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_distribution_compare_uses_violin_variant_when_groups_are_few_and_dense(tmp_path: Path) -> None:
+    input_path = _write_dense_replicate_table(tmp_path / "dense_replicates.csv")
+
+    rendered = build_rendered_plots("distribution_compare", input_path)
+    try:
+        assert len(rendered) == 1
+        assert rendered[0].qa_report is not None
+        assert "distribution_variant_violin" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_distribution_compare_uses_box_variant_when_group_count_is_large(tmp_path: Path) -> None:
+    input_path = _write_many_group_replicate_table(tmp_path / "many_groups.csv")
+
+    rendered = build_rendered_plots("distribution_compare", input_path)
+    try:
+        assert len(rendered) == 1
+        assert rendered[0].qa_report is not None
+        assert "distribution_variant_box" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_scatter_with_fit_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="scatter_with_fit")
+    preflight = preflight_render_request("scatter_with_fit", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_scatter_with_fit.pdf",)
+
+    rendered = build_rendered_plots("scatter_with_fit", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_annotated_heatmap_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_heatmap_table(tmp_path / "heatmap.csv")
+
+    options = resolve_render_options(template="annotated_heatmap")
+    preflight = preflight_render_request("annotated_heatmap", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("heatmap_annotated_heatmap.pdf",)
+
+    rendered = build_rendered_plots("annotated_heatmap", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "annotated_heatmap_labels" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_annotated_heatmap_preflight_warns_for_single_row_or_column_matrices(tmp_path: Path) -> None:
+    input_path = tmp_path / "single_row_heatmap.csv"
+    rows = [
+        ["X", "Y", "Z"],
+        ["Temperature", "Time", "Intensity"],
+        ["degC", "min", "a.u."],
+        [25.0, 0.0, 0.18],
+        [40.0, 0.0, 0.46],
+        [55.0, 0.0, 0.77],
+    ]
+    pd.DataFrame(rows).to_csv(input_path, header=False, index=False)
+
+    options = resolve_render_options(template="annotated_heatmap")
+    preflight = preflight_render_request("annotated_heatmap", input_path, 0, options)
+
+    assert preflight.errors == ()
+    assert any("single-row/column matrices" in warning for warning in preflight.warnings)
+
+
+def test_replicate_curves_with_band_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_multi_curve_table(tmp_path / "multi_curve.csv")
+
+    options = resolve_render_options(template="replicate_curves_with_band")
+    preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("multi_curve_replicate_curves_with_band.pdf",)
+
+    rendered = build_rendered_plots("replicate_curves_with_band", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "replicate_mean_band_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_replicate_curves_with_band_rejects_rheology_bundle(tmp_path: Path) -> None:
+    input_path = _write_frequency_sweep_table(tmp_path / "frequency.xlsx")
+
+    options = resolve_render_options(template="replicate_curves_with_band")
+    preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
+    assert preflight.errors == ("replicate_curves_with_band is not supported for rheology export bundles.",)
+
+    with pytest.raises(ValueError, match="not supported for rheology export bundles"):
+        build_rendered_plots("replicate_curves_with_band", input_path)
+
+
+def test_replicate_curves_with_band_preflight_rejects_poor_x_alignment(tmp_path: Path) -> None:
+    input_path = _write_poorly_aligned_curve_table(tmp_path / "poorly_aligned_curve.csv")
+
+    options = resolve_render_options(template="replicate_curves_with_band")
+    preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
+
+    assert preflight.errors == (
+        "replicate_curves_with_band requires at least two shared x positions across replicates. "
+        "Align the x values (or sampling grid) before rendering.",
+    )
 
 
 def test_small_curve_render_prefers_direct_labels_when_they_fit(tmp_path: Path) -> None:

@@ -239,21 +239,21 @@ def analyze_rendered_figure(
     palette_preset: str,
     autofixes_applied: Iterable[str] = (),
 ) -> QAReport:
-    if template in {"curve", "point_line", "scatter"}:
+    if template in {"curve", "point_line", "scatter", "scatter_with_fit", "replicate_curves_with_band"}:
         return _analyze_curve_figure(
             fig,
             template=template,
             options=options,
             autofixes_applied=autofixes_applied,
         )
-    if template == "heatmap":
+    if template in {"heatmap", "annotated_heatmap"}:
         return _analyze_heatmap_figure(
             fig,
             options=options,
             palette_preset=palette_preset,
             autofixes_applied=autofixes_applied,
         )
-    if template in {"bar", "box", "violin"}:
+    if template in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
         return _analyze_stats_figure(
             fig,
             template=template,

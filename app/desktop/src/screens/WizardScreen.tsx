@@ -204,6 +204,7 @@ export function WizardScreen({
     Boolean(wizard.inputPath) &&
     Boolean(wizard.template) &&
     routeStage === "review";
+  const showStudioStage = routeStage !== "import" && routeStage !== "sheet";
 
   const {
     busy: previewBusy,
@@ -496,7 +497,7 @@ export function WizardScreen({
           />
         )}
 
-        {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
+        {showStudioStage && (
           <WizardStudioStage
             hasTemplate={hasTemplate}
             meta={meta}

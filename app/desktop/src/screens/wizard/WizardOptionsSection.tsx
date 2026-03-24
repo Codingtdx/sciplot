@@ -6,6 +6,7 @@ import type {
   WorkbenchStyle,
   WorkbenchTemplate,
 } from "../../lib/types";
+import { visualThemeChoices } from "../../lib/workbench";
 
 type Props = {
   meta: WorkbenchMeta | null;
@@ -30,10 +31,13 @@ export function WizardOptionsSection({
   tensileCurveMode,
   onUpdateOptions,
 }: Props) {
+  const visualThemes = visualThemeChoices(meta);
   const selectedStyle =
     styleOptions.find((choice) => choice.id === (options.style_preset ?? meta?.default_style)) ??
     styleOptions[0] ??
     null;
+  const selectedVisualTheme =
+    visualThemes.find((choice) => choice.id === options.visual_theme_id) ?? null;
 
   return (
     <section className="context-card wizard-pane">
@@ -109,7 +113,7 @@ export function WizardOptionsSection({
 
               {currentTemplate?.editable_options.includes("style_preset") && (
                 <label className="wizard-option-card">
-                  <span className="field-label">Submission mode</span>
+                  <span className="field-label">Publication profile</span>
                   <select
                     className="field"
                     value={options.style_preset ?? meta?.default_style ?? ""}
@@ -120,6 +124,28 @@ export function WizardOptionsSection({
                     }
                   >
                     {styleOptions.map((choice) => (
+                      <option key={choice.id} value={choice.id}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {visualThemes.length > 0 && (
+                <label className="wizard-option-card">
+                  <span className="field-label">Visual theme</span>
+                  <select
+                    className="field"
+                    value={options.visual_theme_id ?? ""}
+                    onChange={(event) =>
+                      onUpdateOptions({
+                        visual_theme_id: event.target.value || null,
+                      })
+                    }
+                    >
+                    <option value="">Publication only</option>
+                    {visualThemes.map((choice) => (
                       <option key={choice.id} value={choice.id}>
                         {choice.label}
                       </option>
@@ -149,7 +175,7 @@ export function WizardOptionsSection({
 
           {selectedStyle && (
             <details className="wizard-details">
-              <summary>Current style preset</summary>
+              <summary>Current publication profile</summary>
               <div className="wizard-details-body">
                 <div>
                   <strong>{selectedStyle.label}</strong>
@@ -162,6 +188,12 @@ export function WizardOptionsSection({
                 </div>
               </div>
             </details>
+          )}
+
+          {selectedVisualTheme && (
+            <div className="wb-inline-meta">
+              Visual theme: {selectedVisualTheme.label} - {selectedVisualTheme.description}
+            </div>
           )}
 
           <details className="wizard-details">

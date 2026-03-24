@@ -819,6 +819,114 @@
         "dense_group_label_warning"
       ]
     },
+    "grouped_bar_compare": {
+      "label": "Grouped bar compare",
+      "description": "Grouped bar comparison with deterministic spacing and raw-point overlays.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "distribution_compare": {
+      "label": "Distribution compare",
+      "description": "Single structural family for group-wise distribution comparison with deterministic internal variant selection.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "histogram_density": {
+      "label": "Histogram density",
+      "description": "Density-normalized histogram overlays with deterministic smoothed density lines.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
     "scatter": {
       "label": "Scatter",
       "description": "Single-panel scatter plot.",
@@ -859,9 +967,128 @@
       ],
       "soft_rules": []
     },
+    "scatter_with_fit": {
+      "label": "Scatter with fit",
+      "description": "Single-panel scatter plot with a deterministic linear fit overlay.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false,
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "replicate_curves_with_band": {
+      "label": "Replicate curves with band",
+      "description": "Single-panel curve plot with a replicate mean band overlay.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false,
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
     "heatmap": {
       "label": "Heatmap",
       "description": "Heatmap with the main frame aligned to standard single-panel plots and an independent top colorbar.",
+      "category": "heatmap",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "show_colorbar",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "show_colorbar": true,
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "heatmap_main_frame",
+        "heatmap_horizontal_colorbar",
+        "heatmap_colorbar_inside_canvas",
+        "non_blank_pdf"
+      ],
+      "soft_rules": []
+    },
+    "annotated_heatmap": {
+      "label": "Annotated heatmap",
+      "description": "Heatmap with cell annotations layered on top of the matrix.",
       "category": "heatmap",
       "default_size": "60x55",
       "allowed_sizes": [

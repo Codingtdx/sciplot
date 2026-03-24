@@ -8,6 +8,7 @@ from src.plot_contract import (
 )
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HINTS, TEMPLATE_CHOICES
 from src.rendering.models import RenderOptions
+from src.rendering.themes import visual_theme_ids
 
 
 def validate_template_name(template: str) -> str:
@@ -41,6 +42,7 @@ def resolve_render_options(
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
+    visual_theme_id: str | None = None,
 ) -> RenderOptions:
     width_mm, height_mm = resolve_size(size, template)
     spec = template_contract(template)
@@ -57,6 +59,11 @@ def resolve_render_options(
             f"Template `{template}` does not support palette `{resolved_palette}`. "
             f"Supported palettes: {', '.join(spec.available_palettes)}"
         )
+    resolved_theme = visual_theme_id.strip() if isinstance(visual_theme_id, str) else None
+    if resolved_theme and resolved_theme not in visual_theme_ids():
+        raise ValueError(
+            f"Unknown visual theme: {resolved_theme}. Supported themes: {', '.join(visual_theme_ids())}"
+        )
     return RenderOptions(
         width_mm=width_mm,
         height_mm=height_mm,
@@ -68,6 +75,7 @@ def resolve_render_options(
         style_preset=normalized_style,
         palette_preset=resolved_palette,
         use_sidecar=use_sidecar,
+        visual_theme_id=resolved_theme or None,
     )
 
 

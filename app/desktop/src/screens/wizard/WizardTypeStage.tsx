@@ -14,6 +14,7 @@ import {
   templateCompatibilityReason,
   templateLabel,
 } from "../../lib/workbench";
+import { inspectionRecommendationChoices } from "../../lib/wizard";
 
 type Props = {
   inputPath: string | null;
@@ -51,19 +52,6 @@ function templateMockClass(templateId: TemplateName) {
   return "curve";
 }
 
-function recommendationReason(
-  template: WorkbenchTemplate,
-  inspection: InputInspection | null,
-) {
-  if (!inspection) {
-    return "Run inspect to get data-aware template guidance.";
-  }
-  if (inspection.recommendation.template === template.id) {
-    return inspection.recommendation.reason;
-  }
-  return `Compatible with detected model ${inspection.model_label}.`;
-}
-
 export function WizardTypeStage({
   inputPath,
   inspection,
@@ -88,12 +76,38 @@ export function WizardTypeStage({
 }: Props) {
   const [previewMode, setPreviewMode] = useState<"compare" | "preview">("compare");
   const topRecommendations = useMemo(
-    () => compatibleTemplates.slice(0, 5),
-    [compatibleTemplates],
+    () => {
+      if (!inspection) {
+        return [];
+      }
+      if (inspection.recommendations?.length) {
+        return inspectionRecommendationChoices(meta, inspection, 5);
+      }
+      return compatibleTemplates.slice(0, 5).map((template, index) => ({
+        template,
+        recommendation: {
+          template_id: template.id,
+          score: 100 - index,
+          why_hard_match:
+            index === 0
+              ? [inspection.recommendation.reason]
+              : [`Compatible with detected model ${inspection.model_label}.`],
+          why_soft_prior:
+            index === 0 ? [] : [`Compatible with detected model ${inspection.model_label}.`],
+          inferred_mapping: {},
+          optional_enhancements: [],
+          preview_config_summary: {},
+        },
+      }));
+    },
+    [compatibleTemplates, inspection, meta],
   );
   const alternatives = useMemo(
-    () => compatibleTemplates.slice(5),
-    [compatibleTemplates],
+    () => {
+      const recommendedTemplateIds = new Set(topRecommendations.map((item) => item.template.id));
+      return compatibleTemplates.filter((template) => !recommendedTemplateIds.has(template.id));
+    },
+    [compatibleTemplates, topRecommendations],
   );
 
   return (
@@ -126,9 +140,8 @@ export function WizardTypeStage({
             <div className="placeholder-card">Run inspect first to unlock template recommendations.</div>
           ) : (
             <div className="plot-type-cards">
-              {topRecommendations.map((template) => {
+              {topRecommendations.map(({ template, recommendation }, index) => {
                 const selected = selectedTemplate === template.id;
-                const recommended = inspection.recommendation.template === template.id;
                 return (
                   <article
                     className={`plot-type-card ${selected ? "selected" : ""}`}
@@ -138,9 +151,14 @@ export function WizardTypeStage({
                     <div className="plot-type-card-copy">
                       <div className="plot-type-card-title-row">
                         <strong>{template.label}</strong>
-                        <span>{recommended ? "Recommended" : "Compatible"}</span>
+                        <span>
+                          Rank #{index + 1} · Score {recommendation.score.toFixed(1)}
+                        </span>
                       </div>
-                      <p>{recommendationReason(template, inspection)}</p>
+                      <p>{recommendation.why_hard_match[0] ?? "Compatible with detected data."}</p>
+                      {recommendation.why_soft_prior[0] && (
+                        <div className="wb-inline-meta">{recommendation.why_soft_prior[0]}</div>
+                      )}
                       <div className="plot-type-card-meta">
                         <span>Size {template.default_size}</span>
                         <span>{template.category}</span>
@@ -190,6 +208,7 @@ export function WizardTypeStage({
                   </div>
                   {incompatibleTemplates.map((template) => (
                     <CompactListRow
+                      onSelect={() => onSelectTemplate(template.id)}
                       disabled
                       key={template.id}
                       right={<span className="wb-inline-meta">Not compatible</span>}
@@ -238,7 +257,7 @@ export function WizardTypeStage({
                   </p>
                 </div>
                 <div className="plot-type-compare-thumbs">
-                  {topRecommendations.slice(0, 3).map((template) => (
+                  {topRecommendations.slice(0, 3).map(({ template }) => (
                     <button
                       className={`plot-type-compare-thumb ${selectedTemplate === template.id ? "selected" : ""}`}
                       key={template.id}

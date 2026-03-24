@@ -120,10 +120,21 @@ export type Recommendation = {
   use_sidecar?: boolean;
 };
 
+export type TemplateRecommendation = {
+  template_id: TemplateName;
+  score: number;
+  why_hard_match: string[];
+  why_soft_prior: string[];
+  inferred_mapping: Record<string, string>;
+  optional_enhancements: string[];
+  preview_config_summary: Record<string, unknown>;
+};
+
 export type InputInspection = {
   model: string;
   model_label: string;
   recommendation: Recommendation;
+  recommendations?: TemplateRecommendation[];
   warnings: string[];
   signals: string[];
 };
@@ -146,6 +157,7 @@ export type RenderOptionsPayload = {
   style_preset?: StylePreset;
   palette_preset?: PalettePreset;
   use_sidecar?: boolean | null;
+  visual_theme_id?: string | null;
 };
 
 export type EditableRenderOption = keyof RenderOptionsPayload;
@@ -373,6 +385,12 @@ export type WorkbenchPalette = {
   swatches: string[];
 };
 
+export type WorkbenchVisualTheme = {
+  id: string;
+  label: string;
+  description: string;
+};
+
 export type WorkbenchTemplate = {
   id: TemplateName;
   label: string;
@@ -396,6 +414,7 @@ export type WorkbenchMeta = {
   sizes: WorkbenchSize[];
   styles: WorkbenchStyle[];
   palettes: WorkbenchPalette[];
+  visual_themes: WorkbenchVisualTheme[];
   templates: WorkbenchTemplate[];
   template_ids: TemplateName[];
   size_ids: SizePreset[];

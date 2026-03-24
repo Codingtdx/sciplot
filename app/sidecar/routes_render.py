@@ -108,6 +108,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 style_preset=payload_options.style_preset,
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
+                visual_theme_id=payload_options.visual_theme_id,
             )
             try:
                 previews = rendered_plots_to_preview_payload(rendered_plots)
@@ -169,6 +170,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 style_preset=payload_options.style_preset,
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
+                visual_theme_id=payload_options.visual_theme_id,
             )
             try:
                 outputs = export_rendered_plots(rendered_plots, output_dir, close=False)

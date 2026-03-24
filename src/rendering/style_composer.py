@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from src.rendering.themes import publication_profile_hard_constraints, publication_profile_protected_keys
+from src.rendering.themes import (
+    publication_profile_hard_constraints,
+    publication_profile_protected_keys,
+    visual_theme_soft_overrides,
+)
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,7 @@ class ContractStyleComposer:
             publication_profile_id=publication_profile_id,
             visual_theme_id=visual_theme_id,
             resolved_hard=publication_profile_hard_constraints(publication_profile_id),
-            resolved_soft={},
+            resolved_soft=visual_theme_soft_overrides(visual_theme_id),
             protected_keys=publication_profile_protected_keys(publication_profile_id),
         )
 

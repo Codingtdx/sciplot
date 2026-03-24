@@ -30,6 +30,7 @@ import type {
   TemplateName,
   WorkbenchMeta,
   WorkbenchPalette,
+  WorkbenchVisualTheme,
   WorkbenchSize,
   WorkbenchStyle,
   WorkbenchTemplate,
@@ -45,6 +46,7 @@ const EDITABLE_OPTION_KEYS: EditableRenderOption[] = [
   "style_preset",
   "palette_preset",
   "use_sidecar",
+  "visual_theme_id",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -99,6 +101,15 @@ function optionalBaseline(value: unknown): "none" | "linear_endpoints" | undefin
   return value === "none" || value === "linear_endpoints" ? value : undefined;
 }
 
+function readWorkbenchVisualTheme(value: unknown, index: number): WorkbenchVisualTheme {
+  const record = requireRecord(value, `Workbench visual theme ${index}`);
+  return {
+    id: requireString(record.id, `Workbench visual theme ${index}.id`),
+    label: requireString(record.label, `Workbench visual theme ${index}.label`),
+    description: requireString(record.description, `Workbench visual theme ${index}.description`),
+  };
+}
+
 function requireStringArray(value: unknown, label: string): string[] {
   if (!Array.isArray(value)) {
     throw new Error(`${label} is not a valid list.`);
@@ -145,6 +156,10 @@ function readRenderOptions(
     record.use_sidecar === null
   ) {
     next.use_sidecar = record.use_sidecar as boolean | null;
+  }
+  const visualThemeId = optionalString(record.visual_theme_id);
+  if (visualThemeId) {
+    next.visual_theme_id = visualThemeId;
   }
 
   return next;
@@ -489,6 +504,9 @@ export function coerceWorkbenchMeta(value: unknown): WorkbenchMeta {
   const palettes = Array.isArray(record.palettes)
     ? record.palettes.map(readWorkbenchPalette)
     : [];
+  const visualThemes = Array.isArray(record.visual_themes)
+    ? record.visual_themes.map(readWorkbenchVisualTheme)
+    : [];
   const templates = Array.isArray(record.templates)
     ? record.templates.map(readWorkbenchTemplate)
     : [];
@@ -520,6 +538,7 @@ export function coerceWorkbenchMeta(value: unknown): WorkbenchMeta {
     sizes,
     styles,
     palettes,
+    visual_themes: visualThemes,
     templates,
     template_ids: templateIds as TemplateName[],
     size_ids: sizeIds as SizePreset[],

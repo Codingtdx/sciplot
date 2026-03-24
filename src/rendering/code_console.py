@@ -861,7 +861,7 @@ def _scaffold_text(
         "patch_renderer": "patch_existing_renderer",
     }.get(intent, "render_custom_plot")
 
-    if template == "heatmap":
+    if template in {"heatmap", "annotated_heatmap"}:
         custom_lines = [
             "    cmap = plot_style.get_sequential_cmap(options.palette_preset)",
             "    image = ax.imshow(matrix, cmap=cmap, aspect='auto')",
@@ -892,7 +892,7 @@ def _scaffold_text(
             "    # Add the custom plot logic here while preserving SciPlot God defaults.",
         ]
 
-    argument_line = "    matrix," if template == "heatmap" else "    x, y,"
+    argument_line = "    matrix," if template in {"heatmap", "annotated_heatmap"} else "    x, y,"
     return "\n".join(
         [
             "# Reuse these project entry points:",
@@ -948,6 +948,7 @@ def generate_code_console_payload(
     style_preset: str | None,
     palette_preset: str | None,
     use_sidecar: bool | None = None,
+    visual_theme_id: str | None = None,
     target_path: str | None,
     input_path: Path | None,
     sheet: str | int | None,
@@ -969,6 +970,7 @@ def generate_code_console_payload(
         style_preset=style_preset or plot_style.DEFAULT_STYLE_PRESET,
         palette_preset=palette_preset or plot_style.DEFAULT_PALETTE_PRESET,
         use_sidecar=use_sidecar,
+        visual_theme_id=visual_theme_id,
     )
     normalized_target_path = (target_path or "").strip() or _default_target_path(intent, template)
     normalized_sheet = sheet if sheet is not None else 0

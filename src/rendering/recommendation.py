@@ -14,13 +14,20 @@ from src.rendering.cache import (
     load_stress_relaxation_metric_cached,
 )
 from src.rendering.common import looks_like_tensile_curve, to_curve_series
-from src.rendering.dataset_models import build_normalized_dataset, point_line_bundle_signals
+from src.rendering.dataset_models import (
+    build_normalized_dataset,
+    looks_like_dsc_curve,
+    looks_like_ftir_curve,
+    looks_like_nmr_curve,
+    looks_like_xrd_curve,
+    point_line_bundle_signals,
+)
 from src.rendering.models import InputInspection, Recommendation, TemplateName
 from src.rendering.recommender import (
+    DEFAULT_RECOMMENDER,
     legacy_recommendation_to_template_recommendation,
-    legacy_recommendations,
 )
-from src.text_normalization import canonicalize_token
+from src.rendering.recommender_models import TemplateRecommendation
 from src.wide_nmr import wide_nmr_sidecar_path
 
 
@@ -43,6 +50,8 @@ def model_label(model: str) -> str:
         "stress_relaxation": "Stress relaxation export table",
     }
     return labels.get(model, model)
+
+
 def axis_dynamic_range(
     series_list: list[CurveSeries],
     axis: str,
@@ -128,38 +137,11 @@ def recommendation(template: TemplateName, reason: str, **overrides: object) -> 
     return Recommendation(**payload)
 
 
-def looks_like_nmr(series_list: list[CurveSeries]) -> bool:
-    first = series_list[0]
-    x_label = canonicalize_token(first.x_label)
-    x_unit = clean_text(first.x_unit).lower()
-    return x_label == "chemical shift" or "ppm" in x_unit
-
-
-def looks_like_ftir(series_list: list[CurveSeries]) -> bool:
-    first = series_list[0]
-    x_label = canonicalize_token(first.x_label)
-    x_unit = clean_text(first.x_unit).lower()
-    return x_label == "wavenumber" or ("cm" in x_unit and ("-1" in x_unit or "^{-1}" in x_unit))
-
-
-def looks_like_xrd(series_list: list[CurveSeries]) -> bool:
-    first = series_list[0]
-    x_label = canonicalize_token(first.x_label)
-    y_label = canonicalize_token(first.y_label)
-    y_unit = clean_text(first.y_unit).lower()
-    return x_label in {"2theta", "2θ"} or ("count" in y_unit) or (x_label == "2 theta" and y_label == "intensity")
-
-
-def looks_like_dsc(series_list: list[CurveSeries]) -> bool:
-    first = series_list[0]
-    y_label = canonicalize_token(first.y_label)
-    return y_label == "heat flow"
-
-
 def _inspection(
     *,
     model: str,
     recommendation_value: Recommendation,
+    recommendations: tuple[TemplateRecommendation, ...] = (),
     warnings: tuple[str, ...] = (),
     signals: tuple[str, ...] = (),
 ) -> InputInspection:
@@ -180,7 +162,7 @@ def _inspection(
         model=model,
         model_label=model_label(model),
         recommendation=recommendation_value,
-        recommendations=legacy_recommendations(template_recommendation),
+        recommendations=recommendations or (template_recommendation,),
         warnings=warnings,
         signals=signals,
     )
@@ -188,6 +170,7 @@ def _inspection(
 
 def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspection:
     normalized_dataset = build_normalized_dataset(input_path, sheet)
+    ranked_recommendations = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=5)
 
     if normalized_dataset.model == "frequency_sweep":
         return _inspection(
@@ -201,6 +184,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             ),
             warnings=("This export will generate 4 PDF files.",),
             signals=point_line_bundle_signals("frequency_sweep"),
+            recommendations=ranked_recommendations,
         )
     if normalized_dataset.model == "temperature_sweep":
         return _inspection(
@@ -215,6 +199,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             ),
             warnings=("This export will generate 2 PDF files.",),
             signals=point_line_bundle_signals("temperature_sweep"),
+            recommendations=ranked_recommendations,
         )
     if normalized_dataset.model == "stress_relaxation":
         relaxation_series = to_curve_series(load_stress_relaxation_metric_cached(input_path, "σ/σ₀", sheet))
@@ -229,6 +214,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 reverse_x=False,
             ),
             signals=point_line_bundle_signals("stress_relaxation") + range_signals,
+            recommendations=ranked_recommendations,
         )
 
     if normalized_dataset.model == "heatmap_table":
@@ -244,6 +230,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 "Row 1 explicitly defines the X, Y, and Z role columns.",
                 "This input is best converted directly into a heatmap matrix.",
             ),
+            recommendations=ranked_recommendations,
         )
 
     with suppress(Exception):
@@ -258,13 +245,14 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     baseline="linear_endpoints",
                     use_sidecar=True,
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "Detected a standard paired curve table.",
                     "A .wide_nmr.toml sidecar is present in the same directory.",
                     "This input is a better fit for a segmented stacked curve plot.",
                 ),
             )
-        if looks_like_nmr(series_list):
+        if looks_like_nmr_curve(series_list):
             return _inspection(
                 model="curve_table",
                 recommendation_value=recommendation(
@@ -273,13 +261,14 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     reverse_x=True,
                     baseline="linear_endpoints",
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "The x-axis label or unit matches Chemical shift / ppm.",
                     "Multiple sample curves are better shown as a stacked spectrum.",
                     "A reversed x-axis and light baseline correction are recommended.",
                 ),
             )
-        if looks_like_ftir(series_list):
+        if looks_like_ftir_curve(series_list):
             return _inspection(
                 model="curve_table",
                 recommendation_value=recommendation(
@@ -288,13 +277,14 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     reverse_x=True,
                     baseline="none",
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "The x-axis label or unit matches Wavenumber / cm⁻¹.",
                     "Multiple sample curves are better shown as a stacked spectrum.",
                     "A reversed x-axis is recommended without forcing baseline correction.",
                 ),
             )
-        if looks_like_dsc(series_list):
+        if looks_like_dsc_curve(series_list):
             return _inspection(
                 model="curve_table",
                 recommendation_value=recommendation(
@@ -303,13 +293,14 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     reverse_x=False,
                     baseline="linear_endpoints",
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "The y-axis label matches Heat flow.",
                     "These thermal analysis curves are easier to compare in a stacked layout.",
                     "Linear-endpoint baseline correction is recommended.",
                 ),
             )
-        if looks_like_xrd(series_list):
+        if looks_like_xrd_curve(series_list):
             return _inspection(
                 model="curve_table",
                 recommendation_value=recommendation(
@@ -318,6 +309,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     reverse_x=False,
                     baseline="none",
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "The axis labels or units match 2theta / counts / intensity.",
                     "Multiple sample curves are better shown as a stacked spectrum.",
@@ -335,6 +327,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                     yscale="linear",
                     reverse_x=False,
                 ),
+                recommendations=ranked_recommendations,
                 signals=(
                     "The x-axis label or unit matches strain / elongation / %.",
                     "The y-axis label or unit matches stress / MPa.",
@@ -342,14 +335,29 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 ),
             )
         xscale, yscale, range_signals = recommend_curve_scales(series_list)
+        compatibility_template = ranked_recommendations[0].template_id if ranked_recommendations else "curve"
+        compatibility_reason = (
+            "Detected a standard paired curve table, so a basic curve plot is recommended by default."
+        )
+        if compatibility_template == "replicate_curves_with_band":
+            compatibility_reason = (
+                "Detected aligned paired curves with replicate-like structure, "
+                "so a mean-band curve summary is recommended."
+            )
+        elif compatibility_template == "scatter_with_fit":
+            compatibility_reason = (
+                "Detected paired curves with a strong trend pattern, "
+                "so scatter with deterministic linear fit is recommended."
+            )
         return _inspection(
             model="curve_table",
             recommendation_value=recommendation(
-                "curve",
-                "Detected a standard paired curve table, so a basic curve plot is recommended by default.",
+                compatibility_template,
+                compatibility_reason,
                 xscale=xscale,
                 yscale=yscale,
             ),
+            recommendations=ranked_recommendations,
             signals=(
                 "Detected a standard paired curve table.",
                 "The labels and units do not strongly match a spectrum or rheology export bundle.",
@@ -375,6 +383,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             "box",
             "Detected a statistical table with a shared y-axis label, sample names, units, and replicate values.",
         ),
+        recommendations=ranked_recommendations,
         warnings=tuple(warnings),
         signals=(
             "Cell A1 provides the shared y-axis label.",

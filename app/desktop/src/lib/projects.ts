@@ -40,6 +40,9 @@ function asRenderOptions(payload: unknown): RenderOptionsPayload {
   if (typeof candidate.use_sidecar === "boolean") {
     next.use_sidecar = candidate.use_sidecar;
   }
+  if (typeof candidate.visual_theme_id === "string") {
+    next.visual_theme_id = candidate.visual_theme_id;
+  }
   return next;
 }
 

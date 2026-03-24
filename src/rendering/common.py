@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 from src.data_loader import CurveSeries, ReplicateGroup
 from src.plot_contract import validation_rule
@@ -24,6 +28,16 @@ from src.text_normalization import canonicalize_token, normalize_label, slugify_
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
 TENSILE_LINEAR_SCALE_ERROR = "Tensile curves must use linear axes. Log x / y is not supported."
+
+
+@dataclass(frozen=True)
+class ReplicateDistributionSummary:
+    group_count: int
+    total_points: int
+    min_group_points: int
+    max_group_points: int
+    pooled_unique_count: int
+    pooled_unique_ratio: float
 
 
 def humanize_preflight_exception(exc: Exception) -> str:
@@ -104,6 +118,16 @@ def humanize_preflight_exception(exc: Exception) -> str:
             "No valid groups were found in the replicate table. Confirm that "
             "row 2 contains group names and row 4 onward contains replicate values."
         )
+    if "replicate_curves_with_band requires at least two replicate curves." in message:
+        return (
+            "replicate_curves_with_band requires at least two usable replicate curves. "
+            "Check that at least two series contain numeric X/Y data."
+        )
+    if "At least two aligned x points are required for replicate_curves_with_band." in message:
+        return (
+            "replicate_curves_with_band requires at least two shared x positions across replicates. "
+            "Align the x values (or sampling grid) before rendering."
+        )
     return message
 
 
@@ -138,6 +162,68 @@ def validate_series_scales(series_list: list[CurveSeries], *, xscale: str, yscal
         for series in series_list:
             if (series.data["y"] <= 0).any():
                 raise ValueError(f"Series {series.sample!r} contains non-positive y values and cannot use log y-axis.")
+
+
+def summarize_replicate_distribution(groups: list[ReplicateGroup]) -> ReplicateDistributionSummary:
+    if not groups:
+        return ReplicateDistributionSummary(
+            group_count=0,
+            total_points=0,
+            min_group_points=0,
+            max_group_points=0,
+            pooled_unique_count=0,
+            pooled_unique_ratio=0.0,
+        )
+    counts: list[int] = []
+    pooled_blocks: list[np.ndarray] = []
+    for group in groups:
+        values = pd.to_numeric(group.data, errors="coerce").to_numpy(dtype=float)
+        finite = values[np.isfinite(values)]
+        counts.append(int(finite.size))
+        if finite.size:
+            pooled_blocks.append(finite)
+    pooled = np.concatenate(pooled_blocks) if pooled_blocks else np.array([], dtype=float)
+    unique_values = np.unique(np.round(pooled, 9)) if pooled.size else np.array([], dtype=float)
+    return ReplicateDistributionSummary(
+        group_count=len(groups),
+        total_points=int(sum(counts)),
+        min_group_points=min(counts) if counts else 0,
+        max_group_points=max(counts) if counts else 0,
+        pooled_unique_count=int(unique_values.size),
+        pooled_unique_ratio=float(unique_values.size / pooled.size) if pooled.size else 0.0,
+    )
+
+
+def aligned_replicate_band(series_list: list[CurveSeries]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    named: dict[str, list[pd.DataFrame]] = {}
+    for series in series_list:
+        frame = series.data.dropna(subset=["x", "y"])[["x", "y"]].copy(deep=True)
+        if frame.empty:
+            continue
+        frame = frame.astype({"x": float, "y": float}).sort_values("x")
+        named.setdefault(series.sample, []).append(frame)
+    replicated_groups = [frames for frames in named.values() if len(frames) >= 2]
+    all_frames = [frame for frames in named.values() for frame in frames]
+    source = replicated_groups[0] if replicated_groups else all_frames
+    if len(source) < 2:
+        raise ValueError("replicate_curves_with_band requires at least two replicate curves.")
+    x_reference = np.unique(np.concatenate([frame["x"].to_numpy(dtype=float) for frame in source]))
+    x_reference = np.asarray(sorted(float(value) for value in x_reference), dtype=float)
+    if x_reference.size < 2:
+        raise ValueError("At least two aligned x points are required for replicate_curves_with_band.")
+    aligned = []
+    for frame in source:
+        x = frame["x"].to_numpy(dtype=float)
+        y = frame["y"].to_numpy(dtype=float)
+        if x.size < 2:
+            continue
+        aligned.append(np.interp(x_reference, x, y))
+    if len(aligned) < 2:
+        raise ValueError("replicate_curves_with_band requires at least two replicate curves.")
+    stacked = np.vstack(aligned)
+    mean = np.nanmean(stacked, axis=0)
+    std = np.nanstd(stacked, axis=0, ddof=0)
+    return x_reference, mean, std
 
 
 def looks_like_tensile_curve(series_list: list[CurveSeries]) -> bool:
@@ -244,6 +330,10 @@ def preview_output_filenames(
         return (f"{input_path.stem}_point_line.pdf",)
     if template == "curve":
         return (f"{input_path.stem}_curve.pdf",)
+    if template == "scatter_with_fit":
+        return (f"{input_path.stem}_scatter_with_fit.pdf",)
+    if template == "replicate_curves_with_band":
+        return (f"{input_path.stem}_replicate_curves_with_band.pdf",)
     if template == "stacked_curve":
         return (f"{input_path.stem}_stacked_curve.pdf",)
     if template == "segmented_stacked_curve":
@@ -252,7 +342,13 @@ def preview_output_filenames(
         return (f"{input_path.stem}_scatter.pdf",)
     if template == "heatmap":
         return (f"{input_path.stem}_heatmap.pdf",)
+    if template == "annotated_heatmap":
+        return (f"{input_path.stem}_annotated_heatmap.pdf",)
     if template in {"bar", "box", "violin"}:
+        groups = load_replicate_table_cached(input_path, sheet)
+        slug = predict_bar_box_slug(groups)
+        return (f"{slug}_{template}.pdf",)
+    if template in {"grouped_bar_compare", "distribution_compare", "histogram_density"}:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)
@@ -293,6 +389,8 @@ def append_multi_output_warning(warnings: list[str], preview_names: tuple[str, .
 
 
 __all__ = [
+    "ReplicateDistributionSummary",
+    "aligned_replicate_band",
     "append_multi_output_warning",
     "humanize_preflight_exception",
     "load_segmented_config",
@@ -301,6 +399,7 @@ __all__ = [
     "predict_bar_box_slug",
     "preview_output_filenames",
     "rheology_output_filenames",
+    "summarize_replicate_distribution",
     "style_preflight_warnings",
     "TENSILE_LINEAR_SCALE_ERROR",
     "to_curve_series",

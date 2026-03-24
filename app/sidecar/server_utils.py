@@ -41,6 +41,7 @@ def options_from_payload(template: str, payload: RenderOptionsPayload):
         style_preset=payload.style_preset or plot_style.DEFAULT_STYLE_PRESET,
         palette_preset=payload.palette_preset,
         use_sidecar=payload.use_sidecar,
+        visual_theme_id=payload.visual_theme_id,
     )
 
 
@@ -58,6 +59,7 @@ def code_console_payload_options(request: CodeConsoleGenerateRequest) -> RenderO
         or request.palette_preset
         or plot_style.DEFAULT_PALETTE_PRESET,
         use_sidecar=payload.use_sidecar,
+        visual_theme_id=payload.visual_theme_id,
     )
 
 

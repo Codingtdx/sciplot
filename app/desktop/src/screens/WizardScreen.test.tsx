@@ -97,6 +97,41 @@ const TEST_INSPECT_RESPONSE: InspectResponse = {
   },
 };
 
+const TEST_RANKED_INSPECT_RESPONSE: InspectResponse = {
+  ...TEST_INSPECT_RESPONSE,
+  inspection: {
+    ...TEST_INSPECT_RESPONSE.inspection,
+    recommendations: [
+      {
+        template_id: "curve",
+        score: 88.5,
+        why_hard_match: ["Normalized dataset model is curve_table with curve_like shape."],
+        why_soft_prior: ["Compact paired curves are the safest default."],
+        inferred_mapping: { x: "Time", y: "Stress" },
+        optional_enhancements: ["Use point_line if markers become useful."],
+        preview_config_summary: {
+          size: "60x55",
+          xscale: "linear",
+          yscale: "linear",
+        },
+      },
+      {
+        template_id: "point_line",
+        score: 84.2,
+        why_hard_match: ["Normalized dataset model is curve_table with curve_like shape."],
+        why_soft_prior: ["Markers make paired observations easier to scan."],
+        inferred_mapping: { x: "Time", y: "Stress" },
+        optional_enhancements: ["Keep markers small when the series density is high."],
+        preview_config_summary: {
+          size: "60x55",
+          xscale: "linear",
+          yscale: "linear",
+        },
+      },
+    ],
+  },
+};
+
 function getTemplateButton(label: string) {
   const button = screen
     .getAllByRole("button")
@@ -449,6 +484,25 @@ describe("WizardScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows ranked recommendation choices in the type stage", () => {
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      inspection: TEST_RANKED_INSPECT_RESPONSE.inspection,
+      template: "curve",
+      stage: "type",
+      step: "inspect",
+    });
+
+    renderStage("type");
+
+    expect(screen.getByText("Rank #1 · Score 88.5")).toBeInTheDocument();
+    expect(screen.getByText("Rank #2 · Score 84.2")).toBeInTheDocument();
+    expect(screen.getByText("Compact paired curves are the safest default.")).toBeInTheDocument();
+    expect(screen.getByText("Markers make paired observations easier to scan.")).toBeInTheDocument();
+  });
+
   it("refreshes preview in tune stage and only runs preflight once review opens", async () => {
     vi.useFakeTimers();
     useWizardStore.setState({
@@ -493,6 +547,34 @@ describe("WizardScreen", () => {
     });
 
     expect(preflightRender).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the tune stage select a project-level visual theme", () => {
+    useWizardStore.setState({
+      inputPath: "/tmp/curve.csv",
+      sheet: 0,
+      sheetNames: ["Sheet1"],
+      template: "curve",
+      inspection: TEST_INSPECT_RESPONSE.inspection,
+      options: {
+        size: "60x55",
+        xscale: "linear",
+        yscale: "linear",
+        reverse_x: false,
+        style_preset: "default",
+        palette_preset: "colorblind_safe",
+      },
+      stage: "tune",
+      step: "options",
+    });
+
+    renderStage("tune");
+
+    fireEvent.change(screen.getByLabelText("Visual theme"), {
+      target: { value: "soft_grid" },
+    });
+
+    expect(useWizardStore.getState().options.visual_theme_id).toBe("soft_grid");
   });
 
   it("locks tensile curve scales to linear in the tune stage", async () => {

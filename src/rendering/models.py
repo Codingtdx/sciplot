@@ -27,6 +27,7 @@ class RenderOptions:
     style_preset: str
     palette_preset: str
     use_sidecar: bool | None = None
+    visual_theme_id: str | None = None
 
 
 @dataclass(frozen=True)

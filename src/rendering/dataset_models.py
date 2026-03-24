@@ -19,7 +19,7 @@ from src.rendering.cache import (
     load_temperature_sweep_metrics_cached,
     read_raw_table_cached,
 )
-from src.rendering.common import looks_like_tensile_curve
+from src.rendering.common import looks_like_tensile_curve, summarize_replicate_distribution
 from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label
 from src.wide_nmr import wide_nmr_sidecar_path
@@ -229,21 +229,21 @@ def _series_map_for_bundle(bundle: str, input_path: Path, sheet: str | int) -> d
     raise ValueError(f"Unsupported bundle type: {bundle}")
 
 
-def _looks_like_nmr(series_list: list[CurveSeries]) -> bool:
+def looks_like_nmr_curve(series_list: list[CurveSeries]) -> bool:
     first = series_list[0]
     x_label = canonicalize_token(first.x_label)
     x_unit = _clean_text(first.x_unit).lower()
     return x_label == "chemical shift" or "ppm" in x_unit
 
 
-def _looks_like_ftir(series_list: list[CurveSeries]) -> bool:
+def looks_like_ftir_curve(series_list: list[CurveSeries]) -> bool:
     first = series_list[0]
     x_label = canonicalize_token(first.x_label)
     x_unit = _clean_text(first.x_unit).lower()
     return x_label == "wavenumber" or ("cm" in x_unit and ("-1" in x_unit or "^{-1}" in x_unit))
 
 
-def _looks_like_xrd(series_list: list[CurveSeries]) -> bool:
+def looks_like_xrd_curve(series_list: list[CurveSeries]) -> bool:
     first = series_list[0]
     x_label = canonicalize_token(first.x_label)
     y_label = canonicalize_token(first.y_label)
@@ -251,7 +251,7 @@ def _looks_like_xrd(series_list: list[CurveSeries]) -> bool:
     return x_label in {"2theta", "2θ"} or ("count" in y_unit) or (x_label == "2 theta" and y_label == "intensity")
 
 
-def _looks_like_dsc(series_list: list[CurveSeries]) -> bool:
+def looks_like_dsc_curve(series_list: list[CurveSeries]) -> bool:
     first = series_list[0]
     y_label = canonicalize_token(first.y_label)
     return y_label == "heat flow"
@@ -266,13 +266,13 @@ def detect_input_model(input_path: Path, sheet: str | int = 0) -> str:
         series_list = load_curve_table_cached(input_path, sheet)
         if wide_nmr_sidecar_path(input_path).exists():
             return "curve_table"
-        if _looks_like_nmr(series_list):
+        if looks_like_nmr_curve(series_list):
             return "curve_table"
-        if _looks_like_ftir(series_list):
+        if looks_like_ftir_curve(series_list):
             return "curve_table"
-        if _looks_like_dsc(series_list):
+        if looks_like_dsc_curve(series_list):
             return "curve_table"
-        if _looks_like_xrd(series_list):
+        if looks_like_xrd_curve(series_list):
             return "curve_table"
         if looks_like_tensile_curve(series_list):
             return "tensile_curve"
@@ -379,18 +379,26 @@ def build_normalized_dataset(
     raw = read_raw_table_cached(input_path, sheet)
     working_raw = raw.dropna(axis=1, how="all")
     resolved_model = model or detect_input_model(input_path, sheet)
+    extra_quality_flags: list[str] = []
     if resolved_model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         series_map = _series_map_for_bundle(resolved_model, input_path, sheet)
         candidate_roles = _candidate_roles_for_rheology(series_map)
         semantic_signals = point_line_bundle_signals(resolved_model)
     elif resolved_model == "replicate_table":
         groups = load_replicate_table_cached(input_path, sheet)
+        replicate_summary = summarize_replicate_distribution(groups)
         candidate_roles = _candidate_roles_for_replicates(groups)
         semantic_signals = (
             "Detected a statistical replicate table.",
             "Row 2 contains the group names and row 3 contains the units.",
             "Row 4 onward contains replicate measurements.",
         )
+        if replicate_summary.total_points < 12 or replicate_summary.min_group_points < 4:
+            extra_quality_flags.append("replicate_sparse_replicates")
+        if replicate_summary.min_group_points < 2:
+            extra_quality_flags.append("replicate_singleton_groups")
+        if replicate_summary.total_points >= 8 and replicate_summary.pooled_unique_ratio <= 0.35:
+            extra_quality_flags.append("replicate_highly_discrete")
     elif resolved_model == "heatmap_table":
         table = load_heatmap_table_cached(input_path, sheet)
         candidate_roles = _candidate_roles_for_heatmap(table)
@@ -415,7 +423,7 @@ def build_normalized_dataset(
             )
 
     column_profiles = _summarize_raw_columns(working_raw)
-    quality_flags = _quality_flags(raw, working_raw=working_raw)
+    quality_flags = tuple(dict.fromkeys(_quality_flags(raw, working_raw=working_raw) + tuple(extra_quality_flags)))
     data_shapes = _data_shapes_for_model("curve_table" if resolved_model == "curve_table" else resolved_model)
 
     return NormalizedDataset(
@@ -463,6 +471,10 @@ __all__ = [
     "build_normalized_dataset",
     "detect_input_model",
     "detect_point_line_bundle",
+    "looks_like_dsc_curve",
+    "looks_like_ftir_curve",
+    "looks_like_nmr_curve",
+    "looks_like_xrd_curve",
     "normalized_dataset_payload",
     "point_line_bundle_signals",
 ]

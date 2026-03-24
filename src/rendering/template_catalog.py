@@ -27,31 +27,57 @@ class TemplateCatalog(Protocol):
 
 
 def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
-    if template_id in {"curve", "point_line", "stacked_curve", "segmented_stacked_curve", "scatter"}:
+    if template_id in {
+        "curve",
+        "point_line",
+        "scatter",
+        "scatter_with_fit",
+        "replicate_curves_with_band",
+        "stacked_curve",
+        "segmented_stacked_curve",
+    }:
         return ("curve_like",)
-    if template_id in {"bar", "box", "violin"}:
+    if template_id in {"bar", "box", "violin", "grouped_bar_compare"}:
         return ("replicate_table", "distribution")
-    if template_id == "heatmap":
+    if template_id in {"distribution_compare", "histogram_density"}:
+        return ("replicate_table", "distribution")
+    if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix",)
     return ()
 
 
 def _scientific_tags(template_id: str) -> tuple[str, ...]:
-    if template_id in {"curve", "point_line", "scatter", "stacked_curve", "segmented_stacked_curve"}:
+    if template_id in {
+        "curve",
+        "point_line",
+        "scatter",
+        "scatter_with_fit",
+        "replicate_curves_with_band",
+        "stacked_curve",
+        "segmented_stacked_curve",
+    }:
         return ("curve", "spectra")
-    if template_id in {"bar", "box", "violin"}:
+    if template_id in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
         return ("distribution", "statistics")
-    if template_id == "heatmap":
+    if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix", "heatmap")
     return ()
 
 
 def _family(template_id: str) -> str:
-    if template_id in {"curve", "point_line", "scatter", "stacked_curve", "segmented_stacked_curve"}:
+    if template_id in {
+        "curve",
+        "point_line",
+        "scatter",
+        "scatter_with_fit",
+        "replicate_curves_with_band",
+        "stacked_curve",
+        "segmented_stacked_curve",
+    }:
         return "curve"
-    if template_id in {"bar", "box", "violin"}:
+    if template_id in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
         return "statistics"
-    if template_id == "heatmap":
+    if template_id in {"heatmap", "annotated_heatmap"}:
         return "heatmap"
     return "other"
 
@@ -61,10 +87,22 @@ def _preview_priority(template_id: str) -> int:
         return 100
     if template_id == "point_line":
         return 95
+    if template_id == "replicate_curves_with_band":
+        return 92
+    if template_id == "scatter_with_fit":
+        return 88
     if template_id == "scatter":
         return 80
+    if template_id == "annotated_heatmap":
+        return 91
     if template_id == "heatmap":
         return 90
+    if template_id == "distribution_compare":
+        return 86
+    if template_id == "grouped_bar_compare":
+        return 80
+    if template_id == "histogram_density":
+        return 78
     if template_id in {"bar", "box", "violin"}:
         return 70
     return 60
