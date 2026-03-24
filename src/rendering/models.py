@@ -6,6 +6,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from src.rendering.recommender_models import TemplateRecommendation
+
 TemplateName = str
 OutputMode = str
 RenderFn = Callable[[Path, str | int, "RenderOptions"], list["RenderedPlot"]]
@@ -99,6 +101,7 @@ class InputInspection:
     model: str
     model_label: str
     recommendation: Recommendation
+    recommendations: tuple[TemplateRecommendation, ...] = ()
     warnings: tuple[str, ...] = ()
     signals: tuple[str, ...] = ()
 

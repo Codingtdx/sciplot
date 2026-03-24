@@ -257,6 +257,7 @@ export function WizardScreen({
     outputsCount: wizard.outputs.length,
   });
   const stageCopy = PLOT_STAGE_COPY[routeStage];
+  const showStudioStage = (["type", "tune", "review", "export"] as PlotStage[]).includes(routeStage);
   const expectedOutputs = getExpectedWizardOutputs(wizard.outputs, wizard.preflight);
   const stepFlowSteps = useMemo(() => buildWizardStepFlowItems({
     routeStage,
@@ -496,7 +497,7 @@ export function WizardScreen({
           />
         )}
 
-        {(routeStage === "type" || routeStage === "tune" || routeStage === "review" || routeStage === "export") && (
+        {showStudioStage && (
           <WizardStudioStage
             hasTemplate={hasTemplate}
             meta={meta}

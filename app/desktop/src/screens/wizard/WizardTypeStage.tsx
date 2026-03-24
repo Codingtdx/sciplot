@@ -51,6 +51,10 @@ function templateMockClass(templateId: TemplateName) {
   return "curve";
 }
 
+function templateCategoryLabel(template: WorkbenchTemplate) {
+  return template.category.replace(/_/g, " ");
+}
+
 function recommendationReason(
   template: WorkbenchTemplate,
   inspection: InputInspection | null,
@@ -62,6 +66,17 @@ function recommendationReason(
     return inspection.recommendation.reason;
   }
   return `Compatible with detected model ${inspection.model_label}.`;
+}
+
+function templateHint(template: WorkbenchTemplate, inspection: InputInspection | null) {
+  const category = templateCategoryLabel(template);
+  if (!inspection) {
+    return `${template.default_size} · ${category}`;
+  }
+  if (inspection.recommendation.template === template.id) {
+    return `${template.default_size} · best fit for ${inspection.model_label}`;
+  }
+  return `${template.default_size} · compatible with ${inspection.model_label}`;
 }
 
 export function WizardTypeStage({
@@ -95,111 +110,121 @@ export function WizardTypeStage({
     () => compatibleTemplates.slice(5),
     [compatibleTemplates],
   );
+  const sourceLabel = inputPath ? formatLeaf(inputPath) : "No source loaded";
+  const activeTemplate = selectedTemplate ?? inspection?.recommendation.template ?? topRecommendations[0]?.id ?? null;
+  const activeTemplateLabel = hasTemplate ? templateLabel(meta, selectedTemplate) : "Suggested template";
 
   return (
-    <div className="plot-type-workspace">
+    <div className="plot-type-studio">
       <header className="plot-type-header">
         <div className="plot-type-header-copy">
           <strong>Template recommendation workspace</strong>
-          <p>We inspected your data. Choose the best chart template before tuning.</p>
+          <p>We inspected your data and are helping choose the best chart template.</p>
         </div>
-        <div className="plot-type-header-meta">
-          <span title={inputPath ?? "No source loaded"}>
-            {inputPath ? formatLeaf(inputPath) : "No source loaded"}
+        <div className="plot-type-header-source">
+          <span>Source</span>
+          <strong title={sourceLabel}>{sourceLabel}</strong>
+          <span title={inspection?.model_label ?? "Awaiting inspect"}>
+            {inspection ? inspection.model_label : "Awaiting inspect"}
           </span>
-          {inspection ? <span>{inspection.model_label}</span> : <span>Awaiting inspect</span>}
         </div>
       </header>
 
-      <div className="plot-type-grid">
-        <section className="plot-type-recommendations">
-          <div className="plot-type-section-head">
-            <h3>Top recommendations</h3>
-            {!recommendationApplied && inspection && (
-              <button className="ghost-button" onClick={onApplyRecommendedSelection} type="button">
-                Use recommended
-              </button>
-            )}
+      <div className="plot-type-studio-grid">
+        <section className="plot-type-recommendation-pane">
+          <div className="plot-type-pane-head">
+            <span>Recommended templates</span>
+            <h2>Choose the chart family</h2>
+            <p>These cards are ranked from the strongest fit to broader compatible alternatives.</p>
+            <div className="plot-type-supported-types">
+              {inspection ? `Detected ${inspection.model_label}` : "Run inspect to unlock template guidance."}
+            </div>
           </div>
 
           {!inspection ? (
             <div className="placeholder-card">Run inspect first to unlock template recommendations.</div>
           ) : (
-            <div className="plot-type-cards">
-              {topRecommendations.map((template) => {
-                const selected = selectedTemplate === template.id;
-                const recommended = inspection.recommendation.template === template.id;
-                return (
-                  <article
-                    className={`plot-type-card ${selected ? "selected" : ""}`}
-                    key={template.id}
-                  >
-                    <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} />
-                    <div className="plot-type-card-copy">
-                      <div className="plot-type-card-title-row">
-                        <strong>{template.label}</strong>
-                        <span>{recommended ? "Recommended" : "Compatible"}</span>
-                      </div>
-                      <p>{recommendationReason(template, inspection)}</p>
-                      <div className="plot-type-card-meta">
-                        <span>Size {template.default_size}</span>
-                        <span>{template.category}</span>
-                      </div>
-                    </div>
-                    <button
-                      className={selected ? "primary-button" : "ghost-button"}
-                      onClick={() => onSelectTemplate(template.id)}
-                      type="button"
-                    >
-                      {selected ? "Selected" : "Select"}
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-
-          {alternatives.length > 0 && (
-            <section className="plot-type-alternatives">
-              <div className="plot-type-section-head">
-                <h4>Other compatible templates</h4>
-              </div>
-              <div className="plot-type-alt-list">
-                {alternatives.map((template) => (
-                  <CompactListRow
-                    key={template.id}
-                    onSelect={() => onSelectTemplate(template.id)}
-                    right={<span className="wb-inline-meta">Compatible</span>}
-                    subtitle={template.category}
-                    title={template.label}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {incompatibleTemplates.length > 0 && (
-            <section className="plot-type-incompatible">
-              <button className="ghost-button" onClick={onToggleShowAllTemplates} type="button">
-                {showAllTemplates ? "Hide more types" : "More types"}
-              </button>
-              {showAllTemplates && (
-                <div className="plot-type-incompatible-list">
-                  <div className="hint-text">
-                    {inspection ? templateCompatibilityReason(inspection.model) : "Not compatible with current model."}
-                  </div>
-                  {incompatibleTemplates.map((template) => (
-                    <CompactListRow
-                      disabled
+            <>
+              <div className="plot-type-recommendation-stack">
+                {topRecommendations.map((template) => {
+                  const selected = selectedTemplate === template.id;
+                  const recommended = inspection.recommendation.template === template.id;
+                  return (
+                    <article
+                      className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${recommended ? "recommended" : ""}`}
                       key={template.id}
-                      right={<span className="wb-inline-meta">Not compatible</span>}
-                      subtitle={template.category}
-                      title={template.label}
-                    />
-                  ))}
-                </div>
+                    >
+                      <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} aria-hidden="true" />
+                      <div className="plot-type-recommendation-copy">
+                        <div className="plot-type-recommendation-title-row">
+                          <strong>{template.label}</strong>
+                          <span>{recommended ? "Recommended" : "Compatible"}</span>
+                        </div>
+                        <p>{recommendationReason(template, inspection)}</p>
+                        <div className="plot-type-recommendation-hint">{templateHint(template, inspection)}</div>
+                        <div className="plot-type-recommendation-meta">
+                          <span>{template.default_size}</span>
+                          <span>{templateCategoryLabel(template)}</span>
+                        </div>
+                      </div>
+                      <button
+                        className={selected ? "primary-button" : "ghost-button"}
+                        onClick={() => onSelectTemplate(template.id)}
+                        type="button"
+                      >
+                        {selected ? "Selected" : "Select"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {alternatives.length > 0 && (
+                <section className="plot-type-alternatives">
+                  <div className="plot-type-section-head">
+                    <h3>Other compatible templates</h3>
+                  </div>
+                  <div className="plot-type-alt-list">
+                    {alternatives.map((template) => (
+                      <CompactListRow
+                        key={template.id}
+                        onSelect={() => onSelectTemplate(template.id)}
+                        right={<span className="wb-inline-meta">Compatible</span>}
+                        subtitle={`${templateCategoryLabel(template)} · ${template.default_size}`}
+                        title={template.label}
+                      />
+                    ))}
+                  </div>
+                </section>
               )}
-            </section>
+
+              {incompatibleTemplates.length > 0 && (
+                <section className="plot-type-incompatible">
+                  <button className="ghost-button" onClick={onToggleShowAllTemplates} type="button">
+                    {showAllTemplates ? "Hide more types" : "More types"}
+                  </button>
+                  {showAllTemplates && (
+                    <div className="plot-type-incompatible-list">
+                      <div className="hint-text">
+                        {inspection
+                          ? templateCompatibilityReason(inspection.model)
+                          : "Not compatible with current model."}
+                      </div>
+                      {incompatibleTemplates.map((template) => (
+                        <CompactListRow
+                          onSelect={() => onSelectTemplate(template.id)}
+                          disabled
+                          key={template.id}
+                          right={<span className="wb-inline-meta">Not compatible</span>}
+                          subtitle={`${templateCategoryLabel(template)} · ${template.default_size}`}
+                          title={template.label}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </>
           )}
         </section>
 
@@ -221,7 +246,7 @@ export function WizardTypeStage({
               role="tab"
               type="button"
             >
-              Rendered preview
+              Preview
             </button>
           </div>
 
@@ -229,13 +254,20 @@ export function WizardTypeStage({
             {previewMode === "compare" ? (
               <div className="plot-type-compare-view">
                 <div className="plot-type-compare-focus">
-                  <span>Selected template</span>
-                  <strong>{hasTemplate ? templateLabel(meta, selectedTemplate) : "Template selection required"}</strong>
+                  <span>{hasTemplate ? "Selected template" : "Suggested template"}</span>
+                  <strong>
+                    {activeTemplate ? templateLabel(meta, activeTemplate) : "Template selection required"}
+                  </strong>
                   <p>
                     {inspection
-                      ? "Use recommendation cards to compare compatibility before continuing."
+                      ? "Compare the leading cards here before continuing to Tune."
                       : "Inspect and template recommendation will appear here after data detection."}
                   </p>
+                  <div className="plot-type-compare-hints">
+                    <span>{inspection?.recommendation.size ?? "Size"}</span>
+                    <span>{inspection ? inspection.model_label : "Awaiting inspect"}</span>
+                    <span>{hasTemplate ? "Ready to tune" : "Choose one"}</span>
+                  </div>
                 </div>
                 <div className="plot-type-compare-thumbs">
                   {topRecommendations.slice(0, 3).map((template) => (
@@ -247,19 +279,21 @@ export function WizardTypeStage({
                     >
                       <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} />
                       <strong>{template.label}</strong>
+                      <span>{template.default_size}</span>
                     </button>
                   ))}
                 </div>
               </div>
             ) : hasTemplate ? (
               <div className="plot-type-rendered-preview">
-                {sheetNamesLength > 1 && (
-                  <div className="plot-type-preview-toolbar">
+                <div className="plot-type-preview-toolbar">
+                  <span className="plot-type-preview-toolbar-label">{activeTemplateLabel}</span>
+                  {sheetNamesLength > 1 && (
                     <button className="ghost-button" onClick={onChangeSheet} type="button">
                       Change sheet
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
                 <PreviewPane
                   busy={previewBusy}
                   error={previewError}
@@ -281,14 +315,21 @@ export function WizardTypeStage({
             ? `${templateLabel(meta, selectedTemplate)} selected. Continue to Tune to adjust render options.`
             : "Select a template to continue to Tune."}
         </span>
-        <button
-          className="plot-type-continue"
-          disabled={!hasTemplate}
-          onClick={onContinueToTune}
-          type="button"
-        >
-          Continue to tune
-        </button>
+        <div className="plot-type-footer-actions">
+          {!recommendationApplied && inspection ? (
+            <button className="ghost-button" onClick={onApplyRecommendedSelection} type="button">
+              Use recommendation
+            </button>
+          ) : null}
+          <button
+            className="plot-type-continue"
+            disabled={!hasTemplate}
+            onClick={onContinueToTune}
+            type="button"
+          >
+            Continue to tune
+          </button>
+        </div>
       </footer>
     </div>
   );

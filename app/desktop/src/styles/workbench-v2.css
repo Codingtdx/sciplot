@@ -1283,7 +1283,7 @@ textarea.field {
   min-height: 0;
 }
 
-.plot-type-workspace {
+.plot-type-studio {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1315,14 +1315,17 @@ textarea.field {
   color: #60748d;
 }
 
-.plot-type-header-meta {
+.plot-type-header-source {
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.plot-type-header-meta span {
+.plot-type-header-source > span,
+.plot-type-header-source > strong {
   max-width: 240px;
   height: 22px;
   display: inline-flex;
@@ -1338,14 +1341,14 @@ textarea.field {
   text-overflow: ellipsis;
 }
 
-.plot-type-grid {
+.plot-type-studio-grid {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(410px, 1.05fr) minmax(0, 0.95fr);
   gap: 12px;
 }
 
-.plot-type-recommendations,
+.plot-type-recommendation-pane,
 .plot-type-preview-pane {
   min-height: 0;
   border-radius: 12px;
@@ -1354,88 +1357,137 @@ textarea.field {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
-.plot-type-recommendations {
+.plot-type-recommendation-pane {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.plot-type-section-head {
+.plot-type-pane-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.plot-type-section-head h3,
-.plot-type-section-head h4 {
+.plot-type-pane-head > span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8092a9;
+}
+
+.plot-type-pane-head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 18px;
   color: #20364f;
 }
 
-.plot-type-cards {
+.plot-type-pane-head p {
+  margin: 0;
+  font-size: 12px;
+  color: #5c738e;
+  line-height: 1.4;
+}
+
+.plot-type-supported-types {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid #d0dcec;
+  background: #ffffff;
+  font-size: 11px;
+  color: #647c97;
+  white-space: nowrap;
+}
+
+.plot-type-recommendation-stack {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.plot-type-card {
+.plot-type-recommendation-card {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) auto;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 10px;
   border-radius: 10px;
   border: 1px solid #d6e1ef;
   background: #fbfdff;
+  transition:
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    background var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
-.plot-type-card.selected {
+.plot-type-recommendation-card:hover {
+  transform: translateY(-1px);
+  border-color: #b9cde6;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.plot-type-recommendation-card.selected {
   border-color: #b9cde6;
   background: #f4f8ff;
 }
 
-.plot-type-card-copy {
+.plot-type-recommendation-card.recommended {
+  background:
+    radial-gradient(circle at top right, rgba(97, 198, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #fbfdff 0%, #f7faff 100%);
+}
+
+.plot-type-recommendation-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.plot-type-card-title-row {
+.plot-type-recommendation-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.plot-type-card-title-row strong {
+.plot-type-recommendation-title-row strong {
   font-size: 13px;
   color: #1d334d;
 }
 
-.plot-type-card-title-row span {
+.plot-type-recommendation-title-row span {
   font-size: 11px;
   color: #69829f;
   white-space: nowrap;
 }
 
-.plot-type-card-copy p {
+.plot-type-recommendation-copy p {
   margin: 0;
   font-size: 12px;
   line-height: 1.35;
   color: #5c738e;
 }
 
-.plot-type-card-meta {
+.plot-type-recommendation-hint {
+  font-size: 11px;
+  line-height: 1.3;
+  color: #7287a2;
+}
+
+.plot-type-recommendation-meta {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.plot-type-card-meta span {
+.plot-type-recommendation-meta span {
   height: 20px;
   display: inline-flex;
   align-items: center;
@@ -1448,8 +1500,8 @@ textarea.field {
 }
 
 .plot-type-card-thumb {
-  width: 96px;
-  height: 64px;
+  width: 84px;
+  height: 58px;
   border-radius: 8px;
   border: 1px solid #d4dfed;
   background: #f7faff;
@@ -1513,6 +1565,20 @@ textarea.field {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.plot-type-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plot-type-section-head h3,
+.plot-type-section-head h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #20364f;
 }
 
 .plot-type-alt-list,
@@ -1596,6 +1662,24 @@ textarea.field {
   line-height: 1.35;
 }
 
+.plot-type-compare-hints {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plot-type-compare-hints span {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid #d1dcec;
+  background: #ffffff;
+  font-size: 11px;
+  color: #6a829e;
+}
+
 .plot-type-compare-thumbs {
   min-height: 0;
   display: grid;
@@ -1612,11 +1696,17 @@ textarea.field {
   flex-direction: column;
   gap: 6px;
   cursor: pointer;
+  text-align: left;
 }
 
 .plot-type-compare-thumb strong {
   font-size: 12px;
   color: #2a415c;
+}
+
+.plot-type-compare-thumb span {
+  font-size: 11px;
+  color: #7287a2;
 }
 
 .plot-type-compare-thumb.selected {
@@ -1638,7 +1728,31 @@ textarea.field {
 }
 
 .plot-type-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plot-type-preview-toolbar-label {
+  height: 22px;
   display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid #d0dcec;
+  background: #ffffff;
+  font-size: 11px;
+  color: #647c97;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plot-type-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .plot-type-footer {
@@ -2497,7 +2611,16 @@ textarea.field {
     grid-template-columns: 1fr;
   }
 
+  .plot-type-studio-grid {
+    grid-template-columns: 1fr;
+  }
+
   .plot-import-header {
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .plot-type-header {
     flex-wrap: wrap;
     align-items: flex-end;
   }
