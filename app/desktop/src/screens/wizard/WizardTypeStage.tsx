@@ -59,7 +59,11 @@ function templateCategoryLabel(template: WorkbenchTemplate) {
 function recommendationReason(
   template: WorkbenchTemplate,
   inspection: InputInspection | null,
+  overrideReason?: string,
 ) {
+  if (overrideReason) {
+    return overrideReason;
+  }
   if (!inspection) {
     return "Run inspect to get data-aware template guidance.";
   }
@@ -106,27 +110,43 @@ export function WizardTypeStage({
   const topRecommendations = useMemo(
     () => {
       if (!inspection) {
-        return compatibleTemplates.slice(0, 5);
+        return compatibleTemplates.slice(0, 5).map((template, index) => ({
+          template,
+          score: 100 - index,
+          reason: undefined as string | undefined,
+          softPrior: undefined as string | undefined,
+        }));
       }
-      const ranked = inspectionRecommendationChoices(meta, inspection, 5).map((item) => item.template);
+      const ranked = inspectionRecommendationChoices(meta, inspection, 5).map((item) => ({
+        template: item.template,
+        score: item.recommendation.score,
+        reason: item.recommendation.why_hard_match[0],
+        softPrior: item.recommendation.why_soft_prior[0],
+      }));
       if (ranked.length > 0) {
         return ranked;
       }
-      return compatibleTemplates.slice(0, 5);
+      return compatibleTemplates.slice(0, 5).map((template, index) => ({
+        template,
+        score: 100 - index,
+        reason: undefined as string | undefined,
+        softPrior: undefined as string | undefined,
+      }));
     },
     [compatibleTemplates, inspection, meta],
   );
   const alternatives = useMemo(
     () => {
-      const topIds = new Set(topRecommendations.map((template) => template.id));
+      const topIds = new Set(topRecommendations.map((item) => item.template.id));
       return compatibleTemplates.filter((template) => !topIds.has(template.id));
     },
     [compatibleTemplates, topRecommendations],
   );
   const sourceLabel = inputPath ? formatLeaf(inputPath) : "No source loaded";
-  const activeTemplate = selectedTemplate ?? inspection?.recommendation.template ?? topRecommendations[0]?.id ?? null;
+  const activeTemplate =
+    selectedTemplate ?? inspection?.recommendation.template ?? topRecommendations[0]?.template.id ?? null;
   const activeTemplateLabel = hasTemplate ? templateLabel(meta, selectedTemplate) : "Suggested template";
-  const primaryTemplateId = inspection?.recommendation.template ?? topRecommendations[0]?.id ?? null;
+  const primaryTemplateId = inspection?.recommendation.template ?? topRecommendations[0]?.template.id ?? null;
 
   return (
     <div className="plot-type-studio">
@@ -157,7 +177,8 @@ export function WizardTypeStage({
           ) : (
             <>
               <div className="plot-type-recommendation-stack">
-                {topRecommendations.map((template) => {
+                {topRecommendations.map((item, index) => {
+                  const { template } = item;
                   const selected = selectedTemplate === template.id;
                   const recommended = inspection.recommendation.template === template.id;
                   return (
@@ -173,7 +194,11 @@ export function WizardTypeStage({
                           <strong>{template.label}</strong>
                           <span>{template.id === primaryTemplateId ? "Primary recommendation" : recommended ? "Recommended" : "Compatible"}</span>
                         </div>
-                        <p>{recommendationReason(template, inspection)}</p>
+                        <div className="wb-inline-meta">
+                          Rank #{index + 1} · Score {item.score.toFixed(1)}
+                        </div>
+                        <p>{recommendationReason(template, inspection, item.reason)}</p>
+                        {item.softPrior ? <div className="wb-inline-meta">{item.softPrior}</div> : null}
                         <div className="plot-type-recommendation-hint">{templateHint(template, inspection)}</div>
                         <div className="plot-type-recommendation-meta">
                           <span>{template.default_size}</span>
@@ -288,7 +313,9 @@ export function WizardTypeStage({
                     <strong>Compare the top three quickly</strong>
                   </div>
                   <div className="plot-type-compare-thumbs">
-                    {topRecommendations.slice(0, 3).map((template) => (
+                    {topRecommendations.slice(0, 3).map((item) => {
+                      const { template } = item;
+                      return (
                       <button
                         className={`plot-type-compare-thumb ${selectedTemplate === template.id ? "selected" : ""}`}
                         key={template.id}
@@ -299,7 +326,8 @@ export function WizardTypeStage({
                         <strong>{template.label}</strong>
                         <span>{template.default_size}</span>
                       </button>
-                    ))}
+                    );
+                    })}
                   </div>
                 </div>
               </div>

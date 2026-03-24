@@ -6,6 +6,7 @@ import type {
   WorkbenchStyle,
   WorkbenchTemplate,
 } from "../../lib/types";
+import { visualThemeChoices } from "../../lib/workbench";
 
 type Props = {
   meta: WorkbenchMeta | null;
@@ -30,6 +31,7 @@ export function WizardOptionsSection({
   tensileCurveMode,
   onUpdateOptions,
 }: Props) {
+  const visualThemes = visualThemeChoices(meta);
   const selectedStyle =
     styleOptions.find((choice) => choice.id === (options.style_preset ?? meta?.default_style)) ??
     styleOptions[0] ??
@@ -42,6 +44,8 @@ export function WizardOptionsSection({
     sizeOptions.find((choice) => choice.id === (options.size ?? sizeOptions[0]?.id ?? "")) ??
     sizeOptions[0] ??
     null;
+  const selectedVisualTheme =
+    visualThemes.find((choice) => choice.id === options.visual_theme_id) ?? null;
 
   return (
     <section className="context-card wizard-pane wizard-tune-pane">
@@ -198,6 +202,28 @@ export function WizardOptionsSection({
                   </select>
                 </label>
               )}
+
+              {visualThemes.length > 0 && (
+                <label className="wizard-option-card">
+                  <span className="field-label">Visual theme</span>
+                  <select
+                    className="field"
+                    value={options.visual_theme_id ?? ""}
+                    onChange={(event) =>
+                      onUpdateOptions({
+                        visual_theme_id: event.target.value || null,
+                      })
+                    }
+                  >
+                    <option value="">Publication only</option>
+                    {visualThemes.map((choice) => (
+                      <option key={choice.id} value={choice.id}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
 
             {selectedStyle && (
@@ -209,6 +235,13 @@ export function WizardOptionsSection({
                     ? "Editorial constraints stay on."
                     : "Uses the default relaxed mode."}
                 </span>
+              </div>
+            )}
+            {selectedVisualTheme && (
+              <div className="wizard-module-note">
+                <strong>Visual theme</strong>
+                <span>{selectedVisualTheme.label}</span>
+                <span>{selectedVisualTheme.description}</span>
               </div>
             )}
           </article>

@@ -16,7 +16,7 @@ import type {
   WorkbenchStyle,
   WorkbenchTemplate,
 } from "../../lib/types";
-import { formatLeaf, templateLabel } from "../../lib/workbench";
+import { formatLeaf, templateLabel, visualThemeChoices } from "../../lib/workbench";
 import { getWizardStatusForPlot } from "./helpers";
 
 type Props = {
@@ -218,6 +218,9 @@ export function WizardStudioStage({
     paletteOptions.map((choice) => ({ id: choice.id, label: choice.label })),
     options.palette_preset ?? meta?.default_palette,
   );
+  const visualThemes = visualThemeChoices(meta);
+  const selectedVisualThemeLabel =
+    visualThemes.find((choice) => choice.id === options.visual_theme_id)?.label ?? null;
   const previewStatCards =
     stageKey === "tune"
       ? [
@@ -238,7 +241,9 @@ export function WizardStudioStage({
           {
             label: "Presentation",
             value: selectedStyleLabel,
-            note: selectedPaletteLabel,
+            note: selectedVisualThemeLabel
+              ? `${selectedPaletteLabel} · ${selectedVisualThemeLabel}`
+              : selectedPaletteLabel,
           },
         ]
       : stageKey === "review"
@@ -330,7 +335,9 @@ export function WizardStudioStage({
         {fieldCard({
           label: "Presentation",
           value: selectedStyleLabel,
-          note: selectedPaletteLabel,
+          note: selectedVisualThemeLabel
+            ? `${selectedPaletteLabel} · ${selectedVisualThemeLabel}`
+            : selectedPaletteLabel,
         })}
         {fieldCard({
           label: "Source",
@@ -452,6 +459,28 @@ export function WizardStudioStage({
                   }
                 >
                   {paletteOptions.map((choice) => (
+                    <option key={choice.id} value={choice.id}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {visualThemes.length > 0 && (
+              <label className="plot-flow-field-card">
+                <span className="field-label">Visual theme</span>
+                <select
+                  className="field"
+                  value={options.visual_theme_id ?? ""}
+                  onChange={(event) =>
+                    onUpdateOptions({
+                      visual_theme_id: event.target.value || null,
+                    })
+                  }
+                >
+                  <option value="">Publication only</option>
+                  {visualThemes.map((choice) => (
                     <option key={choice.id} value={choice.id}>
                       {choice.label}
                     </option>
