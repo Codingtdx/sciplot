@@ -39,7 +39,7 @@ from src.rendering.qa import (
     apply_curve_autofix,
     recommend_curve_autofix,
 )
-from src.rendering.recommendation import detect_point_line_bundle
+from src.rendering.dataset_models import build_normalized_dataset
 
 
 @dataclass(frozen=True)
