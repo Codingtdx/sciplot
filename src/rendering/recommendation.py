@@ -129,6 +129,30 @@ def recommendation(template: TemplateName, reason: str, **overrides: object) -> 
     return Recommendation(**payload)
 
 
+def _inspection_confidence_and_summary(
+    *,
+    model: str,
+    recommendations: tuple[TemplateRecommendation, ...],
+) -> tuple[float, str]:
+    if not recommendations:
+        return 0.0, "No ranked template candidates are available yet."
+    top = recommendations[0]
+    second = recommendations[1] if len(recommendations) > 1 else None
+    gap = round(max(0.0, top.score - (second.score if second else 0.0)), 1)
+    confidence = round(max(0.0, min(100.0, top.score + min(8.0, gap * 0.5))), 1)
+    if confidence >= 88.0:
+        tone = "High confidence"
+    elif confidence >= 76.0:
+        tone = "Good confidence"
+    else:
+        tone = "Moderate confidence"
+    summary = (
+        f"{tone}: {top.template_id} is the strongest template for {model_label(model)} "
+        f"(score {top.score:.1f}, gap {gap:.1f})."
+    )
+    return confidence, summary
+
+
 def _inspection(
     *,
     model: str,
@@ -150,11 +174,18 @@ def _inspection(
         palette_preset=recommendation_value.palette_preset,
         use_sidecar=recommendation_value.use_sidecar,
     )
+    ranked = recommendations or (template_recommendation,)
+    recommendation_confidence, recommendation_summary = _inspection_confidence_and_summary(
+        model=model,
+        recommendations=ranked,
+    )
     return InputInspection(
         model=model,
         model_label=model_label(model),
         recommendation=recommendation_value,
-        recommendations=recommendations or (template_recommendation,),
+        recommendations=ranked,
+        recommendation_confidence=recommendation_confidence,
+        recommendation_summary=recommendation_summary,
         warnings=warnings,
         signals=signals,
     )

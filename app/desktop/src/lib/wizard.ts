@@ -51,6 +51,10 @@ function inspectionRecommendationFallback(inspection: InputInspection): Template
   return {
     template_id: inspection.recommendation.template,
     score: 100,
+    rank: 1,
+    reason: inspection.recommendation.reason,
+    suitability_hint: "Primary recommendation from compatibility inspection.",
+    score_gap_to_top: 0,
     why_hard_match: [inspection.recommendation.reason],
     why_soft_prior: [],
     inferred_mapping: {},
