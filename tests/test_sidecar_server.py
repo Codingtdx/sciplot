@@ -874,7 +874,23 @@ def test_export_render_writes_bundle_artifacts_and_submission_report(tmp_path: P
         "codegod_submission_report.json",
         "codegod_manifest.json",
     }
-    assert Path(payload["manifest_path"]).exists()
+    manifest_path = Path(payload["manifest_path"])
+    assert manifest_path.exists()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["bundle_version"] == 2
+    assert manifest["generated_at"]
+    assert manifest["template_layer"]["id"] == "curve"
+    assert manifest["mapping_layer"]["selected_template"] == "curve"
+    assert manifest["theme_layer"]["style_preset"] == "nature"
+    assert manifest["theme_layer"]["palette_preset"] == "colorblind_safe"
+    assert manifest["theme_layer"]["publication_profile_id"] == "nature"
+    assert manifest["contract_layer"]["version"] >= 1
+    assert len(manifest["contract_layer"]["sha256"]) == 64
+    reproducibility = manifest["reproducibility"]
+    assert len(reproducibility["run_fingerprint"]) == 64
+    assert len(reproducibility["input"]["sha256"]) == 64
+    assert reproducibility["outputs"]
+    assert reproducibility["preview_outputs"]
 
 
 def test_open_path_endpoint_uses_host_launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

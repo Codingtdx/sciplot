@@ -14,6 +14,40 @@ class VisualThemeSpec:
     soft_overrides: dict[str, Any]
 
 
+# Publication-critical sizing/stroke/export knobs must remain contract-owned.
+_PROTECTED_RCPARAM_KEYS: frozenset[str] = frozenset(
+    {
+        "figure.dpi",
+        "savefig.dpi",
+        "savefig.format",
+        "pdf.fonttype",
+        "ps.fonttype",
+        "font.family",
+        "font.sans-serif",
+        "font.size",
+        "axes.labelsize",
+        "axes.titlesize",
+        "xtick.labelsize",
+        "ytick.labelsize",
+        "legend.fontsize",
+        "axes.labelpad",
+        "xtick.major.pad",
+        "ytick.major.pad",
+        "axes.linewidth",
+        "xtick.major.width",
+        "ytick.major.width",
+        "xtick.major.size",
+        "ytick.major.size",
+        "xtick.minor.width",
+        "ytick.minor.width",
+        "xtick.minor.size",
+        "ytick.minor.size",
+        "lines.linewidth",
+        "lines.markersize",
+    }
+)
+
+
 def _flatten_keys(value: Any, *, prefix: str = "") -> tuple[str, ...]:
     keys: list[str] = []
     if is_dataclass(value) and not isinstance(value, type):
@@ -42,6 +76,13 @@ def publication_profile_hard_constraints(publication_profile_id: str) -> dict[st
 def publication_profile_protected_keys(publication_profile_id: str) -> tuple[str, ...]:
     spec = plot_style.get_style_spec(publication_profile_id)
     return _flatten_keys(spec)
+
+
+def publication_profile_protected_rcparams(publication_profile_id: str) -> tuple[str, ...]:
+    # The set is currently style-agnostic, but the profile id keeps the callsite
+    # contract explicit: protected keys are tied to publication profiles.
+    _ = publication_profile_id
+    return tuple(sorted(_PROTECTED_RCPARAM_KEYS))
 
 
 _VISUAL_THEMES: dict[str, VisualThemeSpec] = {
@@ -101,6 +142,19 @@ def visual_theme_soft_overrides(visual_theme_id: str | None) -> dict[str, Any]:
     return dict(visual_theme_spec(visual_theme_id).soft_overrides)
 
 
+def sanitized_visual_theme_soft_overrides(
+    publication_profile_id: str,
+    visual_theme_id: str | None,
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    raw_overrides = visual_theme_soft_overrides(visual_theme_id)
+    if not raw_overrides:
+        return {}, ()
+    blocked = set(publication_profile_protected_rcparams(publication_profile_id))
+    resolved = {key: value for key, value in raw_overrides.items() if key not in blocked}
+    blocked_keys = tuple(sorted(key for key in raw_overrides if key in blocked))
+    return resolved, blocked_keys
+
+
 def visual_theme_catalog_payload() -> list[dict[str, Any]]:
     return [
         {
@@ -115,6 +169,8 @@ def visual_theme_catalog_payload() -> list[dict[str, Any]]:
 __all__ = [
     "publication_profile_hard_constraints",
     "publication_profile_protected_keys",
+    "publication_profile_protected_rcparams",
+    "sanitized_visual_theme_soft_overrides",
     "visual_theme_catalog_payload",
     "visual_theme_ids",
     "visual_theme_soft_overrides",

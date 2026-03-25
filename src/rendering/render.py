@@ -43,7 +43,6 @@ from src.rendering.qa import (
     recommend_curve_autofix,
 )
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
-from src.rendering.themes import visual_theme_soft_overrides
 
 
 @dataclass(frozen=True)
@@ -1423,7 +1422,7 @@ def build_rendered_plots(
     plot_style.apply_style(
         style_bundle.publication_profile_id,
         options.palette_preset,
-        soft_overrides=style_bundle.resolved_soft or visual_theme_soft_overrides(options.visual_theme_id),
+        soft_overrides=style_bundle.resolved_soft,
     )
     renderer = TEMPLATE_RENDERERS[validated_template]
     return renderer.render(input_path, sheet, options)
