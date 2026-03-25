@@ -10,6 +10,7 @@ from matplotlib.ticker import FixedLocator
 
 from src import plot_style
 from src.data_loader import CurveSeries
+from src.layout_scoring import score_points_against_bbox
 from src.plotting import (
     CURVE_TEMPLATES,
     HIDDEN_Y_LABEL_X,
@@ -81,28 +82,15 @@ def _score_legend_bbox(ax: plt.Axes, legend: Legend, series_list: Sequence[Curve
             continue
 
         points = ax.transData.transform(np.column_stack([x, y]))
-        inside = (
-            (points[:, 0] >= bbox.x0)
-            & (points[:, 0] <= bbox.x1)
-            & (points[:, 1] >= bbox.y0)
-            & (points[:, 1] <= bbox.y1)
+        metrics = score_points_against_bbox(
+            points,
+            bbox,
+            inside_weight=10.0,
+            near_radius=12.0,
+            near_weight=1.0,
+            normalize_near=True,
         )
-        score += float(inside.sum()) * 10.0
-
-        dx = np.where(
-            points[:, 0] < bbox.x0,
-            bbox.x0 - points[:, 0],
-            np.where(points[:, 0] > bbox.x1, points[:, 0] - bbox.x1, 0.0),
-        )
-        dy = np.where(
-            points[:, 1] < bbox.y0,
-            bbox.y0 - points[:, 1],
-            np.where(points[:, 1] > bbox.y1, points[:, 1] - bbox.y1, 0.0),
-        )
-        distance = np.hypot(dx, dy)
-        near = distance < 12.0
-        if np.any(near):
-            score += float((12.0 - distance[near]).sum()) / 12.0
+        score += metrics.total
 
     return score
 

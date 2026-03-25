@@ -14,6 +14,7 @@ from matplotlib.ticker import FixedLocator
 
 from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import CurveSeries, ReplicateGroup
+from src.layout_scoring import bbox_overlaps_any, expanded_bbox, proximity_penalty
 from src.plot_contract import load_plot_contract
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import (
@@ -1312,11 +1313,9 @@ def _score_label_bbox(
     if bbox.x0 < axes_bbox.x0 or bbox.x1 > axes_bbox.x1 or bbox.y0 < axes_bbox.y0 or bbox.y1 > axes_bbox.y1:
         return 1_000_000_000.0
 
-    expanded = bbox.expanded(1.03, 1.10)
-    if placed_bboxes:
-        for placed_bbox in placed_bboxes:
-            if expanded.overlaps(placed_bbox):
-                return 1_000_000_000.0
+    expanded = expanded_bbox(bbox, x_scale=1.03, y_scale=1.10)
+    if placed_bboxes and bbox_overlaps_any(expanded, placed_bboxes):
+        return 1_000_000_000.0
 
     x_margin = max(bbox.width * 0.25, 10.0)
     local_band = (all_curve_points[:, 0] >= bbox.x0 - x_margin) & (all_curve_points[:, 0] <= bbox.x1 + x_margin)
@@ -1330,20 +1329,13 @@ def _score_label_bbox(
     if np.any(inside):
         return 1_000_000_000.0
 
-    dx = np.where(
-        local_points[:, 0] < expanded.x0,
-        expanded.x0 - local_points[:, 0],
-        np.where(local_points[:, 0] > expanded.x1, local_points[:, 0] - expanded.x1, 0.0),
+    score += proximity_penalty(
+        local_points,
+        expanded,
+        radius=11.0,
+        weight=18.0,
+        normalize=False,
     )
-    dy = np.where(
-        local_points[:, 1] < expanded.y0,
-        expanded.y0 - local_points[:, 1],
-        np.where(local_points[:, 1] > expanded.y1, local_points[:, 1] - expanded.y1, 0.0),
-    )
-    distance = np.hypot(dx, dy)
-    near = distance < 11.0
-    if np.any(near):
-        score += float((11.0 - distance[near]).sum()) * 18.0
     return score
 
 
