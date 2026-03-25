@@ -16,8 +16,9 @@ from src.rendering import (
     preflight_render_request,
     resolve_render_options,
 )
+from src.rendering import themes as rendering_themes
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
-from src.rendering.themes import visual_theme_ids, visual_theme_soft_overrides
+from src.rendering.themes import VisualThemeSpec, visual_theme_ids, visual_theme_soft_overrides
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -348,6 +349,27 @@ def test_style_composer_uses_contract_backed_protected_keys() -> None:
     assert "typography.font_size_pt" in bundle.protected_keys
     assert bundle.visual_theme_id == "soft_grid"
     assert bundle.resolved_soft == visual_theme_soft_overrides("soft_grid")
+
+
+def test_style_composer_filters_contract_protected_theme_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    theme_id = "__test_protected_theme__"
+    monkeypatch.setitem(
+        rendering_themes._VISUAL_THEMES,
+        theme_id,
+        VisualThemeSpec(
+            label="Test Protected",
+            description="Inject protected and unprotected overrides.",
+            soft_overrides={
+                "lines.linewidth": 9.9,
+                "axes.facecolor": "#f7f7f7",
+            },
+        ),
+    )
+
+    bundle = DEFAULT_STYLE_COMPOSER.compose("default", theme_id)
+
+    assert bundle.resolved_soft == {"axes.facecolor": "#f7f7f7"}
+    assert bundle.blocked_soft_keys == ("lines.linewidth",)
 
 
 def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> None:
