@@ -14,6 +14,13 @@ from matplotlib.ticker import FixedLocator
 
 from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import CurveSeries, ReplicateGroup
+from src.layout_policy import (
+    LayoutCandidate,
+    LayoutScore,
+    choose_layout_candidate,
+    empty_layout_decision,
+    record_layout_decision,
+)
 from src.layout_scoring import bbox_overlaps_any, expanded_bbox, proximity_penalty
 from src.plot_contract import load_plot_contract
 from src.text_normalization import normalize_label, normalize_unit
@@ -1390,14 +1397,16 @@ def _place_stacked_labels(
         bbox_width, bbox_height = _measure_text_bbox(label_text, color, "left")
         label_records.append((series_index, label_text, color, bbox_width, bbox_height))
 
-    best_result: tuple[float, list[tuple[float, float, str, tuple[float, float, float] | str]], str] | None = None
-    for visual_side, flatness_score, rail_x, per_series in _choose_baseline_label_rail(
-        display_points,
-        label_records,
-        axes_bbox=axes_bbox,
-        side=side,
-        inset_fraction=inset_fraction,
-        search_band_fraction=search_band_fraction,
+    plan_candidates: list[LayoutCandidate] = []
+    for candidate_index, (visual_side, flatness_score, rail_x, per_series) in enumerate(
+        _choose_baseline_label_rail(
+            display_points,
+            label_records,
+            axes_bbox=axes_bbox,
+            side=side,
+            inset_fraction=inset_fraction,
+            search_band_fraction=search_band_fraction,
+        )
     ):
         plan = _place_labels_on_baseline_rail(
             ax,
@@ -1414,13 +1423,53 @@ def _place_stacked_labels(
             continue
         total_score, planned_labels = plan
         total_score += flatness_score
-        if best_result is None or total_score < best_result[0]:
-            best_result = (total_score, planned_labels, visual_side)
+        plan_candidates.append(
+            LayoutCandidate(
+                candidate_id=f"{visual_side}_rail_{candidate_index}",
+                anchor=(float(rail_x), 0.0),
+                standoff_pt=float(label_offset_pt),
+                payload={
+                    "score": float(total_score),
+                    "planned_labels": planned_labels,
+                    "visual_side": visual_side,
+                    "flatness": float(flatness_score),
+                },
+                notes="stacked label rail candidate",
+            )
+        )
 
-    if best_result is None:
+    if not plan_candidates:
+        record_layout_decision(
+            fig,
+            empty_layout_decision("series_labels", reason="no_feasible_label_plan"),
+        )
         return False
 
-    _, planned_labels, visual_side = best_result
+    def _score_plan(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        score = float(payload.get("score", float("inf")))
+        flatness = float(payload.get("flatness", 0.0))
+        return LayoutScore(
+            score=score,
+            blocked=not np.isfinite(score),
+            reason=f"stacked_label_score={score:.4f}; flatness={flatness:.4f}",
+        )
+
+    decision = choose_layout_candidate(
+        object_kind="series_labels",
+        candidates=plan_candidates,
+        score_hook=_score_plan,
+    )
+    record_layout_decision(fig, decision)
+    chosen = decision.chosen_candidate
+    if chosen is None or not isinstance(chosen.payload, dict):
+        return False
+
+    planned_labels = chosen.payload.get("planned_labels")
+    visual_side = chosen.payload.get("visual_side")
+    if not isinstance(planned_labels, list) or visual_side not in {"left", "right"}:
+        return False
+
     for x_pos, y_pos, label_text, color in planned_labels:
         ax.text(
             x_pos,

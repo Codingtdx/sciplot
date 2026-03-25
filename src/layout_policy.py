@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-
 LayoutObjectKind = str
 
 
@@ -129,7 +128,7 @@ def record_layout_decision(target: Any, decision: LayoutDecision) -> None:
     if not isinstance(records, list):
         records = []
     records.append(_decision_to_dict(decision))
-    setattr(target, "_sciplot_layout_debug", records)
+    target._sciplot_layout_debug = records
 
 
 def _decision_to_dict(decision: LayoutDecision) -> dict[str, Any]:

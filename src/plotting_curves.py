@@ -10,6 +10,13 @@ from matplotlib.ticker import FixedLocator
 
 from src import plot_style
 from src.data_loader import CurveSeries
+from src.layout_policy import (
+    LayoutCandidate,
+    LayoutScore,
+    choose_layout_candidate,
+    flag_margin_fallback,
+    record_layout_decision,
+)
 from src.layout_scoring import score_points_against_bbox
 from src.plotting import (
     CURVE_TEMPLATES,
@@ -50,11 +57,34 @@ def _legend_candidates(
     ]
 
 
+def _legend_policy_candidates(
+    inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+) -> list[LayoutCandidate]:
+    policy_candidates: list[LayoutCandidate] = []
+    for loc, anchor, align in _legend_candidates(inset_fraction):
+        candidate_id = loc.replace(" ", "_")
+        policy_candidates.append(
+            LayoutCandidate(
+                candidate_id=candidate_id,
+                anchor=anchor,
+                payload={"loc": loc, "alignment": align},
+                notes="inside corner candidate",
+            )
+        )
+    return policy_candidates
+
+
 def _place_legend_candidate(
     ax: plt.Axes,
-    candidate: tuple[str, tuple[float, float], str],
+    candidate: LayoutCandidate | tuple[str, tuple[float, float], str],
 ) -> Legend:
-    loc, anchor, align = candidate
+    if isinstance(candidate, tuple):
+        loc, anchor, align = candidate
+    else:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        loc = str(payload.get("loc", "upper right"))
+        align = str(payload.get("alignment", "right"))
+        anchor = candidate.anchor if candidate.anchor is not None else (1.0, 1.0)
     legend = ax.legend(
         loc=loc,
         bbox_to_anchor=anchor,
@@ -95,34 +125,59 @@ def _score_legend_bbox(ax: plt.Axes, legend: Legend, series_list: Sequence[Curve
     return score
 
 
+def _legend_kwargs_from_candidate(
+    ax: plt.Axes,
+    candidate: LayoutCandidate,
+) -> dict[str, object]:
+    payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+    loc = str(payload.get("loc", "upper right"))
+    align = str(payload.get("alignment", "right"))
+    anchor = candidate.anchor if candidate.anchor is not None else (1.0, 1.0)
+    return {
+        "loc": loc,
+        "bbox_to_anchor": anchor,
+        "bbox_transform": ax.transAxes,
+        "borderaxespad": 0.0,
+        "alignment": align,
+    }
+
+
+def choose_legend_corner_with_policy(
+    ax: plt.Axes,
+    series_list: Sequence[CurveSeries],
+    inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+) -> tuple[dict[str, object], float, object]:
+    candidates = _legend_policy_candidates(inset_fraction)
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        legend = _place_legend_candidate(ax, candidate)
+        try:
+            score = _score_legend_bbox(ax, legend, series_list)
+            return LayoutScore(score=score, blocked=False, reason=f"curve_overlap={score:.4f}")
+        finally:
+            legend.remove()
+
+    decision = choose_layout_candidate(
+        object_kind="legend",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    chosen = decision.chosen_candidate or candidates[0]
+    score = float(decision.chosen_score) if decision.chosen_score is not None else float("inf")
+    return _legend_kwargs_from_candidate(ax, chosen), score, decision
+
+
 def choose_legend_corner(
     ax: plt.Axes,
     series_list: Sequence[CurveSeries],
     inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
 ) -> tuple[dict[str, object], float]:
-    candidates = _legend_candidates(inset_fraction)
-    best_score = float("inf")
-    best_candidate = candidates[0]
-
-    for candidate in candidates:
-        legend = _place_legend_candidate(ax, candidate)
-        score = _score_legend_bbox(ax, legend, series_list)
-        legend.remove()
-        if score < best_score:
-            best_score = score
-            best_candidate = candidate
-
-    loc, anchor, align = best_candidate
-    return (
-        {
-            "loc": loc,
-            "bbox_to_anchor": anchor,
-            "bbox_transform": ax.transAxes,
-            "borderaxespad": 0.0,
-            "alignment": align,
-        },
-        best_score,
+    kwargs, score, _decision = choose_legend_corner_with_policy(
+        ax,
+        series_list,
+        inset_fraction=inset_fraction,
     )
+    return kwargs, score
 
 
 def _expand_linear_limit(low: float, high: float, *, expand_low: bool, fraction: float) -> tuple[float, float]:
@@ -342,11 +397,18 @@ def plot_curves(
             break
 
     if series_label_mode != "edge" and legend_mode == "inside_best":
-        legend_kwargs, overlap_score = choose_legend_corner(
+        legend_kwargs, overlap_score, pre_decision = choose_legend_corner_with_policy(
             ax,
             plotted_series,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
+        if overlap_score > 0:
+            pre_decision = flag_margin_fallback(
+                pre_decision,
+                action="expand_axes",
+                reason=f"legend overlap score {overlap_score:.4f}; expand_axes={legend_expand_axes}",
+            )
+        record_layout_decision(fig, pre_decision)
         _nudge_limits_for_legend(
             ax,
             legend_kwargs,
@@ -355,11 +417,18 @@ def plot_curves(
             yscale=yscale,
             expand_axes=legend_expand_axes,
         )
-        legend_kwargs, _ = choose_legend_corner(
+        legend_kwargs, _, post_decision = choose_legend_corner_with_policy(
             ax,
             plotted_series,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
+        if overlap_score > 0:
+            post_decision = flag_margin_fallback(
+                post_decision,
+                action="post_expand_reflow",
+                reason="legend reflow after axis expansion",
+            )
+        record_layout_decision(fig, post_decision)
         ax.legend(**legend_kwargs)
     elif series_label_mode != "edge" and legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
@@ -464,11 +533,18 @@ def plot_scatter(
     ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
 
     if legend_mode == "inside_best":
-        legend_kwargs, overlap_score = choose_legend_corner(
+        legend_kwargs, overlap_score, pre_decision = choose_legend_corner_with_policy(
             ax,
             series_list,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
+        if overlap_score > 0:
+            pre_decision = flag_margin_fallback(
+                pre_decision,
+                action="expand_axes",
+                reason=f"legend overlap score {overlap_score:.4f}; expand_axes={legend_expand_axes}",
+            )
+        record_layout_decision(fig, pre_decision)
         _nudge_limits_for_legend(
             ax,
             legend_kwargs,
@@ -477,11 +553,18 @@ def plot_scatter(
             yscale=yscale,
             expand_axes=legend_expand_axes,
         )
-        legend_kwargs, _ = choose_legend_corner(
+        legend_kwargs, _, post_decision = choose_legend_corner_with_policy(
             ax,
             series_list,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
+        if overlap_score > 0:
+            post_decision = flag_margin_fallback(
+                post_decision,
+                action="post_expand_reflow",
+                reason="legend reflow after axis expansion",
+            )
+        record_layout_decision(fig, post_decision)
         ax.legend(**legend_kwargs)
     elif legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))

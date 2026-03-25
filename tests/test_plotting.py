@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
-from src.plotting import plot_bar, plot_box, plot_curves, plot_tensile_curve
+from src.data_loader import CurveSeries, HeatmapTable, load_curve_table, load_replicate_table
+from src.plotting import plot_bar, plot_box, plot_curves, plot_heatmap, plot_tensile_curve
 
 
 def _curve_series(
@@ -201,5 +201,47 @@ def test_plot_bar_keeps_zero_based_lower_bound_without_bottom_display_padding(tm
 
         assert y_low == pytest.approx(0.0, abs=1e-9)
         assert np.any(np.isclose(y_ticks, 0.0))
+    finally:
+        plt.close(fig)
+
+
+def test_plot_curves_records_legend_layout_debug() -> None:
+    series = [
+        _curve_series("Sample A", [0.0, 1.0, 2.0, 3.0], [1.0, 1.6, 2.1, 2.5]),
+        _curve_series("Sample B", [0.0, 1.0, 2.0, 3.0], [2.0, 1.8, 1.6, 1.4]),
+    ]
+    fig, _ = plot_curves(series, legend_mode="inside_best")
+    try:
+        debug = getattr(fig, "_sciplot_layout_debug", [])
+        legend_records = [entry for entry in debug if entry.get("object_kind") == "legend"]
+        assert legend_records
+        assert legend_records[0]["chosen_candidate_id"] is not None
+        assert legend_records[0]["candidates"]
+    finally:
+        plt.close(fig)
+
+
+def test_plot_heatmap_records_colorbar_header_layout_debug() -> None:
+    table = HeatmapTable(
+        x_label="X",
+        y_label="Y",
+        z_label="Intensity",
+        x_unit="mm",
+        y_unit="mm",
+        z_unit="a.u.",
+        data=pd.DataFrame(
+            {
+                "x": [0, 0, 1, 1],
+                "y": [0, 1, 0, 1],
+                "z": [0.1, 0.2, 0.3, 0.4],
+            }
+        ),
+    )
+    fig, _ = plot_heatmap(table, show_colorbar=True)
+    try:
+        debug = getattr(fig, "_sciplot_layout_debug", [])
+        colorbar_records = [entry for entry in debug if entry.get("object_kind") == "colorbar_header"]
+        assert colorbar_records
+        assert colorbar_records[0]["chosen_candidate_id"] is not None
     finally:
         plt.close(fig)
