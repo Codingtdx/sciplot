@@ -180,7 +180,13 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["inspection"]["recommendation"]["template"] == "curve"
     assert len(payload["inspection"]["recommendations"]) == 5
     assert payload["inspection"]["recommendations"][0]["template_id"] == "curve"
+    assert payload["inspection"]["recommendations"][0]["rank"] == 1
+    assert payload["inspection"]["recommendations"][0]["reason"]
+    assert payload["inspection"]["recommendations"][0]["suitability_hint"]
+    assert payload["inspection"]["recommendations"][0]["score_gap_to_top"] == 0.0
     assert payload["inspection"]["recommendations"][1]["template_id"] == "point_line"
+    assert payload["inspection"]["recommendation_confidence"] >= payload["inspection"]["recommendations"][0]["score"]
+    assert "curve" in payload["inspection"]["recommendation_summary"]
 
 
 def test_inspect_file_replicate_model_keeps_legacy_recommendation_field(tmp_path: Path) -> None:

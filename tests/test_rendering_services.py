@@ -274,7 +274,12 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     assert len(inspection.recommendations) == 5
     assert inspection.recommendations[0].template_id == "curve"
     assert inspection.recommendations[1].template_id == "point_line"
+    assert inspection.recommendations[0].rank == 1
+    assert inspection.recommendations[0].reason
+    assert inspection.recommendations[0].suitability_hint
     assert inspection.recommendations[0].why_soft_prior
+    assert inspection.recommendation_confidence >= inspection.recommendations[0].score
+    assert "curve" in inspection.recommendation_summary
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)

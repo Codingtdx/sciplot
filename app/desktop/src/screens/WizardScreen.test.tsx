@@ -101,10 +101,17 @@ const TEST_RANKED_INSPECT_RESPONSE: InspectResponse = {
   ...TEST_INSPECT_RESPONSE,
   inspection: {
     ...TEST_INSPECT_RESPONSE.inspection,
+    recommendation_confidence: 92.3,
+    recommendation_summary:
+      "High confidence: curve is the strongest template for Paired curve table (curve_table) (score 88.5, gap 4.3).",
     recommendations: [
       {
         template_id: "curve",
         score: 88.5,
+        rank: 1,
+        reason: "Detected paired x/y signals that align with compact curve rendering.",
+        suitability_hint: "Strong structural and semantic match for the detected model.",
+        score_gap_to_top: 0,
         why_hard_match: ["Normalized dataset model is curve_table with curve_like shape."],
         why_soft_prior: ["Compact paired curves are the safest default."],
         inferred_mapping: { x: "Time", y: "Stress" },
@@ -118,6 +125,10 @@ const TEST_RANKED_INSPECT_RESPONSE: InspectResponse = {
       {
         template_id: "point_line",
         score: 84.2,
+        rank: 2,
+        reason: "Point-line stays compatible and keeps markers visible for inspection.",
+        suitability_hint: "Good fit with minor trade-offs compared with the primary choice.",
+        score_gap_to_top: 4.3,
         why_hard_match: ["Normalized dataset model is curve_table with curve_like shape."],
         why_soft_prior: ["Markers make paired observations easier to scan."],
         inferred_mapping: { x: "Time", y: "Stress" },
@@ -496,8 +507,18 @@ describe("WizardScreen", () => {
 
     expect(screen.getByText("Rank #1 · Score 88.5")).toBeInTheDocument();
     expect(screen.getByText("Rank #2 · Score 84.2")).toBeInTheDocument();
-    expect(screen.getByText("Compact paired curves are the safest default.")).toBeInTheDocument();
-    expect(screen.getByText("Markers make paired observations easier to scan.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Detected paired x/y signals that align with compact curve rendering."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Strong structural and semantic match for the detected model."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Detected Paired curve table (curve_table) · Confidence 92.3")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "High confidence: curve is the strongest template for Paired curve table (curve_table) (score 88.5, gap 4.3).",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("refreshes preview in tune stage and only runs preflight once review opens", async () => {

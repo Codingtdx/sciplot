@@ -123,6 +123,10 @@ export type Recommendation = {
 export type TemplateRecommendation = {
   template_id: TemplateName;
   score: number;
+  rank?: number | null;
+  reason?: string;
+  suitability_hint?: string;
+  score_gap_to_top?: number;
   why_hard_match: string[];
   why_soft_prior: string[];
   inferred_mapping: Record<string, string>;
@@ -135,6 +139,8 @@ export type InputInspection = {
   model_label: string;
   recommendation: Recommendation;
   recommendations?: TemplateRecommendation[];
+  recommendation_confidence?: number;
+  recommendation_summary?: string;
   warnings: string[];
   signals: string[];
 };

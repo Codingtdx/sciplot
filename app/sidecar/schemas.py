@@ -475,6 +475,10 @@ class RecommendationResponse(StrictModel):
 class TemplateRecommendationResponse(StrictModel):
     template_id: str
     score: float
+    rank: int | None = None
+    reason: str = ""
+    suitability_hint: str = ""
+    score_gap_to_top: float = 0.0
     why_hard_match: list[str] = Field(default_factory=list)
     why_soft_prior: list[str] = Field(default_factory=list)
     inferred_mapping: dict[str, str] = Field(default_factory=dict)
@@ -487,6 +491,8 @@ class InputInspectionResponse(StrictModel):
     model_label: str
     recommendation: RecommendationResponse
     recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
+    recommendation_confidence: float = 0.0
+    recommendation_summary: str = ""
     warnings: list[str] = Field(default_factory=list)
     signals: list[str] = Field(default_factory=list)
 

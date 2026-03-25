@@ -47,6 +47,8 @@ class _ScoredCandidate:
     score: float
     why_hard_match: tuple[str, ...]
     why_soft_prior: tuple[str, ...]
+    reason: str
+    suitability_hint: str
     inferred_mapping: dict[str, str]
     optional_enhancements: tuple[str, ...]
     preview_config_summary: dict[str, Any]
@@ -69,6 +71,10 @@ def legacy_recommendation_to_template_recommendation(
     return TemplateRecommendation(
         template_id=template_id,
         score=_LEGACY_SCORE,
+        rank=1,
+        score_gap_to_top=0.0,
+        reason=reason,
+        suitability_hint="Primary recommendation from compatibility inspection.",
         why_hard_match=(reason,),
         why_soft_prior=(),
         inferred_mapping={},
@@ -127,6 +133,22 @@ def _default_preview_summary(template_id: str, dataset: NormalizedDataset, **ove
     return {key: value for key, value in summary.items() if value is not None}
 
 
+def _candidate_reason(why_hard_match: tuple[str, ...], why_soft_prior: list[str]) -> str:
+    if why_hard_match:
+        return why_hard_match[0]
+    if why_soft_prior:
+        return why_soft_prior[0]
+    return "Compatible template for the detected input model."
+
+
+def _candidate_suitability_hint(score: float) -> str:
+    if score >= 88.0:
+        return "Strong structural and semantic match for the detected model."
+    if score >= 76.0:
+        return "Good fit with minor trade-offs compared with the primary choice."
+    return "Compatible fallback when you need a different visual emphasis."
+
+
 def _build_candidate(
     *,
     template_id: str,
@@ -139,11 +161,14 @@ def _build_candidate(
     **preview_overrides: object,
 ) -> _ScoredCandidate:
     bounded_score = round(max(0.0, min(100.0, score)), 1)
+    suitability_hint = _candidate_suitability_hint(bounded_score)
     return _ScoredCandidate(
         template_id=template_id,
         score=bounded_score,
         why_hard_match=why_hard_match,
         why_soft_prior=tuple(why_soft_prior),
+        reason=_candidate_reason(why_hard_match, why_soft_prior),
+        suitability_hint=suitability_hint,
         inferred_mapping=inferred_mapping,
         optional_enhancements=tuple(optional_enhancements),
         preview_config_summary=_default_preview_summary(template_id, dataset, **preview_overrides),
@@ -643,17 +668,22 @@ def _recommendations_for_dataset(dataset: NormalizedDataset) -> tuple[TemplateRe
         candidates = _heatmap_candidates(dataset)
     else:
         candidates = _curve_candidates(dataset)
+    top_score = candidates[0].score if candidates else 0.0
     return tuple(
         TemplateRecommendation(
             template_id=candidate.template_id,
             score=candidate.score,
+            rank=index + 1,
+            score_gap_to_top=round(max(0.0, top_score - candidate.score), 1),
+            reason=candidate.reason,
+            suitability_hint=candidate.suitability_hint,
             why_hard_match=candidate.why_hard_match,
             why_soft_prior=candidate.why_soft_prior,
             inferred_mapping=candidate.inferred_mapping,
             optional_enhancements=candidate.optional_enhancements,
             preview_config_summary=candidate.preview_config_summary,
         )
-        for candidate in candidates
+        for index, candidate in enumerate(candidates)
     )
 
 

@@ -112,6 +112,12 @@ def test_curve_table_recommender_returns_five_ranked_choices(tmp_path: Path) -> 
         "scatter",
     ]
     assert recommendations[0].score > recommendations[1].score > recommendations[2].score
+    assert recommendations[0].rank == 1
+    assert recommendations[1].rank == 2
+    assert recommendations[0].reason
+    assert recommendations[0].suitability_hint
+    assert recommendations[0].score_gap_to_top == 0.0
+    assert recommendations[1].score_gap_to_top > 0.0
     assert recommendations[0].why_hard_match
     assert recommendations[0].why_soft_prior
 

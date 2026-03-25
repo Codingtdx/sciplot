@@ -112,25 +112,28 @@ export function WizardTypeStage({
       if (!inspection) {
         return compatibleTemplates.slice(0, 5).map((template, index) => ({
           template,
+          rank: index + 1,
           score: 100 - index,
           reason: undefined as string | undefined,
-          softPrior: undefined as string | undefined,
+          suitabilityHint: undefined as string | undefined,
         }));
       }
       const ranked = inspectionRecommendationChoices(meta, inspection, 5).map((item) => ({
         template: item.template,
+        rank: item.recommendation.rank ?? undefined,
         score: item.recommendation.score,
-        reason: item.recommendation.why_hard_match[0],
-        softPrior: item.recommendation.why_soft_prior[0],
+        reason: item.recommendation.reason ?? item.recommendation.why_hard_match[0],
+        suitabilityHint: item.recommendation.suitability_hint ?? item.recommendation.why_soft_prior[0],
       }));
       if (ranked.length > 0) {
         return ranked;
       }
       return compatibleTemplates.slice(0, 5).map((template, index) => ({
         template,
+        rank: index + 1,
         score: 100 - index,
         reason: undefined as string | undefined,
-        softPrior: undefined as string | undefined,
+        suitabilityHint: undefined as string | undefined,
       }));
     },
     [compatibleTemplates, inspection, meta],
@@ -168,8 +171,13 @@ export function WizardTypeStage({
             <h2>Choose the chart family</h2>
             <p>These cards are ranked from the strongest fit to broader compatible alternatives.</p>
             <div className="plot-type-supported-types">
-              {inspection ? `Detected ${inspection.model_label}` : "Run inspect to unlock template guidance."}
+              {inspection
+                ? `Detected ${inspection.model_label} · Confidence ${(inspection.recommendation_confidence ?? 0).toFixed(1)}`
+                : "Run inspect to unlock template guidance."}
             </div>
+            {inspection?.recommendation_summary ? (
+              <div className="wb-inline-meta">{inspection.recommendation_summary}</div>
+            ) : null}
           </div>
 
           {!inspection ? (
@@ -181,6 +189,7 @@ export function WizardTypeStage({
                   const { template } = item;
                   const selected = selectedTemplate === template.id;
                   const recommended = inspection.recommendation.template === template.id;
+                  const rankLabel = item.rank ?? index + 1;
                   return (
                     <article
                       className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${recommended ? "recommended" : ""} ${
@@ -195,10 +204,10 @@ export function WizardTypeStage({
                           <span>{template.id === primaryTemplateId ? "Primary recommendation" : recommended ? "Recommended" : "Compatible"}</span>
                         </div>
                         <div className="wb-inline-meta">
-                          Rank #{index + 1} · Score {item.score.toFixed(1)}
+                          Rank #{rankLabel} · Score {item.score.toFixed(1)}
                         </div>
                         <p>{recommendationReason(template, inspection, item.reason)}</p>
-                        {item.softPrior ? <div className="wb-inline-meta">{item.softPrior}</div> : null}
+                        {item.suitabilityHint ? <div className="wb-inline-meta">{item.suitabilityHint}</div> : null}
                         <div className="plot-type-recommendation-hint">{templateHint(template, inspection)}</div>
                         <div className="plot-type-recommendation-meta">
                           <span>{template.default_size}</span>

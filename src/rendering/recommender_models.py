@@ -15,6 +15,10 @@ class TemplateRecommendation:
     inferred_mapping: dict[str, str]
     optional_enhancements: tuple[str, ...]
     preview_config_summary: dict[str, Any]
+    rank: int | None = None
+    reason: str = ""
+    suitability_hint: str = ""
+    score_gap_to_top: float = 0.0
 
 
 class TemplateRecommender(Protocol):

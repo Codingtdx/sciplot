@@ -46,6 +46,7 @@
 - CLI、GUI、脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
 - `preflight-render`、`render-preview`、`export-render`、`compose-preview` 现在都会返回统一的 `submission_report`；它是投稿检查摘要，不是新的 blocker 通道。真正阻止导出的一律仍走 preflight / Composer overlap 校验。
+- `inspect-file` / `recommend-render` 的 `inspection` 现在在保持旧 `recommendation` 兼容字段的同时，还会返回 richer ranked `recommendations`（含 `rank / score / reason / suitability_hint / score_gap_to_top`）以及顶层 `recommendation_confidence / recommendation_summary`；`wizard` 的 `/plot/type` 只消费这些后端字段做排序与提示，不要在前端再造一套评分逻辑。
 - `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果 GUI 没传显式 `output_dir`，sidecar 默认写到 app-managed `plot_exports` 目录，只有用户明确选目录时才落到用户指定路径。改导出链路时别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
