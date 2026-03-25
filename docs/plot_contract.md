@@ -92,6 +92,16 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
+### `box_strip` / Box + strip
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Box plot with deterministic strip-point overlay emphasis.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: `dense_group_label_warning`
+
 ### `violin` / Violin
 
 - Category: `single_panel`
@@ -109,6 +119,16 @@
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `style_preset`, `palette_preset`
 - Description: Grouped bar comparison with deterministic spacing and raw-point overlays.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: `dense_group_label_warning`
+
+### `grouped_bar_error` / Grouped bar + error
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Grouped bar means with deterministic error bars and raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 

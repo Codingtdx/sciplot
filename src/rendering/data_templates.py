@@ -166,7 +166,7 @@ def _replicate_blank_workbook() -> dict[str, pd.DataFrame]:
             "Keep A1 as the shared y-axis label, row 2 as group names, and row 3 as units.",
             "Add more groups by appending columns.",
             (
-                "This blank template is inspect-ready for bar, box, violin, and "
+                "This blank template is inspect-ready for bar, box, box+strip, violin, and "
                 "replicate-distribution comparison families."
             ),
         ],
@@ -372,6 +372,8 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         input_model="replicate_table",
         typical_families=(
             "distribution_compare",
+            "box_strip",
+            "grouped_bar_error",
             "grouped_bar_compare",
             "histogram_density",
             "box",

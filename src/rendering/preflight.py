@@ -89,8 +89,10 @@ def preflight_render_request(
         elif template in {
             "bar",
             "box",
+            "box_strip",
             "violin",
             "grouped_bar_compare",
+            "grouped_bar_error",
             "distribution_compare",
             "histogram_density",
         }:
@@ -98,7 +100,7 @@ def preflight_render_request(
             if not groups:
                 raise ValueError("No valid groups were found in the replicate table.")
             summary = summarize_replicate_distribution(groups)
-            if template in {"grouped_bar_compare", "distribution_compare"} and len(groups) < 2:
+            if template in {"grouped_bar_compare", "grouped_bar_error", "distribution_compare"} and len(groups) < 2:
                 raise ValueError(f"{template} requires at least two replicate groups.")
             if template == "distribution_compare" and summary.min_group_points < 3:
                 warnings.append(

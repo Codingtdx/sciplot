@@ -10,6 +10,15 @@ from src import (
     mpl_backend,  # noqa: F401
     plot_style,
 )
+from src.layout_policy import (
+    LayoutCandidate,
+    LayoutScore,
+    choose_layout_candidate,
+    empty_layout_decision,
+    flag_margin_fallback,
+    record_layout_decision,
+)
+from src.layout_scoring import score_points_against_bbox
 from src.plot_contract import qa_profile
 from src.plot_style import save_pdf
 from src.plotting import _format_axis_label, _place_series_edge_labels
@@ -322,7 +331,7 @@ def _series_display_colors(ax: plt.Axes, series_count: int) -> list[object]:
     return list(plot_style.get_categorical_palette(n_colors=series_count))
 
 
-def _place_endpoint_direct_labels(
+def _plan_endpoint_direct_labels(
     ax: plt.Axes,
     series_list,
     *,
@@ -331,7 +340,7 @@ def _place_endpoint_direct_labels(
     inset_fraction: float,
     label_offset_pt: float,
     fontsize: float,
-) -> bool:
+) -> tuple[list[tuple[float, float, str, object]] | None, float, str]:
     fig = ax.figure
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
@@ -349,6 +358,7 @@ def _place_endpoint_direct_labels(
     text_colors: list[object] = []
 
     alignment = "right" if side == "left" else "left"
+    curve_anchor_x: list[float] = []
 
     for series, color in zip(series_list, colors, strict=True):
         x = series.data["x"].to_numpy(dtype=float)
@@ -357,7 +367,7 @@ def _place_endpoint_direct_labels(
         x = x[valid]
         y = y[valid]
         if len(x) < 2:
-            return False
+            return None, float("inf"), "insufficient_points"
         order = np.argsort(x)
         x = x[order]
         y = y[order]
@@ -374,21 +384,22 @@ def _place_endpoint_direct_labels(
             horizontal_alignment=alignment,
         )
         if width_px > axes_bbox.width - 2.0 * margin_px:
-            return False
+            return None, float("inf"), "label_too_wide_for_axes"
         if side == "left":
             anchor = min(curve_px[0] - offset_px, axes_bbox.x1 - margin_px)
             anchor = max(anchor, axes_bbox.x0 + width_px + margin_px)
             if anchor - width_px < axes_bbox.x0 + margin_px - 1e-6:
-                return False
+                return None, float("inf"), "left_margin_overflow"
         else:
             anchor = max(curve_px[0] + offset_px, axes_bbox.x0 + margin_px)
             anchor = min(anchor, axes_bbox.x1 - width_px - margin_px)
             if anchor + width_px > axes_bbox.x1 - margin_px + 1e-6:
-                return False
+                return None, float("inf"), "right_margin_overflow"
         desired_y.append(float(curve_px[1]))
         widths.append(width_px)
         heights.append(height_px)
         anchor_x.append(float(anchor))
+        curve_anchor_x.append(float(curve_px[0]))
         labels.append(label_text)
         text_colors.append(color)
 
@@ -400,14 +411,44 @@ def _place_endpoint_direct_labels(
         gap_px=gap_px,
     )
     if centers is None:
-        return False
+        return None, float("inf"), "vertical_spread_failed"
 
     inverse = ax.transData.inverted()
+    planned_labels: list[tuple[float, float, str, object]] = []
+    horizontal_offset = 0.0
+    for anchor_value, curve_value in zip(anchor_x, curve_anchor_x, strict=True):
+        horizontal_offset += abs(anchor_value - curve_value)
+    vertical_adjustment = float(np.mean(np.abs(np.asarray(desired_y, dtype=float) - centers)))
     for x_px, y_px, label_text, color in zip(anchor_x, centers, labels, text_colors, strict=True):
         data_x, data_y = inverse.transform((x_px, y_px))
+        planned_labels.append(
+            (
+                float(data_x),
+                float(data_y),
+                label_text,
+                color,
+            )
+        )
+    score = horizontal_offset / max(len(planned_labels), 1) + vertical_adjustment * 0.45
+    reason = (
+        f"endpoint plan side={side}; horizontal_offset={horizontal_offset:.3f}; "
+        f"vertical_adjustment={vertical_adjustment:.3f}"
+    )
+    return planned_labels, score, reason
+
+
+def _apply_endpoint_direct_label_plan(
+    ax: plt.Axes,
+    *,
+    planned_labels: list[tuple[float, float, str, object]],
+    side: str,
+    fontsize: float,
+) -> None:
+    alignment = "right" if side == "left" else "left"
+    for x_pos, y_pos, label_text, color in planned_labels:
         ax.text(
-            float(data_x),
-            float(data_y),
+            x_pos,
+            y_pos,
             label_text,
             ha=alignment,
             va="center",
@@ -416,7 +457,6 @@ def _place_endpoint_direct_labels(
             clip_on=True,
             zorder=4.5,
         )
-    return True
 
 
 def _ensure_direct_labels(
@@ -448,34 +488,266 @@ def _ensure_direct_labels(
     ):
         return True
     if not _is_compact_curve_panel(options):
+        record_layout_decision(
+            ax.figure,
+            empty_layout_decision("endpoint_direct_labels", reason="not_compact_panel"),
+            context={"path": "render_direct_labels", "phase": "fallback_gate"},
+        )
         return False
-    return _place_endpoint_direct_labels(
+    side_candidates = [side] if side in {"left", "right"} else ["right", "left"]
+    if len(side_candidates) == 1:
+        alternate = "right" if side_candidates[0] == "left" else "left"
+        side_candidates.append(alternate)
+
+    plan_cache: dict[str, tuple[list[tuple[float, float, str, object]] | None, float, str]] = {}
+    candidates = [
+        LayoutCandidate(
+            candidate_id=f"endpoint_{candidate_side}",
+            payload={"side": candidate_side, "bias": 0.0 if candidate_side == side_candidates[0] else 22.0},
+            standoff_pt=float(profile.direct_label_offset_pt),
+            notes="endpoint direct-label fallback candidate",
+        )
+        for candidate_side in side_candidates
+    ]
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        candidate_side = str(payload.get("side", side_candidates[0]))
+        bias = float(payload.get("bias", 0.0))
+        plan, plan_score, reason = _plan_endpoint_direct_labels(
+            ax,
+            series_list,
+            reverse_x=reverse_x,
+            side=candidate_side,
+            inset_fraction=profile.direct_label_inset_fraction,
+            label_offset_pt=profile.direct_label_offset_pt,
+            fontsize=fontsize,
+        )
+        plan_cache[candidate.candidate_id] = (plan, plan_score, reason)
+        if plan is None:
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason=reason)
+        return LayoutScore(
+            score=float(plan_score + bias),
+            blocked=False,
+            reason=f"{reason}; bias={bias:.3f}",
+        )
+
+    decision = choose_layout_candidate(
+        object_kind="endpoint_direct_labels",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    chosen = decision.chosen_candidate
+    if chosen is None:
+        record_layout_decision(
+            ax.figure,
+            flag_margin_fallback(
+                decision,
+                action="endpoint_labels_unavailable",
+                reason="both sides failed compact endpoint fallback",
+            ),
+            context={"path": "render_direct_labels", "phase": "endpoint_policy"},
+        )
+        return False
+    chosen_plan, _chosen_score, chosen_reason = plan_cache.get(
+        chosen.candidate_id,
+        (None, float("inf"), "missing_plan"),
+    )
+    if chosen_plan is None:
+        record_layout_decision(
+            ax.figure,
+            flag_margin_fallback(
+                decision,
+                action="endpoint_labels_missing_plan",
+                reason=chosen_reason,
+            ),
+            context={"path": "render_direct_labels", "phase": "endpoint_policy"},
+        )
+        return False
+
+    chosen_payload = chosen.payload if isinstance(chosen.payload, dict) else {}
+    chosen_side = str(chosen_payload.get("side", side_candidates[0]))
+    if chosen_side != side_candidates[0]:
+        decision = flag_margin_fallback(
+            decision,
+            action=f"switch_side:{chosen_side}",
+            reason=f"preferred side '{side_candidates[0]}' failed endpoint plan",
+        )
+    record_layout_decision(
+        ax.figure,
+        decision,
+        context={"path": "render_direct_labels", "phase": "endpoint_policy"},
+    )
+    _apply_endpoint_direct_label_plan(
         ax,
-        series_list,
-        reverse_x=reverse_x,
-        side=side,
-        inset_fraction=profile.direct_label_inset_fraction,
-        label_offset_pt=profile.direct_label_offset_pt,
+        planned_labels=chosen_plan,
+        side=chosen_side,
         fontsize=fontsize,
     )
+    return True
+
+
+def _collect_axis_display_points(ax: plt.Axes, *, max_points: int = 3200) -> np.ndarray:
+    point_blocks: list[np.ndarray] = []
+    for line in ax.lines:
+        x_values = np.asarray(line.get_xdata(), dtype=float)
+        y_values = np.asarray(line.get_ydata(), dtype=float)
+        valid = np.isfinite(x_values) & np.isfinite(y_values)
+        if not np.any(valid):
+            continue
+        transformed = ax.transData.transform(np.column_stack([x_values[valid], y_values[valid]]))
+        if len(transformed) > max_points:
+            indices = np.linspace(0, len(transformed) - 1, max_points, dtype=int)
+            transformed = transformed[indices]
+        point_blocks.append(transformed)
+    for collection in ax.collections:
+        offsets = np.asarray(collection.get_offsets(), dtype=float)
+        if offsets.size == 0:
+            continue
+        valid = np.isfinite(offsets[:, 0]) & np.isfinite(offsets[:, 1])
+        transformed = ax.transData.transform(offsets[valid])
+        if len(transformed) > max_points:
+            indices = np.linspace(0, len(transformed) - 1, max_points, dtype=int)
+            transformed = transformed[indices]
+        point_blocks.append(transformed)
+    if not point_blocks:
+        return np.empty((0, 2), dtype=float)
+    stacked = np.vstack(point_blocks)
+    if len(stacked) > max_points:
+        indices = np.linspace(0, len(stacked) - 1, max_points, dtype=int)
+        stacked = stacked[indices]
+    return stacked
+
+
+def _compact_legend_candidates(inset: float) -> list[LayoutCandidate]:
+    return [
+        LayoutCandidate(
+            candidate_id="compact_upper_center",
+            anchor=(0.5, 1.0 - inset),
+            standoff_pt=inset * 72.0,
+            payload={"loc": "upper center", "alignment": "center", "bias": 0.0},
+            notes="primary compact legend candidate",
+        ),
+        LayoutCandidate(
+            candidate_id="compact_upper_left",
+            anchor=(inset, 1.0 - inset),
+            standoff_pt=inset * 72.0,
+            payload={"loc": "upper left", "alignment": "left", "bias": 2.4},
+            notes="compact legend fallback candidate",
+        ),
+        LayoutCandidate(
+            candidate_id="compact_upper_right",
+            anchor=(1.0 - inset, 1.0 - inset),
+            standoff_pt=inset * 72.0,
+            payload={"loc": "upper right", "alignment": "right", "bias": 2.8},
+            notes="compact legend fallback candidate",
+        ),
+    ]
 
 
 def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
     if series_count < 2:
+        record_layout_decision(
+            ax.figure,
+            empty_layout_decision("compact_legend", reason="series_count<2"),
+            context={"path": "render_compact_legend", "phase": "candidate_selection"},
+        )
         return False
     handles, labels = ax.get_legend_handles_labels()
     visible_labels = [label for label in labels if not str(label).startswith("_")]
     if len(visible_labels) < 2:
+        record_layout_decision(
+            ax.figure,
+            empty_layout_decision("compact_legend", reason="insufficient_visible_labels"),
+            context={"path": "render_compact_legend", "phase": "candidate_selection"},
+        )
         return False
     profile = _compact_curve_editorial_profile()
     inset = plot_style.current_spacing().legend_inset_fraction
-    legend = ax.legend(
+    candidates = _compact_legend_candidates(inset)
+    data_points = _collect_axis_display_points(ax)
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        anchor = candidate.anchor if candidate.anchor is not None else (0.5, 1.0 - inset)
+        legend = ax.legend(
+            handles,
+            labels,
+            loc=str(payload.get("loc", "upper center")),
+            bbox_to_anchor=anchor,
+            bbox_transform=ax.transAxes,
+            borderaxespad=0.0,
+            alignment=str(payload.get("alignment", "center")),
+            frameon=False,
+            ncol=min(profile.legend_columns, len(visible_labels)),
+            fontsize=plot_style.current_typography().legend_font_size_pt * profile.legend_font_scale,
+            handlelength=profile.legend_handlelength,
+            handletextpad=profile.legend_handletextpad,
+            columnspacing=profile.legend_columnspacing,
+            labelspacing=0.25,
+            borderpad=profile.legend_borderpad,
+        )
+        ax.figure.canvas.draw()
+        renderer = ax.figure.canvas.get_renderer()
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        legend_bbox = legend.get_window_extent(renderer=renderer)
+        legend.remove()
+        if (
+            legend_bbox.x0 < axes_bbox.x0
+            or legend_bbox.x1 > axes_bbox.x1
+            or legend_bbox.y0 < axes_bbox.y0
+            or legend_bbox.y1 > axes_bbox.y1
+        ):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="legend_out_of_axes")
+        overlap_metrics = score_points_against_bbox(
+            data_points,
+            legend_bbox,
+            inside_weight=12.0,
+            near_radius=11.0,
+            near_weight=1.0,
+            normalize_near=True,
+        )
+        axes_area = max(float(axes_bbox.width) * float(axes_bbox.height), 1.0)
+        legend_area = max(float(legend_bbox.width) * float(legend_bbox.height), 0.0)
+        footprint = legend_area / axes_area
+        bias = float(payload.get("bias", 0.0))
+        score = overlap_metrics.total + footprint * 40.0 + bias
+        return LayoutScore(
+            score=score,
+            blocked=False,
+            reason=(
+                f"compact overlap={overlap_metrics.total:.4f}; footprint={footprint:.4f}; "
+                f"bias={bias:.3f}"
+            ),
+        )
+
+    decision = choose_layout_candidate(
+        object_kind="compact_legend",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    chosen = decision.chosen_candidate
+    if chosen is None:
+        record_layout_decision(
+            ax.figure,
+            flag_margin_fallback(
+                decision,
+                action="compact_legend_rejected",
+                reason="no in-axes compact legend candidate remained viable",
+            ),
+            context={"path": "render_compact_legend", "phase": "candidate_selection"},
+        )
+        return False
+    chosen_payload = chosen.payload if isinstance(chosen.payload, dict) else {}
+    chosen_anchor = chosen.anchor if chosen.anchor is not None else (0.5, 1.0 - inset)
+    ax.legend(
         handles,
         labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.0 - inset),
+        loc=str(chosen_payload.get("loc", "upper center")),
+        bbox_to_anchor=chosen_anchor,
         bbox_transform=ax.transAxes,
         borderaxespad=0.0,
+        alignment=str(chosen_payload.get("alignment", "center")),
         frameon=False,
         ncol=min(profile.legend_columns, len(visible_labels)),
         fontsize=plot_style.current_typography().legend_font_size_pt * profile.legend_font_scale,
@@ -485,9 +757,23 @@ def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
         labelspacing=0.25,
         borderpad=profile.legend_borderpad,
     )
+    if chosen.candidate_id != "compact_upper_center":
+        decision = flag_margin_fallback(
+            decision,
+            action=f"compact_anchor:{chosen.candidate_id}",
+            reason="primary compact anchor downgraded by collision/footprint score",
+        )
+    record_layout_decision(
+        ax.figure,
+        decision,
+        context={"path": "render_compact_legend", "phase": "candidate_selection"},
+    )
     ax.figure.canvas.draw()
     renderer = ax.figure.canvas.get_renderer()
     axes_bbox = ax.get_window_extent(renderer=renderer)
+    legend = ax.get_legend()
+    if legend is None:
+        return False
     legend_bbox = legend.get_window_extent(renderer=renderer)
     if (
         legend_bbox.x0 < axes_bbox.x0
@@ -496,6 +782,11 @@ def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
         or legend_bbox.y1 > axes_bbox.y1
     ):
         legend.remove()
+        record_layout_decision(
+            ax.figure,
+            empty_layout_decision("compact_legend", reason="post_apply_bbox_validation_failed"),
+            context={"path": "render_compact_legend", "phase": "post_validation"},
+        )
         return False
     return True
 
@@ -939,9 +1230,39 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
 
 
 def _render_grouped_bar_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_grouped_bar_error_like(
+        input_path,
+        sheet,
+        options,
+        template="grouped_bar_compare",
+        filename_suffix="grouped_bar_compare",
+        profile_autofix="grouped_bar_compare_profile",
+    )
+
+
+def _render_grouped_bar_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_grouped_bar_error_like(
+        input_path,
+        sheet,
+        options,
+        template="grouped_bar_error",
+        filename_suffix="grouped_bar_error",
+        profile_autofix="grouped_bar_error_profile",
+    )
+
+
+def _render_grouped_bar_error_like(
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+    *,
+    template: str,
+    filename_suffix: str,
+    profile_autofix: str,
+) -> list[RenderedPlot]:
     groups = load_replicate_table_cached(input_path, sheet)
     if len(groups) < 2:
-        raise ValueError("grouped_bar_compare requires at least two replicate groups.")
+        raise ValueError(f"{template} requires at least two replicate groups.")
     stats_profile = _stats_profile(groups)
     fig, _ = plot_bar(
         groups,
@@ -956,18 +1277,31 @@ def _render_grouped_bar_compare(input_path: Path, sheet: str | int, options: Ren
     )
     return [
         _rendered_plot_with_qa(
-            filename=f"{predict_bar_box_slug(groups)}_grouped_bar_compare.pdf",
+            filename=f"{predict_bar_box_slug(groups)}_{filename_suffix}.pdf",
             figure=fig,
-            template="grouped_bar_compare",
+            template=template,
             options=options,
             autofixes_applied=(
                 "stats_spacing_profile",
                 "bar_capsize_profile",
                 "bar_raw_points_overlay",
-                "grouped_bar_compare_profile",
+                profile_autofix,
             ),
         )
     ]
+
+
+def _emphasize_strip_point_overlay(
+    ax: plt.Axes,
+    *,
+    min_size: float,
+    min_alpha: float,
+) -> None:
+    for collection in ax.collections:
+        sizes = np.asarray(collection.get_sizes(), dtype=float)
+        if sizes.size:
+            collection.set_sizes(np.maximum(sizes, min_size))
+        collection.set_alpha(max(float(collection.get_alpha() or 0.0), min_alpha))
 
 
 def _distribution_compare_variant(groups) -> tuple[str, str]:
@@ -1006,11 +1340,11 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             spacing_scale=stats_profile.spacing_scale,
         )
         if variant == "strip_box":
-            for collection in ax.collections:
-                sizes = np.asarray(collection.get_sizes(), dtype=float)
-                if sizes.size:
-                    collection.set_sizes(np.maximum(sizes, stats_profile.raw_point_size))
-                collection.set_alpha(max(stats_profile.raw_point_alpha, 0.8))
+            _emphasize_strip_point_overlay(
+                ax,
+                min_size=stats_profile.raw_point_size,
+                min_alpha=max(stats_profile.raw_point_alpha, 0.8),
+            )
             autofixes.append("strip_point_overlay_emphasis")
 
     return [
@@ -1020,6 +1354,38 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             template="distribution_compare",
             options=options,
             autofixes_applied=tuple(autofixes),
+        )
+    ]
+
+
+def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+    stats_profile = _stats_profile(groups)
+    fig, ax = plot_box(
+        groups,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        box_width=stats_profile.box_width,
+        spacing_scale=stats_profile.spacing_scale,
+    )
+    _emphasize_strip_point_overlay(
+        ax,
+        min_size=max(stats_profile.raw_point_size, 11.0),
+        min_alpha=max(stats_profile.raw_point_alpha, 0.82),
+    )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_box_strip.pdf",
+            figure=fig,
+            template="box_strip",
+            options=options,
+            autofixes_applied=(
+                "stats_spacing_profile",
+                "strip_point_overlay_emphasis",
+                "box_strip_profile",
+            ),
         )
     ]
 
@@ -1359,8 +1725,10 @@ TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "segmented_stacked_curve": TemplateRenderer(render=_render_segmented_stacked_curve),
     "bar": TemplateRenderer(render=_render_bar),
     "box": TemplateRenderer(render=_render_box),
+    "box_strip": TemplateRenderer(render=_render_box_strip),
     "violin": TemplateRenderer(render=_render_violin),
     "grouped_bar_compare": TemplateRenderer(render=_render_grouped_bar_compare),
+    "grouped_bar_error": TemplateRenderer(render=_render_grouped_bar_error),
     "distribution_compare": TemplateRenderer(render=_render_distribution_compare),
     "histogram_density": TemplateRenderer(render=_render_histogram_density),
     "scatter": TemplateRenderer(render=_render_scatter),

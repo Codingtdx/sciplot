@@ -1442,6 +1442,7 @@ def _place_stacked_labels(
         record_layout_decision(
             fig,
             empty_layout_decision("series_labels", reason="no_feasible_label_plan"),
+            context={"path": "stacked_label_rail", "phase": "no_plan"},
         )
         return False
 
@@ -1460,7 +1461,11 @@ def _place_stacked_labels(
         candidates=plan_candidates,
         score_hook=_score_plan,
     )
-    record_layout_decision(fig, decision)
+    record_layout_decision(
+        fig,
+        decision,
+        context={"path": "stacked_label_rail", "phase": "candidate_selection"},
+    )
     chosen = decision.chosen_candidate
     if chosen is None or not isinstance(chosen.payload, dict):
         return False

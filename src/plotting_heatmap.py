@@ -237,7 +237,11 @@ def plot_heatmap(
             label_gap_pt=float(colorbar_label_gap_pt),
             fontsize=float(_HEATMAP_LAYOUT["label_font_size_pt"]),
         )
-        record_layout_decision(fig, colorbar_decision)
+        record_layout_decision(
+            fig,
+            colorbar_decision,
+            context={"path": "heatmap_colorbar_header", "phase": "candidate_selection"},
+        )
         header_payload = colorbar_header.payload if isinstance(colorbar_header.payload, dict) else {}
         colorbar_label = fig.text(
             float(header_payload.get("x", cax_rect[0])),

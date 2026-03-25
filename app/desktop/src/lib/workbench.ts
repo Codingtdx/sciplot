@@ -356,6 +356,8 @@ const COMPATIBLE_TEMPLATE_IDS: Record<string, TemplateName[]> = {
   ],
   replicate_table: [
     "distribution_compare",
+    "box_strip",
+    "grouped_bar_error",
     "grouped_bar_compare",
     "histogram_density",
     "box",
@@ -413,7 +415,7 @@ export function templateCompatibilityReason(model: string | null | undefined) {
     case "curve_table":
       return "This input is a paired curve table. Start with curve-family templates.";
     case "replicate_table":
-      return "This input is a replicate summary table. Start with distribution, grouped-bar, histogram-density, or classic stats templates.";
+      return "This input is a replicate summary table. Start with distribution, box+strip, grouped-bar+error, histogram-density, or classic stats templates.";
     case "heatmap_table":
       return "This input is an XYZ heatmap table. Start with heatmap templates.";
     default:

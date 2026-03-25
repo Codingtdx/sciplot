@@ -784,6 +784,42 @@
         "dense_group_label_warning"
       ]
     },
+    "box_strip": {
+      "label": "Box + strip",
+      "description": "Box plot with deterministic strip-point overlay emphasis.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
     "violin": {
       "label": "Violin",
       "description": "Statistical violin plot.",
@@ -822,6 +858,42 @@
     "grouped_bar_compare": {
       "label": "Grouped bar compare",
       "description": "Grouped bar comparison with deterministic spacing and raw-point overlays.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "default"
+      },
+      "available_styles": [
+        "default",
+        "nature"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ]
+    },
+    "grouped_bar_error": {
+      "label": "Grouped bar + error",
+      "description": "Grouped bar means with deterministic error bars and raw-point overlays.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [

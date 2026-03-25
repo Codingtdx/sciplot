@@ -259,7 +259,8 @@ def test_inspect_file_replicate_model_keeps_legacy_recommendation_field(tmp_path
     template_ids = [item["template_id"] for item in payload["inspection"]["recommendations"]]
     assert template_ids[0] == "box"
     assert "distribution_compare" in template_ids
-    assert "grouped_bar_compare" in template_ids
+    assert "grouped_bar_error" in template_ids
+    assert "box_strip" in template_ids
 
 
 def test_code_console_generate_returns_lightweight_context_without_bound_data() -> None:

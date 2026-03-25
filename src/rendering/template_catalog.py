@@ -37,7 +37,7 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "segmented_stacked_curve",
     }:
         return ("curve_like",)
-    if template_id in {"bar", "box", "violin", "grouped_bar_compare"}:
+    if template_id in {"bar", "box", "box_strip", "violin", "grouped_bar_compare", "grouped_bar_error"}:
         return ("replicate_table", "distribution")
     if template_id in {"distribution_compare", "histogram_density"}:
         return ("replicate_table", "distribution")
@@ -57,7 +57,16 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "segmented_stacked_curve",
     }:
         return ("curve", "spectra")
-    if template_id in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
+    if template_id in {
+        "bar",
+        "box",
+        "box_strip",
+        "violin",
+        "grouped_bar_compare",
+        "grouped_bar_error",
+        "distribution_compare",
+        "histogram_density",
+    }:
         return ("distribution", "statistics")
     if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix", "heatmap")
@@ -75,7 +84,16 @@ def _family(template_id: str) -> str:
         "segmented_stacked_curve",
     }:
         return "curve"
-    if template_id in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
+    if template_id in {
+        "bar",
+        "box",
+        "box_strip",
+        "violin",
+        "grouped_bar_compare",
+        "grouped_bar_error",
+        "distribution_compare",
+        "histogram_density",
+    }:
         return "statistics"
     if template_id in {"heatmap", "annotated_heatmap"}:
         return "heatmap"
@@ -99,6 +117,10 @@ def _preview_priority(template_id: str) -> int:
         return 90
     if template_id == "distribution_compare":
         return 86
+    if template_id == "box_strip":
+        return 84
+    if template_id == "grouped_bar_error":
+        return 82
     if template_id == "grouped_bar_compare":
         return 80
     if template_id == "histogram_density":

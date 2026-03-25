@@ -40,6 +40,7 @@ class LayoutDecision:
     evaluations: tuple[LayoutEvaluation, ...]
     fallback_action: str | None = None
     fallback_reason: str | None = None
+    context: dict[str, Any] | None = None
 
 
 ScoreHook = Callable[[LayoutCandidate], LayoutScore]
@@ -123,10 +124,19 @@ def empty_layout_decision(object_kind: LayoutObjectKind, *, reason: str) -> Layo
     )
 
 
-def record_layout_decision(target: Any, decision: LayoutDecision) -> None:
+def record_layout_decision(
+    target: Any,
+    decision: LayoutDecision,
+    *,
+    context: dict[str, Any] | None = None,
+) -> None:
     records = getattr(target, "_sciplot_layout_debug", None)
     if not isinstance(records, list):
         records = []
+    if context:
+        merged_context = dict(decision.context or {})
+        merged_context.update(context)
+        decision = replace(decision, context=merged_context)
     records.append(_decision_to_dict(decision))
     target._sciplot_layout_debug = records
 
@@ -141,6 +151,7 @@ def _decision_to_dict(decision: LayoutDecision) -> dict[str, Any]:
         "chosen_score": decision.chosen_score,
         "fallback_action": decision.fallback_action,
         "fallback_reason": decision.fallback_reason,
+        "context": dict(decision.context or {}),
         "candidates": [
             {
                 "candidate_id": evaluation.candidate.candidate_id,

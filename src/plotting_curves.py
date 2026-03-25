@@ -244,6 +244,144 @@ def _nudge_limits_for_legend(
     ax.set_ylim(y_low, y_high)
 
 
+def _legend_margin_modes(expand_axes: str) -> list[str]:
+    requested = expand_axes if expand_axes in {"x", "y", "xy"} else "xy"
+    if requested == "x":
+        return ["none", "x"]
+    if requested == "y":
+        return ["none", "y"]
+    return ["none", "y", "x", "xy"]
+
+
+def _legend_expand_cost(
+    original_xlim: tuple[float, float],
+    original_ylim: tuple[float, float],
+    updated_xlim: tuple[float, float],
+    updated_ylim: tuple[float, float],
+) -> float:
+    original_x_span = max(abs(float(original_xlim[1] - original_xlim[0])), 1e-9)
+    original_y_span = max(abs(float(original_ylim[1] - original_ylim[0])), 1e-9)
+    updated_x_span = abs(float(updated_xlim[1] - updated_xlim[0]))
+    updated_y_span = abs(float(updated_ylim[1] - updated_ylim[0]))
+    x_growth = max((updated_x_span - original_x_span) / original_x_span, 0.0)
+    y_growth = max((updated_y_span - original_y_span) / original_y_span, 0.0)
+    return x_growth * 22.0 + y_growth * 28.0
+
+
+def _apply_legend_margin_fallback_policy(
+    ax: plt.Axes,
+    *,
+    series_list: Sequence[CurveSeries],
+    legend_loc: str,
+    overlap_score: float,
+    xscale: str,
+    yscale: str,
+    expand_axes: str,
+    inset_fraction: float,
+) -> tuple[dict[str, object], object]:
+    if overlap_score <= 0:
+        legend_kwargs, _, _legend_decision = choose_legend_corner_with_policy(
+            ax,
+            series_list,
+            inset_fraction=inset_fraction,
+        )
+        margin_decision = choose_layout_candidate(
+            object_kind="legend_margin_fallback",
+            candidates=[LayoutCandidate(candidate_id="none", payload={"mode": "none"}, notes="no overlap; no expand")],
+            score_hook=lambda _candidate: LayoutScore(score=0.0, blocked=False, reason="overlap<=0"),
+        )
+        return legend_kwargs, flag_margin_fallback(
+            margin_decision,
+            action="none",
+            reason=f"legend overlap score {overlap_score:.4f}",
+        )
+
+    mode_candidates = [
+        LayoutCandidate(
+            candidate_id=f"expand_{mode}",
+            payload={"mode": mode, "bias": 0.0 if mode == "none" else 0.25},
+            notes="legend axis expansion mode candidate",
+        )
+        for mode in _legend_margin_modes(expand_axes)
+    ]
+    original_xlim = tuple(float(value) for value in ax.get_xlim())
+    original_ylim = tuple(float(value) for value in ax.get_ylim())
+
+    def _score_mode(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        mode = str(payload.get("mode", "none"))
+        bias = float(payload.get("bias", 0.0))
+        ax.set_xlim(*original_xlim)
+        ax.set_ylim(*original_ylim)
+        if mode != "none":
+            _nudge_limits_for_legend(
+                ax,
+                {"loc": legend_loc},
+                overlap_score,
+                xscale=xscale,
+                yscale=yscale,
+                expand_axes=mode,
+            )
+        _legend_kwargs, candidate_overlap, _legend_decision = choose_legend_corner_with_policy(
+            ax,
+            series_list,
+            inset_fraction=inset_fraction,
+        )
+        expand_cost = _legend_expand_cost(
+            original_xlim,
+            original_ylim,
+            tuple(float(value) for value in ax.get_xlim()),
+            tuple(float(value) for value in ax.get_ylim()),
+        )
+        score = candidate_overlap + expand_cost + bias
+        return LayoutScore(
+            score=score,
+            blocked=False,
+            reason=(
+                f"mode={mode}; overlap={candidate_overlap:.4f}; "
+                f"expand_cost={expand_cost:.4f}; bias={bias:.3f}"
+            ),
+        )
+
+    decision = choose_layout_candidate(
+        object_kind="legend_margin_fallback",
+        candidates=mode_candidates,
+        score_hook=_score_mode,
+    )
+
+    ax.set_xlim(*original_xlim)
+    ax.set_ylim(*original_ylim)
+    chosen_mode = "none"
+    if decision.chosen_candidate and isinstance(decision.chosen_candidate.payload, dict):
+        chosen_mode = str(decision.chosen_candidate.payload.get("mode", "none"))
+    if chosen_mode != "none":
+        _nudge_limits_for_legend(
+            ax,
+            {"loc": legend_loc},
+            overlap_score,
+            xscale=xscale,
+            yscale=yscale,
+            expand_axes=chosen_mode,
+        )
+        decision = flag_margin_fallback(
+            decision,
+            action=f"expand_axes:{chosen_mode}",
+            reason=f"legend overlap score {overlap_score:.4f}",
+        )
+    else:
+        decision = flag_margin_fallback(
+            decision,
+            action="none",
+            reason=f"legend overlap score {overlap_score:.4f}",
+        )
+    legend_kwargs, _, _legend_decision = choose_legend_corner_with_policy(
+        ax,
+        series_list,
+        inset_fraction=inset_fraction,
+    )
+    return legend_kwargs, decision
+
+
 def plot_curves(
     series_list: Sequence[CurveSeries],
     *,
@@ -397,38 +535,31 @@ def plot_curves(
             break
 
     if series_label_mode != "edge" and legend_mode == "inside_best":
-        legend_kwargs, overlap_score, pre_decision = choose_legend_corner_with_policy(
+        legend_kwargs, overlap_score, legend_corner_decision = choose_legend_corner_with_policy(
             ax,
             plotted_series,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
-        if overlap_score > 0:
-            pre_decision = flag_margin_fallback(
-                pre_decision,
-                action="expand_axes",
-                reason=f"legend overlap score {overlap_score:.4f}; expand_axes={legend_expand_axes}",
-            )
-        record_layout_decision(fig, pre_decision)
-        _nudge_limits_for_legend(
+        record_layout_decision(
+            fig,
+            legend_corner_decision,
+            context={"path": "plot_curves", "phase": "legend_corner_initial"},
+        )
+        legend_kwargs, margin_decision = _apply_legend_margin_fallback_policy(
             ax,
-            legend_kwargs,
-            overlap_score,
+            series_list=plotted_series,
+            legend_loc=str(legend_kwargs.get("loc", "upper right")),
+            overlap_score=overlap_score,
             xscale=xscale,
             yscale=yscale,
             expand_axes=legend_expand_axes,
-        )
-        legend_kwargs, _, post_decision = choose_legend_corner_with_policy(
-            ax,
-            plotted_series,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
-        if overlap_score > 0:
-            post_decision = flag_margin_fallback(
-                post_decision,
-                action="post_expand_reflow",
-                reason="legend reflow after axis expansion",
-            )
-        record_layout_decision(fig, post_decision)
+        record_layout_decision(
+            fig,
+            margin_decision,
+            context={"path": "plot_curves", "phase": "legend_margin_fallback"},
+        )
         ax.legend(**legend_kwargs)
     elif series_label_mode != "edge" and legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))
@@ -533,38 +664,31 @@ def plot_scatter(
     ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
 
     if legend_mode == "inside_best":
-        legend_kwargs, overlap_score, pre_decision = choose_legend_corner_with_policy(
+        legend_kwargs, overlap_score, legend_corner_decision = choose_legend_corner_with_policy(
             ax,
             series_list,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
-        if overlap_score > 0:
-            pre_decision = flag_margin_fallback(
-                pre_decision,
-                action="expand_axes",
-                reason=f"legend overlap score {overlap_score:.4f}; expand_axes={legend_expand_axes}",
-            )
-        record_layout_decision(fig, pre_decision)
-        _nudge_limits_for_legend(
+        record_layout_decision(
+            fig,
+            legend_corner_decision,
+            context={"path": "plot_scatter", "phase": "legend_corner_initial"},
+        )
+        legend_kwargs, margin_decision = _apply_legend_margin_fallback_policy(
             ax,
-            legend_kwargs,
-            overlap_score,
+            series_list=series_list,
+            legend_loc=str(legend_kwargs.get("loc", "upper right")),
+            overlap_score=overlap_score,
             xscale=xscale,
             yscale=yscale,
             expand_axes=legend_expand_axes,
-        )
-        legend_kwargs, _, post_decision = choose_legend_corner_with_policy(
-            ax,
-            series_list,
             inset_fraction=_current_legend_inset(legend_inset_fraction),
         )
-        if overlap_score > 0:
-            post_decision = flag_margin_fallback(
-                post_decision,
-                action="post_expand_reflow",
-                reason="legend reflow after axis expansion",
-            )
-        record_layout_decision(fig, post_decision)
+        record_layout_decision(
+            fig,
+            margin_decision,
+            context={"path": "plot_scatter", "phase": "legend_margin_fallback"},
+        )
         ax.legend(**legend_kwargs)
     elif legend_mode != "none":
         ax.legend(**_legend_kwargs(legend_mode))

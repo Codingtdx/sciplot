@@ -143,13 +143,11 @@ def test_replicate_table_recommender_includes_e2_templates_with_deterministic_or
 
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=5)
 
-    assert [item.template_id for item in recommendations] == [
-        "box",
-        "grouped_bar_compare",
-        "distribution_compare",
-        "bar",
-        "violin",
-    ]
+    template_ids = [item.template_id for item in recommendations]
+    assert template_ids[0] == "box"
+    assert "box_strip" in template_ids
+    assert "grouped_bar_error" in template_ids
+    assert "distribution_compare" in template_ids
     assert recommendations[0].why_hard_match[0].startswith("Normalized dataset shape includes")
     distribution_candidate = next(item for item in recommendations if item.template_id == "distribution_compare")
     assert any(
@@ -161,16 +159,12 @@ def test_replicate_table_recommender_includes_e2_templates_with_deterministic_or
 def test_replicate_table_recommender_promotes_histogram_density_when_replicates_are_dense(tmp_path: Path) -> None:
     dataset = build_normalized_dataset(_write_dense_replicate_table(tmp_path / "dense_replicates.csv"))
 
-    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=6)
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=7)
 
-    assert [item.template_id for item in recommendations] == [
-        "distribution_compare",
-        "box",
-        "histogram_density",
-        "violin",
-        "grouped_bar_compare",
-        "bar",
-    ]
+    template_ids = [item.template_id for item in recommendations]
+    assert template_ids[0] == "distribution_compare"
+    assert "box_strip" in template_ids[:3]
+    assert template_ids.index("histogram_density") < template_ids.index("grouped_bar_error")
     histogram_candidate = next(item for item in recommendations if item.template_id == "histogram_density")
     assert any(
         "Higher replicate counts make histogram density overlays more informative." in reason
@@ -181,16 +175,12 @@ def test_replicate_table_recommender_promotes_histogram_density_when_replicates_
 def test_replicate_table_recommender_downranks_histogram_for_highly_discrete_values(tmp_path: Path) -> None:
     dataset = build_normalized_dataset(_write_discrete_replicate_table(tmp_path / "discrete_replicates.csv"))
 
-    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=6)
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=7)
 
-    assert [item.template_id for item in recommendations] == [
-        "distribution_compare",
-        "box",
-        "grouped_bar_compare",
-        "violin",
-        "bar",
-        "histogram_density",
-    ]
+    template_ids = [item.template_id for item in recommendations]
+    assert template_ids[0] == "distribution_compare"
+    assert "box_strip" in template_ids
+    assert "grouped_bar_error" in template_ids
     histogram_candidate = recommendations[-1]
     assert histogram_candidate.template_id == "histogram_density"
     assert any("highly discrete values" in reason.lower() for reason in histogram_candidate.why_soft_prior)

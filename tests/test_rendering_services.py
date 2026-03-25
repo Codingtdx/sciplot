@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 from matplotlib import rcParams
@@ -17,6 +19,7 @@ from src.rendering import (
     resolve_render_options,
 )
 from src.rendering import themes as rendering_themes
+from src.rendering.render import _apply_compact_inside_legend
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.themes import VisualThemeSpec, visual_theme_ids, visual_theme_soft_overrides
 
@@ -546,7 +549,7 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     assert inspection.recommendation.template == "box"
     assert inspection.recommendations
     assert inspection.recommendations[0].template_id == "box"
-    assert {"distribution_compare", "grouped_bar_compare"}.issubset(
+    assert {"distribution_compare", "grouped_bar_error", "box_strip"}.issubset(
         {item.template_id for item in inspection.recommendations}
     )
 
@@ -564,6 +567,41 @@ def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "grouped_bar_compare_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_grouped_bar_error_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="grouped_bar_error")
+    preflight = preflight_render_request("grouped_bar_error", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_error.pdf",)
+
+    rendered = build_rendered_plots("grouped_bar_error", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_box_strip_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="box_strip")
+    preflight = preflight_render_request("box_strip", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_box_strip.pdf",)
+
+    rendered = build_rendered_plots("box_strip", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "box_strip_profile" in rendered[0].qa_report.autofixes_applied
+        assert "strip_point_overlay_emphasis" in rendered[0].qa_report.autofixes_applied
     finally:
         close_rendered_plots(rendered)
 
@@ -789,8 +827,29 @@ def test_small_monotonic_curve_uses_direct_label_fallback_when_edge_labels_fail(
         ax = plot.figure.axes[0]
         assert ax.get_legend() is None
         assert {text.get_text() for text in ax.texts} == {"Sample A", "Sample B"}
+        layout_debug = getattr(plot.figure, "_sciplot_layout_debug", [])
+        endpoint_records = [entry for entry in layout_debug if entry.get("object_kind") == "endpoint_direct_labels"]
+        assert endpoint_records
     finally:
         close_rendered_plots(rendered)
+
+
+def test_compact_legend_policy_records_debug_decision() -> None:
+    fig, ax = plot_style.create_panel_figure()
+    try:
+        x = np.linspace(0.0, 5.0, 60)
+        ax.plot(x, np.sin(x) + 1.5, label="Sample A")
+        ax.plot(x, np.cos(x) + 2.5, label="Sample B")
+        ax.plot(x, np.sin(x * 0.8) + 3.2, label="Sample C")
+
+        applied = _apply_compact_inside_legend(ax, series_count=3)
+        assert applied
+        layout_debug = getattr(fig, "_sciplot_layout_debug", [])
+        compact_records = [entry for entry in layout_debug if entry.get("object_kind") == "compact_legend"]
+        assert compact_records
+        assert compact_records[0]["chosen_candidate_id"] is not None
+    finally:
+        plt.close(fig)
 
 
 def test_small_point_line_quality_clears_compact_editorial_checks(tmp_path: Path) -> None:

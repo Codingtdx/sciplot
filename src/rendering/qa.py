@@ -253,7 +253,16 @@ def analyze_rendered_figure(
             palette_preset=palette_preset,
             autofixes_applied=autofixes_applied,
         )
-    if template in {"bar", "box", "violin", "grouped_bar_compare", "distribution_compare", "histogram_density"}:
+    if template in {
+        "bar",
+        "box",
+        "box_strip",
+        "violin",
+        "grouped_bar_compare",
+        "grouped_bar_error",
+        "distribution_compare",
+        "histogram_density",
+    }:
         return _analyze_stats_figure(
             fig,
             template=template,
