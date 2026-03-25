@@ -16,6 +16,35 @@ from src.tensile_replicates import export_tensile_replicate_workbook
 
 client = TestClient(app)
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "tensile_raw"
+DESKTOP_API_ROUTE_SIGNATURES = {
+    ("GET", "/health"),
+    ("GET", "/meta"),
+    ("GET", "/plot-contract"),
+    ("GET", "/data-templates"),
+    ("GET", "/managed-storage"),
+    ("POST", "/data-templates/materialize"),
+    ("POST", "/data-templates/folder"),
+    ("POST", "/managed-storage/cleanup"),
+    ("POST", "/open-path"),
+    ("POST", "/code-console/generate"),
+    ("POST", "/code-console/export-bundle"),
+    ("POST", "/code-console/run"),
+    ("POST", "/inspect-file"),
+    ("POST", "/preflight-render"),
+    ("POST", "/render-preview"),
+    ("POST", "/export-render"),
+    ("POST", "/preprocess-tensile-replicates"),
+    ("POST", "/inspect-tensile-workbook"),
+    ("POST", "/export-tensile-comparison"),
+    ("POST", "/panel-thumbnail"),
+    ("POST", "/compose-preview"),
+    ("POST", "/compose-export"),
+    ("POST", "/composer/three-up"),
+    ("POST", "/composer/two-up-editorial"),
+    ("POST", "/composer/import-panels"),
+    ("POST", "/save-project"),
+    ("POST", "/open-project"),
+}
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -163,6 +192,32 @@ def test_openapi_exposes_required_template_folder_route() -> None:
     assert "get" in payload["paths"]["/meta"]
     assert "get" in payload["paths"]["/plot-contract"]
     assert "post" in payload["paths"]["/data-templates/folder"]
+
+
+def test_openapi_route_signatures_stay_in_parity_with_desktop_api_client() -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    for method, path in sorted(DESKTOP_API_ROUTE_SIGNATURES, key=lambda item: (item[1], item[0])):
+        assert path in payload["paths"]
+        assert method.lower() in payload["paths"][path]
+
+
+def test_server_registered_routes_cover_desktop_api_signatures() -> None:
+    registered = set(server._registered_route_signatures())
+    missing = sorted(
+        DESKTOP_API_ROUTE_SIGNATURES - registered,
+        key=lambda item: (item[1], item[0]),
+    )
+    assert not missing, f"Desktop API route parity missing: {missing}"
+
+
+def test_critical_route_assertion_matches_declared_critical_signatures() -> None:
+    assert server._assert_critical_sidecar_routes() == sorted(
+        server.CRITICAL_SIDECAR_ROUTES,
+        key=lambda item: (item[1], item[0]),
+    )
 
 
 def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> None:
