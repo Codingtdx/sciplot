@@ -344,6 +344,8 @@ def preview_output_filenames(
         return (f"{input_path.stem}_segmented_stacked_curve.pdf",)
     if template == "scatter":
         return (f"{input_path.stem}_scatter.pdf",)
+    if template == "bubble_scatter":
+        return (f"{input_path.stem}_bubble_scatter.pdf",)
     if template == "heatmap":
         return (f"{input_path.stem}_heatmap.pdf",)
     if template == "annotated_heatmap":
@@ -356,6 +358,7 @@ def preview_output_filenames(
         "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
+        "lollipop_error",
         "distribution_compare",
         "histogram_density",
     }:

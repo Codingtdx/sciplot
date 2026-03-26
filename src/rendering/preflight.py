@@ -25,6 +25,7 @@ from src.rendering.template_lifecycle import template_family_ids, template_ident
 from src.submission import build_render_submission_report
 
 _FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
+_BUBBLE_SCATTER_TEMPLATES = set(template_family_ids("bubble_scatter"))
 _MEAN_BAND_TEMPLATES = set(template_family_ids("mean_band"))
 _GROUPED_BAR_ERROR_TEMPLATES = set(template_family_ids("grouped_bar_error"))
 
@@ -40,7 +41,11 @@ def preflight_render_request(
     errors: list[str] = []
     normalized_dataset = (
         build_normalized_dataset(input_path, sheet)
-        if template in {"point_line", "curve"} | _FIT_SCATTER_TEMPLATES | _MEAN_BAND_TEMPLATES
+        if template
+        in {"point_line", "curve"}
+        | _FIT_SCATTER_TEMPLATES
+        | _BUBBLE_SCATTER_TEMPLATES
+        | _MEAN_BAND_TEMPLATES
         else None
     )
 
@@ -74,7 +79,7 @@ def preflight_render_request(
                 curve_series,
                 use_sidecar=True if options.use_sidecar is None else options.use_sidecar,
             )
-        elif template == "scatter":
+        elif template in {"scatter"} | _BUBBLE_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
         elif template in _FIT_SCATTER_TEMPLATES:
@@ -101,6 +106,7 @@ def preflight_render_request(
             "grouped_bar_compare",
             "grouped_bar_error",
             "point_error",
+            "lollipop_error",
             "distribution_compare",
             "histogram_density",
         }:

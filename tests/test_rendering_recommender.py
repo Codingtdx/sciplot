@@ -122,6 +122,17 @@ def test_curve_table_recommender_returns_five_ranked_choices(tmp_path: Path) -> 
     assert recommendations[0].why_soft_prior
 
 
+def test_curve_table_recommender_exposes_bubble_scatter_at_higher_limit(tmp_path: Path) -> None:
+    dataset = build_normalized_dataset(_write_curve_table(tmp_path / "curve.csv"))
+
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=10)
+    template_ids = [item.template_id for item in recommendations]
+
+    assert "bubble_scatter" in template_ids
+    bubble_candidate = next(item for item in recommendations if item.template_id == "bubble_scatter")
+    assert any("bubble scatter" in reason.lower() for reason in bubble_candidate.why_soft_prior)
+
+
 def test_multi_curve_table_recommender_surfaces_mean_band_and_compat_replicate_band(tmp_path: Path) -> None:
     dataset = build_normalized_dataset(_write_multi_curve_table(tmp_path / "multi_curve.csv"))
 
@@ -166,6 +177,17 @@ def test_replicate_table_recommender_keeps_violin_box_available_with_higher_limi
     template_ids = [item.template_id for item in recommendations]
 
     assert "violin_box" in template_ids
+
+
+def test_replicate_table_recommender_exposes_lollipop_error_at_higher_limit(tmp_path: Path) -> None:
+    dataset = build_normalized_dataset(_write_replicate_table(tmp_path / "replicates.csv"))
+
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=10)
+    template_ids = [item.template_id for item in recommendations]
+
+    assert "lollipop_error" in template_ids
+    lollipop_candidate = next(item for item in recommendations if item.template_id == "lollipop_error")
+    assert any("lollipop" in reason.lower() for reason in lollipop_candidate.why_soft_prior)
 
 
 def test_replicate_table_recommender_promotes_histogram_density_when_replicates_are_dense(tmp_path: Path) -> None:

@@ -499,6 +499,9 @@ class InputInspectionResponse(StrictModel):
     model_label: str
     recommendation: RecommendationResponse
     recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
+    primary_recommendation: list[TemplateRecommendationResponse] = Field(default_factory=list)
+    alternative_recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
+    advanced_templates: list[TemplateRecommendationResponse] = Field(default_factory=list)
     recommendation_confidence: float = 0.0
     recommendation_summary: str = ""
     warnings: list[str] = Field(default_factory=list)

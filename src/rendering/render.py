@@ -1294,6 +1294,59 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
     ]
 
 
+def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+    stats_profile = _stats_profile(groups)
+    fig, ax = plot_point_error(
+        groups,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        axis_mode="auto_positive",
+        point_spacing_width=max(0.22, stats_profile.bar_width * 0.82),
+        spacing_scale=max(1.0, stats_profile.spacing_scale),
+        capsize=stats_profile.capsize,
+        marker_size_pt=max(4.4, plot_style.current_stroke().marker_size_pt * 0.94),
+        show_raw_points=stats_profile.show_raw_points,
+        raw_point_size=stats_profile.raw_point_size,
+        raw_point_alpha=stats_profile.raw_point_alpha,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(groups))
+    means = np.array([float(group.data.mean()) for group in groups], dtype=float)
+    positions = np.asarray(ax.get_xticks(), dtype=float)
+    if positions.size != len(groups):
+        positions = np.arange(len(groups), dtype=float)
+    baseline = 0.0 if np.nanmin(means) >= 0.0 else float(ax.get_ylim()[0])
+    if baseline < float(ax.get_ylim()[0]):
+        ax.set_ylim(bottom=baseline)
+    for pos, mean, color in zip(positions, means, palette, strict=True):
+        ax.vlines(
+            pos,
+            baseline,
+            mean,
+            color=color,
+            linewidth=max(0.95, plot_style.current_stroke().line_width_pt * 0.85),
+            alpha=min(0.94, plot_style.current_stroke().line_alpha + 0.08),
+            zorder=3.0,
+        )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_lollipop_error.pdf",
+            figure=fig,
+            template="lollipop_error",
+            options=options,
+            autofixes_applied=(
+                "stats_spacing_profile",
+                "point_error_capsize_profile",
+                "lollipop_stem_overlay",
+                "lollipop_error_profile",
+            )
+            + (("point_error_raw_points_overlay",) if stats_profile.show_raw_points else ()),
+        )
+    ]
+
+
 def _render_grouped_bar_error_like(
     input_path: Path,
     sheet: str | int,
@@ -1804,6 +1857,60 @@ def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) 
     ]
 
 
+def _bubble_size_profile(values: np.ndarray) -> np.ndarray:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return np.full(values.shape, 46.0, dtype=float)
+    magnitude = np.abs(finite)
+    low = float(np.percentile(magnitude, 10))
+    high = float(np.percentile(magnitude, 90))
+    if not np.isfinite(low) or not np.isfinite(high):
+        return np.full(values.shape, 46.0, dtype=float)
+    if np.isclose(high, low):
+        midpoint = float(min(140.0, max(42.0, 46.0 + abs(high) * 0.16)))
+        result = np.full(values.shape, midpoint, dtype=float)
+        result[~np.isfinite(values)] = midpoint
+        return result
+    clipped = np.clip(np.abs(values), low, high)
+    normalized = (clipped - low) / max(high - low, 1e-9)
+    sizes = 34.0 + normalized * (160.0 - 34.0)
+    sizes[~np.isfinite(values)] = 34.0
+    return sizes
+
+
+def _render_bubble_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    series_list = load_curve_table_cached(input_path, sheet)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    rendered = _render_curve_like_plot(
+        filename=f"{input_path.stem}_bubble_scatter.pdf",
+        template="bubble_scatter",
+        series_list=series_list,
+        options=options,
+        show_markers=False,
+        scatter=True,
+        base_kwargs={"axis_mode": axis_mode},
+    )
+    ax = rendered.figure.axes[0]
+    scatter_collections = [collection for collection in ax.collections if np.asarray(collection.get_offsets()).size]
+    for series, collection in zip(series_list, scatter_collections, strict=False):
+        y_values = series.data["y"].to_numpy(dtype=float)
+        bubble_sizes = _bubble_size_profile(y_values)
+        collection.set_sizes(bubble_sizes)
+        collection.set_alpha(max(float(collection.get_alpha() or 0.0), 0.72))
+    rendered = _rendered_plot_with_qa(
+        filename=rendered.filename,
+        figure=rendered.figure,
+        template="bubble_scatter",
+        options=options,
+        autofixes_applied=(
+            tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
+        )
+        + ("bubble_size_encoding",),
+    )
+    return [rendered]
+
+
 def _fit_line_xy(series_list) -> tuple[np.ndarray, np.ndarray, str]:
     x_blocks: list[np.ndarray] = []
     y_blocks: list[np.ndarray] = []
@@ -2091,9 +2198,11 @@ TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "grouped_bar_compare": TemplateRenderer(render=_render_grouped_bar_compare),
     "grouped_bar_error": TemplateRenderer(render=_render_grouped_bar_error),
     "point_error": TemplateRenderer(render=_render_point_error),
+    "lollipop_error": TemplateRenderer(render=_render_lollipop_error),
     "distribution_compare": TemplateRenderer(render=_render_distribution_compare),
     "histogram_density": TemplateRenderer(render=_render_histogram_density),
     "scatter": TemplateRenderer(render=_render_scatter),
+    "bubble_scatter": TemplateRenderer(render=_render_bubble_scatter),
     "scatter_with_fit": TemplateRenderer(render=_render_scatter_with_fit),
     "scatter_fit": TemplateRenderer(render=_render_scatter_fit),
     "mean_band": TemplateRenderer(render=_render_mean_band),

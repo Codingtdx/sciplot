@@ -105,6 +105,9 @@ class InputInspection:
     model_label: str
     recommendation: Recommendation
     recommendations: tuple[TemplateRecommendation, ...] = ()
+    primary_recommendation: tuple[TemplateRecommendation, ...] = ()
+    alternative_recommendations: tuple[TemplateRecommendation, ...] = ()
+    advanced_templates: tuple[TemplateRecommendation, ...] = ()
     recommendation_confidence: float = 0.0
     recommendation_summary: str = ""
     warnings: tuple[str, ...] = ()

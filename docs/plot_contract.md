@@ -152,6 +152,16 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
+### `lollipop_error` / Lollipop + error
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Group means as lollipop stems with deterministic error bars and optional raw-point overlays.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: `dense_group_label_warning`
+
 ### `distribution_compare` / Distribution compare
 
 - Category: `single_panel`
@@ -179,6 +189,16 @@
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: None
+
+### `bubble_scatter` / Bubble scatter
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Description: Single-panel scatter plot with deterministic bubble-size encoding from signal magnitude.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
 

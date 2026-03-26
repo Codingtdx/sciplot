@@ -47,6 +47,100 @@ export type RankedInspectionRecommendation = {
   recommendation: TemplateRecommendation;
 };
 
+export type InspectionRecommendationSections = {
+  primary: RankedInspectionRecommendation[];
+  alternatives: RankedInspectionRecommendation[];
+  advanced: RankedInspectionRecommendation[];
+};
+
+function inspectionTemplateMeta(
+  meta: WorkbenchMeta | null,
+  recommendation: TemplateRecommendation,
+): WorkbenchTemplate | null {
+  const canonicalTemplate =
+    templateMeta(meta, recommendation.canonical_id ?? recommendation.implementation_id ?? recommendation.template_id) ??
+    templateMeta(meta, recommendation.template_id);
+  return canonicalTemplate;
+}
+
+function mapInspectionRecommendations(
+  meta: WorkbenchMeta | null,
+  recommendations: TemplateRecommendation[],
+): RankedInspectionRecommendation[] {
+  return recommendations
+    .map((recommendation) => {
+      const template = inspectionTemplateMeta(meta, recommendation);
+      return template ? { template, recommendation } : null;
+    })
+    .filter((item): item is RankedInspectionRecommendation => Boolean(item));
+}
+
+export function inspectionPrimaryRecommendationChoices(
+  meta: WorkbenchMeta | null,
+  inspection: InputInspection | null,
+  limit = 2,
+): RankedInspectionRecommendation[] {
+  if (!inspection) {
+    return [];
+  }
+  const primaryRecommendations = inspection.primary_recommendation?.length
+    ? inspection.primary_recommendation
+    : inspection.recommendations?.length
+      ? inspection.recommendations.slice(0, 1)
+      : [inspectionRecommendationFallback(inspection)];
+  return mapInspectionRecommendations(meta, primaryRecommendations).slice(0, limit);
+}
+
+export function inspectionAlternativeRecommendationChoices(
+  meta: WorkbenchMeta | null,
+  inspection: InputInspection | null,
+  limit = 3,
+): RankedInspectionRecommendation[] {
+  if (!inspection) {
+    return [];
+  }
+  const primaryIds = new Set(
+    (inspection.primary_recommendation?.length
+      ? inspection.primary_recommendation
+      : inspection.recommendations?.slice(0, 1) ?? []
+    ).map((item) => item.template_id),
+  );
+  const alternativeRecommendations = inspection.alternative_recommendations?.length
+    ? inspection.alternative_recommendations
+    : inspection.recommendations?.length
+      ? inspection.recommendations.filter((item) => !primaryIds.has(item.template_id))
+      : [];
+  return mapInspectionRecommendations(meta, alternativeRecommendations).slice(0, limit);
+}
+
+export function inspectionAdvancedRecommendationChoices(
+  meta: WorkbenchMeta | null,
+  inspection: InputInspection | null,
+  limit = 6,
+): RankedInspectionRecommendation[] {
+  if (!inspection) {
+    return [];
+  }
+  const advancedRecommendations = inspection.advanced_templates?.length
+    ? inspection.advanced_templates
+    : [];
+  return mapInspectionRecommendations(meta, advancedRecommendations).slice(0, limit);
+}
+
+export function inspectionRecommendationSections(
+  meta: WorkbenchMeta | null,
+  inspection: InputInspection | null,
+  primaryLimit = 2,
+  alternativeLimit = 3,
+  advancedLimit = 6,
+): InspectionRecommendationSections {
+  return {
+    primary: inspectionPrimaryRecommendationChoices(meta, inspection, primaryLimit),
+    alternatives: inspectionAlternativeRecommendationChoices(meta, inspection, alternativeLimit),
+    advanced: inspectionAdvancedRecommendationChoices(meta, inspection, advancedLimit),
+  };
+}
+
 function inspectionRecommendationFallback(inspection: InputInspection): TemplateRecommendation {
   return {
     template_id: inspection.recommendation.template,
@@ -81,17 +175,22 @@ export function inspectionRecommendationChoices(
   if (!inspection) {
     return [];
   }
-  const rankedRecommendations = inspection.recommendations?.length
-    ? inspection.recommendations
-    : [inspectionRecommendationFallback(inspection)];
+  const primaryRecommendations = inspectionPrimaryRecommendationChoices(meta, inspection, limit);
+  const alternativeLimit = Math.max(0, limit - primaryRecommendations.length);
+  const alternativeRecommendations =
+    alternativeLimit > 0
+      ? inspectionAlternativeRecommendationChoices(meta, inspection, alternativeLimit)
+      : [];
+  const sourceRecommendations = primaryRecommendations.length || alternativeRecommendations.length
+    ? [...primaryRecommendations, ...alternativeRecommendations]
+    : mapInspectionRecommendations(
+        meta,
+        inspection.recommendations?.length
+          ? inspection.recommendations
+          : [inspectionRecommendationFallback(inspection)],
+      );
 
-  return rankedRecommendations
-    .slice(0, limit)
-    .map((recommendation) => {
-      const template = templateMeta(meta, recommendation.template_id);
-      return template ? { template, recommendation } : null;
-    })
-    .filter((item): item is RankedInspectionRecommendation => Boolean(item));
+  return sourceRecommendations.slice(0, limit);
 }
 
 export function sanitizeTemplateId(
@@ -286,10 +385,15 @@ export function selectionFromInspection(
   template: TemplateName | null;
   options: RenderOptionsPayload;
 } {
+  const primaryTemplateId =
+    inspection.primary_recommendation?.[0]?.template_id ??
+    inspection.recommendations?.[0]?.canonical_id ??
+    inspection.recommendations?.[0]?.template_id ??
+    inspection.recommendation.template;
   const template = sanitizeTemplateId(
     meta,
-    overrides?.template ?? inspection.recommendation.template,
-    inspection.recommendation.template,
+    overrides?.template ?? primaryTemplateId,
+    primaryTemplateId,
   );
   return {
     template,

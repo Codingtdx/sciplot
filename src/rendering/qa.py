@@ -16,6 +16,7 @@ _CURVE_QA_TEMPLATES = {
     "curve",
     "point_line",
     "scatter",
+    "bubble_scatter",
     *template_family_ids("scatter_fit"),
     *template_family_ids("mean_band"),
 }
@@ -27,6 +28,7 @@ _STATS_QA_TEMPLATES = {
     "violin_box",
     *template_family_ids("grouped_bar_error"),
     "point_error",
+    "lollipop_error",
     "distribution_compare",
     "histogram_density",
 }

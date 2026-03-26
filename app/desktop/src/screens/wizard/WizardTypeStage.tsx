@@ -14,7 +14,9 @@ import {
   templateCompatibilityReason,
   templateLabel,
 } from "../../lib/workbench";
-import { inspectionRecommendationChoices } from "../../lib/wizard";
+import {
+  inspectionRecommendationSections,
+} from "../../lib/wizard";
 
 type Props = {
   inputPath: string | null;
@@ -59,6 +61,7 @@ function templateCategoryLabel(template: WorkbenchTemplate) {
 function recommendationReason(
   template: WorkbenchTemplate,
   inspection: InputInspection | null,
+  recommendedTemplateIds: Set<string>,
   overrideReason?: string,
 ) {
   if (overrideReason) {
@@ -67,18 +70,28 @@ function recommendationReason(
   if (!inspection) {
     return "Run inspect to get data-aware template guidance.";
   }
-  if (inspection.recommendation.template === template.id) {
+  if (
+    recommendedTemplateIds.has(template.id) ||
+    inspection.recommendation.template === template.id
+  ) {
     return inspection.recommendation.reason;
   }
   return `Compatible with detected model ${inspection.model_label}.`;
 }
 
-function templateHint(template: WorkbenchTemplate, inspection: InputInspection | null) {
+function templateHint(
+  template: WorkbenchTemplate,
+  inspection: InputInspection | null,
+  recommendedTemplateIds: Set<string>,
+) {
   const category = templateCategoryLabel(template);
   if (!inspection) {
     return `${template.default_size} · ${category}`;
   }
-  if (inspection.recommendation.template === template.id) {
+  if (
+    recommendedTemplateIds.has(template.id) ||
+    inspection.recommendation.template === template.id
+  ) {
     return `${template.default_size} · best fit for ${inspection.model_label}`;
   }
   return `${template.default_size} · compatible with ${inspection.model_label}`;
@@ -107,49 +120,47 @@ export function WizardTypeStage({
   onContinueToTune,
 }: Props) {
   const [previewMode, setPreviewMode] = useState<"compare" | "preview">("compare");
-  const topRecommendations = useMemo(
-    () => {
-      if (!inspection) {
-        return compatibleTemplates.slice(0, 5).map((template, index) => ({
-          template,
-          rank: index + 1,
-          score: 100 - index,
-          reason: undefined as string | undefined,
-          suitabilityHint: undefined as string | undefined,
-        }));
-      }
-      const ranked = inspectionRecommendationChoices(meta, inspection, 5).map((item) => ({
-        template: item.template,
-        rank: item.recommendation.rank ?? undefined,
-        score: item.recommendation.score,
-        reason: item.recommendation.reason ?? item.recommendation.why_hard_match[0],
-        suitabilityHint: item.recommendation.suitability_hint ?? item.recommendation.why_soft_prior[0],
-      }));
-      if (ranked.length > 0) {
-        return ranked;
-      }
-      return compatibleTemplates.slice(0, 5).map((template, index) => ({
+  const fallbackRecommendations = useMemo(
+    () =>
+      compatibleTemplates.slice(0, 5).map((template, index) => ({
         template,
         rank: index + 1,
         score: 100 - index,
         reason: undefined as string | undefined,
         suitabilityHint: undefined as string | undefined,
-      }));
-    },
-    [compatibleTemplates, inspection, meta],
+      })),
+    [compatibleTemplates],
   );
-  const alternatives = useMemo(
-    () => {
-      const topIds = new Set(topRecommendations.map((item) => item.template.id));
-      return compatibleTemplates.filter((template) => !topIds.has(template.id));
-    },
-    [compatibleTemplates, topRecommendations],
+  const recommendationSections = useMemo(
+    () => (inspection ? inspectionRecommendationSections(meta, inspection) : null),
+    [inspection, meta],
+  );
+  const primaryRecommendations = recommendationSections?.primary ?? [];
+  const alternativeRecommendations = recommendationSections?.alternatives ?? [];
+  const advancedRecommendations = recommendationSections?.advanced ?? [];
+  const visibleRecommendations = useMemo(
+    () =>
+      recommendationSections
+        ? [...primaryRecommendations, ...alternativeRecommendations]
+        : fallbackRecommendations,
+    [alternativeRecommendations, fallbackRecommendations, primaryRecommendations, recommendationSections],
+  );
+  const recommendedTemplateIds = useMemo(
+    () => new Set(primaryRecommendations.map((item) => item.template.id)),
+    [primaryRecommendations],
   );
   const sourceLabel = inputPath ? formatLeaf(inputPath) : "No source loaded";
   const activeTemplate =
-    selectedTemplate ?? inspection?.recommendation.template ?? topRecommendations[0]?.template.id ?? null;
+    selectedTemplate ?? visibleRecommendations[0]?.template.id ?? inspection?.recommendation.template ?? null;
   const activeTemplateLabel = hasTemplate ? templateLabel(meta, selectedTemplate) : "Suggested template";
-  const primaryTemplateId = inspection?.recommendation.template ?? topRecommendations[0]?.template.id ?? null;
+  const primaryTemplateId =
+    primaryRecommendations[0]?.template.id ??
+    inspection?.recommendation.template ??
+    visibleRecommendations[0]?.template.id ??
+    null;
+  const primaryTemplateIds = new Set(
+    primaryRecommendations.map((item) => item.template.id),
+  );
 
   return (
     <div className="plot-type-studio">
@@ -184,61 +195,110 @@ export function WizardTypeStage({
             <div className="placeholder-card">Run inspect first to unlock template recommendations.</div>
           ) : (
             <>
-              <div className="plot-type-recommendation-stack">
-                {topRecommendations.map((item, index) => {
-                  const { template } = item;
-                  const selected = selectedTemplate === template.id;
-                  const recommended = inspection.recommendation.template === template.id;
-                  const rankLabel = item.rank ?? index + 1;
-                  return (
-                    <article
-                      className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${recommended ? "recommended" : ""} ${
-                        template.id === primaryTemplateId ? "primary" : ""
-                      }`}
-                      key={template.id}
-                    >
-                      <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} aria-hidden="true" />
-                      <div className="plot-type-recommendation-copy">
-                        <div className="plot-type-recommendation-title-row">
-                          <strong>{template.label}</strong>
-                          <span>{template.id === primaryTemplateId ? "Primary recommendation" : recommended ? "Recommended" : "Compatible"}</span>
-                        </div>
-                        <div className="wb-inline-meta">
-                          Rank #{rankLabel} · Score {item.score.toFixed(1)}
-                        </div>
-                        <p>{recommendationReason(template, inspection, item.reason)}</p>
-                        {item.suitabilityHint ? <div className="wb-inline-meta">{item.suitabilityHint}</div> : null}
-                        <div className="plot-type-recommendation-hint">{templateHint(template, inspection)}</div>
-                        <div className="plot-type-recommendation-meta">
-                          <span>{template.default_size}</span>
-                          <span>{templateCategoryLabel(template)}</span>
-                        </div>
-                      </div>
-                      <button
-                        className={selected ? "primary-button" : "ghost-button"}
-                        onClick={() => onSelectTemplate(template.id)}
-                        type="button"
-                      >
-                        {selected ? "Selected" : "Select"}
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
+              {primaryRecommendations.length > 0 && (
+                <section className="plot-type-primary-recommendations">
+                  <div className="plot-type-section-head">
+                    <h3>{primaryRecommendations.length > 1 ? "Primary recommendations" : "Primary recommendation"}</h3>
+                    <p>
+                      {primaryRecommendations.length > 1
+                        ? "These choices are close enough to present together as co-primary."
+                        : "This is the strongest product choice for the detected data."}
+                    </p>
+                  </div>
+                  <div className="plot-type-recommendation-stack">
+                    {primaryRecommendations.map((item, index) => {
+                      const { template } = item;
+                      const selected = selectedTemplate === template.id;
+                      const rankLabel = item.recommendation.rank ?? index + 1;
+                      return (
+                        <article
+                          className={`plot-type-recommendation-card ${selected ? "selected" : ""} ${
+                            template.id === primaryTemplateId ? "primary" : ""
+                          }`}
+                          key={template.id}
+                        >
+                          <div className={`plot-type-card-thumb ${templateMockClass(template.id)}`} aria-hidden="true" />
+                          <div className="plot-type-recommendation-copy">
+                            <div className="plot-type-recommendation-title-row">
+                              <strong>{template.label}</strong>
+                              <span>
+                                {primaryTemplateIds.has(template.id)
+                                  ? template.id === primaryTemplateId
+                                    ? "Primary recommendation"
+                                    : "Co-primary"
+                                  : "Recommended"}
+                              </span>
+                            </div>
+                            <div className="wb-inline-meta">
+                              Rank #{rankLabel} · Score {item.recommendation.score.toFixed(1)}
+                            </div>
+                            <p>
+                              {recommendationReason(
+                                template,
+                                inspection,
+                                recommendedTemplateIds,
+                                item.recommendation.reason,
+                              )}
+                            </p>
+                            {item.recommendation.suitability_hint ? (
+                              <div className="wb-inline-meta">{item.recommendation.suitability_hint}</div>
+                            ) : null}
+                            <div className="plot-type-recommendation-hint">
+                              {templateHint(template, inspection, recommendedTemplateIds)}
+                            </div>
+                            <div className="plot-type-recommendation-meta">
+                              <span>{template.default_size}</span>
+                              <span>{templateCategoryLabel(template)}</span>
+                            </div>
+                          </div>
+                          <button
+                            className={selected ? "primary-button" : "ghost-button"}
+                            onClick={() => onSelectTemplate(template.id)}
+                            type="button"
+                          >
+                            {selected ? "Selected" : "Select"}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
-              {alternatives.length > 0 && (
+              {alternativeRecommendations.length > 0 && (
                 <section className="plot-type-alternatives">
                   <div className="plot-type-section-head">
-                    <h3>Other compatible templates</h3>
+                    <h3>Alternative recommendations</h3>
+                    <p>These are high-quality nearby choices that stay visible without crowding the primary lane.</p>
                   </div>
                   <div className="plot-type-alt-list">
-                    {alternatives.map((template) => (
+                    {alternativeRecommendations.map((item) => (
                       <CompactListRow
-                        key={template.id}
-                        onSelect={() => onSelectTemplate(template.id)}
-                        right={<span className="wb-inline-meta">Compatible</span>}
-                        subtitle={`${templateCategoryLabel(template)} · ${template.default_size}`}
-                        title={template.label}
+                        key={item.template.id}
+                        onSelect={() => onSelectTemplate(item.template.id)}
+                        right={<span className="wb-inline-meta">Alternative</span>}
+                        subtitle={`${templateCategoryLabel(item.template)} · ${item.template.default_size} · Score ${item.recommendation.score.toFixed(1)}`}
+                        title={item.template.label}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {advancedRecommendations.length > 0 && (
+                <section className="plot-type-alternatives">
+                  <div className="plot-type-section-head">
+                    <h3>Advanced templates</h3>
+                    <p>Technically valid templates that stay out of the default visible shortlist.</p>
+                  </div>
+                  <div className="plot-type-alt-list">
+                    {advancedRecommendations.map((item) => (
+                      <CompactListRow
+                        key={item.template.id}
+                        onSelect={() => onSelectTemplate(item.template.id)}
+                        right={<span className="wb-inline-meta">Advanced</span>}
+                        subtitle={`${templateCategoryLabel(item.template)} · ${item.template.default_size} · Score ${item.recommendation.score.toFixed(1)}`}
+                        title={item.template.label}
                       />
                     ))}
                   </div>
@@ -322,7 +382,7 @@ export function WizardTypeStage({
                     <strong>Compare the top three quickly</strong>
                   </div>
                   <div className="plot-type-compare-thumbs">
-                    {topRecommendations.slice(0, 3).map((item) => {
+                    {visibleRecommendations.slice(0, 3).map((item) => {
                       const { template } = item;
                       return (
                       <button

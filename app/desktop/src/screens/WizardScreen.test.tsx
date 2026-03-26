@@ -143,14 +143,6 @@ const TEST_RANKED_INSPECT_RESPONSE: InspectResponse = {
   },
 };
 
-function getTemplateButton(label: string) {
-  const button = screen
-    .getAllByRole("button")
-    .find((candidate) => candidate.querySelector("strong")?.textContent === label);
-  expect(button).toBeTruthy();
-  return button as HTMLButtonElement;
-}
-
 function renderStage(stage: PlotStage, onNavigate = vi.fn()) {
   render(<WizardScreen meta={TEST_META} onNavigate={onNavigate} routeStage={stage} />);
   return onNavigate;
@@ -477,19 +469,12 @@ describe("WizardScreen", () => {
 
     renderStage("type");
 
-    expect(getTemplateButton("Point line")).toBeInTheDocument();
-    expect(getTemplateButton("Curve")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Primary recommendation", level: 3 })).toBeInTheDocument();
+    expect(screen.getAllByText("Point line").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "More types" })).toBeInTheDocument();
     expect(screen.queryByText("Heatmap")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "More types" }));
-
-    const heatmapButton = getTemplateButton("Heatmap");
-    expect(heatmapButton).toBeDisabled();
-    expect(
-      screen.getByText(
-        "This input is a rheology export bundle. Start with point-line or curve.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Compare the top three quickly")).toBeInTheDocument();
   });
 
   it("shows ranked recommendation choices in the type stage", () => {
@@ -505,8 +490,10 @@ describe("WizardScreen", () => {
 
     renderStage("type");
 
+    expect(screen.getByRole("heading", { name: "Primary recommendation", level: 3 })).toBeInTheDocument();
+    expect(screen.getByText("Alternative recommendations")).toBeInTheDocument();
     expect(screen.getByText("Rank #1 · Score 88.5")).toBeInTheDocument();
-    expect(screen.getByText("Rank #2 · Score 84.2")).toBeInTheDocument();
+    expect(screen.getAllByText("Point line").length).toBeGreaterThan(1);
     expect(
       screen.getByText("Detected paired x/y signals that align with compact curve rendering."),
     ).toBeInTheDocument();

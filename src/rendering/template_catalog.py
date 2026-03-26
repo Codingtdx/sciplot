@@ -35,6 +35,7 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "curve",
         "point_line",
         "scatter",
+        "bubble_scatter",
         "scatter_with_fit",
         "scatter_fit",
         "replicate_curves_with_band",
@@ -52,6 +53,7 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
+        "lollipop_error",
     }:
         return ("replicate_table", "distribution")
     if template_id in {"distribution_compare", "histogram_density"}:
@@ -66,6 +68,7 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "curve",
         "point_line",
         "scatter",
+        "bubble_scatter",
         "scatter_with_fit",
         "scatter_fit",
         "replicate_curves_with_band",
@@ -83,6 +86,7 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
+        "lollipop_error",
         "distribution_compare",
         "histogram_density",
     }:
@@ -97,6 +101,7 @@ def _family(template_id: str) -> str:
         "curve",
         "point_line",
         "scatter",
+        "bubble_scatter",
         "scatter_with_fit",
         "scatter_fit",
         "replicate_curves_with_band",
@@ -114,6 +119,7 @@ def _family(template_id: str) -> str:
         "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
+        "lollipop_error",
         "distribution_compare",
         "histogram_density",
     }:
@@ -138,6 +144,8 @@ def _preview_priority(template_id: str) -> int:
         return 87
     if template_id == "scatter":
         return 80
+    if template_id == "bubble_scatter":
+        return 79
     if template_id == "annotated_heatmap":
         return 91
     if template_id == "heatmap":
@@ -152,6 +160,8 @@ def _preview_priority(template_id: str) -> int:
         return 82
     if template_id == "point_error":
         return 81
+    if template_id == "lollipop_error":
+        return 80
     if template_id == "grouped_bar_compare":
         return 80
     if template_id == "histogram_density":

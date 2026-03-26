@@ -275,7 +275,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
 
     inspection = inspect_input_file(input_path)
     assert inspection.recommendation.template == "curve"
-    assert len(inspection.recommendations) == 5
+    assert len(inspection.recommendations) == 10
     assert inspection.recommendations[0].template_id == "curve"
     assert inspection.recommendations[1].template_id == "point_line"
     assert inspection.recommendations[0].rank == 1
@@ -287,6 +287,14 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     assert inspection.recommendations[0].implementation_id == "curve"
     assert inspection.recommendation_confidence >= inspection.recommendations[0].score
     assert "curve" in inspection.recommendation_summary
+    assert [item.template_id for item in inspection.primary_recommendation] == ["curve"]
+    assert [item.template_id for item in inspection.alternative_recommendations] == [
+        "point_line",
+        "scatter_fit",
+        "stacked_curve",
+    ]
+    assert inspection.recommendations[5].template_id == "bubble_scatter"
+    assert "bubble_scatter" in {item.template_id for item in inspection.advanced_templates}
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
@@ -559,6 +567,7 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     assert {"distribution_compare", "grouped_bar_error", "point_error", "box_strip"}.issubset(
         {item.template_id for item in inspection.recommendations}
     )
+    assert "lollipop_error" in {item.template_id for item in inspection.advanced_templates}
 
 
 def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -> None:
@@ -608,6 +617,24 @@ def test_point_error_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "point_error_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_lollipop_error_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="lollipop_error")
+    preflight = preflight_render_request("lollipop_error", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_lollipop_error.pdf",)
+
+    rendered = build_rendered_plots("lollipop_error", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "lollipop_stem_overlay" in rendered[0].qa_report.autofixes_applied
+        assert "lollipop_error_profile" in rendered[0].qa_report.autofixes_applied
     finally:
         close_rendered_plots(rendered)
 
@@ -762,6 +789,32 @@ def test_scatter_fit_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_bubble_scatter_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="bubble_scatter")
+    preflight = preflight_render_request("bubble_scatter", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_bubble_scatter.pdf",)
+
+    rendered = build_rendered_plots("bubble_scatter", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "bubble_size_encoding" in rendered[0].qa_report.autofixes_applied
+        ax = rendered[0].figure.axes[0]
+        bubble_sizes = np.concatenate(
+            [
+                np.asarray(collection.get_sizes(), dtype=float)
+                for collection in ax.collections
+                if np.asarray(collection.get_offsets()).size and np.asarray(collection.get_sizes()).size
+            ]
+        )
+        assert bubble_sizes.max() > bubble_sizes.min()
     finally:
         close_rendered_plots(rendered)
 

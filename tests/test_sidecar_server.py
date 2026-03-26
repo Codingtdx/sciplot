@@ -241,7 +241,7 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["input_path"] == str(input_path)
     assert payload["inspection"]["model"] == "curve_table"
     assert payload["inspection"]["recommendation"]["template"] == "curve"
-    assert len(payload["inspection"]["recommendations"]) == 5
+    assert len(payload["inspection"]["recommendations"]) == 10
     assert payload["inspection"]["recommendations"][0]["template_id"] == "curve"
     assert payload["inspection"]["recommendations"][0]["rank"] == 1
     assert payload["inspection"]["recommendations"][0]["reason"]
@@ -251,6 +251,16 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["inspection"]["recommendations"][0]["role"] == "canonical"
     assert payload["inspection"]["recommendations"][0]["implementation_id"] == "curve"
     assert payload["inspection"]["recommendations"][1]["template_id"] == "point_line"
+    assert [item["template_id"] for item in payload["inspection"]["primary_recommendation"]] == [
+        "curve"
+    ]
+    assert [item["template_id"] for item in payload["inspection"]["alternative_recommendations"]] == [
+        "point_line",
+        "scatter_fit",
+        "stacked_curve",
+    ]
+    assert payload["inspection"]["recommendations"][5]["template_id"] == "bubble_scatter"
+    assert "bubble_scatter" in {item["template_id"] for item in payload["inspection"]["advanced_templates"]}
     assert payload["inspection"]["recommendation_confidence"] >= payload["inspection"]["recommendations"][0]["score"]
     assert "curve" in payload["inspection"]["recommendation_summary"]
 
@@ -393,11 +403,13 @@ def test_data_template_catalog_and_materialize_flow(
         "curve",
         "point_line",
         "scatter",
+        "bubble_scatter",
         "stacked_curve",
         "segmented_stacked_curve",
         "bar",
         "boxplot",
         "violin",
+        "lollipop_error",
         "heatmap",
     }.issubset(template_ids)
 
@@ -441,11 +453,13 @@ def test_data_template_folder_materializes_chart_type_files(
         "curve_example.xlsx",
         "point_line_example.xlsx",
         "scatter_example.xlsx",
+        "bubble_scatter_example.xlsx",
         "stacked_curve_example.xlsx",
         "segmented_stacked_curve_example.xlsx",
         "bar_example.xlsx",
         "boxplot_example.xlsx",
         "violin_example.xlsx",
+        "lollipop_error_example.xlsx",
         "heatmap_example.xlsx",
     }.issubset(filenames)
     assert all(Path(item["file_path"]).parent == folder_path for item in payload["files"])

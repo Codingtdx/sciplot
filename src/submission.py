@@ -18,7 +18,7 @@ _SAFE_PALETTES = {
     "okabe_ito",
     "tol_muted",
 }
-_CURVE_TEMPLATES = {"curve", "point_line", "scatter"}
+_CURVE_TEMPLATES = {"curve", "point_line", "scatter", "bubble_scatter"}
 _PDF_SUFFIXES = {".pdf"}
 _RASTER_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"}
 
@@ -351,7 +351,10 @@ def build_composer_submission_report(
             message=(
                 "Visible Composer assets stay fully vector-backed."
                 if raster_count == 0
-                else f"Composer includes {raster_count} raster asset(s); confirm that their resolution is publication-ready."
+                else (
+                    f"Composer includes {raster_count} raster asset(s); confirm that their resolution "
+                    "is publication-ready."
+                )
             ),
             metric_value=f"{vector_count} vector / {raster_count} raster",
             target="vector_preferred",

@@ -31,6 +31,7 @@ _CURVE_TEMPLATE_IDS: Final[tuple[str, ...]] = (
     "stacked_curve",
     "segmented_stacked_curve",
     "scatter",
+    "bubble_scatter",
     "scatter_fit",
     "scatter_with_fit",
 )
@@ -39,6 +40,7 @@ _REP_TEMPLATE_IDS: Final[tuple[str, ...]] = (
     "box_strip",
     "violin_box",
     "point_error",
+    "lollipop_error",
     "grouped_bar_error",
     "grouped_bar_compare",
     "histogram_density",
@@ -260,6 +262,7 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
     stacked_score = 71.0
     segmented_score = 63.0
     scatter_score = 67.0
+    bubble_scatter_score = 63.0
     scatter_fit_score = 69.0
     scatter_with_fit_score = 61.0
     replicate_band_score = 66.0
@@ -271,11 +274,15 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
     stacked_soft = ["Offsets help compare several aligned samples without overplotting."]
     segmented_soft = ["Segmented stacks keep grouped traces separated."]
     scatter_soft = ["Scatter stays available when point continuity matters less than point density."]
+    bubble_scatter_soft = [
+        "Bubble scatter adds deterministic point-size encoding to emphasize relative response magnitude."
+    ]
 
     if is_tensile:
         curve_score += 10.0
         point_line_score += 8.0
         scatter_score += 4.0
+        bubble_scatter_score += 3.0
         stacked_score -= 10.0
         segmented_score -= 8.0
         replicate_band_score += 10.0
@@ -284,6 +291,7 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         curve_soft.append("Tensile curves stay linear and compact by default.")
         point_line_soft.append("Markers still help when tensile samples are sparse.")
         scatter_soft.append("Scatter can help when the tensile points need to stay separate.")
+        bubble_scatter_soft.append("Bubble sizing can highlight stress magnitude changes along tensile traces.")
         scatter_fit_soft.append("Tensile stress-strain trends often benefit from a simple fit overlay.")
         scatter_with_fit_soft.append(
             "Tensile stress-strain trends also support the compatibility fitted-scatter variant."
@@ -297,11 +305,13 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         curve_score -= 4.0
         point_line_score -= 2.0
         scatter_score -= 2.0
+        bubble_scatter_score -= 3.0
         scatter_fit_score -= 2.0
         scatter_with_fit_score -= 3.0
         replicate_band_score -= 4.0
         segmented_soft.append("The .wide_nmr sidecar marks this as a segmented stacked curve workflow.")
         stacked_soft.append("The sidecar keeps grouped traces readable as stacked spectra.")
+        bubble_scatter_soft.append("Segmented spectra workflows usually prioritize trace shape over bubble encoding.")
         scatter_fit_soft.append("Segmented spectra workflows usually favor stacked views over fitted scatter.")
         scatter_with_fit_soft.append(
             "Segmented spectra workflows usually favor stacked views over compatibility fitted scatter."
@@ -313,10 +323,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         curve_score -= 4.0
         point_line_score -= 2.0
         scatter_score -= 4.0
+        bubble_scatter_score -= 4.0
         scatter_fit_score -= 5.0
         scatter_with_fit_score -= 6.0
         replicate_band_score -= 6.0
         stacked_soft.append("Chemical shift / ppm data reads best as stacked spectra.")
+        bubble_scatter_soft.append("NMR-like spectra usually prioritize trace shape over bubble-size encoding.")
         segmented_soft.append("The same spectral family can be separated with a segmented stack.")
         scatter_fit_soft.append("NMR-like spectra generally do not benefit from linear trend overlays.")
         scatter_with_fit_soft.append("NMR-like spectra generally do not need compatibility fitted-scatter overlays.")
@@ -326,10 +338,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         curve_score += 2.0
         point_line_score += 1.0
         scatter_score -= 2.0
+        bubble_scatter_score -= 2.0
         scatter_fit_score -= 3.0
         scatter_with_fit_score -= 4.0
         replicate_band_score -= 2.0
         stacked_soft.append("Wavenumber / cm^-1 data is easier to compare as stacked spectra.")
+        bubble_scatter_soft.append("FTIR-like spectra typically prioritize trace shape over bubble-size emphasis.")
         scatter_fit_soft.append("FTIR-like spectra usually prioritize trace shape over fitted trends.")
         scatter_with_fit_soft.append("FTIR-like spectra typically do not need compatibility fitted overlays.")
         replicate_band_soft.append("FTIR-like spectra usually prioritize stacked readability over mean bands.")
@@ -337,10 +351,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         stacked_score += 14.0
         curve_score += 2.0
         point_line_score += 1.0
+        bubble_scatter_score -= 1.0
         scatter_fit_score -= 1.0
         scatter_with_fit_score -= 2.0
         replicate_band_score += 1.0
         stacked_soft.append("Heat flow traces are usually read as stacked thermal curves.")
+        bubble_scatter_soft.append("Thermal traces usually read better as lines than size-weighted bubbles.")
         scatter_fit_soft.append("Thermal traces are usually interpreted as curves before fit overlays.")
         scatter_with_fit_soft.append("Thermal traces usually keep fitted overlays as secondary compatibility choices.")
         replicate_band_soft.append("Thermal replicate sweeps can benefit from a mean band summary.")
@@ -348,10 +364,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         stacked_score += 14.0
         curve_score += 2.0
         point_line_score += 1.0
+        bubble_scatter_score -= 2.0
         scatter_fit_score -= 2.0
         scatter_with_fit_score -= 3.0
         replicate_band_score -= 1.0
         stacked_soft.append("2theta / intensity traces are easier to compare as stacked spectra.")
+        bubble_scatter_soft.append("XRD-like traces usually prioritize line-shape comparison over bubble sizing.")
         scatter_fit_soft.append("XRD-like traces usually prioritize spectral shape over fitted trends.")
         scatter_with_fit_soft.append("XRD-like traces usually keep compatibility fitted overlays as secondary.")
         replicate_band_soft.append("XRD-like traces usually prioritize stacked readability over mean bands.")
@@ -360,12 +378,14 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             curve_score += 4.0
             point_line_score += 3.0
             scatter_score += 1.0
+            bubble_scatter_score += 3.0
             scatter_fit_score += 5.0
             scatter_with_fit_score += 4.0
             replicate_band_score -= 1.0
             curve_soft.append("A small number of series keeps the compact curve easy to read.")
             point_line_soft.append("A small number of series also benefits from visible markers.")
             scatter_fit_soft.append("Fewer series make a fit overlay easier to read and explain.")
+            bubble_scatter_soft.append("With fewer series, bubble-size encoding remains easy to parse.")
             scatter_with_fit_soft.append(
                 "Compatibility fitted scatter stays usable when only a few series are present."
             )
@@ -375,10 +395,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             point_line_score += 1.0
             curve_score += 1.0
             replicate_band_score += 8.0
+            bubble_scatter_score -= 2.0
             scatter_fit_score -= 1.0
             scatter_with_fit_score -= 2.0
             stacked_soft.append("Several series make overplotting more likely, so offsets help.")
             replicate_band_soft.append("More replicate series make a mean band overlay more informative.")
+            bubble_scatter_soft.append("Many traces can make bubble-size layers visually crowded.")
             scatter_fit_soft.append("Many traces can make fitted overlays visually crowded.")
             scatter_with_fit_soft.append("Compatibility fitted overlays can become crowded with many traces.")
 
@@ -483,6 +505,18 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             dataset=dataset,
         ),
         _build_candidate(
+            template_id="bubble_scatter",
+            score=bubble_scatter_score,
+            why_hard_match=hard,
+            why_soft_prior=bubble_scatter_soft,
+            inferred_mapping={
+                "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+            },
+            optional_enhancements=["Use scatter when uniform marker size is preferred."],
+            dataset=dataset,
+        ),
+        _build_candidate(
             template_id="scatter_fit",
             score=scatter_fit_score,
             why_hard_match=hard,
@@ -523,6 +557,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
     distribution_score = 82.0
     grouped_bar_error_score = 72.0
     point_error_score = 73.0
+    lollipop_error_score = 64.0
     histogram_density_score = 68.0
     box_score = 78.0
     box_strip_score = 77.0
@@ -534,6 +569,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
     ]
     grouped_bar_error_soft = ["Grouped bars with error bars keep cross-group mean differences explicit."]
     point_error_soft = ["Point + error keeps group means and uncertainty visible without bar area fill."]
+    lollipop_error_soft = ["Lollipop stems keep group means explicit while preserving vertical uncertainty cues."]
     histogram_density_soft = ["Histogram with density overlays highlights overlap between groups."]
     box_soft = ["Box plots keep medians and spread readable with minimal visual noise."]
     box_strip_soft = ["Box + strip keeps spread summaries while exposing individual replicate points."]
@@ -544,6 +580,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
     if group_count <= 3:
         grouped_bar_error_score += 4.0
         point_error_score += 5.0
+        lollipop_error_score += 2.0
         histogram_density_score += 2.0
         distribution_score -= 2.0
         bar_score += 2.0
@@ -553,6 +590,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         violin_score -= 1.0
         grouped_bar_error_soft.append("A small number of groups keeps grouped bars compact and readable.")
         point_error_soft.append("A small number of groups keeps point+error markers compact and readable.")
+        lollipop_error_soft.append("A small number of groups keeps lollipop stems compact and readable.")
         histogram_density_soft.append("Fewer groups keep overlap in histogram densities legible.")
         distribution_soft.append("With few groups, distribution compare can still default to a compact variant.")
         bar_soft.append("Few groups keep bar labels compact and readable.")
@@ -562,6 +600,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         distribution_score += 4.0
         grouped_bar_error_score -= 2.0
         point_error_score -= 1.0
+        lollipop_error_score -= 1.0
         histogram_density_score -= 2.0
         box_score += 4.0
         box_strip_score += 1.0
@@ -571,6 +610,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         distribution_soft.append("Many groups benefit from a deterministic distribution-first comparison view.")
         grouped_bar_error_soft.append("Many groups can make grouped bars visually dense.")
         point_error_soft.append("Many groups can still remain readable with compact point+error markers.")
+        lollipop_error_soft.append("Many groups can make lollipop stems dense, so spacing discipline is important.")
         histogram_density_soft.append("Many groups can make density overlays visually crowded.")
         box_soft.append("Many groups make box summaries more legible than bars.")
         box_strip_soft.append("Many groups still remain traceable when replicate points are visible.")
@@ -581,6 +621,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         distribution_score -= 5.0
         grouped_bar_error_score += 3.0
         point_error_score += 4.0
+        lollipop_error_score += 2.0
         histogram_density_score -= 10.0
         box_score += 3.0
         box_strip_score += 3.0
@@ -592,6 +633,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
             "Sparse replicates keep grouped means easier to read than detailed distributions."
         )
         point_error_soft.append("Sparse replicates still read well with explicit mean points and error bars.")
+        lollipop_error_soft.append("Sparse replicates keep lollipop mean+error summaries readable.")
         histogram_density_soft.append("Sparse replicate counts make histogram-density overlays unstable.")
         box_soft.append("Box summaries stay robust when replicate counts are low.")
         box_strip_soft.append("Sparse replicates benefit from explicit point overlays on top of box summaries.")
@@ -602,6 +644,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         distribution_score -= 4.0
         grouped_bar_error_score += 2.0
         point_error_score += 2.0
+        lollipop_error_score += 1.0
         histogram_density_score -= 8.0
         violin_score -= 6.0
         box_score += 2.0
@@ -613,12 +656,16 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_strip_soft.append("Visible strip points make singleton-like groups explicit.")
         violin_box_soft.append("Very low replicate counts reduce violin-shape confidence even with box overlays.")
         point_error_soft.append("Point+error keeps singleton-like groups explicit while preserving uncertainty cues.")
+        lollipop_error_soft.append(
+            "Lollipop stems keep singleton-like groups explicit while preserving uncertainty cues."
+        )
 
     if "replicate_highly_discrete" in quality_flags:
         histogram_density_score -= 8.0
         distribution_score += 1.0
         grouped_bar_error_score += 2.0
         point_error_score += 2.0
+        lollipop_error_score += 1.0
         box_score += 2.0
         box_strip_score += 2.0
         violin_box_score += 1.0
@@ -630,12 +677,14 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_strip_soft.append("Discrete replicates stay interpretable when each point remains visible.")
         violin_box_soft.append("Discrete groups keep both shape and quartile cues in violin+box overlays.")
         point_error_soft.append("Discrete replicates stay readable with uncluttered mean/error markers.")
+        lollipop_error_soft.append("Discrete replicates remain readable with lollipop stems and explicit error bars.")
     if estimated_points >= 24:
         histogram_density_score += 8.0
         distribution_score += 2.0
         box_strip_score += 1.0
         violin_box_score += 2.0
         point_error_score += 1.0
+        lollipop_error_score += 1.0
         histogram_density_soft.append("Higher replicate counts make histogram density overlays more informative.")
         distribution_soft.append("Higher replicate counts make robust distribution comparison more reliable.")
     elif estimated_points < 10:
@@ -644,6 +693,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_strip_score -= 1.0
         violin_box_score -= 1.0
         point_error_score -= 1.0
+        lollipop_error_score -= 1.0
         box_strip_soft.append("Very sparse replicates reduce the benefit of strip overlays.")
         point_error_soft.append(
             "Very sparse replicates reduce uncertainty precision, but point+error remains interpretable."
@@ -703,6 +753,18 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                         "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
                     },
                     optional_enhancements=["Use grouped_bar_error when filled group bars are required."],
+                    dataset=dataset,
+                ),
+                _build_candidate(
+                    template_id="lollipop_error",
+                    score=lollipop_error_score,
+                    why_hard_match=hard,
+                    why_soft_prior=lollipop_error_soft,
+                    inferred_mapping={
+                        "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
+                        "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
+                    },
+                    optional_enhancements=["Use point_error when stem baselines are not needed."],
                     dataset=dataset,
                 ),
                 _build_candidate(

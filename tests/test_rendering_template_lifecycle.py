@@ -72,6 +72,10 @@ def test_template_catalog_uses_canonical_implementation_ids_for_aliases() -> Non
     assert DEFAULT_TEMPLATE_CATALOG.get("mean_band").implementation_id == "mean_band"
     assert DEFAULT_TEMPLATE_CATALOG.get("replicate_curves_with_band").implementation_id == "mean_band"
     assert DEFAULT_TEMPLATE_CATALOG.get("grouped_bar_compare").implementation_id == "grouped_bar_error"
+    assert DEFAULT_TEMPLATE_CATALOG.get("bubble_scatter").canonical_id == "bubble_scatter"
+    assert DEFAULT_TEMPLATE_CATALOG.get("bubble_scatter").role == "canonical"
+    assert DEFAULT_TEMPLATE_CATALOG.get("lollipop_error").canonical_id == "lollipop_error"
+    assert DEFAULT_TEMPLATE_CATALOG.get("lollipop_error").role == "canonical"
 
 
 def test_recommender_prefers_canonical_templates_over_aliases_for_curve_data(tmp_path: Path) -> None:

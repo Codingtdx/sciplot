@@ -23,12 +23,15 @@ from src.rendering.dataset_models import (
     point_line_bundle_signals,
 )
 from src.rendering.models import InputInspection, Recommendation, TemplateName
+from src.rendering.recommendation_policy import build_recommendation_presentation
 from src.rendering.recommender import (
     DEFAULT_RECOMMENDER,
     legacy_recommendation_to_template_recommendation,
 )
 from src.rendering.recommender_models import TemplateRecommendation
 from src.wide_nmr import wide_nmr_sidecar_path
+
+INSPECTION_RECOMMENDATION_LIMIT = 10
 
 
 def model_label(model: str) -> str:
@@ -133,6 +136,7 @@ def _inspection_confidence_and_summary(
     *,
     model: str,
     recommendations: tuple[TemplateRecommendation, ...],
+    primary_recommendation: tuple[TemplateRecommendation, ...],
 ) -> tuple[float, str]:
     if not recommendations:
         return 0.0, "No ranked template candidates are available yet."
@@ -146,10 +150,17 @@ def _inspection_confidence_and_summary(
         tone = "Good confidence"
     else:
         tone = "Moderate confidence"
-    summary = (
-        f"{tone}: {top.template_id} is the strongest template for {model_label(model)} "
-        f"(score {top.score:.1f}, gap {gap:.1f})."
-    )
+    if len(primary_recommendation) > 1:
+        primary_ids = " and ".join(item.template_id for item in primary_recommendation[:2])
+        summary = (
+            f"{tone}: {primary_ids} are co-primary templates for {model_label(model)} "
+            f"(top score {top.score:.1f}, gap {gap:.1f})."
+        )
+    else:
+        summary = (
+            f"{tone}: {top.template_id} is the strongest template for {model_label(model)} "
+            f"(score {top.score:.1f}, gap {gap:.1f})."
+        )
     return confidence, summary
 
 
@@ -161,6 +172,7 @@ def _inspection(
     warnings: tuple[str, ...] = (),
     signals: tuple[str, ...] = (),
 ) -> InputInspection:
+    presentation = build_recommendation_presentation(recommendations or ())
     template_recommendation = legacy_recommendation_to_template_recommendation(
         template_id=recommendation_value.template,
         reason=recommendation_value.reason,
@@ -175,15 +187,20 @@ def _inspection(
         use_sidecar=recommendation_value.use_sidecar,
     )
     ranked = recommendations or (template_recommendation,)
+    visible_recommendations = presentation.visible_recommendations or ranked
     recommendation_confidence, recommendation_summary = _inspection_confidence_and_summary(
         model=model,
-        recommendations=ranked,
+        recommendations=visible_recommendations,
+        primary_recommendation=presentation.primary_recommendation,
     )
     return InputInspection(
         model=model,
         model_label=model_label(model),
         recommendation=recommendation_value,
         recommendations=ranked,
+        primary_recommendation=presentation.primary_recommendation,
+        alternative_recommendations=presentation.alternative_recommendations,
+        advanced_templates=presentation.advanced_templates,
         recommendation_confidence=recommendation_confidence,
         recommendation_summary=recommendation_summary,
         warnings=warnings,
@@ -193,7 +210,10 @@ def _inspection(
 
 def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspection:
     normalized_dataset = build_normalized_dataset(input_path, sheet)
-    ranked_recommendations = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=5)
+    ranked_recommendations = DEFAULT_RECOMMENDER.recommend(
+        normalized_dataset,
+        limit=INSPECTION_RECOMMENDATION_LIMIT,
+    )
 
     if normalized_dataset.model == "frequency_sweep":
         return _inspection(
@@ -381,6 +401,11 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             compatibility_reason = (
                 "Detected paired curves with a strong trend pattern, "
                 "so scatter with deterministic linear fit is recommended."
+            )
+        elif compatibility_template == "bubble_scatter":
+            compatibility_reason = (
+                "Detected paired curves where point-level magnitude encoding may improve readability, "
+                "so bubble scatter is recommended."
             )
         return _inspection(
             model="curve_table",

@@ -143,6 +143,9 @@ export type InputInspection = {
   model_label: string;
   recommendation: Recommendation;
   recommendations?: TemplateRecommendation[];
+  primary_recommendation?: TemplateRecommendation[];
+  alternative_recommendations?: TemplateRecommendation[];
+  advanced_templates?: TemplateRecommendation[];
   recommendation_confidence?: number;
   recommendation_summary?: string;
   warnings: string[];
