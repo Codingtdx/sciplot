@@ -185,6 +185,42 @@ export type InspectResponse = {
   sheet: string | number;
   sheet_names: string[];
   inspection: InputInspection;
+  dataset?: PlotDatasetPreview | null;
+};
+
+export type PlotColumnProfile = {
+  name: string;
+  header_preview: Array<string | null>;
+  inferred_type: string;
+  non_empty_count: number;
+  missing_count: number;
+  min_value?: number | string | null;
+  max_value?: number | string | null;
+};
+
+export type PlotCandidateRoles = {
+  x: string[];
+  y: string[];
+  z: string[];
+  group: string[];
+  sample: string[];
+  value: string[];
+  metric: string[];
+  label: string[];
+  series: string[];
+};
+
+export type PlotDatasetPreview = {
+  dataset_id: string;
+  model: string;
+  raw_rows: number;
+  raw_cols: number;
+  column_profiles: PlotColumnProfile[];
+  candidate_roles: PlotCandidateRoles;
+  data_shapes: string[];
+  semantic_signals: string[];
+  quality_flags: string[];
+  sample_rows: unknown[][];
 };
 
 export type PreflightResponse = {

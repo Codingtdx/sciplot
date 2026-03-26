@@ -521,11 +521,47 @@ class PreflightResultResponse(StrictModel):
     submission_report: SubmissionReportResponse | None = None
 
 
+class PlotColumnProfileResponse(StrictModel):
+    name: str
+    header_preview: list[str | None]
+    inferred_type: str
+    non_empty_count: int
+    missing_count: int
+    min_value: float | int | None = None
+    max_value: float | int | None = None
+
+
+class PlotCandidateRolesResponse(StrictModel):
+    x: list[str] = Field(default_factory=list)
+    y: list[str] = Field(default_factory=list)
+    z: list[str] = Field(default_factory=list)
+    group: list[str] = Field(default_factory=list)
+    sample: list[str] = Field(default_factory=list)
+    value: list[str] = Field(default_factory=list)
+    metric: list[str] = Field(default_factory=list)
+    label: list[str] = Field(default_factory=list)
+    series: list[str] = Field(default_factory=list)
+
+
+class PlotDatasetPreviewResponse(StrictModel):
+    dataset_id: str
+    model: str
+    raw_rows: int
+    raw_cols: int
+    column_profiles: list[PlotColumnProfileResponse]
+    candidate_roles: PlotCandidateRolesResponse
+    data_shapes: list[str]
+    semantic_signals: list[str]
+    quality_flags: list[str]
+    sample_rows: list[list[Any]]
+
+
 class InspectFileResponse(StrictModel):
     input_path: str
     sheet: str | int
     sheet_names: list[str]
     inspection: InputInspectionResponse
+    dataset: PlotDatasetPreviewResponse | None = None
 
 
 class PreflightRenderResponse(StrictModel):

@@ -101,12 +101,12 @@ export const PLOT_STAGES: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: "import", label: "Import", hint: "Pick a file" },
-  { id: "sheet", label: "Sheet", hint: "Choose the source tab" },
-  { id: "type", label: "Type", hint: "Confirm the chart family" },
-  { id: "tune", label: "Tune", hint: "Adjust the essentials" },
-  { id: "review", label: "Review", hint: "Check readiness" },
-  { id: "export", label: "Export", hint: "Write the bundle" },
+  { id: "import", label: "Import Data", hint: "Upload a file" },
+  { id: "sheet", label: "Import Data", hint: "Choose the workbook tab" },
+  { id: "type", label: "Choose Template", hint: "Pick the chart family" },
+  { id: "tune", label: "Refine & Export", hint: "Adjust the figure" },
+  { id: "review", label: "Refine & Export", hint: "Confirm readiness" },
+  { id: "export", label: "Refine & Export", hint: "Write the bundle" },
 ];
 
 export const PLOT_STAGE_COPY: Record<

@@ -9,6 +9,7 @@ import type {
   InputInspection,
   PalettePreset,
   PlotStage,
+  PlotDatasetPreview,
   QAReport,
   PdfImportMode,
   PreflightResult,
@@ -42,6 +43,7 @@ type WizardState = {
   sheet: string | number;
   sheetNames: string[];
   inspection: InputInspection | null;
+  dataset: PlotDatasetPreview | null;
   template: TemplateName | null;
   options: RenderOptionsPayload;
   preflight: PreflightResult | null;
@@ -61,6 +63,7 @@ type WizardState = {
   setSheet(value: string | number): void;
   setSheetNames(value: string[]): void;
   setInspection(value: InputInspection | null): void;
+  setDataset(value: PlotDatasetPreview | null): void;
   setTemplate(value: TemplateName | null): void;
   setOptions(value: RenderOptionsPayload): void;
   setPreflight(value: PreflightResult | null): void;
@@ -178,6 +181,7 @@ export const useWizardStore = create<WizardState>()(
       sheet: 0,
       sheetNames: [],
       inspection: null,
+      dataset: null,
       template: null,
       options: { ...defaultOptions },
       preflight: null,
@@ -197,6 +201,7 @@ export const useWizardStore = create<WizardState>()(
       setSheet: (value) => set({ sheet: value }),
       setSheetNames: (value) => set({ sheetNames: value }),
       setInspection: (value) => set({ inspection: value }),
+      setDataset: (value) => set({ dataset: value }),
       setTemplate: (value) => set({ template: value }),
       setOptions: (value) => set({ options: { ...value } }),
       setPreflight: (value) => set({ preflight: value }),
@@ -216,6 +221,7 @@ export const useWizardStore = create<WizardState>()(
           sheet: 0,
           sheetNames: [],
           inspection: null,
+          dataset: null,
           template: null,
           options: { ...defaultOptions },
           preflight: null,
@@ -249,6 +255,7 @@ export const useWizardStore = create<WizardState>()(
         sheet: state.sheet,
         sheetNames: state.sheetNames,
         inspection: state.inspection,
+        dataset: state.dataset,
         template: state.template,
         options: state.options,
         preflight: state.preflight,

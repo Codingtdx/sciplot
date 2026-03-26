@@ -75,6 +75,19 @@ def _clean_text(value: object) -> str:
     return str(value).strip()
 
 
+def _clean_cell(value: object) -> object:
+    if value is None:
+        return None
+    if hasattr(value, "item") and not isinstance(value, (str, bytes)):
+        with suppress(Exception):
+            value = value.item()
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if pd.isna(value):
+        return None
+    return value
+
+
 def _string_or_none(value: object) -> str | None:
     cleaned = _clean_text(value)
     return cleaned or None
@@ -146,6 +159,13 @@ def _column_name(raw: pd.DataFrame, index: int) -> str:
     ]
     labels = [value for value in preview if value]
     return " | ".join(labels) if labels else f"Column {index + 1}"
+
+
+def dataframe_sample_rows(frame: pd.DataFrame, *, limit: int = 8) -> list[list[object]]:
+    rows: list[list[object]] = []
+    for row in frame.head(limit).itertuples(index=False, name=None):
+        rows.append([_clean_cell(value) for value in row])
+    return rows
 
 
 def _dataset_id(*, source_path: Path | None, sheet: str | int | None, model: str, raw_rows: int, raw_cols: int) -> str:
@@ -475,6 +495,7 @@ __all__ = [
     "looks_like_ftir_curve",
     "looks_like_nmr_curve",
     "looks_like_xrd_curve",
+    "dataframe_sample_rows",
     "normalized_dataset_payload",
     "point_line_bundle_signals",
 ]

@@ -6,6 +6,7 @@ import type {
   InspectResponse,
   InputInspection,
   PlotStage,
+  PlotDatasetPreview,
   RenderOptionsPayload,
   TemplateName,
   WizardProject,
@@ -20,6 +21,7 @@ type WizardStoreSnapshot = {
   reset(): void;
   setBusy(value: boolean): void;
   setError(value: string | null): void;
+  setDataset(value: PlotDatasetPreview | null): void;
   setInputPath(value: string): void;
   setInspection(value: InputInspection | null): void;
   setOptions(value: RenderOptionsPayload): void;
@@ -55,6 +57,7 @@ export function applyInspectionToWizard(
   wizard.setSheet(inspected.sheet);
   wizard.setSheetNames(inspected.sheet_names);
   wizard.setInspection(inspected.inspection);
+  wizard.setDataset(inspected.dataset ?? null);
   wizard.setTemplate(selection.template);
   wizard.setOptions(selection.options);
   const nextStage = overrides?.nextStage ?? (inspected.sheet_names.length > 1 ? "sheet" : "type");

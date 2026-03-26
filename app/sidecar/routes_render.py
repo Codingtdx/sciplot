@@ -26,6 +26,7 @@ from app.sidecar.server_utils import (
 )
 from src.rendering import (
     build_rendered_plots,
+    build_normalized_dataset,
     close_rendered_plots,
     coerce_sheet,
     export_rendered_plots,
@@ -35,6 +36,8 @@ from src.rendering import (
     prepare_managed_plot_export_dir,
     validate_template_name,
 )
+from src.rendering.cache import read_raw_table_cached
+from src.rendering.dataset_models import dataframe_sample_rows, normalized_dataset_payload
 from src.rendering.template_lifecycle import template_identity
 from src.submission import build_render_submission_report
 
@@ -53,12 +56,18 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             inspection = inspect_input_file(input_path, sheet)
+            normalized_dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
+            raw = read_raw_table_cached(input_path, sheet).dropna(axis=1, how="all")
             return InspectFileResponse.model_validate(
                 {
                     "input_path": str(input_path),
                     "sheet": sheet,
                     "sheet_names": list_sheet_names(input_path),
                     "inspection": serialize_dataclass(inspection),
+                    "dataset": {
+                        **normalized_dataset_payload(normalized_dataset),
+                        "sample_rows": dataframe_sample_rows(raw),
+                    },
                 }
             )
         except Exception as exc:

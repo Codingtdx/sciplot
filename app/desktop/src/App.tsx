@@ -393,18 +393,25 @@ export default function App() {
             disabled: !wizard.inputPath,
             onSelect: () => navigate("/plot/type"),
           },
+          { id: "plot-open", label: "Open data", onSelect: () => navigate("/plot/import") },
+        ];
+      }
+      if (currentPlotStage === "type") {
+        return [
           {
-            id: "plot-review",
-            label: "Review",
-            disabled: !wizard.inputPath,
-            onSelect: () => navigate("/plot/review"),
+            id: "plot-continue",
+            label: "Continue",
+            kind: "primary" as const,
+            disabled: !wizard.template,
+            onSelect: () => navigate("/plot/tune"),
           },
+          { id: "plot-import", label: "Import", onSelect: () => navigate("/plot/import") },
         ];
       }
       return [
-        { id: "plot-import", label: "Import", kind: "primary" as const, onSelect: () => navigate("/plot/import") },
-        { id: "plot-review", label: "Review", onSelect: () => navigate("/plot/review") },
-        { id: "plot-composer", label: "Composer", onSelect: () => navigate("/composer") },
+        { id: "plot-export", label: "Export", kind: "primary" as const, onSelect: () => navigate("/plot/export") },
+        { id: "plot-type", label: "Template", onSelect: () => navigate("/plot/type") },
+        { id: "plot-import", label: "Import", onSelect: () => navigate("/plot/import") },
       ];
     }
     if (workspace === "tensile") {
@@ -504,7 +511,7 @@ export default function App() {
           )}
           items={railItems}
           onBrandSelect={() => navigate("/")}
-          variant={importFocus ? "icon" : studioWorkspace ? "text" : "icon"}
+          variant={studioWorkspace ? "text" : "icon"}
         />
       }
       statusBar={

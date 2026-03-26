@@ -3905,3 +3905,772 @@ textarea.field {
     zoom: 1;
   }
 }
+
+.plot-workspace.plot-flow-v3 {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.plot-flow-v3-header,
+.plot-flow-v3-footer,
+.plot-flow-v3-main .wb-section-header,
+.plot-flow-v3-side .wb-inspector,
+.plot-template-list,
+.plot-template-preview,
+.plot-refine-controls,
+.plot-refine-preview,
+.plot-modal-card,
+.plot-gallery-group,
+.plot-file-card,
+.plot-dropzone,
+.plot-state-card,
+.plot-warning-strip,
+.plot-column-card,
+.plot-table-preview,
+.plot-source-stack {
+  border: 1px solid var(--wb-border-soft);
+  background: rgba(23, 33, 43, 0.92);
+  box-shadow: var(--wb-shadow-sm);
+}
+
+.plot-flow-v3-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(70, 213, 205, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(26, 37, 48, 0.96), rgba(18, 25, 33, 0.96));
+  animation: plot-fade-up 220ms ease both;
+}
+
+.plot-flow-v3-header-copy,
+.plot-flow-v3-footer {
+  min-width: 0;
+}
+
+.plot-flow-v3-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plot-flow-v3-header-copy > span {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wb-text-muted);
+}
+
+.plot-flow-v3-header-copy > strong {
+  font-size: 24px;
+  line-height: 1.08;
+  font-weight: 650;
+  color: var(--wb-text-main);
+}
+
+.plot-flow-v3-header-copy > p {
+  margin: 0;
+  max-width: 44rem;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wb-text-muted);
+}
+
+.plot-flow-v3-header-actions,
+.plot-flow-v3-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.plot-flow-v3-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.75fr);
+  gap: 14px;
+  min-height: 0;
+  animation: plot-fade-up 260ms ease both;
+}
+
+.plot-flow-v3-main,
+.plot-flow-v3-side {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plot-flow-v3-main .wb-section-header,
+.plot-flow-v3-side .wb-inspector {
+  border-radius: 18px;
+  padding: 16px 16px 14px;
+}
+
+.plot-flow-v3-main .wb-section-header {
+  background: linear-gradient(180deg, rgba(24, 35, 45, 0.96), rgba(21, 31, 40, 0.96));
+}
+
+.plot-flow-v3-side .wb-inspector {
+  background: linear-gradient(180deg, rgba(22, 32, 42, 0.96), rgba(19, 28, 36, 0.96));
+}
+
+.plot-flow-v3-main .wb-section-copy > h2,
+.plot-flow-v3-side .wb-inspector-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.plot-flow-v3-main .wb-section-copy > p,
+.plot-flow-v3-side .wb-inspector-head p {
+  margin: 0;
+  color: var(--wb-text-muted);
+}
+
+.plot-dropzone {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 20px;
+  border-style: dashed;
+  background:
+    radial-gradient(circle at top, rgba(70, 213, 205, 0.12), transparent 48%),
+    linear-gradient(180deg, rgba(17, 25, 32, 0.92), rgba(13, 18, 24, 0.96));
+  transition:
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    opacity var(--motion-fast);
+}
+
+.plot-dropzone.drag-active {
+  transform: translateY(-2px);
+  border-color: var(--wb-border-strong);
+  box-shadow: 0 16px 44px rgba(5, 8, 12, 0.34);
+}
+
+.plot-dropzone-copy {
+  text-align: center;
+  max-width: 34rem;
+}
+
+.plot-dropzone-copy strong,
+.plot-file-card-head strong,
+.plot-state-card strong,
+.plot-template-card-copy strong,
+.plot-refine-preview-draft strong {
+  display: block;
+  color: var(--wb-text-main);
+  font-weight: 650;
+}
+
+.plot-dropzone-copy p,
+.plot-file-card-head span,
+.plot-state-card span,
+.plot-template-card-copy p,
+.plot-refine-preview-draft span {
+  color: var(--wb-text-muted);
+}
+
+.plot-dropzone-hint {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.plot-source-stack {
+  padding: 12px;
+  border-radius: 18px;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.plot-file-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 31, 0.96);
+}
+
+.plot-file-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plot-file-card-head > div {
+  min-width: 0;
+}
+
+.plot-file-card-head strong {
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.plot-file-card-meta,
+.plot-column-meta,
+.plot-flow-v3-footer,
+.plot-state-card p,
+.plot-preview-note,
+.plot-stage-pill,
+.plot-warning-strip span {
+  font-size: 12px;
+}
+
+.plot-file-card-meta,
+.plot-column-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--wb-text-muted);
+}
+
+.plot-sheet-strip,
+.plot-candidate-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.plot-sheet-chip,
+.plot-candidate-chip {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-soft);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--wb-text-body);
+  cursor: pointer;
+}
+
+.plot-sheet-chip.active,
+.plot-candidate-chip.x,
+.plot-candidate-chip.y {
+  border-color: var(--wb-border-strong);
+  background: rgba(70, 213, 205, 0.14);
+  color: var(--wb-text-main);
+}
+
+.plot-warning-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(245, 180, 93, 0.08);
+  color: var(--wb-text-body);
+}
+
+.plot-warning-strip span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.plot-preview-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plot-column-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plot-column-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plot-column-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  transition:
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.plot-column-card.selected {
+  border-color: var(--wb-border-strong);
+  box-shadow: 0 10px 24px rgba(5, 8, 12, 0.22);
+  transform: translateY(-1px);
+}
+
+.plot-column-card.ignored {
+  opacity: 0.62;
+}
+
+.plot-column-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plot-column-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--wb-text-main);
+  text-transform: capitalize;
+}
+
+.plot-column-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.plot-column-title-input,
+.plot-control-row input,
+.plot-control-row select,
+.plot-control-row textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.plot-table-preview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  overflow: auto;
+  background: rgba(10, 16, 21, 0.94);
+}
+
+.plot-table-preview-head,
+.plot-table-preview-row {
+  display: grid;
+  grid-template-columns: 42px repeat(8, minmax(96px, 1fr));
+  gap: 6px;
+  align-items: center;
+}
+
+.plot-table-preview-head span,
+.plot-table-preview-row > span {
+  min-width: 0;
+}
+
+.plot-table-preview-head span {
+  color: var(--wb-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plot-table-cell {
+  min-height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-table-preview-head .muted,
+.plot-column-type.text,
+.plot-column-type.categorical {
+  opacity: 0.72;
+}
+
+.plot-state-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.plot-state-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-state-card strong {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.plot-state-card p {
+  margin: 6px 0 0;
+  color: var(--wb-text-muted);
+  line-height: 1.45;
+}
+
+.plot-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-soft);
+  color: var(--wb-text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.plot-template-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.plot-template-list,
+.plot-template-preview,
+.plot-refine-controls,
+.plot-refine-preview,
+.plot-modal-card,
+.plot-gallery-group {
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.plot-template-list-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.plot-template-list-head span {
+  color: var(--wb-text-muted);
+  font-size: 12px;
+}
+
+.plot-template-card-stack,
+.plot-template-alt-list {
+  display: grid;
+  gap: 10px;
+}
+
+.plot-template-card {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+
+.plot-template-card:hover,
+.plot-template-card.selected {
+  border-color: var(--wb-border-strong);
+  background: rgba(70, 213, 205, 0.08);
+  transform: translateY(-1px);
+}
+
+.plot-template-card.gallery {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.plot-template-thumb {
+  position: relative;
+  height: 60px;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(70, 213, 205, 0.18), rgba(70, 213, 205, 0.04));
+}
+
+.plot-template-thumb::before,
+.plot-template-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.plot-template-thumb.curve::before {
+  background:
+    linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.8) 30.5%, transparent 31.5%) 14px 34px / 52px 2px no-repeat,
+    linear-gradient(135deg, transparent 35%, rgba(255, 255, 255, 0.9) 35.5%, transparent 36.5%) 18px 26px / 42px 2px no-repeat,
+    linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.85) 40.5%, transparent 41.5%) 22px 18px / 32px 2px no-repeat;
+}
+
+.plot-template-thumb.scatter::before {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 2px, transparent 2.5px) 20px 40px / 18px 18px no-repeat,
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 2px, transparent 2.5px) 42px 22px / 18px 18px no-repeat,
+    radial-gradient(circle, rgba(255, 255, 255, 0.74) 0 2px, transparent 2.5px) 60px 34px / 18px 18px no-repeat;
+}
+
+.plot-template-thumb.bar::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)) 18px 22px / 10px 24px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.74)) 34px 14px / 10px 32px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.62)) 50px 28px / 10px 18px no-repeat;
+}
+
+.plot-template-thumb.heat::before {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.82), transparent) 16px 14px / 18px 18px no-repeat,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.62), transparent) 36px 26px / 18px 18px no-repeat,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.46), transparent) 56px 38px / 18px 18px no-repeat;
+}
+
+.plot-template-card-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.plot-template-card-copy p {
+  margin: 0;
+  color: var(--wb-text-muted);
+}
+
+.plot-template-alternates {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.plot-template-preview-head,
+.plot-refine-preview-draft,
+.plot-refine-preview-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.plot-template-preview-head {
+  margin-bottom: 10px;
+}
+
+.plot-template-preview-head span,
+.plot-refine-preview-draft span,
+.plot-refine-preview-foot span {
+  color: var(--wb-text-muted);
+}
+
+.plot-template-preview-shell {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plot-template-preview-shell .preview-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+.plot-refine-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.plot-refine-controls,
+.plot-refine-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plot-refine-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.plot-refine-preview-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 520px;
+  padding: 14px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(70, 213, 205, 0.2), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(97, 198, 255, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(10, 16, 22, 0.96), rgba(8, 12, 16, 0.98));
+}
+
+.plot-refine-preview-shell .preview-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+.plot-refine-preview-draft {
+  padding-right: 170px;
+  min-height: 48px;
+}
+
+.plot-refine-legend {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--wb-border-soft);
+  background: rgba(18, 26, 34, 0.92);
+  cursor: grab;
+  box-shadow: 0 10px 24px rgba(5, 8, 12, 0.28);
+  transition:
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.plot-refine-legend.dragging {
+  cursor: grabbing;
+  transform: scale(1.02);
+  border-color: var(--wb-border-strong);
+}
+
+.plot-refine-preview-foot {
+  padding-top: 4px;
+  border-top: 1px solid var(--wb-border-soft);
+}
+
+.plot-flow-v3-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(14, 20, 26, 0.92);
+  backdrop-filter: blur(14px);
+}
+
+.plot-flow-v3-footer > span {
+  color: var(--wb-text-muted);
+}
+
+.plot-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 10, 14, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.plot-modal-card {
+  width: min(980px, 100%);
+  max-height: min(84vh, 860px);
+  overflow: auto;
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(24, 33, 42, 0.98), rgba(15, 22, 29, 0.98));
+}
+
+.plot-modal-card.wide {
+  width: min(1180px, 100%);
+}
+
+.plot-modal-card.export {
+  width: min(560px, 100%);
+}
+
+.plot-modal-list,
+.plot-gallery-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.plot-gallery-group {
+  display: grid;
+  gap: 10px;
+}
+
+.plot-gallery-group > strong {
+  color: var(--wb-text-main);
+}
+
+.plot-gallery-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plot-export-form {
+  display: grid;
+  gap: 10px;
+}
+
+.plot-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+@keyframes plot-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1100px) {
+  .plot-flow-v3-grid,
+  .plot-template-layout,
+  .plot-refine-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plot-column-controls,
+  .plot-column-grid,
+  .plot-gallery-group-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plot-refine-preview-draft {
+    padding-right: 0;
+  }
+
+  .plot-refine-legend {
+    position: static;
+    width: fit-content;
+  }
+}
