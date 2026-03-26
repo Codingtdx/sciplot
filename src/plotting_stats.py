@@ -265,6 +265,129 @@ def plot_bar(
     return fig, ax
 
 
+def plot_point_error(
+    groups: Sequence[ReplicateGroup],
+    *,
+    legend_mode: LegendMode = "outside",
+    axis_mode: AxisMode = "auto",
+    width_mm: float | None = None,
+    height_mm: float | None = None,
+    left_margin_mm: float | None = None,
+    right_margin_mm: float | None = None,
+    bottom_margin_mm: float | None = None,
+    top_margin_mm: float | None = None,
+    point_spacing_width: float = 0.32,
+    spacing_scale: float = 1.0,
+    capsize: float = 2.5,
+    marker_size_pt: float = 4.6,
+    error_linewidth_pt: float = 1.0,
+    show_raw_points: bool = True,
+    raw_point_size: float = 10.0,
+    raw_point_alpha: float | None = None,
+    raw_point_jitter_fraction: float = 0.2,
+    ylim: tuple[float, float] | None = None,
+    headroom_factor: float | None = None,
+    y_padding_top: float = 0.12,
+    y_padding_bottom: float = 0.06,
+) -> tuple[plt.Figure, plt.Axes]:
+    _validate_group_input(groups, chart_name="point-error plot")
+    stroke = plot_style.current_stroke()
+    (
+        resolved_width_mm,
+        resolved_height_mm,
+        resolved_left_margin_mm,
+        resolved_right_margin_mm,
+        resolved_bottom_margin_mm,
+        resolved_top_margin_mm,
+    ) = _resolved_panel_geometry(
+        width_mm=width_mm,
+        height_mm=height_mm,
+        left_margin_mm=left_margin_mm,
+        right_margin_mm=right_margin_mm,
+        bottom_margin_mm=bottom_margin_mm,
+        top_margin_mm=top_margin_mm,
+    )
+    fig, ax = plot_style.create_panel_figure(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+    )
+    palette = plot_style.get_categorical_palette(n_colors=len(groups))
+    means = np.array([group.data.mean() for group in groups], dtype=float)
+    stds = np.array(
+        [group.data.std(ddof=1) if len(group.data) > 1 else 0.0 for group in groups],
+        dtype=float,
+    )
+    positions = compute_group_positions(len(groups), point_spacing_width, spacing_scale=spacing_scale)
+
+    for pos, mean, std, color in zip(positions, means, stds, palette, strict=True):
+        ax.errorbar(
+            pos,
+            mean,
+            yerr=std,
+            fmt="o",
+            markersize=marker_size_pt,
+            markerfacecolor=color,
+            markeredgecolor=color,
+            ecolor=color,
+            elinewidth=max(error_linewidth_pt, stroke.tick_width_pt),
+            capsize=capsize,
+            capthick=max(error_linewidth_pt, stroke.tick_width_pt),
+            linestyle="none",
+            zorder=3.2,
+        )
+
+    if show_raw_points:
+        for pos, group, color in zip(positions, groups, palette, strict=True):
+            jitter_half_span = min(0.085, max(point_spacing_width * raw_point_jitter_fraction, 0.03))
+            jitter = (
+                np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
+                if len(group.data) > 1
+                else np.array([0.0])
+            )
+            ax.scatter(
+                np.full(len(group.data), pos, dtype=float) + jitter,
+                group.data,
+                color=color,
+                alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
+                s=raw_point_size,
+                zorder=2.8,
+                linewidths=0.0,
+            )
+
+    values = [
+        np.concatenate([group.data.to_numpy(dtype=float), [mean + std, mean - std]])
+        for group, mean, std in zip(groups, means, stds, strict=True)
+    ]
+    limits = _compute_distribution_axis_limits(
+        values,
+        axis_mode=axis_mode,
+        legend_mode=legend_mode,
+        headroom_factor=headroom_factor,
+        y_padding_top=y_padding_top,
+        y_padding_bottom=y_padding_bottom,
+    )
+    ax.set_ylim(*(ylim or limits.ylim))
+    ax.set_xticks(positions)
+    _style_categorical_ticklabels(ax, [group.group for group in groups])
+    if len(positions):
+        side_padding = max(0.25, point_spacing_width * 0.95)
+        ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
+    if limits.y_tick_policy is not None:
+        _apply_explicit_major_ticks(
+            ax.yaxis,
+            limits.y_tick_policy.major_ticks,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+        )
+
+    first = groups[0]
+    ax.set_ylabel(_format_axis_label(first.value_label, first.value_unit))
+    return fig, ax
+
+
 def plot_violin(
     groups: Sequence[ReplicateGroup],
     *,

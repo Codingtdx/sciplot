@@ -19,9 +19,10 @@ from src.layout_policy import (
     LayoutScore,
     choose_layout_candidate,
     empty_layout_decision,
+    flag_margin_fallback,
     record_layout_decision,
 )
-from src.layout_scoring import bbox_overlaps_any, expanded_bbox, proximity_penalty
+from src.layout_scoring import bbox_overlaps_any, expanded_bbox, proximity_penalty, score_points_against_bbox
 from src.plot_contract import load_plot_contract
 from src.text_normalization import normalize_label, normalize_unit
 from src.wide_nmr import (
@@ -2297,6 +2298,486 @@ def _wide_nmr_region_matches_series(
     return raw_name in region.series or display_name in region.series
 
 
+def _collect_axis_display_points(ax: plt.Axes, *, max_points: int = 3200) -> np.ndarray:
+    point_blocks: list[np.ndarray] = []
+    for line in ax.lines:
+        x_values = np.asarray(line.get_xdata(), dtype=float)
+        y_values = np.asarray(line.get_ydata(), dtype=float)
+        valid = np.isfinite(x_values) & np.isfinite(y_values)
+        if not np.any(valid):
+            continue
+        transformed = ax.transData.transform(np.column_stack([x_values[valid], y_values[valid]]))
+        if len(transformed) > max_points:
+            indices = np.linspace(0, len(transformed) - 1, max_points, dtype=int)
+            transformed = transformed[indices]
+        point_blocks.append(transformed)
+    for collection in ax.collections:
+        offsets = np.asarray(collection.get_offsets(), dtype=float)
+        if offsets.size == 0:
+            continue
+        valid = np.isfinite(offsets[:, 0]) & np.isfinite(offsets[:, 1])
+        transformed = ax.transData.transform(offsets[valid])
+        if len(transformed) > max_points:
+            indices = np.linspace(0, len(transformed) - 1, max_points, dtype=int)
+            transformed = transformed[indices]
+        point_blocks.append(transformed)
+    if not point_blocks:
+        return np.empty((0, 2), dtype=float)
+    stacked = np.vstack(point_blocks)
+    if len(stacked) > max_points:
+        indices = np.linspace(0, len(stacked) - 1, max_points, dtype=int)
+        stacked = stacked[indices]
+    return stacked
+
+
+def _probe_axis_text_bbox(
+    ax: plt.Axes,
+    *,
+    renderer: Any,
+    x: float,
+    y: float,
+    text: str,
+    color: str,
+    fontsize: float,
+    ha: str,
+    va: str,
+    clip_on: bool,
+) -> transforms.Bbox:
+    probe = ax.text(
+        x,
+        y,
+        text,
+        color=color,
+        ha=ha,
+        va=va,
+        fontsize=fontsize,
+        clip_on=clip_on,
+        alpha=0.0,
+        zorder=3.0,
+    )
+    bbox = probe.get_window_extent(renderer=renderer)
+    probe.remove()
+    return bbox
+
+
+def _wide_nmr_region_label_candidates(
+    *,
+    region_mid: float,
+    y_lows: Sequence[float],
+    y_highs: Sequence[float],
+    step: float,
+    preferred_position: str,
+) -> list[LayoutCandidate]:
+    top_outside = max(y_highs) + step * 0.04
+    bottom_outside = min(y_lows) - step * 0.04
+    top_inside = max(y_highs) - step * 0.03
+    bottom_inside = min(y_lows) + step * 0.03
+    center_inside = (max(y_highs) + min(y_lows)) * 0.5
+
+    top_candidate = LayoutCandidate(
+        candidate_id="top_outside",
+        standoff_pt=step * 0.04,
+        payload={
+            "x": region_mid,
+            "y": top_outside,
+            "ha": "center",
+            "va": "bottom",
+            "clip_on": False,
+            "bias": 0.0 if preferred_position == "top" else 5.2,
+        },
+        notes="outside-top label candidate",
+    )
+    bottom_candidate = LayoutCandidate(
+        candidate_id="bottom_outside",
+        standoff_pt=step * 0.04,
+        payload={
+            "x": region_mid,
+            "y": bottom_outside,
+            "ha": "center",
+            "va": "top",
+            "clip_on": False,
+            "bias": 0.0 if preferred_position == "bottom" else 5.2,
+        },
+        notes="outside-bottom label candidate",
+    )
+    inside_top_candidate = LayoutCandidate(
+        candidate_id="top_inside",
+        standoff_pt=step * 0.03,
+        payload={
+            "x": region_mid,
+            "y": top_inside,
+            "ha": "center",
+            "va": "top",
+            "clip_on": True,
+            "bias": 2.4,
+        },
+        notes="inside-top fallback candidate",
+    )
+    inside_bottom_candidate = LayoutCandidate(
+        candidate_id="bottom_inside",
+        standoff_pt=step * 0.03,
+        payload={
+            "x": region_mid,
+            "y": bottom_inside,
+            "ha": "center",
+            "va": "bottom",
+            "clip_on": True,
+            "bias": 2.6,
+        },
+        notes="inside-bottom fallback candidate",
+    )
+    center_candidate = LayoutCandidate(
+        candidate_id="center_inside",
+        standoff_pt=0.0,
+        payload={
+            "x": region_mid,
+            "y": center_inside,
+            "ha": "center",
+            "va": "center",
+            "clip_on": True,
+            "bias": 4.2,
+        },
+        notes="center fallback candidate",
+    )
+    if preferred_position == "bottom":
+        return [
+            bottom_candidate,
+            top_candidate,
+            inside_bottom_candidate,
+            inside_top_candidate,
+            center_candidate,
+        ]
+    return [
+        top_candidate,
+        bottom_candidate,
+        inside_top_candidate,
+        inside_bottom_candidate,
+        center_candidate,
+    ]
+
+
+def _place_wide_nmr_region_label_with_policy(
+    *,
+    axis: plt.Axes,
+    region: WideNMRHighlightRegion,
+    region_index: int,
+    region_mid: float,
+    y_lows: Sequence[float],
+    y_highs: Sequence[float],
+    layout: StackedLayout,
+    placed_label_bboxes: list[transforms.Bbox],
+) -> bool:
+    fig = axis.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    axes_bbox = axis.get_window_extent(renderer=renderer)
+    figure_bbox = fig.bbox
+    points = _collect_axis_display_points(axis)
+    existing_text_bboxes = [
+        text.get_window_extent(renderer=renderer)
+        for text in axis.texts
+        if text.get_visible() and str(text.get_text()).strip()
+    ]
+    candidates = _wide_nmr_region_label_candidates(
+        region_mid=region_mid,
+        y_lows=y_lows,
+        y_highs=y_highs,
+        step=layout.step,
+        preferred_position=region.label_position,
+    )
+    candidate_bboxes: dict[str, transforms.Bbox] = {}
+    candidate_payloads: dict[str, dict[str, Any]] = {}
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        x_pos = float(payload.get("x", region_mid))
+        y_pos = float(payload.get("y", max(y_highs)))
+        ha = str(payload.get("ha", "center"))
+        va = str(payload.get("va", "bottom"))
+        clip_on = bool(payload.get("clip_on", False))
+        bias = float(payload.get("bias", 0.0))
+
+        bbox = _probe_axis_text_bbox(
+            axis,
+            renderer=renderer,
+            x=x_pos,
+            y=y_pos,
+            text=region.label,
+            color=region.color,
+            fontsize=plot_style.current_typography().font_size_pt,
+            ha=ha,
+            va=va,
+            clip_on=clip_on,
+        )
+        candidate_bboxes[candidate.candidate_id] = bbox
+        candidate_payloads[candidate.candidate_id] = payload
+
+        if bbox.width >= axes_bbox.width * 0.98:
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="label_too_wide_for_axis")
+        margin_px = 2.0
+        if (
+            bbox.x0 < figure_bbox.x0 + margin_px
+            or bbox.x1 > figure_bbox.x1 - margin_px
+            or bbox.y0 < figure_bbox.y0 + margin_px
+            or bbox.y1 > figure_bbox.y1 - margin_px
+        ):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="outside_figure_margin")
+        axis_margin_px = 1.0
+        if (
+            bbox.x0 < axes_bbox.x0 + axis_margin_px
+            or bbox.x1 > axes_bbox.x1 - axis_margin_px
+            or bbox.y0 < axes_bbox.y0 + axis_margin_px
+            or bbox.y1 > axes_bbox.y1 - axis_margin_px
+        ):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="outside_axis_bounds")
+
+        expanded = expanded_bbox(bbox, x_scale=1.02, y_scale=1.08)
+        if placed_label_bboxes and bbox_overlaps_any(expanded, placed_label_bboxes):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="overlap_existing_annotation")
+        if existing_text_bboxes and bbox_overlaps_any(expanded, existing_text_bboxes):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="overlap_existing_text")
+
+        point_metrics = score_points_against_bbox(
+            points,
+            bbox,
+            inside_weight=12.0,
+            near_radius=max(9.0, bbox.height * 0.85),
+            near_weight=1.6,
+        )
+        score = point_metrics.total + bias
+        reason = (
+            f"inside={point_metrics.inside_count}; near={point_metrics.near_score:.3f}; bias={bias:.3f}"
+        )
+        return LayoutScore(score=float(score), reason=reason)
+
+    decision = choose_layout_candidate(
+        object_kind="annotation_textbox",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    chosen = decision.chosen_candidate
+    if chosen is None:
+        record_layout_decision(
+            fig,
+            empty_layout_decision("annotation_textbox", reason="no_feasible_region_label_candidate"),
+            context={
+                "path": "wide_nmr_annotation",
+                "phase": "candidate_selection",
+                "annotation_kind": "highlight_region_label",
+                "region_index": region_index,
+                "label": region.label,
+            },
+        )
+        return False
+    chosen_payload = candidate_payloads.get(chosen.candidate_id, {})
+    chosen_bbox = candidate_bboxes.get(chosen.candidate_id)
+    if chosen.candidate_id not in {
+        "top_outside" if region.label_position != "bottom" else "bottom_outside"
+    }:
+        decision = flag_margin_fallback(
+            decision,
+            action=f"region_label_fallback:{chosen.candidate_id}",
+            reason=f"preferred_position={region.label_position}",
+        )
+    record_layout_decision(
+        fig,
+        decision,
+        context={
+            "path": "wide_nmr_annotation",
+            "phase": "candidate_selection",
+            "annotation_kind": "highlight_region_label",
+            "region_index": region_index,
+            "label": region.label,
+        },
+    )
+    axis.text(
+        float(chosen_payload.get("x", region_mid)),
+        float(chosen_payload.get("y", max(y_highs))),
+        region.label,
+        color=region.color,
+        ha=str(chosen_payload.get("ha", "center")),
+        va=str(chosen_payload.get("va", "bottom")),
+        fontsize=plot_style.current_typography().font_size_pt,
+        clip_on=bool(chosen_payload.get("clip_on", False)),
+        zorder=3,
+    )
+    if chosen_bbox is not None:
+        placed_label_bboxes.append(expanded_bbox(chosen_bbox, x_scale=1.04, y_scale=1.12))
+    return True
+
+
+def _probe_figure_text_bbox(
+    fig: plt.Figure,
+    *,
+    renderer: Any,
+    x: float,
+    y: float,
+    text: str,
+    fontsize: float,
+    ha: str,
+    va: str,
+) -> transforms.Bbox:
+    probe = fig.text(
+        x,
+        y,
+        text,
+        ha=ha,
+        va=va,
+        fontsize=fontsize,
+        alpha=0.0,
+    )
+    bbox = probe.get_window_extent(renderer=renderer)
+    probe.remove()
+    return bbox
+
+
+def _place_wide_nmr_panel_label_with_policy(
+    *,
+    fig: plt.Figure,
+    panel_label: str,
+    axes: Sequence[plt.Axes],
+    left_margin_mm: float,
+    right_margin_mm: float,
+    width_mm: float,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    figure_bbox = fig.bbox
+    axis_bboxes = [axis.get_window_extent(renderer=renderer) for axis in axes]
+    existing_text_bboxes: list[transforms.Bbox] = []
+    for axis in axes:
+        for text in axis.texts:
+            if text.get_visible():
+                existing_text_bboxes.append(text.get_window_extent(renderer=renderer))
+    for text in fig.texts:
+        if text.get_visible():
+            existing_text_bboxes.append(text.get_window_extent(renderer=renderer))
+
+    left_anchor = float(left_margin_mm / width_mm)
+    right_anchor = float(1.0 - right_margin_mm / width_mm)
+    candidates = [
+        LayoutCandidate(
+            candidate_id="top_left",
+            anchor=(left_anchor, 0.985),
+            standoff_pt=2.0,
+            payload={"x": left_anchor, "y": 0.985, "ha": "left", "va": "top", "bias": 0.0},
+            notes="primary top-left panel label candidate",
+        ),
+        LayoutCandidate(
+            candidate_id="top_right",
+            anchor=(right_anchor, 0.985),
+            standoff_pt=2.0,
+            payload={"x": right_anchor, "y": 0.985, "ha": "right", "va": "top", "bias": 1.8},
+            notes="top-right fallback panel label candidate",
+        ),
+        LayoutCandidate(
+            candidate_id="top_center",
+            anchor=(0.5, 0.985),
+            standoff_pt=2.0,
+            payload={"x": 0.5, "y": 0.985, "ha": "center", "va": "top", "bias": 2.8},
+            notes="top-center fallback panel label candidate",
+        ),
+        LayoutCandidate(
+            candidate_id="left_inner",
+            anchor=(left_anchor, 0.94),
+            standoff_pt=4.0,
+            payload={"x": left_anchor, "y": 0.94, "ha": "left", "va": "top", "bias": 3.6},
+            notes="inner fallback panel label candidate",
+        ),
+    ]
+    candidate_bboxes: dict[str, transforms.Bbox] = {}
+    candidate_payloads: dict[str, dict[str, Any]] = {}
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        x_pos = float(payload.get("x", left_anchor))
+        y_pos = float(payload.get("y", 0.985))
+        ha = str(payload.get("ha", "left"))
+        va = str(payload.get("va", "top"))
+        bias = float(payload.get("bias", 0.0))
+
+        bbox = _probe_figure_text_bbox(
+            fig,
+            renderer=renderer,
+            x=x_pos,
+            y=y_pos,
+            text=panel_label,
+            fontsize=10.0,
+            ha=ha,
+            va=va,
+        )
+        candidate_bboxes[candidate.candidate_id] = bbox
+        candidate_payloads[candidate.candidate_id] = payload
+
+        margin_px = 2.0
+        if (
+            bbox.x0 < figure_bbox.x0 + margin_px
+            or bbox.x1 > figure_bbox.x1 - margin_px
+            or bbox.y0 < figure_bbox.y0 + margin_px
+            or bbox.y1 > figure_bbox.y1 - margin_px
+        ):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="outside_figure_margin")
+        if bbox.width >= figure_bbox.width * 0.95:
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="panel_label_too_wide")
+
+        expanded = expanded_bbox(bbox, x_scale=1.03, y_scale=1.10)
+        if existing_text_bboxes and bbox_overlaps_any(expanded, existing_text_bboxes):
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="overlap_existing_text")
+
+        axis_overlap_penalty = 0.0
+        if bbox_overlaps_any(expanded, axis_bboxes):
+            axis_overlap_penalty = 4.0
+        top_distance_penalty = max(0.0, (figure_bbox.y1 - bbox.y1) / max(figure_bbox.height, 1.0) * 3.0)
+        score = axis_overlap_penalty + top_distance_penalty + bias
+        reason = (
+            f"axis_overlap_penalty={axis_overlap_penalty:.3f}; "
+            f"top_distance_penalty={top_distance_penalty:.3f}; bias={bias:.3f}"
+        )
+        return LayoutScore(score=float(score), reason=reason)
+
+    decision = choose_layout_candidate(
+        object_kind="annotation_textbox",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    chosen = decision.chosen_candidate
+    if chosen is None:
+        record_layout_decision(
+            fig,
+            empty_layout_decision("annotation_textbox", reason="no_feasible_panel_label_candidate"),
+            context={
+                "path": "wide_nmr_panel_label",
+                "phase": "candidate_selection",
+                "annotation_kind": "panel_label",
+            },
+        )
+        return
+    if chosen.candidate_id != "top_left":
+        decision = flag_margin_fallback(
+            decision,
+            action=f"panel_label_fallback:{chosen.candidate_id}",
+            reason="top_left candidate blocked or scored worse",
+        )
+    record_layout_decision(
+        fig,
+        decision,
+        context={
+            "path": "wide_nmr_panel_label",
+            "phase": "candidate_selection",
+            "annotation_kind": "panel_label",
+        },
+    )
+    chosen_payload = candidate_payloads.get(chosen.candidate_id, {})
+    fig.text(
+        float(chosen_payload.get("x", left_anchor)),
+        float(chosen_payload.get("y", 0.985)),
+        panel_label,
+        ha=str(chosen_payload.get("ha", "left")),
+        va=str(chosen_payload.get("va", "top")),
+        fontsize=10,
+    )
+
+
 def _add_wide_nmr_highlights(
     axes: Sequence[plt.Axes],
     segments: Sequence[WideNMRSegment],
@@ -2305,7 +2786,8 @@ def _add_wide_nmr_highlights(
     display_names: Sequence[str],
     config: WideNMRConfig,
 ) -> None:
-    for region in config.highlight_regions:
+    placed_label_bboxes: list[transforms.Bbox] = []
+    for region_index, region in enumerate(config.highlight_regions):
         label_axis, _ = _pick_segment_axis_for_region(axes, segments, region)
         region_label_drawn = False
         for axis, segment in zip(axes, segments, strict=True):
@@ -2350,24 +2832,16 @@ def _add_wide_nmr_highlights(
 
             if region.label and y_lows and axis is label_axis and not region_label_drawn:
                 region_mid = (overlap_low + overlap_high) / 2
-                if region.label_position == "bottom":
-                    label_y = min(y_lows) - layout.step * 0.04
-                    va = "top"
-                else:
-                    label_y = max(y_highs) + layout.step * 0.04
-                    va = "bottom"
-                axis.text(
-                    region_mid,
-                    label_y,
-                    region.label,
-                    color=region.color,
-                    ha="center",
-                    va=va,
-                    fontsize=plot_style.current_typography().font_size_pt,
-                    clip_on=False,
-                    zorder=3,
+                region_label_drawn = _place_wide_nmr_region_label_with_policy(
+                    axis=axis,
+                    region=region,
+                    region_index=region_index,
+                    region_mid=region_mid,
+                    y_lows=y_lows,
+                    y_highs=y_highs,
+                    layout=layout,
+                    placed_label_bboxes=placed_label_bboxes,
                 )
-                region_label_drawn = True
 
 
 def _draw_wide_nmr_break_marks(left_ax: plt.Axes, right_ax: plt.Axes) -> None:
@@ -2472,15 +2946,6 @@ def plot_wide_nmr(
                 include_minor=False,
             )
 
-        _add_wide_nmr_highlights(
-            axes,
-            config.segments,
-            stacked_layout,
-            raw_names,
-            display_names,
-            config,
-        )
-
         candidate_sides = (
             [config.label_side]
             if config.label_side in {"left", "right"}
@@ -2503,8 +2968,17 @@ def plot_wide_nmr(
             ):
                 label_success = True
                 break
-        if label_success:
-            break
+        if not label_success:
+            continue
+        _add_wide_nmr_highlights(
+            axes,
+            config.segments,
+            stacked_layout,
+            raw_names,
+            display_names,
+            config,
+        )
+        break
 
     for left_axis, right_axis in zip(axes[:-1], axes[1:], strict=True):
         _draw_wide_nmr_break_marks(left_axis, right_axis)
@@ -2512,6 +2986,13 @@ def plot_wide_nmr(
     first = series_list[0]
     fig.supxlabel(_format_axis_label(first.x_label, first.x_unit), x=1 - right_margin_mm / width_mm, ha="right")
     if config.panel_label:
-        fig.text(left_margin_mm / width_mm, 0.98, config.panel_label, ha="left", va="top", fontsize=10)
+        _place_wide_nmr_panel_label_with_policy(
+            fig=fig,
+            panel_label=config.panel_label,
+            axes=axes,
+            left_margin_mm=left_margin_mm,
+            right_margin_mm=right_margin_mm,
+            width_mm=width_mm,
+        )
 
     return fig, axes[0]

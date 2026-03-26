@@ -170,6 +170,14 @@ def test_meta_endpoint_returns_contract_backed_payload() -> None:
     assert payload["palette_preset_ids"]
     assert payload["visual_themes"]
     assert len(payload["templates"]) == len(payload["template_ids"])
+    alias_template = next(item for item in payload["templates"] if item["id"] == "scatter_with_fit")
+    assert alias_template["canonical_id"] == "scatter_fit"
+    assert alias_template["role"] == "alias"
+    assert alias_template["lifecycle_policy"] == "deprecated_in_practice"
+    assert alias_template["implementation_id"] == "scatter_fit"
+    canonical_template = next(item for item in payload["templates"] if item["id"] == "curve")
+    assert canonical_template["canonical_id"] == "curve"
+    assert canonical_template["role"] == "canonical"
 
 
 def test_plot_contract_endpoint_exposes_validation_rules() -> None:
@@ -239,6 +247,9 @@ def test_inspect_file_endpoint_returns_valid_nested_schema(tmp_path: Path) -> No
     assert payload["inspection"]["recommendations"][0]["reason"]
     assert payload["inspection"]["recommendations"][0]["suitability_hint"]
     assert payload["inspection"]["recommendations"][0]["score_gap_to_top"] == 0.0
+    assert payload["inspection"]["recommendations"][0]["canonical_id"] == "curve"
+    assert payload["inspection"]["recommendations"][0]["role"] == "canonical"
+    assert payload["inspection"]["recommendations"][0]["implementation_id"] == "curve"
     assert payload["inspection"]["recommendations"][1]["template_id"] == "point_line"
     assert payload["inspection"]["recommendation_confidence"] >= payload["inspection"]["recommendations"][0]["score"]
     assert "curve" in payload["inspection"]["recommendation_summary"]
@@ -260,6 +271,7 @@ def test_inspect_file_replicate_model_keeps_legacy_recommendation_field(tmp_path
     assert template_ids[0] == "box"
     assert "distribution_compare" in template_ids
     assert "grouped_bar_error" in template_ids
+    assert "point_error" in template_ids
     assert "box_strip" in template_ids
 
 
@@ -873,9 +885,17 @@ def test_preflight_render_includes_submission_report_and_style_preset(tmp_path: 
     assert response.status_code == 200
     payload = response.json()
     assert payload["options"]["style_preset"] == "nature"
+    assert payload["requested_template_id"] == "curve"
+    assert payload["canonical_id"] == "curve"
+    assert payload["role"] == "canonical"
+    assert payload["implementation_id"] == "curve"
     assert payload["preflight"]["submission_report"]["style_preset"] == "nature"
     assert payload["preflight"]["submission_report"]["context"] == "preflight"
     assert payload["preflight"]["submission_report"]["checks"]
+    assert payload["preflight"]["requested_template_id"] == "curve"
+    assert payload["preflight"]["canonical_id"] == "curve"
+    assert payload["preflight"]["role"] == "canonical"
+    assert payload["preflight"]["implementation_id"] == "curve"
 
 
 def test_render_preview_includes_advisory_qa_payload_and_submission_report(tmp_path: Path) -> None:
@@ -897,6 +917,10 @@ def test_render_preview_includes_advisory_qa_payload_and_submission_report(tmp_p
     assert response.status_code == 200
     payload = response.json()
     assert payload["previews"]
+    assert payload["requested_template_id"] == "curve"
+    assert payload["canonical_id"] == "curve"
+    assert payload["role"] == "canonical"
+    assert payload["implementation_id"] == "curve"
     assert payload["submission_report"]["context"] == "preview"
     assert payload["submission_report"]["style_preset"] == "nature"
     qa = payload["previews"][0]["qa"]
@@ -925,6 +949,10 @@ def test_export_render_writes_bundle_artifacts_and_submission_report(tmp_path: P
     assert response.status_code == 200
     payload = response.json()
     assert payload["output_dir"] == str(output_dir)
+    assert payload["requested_template_id"] == "curve"
+    assert payload["canonical_id"] == "curve"
+    assert payload["role"] == "canonical"
+    assert payload["implementation_id"] == "curve"
     assert payload["submission_report"]["context"] == "export"
     assert Path(payload["outputs"][0]).exists()
     assert all(Path(path).exists() for path in payload["preview_outputs"])
@@ -942,7 +970,15 @@ def test_export_render_writes_bundle_artifacts_and_submission_report(tmp_path: P
     assert manifest["bundle_version"] == 2
     assert manifest["generated_at"]
     assert manifest["template_layer"]["id"] == "curve"
+    assert manifest["template_layer"]["requested_template_id"] == "curve"
+    assert manifest["template_layer"]["canonical_id"] == "curve"
+    assert manifest["template_layer"]["implementation_id"] == "curve"
     assert manifest["mapping_layer"]["selected_template"] == "curve"
+    assert manifest["mapping_layer"]["requested_template_id"] == "curve"
+    assert manifest["mapping_layer"]["selected_implementation_id"] == "curve"
+    assert manifest["mapping_layer"]["canonical_id"] == "curve"
+    assert manifest["requested_template_id"] == "curve"
+    assert manifest["canonical_template_id"] == "curve"
     assert manifest["theme_layer"]["style_preset"] == "nature"
     assert manifest["theme_layer"]["palette_preset"] == "colorblind_safe"
     assert manifest["theme_layer"]["publication_profile_id"] == "nature"
@@ -953,6 +989,81 @@ def test_export_render_writes_bundle_artifacts_and_submission_report(tmp_path: P
     assert len(reproducibility["input"]["sha256"]) == 64
     assert reproducibility["outputs"]
     assert reproducibility["preview_outputs"]
+    assert reproducibility["run_fingerprint"]
+    assert reproducibility["runtime"]["python"]["version"]
+
+
+def test_alias_template_identity_is_explicit_in_preflight_preview_and_manifest(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    output_dir = tmp_path / "alias_exports"
+
+    preflight_response = client.post(
+        "/preflight-render",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "scatter_with_fit",
+            "options": {},
+        },
+    )
+    assert preflight_response.status_code == 200
+    preflight_payload = preflight_response.json()
+    assert preflight_payload["template"] == "scatter_with_fit"
+    assert preflight_payload["requested_template_id"] == "scatter_with_fit"
+    assert preflight_payload["canonical_id"] == "scatter_fit"
+    assert preflight_payload["role"] == "alias"
+    assert preflight_payload["lifecycle_policy"] == "deprecated_in_practice"
+    assert preflight_payload["implementation_id"] == "scatter_fit"
+    assert preflight_payload["preflight"]["requested_template_id"] == "scatter_with_fit"
+    assert preflight_payload["preflight"]["canonical_id"] == "scatter_fit"
+
+    preview_response = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "scatter_with_fit",
+            "options": {},
+        },
+    )
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert preview_payload["template"] == "scatter_with_fit"
+    assert preview_payload["requested_template_id"] == "scatter_with_fit"
+    assert preview_payload["canonical_id"] == "scatter_fit"
+    assert preview_payload["role"] == "alias"
+    assert preview_payload["implementation_id"] == "scatter_fit"
+
+    export_response = client.post(
+        "/export-render",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "scatter_with_fit",
+            "options": {},
+            "output_dir": str(output_dir),
+        },
+    )
+    assert export_response.status_code == 200
+    export_payload = export_response.json()
+    assert export_payload["requested_template_id"] == "scatter_with_fit"
+    assert export_payload["canonical_id"] == "scatter_fit"
+    assert export_payload["role"] == "alias"
+    assert export_payload["lifecycle_policy"] == "deprecated_in_practice"
+    assert export_payload["implementation_id"] == "scatter_fit"
+
+    manifest = json.loads(Path(export_payload["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest["template"] == "scatter_with_fit"
+    assert manifest["requested_template_id"] == "scatter_with_fit"
+    assert manifest["canonical_template_id"] == "scatter_fit"
+    assert manifest["template_layer"]["requested_template_id"] == "scatter_with_fit"
+    assert manifest["template_layer"]["canonical_id"] == "scatter_fit"
+    assert manifest["template_layer"]["role"] == "alias"
+    assert manifest["template_layer"]["lifecycle_policy"] == "deprecated_in_practice"
+    assert manifest["template_layer"]["implementation_id"] == "scatter_fit"
+    assert manifest["mapping_layer"]["selected_template"] == "scatter_with_fit"
+    assert manifest["mapping_layer"]["selected_implementation_id"] == "scatter_fit"
+    assert manifest["mapping_layer"]["canonical_id"] == "scatter_fit"
 
 
 def test_open_path_endpoint_uses_host_launcher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

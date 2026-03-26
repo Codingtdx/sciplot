@@ -114,10 +114,10 @@
   - `stress_relaxation curve` 导出 `stress_relaxation_sigma_over_sigma0_curve.pdf`
 - `wizard` 前端当前使用的兼容模板映射是：
   - `frequency_sweep / temperature_sweep / stress_relaxation -> point_line, curve`
-  - `tensile_curve -> curve, point_line, stacked_curve, segmented_stacked_curve, scatter`
-  - `curve_table -> curve, point_line, stacked_curve, segmented_stacked_curve, scatter`
-  - `replicate_table -> bar, box, violin`
-  - `heatmap_table -> heatmap`
+  - `tensile_curve -> curve, point_line, replicate_curves_with_band, stacked_curve, segmented_stacked_curve, scatter, scatter_fit, scatter_with_fit`
+  - `curve_table -> curve, point_line, replicate_curves_with_band, stacked_curve, segmented_stacked_curve, scatter, scatter_fit, scatter_with_fit`
+  - `replicate_table -> distribution_compare, box_strip, point_error, grouped_bar_error, grouped_bar_compare, histogram_density, box, violin, bar`
+  - `heatmap_table -> heatmap, annotated_heatmap`
 - 所有识别为 `tensile_curve` 的曲线都必须固定使用 `linear` x/y 坐标；不允许在推荐、预检或渲染阶段退回 `log`。
 - `tensile_curve` 的 `y` 轴必须始终包含并显示 `0`，但 display bounds 仍要在 `0` 下方留出无标签留白；不要再把 tensile 曲线直接贴在横轴上。
 - 标准 `log` 轴允许 display bounds 超过最后一个标签，但标签只显示 decade 主刻度；不要把 `2×10^n`、`5×10^n` 直接当成主标签端点。

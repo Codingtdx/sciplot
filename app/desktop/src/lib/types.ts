@@ -122,6 +122,10 @@ export type Recommendation = {
 
 export type TemplateRecommendation = {
   template_id: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   score: number;
   rank?: number | null;
   reason?: string;
@@ -147,6 +151,11 @@ export type InputInspection = {
 
 export type PreflightResult = {
   template: TemplateName;
+  requested_template_id?: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   warnings: string[];
   errors: string[];
   output_filenames: string[];
@@ -178,6 +187,11 @@ export type InspectResponse = {
 export type PreflightResponse = {
   input_path: string;
   template: TemplateName;
+  requested_template_id?: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   sheet: string | number;
   options: RenderOptionsPayload;
   preflight: PreflightResult;
@@ -185,12 +199,22 @@ export type PreflightResponse = {
 
 export type RenderPreviewResponse = {
   template: TemplateName;
+  requested_template_id?: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   sheet: string | number;
   previews: PreviewItem[];
   submission_report?: SubmissionReport | null;
 };
 
 export type ExportResponse = {
+  requested_template_id?: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   outputs: string[];
   output_dir: string;
   preview_outputs?: string[];
@@ -399,6 +423,10 @@ export type WorkbenchVisualTheme = {
 
 export type WorkbenchTemplate = {
   id: TemplateName;
+  canonical_id?: TemplateName;
+  role?: "canonical" | "alias";
+  lifecycle_policy?: string;
+  implementation_id?: TemplateName;
   label: string;
   description: string;
   category: string;

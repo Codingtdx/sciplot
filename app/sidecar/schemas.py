@@ -230,6 +230,10 @@ class WorkbenchVisualThemeResponse(StrictModel):
 
 class WorkbenchTemplateResponse(StrictModel):
     id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     label: str
     description: str
     category: str
@@ -474,6 +478,10 @@ class RecommendationResponse(StrictModel):
 
 class TemplateRecommendationResponse(StrictModel):
     template_id: str
+    canonical_id: str = ""
+    role: str = "canonical"
+    lifecycle_policy: str = "canonical"
+    implementation_id: str = ""
     score: float
     rank: int | None = None
     reason: str = ""
@@ -499,6 +507,11 @@ class InputInspectionResponse(StrictModel):
 
 class PreflightResultResponse(StrictModel):
     template: str
+    requested_template_id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     output_filenames: list[str] = Field(default_factory=list)
@@ -515,6 +528,11 @@ class InspectFileResponse(StrictModel):
 class PreflightRenderResponse(StrictModel):
     input_path: str
     template: str
+    requested_template_id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     sheet: str | int
     options: RenderOptionsPayload
     preflight: PreflightResultResponse
@@ -565,12 +583,22 @@ class PreviewItemResponse(StrictModel):
 
 class RenderPreviewResponse(StrictModel):
     template: str
+    requested_template_id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     sheet: str | int
     previews: list[PreviewItemResponse]
     submission_report: SubmissionReportResponse | None = None
 
 
 class ExportRenderResponse(StrictModel):
+    requested_template_id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     outputs: list[str]
     output_dir: str
     preview_outputs: list[str] = Field(default_factory=list)

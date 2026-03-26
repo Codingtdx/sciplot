@@ -207,8 +207,16 @@ function readWorkbenchPalette(value: unknown, index: number): WorkbenchPalette {
 
 function readWorkbenchTemplate(value: unknown, index: number): WorkbenchTemplate {
   const record = requireRecord(value, `Workbench template ${index}`);
+  const canonicalId = optionalString(record.canonical_id);
+  const role = optionalString(record.role);
+  const lifecyclePolicy = optionalString(record.lifecycle_policy);
+  const implementationId = optionalString(record.implementation_id);
   return {
     id: requireString(record.id, `Workbench template ${index}.id`) as TemplateName,
+    canonical_id: canonicalId ? (canonicalId as TemplateName) : undefined,
+    role: role === "alias" || role === "canonical" ? role : undefined,
+    lifecycle_policy: lifecyclePolicy ?? undefined,
+    implementation_id: implementationId ? (implementationId as TemplateName) : undefined,
     label: requireString(record.label, `Workbench template ${index}.label`),
     description: requireString(record.description, `Workbench template ${index}.description`),
     category: requireString(record.category, `Workbench template ${index}.category`),

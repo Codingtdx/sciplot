@@ -9,7 +9,27 @@ from matplotlib import transforms
 
 from src.plot_contract import qa_profile
 from src.rendering.models import QAIssue, QAReport, RenderOptions
+from src.rendering.template_lifecycle import template_family_ids
 from src.wide_nmr import WIDE_NMR_STRUCTURE_RESERVED_MM
+
+_CURVE_QA_TEMPLATES = {
+    "curve",
+    "point_line",
+    "scatter",
+    *template_family_ids("scatter_fit"),
+    *template_family_ids("mean_band"),
+}
+_STATS_QA_TEMPLATES = {
+    "bar",
+    "box",
+    "box_strip",
+    "violin",
+    "violin_box",
+    *template_family_ids("grouped_bar_error"),
+    "point_error",
+    "distribution_compare",
+    "histogram_density",
+}
 
 
 @dataclass(frozen=True)
@@ -239,7 +259,7 @@ def analyze_rendered_figure(
     palette_preset: str,
     autofixes_applied: Iterable[str] = (),
 ) -> QAReport:
-    if template in {"curve", "point_line", "scatter", "scatter_with_fit", "replicate_curves_with_band"}:
+    if template in _CURVE_QA_TEMPLATES:
         return _analyze_curve_figure(
             fig,
             template=template,
@@ -253,16 +273,7 @@ def analyze_rendered_figure(
             palette_preset=palette_preset,
             autofixes_applied=autofixes_applied,
         )
-    if template in {
-        "bar",
-        "box",
-        "box_strip",
-        "violin",
-        "grouped_bar_compare",
-        "grouped_bar_error",
-        "distribution_compare",
-        "histogram_density",
-    }:
+    if template in _STATS_QA_TEMPLATES:
         return _analyze_stats_figure(
             fig,
             template=template,

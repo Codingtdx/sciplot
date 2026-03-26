@@ -19,6 +19,10 @@ class TemplateRecommendation:
     reason: str = ""
     suitability_hint: str = ""
     score_gap_to_top: float = 0.0
+    canonical_id: str = ""
+    role: str = "canonical"
+    lifecycle_policy: str = "canonical"
+    implementation_id: str = ""
 
 
 class TemplateRecommender(Protocol):

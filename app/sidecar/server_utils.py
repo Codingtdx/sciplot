@@ -18,6 +18,7 @@ from src import plot_style
 from src.plot_contract import CONTRACT_PATH, load_plot_contract, template_contract
 from src.rendering import DEFAULT_SIZE_BY_TEMPLATE, ensure_input_path, normalize_input_path_text, resolve_render_options
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
+from src.rendering.template_lifecycle import template_identity
 
 
 def normalize_path(path_text: str) -> Path:
@@ -206,10 +207,16 @@ def _runtime_versions() -> dict[str, object]:
     }
 
 
-def _template_layer(template: str) -> dict[str, object]:
-    spec = template_contract(template)
+def _template_layer(requested_template_id: str) -> dict[str, object]:
+    spec = template_contract(requested_template_id)
+    identity = template_identity(requested_template_id)
     return {
-        "id": template,
+        "id": requested_template_id,
+        "requested_template_id": identity.requested_template_id,
+        "canonical_id": identity.canonical_id,
+        "role": identity.role,
+        "lifecycle_policy": identity.lifecycle_policy,
+        "implementation_id": identity.implementation_id,
         "default_size": spec.default_size,
         "allowed_sizes": list(spec.allowed_sizes),
         "available_styles": list(spec.available_styles),
@@ -217,14 +224,18 @@ def _template_layer(template: str) -> dict[str, object]:
     }
 
 
-def _mapping_layer(template: str, inspection: object) -> dict[str, object]:
+def _mapping_layer(
+    requested_template_id: str,
+    canonical_template_id: str,
+    inspection: object,
+) -> dict[str, object]:
     inspection_data = _as_mapping(inspection)
     recommendations = inspection_data.get("recommendations")
     matched_mapping: dict[str, object] = {}
     if isinstance(recommendations, list):
         for candidate in recommendations:
             candidate_data = _as_mapping(candidate)
-            if candidate_data.get("template_id") == template:
+            if candidate_data.get("template_id") == requested_template_id:
                 inferred = candidate_data.get("inferred_mapping")
                 if isinstance(inferred, Mapping):
                     matched_mapping = {str(key): value for key, value in inferred.items()}
@@ -235,7 +246,10 @@ def _mapping_layer(template: str, inspection: object) -> dict[str, object]:
         recommendation_template = recommendation_payload.get("template")
     return {
         "detected_model": inspection_data.get("model"),
-        "selected_template": template,
+        "selected_template": requested_template_id,
+        "requested_template_id": requested_template_id,
+        "selected_implementation_id": canonical_template_id,
+        "canonical_id": canonical_template_id,
         "recommendation_template": recommendation_template,
         "inferred_mapping": matched_mapping,
         "source": "inspection.recommendations",
@@ -273,7 +287,8 @@ def _run_fingerprint_payload(
     *,
     input_entry: dict[str, object],
     sheet: str | int,
-    template: str,
+    requested_template_id: str,
+    canonical_template_id: str,
     options: object,
     output_entries: list[dict[str, object]],
     preview_entries: list[dict[str, object]],
@@ -283,7 +298,8 @@ def _run_fingerprint_payload(
     return {
         "input_sha256": input_entry.get("sha256"),
         "sheet": sheet,
-        "template": template,
+        "requested_template_id": requested_template_id,
+        "canonical_template_id": canonical_template_id,
         "options": _as_mapping(options),
         "output_sha256": [entry.get("sha256") for entry in output_entries],
         "preview_sha256": [entry.get("sha256") for entry in preview_entries],
@@ -296,7 +312,8 @@ def bundle_manifest_payload(
     *,
     input_path: Path,
     sheet: str | int,
-    template: str,
+    requested_template_id: str,
+    canonical_template_id: str,
     output_dir: Path,
     outputs: list[Path],
     preview_outputs: list[Path],
@@ -310,15 +327,16 @@ def bundle_manifest_payload(
     output_entries = [_file_entry(path) for path in outputs]
     preview_entries = [_file_entry(path) for path in preview_outputs]
     artifact_entries = [_file_entry(path) for path in artifact_paths]
-    template_data = _template_layer(template)
-    mapping_data = _mapping_layer(template, inspection)
+    template_data = _template_layer(requested_template_id)
+    mapping_data = _mapping_layer(requested_template_id, canonical_template_id, inspection)
     theme_data = _theme_layer(options)
     contract_data = _contract_layer()
     run_fingerprint = _sha256_text(
         _run_fingerprint_payload(
             input_entry=input_data,
             sheet=sheet,
-            template=template,
+            requested_template_id=requested_template_id,
+            canonical_template_id=canonical_template_id,
             options=options,
             output_entries=output_entries,
             preview_entries=preview_entries,
@@ -331,7 +349,9 @@ def bundle_manifest_payload(
         "generated_at": generated_at,
         "input_path": str(input_path),
         "sheet": sheet,
-        "template": template,
+        "template": requested_template_id,
+        "requested_template_id": requested_template_id,
+        "canonical_template_id": canonical_template_id,
         "output_dir": str(output_dir),
         "outputs": [str(path) for path in outputs],
         "preview_outputs": [str(path) for path in preview_outputs],

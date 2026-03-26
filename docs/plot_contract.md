@@ -112,6 +112,16 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
+### `violin_box` / Violin + box
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Violin distribution with a compact box-summary overlay.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: `dense_group_label_warning`
+
 ### `grouped_bar_compare` / Grouped bar compare
 
 - Category: `single_panel`
@@ -129,6 +139,16 @@
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `style_preset`, `palette_preset`
 - Description: Grouped bar means with deterministic error bars and raw-point overlays.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: `dense_group_label_warning`
+
+### `point_error` / Point + error
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Group means as points with deterministic error bars and optional raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
@@ -172,7 +192,27 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
 
+### `scatter_fit` / Scatter fit
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Description: Single-panel scatter plot with a deterministic linear fit overlay.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: None
+
 ### `replicate_curves_with_band` / Replicate curves with band
+
+- Category: `single_panel`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Description: Single-panel curve plot with a replicate mean band overlay.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: None
+
+### `mean_band` / Mean band
 
 - Category: `single_panel`
 - Default size: `60x55`

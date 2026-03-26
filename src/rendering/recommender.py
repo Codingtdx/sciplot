@@ -6,6 +6,7 @@ from typing import Any, Final
 from src.plot_contract import default_options_for_template, default_size_for_template
 from src.rendering.dataset_models import NormalizedDataset
 from src.rendering.recommender_models import TemplateRecommendation, TemplateRecommender
+from src.rendering.template_lifecycle import alias_recommendation_penalty, template_identity
 from src.text_normalization import canonicalize_token
 from src.wide_nmr import wide_nmr_sidecar_path
 
@@ -25,15 +26,19 @@ _BUNDLE_MODELS: Final[set[str]] = {
 _CURVE_TEMPLATE_IDS: Final[tuple[str, ...]] = (
     "curve",
     "point_line",
+    "mean_band",
     "replicate_curves_with_band",
     "stacked_curve",
     "segmented_stacked_curve",
     "scatter",
+    "scatter_fit",
     "scatter_with_fit",
 )
 _REP_TEMPLATE_IDS: Final[tuple[str, ...]] = (
     "distribution_compare",
     "box_strip",
+    "violin_box",
+    "point_error",
     "grouped_bar_error",
     "grouped_bar_compare",
     "histogram_density",
@@ -70,6 +75,7 @@ def legacy_recommendation_to_template_recommendation(
     palette_preset: str | None,
     use_sidecar: bool | None,
 ) -> TemplateRecommendation:
+    identity = template_identity(template_id)
     return TemplateRecommendation(
         template_id=template_id,
         score=_LEGACY_SCORE,
@@ -92,6 +98,10 @@ def legacy_recommendation_to_template_recommendation(
             "palette_preset": palette_preset,
             "use_sidecar": use_sidecar,
         },
+        canonical_id=identity.canonical_id,
+        role=identity.role,
+        lifecycle_policy=identity.lifecycle_policy,
+        implementation_id=identity.implementation_id,
     )
 
 
@@ -251,10 +261,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
     segmented_score = 63.0
     scatter_score = 67.0
     scatter_fit_score = 69.0
+    scatter_with_fit_score = 61.0
     replicate_band_score = 66.0
     curve_soft = ["Compact paired curves are the safest default."]
     point_line_soft = ["Markers make paired observations easier to scan."]
     scatter_fit_soft = ["A deterministic linear fit can summarize trend direction without changing raw points."]
+    scatter_with_fit_soft = ["scatter_with_fit remains available as a compatibility variant of fitted scatter."]
     replicate_band_soft = ["A mean-with-band overlay can summarize replicate spread across aligned curves."]
     stacked_soft = ["Offsets help compare several aligned samples without overplotting."]
     segmented_soft = ["Segmented stacks keep grouped traces separated."]
@@ -268,10 +280,14 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         segmented_score -= 8.0
         replicate_band_score += 10.0
         scatter_fit_score += 8.0
+        scatter_with_fit_score += 7.0
         curve_soft.append("Tensile curves stay linear and compact by default.")
         point_line_soft.append("Markers still help when tensile samples are sparse.")
         scatter_soft.append("Scatter can help when the tensile points need to stay separate.")
         scatter_fit_soft.append("Tensile stress-strain trends often benefit from a simple fit overlay.")
+        scatter_with_fit_soft.append(
+            "Tensile stress-strain trends also support the compatibility fitted-scatter variant."
+        )
         replicate_band_soft.append("Aligned tensile replicates often benefit from a mean band summary.")
         stacked_soft.append("Stacked traces are less natural for tensile stress-strain data.")
         segmented_soft.append("Segmented stacks are overkill for tensile stress-strain data.")
@@ -282,10 +298,14 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         point_line_score -= 2.0
         scatter_score -= 2.0
         scatter_fit_score -= 2.0
+        scatter_with_fit_score -= 3.0
         replicate_band_score -= 4.0
         segmented_soft.append("The .wide_nmr sidecar marks this as a segmented stacked curve workflow.")
         stacked_soft.append("The sidecar keeps grouped traces readable as stacked spectra.")
         scatter_fit_soft.append("Segmented spectra workflows usually favor stacked views over fitted scatter.")
+        scatter_with_fit_soft.append(
+            "Segmented spectra workflows usually favor stacked views over compatibility fitted scatter."
+        )
         replicate_band_soft.append("Segmented spectra workflows usually favor stacked views over mean bands.")
     elif is_nmr_like:
         stacked_score += 18.0
@@ -294,10 +314,12 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         point_line_score -= 2.0
         scatter_score -= 4.0
         scatter_fit_score -= 5.0
+        scatter_with_fit_score -= 6.0
         replicate_band_score -= 6.0
         stacked_soft.append("Chemical shift / ppm data reads best as stacked spectra.")
         segmented_soft.append("The same spectral family can be separated with a segmented stack.")
         scatter_fit_soft.append("NMR-like spectra generally do not benefit from linear trend overlays.")
+        scatter_with_fit_soft.append("NMR-like spectra generally do not need compatibility fitted-scatter overlays.")
         replicate_band_soft.append("NMR-like spectra are usually better compared through stacked layouts.")
     elif is_ftir_like:
         stacked_score += 16.0
@@ -305,27 +327,33 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         point_line_score += 1.0
         scatter_score -= 2.0
         scatter_fit_score -= 3.0
+        scatter_with_fit_score -= 4.0
         replicate_band_score -= 2.0
         stacked_soft.append("Wavenumber / cm^-1 data is easier to compare as stacked spectra.")
         scatter_fit_soft.append("FTIR-like spectra usually prioritize trace shape over fitted trends.")
+        scatter_with_fit_soft.append("FTIR-like spectra typically do not need compatibility fitted overlays.")
         replicate_band_soft.append("FTIR-like spectra usually prioritize stacked readability over mean bands.")
     elif is_dsc_like:
         stacked_score += 14.0
         curve_score += 2.0
         point_line_score += 1.0
         scatter_fit_score -= 1.0
+        scatter_with_fit_score -= 2.0
         replicate_band_score += 1.0
         stacked_soft.append("Heat flow traces are usually read as stacked thermal curves.")
         scatter_fit_soft.append("Thermal traces are usually interpreted as curves before fit overlays.")
+        scatter_with_fit_soft.append("Thermal traces usually keep fitted overlays as secondary compatibility choices.")
         replicate_band_soft.append("Thermal replicate sweeps can benefit from a mean band summary.")
     elif is_xrd_like:
         stacked_score += 14.0
         curve_score += 2.0
         point_line_score += 1.0
         scatter_fit_score -= 2.0
+        scatter_with_fit_score -= 3.0
         replicate_band_score -= 1.0
         stacked_soft.append("2theta / intensity traces are easier to compare as stacked spectra.")
         scatter_fit_soft.append("XRD-like traces usually prioritize spectral shape over fitted trends.")
+        scatter_with_fit_soft.append("XRD-like traces usually keep compatibility fitted overlays as secondary.")
         replicate_band_soft.append("XRD-like traces usually prioritize stacked readability over mean bands.")
     else:
         if series_count <= 2:
@@ -333,10 +361,14 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             point_line_score += 3.0
             scatter_score += 1.0
             scatter_fit_score += 5.0
+            scatter_with_fit_score += 4.0
             replicate_band_score -= 1.0
             curve_soft.append("A small number of series keeps the compact curve easy to read.")
             point_line_soft.append("A small number of series also benefits from visible markers.")
             scatter_fit_soft.append("Fewer series make a fit overlay easier to read and explain.")
+            scatter_with_fit_soft.append(
+                "Compatibility fitted scatter stays usable when only a few series are present."
+            )
             replicate_band_soft.append("A mean band is available but often unnecessary with very few series.")
         if series_count >= 4:
             stacked_score += 4.0
@@ -344,9 +376,24 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             curve_score += 1.0
             replicate_band_score += 8.0
             scatter_fit_score -= 1.0
+            scatter_with_fit_score -= 2.0
             stacked_soft.append("Several series make overplotting more likely, so offsets help.")
             replicate_band_soft.append("More replicate series make a mean band overlay more informative.")
             scatter_fit_soft.append("Many traces can make fitted overlays visually crowded.")
+            scatter_with_fit_soft.append("Compatibility fitted overlays can become crowded with many traces.")
+
+    mean_band_score = replicate_band_score + 1.0
+    mean_band_soft = list(replicate_band_soft) + [
+        "mean_band keeps the same replicate-summary behavior under the canonical template id."
+    ]
+    scatter_with_fit_score = min(
+        scatter_with_fit_score,
+        scatter_fit_score - alias_recommendation_penalty("scatter_with_fit"),
+    )
+    replicate_band_score = min(
+        replicate_band_score,
+        mean_band_score - alias_recommendation_penalty("replicate_curves_with_band"),
+    )
 
     candidates = (
         _build_candidate(
@@ -374,6 +421,19 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             dataset=dataset,
         ),
         _build_candidate(
+            template_id="mean_band",
+            score=mean_band_score,
+            why_hard_match=hard,
+            why_soft_prior=mean_band_soft,
+            inferred_mapping={
+                "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+                "sample": dataset.candidate_roles.sample[0] if dataset.candidate_roles.sample else "",
+            },
+            optional_enhancements=["Use curve when you need the raw traces without the summary band."],
+            dataset=dataset,
+        ),
+        _build_candidate(
             template_id="replicate_curves_with_band",
             score=replicate_band_score,
             why_hard_match=hard,
@@ -383,7 +443,7 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
                 "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
                 "sample": dataset.candidate_roles.sample[0] if dataset.candidate_roles.sample else "",
             },
-            optional_enhancements=["Use curve when you need the raw traces without the summary band."],
+            optional_enhancements=["Use mean_band for the canonical replicate-band template id."],
             dataset=dataset,
         ),
         _build_candidate(
@@ -423,7 +483,7 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             dataset=dataset,
         ),
         _build_candidate(
-            template_id="scatter_with_fit",
+            template_id="scatter_fit",
             score=scatter_fit_score,
             why_hard_match=hard,
             why_soft_prior=scatter_fit_soft,
@@ -432,6 +492,18 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
                 "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
             },
             optional_enhancements=["Use scatter when you want points without the fit overlay."],
+            dataset=dataset,
+        ),
+        _build_candidate(
+            template_id="scatter_with_fit",
+            score=scatter_with_fit_score,
+            why_hard_match=hard,
+            why_soft_prior=scatter_with_fit_soft,
+            inferred_mapping={
+                "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+            },
+            optional_enhancements=["Use scatter_fit for the canonical fitted-scatter template id."],
             dataset=dataset,
         ),
     )
@@ -450,101 +522,132 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
 
     distribution_score = 82.0
     grouped_bar_error_score = 72.0
+    point_error_score = 73.0
     histogram_density_score = 68.0
     box_score = 78.0
     box_strip_score = 77.0
+    violin_box_score = 73.0
     violin_score = 74.0
     bar_score = 70.0
     distribution_soft = [
         "distribution_compare stays as one structural family in v1 with deterministic internal variants."
     ]
     grouped_bar_error_soft = ["Grouped bars with error bars keep cross-group mean differences explicit."]
+    point_error_soft = ["Point + error keeps group means and uncertainty visible without bar area fill."]
     histogram_density_soft = ["Histogram with density overlays highlights overlap between groups."]
     box_soft = ["Box plots keep medians and spread readable with minimal visual noise."]
     box_strip_soft = ["Box + strip keeps spread summaries while exposing individual replicate points."]
+    violin_box_soft = ["Violin + box combines density shape with a compact box-summary overlay."]
     violin_soft = ["Violin plots reveal distribution shape when replicate density is sufficient."]
     bar_soft = ["Bar charts keep simple group means easy to compare."]
 
     if group_count <= 3:
         grouped_bar_error_score += 4.0
+        point_error_score += 5.0
         histogram_density_score += 2.0
         distribution_score -= 2.0
         bar_score += 2.0
         box_score += 2.0
         box_strip_score += 2.0
+        violin_box_score += 1.0
         violin_score -= 1.0
         grouped_bar_error_soft.append("A small number of groups keeps grouped bars compact and readable.")
+        point_error_soft.append("A small number of groups keeps point+error markers compact and readable.")
         histogram_density_soft.append("Fewer groups keep overlap in histogram densities legible.")
         distribution_soft.append("With few groups, distribution compare can still default to a compact variant.")
         bar_soft.append("Few groups keep bar labels compact and readable.")
         box_strip_soft.append("Few groups keep strip overlays clean without clutter.")
+        violin_box_soft.append("Few groups keep violin+box overlays compact and readable.")
     if group_count >= 5:
         distribution_score += 4.0
         grouped_bar_error_score -= 2.0
+        point_error_score -= 1.0
         histogram_density_score -= 2.0
         box_score += 4.0
         box_strip_score += 1.0
+        violin_box_score += 2.0
         violin_score += 6.0
         bar_score -= 4.0
         distribution_soft.append("Many groups benefit from a deterministic distribution-first comparison view.")
         grouped_bar_error_soft.append("Many groups can make grouped bars visually dense.")
+        point_error_soft.append("Many groups can still remain readable with compact point+error markers.")
         histogram_density_soft.append("Many groups can make density overlays visually crowded.")
         box_soft.append("Many groups make box summaries more legible than bars.")
         box_strip_soft.append("Many groups still remain traceable when replicate points are visible.")
+        violin_box_soft.append("Many groups still retain shape cues with compact box overlays.")
         violin_soft.append("More groups make the density shape more informative.")
 
     if "replicate_sparse_replicates" in quality_flags:
         distribution_score -= 5.0
         grouped_bar_error_score += 3.0
+        point_error_score += 4.0
         histogram_density_score -= 10.0
         box_score += 3.0
         box_strip_score += 3.0
+        violin_box_score += 1.0
         violin_score -= 2.0
         bar_score += 2.0
         distribution_soft.append("Sparse replicate counts favor simpler spread summaries over density-heavy variants.")
         grouped_bar_error_soft.append(
             "Sparse replicates keep grouped means easier to read than detailed distributions."
         )
+        point_error_soft.append("Sparse replicates still read well with explicit mean points and error bars.")
         histogram_density_soft.append("Sparse replicate counts make histogram-density overlays unstable.")
         box_soft.append("Box summaries stay robust when replicate counts are low.")
         box_strip_soft.append("Sparse replicates benefit from explicit point overlays on top of box summaries.")
+        violin_box_soft.append("Sparse replicates can still use violin+box as a balanced spread summary.")
         bar_soft.append("Simple mean comparisons remain readable with sparse replicates.")
 
     if "replicate_singleton_groups" in quality_flags:
         distribution_score -= 4.0
         grouped_bar_error_score += 2.0
+        point_error_score += 2.0
         histogram_density_score -= 8.0
         violin_score -= 6.0
         box_score += 2.0
         box_strip_score += 2.0
+        violin_box_score -= 1.0
         distribution_soft.append("At least one group has very few replicates, so robust summaries are preferred.")
         histogram_density_soft.append("Singleton-like groups reduce the reliability of smoothed density overlays.")
         violin_soft.append("Very low group replicate counts reduce violin-shape reliability.")
         box_strip_soft.append("Visible strip points make singleton-like groups explicit.")
+        violin_box_soft.append("Very low replicate counts reduce violin-shape confidence even with box overlays.")
+        point_error_soft.append("Point+error keeps singleton-like groups explicit while preserving uncertainty cues.")
 
     if "replicate_highly_discrete" in quality_flags:
         histogram_density_score -= 8.0
         distribution_score += 1.0
         grouped_bar_error_score += 2.0
+        point_error_score += 2.0
         box_score += 2.0
         box_strip_score += 2.0
+        violin_box_score += 1.0
         histogram_density_soft.append("Highly discrete values can make histogram-density overlays blocky.")
         distribution_soft.append(
             "Discrete-valued groups still compare well through deterministic distribution summaries."
         )
         box_soft.append("Discrete-valued replicates remain clear in box summaries.")
         box_strip_soft.append("Discrete replicates stay interpretable when each point remains visible.")
+        violin_box_soft.append("Discrete groups keep both shape and quartile cues in violin+box overlays.")
+        point_error_soft.append("Discrete replicates stay readable with uncluttered mean/error markers.")
     if estimated_points >= 24:
         histogram_density_score += 8.0
         distribution_score += 2.0
         box_strip_score += 1.0
+        violin_box_score += 2.0
+        point_error_score += 1.0
         histogram_density_soft.append("Higher replicate counts make histogram density overlays more informative.")
         distribution_soft.append("Higher replicate counts make robust distribution comparison more reliable.")
     elif estimated_points < 10:
         histogram_density_score -= 6.0
         histogram_density_soft.append("Very sparse replicate counts reduce histogram-density reliability.")
         box_strip_score -= 1.0
+        violin_box_score -= 1.0
+        point_error_score -= 1.0
         box_strip_soft.append("Very sparse replicates reduce the benefit of strip overlays.")
+        point_error_soft.append(
+            "Very sparse replicates reduce uncertainty precision, but point+error remains interpretable."
+        )
     if estimated_points >= 12:
         violin_score += 4.0
         violin_soft.append("More replicate points make the distribution shape clearer.")
@@ -565,6 +668,18 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                     dataset=dataset,
                 ),
                 _build_candidate(
+                    template_id="violin_box",
+                    score=violin_box_score,
+                    why_hard_match=hard,
+                    why_soft_prior=violin_box_soft,
+                    inferred_mapping={
+                        "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
+                        "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
+                    },
+                    optional_enhancements=["Use violin when you need shape emphasis without box overlays."],
+                    dataset=dataset,
+                ),
+                _build_candidate(
                     template_id="distribution_compare",
                     score=distribution_score,
                     why_hard_match=hard,
@@ -576,6 +691,18 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                     optional_enhancements=[
                         "The renderer chooses a deterministic internal variant (box / violin / strip+box)."
                     ],
+                    dataset=dataset,
+                ),
+                _build_candidate(
+                    template_id="point_error",
+                    score=point_error_score,
+                    why_hard_match=hard,
+                    why_soft_prior=point_error_soft,
+                    inferred_mapping={
+                        "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
+                        "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
+                    },
+                    optional_enhancements=["Use grouped_bar_error when filled group bars are required."],
                     dataset=dataset,
                 ),
                 _build_candidate(
@@ -698,22 +825,29 @@ def _recommendations_for_dataset(dataset: NormalizedDataset) -> tuple[TemplateRe
     else:
         candidates = _curve_candidates(dataset)
     top_score = candidates[0].score if candidates else 0.0
-    return tuple(
-        TemplateRecommendation(
-            template_id=candidate.template_id,
-            score=candidate.score,
-            rank=index + 1,
-            score_gap_to_top=round(max(0.0, top_score - candidate.score), 1),
-            reason=candidate.reason,
-            suitability_hint=candidate.suitability_hint,
-            why_hard_match=candidate.why_hard_match,
-            why_soft_prior=candidate.why_soft_prior,
-            inferred_mapping=candidate.inferred_mapping,
-            optional_enhancements=candidate.optional_enhancements,
-            preview_config_summary=candidate.preview_config_summary,
+    ranked: list[TemplateRecommendation] = []
+    for index, candidate in enumerate(candidates):
+        identity = template_identity(candidate.template_id)
+        ranked.append(
+            TemplateRecommendation(
+                template_id=candidate.template_id,
+                score=candidate.score,
+                rank=index + 1,
+                score_gap_to_top=round(max(0.0, top_score - candidate.score), 1),
+                reason=candidate.reason,
+                suitability_hint=candidate.suitability_hint,
+                why_hard_match=candidate.why_hard_match,
+                why_soft_prior=candidate.why_soft_prior,
+                inferred_mapping=candidate.inferred_mapping,
+                optional_enhancements=candidate.optional_enhancements,
+                preview_config_summary=candidate.preview_config_summary,
+                canonical_id=identity.canonical_id,
+                role=identity.role,
+                lifecycle_policy=identity.lifecycle_policy,
+                implementation_id=identity.implementation_id,
+            )
         )
-        for index, candidate in enumerate(candidates)
-    )
+    return tuple(ranked)
 
 
 class RuleBasedDatasetRecommender:

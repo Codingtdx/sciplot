@@ -5,6 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import transforms
 
 from src import (
     mpl_backend,  # noqa: F401
@@ -26,7 +27,7 @@ from src.plotting_families.curve_family import plot_curves, plot_scatter
 from src.plotting_families.heatmap_family import plot_heatmap
 from src.plotting_families.layout_helpers import compute_shared_curve_x_layout
 from src.plotting_families.spectral_family import plot_wide_nmr
-from src.plotting_families.stats_family import plot_bar, plot_box, plot_violin
+from src.plotting_families.stats_family import plot_bar, plot_box, plot_point_error, plot_violin
 from src.rendering.cache import (
     load_curve_table_cached,
     load_heatmap_table_cached,
@@ -90,6 +91,15 @@ class CompactCurveEditorialProfile:
     legend_handletextpad: float
     legend_columnspacing: float
     legend_borderpad: float
+
+
+@dataclass(frozen=True)
+class HeatmapCellLabelPlacement:
+    x: float
+    y: float
+    text: str
+    color: str
+    fontsize: float
 
 
 def _rendered_plot_with_qa(
@@ -1251,6 +1261,39 @@ def _render_grouped_bar_error(input_path: Path, sheet: str | int, options: Rende
     )
 
 
+def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+    stats_profile = _stats_profile(groups)
+    fig, _ = plot_point_error(
+        groups,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        point_spacing_width=max(0.22, stats_profile.bar_width * 0.85),
+        spacing_scale=max(1.0, stats_profile.spacing_scale),
+        capsize=stats_profile.capsize,
+        marker_size_pt=max(4.2, plot_style.current_stroke().marker_size_pt * 0.9),
+        show_raw_points=stats_profile.show_raw_points,
+        raw_point_size=stats_profile.raw_point_size,
+        raw_point_alpha=stats_profile.raw_point_alpha,
+    )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_point_error.pdf",
+            figure=fig,
+            template="point_error",
+            options=options,
+            autofixes_applied=(
+                "stats_spacing_profile",
+                "point_error_capsize_profile",
+                "point_error_profile",
+            )
+            + (("point_error_raw_points_overlay",) if stats_profile.show_raw_points else ()),
+        )
+    ]
+
+
 def _render_grouped_bar_error_like(
     input_path: Path,
     sheet: str | int,
@@ -1302,6 +1345,31 @@ def _emphasize_strip_point_overlay(
         if sizes.size:
             collection.set_sizes(np.maximum(sizes, min_size))
         collection.set_alpha(max(float(collection.get_alpha() or 0.0), min_alpha))
+
+
+def _overlay_violin_box_summary(
+    ax: plt.Axes,
+    *,
+    groups,
+    positions: np.ndarray,
+    box_width: float,
+) -> None:
+    values = [group.data.to_numpy(dtype=float) for group in groups]
+    box = ax.boxplot(
+        values,
+        positions=positions,
+        widths=box_width,
+        patch_artist=True,
+        showfliers=False,
+        medianprops={"color": "black", "linewidth": max(1.0, plot_style.current_stroke().line_width_pt)},
+        whiskerprops={"linewidth": 0.95, "color": "black"},
+        capprops={"linewidth": 0.95, "color": "black"},
+        boxprops={"linewidth": 0.95, "color": "black"},
+    )
+    for patch in box["boxes"]:
+        patch.set_facecolor("none")
+        patch.set_alpha(1.0)
+        patch.set_edgecolor("black")
 
 
 def _distribution_compare_variant(groups) -> tuple[str, str]:
@@ -1390,6 +1458,41 @@ def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions
     ]
 
 
+def _render_violin_box(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = load_replicate_table_cached(input_path, sheet)
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+    stats_profile = _stats_profile(groups)
+    fig, ax = plot_violin(
+        groups,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        violin_width=stats_profile.violin_width,
+        spacing_scale=stats_profile.spacing_scale,
+    )
+    positions = np.asarray(ax.get_xticks(), dtype=float)
+    if positions.size == len(groups):
+        _overlay_violin_box_summary(
+            ax,
+            groups=groups,
+            positions=positions,
+            box_width=max(0.16, stats_profile.violin_width * 0.42),
+        )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_violin_box.pdf",
+            figure=fig,
+            template="violin_box",
+            options=options,
+            autofixes_applied=(
+                "stats_spacing_profile",
+                "violin_box_overlay",
+                "violin_box_profile",
+            ),
+        )
+    ]
+
+
 def _gaussian_density(values: np.ndarray, x_grid: np.ndarray) -> np.ndarray:
     if values.size == 0:
         return np.zeros_like(x_grid)
@@ -1402,6 +1505,205 @@ def _gaussian_density(values: np.ndarray, x_grid: np.ndarray) -> np.ndarray:
     z = (x_grid[:, None] - values[None, :]) / bandwidth
     kernel = np.exp(-0.5 * z * z) / np.sqrt(2.0 * np.pi)
     return kernel.mean(axis=1) / bandwidth
+
+
+def _probe_heatmap_cell_text_bbox(
+    ax: plt.Axes,
+    *,
+    renderer: object,
+    x: float,
+    y: float,
+    text: str,
+    fontsize: float,
+) -> transforms.Bbox:
+    probe = ax.text(
+        x,
+        y,
+        text,
+        ha="center",
+        va="center",
+        fontsize=fontsize,
+        alpha=0.0,
+        clip_on=True,
+        zorder=4.2,
+    )
+    bbox = probe.get_window_extent(renderer=renderer)
+    probe.remove()
+    return bbox
+
+
+def _heatmap_cell_display_bbox(ax: plt.Axes, *, x_idx: int, y_idx: int) -> transforms.Bbox:
+    p0 = ax.transData.transform((float(x_idx), float(y_idx)))
+    p1 = ax.transData.transform((float(x_idx + 1), float(y_idx + 1)))
+    left = min(float(p0[0]), float(p1[0]))
+    right = max(float(p0[0]), float(p1[0]))
+    bottom = min(float(p0[1]), float(p1[1]))
+    top = max(float(p0[1]), float(p1[1]))
+    return transforms.Bbox.from_extents(left, bottom, right, top)
+
+
+def _overflow_against_cell(text_bbox: transforms.Bbox, cell_bbox: transforms.Bbox) -> float:
+    overflow = 0.0
+    overflow += max(0.0, cell_bbox.x0 - text_bbox.x0)
+    overflow += max(0.0, text_bbox.x1 - cell_bbox.x1)
+    overflow += max(0.0, cell_bbox.y0 - text_bbox.y0)
+    overflow += max(0.0, text_bbox.y1 - cell_bbox.y1)
+    norm = max(cell_bbox.width + cell_bbox.height, 1.0)
+    return overflow / norm
+
+
+def _format_heatmap_cell_value(value: float, *, fmt: str) -> str:
+    return f"{value:{fmt}}"
+
+
+def _choose_annotated_heatmap_label_plan(
+    *,
+    fig: plt.Figure,
+    ax: plt.Axes,
+    values: np.ndarray,
+    mid: float,
+) -> tuple[list[HeatmapCellLabelPlacement], str]:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    finite_cells = [
+        (y_idx, x_idx, float(values[y_idx, x_idx]))
+        for y_idx in range(values.shape[0])
+        for x_idx in range(values.shape[1])
+        if np.isfinite(values[y_idx, x_idx])
+    ]
+    if not finite_cells:
+        record_layout_decision(
+            fig,
+            empty_layout_decision("annotation_textbox", reason="no_finite_heatmap_cells"),
+            context={
+                "path": "annotated_heatmap_cell_labels",
+                "phase": "candidate_selection",
+                "annotation_kind": "heatmap_cell_labels",
+                "matrix_shape": [int(values.shape[0]), int(values.shape[1])],
+                "finite_cells": 0,
+            },
+        )
+        return [], "labels_none"
+
+    candidates = [
+        LayoutCandidate(
+            candidate_id="labels_full",
+            payload={"fmt": ".3g", "fontsize": 5.2, "checkerboard": False, "bias": 0.0},
+            notes="full precision per-cell labels",
+        ),
+        LayoutCandidate(
+            candidate_id="labels_compact",
+            payload={"fmt": ".2g", "fontsize": 4.8, "checkerboard": False, "bias": 0.8},
+            notes="compact precision per-cell labels",
+        ),
+        LayoutCandidate(
+            candidate_id="labels_small",
+            payload={"fmt": ".2g", "fontsize": 4.4, "checkerboard": False, "bias": 1.2},
+            notes="small-font per-cell labels",
+        ),
+        LayoutCandidate(
+            candidate_id="labels_checkerboard",
+            payload={"fmt": ".2g", "fontsize": 4.8, "checkerboard": True, "bias": 2.8},
+            notes="checkerboard fallback for dense matrices",
+        ),
+    ]
+    plan_cache: dict[str, list[HeatmapCellLabelPlacement]] = {}
+
+    def _score(candidate: LayoutCandidate) -> LayoutScore:
+        payload = candidate.payload if isinstance(candidate.payload, dict) else {}
+        fmt = str(payload.get("fmt", ".3g"))
+        fontsize = float(payload.get("fontsize", 5.2))
+        checkerboard = bool(payload.get("checkerboard", False))
+        bias = float(payload.get("bias", 0.0))
+
+        placements: list[HeatmapCellLabelPlacement] = []
+        placed_bboxes: list[transforms.Bbox] = []
+        overflow_total = 0.0
+        overlap_count = 0
+        hidden_count = 0
+
+        for y_idx, x_idx, value in finite_cells:
+            if checkerboard and ((x_idx + y_idx) % 2 == 1):
+                hidden_count += 1
+                continue
+            text_value = _format_heatmap_cell_value(value, fmt=fmt)
+            text_bbox = _probe_heatmap_cell_text_bbox(
+                ax,
+                renderer=renderer,
+                x=float(x_idx + 0.5),
+                y=float(y_idx + 0.5),
+                text=text_value,
+                fontsize=fontsize,
+            )
+            cell_bbox = _heatmap_cell_display_bbox(ax, x_idx=x_idx, y_idx=y_idx)
+            overflow_total += _overflow_against_cell(text_bbox, cell_bbox)
+            expanded = text_bbox.expanded(1.03, 1.10)
+            if any(expanded.overlaps(other) for other in placed_bboxes):
+                overlap_count += 1
+            placed_bboxes.append(expanded)
+            placements.append(
+                HeatmapCellLabelPlacement(
+                    x=float(x_idx + 0.5),
+                    y=float(y_idx + 0.5),
+                    text=text_value,
+                    color="white" if value >= mid else "black",
+                    fontsize=fontsize,
+                )
+            )
+
+        if not placements:
+            return LayoutScore(score=1_000_000_000.0, blocked=True, reason="no_visible_labels")
+
+        shown = len(placements)
+        total = len(finite_cells)
+        overlap_ratio = overlap_count / shown
+        overflow_ratio = overflow_total / shown
+        hidden_ratio = hidden_count / total
+        score = overlap_ratio * 260.0 + overflow_ratio * 62.0 + hidden_ratio * 28.0 + bias
+        reason = (
+            f"shown={shown}/{total}; overlap_ratio={overlap_ratio:.3f}; "
+            f"overflow_ratio={overflow_ratio:.3f}; hidden_ratio={hidden_ratio:.3f}; bias={bias:.3f}"
+        )
+        plan_cache[candidate.candidate_id] = placements
+        return LayoutScore(score=float(score), reason=reason)
+
+    decision = choose_layout_candidate(
+        object_kind="annotation_textbox",
+        candidates=candidates,
+        score_hook=_score,
+    )
+    if decision.chosen_candidate is None:
+        record_layout_decision(
+            fig,
+            empty_layout_decision("annotation_textbox", reason="no_viable_heatmap_label_strategy"),
+            context={
+                "path": "annotated_heatmap_cell_labels",
+                "phase": "candidate_selection",
+                "annotation_kind": "heatmap_cell_labels",
+                "matrix_shape": [int(values.shape[0]), int(values.shape[1])],
+                "finite_cells": int(len(finite_cells)),
+            },
+        )
+        return [], "labels_none"
+    strategy_id = decision.chosen_candidate.candidate_id
+    if strategy_id != "labels_full":
+        decision = flag_margin_fallback(
+            decision,
+            action=f"heatmap_label_strategy:{strategy_id}",
+            reason="default full-label strategy was not optimal for this matrix density",
+        )
+    record_layout_decision(
+        fig,
+        decision,
+        context={
+            "path": "annotated_heatmap_cell_labels",
+            "phase": "candidate_selection",
+            "annotation_kind": "heatmap_cell_labels",
+            "matrix_shape": [int(values.shape[0]), int(values.shape[1])],
+            "finite_cells": int(len(finite_cells)),
+        },
+    )
+    return plan_cache.get(strategy_id, []), strategy_id
 
 
 def _render_histogram_density(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
@@ -1529,13 +1831,20 @@ def _fit_line_xy(series_list) -> tuple[np.ndarray, np.ndarray, str]:
     return x_line, y_line, f"fit: y = {slope:.3g}x + {intercept:.3g}"
 
 
-def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+def _render_scatter_fit_like(
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+    *,
+    template: str,
+    filename_suffix: str,
+) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
     rendered = _render_curve_like_plot(
-        filename=f"{input_path.stem}_scatter_with_fit.pdf",
-        template="scatter_with_fit",
+        filename=f"{input_path.stem}_{filename_suffix}.pdf",
+        template=template,
         series_list=series_list,
         options=options,
         show_markers=False,
@@ -1560,7 +1869,7 @@ def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: Render
     rendered = _rendered_plot_with_qa(
         filename=rendered.filename,
         figure=rendered.figure,
-        template="scatter_with_fit",
+        template=template,
         options=options,
         autofixes_applied=(
             tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
@@ -1570,21 +1879,44 @@ def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: Render
     return [rendered]
 
 
-def _render_replicate_curves_with_band(
+def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_scatter_fit_like(
+        input_path,
+        sheet,
+        options,
+        template="scatter_with_fit",
+        filename_suffix="scatter_with_fit",
+    )
+
+
+def _render_scatter_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_scatter_fit_like(
+        input_path,
+        sheet,
+        options,
+        template="scatter_fit",
+        filename_suffix="scatter_fit",
+    )
+
+
+def _render_replicate_band_like(
     input_path: Path,
     sheet: str | int,
     options: RenderOptions,
+    *,
+    template: str,
+    filename_suffix: str,
 ) -> list[RenderedPlot]:
     normalized_dataset = build_normalized_dataset(input_path, sheet)
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        raise ValueError("replicate_curves_with_band is not supported for rheology export bundles.")
+        raise ValueError(f"{template} is not supported for rheology export bundles.")
 
     series_list = load_curve_table_cached(input_path, sheet)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
     rendered = _render_curve_like_plot(
-        filename=f"{input_path.stem}_replicate_curves_with_band.pdf",
-        template="replicate_curves_with_band",
+        filename=f"{input_path.stem}_{filename_suffix}.pdf",
+        template=template,
         series_list=series_list,
         options=options,
         show_markers=False,
@@ -1619,7 +1951,7 @@ def _render_replicate_curves_with_band(
     rendered = _rendered_plot_with_qa(
         filename=rendered.filename,
         figure=rendered.figure,
-        template="replicate_curves_with_band",
+        template=template,
         options=options,
         autofixes_applied=(
             tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
@@ -1627,6 +1959,30 @@ def _render_replicate_curves_with_band(
         + ("replicate_mean_band_overlay",),
     )
     return [rendered]
+
+
+def _render_replicate_curves_with_band(
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+) -> list[RenderedPlot]:
+    return _render_replicate_band_like(
+        input_path,
+        sheet,
+        options,
+        template="replicate_curves_with_band",
+        filename_suffix="replicate_curves_with_band",
+    )
+
+
+def _render_mean_band(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_replicate_band_like(
+        input_path,
+        sheet,
+        options,
+        template="mean_band",
+        filename_suffix="mean_band",
+    )
 
 
 def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
@@ -1678,32 +2034,36 @@ def _render_annotated_heatmap(input_path: Path, sheet: str | int, options: Rende
         colorbar_label_gap_pt=layout.label_gap_pt,
     )
     matrix = table.data.pivot(index="y", columns="x", values="z")
-    row_labels = list(matrix.index.tolist())
-    col_labels = list(matrix.columns.tolist())
     values = matrix.to_numpy(dtype=float)
     if values.size:
         finite = values[np.isfinite(values)]
         mid = float(np.median(finite)) if finite.size else 0.0
     else:
         mid = 0.0
-    for y_idx, _ in enumerate(row_labels):
-        for x_idx, _ in enumerate(col_labels):
-            value = values[y_idx, x_idx]
-            if not np.isfinite(value):
-                continue
-            ax.text(
-                x_idx + 0.5,
-                y_idx + 0.5,
-                f"{value:.3g}",
-                ha="center",
-                va="center",
-                fontsize=5.2,
-                color="white" if value >= mid else "black",
-                zorder=4.2,
-            )
+    placements, strategy_id = _choose_annotated_heatmap_label_plan(
+        fig=fig,
+        ax=ax,
+        values=values,
+        mid=mid,
+    )
+    for placement in placements:
+        ax.text(
+            placement.x,
+            placement.y,
+            placement.text,
+            ha="center",
+            va="center",
+            fontsize=placement.fontsize,
+            color=placement.color,
+            zorder=4.2,
+            clip_on=True,
+        )
     ax.set_xlabel(_format_axis_label(table.x_label, table.x_unit))
     ax.set_ylabel(_format_axis_label(table.y_label, table.y_unit))
     autofixes = ["annotated_heatmap_labels"]
+    if strategy_id != "labels_full":
+        autofixes.append("annotated_heatmap_label_layout_policy")
+        autofixes.append(f"annotated_heatmap_label_strategy_{strategy_id}")
     if options.show_colorbar:
         autofixes.append("heatmap_colorbar_tuned")
     return [
@@ -1727,12 +2087,16 @@ TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "box": TemplateRenderer(render=_render_box),
     "box_strip": TemplateRenderer(render=_render_box_strip),
     "violin": TemplateRenderer(render=_render_violin),
+    "violin_box": TemplateRenderer(render=_render_violin_box),
     "grouped_bar_compare": TemplateRenderer(render=_render_grouped_bar_compare),
     "grouped_bar_error": TemplateRenderer(render=_render_grouped_bar_error),
+    "point_error": TemplateRenderer(render=_render_point_error),
     "distribution_compare": TemplateRenderer(render=_render_distribution_compare),
     "histogram_density": TemplateRenderer(render=_render_histogram_density),
     "scatter": TemplateRenderer(render=_render_scatter),
     "scatter_with_fit": TemplateRenderer(render=_render_scatter_with_fit),
+    "scatter_fit": TemplateRenderer(render=_render_scatter_fit),
+    "mean_band": TemplateRenderer(render=_render_mean_band),
     "heatmap": TemplateRenderer(render=_render_heatmap),
     "annotated_heatmap": TemplateRenderer(render=_render_annotated_heatmap),
 }

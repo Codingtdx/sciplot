@@ -33,6 +33,7 @@ from src.rendering import (
     materialize_data_template_folder,
     plot_template_folder_catalog,
 )
+from src.rendering.template_lifecycle import template_identity
 from src.rendering.themes import visual_theme_catalog_payload
 
 
@@ -53,6 +54,24 @@ def create_meta_storage_router(
     @router.get("/meta", response_model=MetaResponse)
     def meta() -> MetaResponse:
         payload = meta_payload()
+        enriched_templates: list[dict[str, object]] = []
+        for item in payload.get("templates", []):
+            if not isinstance(item, dict):
+                continue
+            template_id = str(item.get("id", ""))
+            if not template_id:
+                continue
+            identity = template_identity(template_id)
+            enriched_templates.append(
+                {
+                    **item,
+                    "canonical_id": identity.canonical_id,
+                    "role": identity.role,
+                    "lifecycle_policy": identity.lifecycle_policy,
+                    "implementation_id": identity.implementation_id,
+                }
+            )
+        payload["templates"] = enriched_templates
         payload.update(
             {
                 "template_ids": list(TEMPLATE_CHOICES),

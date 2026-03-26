@@ -8,7 +8,8 @@ import pandas as pd
 import pytest
 
 from src.data_loader import CurveSeries, HeatmapTable, load_curve_table, load_replicate_table
-from src.plotting import plot_bar, plot_box, plot_curves, plot_heatmap, plot_tensile_curve
+from src.plotting import plot_bar, plot_box, plot_curves, plot_heatmap, plot_tensile_curve, plot_wide_nmr
+from src.wide_nmr import WideNMRConfig, WideNMRHighlightRegion, WideNMRSegment
 
 
 def _curve_series(
@@ -243,5 +244,70 @@ def test_plot_heatmap_records_colorbar_header_layout_debug() -> None:
         colorbar_records = [entry for entry in debug if entry.get("object_kind") == "colorbar_header"]
         assert colorbar_records
         assert colorbar_records[0]["chosen_candidate_id"] is not None
+    finally:
+        plt.close(fig)
+
+
+def test_plot_wide_nmr_records_annotation_textbox_layout_debug() -> None:
+    x = np.linspace(0.0, 10.0, 120)
+    series = [
+        _curve_series(
+            "Sample A",
+            x.tolist(),
+            (1.1 + 0.34 * np.sin(x * 1.6)).tolist(),
+            x_label="Chemical shift",
+            y_label="Intensity",
+            x_unit="ppm",
+            y_unit="a.u.",
+        ),
+        _curve_series(
+            "Sample B",
+            x.tolist(),
+            (1.5 + 0.30 * np.cos(x * 1.2)).tolist(),
+            x_label="Chemical shift",
+            y_label="Intensity",
+            x_unit="ppm",
+            y_unit="a.u.",
+        ),
+    ]
+    config = WideNMRConfig(
+        segments=(WideNMRSegment(x_min=10.0, x_max=6.0), WideNMRSegment(x_min=4.0, x_max=0.0)),
+        highlight_regions=(
+            WideNMRHighlightRegion(
+                x_min=7.6,
+                x_max=6.7,
+                label="Aromatic",
+                color="#9fbfe8",
+                label_position="top",
+            ),
+            WideNMRHighlightRegion(
+                x_min=2.9,
+                x_max=1.8,
+                label="Aliphatic",
+                color="#f2c48a",
+                label_position="bottom",
+            ),
+        ),
+        panel_label="Wide NMR",
+        label_side="left",
+    )
+
+    fig, _ = plot_wide_nmr(series, config)
+    try:
+        debug = getattr(fig, "_sciplot_layout_debug", [])
+        annotation_records = [entry for entry in debug if entry.get("object_kind") == "annotation_textbox"]
+        assert annotation_records
+        highlight_records = [
+            entry
+            for entry in annotation_records
+            if entry.get("context", {}).get("annotation_kind") == "highlight_region_label"
+        ]
+        panel_records = [
+            entry for entry in annotation_records if entry.get("context", {}).get("annotation_kind") == "panel_label"
+        ]
+        assert len(highlight_records) >= 2
+        assert panel_records
+        assert all(entry.get("candidates") for entry in annotation_records)
+        assert all(entry.get("chosen_candidate_id") is not None for entry in annotation_records)
     finally:
         plt.close(fig)

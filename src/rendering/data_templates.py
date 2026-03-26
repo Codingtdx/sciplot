@@ -336,10 +336,12 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         typical_families=(
             "curve",
             "point_line",
+            "mean_band",
             "replicate_curves_with_band",
             "stacked_curve",
             "segmented_stacked_curve",
             "scatter",
+            "scatter_fit",
             "scatter_with_fit",
         ),
         format_summary="Rows 1 to 3 define labels, units, and sample names; row 4 onward stores numeric X/Y pairs.",
@@ -353,10 +355,12 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         typical_families=(
             "curve",
             "point_line",
+            "mean_band",
             "replicate_curves_with_band",
             "stacked_curve",
             "segmented_stacked_curve",
             "scatter",
+            "scatter_fit",
             "scatter_with_fit",
         ),
         format_summary=(
@@ -373,6 +377,8 @@ DATA_TEMPLATE_SPECS: tuple[DataTemplateSpec, ...] = (
         typical_families=(
             "distribution_compare",
             "box_strip",
+            "violin_box",
+            "point_error",
             "grouped_bar_error",
             "grouped_bar_compare",
             "histogram_density",

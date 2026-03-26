@@ -35,6 +35,7 @@ from src.rendering import (
     prepare_managed_plot_export_dir,
     validate_template_name,
 )
+from src.rendering.template_lifecycle import template_identity
 from src.submission import build_render_submission_report
 
 
@@ -72,6 +73,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         try:
             input_path = normalize_path(request.input_path)
             template = validate_template_name(request.template)
+            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
             options = options_from_payload(template, request.options)
             preflight = preflight_render_request(template, input_path, sheet, options)
@@ -79,6 +81,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 {
                     "input_path": str(input_path),
                     "template": template,
+                    "requested_template_id": identity.requested_template_id,
+                    "canonical_id": identity.canonical_id,
+                    "role": identity.role,
+                    "lifecycle_policy": identity.lifecycle_policy,
+                    "implementation_id": identity.implementation_id,
                     "sheet": sheet,
                     "options": request.options.model_dump(),
                     "preflight": serialize_dataclass(preflight),
@@ -92,6 +99,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         try:
             input_path = normalize_path(request.input_path)
             template = validate_template_name(request.template)
+            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
             payload_options = request.options
             resolved_options = options_from_payload(template, payload_options)
@@ -123,6 +131,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 close_rendered_plots(rendered_plots)
             return RenderPreviewResponse(
                 template=template,
+                requested_template_id=identity.requested_template_id,
+                canonical_id=identity.canonical_id,
+                role=identity.role,
+                lifecycle_policy=identity.lifecycle_policy,
+                implementation_id=identity.implementation_id,
                 sheet=sheet,
                 previews=previews,
                 submission_report=serialize_dataclass(submission_report),
@@ -135,6 +148,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         try:
             input_path = normalize_path(request.input_path)
             template = validate_template_name(request.template)
+            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
             payload_options = request.options
             managed_output_dir_fn = _dep(
@@ -221,7 +235,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 manifest_payload = bundle_manifest_payload(
                     input_path=input_path,
                     sheet=sheet,
-                    template=template,
+                    requested_template_id=identity.requested_template_id,
+                    canonical_template_id=identity.canonical_id,
                     output_dir=output_dir,
                     outputs=outputs,
                     preview_outputs=preview_outputs,
@@ -241,6 +256,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             finally:
                 close_rendered_plots(rendered_plots)
             return ExportRenderResponse(
+                requested_template_id=identity.requested_template_id,
+                canonical_id=identity.canonical_id,
+                role=identity.role,
+                lifecycle_policy=identity.lifecycle_policy,
+                implementation_id=identity.implementation_id,
                 outputs=[str(path) for path in outputs],
                 output_dir=str(output_dir),
                 preview_outputs=[str(path) for path in preview_outputs],

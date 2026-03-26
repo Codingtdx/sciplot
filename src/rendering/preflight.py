@@ -21,7 +21,12 @@ from src.rendering.common import (
 )
 from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
+from src.rendering.template_lifecycle import template_family_ids, template_identity
 from src.submission import build_render_submission_report
+
+_FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
+_MEAN_BAND_TEMPLATES = set(template_family_ids("mean_band"))
+_GROUPED_BAR_ERROR_TEMPLATES = set(template_family_ids("grouped_bar_error"))
 
 
 def preflight_render_request(
@@ -30,23 +35,24 @@ def preflight_render_request(
     sheet: str | int,
     options: RenderOptions,
 ) -> PreflightResult:
+    identity = template_identity(template)
     warnings: list[str] = list(style_preflight_warnings(options))
     errors: list[str] = []
     normalized_dataset = (
         build_normalized_dataset(input_path, sheet)
-        if template in {"point_line", "curve", "scatter_with_fit", "replicate_curves_with_band"}
+        if template in {"point_line", "curve"} | _FIT_SCATTER_TEMPLATES | _MEAN_BAND_TEMPLATES
         else None
     )
 
     try:
-        if template in {"point_line", "curve", "replicate_curves_with_band"}:
+        if template in {"point_line", "curve"} | _MEAN_BAND_TEMPLATES:
             if normalized_dataset and normalized_dataset.model in {
                 "frequency_sweep",
                 "temperature_sweep",
                 "stress_relaxation",
             }:
-                if template == "replicate_curves_with_band":
-                    raise ValueError("replicate_curves_with_band is not supported for rheology export bundles.")
+                if template in _MEAN_BAND_TEMPLATES:
+                    raise ValueError(f"{template} is not supported for rheology export bundles.")
                 validate_rheology_bundle_scales(
                     normalized_dataset.model,
                     input_path,
@@ -57,7 +63,7 @@ def preflight_render_request(
             else:
                 curve_series = load_curve_table_cached(input_path, sheet)
                 validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
-                if template == "replicate_curves_with_band":
+                if template in _MEAN_BAND_TEMPLATES:
                     aligned_replicate_band(curve_series)
         elif template == "stacked_curve":
             load_curve_table_cached(input_path, sheet)
@@ -71,7 +77,7 @@ def preflight_render_request(
         elif template == "scatter":
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
-        elif template == "scatter_with_fit":
+        elif template in _FIT_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
             if not curve_series:
@@ -91,8 +97,10 @@ def preflight_render_request(
             "box",
             "box_strip",
             "violin",
+            "violin_box",
             "grouped_bar_compare",
             "grouped_bar_error",
+            "point_error",
             "distribution_compare",
             "histogram_density",
         }:
@@ -100,7 +108,7 @@ def preflight_render_request(
             if not groups:
                 raise ValueError("No valid groups were found in the replicate table.")
             summary = summarize_replicate_distribution(groups)
-            if template in {"grouped_bar_compare", "grouped_bar_error", "distribution_compare"} and len(groups) < 2:
+            if template in _GROUPED_BAR_ERROR_TEMPLATES | {"distribution_compare"} and len(groups) < 2:
                 raise ValueError(f"{template} requires at least two replicate groups.")
             if template == "distribution_compare" and summary.min_group_points < 3:
                 warnings.append(
@@ -152,6 +160,11 @@ def preflight_render_request(
 
     return PreflightResult(
         template=template,
+        requested_template_id=identity.requested_template_id,
+        canonical_id=identity.canonical_id,
+        role=identity.role,
+        lifecycle_policy=identity.lifecycle_policy,
+        implementation_id=identity.implementation_id,
         warnings=tuple(warnings),
         errors=tuple(errors),
         output_filenames=preview_names,

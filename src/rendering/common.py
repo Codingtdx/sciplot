@@ -332,8 +332,12 @@ def preview_output_filenames(
         return (f"{input_path.stem}_curve.pdf",)
     if template == "scatter_with_fit":
         return (f"{input_path.stem}_scatter_with_fit.pdf",)
+    if template == "scatter_fit":
+        return (f"{input_path.stem}_scatter_fit.pdf",)
     if template == "replicate_curves_with_band":
         return (f"{input_path.stem}_replicate_curves_with_band.pdf",)
+    if template == "mean_band":
+        return (f"{input_path.stem}_mean_band.pdf",)
     if template == "stacked_curve":
         return (f"{input_path.stem}_stacked_curve.pdf",)
     if template == "segmented_stacked_curve":
@@ -344,11 +348,17 @@ def preview_output_filenames(
         return (f"{input_path.stem}_heatmap.pdf",)
     if template == "annotated_heatmap":
         return (f"{input_path.stem}_annotated_heatmap.pdf",)
-    if template in {"bar", "box", "box_strip", "violin"}:
+    if template in {"bar", "box", "box_strip", "violin", "violin_box"}:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)
-    if template in {"grouped_bar_compare", "grouped_bar_error", "distribution_compare", "histogram_density"}:
+    if template in {
+        "grouped_bar_compare",
+        "grouped_bar_error",
+        "point_error",
+        "distribution_compare",
+        "histogram_density",
+    }:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)

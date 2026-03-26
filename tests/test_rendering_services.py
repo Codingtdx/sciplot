@@ -282,12 +282,19 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     assert inspection.recommendations[0].reason
     assert inspection.recommendations[0].suitability_hint
     assert inspection.recommendations[0].why_soft_prior
+    assert inspection.recommendations[0].canonical_id == "curve"
+    assert inspection.recommendations[0].role == "canonical"
+    assert inspection.recommendations[0].implementation_id == "curve"
     assert inspection.recommendation_confidence >= inspection.recommendations[0].score
     assert "curve" in inspection.recommendation_summary
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
     assert preflight.errors == ()
+    assert preflight.requested_template_id == "curve"
+    assert preflight.canonical_id == "curve"
+    assert preflight.role == "canonical"
+    assert preflight.implementation_id == "curve"
     assert preflight.submission_report is not None
     assert preflight.submission_report.context == "preflight"
     assert preflight.submission_report.style_preset == "default"
@@ -549,7 +556,7 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     assert inspection.recommendation.template == "box"
     assert inspection.recommendations
     assert inspection.recommendations[0].template_id == "box"
-    assert {"distribution_compare", "grouped_bar_error", "box_strip"}.issubset(
+    assert {"distribution_compare", "grouped_bar_error", "point_error", "box_strip"}.issubset(
         {item.template_id for item in inspection.recommendations}
     )
 
@@ -584,6 +591,40 @@ def test_grouped_bar_error_preflight_matches_render_filename(tmp_path: Path) -> 
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_point_error_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="point_error")
+    preflight = preflight_render_request("point_error", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_point_error.pdf",)
+
+    rendered = build_rendered_plots("point_error", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "point_error_profile" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_violin_box_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="violin_box")
+    preflight = preflight_render_request("violin_box", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_violin_box.pdf",)
+
+    rendered = build_rendered_plots("violin_box", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "violin_box_profile" in rendered[0].qa_report.autofixes_applied
     finally:
         close_rendered_plots(rendered)
 
@@ -692,6 +733,11 @@ def test_scatter_with_fit_preflight_matches_render_filename(tmp_path: Path) -> N
     options = resolve_render_options(template="scatter_with_fit")
     preflight = preflight_render_request("scatter_with_fit", input_path, 0, options)
     assert preflight.errors == ()
+    assert preflight.requested_template_id == "scatter_with_fit"
+    assert preflight.canonical_id == "scatter_fit"
+    assert preflight.role == "alias"
+    assert preflight.lifecycle_policy == "deprecated_in_practice"
+    assert preflight.implementation_id == "scatter_fit"
     assert preflight.output_filenames == ("curve_scatter_with_fit.pdf",)
 
     rendered = build_rendered_plots("scatter_with_fit", input_path)
@@ -699,6 +745,40 @@ def test_scatter_with_fit_preflight_matches_render_filename(tmp_path: Path) -> N
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_scatter_fit_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="scatter_fit")
+    preflight = preflight_render_request("scatter_fit", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_scatter_fit.pdf",)
+
+    rendered = build_rendered_plots("scatter_fit", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_mean_band_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_multi_curve_table(tmp_path / "multi_curve.csv")
+
+    options = resolve_render_options(template="mean_band")
+    preflight = preflight_render_request("mean_band", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("multi_curve_mean_band.pdf",)
+
+    rendered = build_rendered_plots("mean_band", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "replicate_mean_band_overlay" in rendered[0].qa_report.autofixes_applied
     finally:
         close_rendered_plots(rendered)
 
@@ -716,6 +796,16 @@ def test_annotated_heatmap_preflight_matches_render_filename(tmp_path: Path) -> 
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "annotated_heatmap_labels" in rendered[0].qa_report.autofixes_applied
+        layout_debug = getattr(rendered[0].figure, "_sciplot_layout_debug", [])
+        annotation_records = [
+            entry
+            for entry in layout_debug
+            if entry.get("object_kind") == "annotation_textbox"
+            and entry.get("context", {}).get("annotation_kind") == "heatmap_cell_labels"
+        ]
+        assert annotation_records
+        assert annotation_records[0]["chosen_candidate_id"] is not None
+        assert annotation_records[0]["candidates"]
     finally:
         close_rendered_plots(rendered)
 
@@ -737,6 +827,34 @@ def test_annotated_heatmap_preflight_warns_for_single_row_or_column_matrices(tmp
 
     assert preflight.errors == ()
     assert any("single-row/column matrices" in warning for warning in preflight.warnings)
+
+
+def test_annotated_heatmap_dense_matrix_can_fallback_to_non_default_label_strategy(tmp_path: Path) -> None:
+    input_path = tmp_path / "dense_annotated_heatmap.csv"
+    rows = [["X", "Y", "Z"], ["Temperature", "Time", "Intensity"], ["degC", "min", "a.u."]]
+    for x_idx in range(20):
+        for y_idx in range(20):
+            rows.append([float(x_idx), float(y_idx), float(np.sin(x_idx * 0.3) + np.cos(y_idx * 0.4))])
+    pd.DataFrame(rows).to_csv(input_path, header=False, index=False)
+
+    rendered = build_rendered_plots("annotated_heatmap", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        layout_debug = getattr(plot.figure, "_sciplot_layout_debug", [])
+        annotation_records = [
+            entry
+            for entry in layout_debug
+            if entry.get("object_kind") == "annotation_textbox"
+            and entry.get("context", {}).get("annotation_kind") == "heatmap_cell_labels"
+        ]
+        assert annotation_records
+        chosen_id = str(annotation_records[0].get("chosen_candidate_id"))
+        assert chosen_id.startswith("labels_")
+        assert (annotation_records[0].get("fallback_action") is not None) or (chosen_id == "labels_full")
+    finally:
+        close_rendered_plots(rendered)
 
 
 def test_replicate_curves_with_band_preflight_matches_render_filename(tmp_path: Path) -> None:
@@ -765,6 +883,17 @@ def test_replicate_curves_with_band_rejects_rheology_bundle(tmp_path: Path) -> N
 
     with pytest.raises(ValueError, match="not supported for rheology export bundles"):
         build_rendered_plots("replicate_curves_with_band", input_path)
+
+
+def test_mean_band_rejects_rheology_bundle(tmp_path: Path) -> None:
+    input_path = _write_frequency_sweep_table(tmp_path / "frequency.xlsx")
+
+    options = resolve_render_options(template="mean_band")
+    preflight = preflight_render_request("mean_band", input_path, 0, options)
+    assert preflight.errors == ("mean_band is not supported for rheology export bundles.",)
+
+    with pytest.raises(ValueError, match="not supported for rheology export bundles"):
+        build_rendered_plots("mean_band", input_path)
 
 
 def test_replicate_curves_with_band_preflight_rejects_poor_x_alignment(tmp_path: Path) -> None:

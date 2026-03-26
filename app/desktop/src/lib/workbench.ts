@@ -339,24 +339,30 @@ const COMPATIBLE_TEMPLATE_IDS: Record<string, TemplateName[]> = {
   tensile_curve: [
     "curve",
     "point_line",
+    "mean_band",
     "replicate_curves_with_band",
     "stacked_curve",
     "segmented_stacked_curve",
     "scatter",
+    "scatter_fit",
     "scatter_with_fit",
   ],
   curve_table: [
     "curve",
     "point_line",
+    "mean_band",
     "replicate_curves_with_band",
     "stacked_curve",
     "segmented_stacked_curve",
     "scatter",
+    "scatter_fit",
     "scatter_with_fit",
   ],
   replicate_table: [
     "distribution_compare",
     "box_strip",
+    "violin_box",
+    "point_error",
     "grouped_bar_error",
     "grouped_bar_compare",
     "histogram_density",
@@ -415,7 +421,7 @@ export function templateCompatibilityReason(model: string | null | undefined) {
     case "curve_table":
       return "This input is a paired curve table. Start with curve-family templates.";
     case "replicate_table":
-      return "This input is a replicate summary table. Start with distribution, box+strip, grouped-bar+error, histogram-density, or classic stats templates.";
+      return "This input is a replicate summary table. Start with distribution, box+strip, violin+box, point+error, grouped-bar+error, histogram-density, or classic stats templates.";
     case "heatmap_table":
       return "This input is an XYZ heatmap table. Start with heatmap templates.";
     default:

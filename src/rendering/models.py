@@ -114,6 +114,11 @@ class InputInspection:
 @dataclass(frozen=True)
 class PreflightResult:
     template: TemplateName
+    requested_template_id: str
+    canonical_id: str
+    role: str
+    lifecycle_policy: str
+    implementation_id: str
     warnings: tuple[str, ...]
     errors: tuple[str, ...]
     output_filenames: tuple[str, ...]

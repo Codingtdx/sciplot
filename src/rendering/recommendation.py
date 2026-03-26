@@ -367,6 +367,16 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 "Detected aligned paired curves with replicate-like structure, "
                 "so a mean-band curve summary is recommended."
             )
+        elif compatibility_template == "mean_band":
+            compatibility_reason = (
+                "Detected aligned paired curves with replicate-like structure, "
+                "so mean_band is recommended for deterministic mean±band summary."
+            )
+        elif compatibility_template == "scatter_fit":
+            compatibility_reason = (
+                "Detected paired curves with a strong trend pattern, "
+                "so scatter fit with deterministic linear overlay is recommended."
+            )
         elif compatibility_template == "scatter_with_fit":
             compatibility_reason = (
                 "Detected paired curves with a strong trend pattern, "
