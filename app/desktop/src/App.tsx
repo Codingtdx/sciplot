@@ -350,7 +350,7 @@ export default function App() {
   let activeItemLabel = "Next action";
   let activeItemValue = "Choose a workspace and start working.";
   if (workspace === "plot") {
-    activeItemLabel = importFocus ? "Source" : "Active file";
+    activeItemLabel = importFocus ? "Data file" : "Active file";
     activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file loaded";
   } else if (workspace === "tensile") {
     activeItemLabel = "Latest workbook";

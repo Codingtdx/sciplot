@@ -330,6 +330,19 @@ function previewValue(value: unknown) {
   return String(value);
 }
 
+function plotColumnRoleLabel(role: PlotColumnRole) {
+  switch (role) {
+    case "x":
+      return "X field";
+    case "y":
+      return "Y field";
+    case "ignore":
+      return "Hidden";
+    default:
+      return "Candidate";
+  }
+}
+
 export function PlotScreen({
   meta,
   routeStage = useWizardStore.getState().stage,
@@ -833,6 +846,9 @@ export function PlotScreen({
   const selectedYIndex = plotDataDraft?.columnRoles.findIndex((role) => role === "y") ?? -1;
   const selectedXLabel = plotDataDraft && selectedXIndex >= 0 ? plotDataDraft.columnTitles[selectedXIndex] : "X";
   const selectedYLabel = plotDataDraft && selectedYIndex >= 0 ? plotDataDraft.columnTitles[selectedYIndex] : "Y";
+  const selectedXKind = columnKind(wizard.dataset, selectedXIndex, plotDataDraft);
+  const selectedYKind = columnKind(wizard.dataset, selectedYIndex, plotDataDraft);
+  const selectedIntent = chartIntentLabel(selectedXKind, selectedYKind);
   const dataWarnings = [
     ...(wizard.inspection?.warnings ?? []),
     ...(wizard.dataset?.quality_flags?.includes("empty_columns_dropped")
@@ -1033,9 +1049,15 @@ export function PlotScreen({
                   title="Light data prep"
                   extra={
                     <div className="plot-column-summary">
-                      <span>{selectedXLabel || "X"}</span>
-                      <span>{selectedYLabel || "Y"}</span>
-                      <span>{plotDataDraft.rows.length} rows</span>
+                      <span className="plot-summary-chip x">
+                        <strong>X</strong>
+                        <span>{selectedXLabel || "X"}</span>
+                      </span>
+                      <span className="plot-summary-chip y">
+                        <strong>Y</strong>
+                        <span>{selectedYLabel || "Y"}</span>
+                      </span>
+                      <span className="plot-summary-meta">{plotDataDraft.rows.length} rows</span>
                     </div>
                   }
                 >
@@ -1096,7 +1118,7 @@ export function PlotScreen({
                           >
                             {item.title}
                           </button>
-                        ))}
+                      ))}
                     </div>
                   ) : null}
                   <div className="plot-column-grid">
@@ -1106,13 +1128,24 @@ export function PlotScreen({
                         key={`${plotDataDraft.datasetId}-${index}`}
                       >
                         <div className="plot-column-card-head">
-                          <span className={`plot-column-type ${wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}`}>
-                            {wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}
-                          </span>
+                          <div className="plot-column-head-copy">
+                            <span className={`plot-column-type ${wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}`}>
+                              {wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}
+                            </span>
+                            <span className={`plot-column-role ${plotDataDraft.columnRoles[index]}`}>
+                              {plotColumnRoleLabel(plotDataDraft.columnRoles[index])}
+                            </span>
+                          </div>
                           <div className="plot-column-actions">
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "x")} type="button">X</button>
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "y")} type="button">Y</button>
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "ignore")} type="button">Hide</button>
+                            <button className="ghost-button" onClick={() => updateColumnRole(index, "x")} type="button">
+                              X
+                            </button>
+                            <button className="ghost-button" onClick={() => updateColumnRole(index, "y")} type="button">
+                              Y
+                            </button>
+                            <button className="ghost-button" onClick={() => updateColumnRole(index, "ignore")} type="button">
+                              Hide
+                            </button>
                           </div>
                         </div>
                         <input
@@ -1138,9 +1171,15 @@ export function PlotScreen({
                     <div className="plot-table-preview-head">
                       <span>#</span>
                       {previewColumns.map((column, index) => (
-                        <span key={`${column}-${index}`} className={plotDataDraft.columnRoles[index] === "ignore" ? "muted" : ""}>
-                          {column}
-                        </span>
+                        <div
+                          className={`plot-table-preview-head-cell ${plotDataDraft.columnRoles[index] === "ignore" ? "muted" : ""}`}
+                          key={`${column}-${index}`}
+                        >
+                          <strong>{column}</strong>
+                          <span>
+                            {plotColumnRoleLabel(plotDataDraft.columnRoles[index])} · {columnKind(wizard.dataset, index, plotDataDraft) ?? "text"}
+                          </span>
+                        </div>
                       ))}
                     </div>
                     {visiblePreviewRows.map((row, rowIndex) => (
@@ -1177,7 +1216,7 @@ export function PlotScreen({
                 <div className="plot-state-card">
                   <span>Mapping</span>
                   <strong>{selectedXLabel} / {selectedYLabel}</strong>
-                  <p>{chartIntentLabel(undefined, undefined)}</p>
+                  <p>{selectedIntent}</p>
                 </div>
                 <div className="plot-state-card">
                   <span>Ready</span>
@@ -1241,14 +1280,21 @@ export function PlotScreen({
                 {templateSections.alternatives.length > 0 ? (
                   <div className="plot-template-alternates">
                     <strong>Alternates</strong>
-                    <div className="plot-template-alt-list">
+                    <div className="plot-template-alt-grid">
                       {templateSections.alternatives.slice(0, 4).map((template) => (
-                        <CompactListRow
+                        <button
+                          className={`plot-template-card gallery alt ${wizard.template === template.id ? "selected" : ""}`}
                           key={template.id}
-                          onSelect={() => updateWizardTemplate(template.id)}
-                          subtitle={`${template.category.replace(/_/g, " ")} · ${template.default_size}`}
-                          title={template.label}
-                        />
+                          onClick={() => updateWizardTemplate(template.id)}
+                          type="button"
+                        >
+                          <div className={`plot-template-thumb ${plotThumbClass(template.id)}`} aria-hidden="true" />
+                          <div className="plot-template-card-copy">
+                            <strong>{template.label}</strong>
+                            <span>{template.category.replace(/_/g, " ")}</span>
+                            <p>{template.description}</p>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1300,9 +1346,6 @@ export function PlotScreen({
               description="Keep the preview alive while you polish the final figure and choose an export location."
               actions={
                 <CompactToolbar label="Refine actions">
-                  <button className="ghost-button" onClick={() => setShowExportModal(true)} type="button">
-                    Export settings
-                  </button>
                   <button className="primary-button" onClick={() => setShowExportModal(true)} type="button">
                     Export
                   </button>

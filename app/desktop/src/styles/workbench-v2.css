@@ -3909,8 +3909,25 @@ textarea.field {
 .plot-workspace.plot-flow-v3 {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
+}
+
+.plot-workspace.plot-flow-v3 .wb-step-rail {
+  gap: 4px;
+}
+
+.plot-workspace.plot-flow-v3 .wb-step-button {
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.plot-workspace.plot-flow-v3 .wb-step-copy strong {
+  font-size: 12px;
+}
+
+.plot-workspace.plot-flow-v3 .wb-step-copy span {
+  font-size: 11px;
 }
 
 .plot-flow-v3-header,
@@ -3940,8 +3957,8 @@ textarea.field {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
   background:
     radial-gradient(circle at top left, rgba(70, 213, 205, 0.16), transparent 42%),
     linear-gradient(180deg, rgba(26, 37, 48, 0.96), rgba(18, 25, 33, 0.96));
@@ -3956,18 +3973,18 @@ textarea.field {
 .plot-flow-v3-header-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .plot-flow-v3-header-copy > span {
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--wb-text-muted);
 }
 
 .plot-flow-v3-header-copy > strong {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1.08;
   font-weight: 650;
   color: var(--wb-text-main);
@@ -3993,9 +4010,9 @@ textarea.field {
 .plot-flow-v3-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.75fr);
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
-  animation: plot-fade-up 260ms ease both;
+  animation: plot-fade-up 220ms ease both;
 }
 
 .plot-flow-v3-main,
@@ -4004,13 +4021,13 @@ textarea.field {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .plot-flow-v3-main .wb-section-header,
 .plot-flow-v3-side .wb-inspector {
-  border-radius: 18px;
-  padding: 16px 16px 14px;
+  border-radius: 16px;
+  padding: 14px 14px 12px;
 }
 
 .plot-flow-v3-main .wb-section-header {
@@ -4024,7 +4041,7 @@ textarea.field {
 .plot-flow-v3-main .wb-section-copy > h2,
 .plot-flow-v3-side .wb-inspector-head h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .plot-flow-v3-main .wb-section-copy > p,
@@ -4034,18 +4051,18 @@ textarea.field {
 }
 
 .plot-dropzone {
-  min-height: 220px;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 24px;
-  border-radius: 20px;
+  gap: 12px;
+  padding: 20px 22px;
+  border-radius: 18px;
   border-style: dashed;
   background:
-    radial-gradient(circle at top, rgba(70, 213, 205, 0.12), transparent 48%),
-    linear-gradient(180deg, rgba(17, 25, 32, 0.92), rgba(13, 18, 24, 0.96));
+    radial-gradient(circle at top, rgba(70, 213, 205, 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(17, 25, 32, 0.88), rgba(13, 18, 24, 0.94));
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
@@ -4061,7 +4078,7 @@ textarea.field {
 
 .plot-dropzone-copy {
   text-align: center;
-  max-width: 34rem;
+  max-width: 32rem;
 }
 
 .plot-dropzone-copy strong,
@@ -4087,19 +4104,39 @@ textarea.field {
   color: var(--wb-text-muted);
 }
 
+.plot-flow-v3-grid.import-grid.empty {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.plot-flow-v3-grid.import-grid.empty .plot-flow-v3-side {
+  display: none;
+}
+
+.plot-flow-v3-grid.import-grid.empty .import-main {
+  max-width: 980px;
+  margin-inline: auto;
+}
+
+.plot-flow-v3-grid.import-grid.empty .plot-flow-v3-main .wb-section-header {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .plot-source-stack {
-  padding: 12px;
-  border-radius: 18px;
-  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  gap: 8px;
   background: rgba(255, 255, 255, 0.02);
 }
 
 .plot-file-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 16px;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-radius: 14px;
   background: rgba(15, 23, 31, 0.96);
 }
 
@@ -4115,7 +4152,7 @@ textarea.field {
 }
 
 .plot-file-card-head strong {
-  font-size: 15px;
+  font-size: 14px;
   word-break: break-word;
 }
 
@@ -4126,7 +4163,7 @@ textarea.field {
 .plot-preview-note,
 .plot-stage-pill,
 .plot-warning-strip span {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .plot-file-card-meta,
@@ -4166,44 +4203,87 @@ textarea.field {
 .plot-warning-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(245, 180, 93, 0.08);
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(245, 180, 93, 0.06);
   color: var(--wb-text-body);
 }
 
 .plot-warning-strip span {
-  padding: 5px 8px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.plot-column-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plot-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-soft);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--wb-text-muted);
+}
+
+.plot-summary-chip strong {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plot-summary-chip span {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plot-summary-chip.x,
+.plot-summary-chip.y {
+  border-color: var(--wb-border-strong);
+  background: rgba(70, 213, 205, 0.1);
+  color: var(--wb-text-main);
+}
+
+.plot-summary-meta {
+  color: var(--wb-text-muted);
 }
 
 .plot-preview-layout {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .plot-column-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .plot-column-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
 }
 
 .plot-column-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
@@ -4227,6 +4307,13 @@ textarea.field {
   gap: 10px;
 }
 
+.plot-column-head-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .plot-column-type {
   display: inline-flex;
   align-items: center;
@@ -4235,6 +4322,29 @@ textarea.field {
   background: rgba(255, 255, 255, 0.05);
   color: var(--wb-text-main);
   text-transform: capitalize;
+}
+
+.plot-column-role {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-soft);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--wb-text-muted);
+  font-size: 11px;
+}
+
+.plot-column-role.x,
+.plot-column-role.y {
+  border-color: var(--wb-border-strong);
+  background: rgba(70, 213, 205, 0.12);
+  color: var(--wb-text-main);
+}
+
+.plot-column-role.ignore {
+  opacity: 0.82;
 }
 
 .plot-column-actions {
@@ -4254,9 +4364,9 @@ textarea.field {
 
 .plot-table-preview {
   display: grid;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 16px;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
   overflow: auto;
   background: rgba(10, 16, 21, 0.94);
 }
@@ -4264,14 +4374,37 @@ textarea.field {
 .plot-table-preview-head,
 .plot-table-preview-row {
   display: grid;
-  grid-template-columns: 42px repeat(8, minmax(96px, 1fr));
-  gap: 6px;
+  grid-template-columns: 42px repeat(8, minmax(104px, 1fr));
+  gap: 5px;
   align-items: center;
 }
 
 .plot-table-preview-head span,
 .plot-table-preview-row > span {
   min-width: 0;
+}
+
+.plot-table-preview-head-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plot-table-preview-head-cell strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plot-table-preview-head-cell span {
+  color: var(--wb-text-muted);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
 }
 
 .plot-table-preview-head span {
@@ -4295,22 +4428,22 @@ textarea.field {
 
 .plot-state-stack {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .plot-state-card {
-  padding: 12px;
-  border-radius: 14px;
+  padding: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .plot-state-card strong {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .plot-state-card p {
-  margin: 6px 0 0;
+  margin: 5px 0 0;
   color: var(--wb-text-muted);
   line-height: 1.45;
 }
@@ -4328,7 +4461,7 @@ textarea.field {
 .plot-template-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 12px;
+  gap: 14px;
   min-height: 0;
 }
 
@@ -4338,15 +4471,15 @@ textarea.field {
 .plot-refine-preview,
 .plot-modal-card,
 .plot-gallery-group {
-  border-radius: 18px;
-  padding: 14px;
+  border-radius: 16px;
+  padding: 12px;
 }
 
 .plot-template-list-head {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .plot-template-list-head span {
@@ -4355,17 +4488,17 @@ textarea.field {
 }
 
 .plot-template-card-stack,
-.plot-template-alt-list {
+.plot-template-alt-grid {
   display: grid;
   gap: 10px;
 }
 
 .plot-template-card {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
-  padding: 12px;
+  padding: 10px;
   border-radius: 16px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.03);
@@ -4377,16 +4510,25 @@ textarea.field {
   border-color: var(--wb-border-strong);
   background: rgba(70, 213, 205, 0.08);
   transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(5, 8, 12, 0.18);
 }
 
 .plot-template-card.gallery {
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
+.plot-template-card.gallery.alt {
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+
+.plot-template-card.gallery.alt .plot-template-thumb {
+  height: 54px;
+}
+
 .plot-template-thumb {
   position: relative;
-  height: 60px;
-  border-radius: 14px;
+  height: 64px;
+  border-radius: 12px;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
@@ -4435,6 +4577,11 @@ textarea.field {
   gap: 3px;
 }
 
+.plot-template-card-copy span {
+  font-size: 11px;
+  color: var(--wb-text-muted);
+}
+
 .plot-template-card-copy p {
   margin: 0;
   color: var(--wb-text-muted);
@@ -4443,8 +4590,8 @@ textarea.field {
 .plot-template-alternates {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .plot-template-preview-head,
@@ -4457,7 +4604,7 @@ textarea.field {
 }
 
 .plot-template-preview-head {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .plot-template-preview-head span,
@@ -4467,10 +4614,10 @@ textarea.field {
 }
 
 .plot-template-preview-shell {
-  min-height: 420px;
+  min-height: 396px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .plot-template-preview-shell .preview-pane {
@@ -4480,8 +4627,8 @@ textarea.field {
 
 .plot-refine-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
-  gap: 12px;
+  grid-template-columns: minmax(240px, 0.66fr) minmax(0, 1.34fr);
+  gap: 14px;
   min-height: 0;
 }
 
@@ -4489,15 +4636,15 @@ textarea.field {
 .plot-refine-preview {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .plot-refine-block {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .plot-toggle-row {
@@ -4511,14 +4658,14 @@ textarea.field {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 520px;
-  padding: 14px;
-  border-radius: 20px;
+  gap: 8px;
+  min-height: 500px;
+  padding: 12px;
+  border-radius: 18px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(70, 213, 205, 0.2), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(97, 198, 255, 0.14), transparent 36%),
+    radial-gradient(circle at top left, rgba(70, 213, 205, 0.16), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(97, 198, 255, 0.12), transparent 36%),
     linear-gradient(180deg, rgba(10, 16, 22, 0.96), rgba(8, 12, 16, 0.98));
 }
 
@@ -4528,8 +4675,8 @@ textarea.field {
 }
 
 .plot-refine-preview-draft {
-  padding-right: 170px;
-  min-height: 48px;
+  padding-right: 140px;
+  min-height: 44px;
 }
 
 .plot-refine-legend {
@@ -4538,8 +4685,8 @@ textarea.field {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 9px 10px;
+  border-radius: 12px;
   border: 1px solid var(--wb-border-soft);
   background: rgba(18, 26, 34, 0.92);
   cursor: grab;
@@ -4552,7 +4699,7 @@ textarea.field {
 
 .plot-refine-legend.dragging {
   cursor: grabbing;
-  transform: scale(1.02);
+  transform: scale(1.01);
   border-color: var(--wb-border-strong);
 }
 
@@ -4568,8 +4715,8 @@ textarea.field {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 18px;
+  padding: 10px 14px;
+  border-radius: 16px;
   background: rgba(14, 20, 26, 0.92);
   backdrop-filter: blur(14px);
 }
@@ -4594,8 +4741,8 @@ textarea.field {
   width: min(980px, 100%);
   max-height: min(84vh, 860px);
   overflow: auto;
-  border-radius: 22px;
-  padding: 18px;
+  border-radius: 20px;
+  padding: 16px;
   background: linear-gradient(180deg, rgba(24, 33, 42, 0.98), rgba(15, 22, 29, 0.98));
 }
 
@@ -4604,7 +4751,7 @@ textarea.field {
 }
 
 .plot-modal-card.export {
-  width: min(560px, 100%);
+  width: min(500px, 100%);
 }
 
 .plot-modal-list,
@@ -4661,6 +4808,7 @@ textarea.field {
 
   .plot-column-controls,
   .plot-column-grid,
+  .plot-template-alt-grid,
   .plot-gallery-group-grid {
     grid-template-columns: 1fr;
   }
@@ -4672,5 +4820,9 @@ textarea.field {
   .plot-refine-legend {
     position: static;
     width: fit-content;
+  }
+
+  .plot-flow-v3-grid.import-grid.empty .plot-flow-v3-side {
+    display: flex;
   }
 }
