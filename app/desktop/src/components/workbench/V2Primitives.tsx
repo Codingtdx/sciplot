@@ -166,14 +166,18 @@ export function CommandBar({
     <header className="wb-command-bar">
       <div className="wb-command-leading">
         <div className="wb-command-module">
-          <span className="wb-command-meta">{moduleLabel}</span>
+          {moduleLabel ? <span className="wb-command-meta">{moduleLabel}</span> : null}
           <strong>{moduleTitle}</strong>
         </div>
-        <div className="wb-command-context">
-          <span className="wb-command-meta">{objectLabel}</span>
-          <strong title={objectValue}>{objectValue}</strong>
-          {sessionLabel ? <span className="wb-command-subtle">{sessionLabel}</span> : null}
-        </div>
+        {objectLabel || objectValue ? (
+          <div className="wb-command-context">
+            {objectLabel ? <span className="wb-command-meta">{objectLabel}</span> : null}
+            {objectValue ? <strong title={objectValue}>{objectValue}</strong> : null}
+            {sessionLabel ? <span className="wb-command-subtle">{sessionLabel}</span> : null}
+          </div>
+        ) : sessionLabel ? (
+          <span className="wb-command-subtle">{sessionLabel}</span>
+        ) : null}
       </div>
 
       <div className="wb-command-actions">

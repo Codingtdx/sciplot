@@ -298,21 +298,29 @@ export async function renderPreview(
   }, requestOptions);
 }
 
+export type ExportRenderRequest = {
+  input_path: string;
+  sheet: string | number;
+  template: TemplateName;
+  options: RenderOptionsPayload;
+  output_dir?: string | null;
+};
+
 export async function exportRender(
-  inputPath: string,
-  sheet: string | number,
-  template: TemplateName,
-  options: RenderOptionsPayload,
-  outputDir?: string,
+  payload: ExportRenderRequest,
   requestOptions: RequestOptions = {},
 ): Promise<ExportResponse> {
-  return postJson<ExportResponse>("/export-render", {
-    input_path: inputPath,
-    sheet,
-    template,
-    options,
-    output_dir: outputDir ?? null,
-  }, requestOptions);
+  return postJson<ExportResponse>(
+    "/export-render",
+    {
+      input_path: payload.input_path,
+      sheet: payload.sheet,
+      template: payload.template,
+      options: payload.options,
+      output_dir: payload.output_dir ?? null,
+    },
+    requestOptions,
+  );
 }
 
 export async function openPath(

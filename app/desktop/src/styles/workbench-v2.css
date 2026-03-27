@@ -3933,6 +3933,7 @@ textarea.field {
 .plot-flow-v3-header,
 .plot-flow-v3-footer,
 .plot-flow-v3-main .wb-section-header,
+.plot-flow-v3-main .wb-inspector,
 .plot-flow-v3-side .wb-inspector,
 .plot-template-list,
 .plot-template-preview,
@@ -3948,20 +3949,20 @@ textarea.field {
 .plot-table-preview,
 .plot-source-stack {
   border: 1px solid var(--wb-border-soft);
-  background: rgba(23, 33, 43, 0.92);
-  box-shadow: var(--wb-shadow-sm);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 .plot-flow-v3-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at top left, rgba(70, 213, 205, 0.16), transparent 42%),
-    linear-gradient(180deg, rgba(26, 37, 48, 0.96), rgba(18, 25, 33, 0.96));
+  padding: 10px 4px 2px;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   animation: plot-fade-up 220ms ease both;
 }
 
@@ -3978,21 +3979,14 @@ textarea.field {
 
 .plot-flow-v3-header-copy > span {
   font-size: 11px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--wb-text-muted);
 }
 
-.plot-flow-v3-header-copy > strong {
-  font-size: 22px;
-  line-height: 1.08;
-  font-weight: 650;
-  color: var(--wb-text-main);
-}
-
 .plot-flow-v3-header-copy > p {
   margin: 0;
-  max-width: 44rem;
+  max-width: 46rem;
   font-size: 13px;
   line-height: 1.5;
   color: var(--wb-text-muted);
@@ -4007,10 +4001,129 @@ textarea.field {
   justify-content: flex-end;
 }
 
+.plot-dataset-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(70, 213, 205, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.028));
+  box-shadow: none;
+  min-height: 0;
+}
+
+.plot-dataset-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plot-dataset-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plot-dataset-copy > span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wb-text-muted);
+}
+
+.plot-dataset-copy > strong {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.25;
+  color: var(--wb-text-main);
+  word-break: break-word;
+}
+
+.plot-dataset-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--wb-text-muted);
+  font-size: 11px;
+}
+
+.plot-dataset-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-data-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(280px, 0.76fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.plot-preview-panel,
+.plot-fields-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-preview-panel {
+  min-height: 460px;
+}
+
+.plot-preview-panel .plot-table-preview {
+  flex: 1;
+}
+
+.plot-preview-panel-head,
+.plot-fields-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plot-preview-panel-head strong,
+.plot-fields-panel-head strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--wb-text-main);
+}
+
+.plot-preview-panel-head span,
+.plot-fields-panel-head span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--wb-text-muted);
+  line-height: 1.35;
+}
+
+.plot-preview-panel-head .plot-preview-note {
+  max-width: 18ch;
+  text-align: right;
+}
+
 .plot-flow-v3-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.75fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   min-height: 0;
   animation: plot-fade-up 220ms ease both;
 }
@@ -4026,12 +4139,21 @@ textarea.field {
 
 .plot-flow-v3-main .wb-section-header,
 .plot-flow-v3-side .wb-inspector {
-  border-radius: 16px;
-  padding: 14px 14px 12px;
+  border-radius: 14px;
+  padding: 10px 4px 6px;
 }
 
 .plot-flow-v3-main .wb-section-header {
-  background: linear-gradient(180deg, rgba(24, 35, 45, 0.96), rgba(21, 31, 40, 0.96));
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.plot-flow-v3-main .wb-inspector {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 .plot-flow-v3-side .wb-inspector {
@@ -4051,18 +4173,18 @@ textarea.field {
 }
 
 .plot-dropzone {
-  min-height: 200px;
+  min-height: 184px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 20px 22px;
-  border-radius: 18px;
+  padding: 18px 20px;
+  border-radius: 16px;
   border-style: dashed;
   background:
-    radial-gradient(circle at top, rgba(70, 213, 205, 0.08), transparent 48%),
-    linear-gradient(180deg, rgba(17, 25, 32, 0.88), rgba(13, 18, 24, 0.94));
+    radial-gradient(circle at top, rgba(70, 213, 205, 0.06), transparent 48%),
+    linear-gradient(180deg, rgba(17, 25, 32, 0.86), rgba(13, 18, 24, 0.92));
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
@@ -4113,7 +4235,7 @@ textarea.field {
 }
 
 .plot-flow-v3-grid.import-grid.empty .import-main {
-  max-width: 980px;
+  max-width: 920px;
   margin-inline: auto;
 }
 
@@ -4125,8 +4247,8 @@ textarea.field {
 }
 
 .plot-source-stack {
-  padding: 10px;
-  border-radius: 16px;
+  padding: 0;
+  border-radius: 0;
   gap: 8px;
   background: rgba(255, 255, 255, 0.02);
 }
@@ -4135,9 +4257,9 @@ textarea.field {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 12px 10px;
+  padding: 12px;
   border-radius: 14px;
-  background: rgba(15, 23, 31, 0.96);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .plot-file-card-head {
@@ -4206,7 +4328,7 @@ textarea.field {
   gap: 6px;
   padding: 8px 10px;
   border-radius: 12px;
-  background: rgba(245, 180, 93, 0.06);
+  background: rgba(245, 180, 93, 0.05);
   color: var(--wb-text-body);
 }
 
@@ -4214,6 +4336,31 @@ textarea.field {
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.plot-import-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.plot-import-footer-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plot-import-footer-copy span {
+  font-size: 11px;
+  color: var(--wb-text-muted);
+}
+
+.plot-import-footer-copy strong {
+  font-size: 13px;
+  color: var(--wb-text-main);
 }
 
 .plot-column-summary {
@@ -4268,12 +4415,15 @@ textarea.field {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+}
+
+.plot-fields-panel .plot-column-controls {
+  margin-bottom: 0;
 }
 
 .plot-column-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
   gap: 8px;
 }
 
@@ -4283,7 +4433,7 @@ textarea.field {
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.03);
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
@@ -4368,13 +4518,14 @@ textarea.field {
   padding: 10px;
   border-radius: 14px;
   overflow: auto;
-  background: rgba(10, 16, 21, 0.94);
+  background: rgba(255, 255, 255, 0.025);
+  min-height: 0;
 }
 
 .plot-table-preview-head,
 .plot-table-preview-row {
   display: grid;
-  grid-template-columns: 42px repeat(8, minmax(104px, 1fr));
+  grid-template-columns: 42px repeat(var(--plot-preview-columns), minmax(112px, 1fr));
   gap: 5px;
   align-items: center;
 }
@@ -4417,7 +4568,12 @@ textarea.field {
 .plot-table-cell {
   min-height: 32px;
   border-radius: 10px;
+  border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.plot-fields-panel .plot-column-grid {
+  margin-top: 2px;
 }
 
 .plot-table-preview-head .muted,
@@ -4644,7 +4800,7 @@ textarea.field {
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .plot-toggle-row {
@@ -4802,7 +4958,8 @@ textarea.field {
 @media (max-width: 1100px) {
   .plot-flow-v3-grid,
   .plot-template-layout,
-  .plot-refine-layout {
+  .plot-refine-layout,
+  .plot-data-workspace {
     grid-template-columns: 1fr;
   }
 

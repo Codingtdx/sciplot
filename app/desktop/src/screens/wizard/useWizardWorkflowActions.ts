@@ -137,10 +137,12 @@ export function useWizardWorkflowActions({
     wizard.setBusy(true);
     try {
       const response = await exportRender(
-        wizard.inputPath,
-        wizard.sheet,
-        wizard.template,
-        wizard.options,
+        {
+          input_path: wizard.inputPath,
+          sheet: wizard.sheet,
+          template: wizard.template,
+          options: wizard.options,
+        },
       );
       wizard.setOutputs(response.outputs);
       wizard.setExportResult(response);

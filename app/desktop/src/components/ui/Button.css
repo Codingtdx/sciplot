@@ -1,0 +1,77 @@
+.sciplot-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  gap: var(--spacing-sm);
+  outline: none;
+}
+
+.sciplot-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-accent-primary);
+}
+
+.sciplot-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary variant */
+.sciplot-button--primary {
+  background-color: var(--color-accent-primary);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.sciplot-button--primary:not(:disabled):hover {
+  background-color: #3a76d8;
+}
+
+.sciplot-button--primary:not(:disabled):active {
+  background-color: #2a66c8;
+}
+
+/* Secondary variant */
+.sciplot-button--secondary {
+  background-color: transparent;
+  color: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.sciplot-button--secondary:not(:disabled):hover {
+  background-color: rgba(74, 134, 232, 0.1);
+}
+
+/* Tertiary variant */
+.sciplot-button--tertiary {
+  background-color: transparent;
+  color: var(--color-text-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.sciplot-button--tertiary:not(:disabled):hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Size variants */
+.sciplot-button--sm {
+  font-size: var(--font-size-sm);
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+  padding-left: var(--spacing-sm);
+  padding-right: var(--spacing-sm);
+}
+
+.sciplot-button--lg {
+  font-size: var(--font-size-md);
+  padding-top: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+}

@@ -11,11 +11,9 @@ import { useShallow } from "zustand/react/shallow";
 import { PreviewPane } from "../components/PreviewPane";
 import {
   CompactListRow,
-  CompactToolbar,
   InspectorPanel,
   SectionHeader,
   SegmentedControl,
-  StepRail,
 } from "../components/workbench/V2Primitives";
 import { exportRender, inspectFile, openPath } from "../lib/api";
 import { applyInspectionToWizard, loadWizardDataFile } from "../lib/project-io";
@@ -37,7 +35,6 @@ import {
   confirmReplaceWizardSession,
   formatLeaf,
   getErrorMessage,
-  getPlotStageLabel,
   plotRoute,
   templateLabel,
   templateMeta,
@@ -93,20 +90,8 @@ type PlotRefineDraft = {
 };
 
 type PlotExportDraft = {
-  filename: string;
   outputRoot: string;
-  format: "pdf";
 };
-
-const FLOW_STEPS: Array<{
-  id: PlotFlowStage;
-  label: string;
-  hint: string;
-}> = [
-  { id: "import", label: "Import Data", hint: "Upload, inspect, and map fields" },
-  { id: "template", label: "Choose Template", hint: "Pick the strongest chart family" },
-  { id: "refine", label: "Refine & Export", hint: "Tune the figure and export" },
-];
 
 const SUPPORTED_EXTENSIONS = new Set(["csv", "txt", "tsv", "xlsx", "xlsm"]);
 
@@ -129,18 +114,6 @@ function flowStageForRoute(stage: PlotStage): PlotFlowStage {
     return "refine";
   }
   return "import";
-}
-
-function stageHint(stage: PlotFlowStage) {
-  switch (stage) {
-    case "template":
-      return "Data becomes chart intent.";
-    case "refine":
-      return "Preview stays alive while you polish and export.";
-    case "import":
-    default:
-      return "Bring data in, map fields, and keep moving.";
-  }
 }
 
 function cleanCell(value: unknown) {
@@ -206,13 +179,9 @@ function defaultRefineDraft(
   };
 }
 
-function defaultExportDraft(inputPath: string, template: TemplateName | null): PlotExportDraft {
-  const source = inputPath ? inputPath.replace(/\.[^.]+$/, "") : "plot";
-  const suffix = template ? `_${template}` : "";
+function defaultExportDraft(inputPath: string): PlotExportDraft {
   return {
-    filename: `${formatLeaf(source)}${suffix}`,
     outputRoot: inputPath ? inputPath.replace(/[/\\][^/\\]+$/, "") : "",
-    format: "pdf",
   };
 }
 
@@ -407,38 +376,6 @@ export function PlotScreen({
   const routeFlowStage = flowStageForRoute(routeStage);
   const hasInput = Boolean(wizard.inputPath);
   const hasTemplate = Boolean(wizard.template);
-  const stepItems = useMemo(() => {
-    const currentIndex = FLOW_STEPS.findIndex((step) => step.id === routeFlowStage);
-    return FLOW_STEPS.map((step, index) => {
-      let status: "complete" | "current" | "upcoming" | "disabled" = "upcoming";
-      if (!hasInput && index === 0) {
-        status = "current";
-      } else if (index < currentIndex) {
-        status = "complete";
-      } else if (index === currentIndex) {
-        status = "current";
-      }
-      return {
-        id: step.id,
-        label: step.label,
-        hint: step.hint,
-        status,
-        onSelect:
-          status === "complete"
-            ? () => {
-                if (step.id === "import") {
-                  onNavigate(plotRoute("import"));
-                } else if (step.id === "template") {
-                  onNavigate(plotRoute("type"));
-                } else {
-                  onNavigate(plotRoute("tune"));
-                }
-              }
-            : null,
-      };
-    });
-  }, [hasInput, onNavigate, routeFlowStage]);
-
   const recommendedSelection = useMemo(
     () => (wizard.inspection ? selectionFromInspection(meta, wizard.inspection) : null),
     [meta, wizard.inspection],
@@ -510,7 +447,7 @@ export function PlotScreen({
       setRefineDraft(defaultRefineDraft(wizard.inspection, wizard.template, plotDataDraft, meta));
     }
     if (!exportDraft) {
-      setExportDraft(defaultExportDraft(wizard.inputPath, wizard.template));
+      setExportDraft(defaultExportDraft(wizard.inputPath));
     }
   }, [exportDraft, meta, plotDataDraft, refineDraft, wizard.dataset, wizard.inspection, wizard.inputPath, wizard.template]);
 
@@ -643,13 +580,13 @@ export function PlotScreen({
       const nextTemplate = inspected.inspection.recommendation.template;
       setPlotDataDraft(inspected.dataset ? normalizeDataset(inspected.dataset) : null);
       setRefineDraft(null);
-      setExportDraft(defaultExportDraft(inspected.input_path, nextTemplate));
+      setExportDraft(defaultExportDraft(inspected.input_path));
       rememberProject({
         mode: "wizard",
         kind: "data",
         path: inspected.input_path,
         title: formatLeaf(inspected.input_path),
-        detail: `Data file · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, nextTemplate)}`,
+        detail: `Dataset · ${inspected.sheet_names.length} sheets · ${templateLabel(meta, nextTemplate)}`,
       });
       onNavigate(plotRoute(nextRoute));
       return inspected;
@@ -723,12 +660,12 @@ export function PlotScreen({
     onNavigate(plotRoute("tune"));
   };
 
-  const exportOutputPath = useMemo(() => {
+  const exportOutputDir = useMemo(() => {
     if (!wizard.inputPath || !exportDraft) {
       return "";
     }
     const root = exportDraft.outputRoot || wizard.inputPath.replace(/[/\\][^/\\]+$/, "");
-    return root ? `${root.replace(/[/\\]$/, "")}/${exportDraft.filename}` : exportDraft.filename;
+    return root ? root.replace(/[/\\]$/, "") : "";
   }, [exportDraft, wizard.inputPath]);
 
   const runExport = async () => {
@@ -738,13 +675,13 @@ export function PlotScreen({
     wizard.setError(null);
     wizard.setBusy(true);
     try {
-      const response = await exportRender(
-        wizard.inputPath,
-        wizard.sheet,
-        wizard.template,
-        wizard.options,
-        exportOutputPath || undefined,
-      );
+      const response = await exportRender({
+        input_path: wizard.inputPath,
+        sheet: wizard.sheet,
+        template: wizard.template,
+        options: wizard.options,
+        output_dir: exportOutputDir || undefined,
+      });
       wizard.setOutputs(response.outputs);
       wizard.setExportResult(response);
       wizard.setSubmissionReport(response.submission_report ?? wizard.submissionReport);
@@ -767,14 +704,7 @@ export function PlotScreen({
     wizard.setTemplate(nextTemplate);
     wizard.setOptions(sanitizeRenderOptions(meta, nextTemplate, wizard.options, wizard.inspection?.model));
     setRefineDraft(defaultRefineDraft(wizard.inspection, nextTemplate, plotDataDraft, meta));
-    setExportDraft((current) =>
-      current
-        ? {
-            ...current,
-            filename: `${formatLeaf(wizard.inputPath || "plot").replace(/\.[^.]+$/, "")}_${nextTemplate}`,
-          }
-        : current,
-    );
+    setExportDraft((current) => current ?? defaultExportDraft(wizard.inputPath || ""));
   };
 
   const updateColumnRole = (index: number, role: PlotColumnRole) => {
@@ -846,9 +776,6 @@ export function PlotScreen({
   const selectedYIndex = plotDataDraft?.columnRoles.findIndex((role) => role === "y") ?? -1;
   const selectedXLabel = plotDataDraft && selectedXIndex >= 0 ? plotDataDraft.columnTitles[selectedXIndex] : "X";
   const selectedYLabel = plotDataDraft && selectedYIndex >= 0 ? plotDataDraft.columnTitles[selectedYIndex] : "Y";
-  const selectedXKind = columnKind(wizard.dataset, selectedXIndex, plotDataDraft);
-  const selectedYKind = columnKind(wizard.dataset, selectedYIndex, plotDataDraft);
-  const selectedIntent = chartIntentLabel(selectedXKind, selectedYKind);
   const dataWarnings = [
     ...(wizard.inspection?.warnings ?? []),
     ...(wizard.dataset?.quality_flags?.includes("empty_columns_dropped")
@@ -873,6 +800,20 @@ export function PlotScreen({
 
   const visiblePreviewRows = plotDataDraft?.rows.slice(0, 8) ?? [];
   const previewColumns = plotDataDraft?.columnTitles.slice(0, 8) ?? [];
+  const previewTableStyle = useMemo(
+    () =>
+      ({
+        ["--plot-preview-columns" as string]: String(Math.max(previewColumns.length, 1)),
+      }) as CSSProperties,
+    [previewColumns.length],
+  );
+  const previewGridColumnsStyle = useMemo(
+    () =>
+      ({
+        gridTemplateColumns: `42px repeat(${Math.max(previewColumns.length, 1)}, minmax(112px, 1fr))`,
+      }) as CSSProperties,
+    [previewColumns.length],
+  );
   const templateSections = useMemo(
     () => {
       const recommendations = wizard.inspection?.recommendations ?? [];
@@ -908,67 +849,47 @@ export function PlotScreen({
   }, [meta]);
 
   const currentPreviewLabel = hasTemplate ? templateLabel(meta, wizard.template) : "Template preview";
-  const currentStageTitle =
-    routeFlowStage === "import"
-      ? "Import data"
-      : routeFlowStage === "template"
-        ? "Choose template"
-        : "Refine and export";
-
   return (
     <div className={`plot-workspace plot-flow-v3 plot-flow-stage-${routeFlowStage} ${hasInput ? "has-data" : "empty-data"}`}>
       <header className="plot-flow-v3-header">
-        <div className="plot-flow-v3-header-copy">
-          <span>Plot</span>
-          <strong>{currentStageTitle}</strong>
-          <p>{stageHint(routeFlowStage)}</p>
-        </div>
         <div className="plot-flow-v3-header-actions">
-          {routeFlowStage !== "import" && hasInput ? (
-            <button className="ghost-button" onClick={() => onNavigate(plotRoute("import"))} type="button">
-              Back to import
-            </button>
-          ) : null}
-          {routeFlowStage === "template" && hasTemplate ? (
-            <button className="primary-button" onClick={continueFromTemplate} type="button">
-              Continue
-            </button>
-          ) : routeFlowStage === "refine" ? (
+          {routeFlowStage === "import" ? (
+            hasInput ? (
+              <>
+                <button className="ghost-button" onClick={openDataFile} type="button">
+                  Replace
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="ghost-button" onClick={() => setShowRecentModal(true)} type="button">
+                  Open recent
+                </button>
+                <button className="primary-button" onClick={openDataFile} type="button">
+                  Upload file
+                </button>
+              </>
+            )
+          ) : routeFlowStage === "template" ? (
+            <>
+              <button className="ghost-button" onClick={() => setShowTemplateGallery(true)} type="button">
+                More chart types
+              </button>
+              <button className="primary-button" disabled={!wizard.template} onClick={continueFromTemplate} type="button">
+                Continue
+              </button>
+            </>
+          ) : (
             <button className="primary-button" onClick={() => setShowExportModal(true)} type="button">
               Export
-            </button>
-          ) : (
-            <button className="primary-button" disabled={!hasInput} onClick={continueFromImport} type="button">
-              Continue
             </button>
           )}
         </div>
       </header>
 
-      <StepRail
-        ariaLabel="Plot flow steps"
-        steps={stepItems}
-      />
-
       {routeFlowStage === "import" ? (
         <div className={`plot-flow-v3-grid import-grid ${plotDataDraft ? "loaded" : "empty"} ${dropActive ? "drop-active" : ""}`}>
           <section className="plot-flow-v3-main import-main">
-            <SectionHeader
-              kicker="Stage 1"
-              title="Import data"
-              description="Upload a file, confirm the sheet, and lightly prep the table before chart selection."
-              actions={
-                <CompactToolbar label="Import actions">
-                  <button className="primary-button" onClick={openDataFile} type="button">
-                    Open data
-                  </button>
-                  <button className="ghost-button" onClick={() => setShowRecentModal(true)} type="button">
-                    Open recent
-                  </button>
-                </CompactToolbar>
-              }
-            />
-
             {!hasInput ? (
               <div
                 className={`plot-dropzone ${dropActive ? "drag-active" : ""}`}
@@ -992,45 +913,42 @@ export function PlotScreen({
                   <p>CSV, TSV, TXT, XLSX, or XLSM. Keep it calm and focused.</p>
                 </div>
                 <button className="primary-button prominent" onClick={openDataFile} type="button">
-                  Upload file
+                  Browse files
                 </button>
                 <div className="plot-dropzone-hint">Drop a single workbook or spreadsheet to begin.</div>
               </div>
             ) : (
-              <div className="plot-source-stack">
-                <article className="plot-file-card">
-                  <div className="plot-file-card-head">
-                    <div>
-                      <span>Attached file</span>
-                      <strong title={formatLeaf(wizard.inputPath)}>{formatLeaf(wizard.inputPath)}</strong>
+              <div className="plot-dataset-shell">
+                <div className="plot-dataset-head">
+                  <div className="plot-dataset-copy">
+                    <span>Current dataset</span>
+                    <strong title={formatLeaf(wizard.inputPath)}>{formatLeaf(wizard.inputPath)}</strong>
+                    <div className="plot-dataset-meta">
+                      <span>{wizard.sheetNames.length} sheet{wizard.sheetNames.length === 1 ? "" : "s"}</span>
+                      <span>{plotDataDraft?.rows.length ?? 0} preview rows</span>
+                      <span>{plotDataDraft?.columnTitles.length ?? 0} columns</span>
                     </div>
-                    <button className="ghost-button" onClick={openDataFile} type="button">
-                      Replace
-                    </button>
                   </div>
-                  <div className="plot-file-card-meta">
-                    <span>{wizard.sheetNames.length} sheets</span>
-                    <span>{wizard.inspection?.model_label ?? "Inspecting"}</span>
-                    <span>{plotDataDraft?.rows.length ?? 0} preview rows</span>
-                  </div>
-                  {wizard.sheetNames.length > 1 ? (
-                    <div className="plot-sheet-strip">
-                      {wizard.sheetNames.map((sheetName) => {
-                        const active = wizard.sheet === sheetName || (typeof wizard.sheet === "number" && wizard.sheetNames[wizard.sheet] === sheetName);
-                        return (
-                          <button
-                            className={`plot-sheet-chip ${active ? "active" : ""}`}
-                            key={sheetName}
-                            onClick={() => void rerunInspect(sheetName)}
-                            type="button"
-                          >
-                            {sheetName}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </article>
+                  <button className="ghost-button" onClick={openDataFile} type="button">
+                    Replace file
+                  </button>
+                </div>
+
+                <div className="plot-sheet-strip">
+                  {wizard.sheetNames.map((sheetName) => {
+                    const active = wizard.sheet === sheetName || (typeof wizard.sheet === "number" && wizard.sheetNames[wizard.sheet] === sheetName);
+                    return (
+                      <button
+                        className={`plot-sheet-chip ${active ? "active" : ""}`}
+                        key={sheetName}
+                        onClick={() => void rerunInspect(sheetName)}
+                        type="button"
+                      >
+                        {sheetName}
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {wizard.inspection?.warnings?.length || dataWarnings.length ? (
                   <div className="plot-warning-strip">
@@ -1039,195 +957,192 @@ export function PlotScreen({
                     ))}
                   </div>
                 ) : null}
+
+                {plotDataDraft ? (
+                  <>
+                    <InspectorPanel
+                      kicker="Preview"
+                      title="Data preview"
+                      extra={
+                        <div className="plot-column-summary">
+                          <span className="plot-summary-chip x">
+                            <strong>X</strong>
+                            <span>{selectedXLabel || "X"}</span>
+                          </span>
+                          <span className="plot-summary-chip y">
+                            <strong>Y</strong>
+                            <span>{selectedYLabel || "Y"}</span>
+                          </span>
+                          <span className="plot-summary-meta">{plotDataDraft.rows.length} rows</span>
+                        </div>
+                      }
+                    >
+                      <div className="plot-data-workspace">
+                        <div className="plot-preview-panel">
+                          <div className="plot-preview-panel-head">
+                            <div>
+                              <strong>Rows and cells</strong>
+                              <span>Preview the dataset before chart selection.</span>
+                            </div>
+                            <span className="plot-preview-note">x/y mapping updates live</span>
+                          </div>
+                          <div className="plot-table-preview" style={previewTableStyle}>
+                            <div className="plot-table-preview-head" style={previewGridColumnsStyle}>
+                              <span>#</span>
+                              {previewColumns.map((column, index) => (
+                                <div
+                                  className={`plot-table-preview-head-cell ${plotDataDraft.columnRoles[index] === "ignore" ? "muted" : ""}`}
+                                  key={`${column}-${index}`}
+                                >
+                                  <strong>{column}</strong>
+                                  <span>
+                                    {plotColumnRoleLabel(plotDataDraft.columnRoles[index])} · {columnKind(wizard.dataset, index, plotDataDraft) ?? "text"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {visiblePreviewRows.map((row, rowIndex) => (
+                              <div className="plot-table-preview-row" key={`row-${rowIndex}`} style={previewGridColumnsStyle}>
+                                <span className="plot-row-index">{rowIndex + 1}</span>
+                                {previewColumns.map((_, columnIndex) => (
+                                  <input
+                                    className="plot-table-cell"
+                                    key={`${rowIndex}-${columnIndex}`}
+                                    onChange={(event) => updateCellValue(rowIndex, columnIndex, event.target.value)}
+                                    value={previewValue(row[columnIndex])}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="plot-fields-panel">
+                          <div className="plot-fields-panel-head">
+                            <strong>Field mapping</strong>
+                            <span>Keep x and y obvious, then tidy the columns you need.</span>
+                          </div>
+                          <div className="plot-column-controls">
+                            <label className="plot-control-row">
+                              <span>Header row</span>
+                              <select
+                                value={plotDataDraft.headerRowIndex}
+                                onChange={(event) => updateHeaderRowIndex(Number(event.target.value))}
+                              >
+                                {plotDataDraft.rows.slice(0, 3).map((_, index) => (
+                                  <option key={index} value={index}>
+                                    Row {index + 1}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="plot-control-row">
+                              <span>X column</span>
+                              <select
+                                value={selectedXIndex >= 0 ? selectedXIndex : ""}
+                                onChange={(event) => updateColumnRole(Number(event.target.value), "x")}
+                              >
+                                <option value="">Choose</option>
+                                {visibleColumns.map((column) => (
+                                  <option key={column.index} value={column.index}>
+                                    {column.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="plot-control-row">
+                              <span>Y column</span>
+                              <select
+                                value={selectedYIndex >= 0 ? selectedYIndex : ""}
+                                onChange={(event) => updateColumnRole(Number(event.target.value), "y")}
+                              >
+                                <option value="">Choose</option>
+                                {visibleColumns.map((column) => (
+                                  <option key={column.index} value={column.index}>
+                                    {column.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                          {candidateRoleLabels.length > 0 ? (
+                            <div className="plot-candidate-strip">
+                              {candidateRoleLabels
+                                .filter((item) => item.role !== "ignore")
+                                .slice(0, 4)
+                                .map((item) => (
+                                  <button
+                                    className={`plot-candidate-chip ${item.role === "x" ? "x" : item.role === "y" ? "y" : ""}`}
+                                    key={`${item.index}-${item.title}`}
+                                    onClick={() => updateColumnRole(item.index, item.role === "x" ? "y" : "x")}
+                                    type="button"
+                                  >
+                                    {item.title}
+                                  </button>
+                                ))}
+                            </div>
+                          ) : null}
+                          <div className="plot-column-grid">
+                            {plotDataDraft.columnTitles.map((title, index) => (
+                              <article
+                                className={`plot-column-card ${plotDataDraft.columnRoles[index] === "ignore" ? "ignored" : ""} ${index === selectedXIndex || index === selectedYIndex ? "selected" : ""}`}
+                                key={`${plotDataDraft.datasetId}-${index}`}
+                              >
+                                <div className="plot-column-card-head">
+                                  <div className="plot-column-head-copy">
+                                    <span className={`plot-column-type ${wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}`}>
+                                      {wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}
+                                    </span>
+                                    <span className={`plot-column-role ${plotDataDraft.columnRoles[index]}`}>
+                                      {plotColumnRoleLabel(plotDataDraft.columnRoles[index])}
+                                    </span>
+                                  </div>
+                                  <div className="plot-column-actions">
+                                    <button className="ghost-button" onClick={() => updateColumnRole(index, "x")} type="button">
+                                      X
+                                    </button>
+                                    <button className="ghost-button" onClick={() => updateColumnRole(index, "y")} type="button">
+                                      Y
+                                    </button>
+                                    <button className="ghost-button" onClick={() => updateColumnRole(index, "ignore")} type="button">
+                                      Hide
+                                    </button>
+                                  </div>
+                                </div>
+                                <input
+                                  className="plot-column-title-input"
+                                  onChange={(event) => updateColumnTitle(index, event.target.value)}
+                                  value={title}
+                                />
+                                <div className="plot-column-meta">
+                                  <span>{wizard.dataset?.column_profiles[index]?.non_empty_count ?? 0} values</span>
+                                  <span>{wizard.dataset?.column_profiles[index]?.missing_count ?? 0} missing</span>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </InspectorPanel>
+
+                    <div className="plot-import-footer">
+                      <div className="plot-import-footer-copy">
+                        <span>
+                          {wizard.sheetNames.length} sheet{wizard.sheetNames.length === 1 ? "" : "s"} · {plotDataDraft.rows.length} rows
+                        </span>
+                        <strong>
+                          {selectedXLabel} / {selectedYLabel}
+                        </strong>
+                      </div>
+                      <button className="primary-button" disabled={!hasInput} onClick={continueFromImport} type="button">
+                        Continue
+                      </button>
+                    </div>
+                  </>
+                ) : null}
               </div>
             )}
-
-            {plotDataDraft ? (
-              <div className="plot-preview-layout">
-                <InspectorPanel
-                  kicker="Preview"
-                  title="Light data prep"
-                  extra={
-                    <div className="plot-column-summary">
-                      <span className="plot-summary-chip x">
-                        <strong>X</strong>
-                        <span>{selectedXLabel || "X"}</span>
-                      </span>
-                      <span className="plot-summary-chip y">
-                        <strong>Y</strong>
-                        <span>{selectedYLabel || "Y"}</span>
-                      </span>
-                      <span className="plot-summary-meta">{plotDataDraft.rows.length} rows</span>
-                    </div>
-                  }
-                >
-                  <div className="plot-column-controls">
-                    <label className="plot-control-row">
-                      <span>Header row</span>
-                      <select
-                        value={plotDataDraft.headerRowIndex}
-                        onChange={(event) => updateHeaderRowIndex(Number(event.target.value))}
-                      >
-                        {plotDataDraft.rows.slice(0, 3).map((_, index) => (
-                          <option key={index} value={index}>
-                            Row {index + 1}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="plot-control-row">
-                      <span>X column</span>
-                      <select
-                        value={selectedXIndex >= 0 ? selectedXIndex : ""}
-                        onChange={(event) => updateColumnRole(Number(event.target.value), "x")}
-                      >
-                        <option value="">Choose</option>
-                        {visibleColumns.map((column) => (
-                          <option key={column.index} value={column.index}>
-                            {column.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="plot-control-row">
-                      <span>Y column</span>
-                      <select
-                        value={selectedYIndex >= 0 ? selectedYIndex : ""}
-                        onChange={(event) => updateColumnRole(Number(event.target.value), "y")}
-                      >
-                        <option value="">Choose</option>
-                        {visibleColumns.map((column) => (
-                          <option key={column.index} value={column.index}>
-                            {column.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  {candidateRoleLabels.length > 0 ? (
-                    <div className="plot-candidate-strip">
-                      {candidateRoleLabels
-                        .filter((item) => item.role !== "ignore")
-                        .slice(0, 4)
-                        .map((item) => (
-                          <button
-                            className={`plot-candidate-chip ${item.role === "x" ? "x" : item.role === "y" ? "y" : ""}`}
-                            key={`${item.index}-${item.title}`}
-                            onClick={() => updateColumnRole(item.index, item.role === "x" ? "y" : "x")}
-                            type="button"
-                          >
-                            {item.title}
-                          </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="plot-column-grid">
-                    {plotDataDraft.columnTitles.map((title, index) => (
-                      <article
-                        className={`plot-column-card ${plotDataDraft.columnRoles[index] === "ignore" ? "ignored" : ""} ${index === selectedXIndex || index === selectedYIndex ? "selected" : ""}`}
-                        key={`${plotDataDraft.datasetId}-${index}`}
-                      >
-                        <div className="plot-column-card-head">
-                          <div className="plot-column-head-copy">
-                            <span className={`plot-column-type ${wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}`}>
-                              {wizard.dataset?.column_profiles[index]?.inferred_type ?? "text"}
-                            </span>
-                            <span className={`plot-column-role ${plotDataDraft.columnRoles[index]}`}>
-                              {plotColumnRoleLabel(plotDataDraft.columnRoles[index])}
-                            </span>
-                          </div>
-                          <div className="plot-column-actions">
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "x")} type="button">
-                              X
-                            </button>
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "y")} type="button">
-                              Y
-                            </button>
-                            <button className="ghost-button" onClick={() => updateColumnRole(index, "ignore")} type="button">
-                              Hide
-                            </button>
-                          </div>
-                        </div>
-                        <input
-                          className="plot-column-title-input"
-                          onChange={(event) => updateColumnTitle(index, event.target.value)}
-                          value={title}
-                        />
-                        <div className="plot-column-meta">
-                          <span>{wizard.dataset?.column_profiles[index]?.non_empty_count ?? 0} values</span>
-                          <span>{wizard.dataset?.column_profiles[index]?.missing_count ?? 0} missing</span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </InspectorPanel>
-
-                <InspectorPanel
-                  kicker="Table preview"
-                  title="Rows and cells"
-                  extra={<span className="plot-preview-note">{stageIntent.intent}</span>}
-                >
-                  <div className="plot-table-preview">
-                    <div className="plot-table-preview-head">
-                      <span>#</span>
-                      {previewColumns.map((column, index) => (
-                        <div
-                          className={`plot-table-preview-head-cell ${plotDataDraft.columnRoles[index] === "ignore" ? "muted" : ""}`}
-                          key={`${column}-${index}`}
-                        >
-                          <strong>{column}</strong>
-                          <span>
-                            {plotColumnRoleLabel(plotDataDraft.columnRoles[index])} · {columnKind(wizard.dataset, index, plotDataDraft) ?? "text"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {visiblePreviewRows.map((row, rowIndex) => (
-                      <div className="plot-table-preview-row" key={`row-${rowIndex}`}>
-                        <span className="plot-row-index">{rowIndex + 1}</span>
-                        {previewColumns.map((_, columnIndex) => (
-                          <input
-                            className="plot-table-cell"
-                            key={`${rowIndex}-${columnIndex}`}
-                            onChange={(event) => updateCellValue(rowIndex, columnIndex, event.target.value)}
-                            value={previewValue(row[columnIndex])}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </InspectorPanel>
-              </div>
-            ) : null}
           </section>
-
-          <aside className="plot-flow-v3-side">
-            <InspectorPanel
-              kicker="Workspace"
-              title="Current state"
-              extra={<span className="plot-stage-pill">{getPlotStageLabel(routeStage)}</span>}
-            >
-              <div className="plot-state-stack">
-                <div className="plot-state-card">
-                  <span>Stage</span>
-                  <strong>{FLOW_STEPS.find((step) => step.id === routeFlowStage)?.label}</strong>
-                  <p>{stageHint(routeFlowStage)}</p>
-                </div>
-                <div className="plot-state-card">
-                  <span>Mapping</span>
-                  <strong>{selectedXLabel} / {selectedYLabel}</strong>
-                  <p>{selectedIntent}</p>
-                </div>
-                <div className="plot-state-card">
-                  <span>Ready</span>
-                  <strong>{hasTemplate ? templateLabel(meta, wizard.template) : "Choose a template"}</strong>
-                  <p>{wizard.inspection?.recommendation_summary ?? "The chart scene is waiting for a template choice."}</p>
-                </div>
-              </div>
-            </InspectorPanel>
-
-            {dropNotice ? <div className="warning-card">{dropNotice}</div> : null}
-          </aside>
         </div>
       ) : null}
 
@@ -1235,19 +1150,8 @@ export function PlotScreen({
         <div className="plot-flow-v3-grid template-grid">
           <section className="plot-flow-v3-main template-main">
             <SectionHeader
-              kicker="Stage 2"
               title="Choose template"
               description="Recommended templates appear as visual cards. Select one to update the live preview immediately."
-              actions={
-                <CompactToolbar label="Template actions">
-                  <button className="ghost-button" onClick={() => setShowTemplateGallery(true)} type="button">
-                    More chart types
-                  </button>
-                  <button className="primary-button" disabled={!wizard.template} onClick={continueFromTemplate} type="button">
-                    Continue
-                  </button>
-                </CompactToolbar>
-              }
             />
 
             <div className="plot-template-layout">
@@ -1318,22 +1222,6 @@ export function PlotScreen({
               </section>
             </div>
           </section>
-          <aside className="plot-flow-v3-side">
-            <InspectorPanel kicker="Guide" title="Template notes">
-              <div className="plot-state-stack">
-                <div className="plot-state-card">
-                  <span>Selected template</span>
-                  <strong>{wizard.template ? templateLabel(meta, wizard.template) : "None yet"}</strong>
-                  <p>{wizard.template ? "Preview updates automatically." : "Pick a card to continue."}</p>
-                </div>
-                <div className="plot-state-card">
-                  <span>Mapping</span>
-                  <strong>{selectedXLabel} / {selectedYLabel}</strong>
-                  <p>{wizard.inspection?.recommendation.reason ?? "Data-aware guidance comes from the inspection."}</p>
-                </div>
-              </div>
-            </InspectorPanel>
-          </aside>
         </div>
       ) : null}
 
@@ -1341,16 +1229,8 @@ export function PlotScreen({
         <div className="plot-flow-v3-grid refine-grid">
           <section className="plot-flow-v3-main refine-main">
             <SectionHeader
-              kicker="Stage 3"
               title="Refine & export"
               description="Keep the preview alive while you polish the final figure and choose an export location."
-              actions={
-                <CompactToolbar label="Refine actions">
-                  <button className="primary-button" onClick={() => setShowExportModal(true)} type="button">
-                    Export
-                  </button>
-                </CompactToolbar>
-              }
             />
             <div className="plot-refine-layout">
               <section className="plot-refine-controls">
@@ -1510,48 +1390,8 @@ export function PlotScreen({
               </section>
             </div>
           </section>
-          <aside className="plot-flow-v3-side">
-            <InspectorPanel kicker="Export" title="Delivery settings">
-              <div className="plot-state-stack">
-                <div className="plot-state-card">
-                  <span>Ready</span>
-                  <strong>{wizard.template ? templateLabel(meta, wizard.template) : "Choose a template"}</strong>
-                  <p>{wizard.inspection?.recommendation_summary ?? "The figure is ready for refinement."}</p>
-                </div>
-                <div className="plot-state-card">
-                  <span>Export path</span>
-                  <strong>{exportOutputPath || "Choose a destination"}</strong>
-                  <p>{wizard.exportResult?.output_dir ? "The latest export finished." : "Use the export modal to choose a directory."}</p>
-                </div>
-              </div>
-            </InspectorPanel>
-          </aside>
         </div>
       ) : null}
-
-      <footer className="plot-flow-v3-footer">
-        <span>{stageHint(routeFlowStage)}</span>
-        <div className="plot-flow-v3-footer-actions">
-          {routeFlowStage !== "import" ? (
-            <button className="ghost-button" onClick={() => onNavigate(plotRoute("import"))} type="button">
-              Back
-            </button>
-          ) : null}
-          {routeFlowStage === "template" ? (
-            <button className="primary-button" disabled={!wizard.template} onClick={continueFromTemplate} type="button">
-              Continue
-            </button>
-          ) : routeFlowStage === "refine" ? (
-            <button className="primary-button" onClick={() => setShowExportModal(true)} type="button">
-              Export
-            </button>
-          ) : (
-            <button className="primary-button" disabled={!wizard.inputPath} onClick={continueFromImport} type="button">
-              Continue
-            </button>
-          )}
-        </div>
-      </footer>
 
       {showRecentModal ? (
         <div className="plot-modal-backdrop" role="presentation" onClick={() => setShowRecentModal(false)}>
@@ -1615,13 +1455,6 @@ export function PlotScreen({
           <div className="plot-modal-card export" role="dialog" aria-label="Export plot" onClick={(event) => event.stopPropagation()}>
             <SectionHeader kicker="Export" title="Choose export destination" description="The bundle defaults to the source folder when possible." />
             <div className="plot-export-form">
-              <label className="plot-control-row">
-                <span>Bundle name</span>
-                <input
-                  value={exportDraft?.filename ?? ""}
-                  onChange={(event) => setExportDraft((current) => current ? { ...current, filename: event.target.value } : current)}
-                />
-              </label>
               <label className="plot-control-row">
                 <span>Output folder</span>
                 <input

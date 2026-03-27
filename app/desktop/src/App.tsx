@@ -1,5 +1,4 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
 
 import {
   CommandBar,
@@ -29,11 +28,8 @@ import {
   WORKSPACE_ITEMS,
   WORKSPACE_META,
   formatLeaf,
-  getPlotStageLabel,
   hasComposerSessionContent,
-  hasWizardSessionContent,
   normalizeWorkbenchRoute,
-  plotRoute,
   plotStageFromRoute,
   workspaceForRoute,
 } from "./lib/workbench";
@@ -44,8 +40,8 @@ const LaunchpadScreen = lazy(async () => ({
 const TensileScreen = lazy(async () => ({
   default: (await import("./screens/TensileScreen")).TensileScreen,
 }));
-const WizardScreen = lazy(async () => ({
-  default: (await import("./screens/WizardScreen")).WizardScreen,
+const PlotScreen = lazy(async () => ({
+  default: (await import("./screens/PlotScreen")).PlotScreen,
 }));
 const ComposerScreen = lazy(async () => ({
   default: (await import("./screens/ComposerScreen")).ComposerScreen,
@@ -85,16 +81,7 @@ export default function App() {
   const [metaError, setMetaError] = useState<string | null>(null);
   const sidecarReady = useWizardStore((state) => state.sidecarReady);
   const setSidecarReady = useWizardStore((state) => state.setSidecarReady);
-  const wizard = useWizardStore(
-    useShallow((state) => ({
-      exportResult: state.exportResult,
-      inputPath: state.inputPath,
-      inspection: state.inspection,
-      outputsCount: state.outputs.length,
-      stage: state.stage,
-      template: state.template,
-    })),
-  );
+  const wizardInputPath = useWizardStore((state) => state.inputPath);
   const tensileCompareCount = useTensileStore((state) => state.comparisonSources.length);
   const tensileOutputsCount = useTensileStore((state) => state.comparisonResult?.outputs.length ?? 0);
   const tensileLatestWorkbook = useTensileStore(
@@ -279,13 +266,6 @@ export default function App() {
   const meta = WORKSPACE_META[workspace];
   const currentPlotStage = plotStageFromRoute(route);
   const importFocus = workspace === "plot" && currentPlotStage === "import";
-  const plotSessionActive = hasWizardSessionContent({
-    inputPath: wizard.inputPath,
-    inspection: wizard.inspection,
-    template: wizard.template,
-    outputs: wizard.outputsCount > 0 ? new Array(wizard.outputsCount).fill("") : [],
-    exportResult: wizard.exportResult,
-  });
   const composerSessionActive = hasComposerSessionContent(composerProject);
 
   const workspaceLinks = useMemo(
@@ -294,9 +274,7 @@ export default function App() {
         ...item,
         route:
           item.workspace === "plot"
-            ? plotSessionActive
-              ? plotRoute(wizard.stage)
-              : "/plot/import"
+            ? "/plot/import"
             : item.workspace === "tensile"
               ? "/tensile"
               : item.workspace === "composer"
@@ -305,7 +283,7 @@ export default function App() {
                   ? "/code-console"
                 : "/settings",
       })),
-    [plotSessionActive, wizard.stage],
+    [],
   );
   const railItems = [
     {
@@ -320,16 +298,13 @@ export default function App() {
       label: item.label,
       icon: item.icon,
       active: workspace === item.workspace,
-      onSelect: () => navigate(item.route),
+      onSelect: () => navigate(item.route as WorkbenchRoute),
     })),
   ];
 
   let secondaryStatusLabel = "Focus mode";
   if (workspace === "plot") {
-    secondaryStatusLabel =
-      wizard.outputsCount > 0
-        ? `${getPlotStageLabel(wizard.stage)} / ${wizard.outputsCount} outputs`
-        : `${getPlotStageLabel(plotStageFromRoute(route))} stage`;
+    secondaryStatusLabel = "Plot workspace";
   } else if (workspace === "tensile") {
     secondaryStatusLabel =
       tensileOutputsCount > 0
@@ -338,11 +313,9 @@ export default function App() {
   } else if (workspace === "composer") {
     secondaryStatusLabel = `${composerPanelCount + composerTextCount} objects`;
   } else if (workspace === "code") {
-    secondaryStatusLabel = wizard.inputPath ? "Current plot context" : "Waiting for Plot session";
+    secondaryStatusLabel = wizardInputPath ? "Current plot context" : "Waiting for Plot session";
   } else if (workspace === "settings") {
     secondaryStatusLabel = `${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`;
-  } else if (plotSessionActive) {
-    secondaryStatusLabel = `Plot session · ${getPlotStageLabel(wizard.stage)}`;
   } else if (composerSessionActive) {
     secondaryStatusLabel = "Composer session ready";
   }
@@ -350,8 +323,8 @@ export default function App() {
   let activeItemLabel = "Next action";
   let activeItemValue = "Choose a workspace and start working.";
   if (workspace === "plot") {
-    activeItemLabel = importFocus ? "Data file" : "Active file";
-    activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No file loaded";
+    activeItemLabel = "";
+    activeItemValue = "";
   } else if (workspace === "tensile") {
     activeItemLabel = "Latest workbook";
     activeItemValue = tensileLatestWorkbook ? formatLeaf(tensileLatestWorkbook) : "No workbook prepared";
@@ -363,13 +336,10 @@ export default function App() {
         : "No composition open";
   } else if (workspace === "code") {
     activeItemLabel = "Bound data";
-    activeItemValue = wizard.inputPath ? formatLeaf(wizard.inputPath) : "No data bound";
+    activeItemValue = wizardInputPath ? formatLeaf(wizardInputPath) : "No data bound";
   } else if (workspace === "settings") {
     activeItemLabel = "Appearance";
     activeItemValue = `${describeAppearanceMode(appearanceMode)} / ${activeThemePreset.name}`;
-  } else if (plotSessionActive) {
-    activeItemLabel = "Resume";
-    activeItemValue = `Plot · ${getPlotStageLabel(wizard.stage)}`;
   } else if (composerSessionActive) {
     activeItemLabel = "Resume";
     activeItemValue = "Composer session ready";
@@ -384,35 +354,7 @@ export default function App() {
       ];
     }
     if (workspace === "plot") {
-      if (importFocus) {
-        return [
-          {
-            id: "plot-continue",
-            label: "Continue",
-            kind: "primary" as const,
-            disabled: !wizard.inputPath,
-            onSelect: () => navigate("/plot/type"),
-          },
-          { id: "plot-open", label: "Open data", onSelect: () => navigate("/plot/import") },
-        ];
-      }
-      if (currentPlotStage === "type") {
-        return [
-          {
-            id: "plot-continue",
-            label: "Continue",
-            kind: "primary" as const,
-            disabled: !wizard.template,
-            onSelect: () => navigate("/plot/tune"),
-          },
-          { id: "plot-import", label: "Import", onSelect: () => navigate("/plot/import") },
-        ];
-      }
-      return [
-        { id: "plot-export", label: "Export", kind: "primary" as const, onSelect: () => navigate("/plot/export") },
-        { id: "plot-type", label: "Template", onSelect: () => navigate("/plot/type") },
-        { id: "plot-import", label: "Import", onSelect: () => navigate("/plot/import") },
-      ];
+      return [];
     }
     if (workspace === "tensile") {
       return [
@@ -458,7 +400,7 @@ export default function App() {
 
   if (workspace === "plot") {
     content = (
-      <WizardScreen
+      <PlotScreen
         meta={workbenchMeta}
         onNavigate={navigate}
         routeStage={plotStageFromRoute(route)}
@@ -475,18 +417,22 @@ export default function App() {
   }
 
   return (
-    <WorkbenchShell
+      <WorkbenchShell
       className={shellClassName}
       commandBar={
         <CommandBar
           actions={commandActions}
-          moduleLabel={workspace === "plot" ? `${meta.eyebrow} · ${getPlotStageLabel(currentPlotStage)}` : meta.eyebrow}
-          moduleTitle={meta.title}
+          moduleLabel={workspace === "plot" ? "Plot" : meta.eyebrow}
+          moduleTitle={
+            workspace === "plot"
+              ? "Plot"
+              : meta.title
+          }
           objectLabel={activeItemLabel}
           objectValue={activeItemValue}
           runtimeStatusLabel={sidecarReady ? "Sidecar Online" : "Sidecar Offline"}
           runtimeTone={sidecarReady ? "good" : "warn"}
-          sessionLabel={importFocus ? undefined : secondaryStatusLabel}
+          sessionLabel={workspace === "plot" ? undefined : secondaryStatusLabel}
         />
       }
       content={
@@ -504,8 +450,8 @@ export default function App() {
           brandLabel="SciPlot God"
           footer={importFocus ? null : (
             <span>
-              {plotSessionActive || composerSessionActive
-                ? `${Number(plotSessionActive) + Number(composerSessionActive)} active`
+              {composerSessionActive || workspace === "plot"
+                ? `${Number(composerSessionActive) + Number(workspace === "plot")} active`
                 : "Idle"}
             </span>
           )}
@@ -516,7 +462,11 @@ export default function App() {
       }
       statusBar={
         <StatusBar
-          left={`${meta.title} · ${secondaryStatusLabel}`}
+          left={
+            workspace === "plot"
+              ? "Plot"
+              : `${meta.title} · ${secondaryStatusLabel}`
+          }
           right={`Appearance: ${describeAppearanceMode(appearanceMode)} · ${activeThemePreset.name}`}
         />
       }

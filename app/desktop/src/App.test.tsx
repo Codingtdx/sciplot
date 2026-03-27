@@ -20,8 +20,8 @@ vi.mock("./screens/TensileScreen", () => ({
   TensileScreen: () => <div>Tensile Stub</div>,
 }));
 
-vi.mock("./screens/WizardScreen", () => ({
-  WizardScreen: () => <div>Wizard Stub</div>,
+vi.mock("./screens/PlotScreen", () => ({
+  PlotScreen: () => <div>Plot Stub</div>,
 }));
 
 vi.mock("./screens/ComposerScreen", () => ({
@@ -160,7 +160,7 @@ describe("App", () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByText("Wizard Stub")).toBeInTheDocument();
+    expect(screen.getByText("Plot Stub")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
 

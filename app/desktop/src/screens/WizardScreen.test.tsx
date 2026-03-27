@@ -276,14 +276,13 @@ describe("WizardScreen", () => {
   it("opens as a single clean three-stage Plot scene", () => {
     renderStage("import");
 
-    expect(screen.getByText("Plot")).toBeInTheDocument();
+    expect(screen.getByText("Drag a data file here")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload file" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Browse files" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open recent" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Import data", level: 2 })).toBeInTheDocument();
-    expect(screen.getByText("Choose Template", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.getByText("Refine & Export", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.queryByText("Recent data")).not.toBeInTheDocument();
-    expect(screen.queryByText("Logs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Current dataset")).not.toBeInTheDocument();
+    expect(screen.queryByText("Choose Template")).not.toBeInTheDocument();
+    expect(screen.queryByText("Refine & Export")).not.toBeInTheDocument();
   });
 
   it("imports a file and transitions into the template stage", async () => {
@@ -291,12 +290,14 @@ describe("WizardScreen", () => {
     const onNavigate = vi.fn();
 
     renderStage("import", onNavigate);
-    fireEvent.click(screen.getByRole("button", { name: "Open data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse files" }));
 
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("/plot/type"));
-    expect(screen.getByText("Attached file")).toBeInTheDocument();
+    expect(screen.getByText("Current dataset")).toBeInTheDocument();
     expect(screen.getByText("curve.csv")).toBeInTheDocument();
-    expect(screen.getByText(/preview rows/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sheet1" })).toBeInTheDocument();
+    expect(screen.getByText("Rows and cells")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
   });
 
 });
