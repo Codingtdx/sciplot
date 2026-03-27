@@ -2,6 +2,8 @@
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
+> **Desktop GUI status (2026-03-27):** `app/desktop/src` 的 legacy GUI 实现已被移除（delete-first），当前桌面前端处于“待重建”状态。后续前端改动应基于新的 foundation 重新搭建，而不是恢复旧 Wizard/Workbench 结构。
+
 ## 项目结构
 
 - `src/`: 绘图内核、数据加载、布局规则、拉伸预处理、拼图后端。
