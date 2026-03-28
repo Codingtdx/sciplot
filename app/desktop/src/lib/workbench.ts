@@ -23,25 +23,18 @@ export const PLOT_STAGE_ORDER: PlotStage[] = [
 
 export const PLOT_STAGE_ROUTES: Record<PlotStage, WorkbenchRoute> = {
   import: "/plot/import",
-  sheet: "/plot/sheet",
-  type: "/plot/type",
-  tune: "/plot/tune",
-  review: "/plot/review",
-  export: "/plot/export",
+  sheet: "/plot/import",
+  type: "/plot/template",
+  tune: "/plot/refine",
+  review: "/plot/refine",
+  export: "/plot/refine",
 };
 
 export const APP_ROUTES: WorkbenchRoute[] = [
   "/",
   "/plot/import",
-  "/plot/sheet",
-  "/plot/type",
-  "/plot/tune",
-  "/plot/review",
-  "/plot/export",
-  "/tensile",
-  "/composer",
-  "/code-console",
-  "/settings",
+  "/plot/template",
+  "/plot/refine",
 ];
 
 export const WORKSPACE_ITEMS: Array<{
@@ -49,11 +42,8 @@ export const WORKSPACE_ITEMS: Array<{
   label: string;
   icon: AppIconName;
 }> = [
+  { workspace: "launchpad", label: "Start", icon: "start" },
   { workspace: "plot", label: "Plot", icon: "plot" },
-  { workspace: "tensile", label: "Tensile", icon: "tensile" },
-  { workspace: "composer", label: "Composer", icon: "composer" },
-  { workspace: "code", label: "Code Console", icon: "code" },
-  { workspace: "settings", label: "Settings", icon: "settings" },
 ];
 
 export const WORKSPACE_META: Record<
@@ -65,34 +55,14 @@ export const WORKSPACE_META: Record<
   }
 > = {
   launchpad: {
-    eyebrow: "Workspace Hub",
+    eyebrow: "Plot Workspace",
     title: "Start",
-    description: "Start work or resume a session.",
+    description: "Open a dataset or resume recent work.",
   },
   plot: {
-    eyebrow: "Figure Flow",
+    eyebrow: "Plot Workspace",
     title: "Plot",
-    description: "Import, tune, review, and export.",
-  },
-  tensile: {
-    eyebrow: "Material Lab",
-    title: "Tensile",
-    description: "Prepare and compare tensile workbooks.",
-  },
-  composer: {
-    eyebrow: "Layout Studio",
-    title: "Composer",
-    description: "Compose graphs, assets, and text.",
-  },
-  code: {
-    eyebrow: "Repo Runner",
-    title: "Code Console",
-    description: "Bind data, copy prompt, run code.",
-  },
-  settings: {
-    eyebrow: "Runtime",
-    title: "Settings",
-    description: "Appearance, runtime, and cleanup.",
+    description: "Import, recommend, refine, and export.",
   },
 };
 
@@ -101,12 +71,12 @@ export const PLOT_STAGES: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: "import", label: "Import Data", hint: "Upload a file" },
-  { id: "sheet", label: "Import Data", hint: "Choose the workbook tab" },
-  { id: "type", label: "Choose Template", hint: "Pick the chart family" },
-  { id: "tune", label: "Refine & Export", hint: "Adjust the figure" },
-  { id: "review", label: "Refine & Export", hint: "Confirm readiness" },
-  { id: "export", label: "Refine & Export", hint: "Write the bundle" },
+  { id: "import", label: "Plot Import", hint: "Load the dataset" },
+  { id: "sheet", label: "Plot Import", hint: "Choose the workbook tab" },
+  { id: "type", label: "Plot Template", hint: "Pick the recommended chart family" },
+  { id: "tune", label: "Plot Refine", hint: "Adjust the figure" },
+  { id: "review", label: "Plot Refine", hint: "Confirm readiness inline" },
+  { id: "export", label: "Plot Refine", hint: "Write the bundle inline" },
 ];
 
 export const PLOT_STAGE_COPY: Record<
@@ -117,28 +87,28 @@ export const PLOT_STAGE_COPY: Record<
   }
 > = {
   import: {
-    title: "Import a data file",
-    description: "Open data. Inspect runs first.",
+    title: "Import a dataset",
+    description: "Open the file and confirm detected structure.",
   },
   sheet: {
     title: "Choose the source tab",
-    description: "Pick the sheet to inspect and render.",
+    description: "Pick the workbook sheet inside Plot Import.",
   },
   type: {
-    title: "Confirm the chart type",
-    description: "Use the recommendation or choose a compatible template.",
+    title: "Choose the plot template",
+    description: "Lead with the strongest recommendation first.",
   },
   tune: {
-    title: "Tune the essentials",
-    description: "Adjust the key rendering options.",
+    title: "Refine the chart",
+    description: "Adjust the key rendering options inline.",
   },
   review: {
-    title: "Review export readiness",
-    description: "Preview, check blockers, then export.",
+    title: "Check export readiness",
+    description: "Keep preview, readiness, and export in one screen.",
   },
   export: {
     title: "Export the bundle",
-    description: "Open output, continue to Composer, or start the next plot.",
+    description: "Write output and reveal it without leaving Plot Refine.",
   },
 };
 
@@ -150,6 +120,15 @@ export function normalizeWorkbenchRoute(value: string | null | undefined): Workb
   if (!value) {
     return null;
   }
+  if (value === "/plot/sheet") {
+    return "/plot/import";
+  }
+  if (value === "/plot/type") {
+    return "/plot/template";
+  }
+  if (value === "/plot/tune" || value === "/plot/review" || value === "/plot/export") {
+    return "/plot/refine";
+  }
   return isWorkbenchRoute(value) ? value : null;
 }
 
@@ -160,16 +139,7 @@ export function workspaceForRoute(route: WorkbenchRoute): WorkbenchWorkspace {
   if (route.startsWith("/plot/")) {
     return "plot";
   }
-  if (route === "/tensile") {
-    return "tensile";
-  }
-  if (route === "/composer") {
-    return "composer";
-  }
-  if (route === "/code-console") {
-    return "code";
-  }
-  return "settings";
+  return "launchpad";
 }
 
 export function plotRoute(stage: PlotStage): WorkbenchRoute {
@@ -177,11 +147,14 @@ export function plotRoute(stage: PlotStage): WorkbenchRoute {
 }
 
 export function plotStageFromRoute(route: WorkbenchRoute): PlotStage {
-  if (route.startsWith("/plot/")) {
-    const stage = route.slice("/plot/".length);
-    if (PLOT_STAGE_ORDER.includes(stage as PlotStage)) {
-      return stage as PlotStage;
-    }
+  if (route === "/plot/import") {
+    return "import";
+  }
+  if (route === "/plot/template") {
+    return "type";
+  }
+  if (route === "/plot/refine") {
+    return "tune";
   }
   return "import";
 }

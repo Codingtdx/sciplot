@@ -21,23 +21,12 @@ export type RequestActivity = "idle" | "scheduled" | "running" | "ready" | "erro
 
 export type WorkbenchWorkspace =
   | "launchpad"
-  | "plot"
-  | "tensile"
-  | "composer"
-  | "code"
-  | "settings";
+  | "plot";
 export type WorkbenchRoute =
   | "/"
   | "/plot/import"
-  | "/plot/sheet"
-  | "/plot/type"
-  | "/plot/tune"
-  | "/plot/review"
-  | "/plot/export"
-  | "/tensile"
-  | "/composer"
-  | "/code-console"
-  | "/settings";
+  | "/plot/template"
+  | "/plot/refine";
 export type PdfImportMode = "graph" | "asset";
 export type AppearanceMode = "system" | "light" | "dark";
 
