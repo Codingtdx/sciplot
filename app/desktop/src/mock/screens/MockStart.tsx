@@ -92,10 +92,10 @@ export function MockStart() {
             <h2>{mockStartHero.title}</h2>
             <p className="mock-start__hero-description">{mockStartHero.description}</p>
             <div className="mock-start__actions">
-              <a className="mock-button mock-button--primary" href="#/plot-import">
+              <a className="mock-button mock-button--primary" href="#/plot/refine">
                 {mockStartHero.primaryAction}
               </a>
-              <a className="mock-button" href="#/plot-template">
+              <a className="mock-button" href="#/plot/template">
                 {mockStartHero.secondaryAction}
               </a>
             </div>

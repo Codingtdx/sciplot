@@ -36,7 +36,7 @@ function renderFigureFrame(
         y="0.5"
         width={width - 1}
         height={height - 1}
-        rx={large ? 18 : 14}
+        rx={large ? 10 : 8}
         className="mock-template-svg__surface"
       />
       <rect
@@ -323,7 +323,7 @@ function renderPreviewFigure(template: MockTemplateOption) {
             className="mock-template-svg__line--secondary"
           />
           <g className="mock-template-svg__legend">
-            <rect x="334" y="32" width="116" height="54" rx="12" />
+            <rect x="334" y="32" width="116" height="54" rx="8" />
             <circle cx="354" cy="52" r="4.5" className="mock-template-svg__dot" />
             <text x="366" y="56" className="mock-template-svg__tick">
               Storage modulus
@@ -350,14 +350,12 @@ function renderPreview(template: MockTemplateOption) {
       {renderPreviewFigure(template)}
       <div className="mock-template__preview-caption">
         <div>
-          <p className="mock-panel__eyebrow">Live preview</p>
           <h3>{template.name}</h3>
         </div>
         <span className="mock-template__preview-confidence">{template.confidence}</span>
       </div>
-      <p className="mock-template__preview-summary">{template.summary}</p>
       <div className="mock-template__metrics">
-        {template.metrics.map((metric) => (
+        {template.metrics.slice(0, 3).map((metric) => (
           <div key={metric.label} className="mock-template__metric">
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
@@ -378,19 +376,17 @@ export function MockPlotTemplate() {
 
   return (
     <section className="mock-screen mock-template">
-      <div className="mock-panel mock-template__intro">
-        <div>
-          <p className="mock-panel__eyebrow">Recommendation summary</p>
-          <h2>{mockTemplateHeader.datasetName}</h2>
-          <p>{mockTemplateHeader.recommendationSummary}</p>
-        </div>
-        <span className="mock-template__intro-meta">
-          Active sheet · {mockTemplateHeader.sheetName}
-        </span>
-      </div>
-
       <div className="mock-template__layout">
         <div className="mock-template__selection-column">
+          <div className="mock-panel mock-template__dataset-bar">
+            <div className="mock-panel__header">
+              <div>
+                <h3>{mockTemplateHeader.datasetName}</h3>
+              </div>
+              <span className="mock-template__intro-meta">{mockTemplateHeader.sheetName}</span>
+            </div>
+          </div>
+
           <button
             className={`mock-panel mock-template__recommended${
               selectedTemplate.id === recommendedTemplate.id ? " is-active" : ""
@@ -400,23 +396,14 @@ export function MockPlotTemplate() {
           >
             <div className="mock-panel__header">
               <div>
-                <p className="mock-panel__eyebrow">Primary recommendation</p>
                 <h3>{recommendedTemplate.name}</h3>
               </div>
-              <span className="mock-chip">
-                {recommendedTemplate.badge}
-              </span>
+              <span className="mock-template__alternate-meta">{recommendedTemplate.confidence}</span>
             </div>
             <div className="mock-template__recommended-body">
               {renderTemplateThumbnail(recommendedTemplate.id)}
               <div className="mock-template__recommended-copy">
-                <strong>{recommendedTemplate.confidence}</strong>
-                <p>{recommendedTemplate.summary}</p>
-                <ul className="mock-bullet-list">
-                  {recommendedTemplate.rationale.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
+                <strong>{recommendedTemplate.badge}</strong>
               </div>
             </div>
           </button>
@@ -424,8 +411,7 @@ export function MockPlotTemplate() {
           <div className="mock-panel mock-template__alternates">
             <div className="mock-panel__header">
               <div>
-                <p className="mock-panel__eyebrow">Alternates</p>
-                <h3>Other viable directions</h3>
+                <h3>Alternates</h3>
               </div>
             </div>
             <div className="mock-template__alternate-list">
@@ -443,7 +429,6 @@ export function MockPlotTemplate() {
                   </div>
                   <div className="mock-template__alternate-copy">
                     <strong>{template.name}</strong>
-                    <span>{template.summary}</span>
                   </div>
                   <span className="mock-template__alternate-meta">{template.confidence}</span>
                 </button>
@@ -454,7 +439,7 @@ export function MockPlotTemplate() {
 
         <div className="mock-panel mock-template__preview-column">
           {renderPreview(selectedTemplate)}
-          <a className="mock-button mock-button--primary" href="#/plot-refine">
+          <a className="mock-button mock-button--primary" href="#/plot/refine">
             Continue with Selected Template
           </a>
         </div>

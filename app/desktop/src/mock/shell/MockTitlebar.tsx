@@ -1,13 +1,13 @@
-import { mockRouteMeta, type MockRouteId } from "../data/mockNavigationData";
+import type { MockRoute } from "../data/mockNavigationData";
 
 type MockTitlebarProps = {
-  currentRoute: MockRouteId;
+  currentRoute: MockRoute;
 };
 
 const WINDOW_CONTROLS = ["close", "minimize", "zoom"] as const;
 
 export function MockTitlebar({ currentRoute }: MockTitlebarProps) {
-  const meta = mockRouteMeta[currentRoute];
+  void currentRoute;
 
   return (
     <header className="mock-titlebar">
@@ -19,18 +19,6 @@ export function MockTitlebar({ currentRoute }: MockTitlebarProps) {
           />
         ))}
       </div>
-      <div className="mock-titlebar__meta">
-        <p className="mock-titlebar__eyebrow">SciPlot God Mock Desktop</p>
-        <div className="mock-titlebar__titles">
-          <strong>{meta.title}</strong>
-          <span>{meta.subtitle}</span>
-        </div>
-      </div>
-      <div className="mock-titlebar__status">
-        <span className="mock-chip">Static fake data</span>
-        <span className="mock-chip mock-chip--accent">{meta.workspaceLabel}</span>
-      </div>
     </header>
   );
 }
-

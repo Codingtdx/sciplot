@@ -137,6 +137,103 @@ Default user-visible UI flow:
 
 - `Context -> Code -> Run -> Outputs`
 
+## Repo-Grounded Action Inventory
+
+This section is the maintainer-facing action and control inventory for mock completion and future UI restoration work.
+
+It distinguishes current confirmed support from recent integrated history and from actions that should not be assumed.
+
+### Plot
+
+Confirmed in current repo/docs/tests:
+
+- import a data file and choose a sheet
+- inspect input structure through `/inspect-file`
+- use recommendation-backed template selection through `/recommend-render`
+- preview the active figure through `/render-preview`
+- run export validation through `/preflight-render`
+- export the figure bundle through `/export-render`
+- adjust only contract-backed render options such as size, scale, style, palette, reverse-x, baseline, and colorbar where supported
+
+Strongly implied by recent integrated history:
+
+- reveal or review managed export artifacts after export
+- optional handoff from Plot into Composer after the figure is ready
+
+Do not assume without new evidence:
+
+- user-facing legend-order controls
+- user-facing figure-component ordering controls
+- a separate preflight page outside the refine/export surface
+
+### Data Cleanup
+
+Confirmed in current repo/docs/tests:
+
+- preprocess raw tensile CSV into a prepared workbook through `/preprocess-tensile-replicates`
+- inspect a prepared workbook through `/inspect-tensile-workbook`
+- review representative curves and compare-ready workbook outputs
+- export the tensile comparison bundle through `/export-tensile-comparison`
+- explicitly hand cleaned outputs into Plot through `Open in Plot`
+
+Strongly implied by recent integrated history:
+
+- mixed intake of raw CSV and already-prepared workbooks in one workbench
+- QC compare review before export or Plot handoff
+
+Do not assume without new evidence:
+
+- inline spreadsheet-style editing
+- exposed detect/map/normalize toggles as separate user controls
+- ordering or sorting controls beyond the prepared comparison outputs themselves
+
+### Composer
+
+Confirmed in current repo/docs/tests:
+
+- import graph or asset files through `/composer/import-panels`
+- preview the composition through `/compose-preview`
+- export the composition PDF through `/compose-export`
+- generate compact presets through `/composer/three-up` and `/composer/two-up-editorial`
+- request panel thumbnails through `/panel-thumbnail`
+- preserve drawable order through `z_index` and sorted drawable rendering
+- preserve automatic graph panel labels through `auto_labels`
+
+Strongly implied by recent integrated history:
+
+- add graph, add asset, and add text/label actions in the workbench surface
+- layer-order controls for `Forward`, `Back`, `To front`, and `To back`
+- custom labels, binding, crop, lock, and hide controls for selected drawables
+
+Do not assume without new evidence:
+
+- a broader preset gallery beyond the shipped preset helpers
+- multi-page export
+- arbitrary figure-numbering schemes beyond `auto_labels` and custom labels
+
+### Code Console
+
+Confirmed in current repo/docs:
+
+- bind current data and Plot context into the workbench
+- edit code on one controlled runner surface
+- run repo-native Python
+- review outputs on a dedicated output surface
+
+Strongly implied by recent integrated history:
+
+- generate fixed prompt/context bundles for external AI use
+- show runner status, stdout, stderr, exit code, duration, generated files, and previews
+- open the managed output folder
+- hand generated outputs back into Plot or Composer
+
+Do not assume without new evidence:
+
+- chat-style interaction
+- arbitrary shell access
+- package-install controls
+- persistent background run management beyond controlled managed outputs
+
 ## App-Level IA
 
 ### Canonical Tree

@@ -50,7 +50,7 @@ function RefineChart() {
         y="0"
         width={STAGE_WIDTH}
         height={STAGE_HEIGHT}
-        rx="28"
+        rx="12"
         className="mock-refine__stage-bg"
       />
 
@@ -163,7 +163,7 @@ function RefineChart() {
           y="0"
           width="186"
           height="74"
-          rx="20"
+          rx="10"
           className="mock-refine__legend-bg"
         />
         {mockRefineSeries.map((series, index) => (
@@ -182,7 +182,7 @@ function RefineChart() {
           y="0"
           width="230"
           height="52"
-          rx="18"
+          rx="10"
           className="mock-refine__annotation-bg"
         />
         <text x="18" y="22" className="mock-refine__annotation-title">
@@ -199,31 +199,14 @@ function RefineChart() {
 export function MockPlotRefine() {
   return (
     <section className="mock-screen mock-refine">
-      <div className="mock-panel mock-refine__intro">
-        <div>
-          <p className="mock-panel__eyebrow">Figure workspace</p>
-          <h2>{mockRefineHeader.figureName}</h2>
-          <p>{mockRefineHeader.datasetName}</p>
-        </div>
-        <div className="mock-refine__intro-meta">
-          <span className="mock-chip mock-chip--accent">{mockRefineHeader.status}</span>
-          <span className="mock-chip">{mockRefineHeader.lastUpdated}</span>
-        </div>
-      </div>
-
       <div className="mock-refine__layout">
         <div className="mock-refine__stage-column">
           <div className="mock-panel mock-refine__stage">
             <div className="mock-panel__header">
               <div>
-                <p className="mock-panel__eyebrow">Preview stage</p>
-                <h3>Publication-ready figure preview</h3>
+                <h3>{mockRefineHeader.figureName}</h3>
               </div>
-              <div className="mock-chip-row">
-                <span className="mock-chip">120 x 55 mm</span>
-                <span className="mock-chip">log x</span>
-                <span className="mock-chip">2 series</span>
-              </div>
+              <span className="mock-refine__meta">{mockRefineHeader.datasetName}</span>
             </div>
             <div className="mock-refine__preview-toolbar">
               <div className="mock-refine__toolbar-actions">
@@ -239,33 +222,16 @@ export function MockPlotRefine() {
                   </button>
                 ))}
               </div>
-              <div className="mock-refine__toolbar-meta">
-                <span>Axis frame locked</span>
-                <span>Legend inline</span>
-              </div>
             </div>
             <RefineChart />
             <div className="mock-refine__stage-export">
               <div className="mock-refine__export-copy">
-                <p className="mock-panel__eyebrow">Export</p>
-                <h3>Keep export attached to the active figure</h3>
                 <div className="mock-refine__filename">freq_sweep_dual_modulus_curve</div>
               </div>
               <div className="mock-refine__export-controls">
-                <div className="mock-chip-row">
-                  {mockRefineExportFormats.map((format, index) => (
-                    <span
-                      key={format}
-                      className={`mock-chip${
-                        index === 0 ? " mock-chip--accent" : " mock-chip--subtle"
-                      }`}
-                    >
-                      {format}
-                    </span>
-                  ))}
-                </div>
+                <span className="mock-refine__meta">{mockRefineExportFormats.join(" · ")}</span>
                 <button className="mock-button mock-button--primary" type="button">
-                  Export Figure Bundle
+                  Export
                 </button>
               </div>
             </div>
@@ -275,8 +241,7 @@ export function MockPlotRefine() {
         <div className="mock-panel mock-refine__inspector">
           <div className="mock-panel__header">
             <div>
-              <p className="mock-panel__eyebrow">Inspector</p>
-              <h3>Compact figure controls</h3>
+              <h3>Figure</h3>
             </div>
           </div>
           <div className="mock-refine__inspector-sections">

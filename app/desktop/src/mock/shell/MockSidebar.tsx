@@ -1,10 +1,11 @@
 import {
-  mockNavigationItems,
-  type MockRouteId,
+  getDefaultHashForWorkbench,
+  mockPrimaryNavItems,
+  type MockRoute,
 } from "../data/mockNavigationData";
 
 type MockSidebarProps = {
-  currentRoute: MockRouteId;
+  currentRoute: MockRoute;
 };
 
 export function MockSidebar({ currentRoute }: MockSidebarProps) {
@@ -16,38 +17,25 @@ export function MockSidebar({ currentRoute }: MockSidebarProps) {
           <span />
           <span />
         </div>
-        <div>
-          <p className="mock-sidebar__brand-eyebrow">Desktop redesign</p>
-          <h1 className="mock-sidebar__brand-title">SciPlot God</h1>
-        </div>
+        <h1 className="mock-sidebar__brand-title">SciPlot God</h1>
       </div>
 
-      <p className="mock-sidebar__group-label">Sections</p>
-      <nav className="mock-sidebar__nav" aria-label="Product navigation">
-        {mockNavigationItems.map((item) => (
-          <a
-            key={item.id}
-            className={`mock-sidebar__nav-item${
-              item.id === currentRoute ? " is-active" : ""
-            }`}
-            href={item.hash}
-          >
-            <div className="mock-sidebar__nav-copy">
-              <span className="mock-sidebar__nav-eyebrow">{item.eyebrow}</span>
+      <div className="mock-sidebar__section">
+        <nav className="mock-sidebar__nav" aria-label="Primary workbench navigation">
+          {mockPrimaryNavItems.map((item) => (
+            <a
+              key={item.id}
+              className={`mock-sidebar__nav-item mock-sidebar__nav-item--${item.id}${
+                item.id === currentRoute.workbench ? " is-active" : ""
+              }`}
+              href={getDefaultHashForWorkbench(item.id)}
+              aria-label={item.label}
+            >
+              <span className="mock-sidebar__nav-icon" aria-hidden="true" />
               <strong>{item.label}</strong>
-              <span>{item.description}</span>
-            </div>
-          </a>
-        ))}
-      </nav>
-
-      <div className="mock-sidebar__focus">
-        <p className="mock-sidebar__focus-eyebrow">Pinned workspace</p>
-        <strong>Single-figure desktop mock</strong>
-        <span>
-          Static preview-only shell with local data, stable product sections,
-          and no production wiring.
-        </span>
+            </a>
+          ))}
+        </nav>
       </div>
     </aside>
   );

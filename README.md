@@ -118,4 +118,4 @@ Any future mock redesign should:
 
 ## More Detail
 
-See [docs/product-architecture.md](docs/product-architecture.md) for the detailed product architecture, workflow normalization rules, IA tree, and deprecation guidance.
+See [docs/product-architecture.md](docs/product-architecture.md) for the detailed product architecture, workflow normalization rules, repo-grounded workbench action inventory, IA tree, and deprecation guidance.

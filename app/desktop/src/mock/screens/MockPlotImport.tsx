@@ -31,7 +31,7 @@ export function MockPlotImport() {
           </span>
         </div>
         <button className="mock-button mock-button--primary" type="button">
-          Inspect Dataset
+          Inspect
         </button>
       </div>
 
@@ -39,12 +39,9 @@ export function MockPlotImport() {
         <div className="mock-panel mock-import__table-panel">
           <div className="mock-panel__header">
             <div>
-              <p className="mock-panel__eyebrow">Preview table</p>
-              <h3>Workbook rows that will drive the plot recommendation</h3>
+              <h3>{mockImportWorkbook.name}</h3>
             </div>
-            <span className="mock-chip">
-              {mockImportRows.length} visible rows · updated {mockImportWorkbook.modified}
-            </span>
+            <span className="mock-import__toolbar-meta">{mockImportWorkbook.selectedSheet}</span>
           </div>
 
           <div className="mock-import__table-wrap">
@@ -72,10 +69,9 @@ export function MockPlotImport() {
         <div className="mock-panel mock-import__inspection">
           <div className="mock-panel__header">
             <div>
-              <p className="mock-panel__eyebrow">Inspection rail</p>
-              <h3>Compact structure readout</h3>
+              <h3>Inspect</h3>
             </div>
-            <span className="mock-chip mock-chip--accent">Inspection clean</span>
+            <span className="mock-import__toolbar-meta">Ready</span>
           </div>
 
           <div className="mock-import__facts">
@@ -87,17 +83,7 @@ export function MockPlotImport() {
             ))}
           </div>
 
-          <div className="mock-import__note-block">
-            <p className="mock-panel__eyebrow">Readiness notes</p>
-            <ul className="mock-bullet-list">
-              {mockImportInspectionNotes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </div>
-
           <div className="mock-import__template-chips">
-            <p className="mock-panel__eyebrow">Compatible templates</p>
             <div className="mock-chip-row">
               {mockImportCompatibleTemplates.map((template) => (
                 <span key={template} className="mock-chip mock-chip--subtle">
@@ -110,16 +96,8 @@ export function MockPlotImport() {
       </div>
 
       <div className="mock-panel mock-import__footer">
-        <div className="mock-import__footer-copy">
-          <p className="mock-panel__eyebrow">Workflow anchor</p>
-          <h3>Inspection is ready. Continue into template selection.</h3>
-          <span>
-            {mockImportCompatibleTemplates.length} compatible figure directions ·{" "}
-            {mockImportRows.length} rows visible in the active preview
-          </span>
-        </div>
-        <a className="mock-button mock-button--primary" href="#/plot-template">
-          Continue with Recommended Templates
+        <a className="mock-button mock-button--primary" href="#/plot/template">
+          Continue
         </a>
       </div>
     </section>

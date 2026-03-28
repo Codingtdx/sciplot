@@ -1,61 +1,62 @@
 import { useEffect, useState } from "react";
 
 import {
-  type MockRouteId,
-  mockNavigationItems,
+  getDefaultRoute,
+  getMockRouteHash,
+  normalizeMockRoute,
+  type MockRoute,
 } from "./data/mockNavigationData";
 import { MockShell } from "./shell/MockShell";
-import { MockPlotImport } from "./screens/MockPlotImport";
-import { MockPlotRefine } from "./screens/MockPlotRefine";
-import { MockPlotTemplate } from "./screens/MockPlotTemplate";
-import { MockStart } from "./screens/MockStart";
+import { MockCodeConsoleWorkbench } from "./screens/MockCodeConsoleWorkbench";
+import { MockComposerWorkbench } from "./screens/MockComposerWorkbench";
+import { MockDataCleanupWorkbench } from "./screens/MockDataCleanupWorkbench";
+import { MockPlotWorkbench } from "./screens/MockPlotWorkbench";
 
-const KNOWN_ROUTE_IDS = new Set<MockRouteId>(
-  mockNavigationItems.map((item) => item.id),
-);
-
-function getRouteFromHash(hash: string): MockRouteId {
-  const normalized = hash.replace(/^#\//, "") as MockRouteId;
-  return KNOWN_ROUTE_IDS.has(normalized) ? normalized : "start";
-}
-
-function readCurrentRoute(): MockRouteId {
+function readCurrentRoute(): MockRoute {
   if (typeof window === "undefined") {
-    return "start";
+    return getDefaultRoute();
   }
-  return getRouteFromHash(window.location.hash);
+
+  return normalizeMockRoute(window.location.hash);
 }
 
-function renderRoute(route: MockRouteId) {
-  switch (route) {
-    case "plot-import":
-      return <MockPlotImport />;
-    case "plot-template":
-      return <MockPlotTemplate />;
-    case "plot-refine":
-      return <MockPlotRefine />;
-    case "start":
-    default:
-      return <MockStart />;
+function renderRoute(route: MockRoute) {
+  switch (route.workbench) {
+    case "plot":
+      return <MockPlotWorkbench stage={route.stage} />;
+    case "cleanup":
+      return <MockDataCleanupWorkbench stage={route.stage} />;
+    case "composer":
+      return <MockComposerWorkbench stage={route.stage} />;
+    case "console":
+      return <MockCodeConsoleWorkbench stage={route.stage} />;
   }
 }
 
 export function MockApp() {
-  const [route, setRoute] = useState<MockRouteId>(() => readCurrentRoute());
+  const [route, setRoute] = useState<MockRoute>(() => readCurrentRoute());
 
   useEffect(() => {
-    if (!window.location.hash) {
-      window.history.replaceState(null, "", "#/start");
-      setRoute("start");
-    }
+    const syncRoute = () => {
+      const nextRoute = readCurrentRoute();
+      const normalizedHash = getMockRouteHash(nextRoute);
 
-    const handleHashChange = () => {
-      setRoute(readCurrentRoute());
+      if (window.location.hash !== normalizedHash) {
+        window.history.replaceState(null, "", normalizedHash);
+      }
+
+      setRoute(nextRoute);
     };
 
-    window.addEventListener("hashchange", handleHashChange);
+    if (!window.location.hash) {
+      window.history.replaceState(null, "", getMockRouteHash(getDefaultRoute()));
+    }
+
+    syncRoute();
+
+    window.addEventListener("hashchange", syncRoute);
     return () => {
-      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("hashchange", syncRoute);
     };
   }, []);
 
