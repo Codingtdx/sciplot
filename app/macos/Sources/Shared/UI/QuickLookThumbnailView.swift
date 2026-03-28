@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import QuickLookThumbnailing
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -18,16 +19,23 @@ final class QuickLookThumbnailModel {
             scale: NSScreen.main?.backingScaleFactor ?? 2.0,
             representationTypes: .thumbnail
         )
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
 
         await withCheckedContinuation { continuation in
-            QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] thumbnail, error in
-                Task { @MainActor in
-                    if let thumbnail {
-                        self?.image = thumbnail.nsImage
+            QLThumbnailGenerator.shared.saveBestRepresentation(for: request, to: temporaryURL, as: .png) { [weak self] error in
+                let loadedImage = NSImage(contentsOf: temporaryURL)
+                let message = error?.localizedDescription ?? "Could not load a thumbnail for this asset."
+                DispatchQueue.main.async {
+                    if let loadedImage {
+                        self?.image = loadedImage
+                        self?.errorMessage = nil
                     } else {
                         self?.image = nil
-                        self?.errorMessage = error?.localizedDescription ?? "Could not load a thumbnail for this asset."
+                        self?.errorMessage = message
                     }
+                    try? FileManager.default.removeItem(at: temporaryURL)
                     continuation.resume()
                 }
             }

@@ -53,9 +53,8 @@ final class AppModel {
 
         do {
             try await runtime.ensureRunning()
-            async let metaPayload = client.fetchMeta()
-            async let contractPayload = client.fetchPlotContract()
-            let (meta, contract) = try await (metaPayload, contractPayload)
+            let meta = try await client.fetchMeta()
+            let contract = try await client.fetchPlotContract()
             plotSession.apply(meta: meta, contract: contract)
             refreshCodeConsoleContext()
             hasBootstrapped = true

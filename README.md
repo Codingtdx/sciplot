@@ -84,6 +84,14 @@ Notes:
 - The supported desktop frontend is the native macOS app under `app/macos`.
 - The current protected mock under `app/desktop/src/mock/**` is a plot-flow-only reference and is not the authoritative whole-app IA.
 
+## Desktop Development
+
+- Use `Launch_Plotter.command` to build and open the supported native macOS frontend.
+- For direct validation, run:
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' build`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' test`
+- Treat `app/desktop` as a legacy/reference area for the protected mock and migration history, not as the supported desktop runtime.
+
 ## Utilities, Not Primary Workbenches
 
 The following concepts may remain in the codebase as supporting utilities:

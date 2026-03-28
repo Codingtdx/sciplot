@@ -47,6 +47,25 @@ struct ComposerPanelPayload: Codable, Equatable, Sendable, Identifiable {
     var regionID: String?
     var slotID: String?
     var cropRect: ComposerCropRectPayload = .init()
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case filePath
+        case pageIndex
+        case xMm
+        case yMm
+        case wMm
+        case hMm
+        case locked
+        case hidden
+        case label
+        case kind
+        case zIndex
+        case groupID = "groupId"
+        case regionID = "regionId"
+        case slotID = "slotId"
+        case cropRect
+    }
 }
 
 struct ComposerTextPayload: Codable, Equatable, Sendable, Identifiable {
@@ -62,6 +81,21 @@ struct ComposerTextPayload: Codable, Equatable, Sendable, Identifiable {
     var groupID: String?
     var regionID: String?
     var slotID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case text
+        case xMm
+        case yMm
+        case fontSizePt
+        case align
+        case zIndex
+        case locked
+        case hidden
+        case groupID = "groupId"
+        case regionID = "regionId"
+        case slotID = "slotId"
+    }
 }
 
 struct ComposerRequestPayload: Codable, Equatable, Sendable {

@@ -35,6 +35,19 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.useSidecar = useSidecar
         self.visualThemeID = visualThemeID
     }
+
+    enum CodingKeys: String, CodingKey {
+        case size
+        case xscale
+        case yscale
+        case reverseX
+        case baseline
+        case showColorbar
+        case stylePreset
+        case palettePreset
+        case useSidecar
+        case visualThemeID = "visualThemeId"
+    }
 }
 
 struct FileRequest: Codable, Equatable, Sendable {
@@ -89,6 +102,24 @@ struct TemplateRecommendationResponse: Codable, Equatable, Sendable, Identifiabl
     let previewConfigSummary: [String: JSONValue]
 
     var id: String { templateID }
+
+    enum CodingKeys: String, CodingKey {
+        case templateID = "templateId"
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+        case score
+        case rank
+        case reason
+        case suitabilityHint
+        case scoreGapToTop
+        case whyHardMatch
+        case whySoftPrior
+        case inferredMapping
+        case optionalEnhancements
+        case previewConfigSummary
+    }
 }
 
 struct InputInspectionResponse: Codable, Equatable, Sendable {
@@ -140,6 +171,21 @@ struct PlotDatasetPreviewResponse: Codable, Equatable, Sendable {
     let semanticSignals: [String]
     let qualityFlags: [String]
     let sampleRows: [[JSONValue]]
+
+    enum CodingKeys: String, CodingKey {
+        case datasetID = "datasetId"
+        case sourcePath
+        case sheet
+        case model
+        case rawRows
+        case rawCols
+        case columnProfiles
+        case candidateRoles
+        case dataShapes
+        case semanticSignals
+        case qualityFlags
+        case sampleRows
+    }
 }
 
 struct InspectFileResponse: Codable, Equatable, Sendable {
@@ -161,6 +207,19 @@ struct PreflightResultResponse: Codable, Equatable, Sendable {
     let errors: [String]
     let outputFilenames: [String]
     let submissionReport: SubmissionReportResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case template
+        case requestedTemplateID = "requestedTemplateId"
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+        case warnings
+        case errors
+        case outputFilenames
+        case submissionReport
+    }
 }
 
 struct PreflightRenderResponse: Codable, Equatable, Sendable {
@@ -174,6 +233,19 @@ struct PreflightRenderResponse: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let options: RenderOptionsPayload
     let preflight: PreflightResultResponse
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case template
+        case requestedTemplateID = "requestedTemplateId"
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+        case sheet
+        case options
+        case preflight
+    }
 }
 
 struct RenderPreviewResponse: Codable, Equatable, Sendable {
@@ -186,6 +258,18 @@ struct RenderPreviewResponse: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let previews: [PreviewItemResponse]
     let submissionReport: SubmissionReportResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case template
+        case requestedTemplateID = "requestedTemplateId"
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+        case sheet
+        case previews
+        case submissionReport
+    }
 }
 
 struct ExportRenderResponse: Codable, Equatable, Sendable {
@@ -200,6 +284,20 @@ struct ExportRenderResponse: Codable, Equatable, Sendable {
     let artifactPaths: [String]
     let manifestPath: String?
     let submissionReport: SubmissionReportResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case requestedTemplateID = "requestedTemplateId"
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+        case outputs
+        case outputDir
+        case previewOutputs
+        case artifactPaths
+        case manifestPath
+        case submissionReport
+    }
 }
 
 struct MetaDefaultsResponse: Codable, Equatable, Sendable {
@@ -246,6 +344,23 @@ struct MetaTemplateSummary: Codable, Equatable, Sendable, Identifiable {
     let role: String
     let lifecyclePolicy: String
     let implementationID: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case description
+        case category
+        case defaultSize
+        case allowedSizes
+        case editableOptions
+        case defaultOptions
+        case availableStyles
+        case availablePalettes
+        case canonicalID = "canonicalId"
+        case role
+        case lifecyclePolicy
+        case implementationID = "implementationId"
+    }
 }
 
 struct VisualThemeResponse: Codable, Equatable, Sendable, Identifiable {

@@ -19,7 +19,7 @@ final class SidecarRuntimeTests: XCTestCase {
         FileManager.default.changeCurrentDirectoryPath(nested.path)
 
         let located = try RepoLocator().locateRepositoryRoot()
-        XCTAssertEqual(located.path, tempRoot.path)
+        XCTAssertEqual(canonicalPath(located), canonicalPath(tempRoot))
     }
 
     @MainActor
@@ -65,7 +65,7 @@ final class SidecarRuntimeTests: XCTestCase {
         try await runtime.ensureRunning()
 
         XCTAssertEqual(runtime.status, .running)
-        XCTAssertEqual(runtime.repoRootURL?.path, repoRoot.path)
+        XCTAssertEqual(runtime.repoRootURL.map(canonicalPath), canonicalPath(repoRoot))
         XCTAssertTrue(runtime.logs.contains(where: { $0.contains("Reusing a compatible sidecar") }))
     }
 
@@ -137,5 +137,9 @@ final class SidecarRuntimeTests: XCTestCase {
             headerFields: ["Content-Type": "application/json"]
         )!
         return (response, Data(body.utf8))
+    }
+
+    private func canonicalPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }

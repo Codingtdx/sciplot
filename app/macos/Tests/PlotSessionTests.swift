@@ -12,7 +12,7 @@ final class PlotSessionTests: XCTestCase {
         session.handleImportedFile(URL(fileURLWithPath: "/tmp/sample.csv"))
         await session.inspectCurrentFile()
 
-        XCTAssertEqual(session.stage, .refineExport)
+        XCTAssertEqual(session.stage, .template)
         XCTAssertEqual(session.selectedTemplateID, "curve")
         XCTAssertEqual(session.sampleRows.count, 3)
         XCTAssertEqual(client.inspectRequests.first?.inputPath, "/tmp/sample.csv")

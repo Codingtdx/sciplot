@@ -412,6 +412,7 @@
 		A00000000000000000000014 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				ONLY_ACTIVE_ARCH = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -420,6 +421,7 @@
 		A00000000000000000000015 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
 				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
@@ -482,6 +484,7 @@
 		A00000000000000000000018 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -497,6 +500,7 @@
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot God.app/Contents/MacOS/SciPlot God";
 				TEST_TARGET_NAME = SciPlotGodMac;
 			};
 			name = Debug;
@@ -504,6 +508,7 @@
 		A00000000000000000000019 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -519,6 +524,7 @@
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot God.app/Contents/MacOS/SciPlot God";
 				TEST_TARGET_NAME = SciPlotGodMac;
 			};
 			name = Release;
