@@ -2,7 +2,7 @@
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
-> **Desktop GUI status (2026-03-27):** `app/desktop/src` 的 legacy GUI 实现已被移除（delete-first），当前桌面前端处于“待重建”状态。后续前端改动应基于新的 foundation 重新搭建，而不是恢复旧 Wizard/Workbench 结构。
+> **Desktop GUI status (2026-03-28):** `app/desktop/src` 已进入新的 code-first foundation 阶段。当前活动桌面前端由 `Mac*` 组件层、单一 Plot 工作流屏幕和统一 `styles.css` 主题层驱动；不要恢复旧 Wizard/Workbench 多工作区结构。
 
 ## 项目结构
 
@@ -16,10 +16,10 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 4.x GUI，仅支持 Tauri 桌面宿主。屏幕按 `launchpad / tensile / wizard / composer / code-console / settings` 分层，尽量不要再把事实源硬编码回前端。
-- `app/desktop/src/screens/composer/`: Composer 屏专属 hooks、面板组件和选择态/快捷键等 UI 行为模块；优先在这里继续拆分，不要再把导入、inspect、layers、快捷键逻辑重新堆回单个 `ComposerScreen.tsx`。
-- `app/desktop/src/screens/wizard/`: Wizard 屏专属 hooks、section 组件和流程辅助函数；保持 `WizardScreen.tsx` 只做状态编排，不要再把 detect/templates/options/preflight 整段 UI 塞回主屏文件。
-- `app/desktop/src/styles/`: 桌面端按功能拆分的样式分片；`shell / components / responsive` 承接共享外壳、通用控件和断点规则，`wizard / composer` 这类页面专属规则优先放到对应 CSS 分片中。
+- `app/desktop/src/`: 当前活动桌面前端入口；`App.tsx` 只负责 shell 装配、路由切换和 sidecar/store 协调，不要再把整个 GUI 重新堆回单文件巨型视图。
+- `app/desktop/src/components/mac/`: 本地 macOS 风格组件层，承接 `MacWindowShell / MacTitlebar / MacSidebar / MacPanel / MacButton / MacSelect / MacSegmentedControl / MacInspectorSection / MacStatusPill` 这些可复用基础件；新的桌面界面优先复用这里。
+- `app/desktop/src/screens/`: 当前活动 Plot 工作流屏幕层；`Start / PlotImport / PlotTemplate / PlotRefine` 的结构与行为以这里为准。
+- `app/desktop/src/styles.css`: 桌面端单一主题层与共享样式入口；使用 CSS variables 维护窗口、表面、控件和断点规则，不要再并行维护第二套主题真相源。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `sciplot-god-desktop` 进程已起来。
 - `Launch_Plotter.command`: 桌面端唯一启动器；只负责拉起当前 Tauri 开发宿主，失败时直接报错，不再提供任何 PySide / 终端 fallback。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
@@ -57,16 +57,16 @@
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
 - `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
-- 桌面端现在默认先进入 `Launchpad`，再进入 `plot / tensile / composer / code-console / settings` 这些专属 workspace；不要再把全局信息架构改回“常驻后台侧栏 + 一个大工作区”。
+- 桌面端当前默认先进入 `Start`，再沿 `Plot Import -> Plot Template -> Plot Refine` 进入单一 Plot 工作流；`tensile / composer / code-console / settings` 相关业务逻辑仍可保留为库或后端能力，但不再作为当前 shell 的活动 workspace 挂载。
 - 桌面端 workspace 默认只保留一个纵向滚动根：`app-main`。除非是明确设计的局部画布/代码横向预览，不要再给页面内部叠第二层默认纵向滚动容器。
 - `PreviewPane` 的普通滚轮应继续服务页面滚动；只有 `Ctrl/Cmd + wheel` 才用于缩放，双击回到 reset/fit。不要再让预览面板吞掉默认页面滚动。
-- 单图 `wizard` 流程默认是 staged workspace：`import -> sheet(按需) -> type -> tune -> review -> export`；不要把“保存/打开项目文件”重新堆成单图主入口，需要显式项目文件的主要仍是 `composer`。
-- `wizard` 的 `inspect` 仍在导入和切 sheet 后立即执行；`render-preview` 只在 `type / tune / review / export` 阶段活跃，`preflight` 只在 `review` 阶段活跃；不要再改回“单屏自动把所有检查全跑完”的心智模型。
-- `wizard` 的模板区默认只显示当前输入模型兼容的模板，其他模板只能放在“更多图型”里并以 disabled 方式展示；不要再让用户点进一个必报错的模板路径。
+- 当前单图 Plot 流程默认是 `Start -> Plot Import -> Plot Template -> Plot Refine`；不要再把旧的 staged wizard 子路由恢复成主入口，也不要重新堆回第二套 workbench/workspace 导航。
+- `inspect` 仍在导入和切 sheet 后立即执行，但现在留在 `Plot Import` 内完成；`render-preview`、readiness check 与 export 都收敛在 `Plot Refine` 内联完成，不要再改回跨多个子阶段屏幕的重向导心智模型。
+- `Plot Template` 默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
 - 拉伸整理和拉伸对比现在收敛到独立 `tensile` 工作台；`wizard` 只保留通用单图绘图流，不再承载 tensile preprocess / compare UI。
 - `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
 - tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
-- 最近记录现在由 `Launchpad` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 wizard 项目。
+- 最近记录现在由 `Start` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 plot 项目。
 - `wizard` 导入阶段现在可以一键触发 sidecar materialize `example template folder / blank template folder`；这些 workbook 要写到 app-managed stable 目录并按需覆盖刷新，不能再每次动作都散落新的 temp folder。这些模板和 folder 只是输入模板、格式引导与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
 - `code-console` 工作台现在收敛为“数据绑定/inspect + chart type 选择 + prompt 复制器 + repo-native Python runner”：前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
 - `code-console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
@@ -223,9 +223,9 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留 Tauri。
-- 不要把 wizard 再改回“先保存项目再继续”或“所有内容都堆在一屏里”的心智模型；单图流程默认应该保持 `Launchpad -> staged plot workspace`。
+- 不要把当前 Plot 前端再改回旧 wizard/多工作区路线，也不要把所有步骤塞回一个无层次的大表单；单图流程默认应该保持 `Start -> Plot Import -> Plot Template -> Plot Refine`。
 - 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
-- 不要把不兼容模板重新放回 wizard 默认主列表，更不要让 disabled 模板还能被点击。
+- 不要把不兼容模板重新放回 `Plot Template` 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
 - 不要把内部 QA / editorial policy 做成“让用户自己盯着分数改图”的前台功能；默认产品行为应该是软件自己统一出图，必要时只暴露极少数 cleanup 提示。
