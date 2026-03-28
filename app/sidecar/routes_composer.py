@@ -17,7 +17,9 @@ from app.sidecar.schemas import (
     composer_project_from_request,
     serialize_dataclass,
 )
-from src.composer import (
+from src.core.application.composer import (
+    analyze_composer_project,
+    build_composer_submission_report,
     compose_export_pdf,
     compose_preview_png,
     import_panels_from_paths,
@@ -26,8 +28,6 @@ from src.composer import (
     two_up_editorial_panels_from_paths,
     validate_non_overlapping_panels,
 )
-from src.composer_qa import analyze_composer_project
-from src.submission import build_composer_submission_report
 
 
 def create_composer_router() -> APIRouter:

@@ -1,4 +1,4 @@
-from src.rendering.cache import clear_input_cache
+from src.rendering.cache import read_raw_table_cached
 from src.rendering.constants import (
     DEFAULT_SIZE_BY_TEMPLATE,
     PALETTE_PRESET_CHOICES,
@@ -6,7 +6,12 @@ from src.rendering.constants import (
     STYLE_PRESET_CHOICES,
     TEMPLATE_CHOICES,
 )
-from src.rendering.dataset_models import NormalizedDataset, build_normalized_dataset
+from src.rendering.dataset_models import (
+    NormalizedDataset,
+    build_normalized_dataset,
+    dataframe_sample_rows,
+    normalized_dataset_payload,
+)
 from src.rendering.io import (
     coerce_sheet,
     default_output_dir,
@@ -34,10 +39,8 @@ from src.rendering.render import (
     export_rendered_plots,
     render_template,
 )
-from src.rendering.tensile_compare import (
-    export_tensile_comparison_bundle,
-    inspect_tensile_workbook,
-)
+from src.rendering.template_lifecycle import template_identity
+from src.submission import build_render_submission_report
 
 __all__ = [
     "DEFAULT_SIZE_BY_TEMPLATE",
@@ -46,30 +49,32 @@ __all__ = [
     "PALETTE_PRESET_CHOICES",
     "PreflightResult",
     "Recommendation",
-    "TemplateRecommendation",
-    "RenderOptions",
     "RenderedPlot",
+    "RenderOptions",
     "SIZE_CHOICES",
     "STYLE_PRESET_CHOICES",
     "TEMPLATE_CHOICES",
     "TEMPLATE_RENDERERS",
+    "TemplateRecommendation",
     "TemplateRenderer",
-    "build_rendered_plots",
     "build_normalized_dataset",
-    "clear_input_cache",
+    "build_render_submission_report",
+    "build_rendered_plots",
     "close_rendered_plots",
     "coerce_sheet",
+    "dataframe_sample_rows",
     "default_output_dir",
     "ensure_input_path",
     "export_rendered_plots",
-    "export_tensile_comparison_bundle",
     "inspect_input_file",
-    "inspect_tensile_workbook",
     "list_sheet_names",
     "normalize_input_path_text",
+    "normalized_dataset_payload",
     "preflight_render_request",
+    "read_raw_table_cached",
     "render_template",
     "resolve_output_dir",
     "resolve_render_options",
+    "template_identity",
     "validate_template_name",
 ]

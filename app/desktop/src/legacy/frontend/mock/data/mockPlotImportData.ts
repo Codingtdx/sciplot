@@ -1,0 +1,75 @@
+export const mockPlotImportData = {
+  fileName: "frequency_sweep_hydrogel_panel.xlsx",
+  filePath: "/Users/design/research/hydrogels/frequency_sweep_hydrogel_panel.xlsx",
+  sourceLabel: "Workbook import",
+  selectedSheet: "Rheology_Master",
+  sheets: ["Rheology_Master", "StorageOnly", "LossOnly", "Metadata"],
+  rowCount: 384,
+  columnCount: 8,
+  inspectedAt: "Last inspected 0.7 s ago",
+  schemaBadges: ["Rheology bundle", "Log-x recommended", "Markers available"],
+  headers: [
+    "Sample",
+    "Frequency (Hz)",
+    "G' (Pa)",
+    "G'' (Pa)",
+    "tanδ",
+    "Temperature (°C)",
+    "Strain (%)",
+    "Replicate",
+  ],
+  rows: [
+    ["GelMA 12%", "0.10", "1450", "210", "0.145", "25.0", "1.0", "R1"],
+    ["GelMA 12%", "0.25", "1620", "236", "0.146", "25.0", "1.0", "R1"],
+    ["GelMA 12%", "0.50", "1810", "264", "0.146", "25.0", "1.0", "R1"],
+    ["GelMA 12%", "1.00", "2140", "318", "0.149", "25.0", "1.0", "R1"],
+    ["GelMA 12%", "2.00", "2620", "381", "0.145", "25.0", "1.0", "R1"],
+    ["GelMA 12%", "4.00", "3290", "475", "0.144", "25.0", "1.0", "R1"],
+    ["GelMA 16%", "0.10", "1120", "172", "0.154", "25.0", "1.0", "R2"],
+    ["GelMA 16%", "0.25", "1280", "196", "0.153", "25.0", "1.0", "R2"],
+    ["GelMA 16%", "0.50", "1490", "226", "0.152", "25.0", "1.0", "R2"],
+    ["GelMA 16%", "1.00", "1780", "268", "0.151", "25.0", "1.0", "R2"],
+    ["GelMA + HA", "0.10", "930", "158", "0.170", "25.0", "1.0", "R3"],
+    ["GelMA + HA", "0.25", "1060", "177", "0.167", "25.0", "1.0", "R3"],
+    ["GelMA + HA", "0.50", "1220", "205", "0.168", "25.0", "1.0", "R3"],
+    ["GelMA + HA", "1.00", "1450", "242", "0.167", "25.0", "1.0", "R3"],
+  ],
+  inspection: {
+    model: "frequency_sweep",
+    confidence: "0.94 confidence",
+    summary:
+      "Column roles are stable across the workbook and the x-axis spans nearly three orders of magnitude, so the mock recommendation rail favors point-line and curve templates.",
+    signalGroups: [
+      {
+        label: "Detected roles",
+        items: [
+          "Frequency mapped to log-scale x axis",
+          "Storage and loss modulus columns split cleanly",
+          "Replicate labels stay consistent per formulation",
+        ],
+      },
+      {
+        label: "Quality notes",
+        items: [
+          "No missing values in visible region",
+          "Temperature held constant at 25.0 C",
+          "tanδ stays within a tight 0.14-0.17 band",
+        ],
+      },
+      {
+        label: "Suggested next",
+        items: [
+          "Point + line for manuscript comparison",
+          "Curve for denser series review",
+          "Scatter fit only if regression view is needed",
+        ],
+      },
+    ],
+    columnRoles: [
+      { name: "Frequency (Hz)", role: "Primary x axis" },
+      { name: "G' (Pa)", role: "Primary y metric" },
+      { name: "G'' (Pa)", role: "Secondary y metric" },
+      { name: "Replicate", role: "Grouping key" },
+    ],
+  },
+};

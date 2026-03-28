@@ -14,8 +14,11 @@ from app.sidecar.schemas import (
     serialize_dataclass,
 )
 from app.sidecar.server_utils import http_bad_request
-from src.rendering import export_tensile_comparison_bundle, inspect_tensile_workbook
-from src.tensile_replicates import export_tensile_replicate_workbook
+from src.core.application.tensile import (
+    export_tensile_comparison_bundle,
+    export_tensile_replicate_workbook,
+    inspect_tensile_workbook,
+)
 
 
 def create_tensile_router() -> APIRouter:

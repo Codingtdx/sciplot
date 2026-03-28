@@ -24,22 +24,23 @@ from app.sidecar.server_utils import (
     preview_artifact_path,
     write_json_artifact,
 )
-from src.rendering import (
+from src.core.application.render import (
     build_rendered_plots,
     build_normalized_dataset,
+    build_render_submission_report,
     close_rendered_plots,
     coerce_sheet,
+    dataframe_sample_rows,
     export_rendered_plots,
     inspect_input_file,
     list_sheet_names,
+    normalized_dataset_payload,
     preflight_render_request,
-    prepare_managed_plot_export_dir,
+    read_raw_table_cached,
+    template_identity,
     validate_template_name,
 )
-from src.rendering.cache import read_raw_table_cached
-from src.rendering.dataset_models import dataframe_sample_rows, normalized_dataset_payload
-from src.rendering.template_lifecycle import template_identity
-from src.submission import build_render_submission_report
+from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
 
 
 def create_render_router(*, dep_provider: Callable[[], object] | None = None) -> APIRouter:
