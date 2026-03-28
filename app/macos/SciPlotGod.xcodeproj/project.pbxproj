@@ -1,0 +1,559 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		C00000000000000000000001 /* Sources/App/AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* Sources/App/AppCommands.swift */; };
+		C00000000000000000000002 /* Sources/App/AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* Sources/App/AppModel.swift */; };
+		C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Sources/App/RootSplitView.swift */; };
+		C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */; };
+		C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Sources/App/Workbench.swift */; };
+		C00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */; };
+		C00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */; };
+		C00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */; };
+		C00000000000000000000009 /* Sources/Features/CodeConsole/CodeConsoleSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* Sources/Features/CodeConsole/CodeConsoleSession.swift */; };
+		C0000000000000000000000A /* Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift */; };
+		C0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift */; };
+		C0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift */; };
+		C0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */; };
+		C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */; };
+		C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */; };
+		C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */; };
+		C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */; };
+		C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */; };
+		C00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */; };
+		C00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */; };
+		C00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */; };
+		C00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */; };
+		C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */; };
+		C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */; };
+		C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */; };
+		C0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */; };
+		C0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift */; };
+		C0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift */; };
+		C0000000000000000000001D /* Sources/Infrastructure/RepoLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001D /* Sources/Infrastructure/RepoLocator.swift */; };
+		C0000000000000000000001E /* Sources/Infrastructure/SidecarClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001E /* Sources/Infrastructure/SidecarClient.swift */; };
+		C0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift */; };
+		C00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift */; };
+		C00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift */; };
+		C00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift */; };
+		C00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift */; };
+		C00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift */; };
+		C00000000000000000000025 /* Sources/Shared/UI/Base64PreviewImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000025 /* Sources/Shared/UI/Base64PreviewImageView.swift */; };
+		C00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */; };
+		C00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */; };
+		C00000000000000000000028 /* Sources/Shared/UI/StateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */; };
+		C00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */; };
+		C0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */; };
+		C0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */; };
+		C0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */; };
+		C0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */; };
+		C0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */; };
+		C00000000000000000000031 /* Tests/AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000031 /* Tests/AppModelTests.swift */; };
+		C00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */; };
+		C00000000000000000000033 /* Tests/ComposerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* Tests/ComposerSessionTests.swift */; };
+		C00000000000000000000034 /* Tests/DataCleanupSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */; };
+		C00000000000000000000035 /* Tests/MockSidecarClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000035 /* Tests/MockSidecarClient.swift */; };
+		C00000000000000000000036 /* Tests/MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000036 /* Tests/MockURLProtocol.swift */; };
+		C00000000000000000000037 /* Tests/PlotSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000037 /* Tests/PlotSessionTests.swift */; };
+		C00000000000000000000038 /* Tests/SchemaDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000038 /* Tests/SchemaDecodingTests.swift */; };
+		C00000000000000000000039 /* Tests/SidecarRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000039 /* Tests/SidecarRuntimeTests.swift */; };
+		C0000000000000000000003A /* Tests/TestPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003A /* Tests/TestPayloads.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A0000000000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00000000000000000000006;
+			remoteInfo = SciPlotGodMac;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B00000000000000000000001 /* Sources/App/AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/AppCommands.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 /* Sources/App/AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/AppModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 /* Sources/App/RootSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/RootSplitView.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/SciPlotGodApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000005 /* Sources/App/Workbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/Workbench.swift; sourceTree = "<group>"; };
+		B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleContextView.swift; sourceTree = "<group>"; };
+		B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleEditorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleOutputsView.swift; sourceTree = "<group>"; };
+		B00000000000000000000009 /* Sources/Features/CodeConsole/CodeConsoleSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleSession.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A /* Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift; sourceTree = "<group>"; };
+		B0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerAssetBrowserView.swift; sourceTree = "<group>"; };
+		B0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerCanvasView.swift; sourceTree = "<group>"; };
+		B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerInspectorView.swift; sourceTree = "<group>"; };
+		B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSession.swift; sourceTree = "<group>"; };
+		B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerWorkbenchView.swift; sourceTree = "<group>"; };
+		B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupCompareView.swift; sourceTree = "<group>"; };
+		B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupExportView.swift; sourceTree = "<group>"; };
+		B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupImportView.swift; sourceTree = "<group>"; };
+		B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupInspectorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupReviewView.swift; sourceTree = "<group>"; };
+		B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/DataCleanupSession.swift; sourceTree = "<group>"; };
+		B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift; sourceTree = "<group>"; };
+		B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotImportView.swift; sourceTree = "<group>"; };
+		B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotRefineView.swift; sourceTree = "<group>"; };
+		B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotSession.swift; sourceTree = "<group>"; };
+		B0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotTemplateView.swift; sourceTree = "<group>"; };
+		B0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotWorkbenchView.swift; sourceTree = "<group>"; };
+		B0000000000000000000001D /* Sources/Infrastructure/RepoLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/RepoLocator.swift; sourceTree = "<group>"; };
+		B0000000000000000000001E /* Sources/Infrastructure/SidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarClient.swift; sourceTree = "<group>"; };
+		B0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarError.swift; sourceTree = "<group>"; };
+		B00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarModelsCommon.swift; sourceTree = "<group>"; };
+		B00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarModelsComposer.swift; sourceTree = "<group>"; };
+		B00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarModelsRender.swift; sourceTree = "<group>"; };
+		B00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarModelsTensile.swift; sourceTree = "<group>"; };
+		B00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarRuntime.swift; sourceTree = "<group>"; };
+		B00000000000000000000025 /* Sources/Shared/UI/Base64PreviewImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/Base64PreviewImageView.swift; sourceTree = "<group>"; };
+		B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/PDFPreviewView.swift; sourceTree = "<group>"; };
+		B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/QuickLookThumbnailView.swift; sourceTree = "<group>"; };
+		B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/StateViews.swift; sourceTree = "<group>"; };
+		B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/FileTypeCatalog.swift; sourceTree = "<group>"; };
+		B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/JSONValue.swift; sourceTree = "<group>"; };
+		B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/NativePanels.swift; sourceTree = "<group>"; };
+		B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/PreviewImageDecoder.swift; sourceTree = "<group>"; };
+		B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/SheetValue.swift; sourceTree = "<group>"; };
+		B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/WorkspaceBridge.swift; sourceTree = "<group>"; };
+		B00000000000000000000031 /* Tests/AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/AppModelTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/CodeConsoleSessionTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000033 /* Tests/ComposerSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ComposerSessionTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/DataCleanupSessionTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000035 /* Tests/MockSidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/MockSidecarClient.swift; sourceTree = "<group>"; };
+		B00000000000000000000036 /* Tests/MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/MockURLProtocol.swift; sourceTree = "<group>"; };
+		B00000000000000000000037 /* Tests/PlotSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/PlotSessionTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000038 /* Tests/SchemaDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/SchemaDecodingTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000039 /* Tests/SidecarRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/SidecarRuntimeTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000003A /* Tests/TestPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/TestPayloads.swift; sourceTree = "<group>"; };
+		A00000000000000000000008 /* SciPlot God.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot God.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000009 /* SciPlotGodMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotGodMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A0000000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0000000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000003 /* Sources */,
+				A00000000000000000000004 /* Tests */,
+				A00000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000003 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000001 /* Sources/App/AppCommands.swift */,
+				B00000000000000000000002 /* Sources/App/AppModel.swift */,
+				B00000000000000000000003 /* Sources/App/RootSplitView.swift */,
+				B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */,
+				B00000000000000000000005 /* Sources/App/Workbench.swift */,
+				B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */,
+				B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */,
+				B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */,
+				B00000000000000000000009 /* Sources/Features/CodeConsole/CodeConsoleSession.swift */,
+				B0000000000000000000000A /* Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift */,
+				B0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift */,
+				B0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift */,
+				B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */,
+				B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */,
+				B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */,
+				B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */,
+				B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */,
+				B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */,
+				B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */,
+				B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */,
+				B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */,
+				B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */,
+				B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */,
+				B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */,
+				B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */,
+				B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */,
+				B0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift */,
+				B0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift */,
+				B0000000000000000000001D /* Sources/Infrastructure/RepoLocator.swift */,
+				B0000000000000000000001E /* Sources/Infrastructure/SidecarClient.swift */,
+				B0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift */,
+				B00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift */,
+				B00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift */,
+				B00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift */,
+				B00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift */,
+				B00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift */,
+				B00000000000000000000025 /* Sources/Shared/UI/Base64PreviewImageView.swift */,
+				B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */,
+				B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */,
+				B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */,
+				B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */,
+				B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */,
+				B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */,
+				B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */,
+				B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */,
+				B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000004 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000031 /* Tests/AppModelTests.swift */,
+				B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */,
+				B00000000000000000000033 /* Tests/ComposerSessionTests.swift */,
+				B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */,
+				B00000000000000000000035 /* Tests/MockSidecarClient.swift */,
+				B00000000000000000000036 /* Tests/MockURLProtocol.swift */,
+				B00000000000000000000037 /* Tests/PlotSessionTests.swift */,
+				B00000000000000000000038 /* Tests/SchemaDecodingTests.swift */,
+				B00000000000000000000039 /* Tests/SidecarRuntimeTests.swift */,
+				B0000000000000000000003A /* Tests/TestPayloads.swift */,
+			);
+			name = Tests;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000008 /* SciPlot God.app */,
+				A00000000000000000000009 /* SciPlotGodMacTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000006 /* SciPlotGodMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotGodMac" */;
+			buildPhases = (
+				A0000000000000000000000A /* Sources */,
+				A0000000000000000000000B /* Frameworks */,
+				A0000000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SciPlotGodMac;
+			productName = "SciPlot God";
+			productReference = A00000000000000000000008 /* SciPlot God.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A00000000000000000000007 /* SciPlotGodMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotGodMacTests" */;
+			buildPhases = (
+				A0000000000000000000000D /* Sources */,
+				A0000000000000000000000E /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A0000000000000000000001B /* PBXTargetDependency */,
+			);
+			name = SciPlotGodMacTests;
+			productName = SciPlotGodMacTests;
+			productReference = A00000000000000000000009 /* SciPlotGodMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					A00000000000000000000006 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					A00000000000000000000007 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = A00000000000000000000006;
+					};
+				};
+			};
+			buildConfigurationList = A00000000000000000000011 /* Build configuration list for PBXProject "SciPlotGod" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000000000000000000002;
+			productRefGroup = A00000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000000000000000000006 /* SciPlotGodMac */,
+				A00000000000000000000007 /* SciPlotGodMacTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A0000000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A0000000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C00000000000000000000001 /* Sources/App/AppCommands.swift in Sources */,
+				C00000000000000000000002 /* Sources/App/AppModel.swift in Sources */,
+				C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */,
+				C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */,
+				C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */,
+				C00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift in Sources */,
+				C00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift in Sources */,
+				C00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift in Sources */,
+				C00000000000000000000009 /* Sources/Features/CodeConsole/CodeConsoleSession.swift in Sources */,
+				C0000000000000000000000A /* Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift in Sources */,
+				C0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift in Sources */,
+				C0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift in Sources */,
+				C0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift in Sources */,
+				C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */,
+				C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */,
+				C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */,
+				C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */,
+				C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */,
+				C00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift in Sources */,
+				C00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift in Sources */,
+				C00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift in Sources */,
+				C00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift in Sources */,
+				C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */,
+				C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */,
+				C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */,
+				C0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift in Sources */,
+				C0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift in Sources */,
+				C0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift in Sources */,
+				C0000000000000000000001D /* Sources/Infrastructure/RepoLocator.swift in Sources */,
+				C0000000000000000000001E /* Sources/Infrastructure/SidecarClient.swift in Sources */,
+				C0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift in Sources */,
+				C00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift in Sources */,
+				C00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift in Sources */,
+				C00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift in Sources */,
+				C00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift in Sources */,
+				C00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift in Sources */,
+				C00000000000000000000025 /* Sources/Shared/UI/Base64PreviewImageView.swift in Sources */,
+				C00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift in Sources */,
+				C00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift in Sources */,
+				C00000000000000000000028 /* Sources/Shared/UI/StateViews.swift in Sources */,
+				C00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift in Sources */,
+				C0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift in Sources */,
+				C0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift in Sources */,
+				C0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift in Sources */,
+				C0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift in Sources */,
+				C0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0000000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C00000000000000000000031 /* Tests/AppModelTests.swift in Sources */,
+				C00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift in Sources */,
+				C00000000000000000000033 /* Tests/ComposerSessionTests.swift in Sources */,
+				C00000000000000000000034 /* Tests/DataCleanupSessionTests.swift in Sources */,
+				C00000000000000000000035 /* Tests/MockSidecarClient.swift in Sources */,
+				C00000000000000000000036 /* Tests/MockURLProtocol.swift in Sources */,
+				C00000000000000000000037 /* Tests/PlotSessionTests.swift in Sources */,
+				C00000000000000000000038 /* Tests/SchemaDecodingTests.swift in Sources */,
+				C00000000000000000000039 /* Tests/SidecarRuntimeTests.swift in Sources */,
+				C0000000000000000000003A /* Tests/TestPayloads.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A0000000000000000000001B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00000000000000000000006 /* SciPlotGodMac */;
+			targetProxy = A0000000000000000000001A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000014 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000015 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000016 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				INFOPLIST_KEY_RepoRootHint = "$(PROJECT_DIR)/../..";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop;
+				PRODUCT_MODULE_NAME = SciPlotGodMac;
+				PRODUCT_NAME = "SciPlot God";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000017 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHighResolutionCapable = YES;
+				INFOPLIST_KEY_RepoRootHint = "$(PROJECT_DIR)/../..";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop;
+				PRODUCT_MODULE_NAME = SciPlotGodMac;
+				PRODUCT_NAME = "SciPlot God";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000018 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop.tests;
+				PRODUCT_MODULE_NAME = SciPlotGodMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = SciPlotGodMac;
+			};
+			name = Debug;
+		};
+		A00000000000000000000019 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop.tests;
+				PRODUCT_MODULE_NAME = SciPlotGodMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = SciPlotGodMac;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000011 /* Build configuration list for PBXProject "SciPlotGod" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000014 /* Debug */,
+				A00000000000000000000015 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotGodMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000016 /* Debug */,
+				A00000000000000000000017 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotGodMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000018 /* Debug */,
+				A00000000000000000000019 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
+}

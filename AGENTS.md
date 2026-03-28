@@ -2,7 +2,7 @@
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
-> **Desktop GUI status (2026-03-28):** `app/desktop/src` 已进入新的 code-first foundation 阶段。当前活动桌面前端以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个保留 workbench 作为 app-level product model；`app/desktop/src/mock/**` 里的当前 mock 仍是受保护的 Plot-only 参考，不代表 whole-app IA，也不要在非 mock-design pass 里改它。
+> **Desktop GUI status (2026-03-28):** 当前受支持桌面前端已经切到原生 macOS `app/macos`。app-level product model 仍以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个保留 workbench 为准；`app/desktop/src/mock/**` 里的当前 mock 仍是受保护的 Plot-only 参考，不代表 whole-app IA，也不要在非 mock-design pass 里改它。
 
 ## 项目结构
 
@@ -19,12 +19,17 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 当前活动桌面前端基础入口；`App.tsx` / `entry/DesktopApp.tsx` 负责 foundation shell、运行时装配与后续 workbench 接回点，不要把整个 GUI 重新堆回单文件巨型视图。
+- `app/macos/`: 当前受支持的原生 macOS 前端；手工 Xcode 工程、SwiftUI app shell、sidecar runtime 与 4 个 workbench 的实现都在这里。
+- `app/macos/Sources/App`: SwiftUI `App` root、`NavigationSplitView` shell、toolbar、commands 与 app-level session/runtime 装配。
+- `app/macos/Sources/Infrastructure`: `Process + Pipe` sidecar runtime、`URLSession + Codable` client、repo root 定位与 sidecar schema mirror。
+- `app/macos/Sources/Features`: `Plot / Data Cleanup / Composer / Code Console` 各工作台与本地 session state。
+- `app/macos/Tests`: 原生 macOS 测试目标；覆盖 sidecar bootstrap/probe、schema decoding 与工作台状态流。
+- `app/desktop/src/`: 旧的 Tauri foundation 代码保留作历史/参考层，不再是受支持的桌面主链路。
 - `app/desktop/src/mock/`: 当前受保护的 Plot-only mock 参考；它保留 runnable mount 供后续 mock-design pass 使用，但不代表 app-level IA，也不要在本类 foundation pass 里修改。
-- `app/desktop/src/styles.css`: 桌面端单一主题层与共享样式入口；使用 CSS variables 维护窗口、表面、控件和断点规则，不要再并行维护第二套主题真相源。
+- `app/desktop/src/styles.css`: 旧 mock/Tauri 参考样式层；不要把它当成原生 macOS 前端的主题真相源。
 - `README.md` + `docs/product-architecture.md`: 当前 whole-app 产品模型、4 个 retained workbench、canonical workflow 与 IA 原则说明；做 mock、shell、路由、文案或导航清理前先看这里。
-- `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `sciplot-god-desktop` 进程已起来。
-- `Launch_Plotter.command`: 桌面端唯一启动器；只负责拉起当前 Tauri 开发宿主，失败时直接报错，不再提供任何 PySide / 终端 fallback。
+- `app/desktop/scripts/tauri-smoke.mjs`: 旧 Tauri 宿主 smoke；只在维护受保护 mock 或迁移历史行为时才参考，不是当前桌面主链路验证入口。
+- `Launch_Plotter.command`: 桌面端唯一启动器；现在负责构建并打开原生 macOS app，失败时直接报错，不再提供任何 PySide / 终端 fallback。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
 - `scripts/debug_refresh.py`: 人工审图刷新脚本；始终重刷 review fixtures，真实数据输入统一走 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`。
 - `scripts/clean_repo.py`: 仓库级清理入口；默认清掉缓存、`.DS_Store`、临时目录、桌面构建产物和 `.venv-*` 这类备份环境，只有显式传 `--include-node-modules` 才会进一步删掉桌面端依赖目录。
@@ -57,9 +62,9 @@
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`；`src/plotting.py` 只当公开兼容接口，不当实现文件，也不要再从里面 import 私有 helper。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 TS 强转把不可信 payload 直接吃进去。
 - Plot 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
-- 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问应统一收敛到明确的 runtime adapter 入口，不要在页面里散落调用或静默吞错。
-- `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
-- 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
+- 桌面端当前受支持宿主是 `app/macos` 原生 SwiftUI 应用；文件导入、目录选择、Finder reveal、sidecar 拉起等运行时访问应统一收敛到明确的 Swift runtime 入口，不要在页面里散落调用或静默吞错。
+- `Launch_Plotter.command` 现在代表原生 macOS 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
+- 原生桌面文件对话框优先走 `fileImporter`、`NSOpenPanel`、`NSSavePanel` 这类一方 API；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 桌面端当前的 app-level product model 以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
 - 设计或 mock 规划时要明确区分 canonical internal workflow 和 user-visible UI workflow：detect / normalize / map / validate / handoff / automation 这类系统步骤可以隐藏或并入更大的 work surface，只有用户需要定位、决策、复核、调整、确认、导出或交接时才应暴露成可见步骤。
 - 当前受保护 mock 仍展示 `Start -> Plot Import -> Plot Template -> Plot Refine` 这一条 Plot-only 参考流；它服务于后续 mock-design pass，但不是 whole-app IA 真相源，也不要在非 mock pass 里改 `app/desktop/src/mock/**` 与 `app/desktop/src/main.tsx`。
@@ -157,14 +162,10 @@
   - `.venv/bin/python -m pytest tests`
 - Python 全量回归：
   - `.venv/bin/python scripts/smoke_check.py`
-- GUI 组件测试：
-  - `cd app/desktop && npm test`
-- GUI Tauri 启动 smoke：
-  - `cd app/desktop && npm run test:e2e:tauri-smoke`
-- GUI 构建：
-  - `cd app/desktop && npm run build`
-- Tauri 编译检查：
-  - `cd app/desktop/src-tauri && cargo check`
+- Native macOS 构建：
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+- Native macOS 测试：
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
 
 ## 变更清单
 
@@ -181,8 +182,8 @@
 - `ruff check`
 - `pytest`
 - `scripts/smoke_check.py`
-- `app/desktop npm run build`
-- 如果改了 `/meta` 或前端选项展示，再跑 `app/desktop npm test`
+- `xcodebuild ... build`
+- 如果改了 `/meta` 或前端选项展示，再跑 `xcodebuild ... test`
 
 改拼图器时，至少回归：
 
@@ -190,23 +191,21 @@
 - `scripts/smoke_check.py` 中的 composer 段
 - `ruff check`
 - `mypy src/composer.py`
-- `app/desktop npm test`
-- 如果改了 Tauri 启动链路、窗口配置、wrapper 与真实宿主交互或桌面打包入口，再跑 `app/desktop npm run test:e2e:tauri-smoke`
-- `app/desktop npm run build`
-- `app/desktop/src-tauri cargo check`
+- `xcodebuild ... test`
+- 如果改了原生启动链路、窗口配置、sidecar bootstrap 或 Finder/runtime 交互，再跑 `xcodebuild ... build` 与 `xcodebuild ... test`
 
 改拉伸预处理时，至少回归：
 
 - `pytest`
 - `scripts/smoke_check.py` 中的 tensile preprocess 段
 - `tests/test_sidecar_active_routes.py`
-- `app/desktop npm test` 中覆盖当前 foundation shell 的用例（如果本轮改了桌面文案、入口或导航假设）
+- `xcodebuild ... test` 中覆盖当前 native shell 的用例（如果本轮改了桌面文案、入口或导航假设）
 - 确认生成的 workbook 能在 `Data Cleanup` 工作台显示整理结果，并且点击“在绘图中打开”后可继续 Plot 的 `inspect / preflight / render`
 
 改 GUI 选项或状态流时，至少回归：
 
-- `app/desktop npm test`
-- `app/desktop npm run build`
+- `xcodebuild ... test`
+- `xcodebuild ... build`
 - 如果动到 sidecar 交互字段，再补跑 Python smoke
 
 改 `src/rendering/`、`make_plot.py`、sidecar schema 或项目文件读写时，至少回归：
@@ -215,7 +214,7 @@
 - `mypy`
 - `pytest`
 - `scripts/smoke_check.py`
-- 如果 sidecar 返回字段或桌面端载入路径受影响，再跑 `app/desktop npm test`
+- 如果 sidecar 返回字段或桌面端载入路径受影响，再跑 `xcodebuild ... test`
 
 ## 常见坑
 
@@ -226,9 +225,9 @@
 - 不要在 sidecar 里直接 `return {...}` 一坨裸对象而不经过 response model。
 - 不要让 `save/open project` 旁路 `app/sidecar/schemas.py` 的校验/迁移层。
 - 不要在前端重新引入“第二套项目文件 schema”或靠 TS 强转跳过运行时校验。
-- 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
+- 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一受支持目标宿主是原生 macOS `app/macos`。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
-- 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留 Tauri。
+- 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留原生 macOS app。
 - 不要让当前受保护 mock 或 Plot-only 参考流反向定义 whole-app IA；app-level retained model 始终是 `Plot / Data Cleanup / Composer / Code Console`。
 - 不要重新把 `Start / Home / Project / Settings` 恢复成一级产品区；这些概念最多只能作为 utility surface 或历史兼容层存在。
 - 不要把 Plot 的本地步骤塞回一级导航，也不要把所有 Plot 控件重新堆成一个无层次的大表单；Plot 的 canonical local flow 仍应保持 `Import -> Inspect -> Template -> Refine -> Preflight -> Export`。
@@ -247,7 +246,7 @@
 - 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 `Data Cleanup` 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 Plot render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
 - `scripts/debug_refresh.py` 的真实数据入口只认 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`；不要把个人绝对路径或私有目录结构写回仓库。
-- `scripts/clean_repo.py` 默认不应删除当前激活的 `.venv`；如果要清 `app/desktop/node_modules/`，必须显式传 `--include-node-modules`，不要把“重装成本高”的依赖目录做成隐式默认删除项。
+- `scripts/clean_repo.py` 默认不应删除当前激活的 `.venv`；如果要清 `app/desktop/node_modules/` 这类旧桌面依赖，必须显式传 `--include-node-modules`，不要把“重装成本高”的依赖目录做成隐式默认删除项。
 
 ## 拉伸预处理夹具
 

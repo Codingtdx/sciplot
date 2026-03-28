@@ -305,7 +305,7 @@ The following foundations must be preserved for future implementation work:
 - Data Cleanup handoff into Plot
 - Composer v2 geometry and export invariants
 - controlled Code Console semantics when restored or expanded
-- Tauri-only desktop hosting
+- native macOS hosting in `app/macos`
 - the protected current mock under `app/desktop/src/mock/**`
 - the protected current mock mount in `app/desktop/src/main.tsx`
 

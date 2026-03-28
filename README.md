@@ -81,6 +81,7 @@ Notes:
 - `Start`, `Home`, and other launchpad-style destinations are not part of the long-term primary IA.
 - `Project`, `Settings`, recents, managed files, appearance controls, open/save actions, and similar affordances are utilities, not primary workbenches.
 - Plot may still have its own local multi-step workflow, but those local steps are not top-level app destinations.
+- The supported desktop frontend is the native macOS app under `app/macos`.
 - The current protected mock under `app/desktop/src/mock/**` is a plot-flow-only reference and is not the authoritative whole-app IA.
 
 ## Utilities, Not Primary Workbenches

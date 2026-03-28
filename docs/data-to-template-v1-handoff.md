@@ -88,10 +88,10 @@ Sidecar API/schema boundaries:
   - option payload normalization and route utilities.
 
 Desktop continuity seams:
-- `app/desktop/src/App.tsx`
-  - active runtime foundation entry that re-exports the current desktop shell stub.
-- `app/desktop/src/entry/DesktopApp.tsx`
-  - foundation-level desktop shell placeholder aligned to the retained four-workbench model.
+- `app/macos/Sources/App/**`
+  - native macOS app shell, commands, and runtime ownership for the supported desktop frontend.
+- `app/macos/Sources/Features/Plot/**`
+  - Plot workbench flow that consumes the inspect/recommend/preflight/render/export sidecar chain.
 - `app/desktop/src/mock/**`
   - protected Plot-only mock reference; useful for local Plot-flow continuity, but not for whole-app IA decisions.
 - `README.md`
@@ -158,6 +158,6 @@ This v1 flow passed the stabilization gate:
 - lint (`ruff`)
 - tests (`pytest`, including rendering/sidecar coverage)
 - smoke check (`scripts/smoke_check.py`)
-- desktop tests/build (`npm test`, `npm run build`)
+- desktop tests/build (`xcodebuild test`, `xcodebuild build`)
 
 Current assessment: **v1 data-to-template flow is release-ready within defined scope.**

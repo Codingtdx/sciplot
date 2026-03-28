@@ -15,24 +15,12 @@ jobs:
         with:
           python-version: "3.14.3"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: app/desktop/package-lock.json
-
-      - uses: dtolnay/rust-toolchain@stable
-
       - name: Install Python dependencies
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt
           .venv/bin/pip install -c requirements-constraints.txt pytest ruff mypy coverage httpx pre-commit
-
-      - name: Install desktop dependencies
-        working-directory: app/desktop
-        run: npm ci
 
       - name: Ruff
         run: .venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py
@@ -46,18 +34,20 @@ jobs:
       - name: Python smoke check
         run: .venv/bin/python scripts/smoke_check.py
 
-      - name: Desktop tests
-        working-directory: app/desktop
-        run: npm test
+      - name: Native macOS build
+        run: |
+          xcodebuild \
+            -project app/macos/SciPlotGod.xcodeproj \
+            -scheme SciPlotGodMac \
+            -destination 'platform=macOS' \
+            -derivedDataPath app/macos/.derivedData \
+            build
 
-      - name: Desktop Tauri smoke
-        working-directory: app/desktop
-        run: npm run test:e2e:tauri-smoke
-
-      - name: Desktop build
-        working-directory: app/desktop
-        run: npm run build
-
-      - name: Tauri cargo check
-        working-directory: app/desktop/src-tauri
-        run: cargo check
+      - name: Native macOS tests
+        run: |
+          xcodebuild \
+            -project app/macos/SciPlotGod.xcodeproj \
+            -scheme SciPlotGodMac \
+            -destination 'platform=macOS' \
+            -derivedDataPath app/macos/.derivedData \
+            test

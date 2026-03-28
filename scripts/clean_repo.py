@@ -13,17 +13,20 @@ TOP_LEVEL_PATH_TARGETS: tuple[tuple[str, str], ...] = (
     (".pytest_cache", "pytest cache"),
     (".ruff_cache", "ruff cache"),
     (".tmp", "temporary workspace"),
-    ("app/desktop/dist", "desktop build output"),
-    ("app/desktop/playwright-report", "desktop Playwright report"),
-    ("app/desktop/test-results", "desktop test results"),
-    ("app/desktop/src-tauri/target", "Tauri build output"),
+    ("app/macos/.derivedData", "native macOS derived data"),
+    ("app/macos/build", "native macOS build output"),
+    ("app/desktop/dist", "legacy desktop build output"),
+    ("app/desktop/playwright-report", "legacy desktop Playwright report"),
+    ("app/desktop/test-results", "legacy desktop test results"),
+    ("app/desktop/src-tauri/target", "legacy Tauri build output"),
 )
 TOP_LEVEL_GLOB_TARGETS: tuple[tuple[str, str], ...] = (
     (".venv-*", "backup virtualenv"),
     (".tmp_*", "temporary workspace"),
+    ("app/macos/*.xcresult", "native macOS test result bundle"),
 )
 DEEP_PATH_TARGETS: tuple[tuple[str, str], ...] = (
-    ("app/desktop/node_modules", "desktop dependencies"),
+    ("app/desktop/node_modules", "legacy desktop dependencies"),
 )
 RECURSIVE_DIR_NAMES = frozenset({"__pycache__", ".cache", ".vite", ".turbo"})
 RECURSIVE_FILE_NAMES = frozenset({".DS_Store"})
@@ -51,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-node-modules",
         action="store_true",
-        help="Also remove app/desktop/node_modules.",
+        help="Also remove legacy app/desktop/node_modules.",
     )
     parser.add_argument(
         "--root",
