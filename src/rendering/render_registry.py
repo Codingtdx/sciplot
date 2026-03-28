@@ -1,0 +1,53 @@
+from src.rendering.models import TemplateName, TemplateRenderer
+from src.rendering.render_curve import (
+    _render_bubble_scatter,
+    _render_curve,
+    _render_mean_band,
+    _render_point_line,
+    _render_replicate_curves_with_band,
+    _render_scatter,
+    _render_scatter_fit,
+    _render_scatter_with_fit,
+    _render_segmented_stacked_curve,
+    _render_stacked_curve,
+)
+from src.rendering.render_heatmap import _render_annotated_heatmap, _render_heatmap
+from src.rendering.render_stats import (
+    _render_bar,
+    _render_box,
+    _render_box_strip,
+    _render_distribution_compare,
+    _render_grouped_bar_compare,
+    _render_grouped_bar_error,
+    _render_histogram_density,
+    _render_lollipop_error,
+    _render_point_error,
+    _render_violin,
+    _render_violin_box,
+)
+
+TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
+    "curve": TemplateRenderer(render=_render_curve),
+    "point_line": TemplateRenderer(render=_render_point_line),
+    "replicate_curves_with_band": TemplateRenderer(render=_render_replicate_curves_with_band),
+    "stacked_curve": TemplateRenderer(render=_render_stacked_curve),
+    "segmented_stacked_curve": TemplateRenderer(render=_render_segmented_stacked_curve),
+    "bar": TemplateRenderer(render=_render_bar),
+    "box": TemplateRenderer(render=_render_box),
+    "box_strip": TemplateRenderer(render=_render_box_strip),
+    "violin": TemplateRenderer(render=_render_violin),
+    "violin_box": TemplateRenderer(render=_render_violin_box),
+    "grouped_bar_compare": TemplateRenderer(render=_render_grouped_bar_compare),
+    "grouped_bar_error": TemplateRenderer(render=_render_grouped_bar_error),
+    "point_error": TemplateRenderer(render=_render_point_error),
+    "lollipop_error": TemplateRenderer(render=_render_lollipop_error),
+    "distribution_compare": TemplateRenderer(render=_render_distribution_compare),
+    "histogram_density": TemplateRenderer(render=_render_histogram_density),
+    "scatter": TemplateRenderer(render=_render_scatter),
+    "bubble_scatter": TemplateRenderer(render=_render_bubble_scatter),
+    "scatter_with_fit": TemplateRenderer(render=_render_scatter_with_fit),
+    "scatter_fit": TemplateRenderer(render=_render_scatter_fit),
+    "mean_band": TemplateRenderer(render=_render_mean_band),
+    "heatmap": TemplateRenderer(render=_render_heatmap),
+    "annotated_heatmap": TemplateRenderer(render=_render_annotated_heatmap),
+}

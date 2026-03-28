@@ -18,29 +18,31 @@ from src.layout_policy import (
     record_layout_decision,
 )
 from src.layout_scoring import score_points_against_bbox
-from src.plotting import (
+from src.plotting_curve_support import (
     CURVE_TEMPLATES,
     HIDDEN_Y_LABEL_X,
     INSIDE_LEGEND_INSET_FRACTION,
     MARKER_STYLE_CYCLE,
+    _baseline_correct_series,
+    _compute_stacked_axis_limits,
+    _current_legend_inset,
+    _infer_markevery,
+    _legend_kwargs,
+    _place_series_edge_labels,
+    _prepare_stacked_layout,
+    _stack_retry_scales,
+    _validate_curve_series_input,
+)
+from src.plotting_primitives import (
     MAX_VISIBLE_Y_MAJOR_TICKS,
     AxisLimits,
     AxisMode,
     LegendMode,
     _apply_explicit_major_ticks,
-    _baseline_correct_series,
-    _compute_stacked_axis_limits,
-    _current_legend_inset,
     _format_axis_label,
-    _infer_markevery,
-    _legend_kwargs,
     _merge_limits,
     _override_complete,
-    _place_series_edge_labels,
-    _prepare_stacked_layout,
     _resolved_panel_geometry,
-    _stack_retry_scales,
-    _validate_curve_series_input,
     compute_axis_limits,
 )
 

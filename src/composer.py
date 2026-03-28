@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-from src.composer_ops import (
-    composer_layout_grid,
+from src.composer_assets import (
     image_aspect_ratio,
-    import_panels_from_paths,
-    normalize_project,
     panel_aspect_ratio,
     pdf_page_aspect_ratio,
     pdf_page_size_pt,
+)
+from src.composer_export import compose_export_pdf
+from src.composer_imports import (
+    import_panels_from_paths,
+    three_up_panels_from_paths,
+    two_up_editorial_panels_from_paths,
+    validate_non_overlapping_panels,
+)
+from src.composer_preview import compose_preview_png, panel_thumbnail_png
+from src.composer_project import (
+    composer_layout_grid,
+    normalize_project,
     project_from_dict,
     region_rect_mm,
     region_slot_id,
     region_slot_rect_mm,
     resolve_panel_labels,
-    three_up_panels_from_paths,
-    two_up_editorial_panels_from_paths,
-    validate_non_overlapping_panels,
-)
-from src.composer_render import (
-    compose_export_pdf,
-    compose_preview_png,
-    panel_thumbnail_png,
 )
 from src.composer_types import (
     COMPOSER_CANVAS_HEIGHT_MM,

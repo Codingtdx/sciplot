@@ -27,8 +27,8 @@ from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.preflight import preflight_render_request
 from src.rendering.recommendation import inspect_input_file
 from src.rendering.recommender_models import TemplateRecommendation
-from src.rendering.render import (
-    TEMPLATE_RENDERERS,
+from src.rendering.render_registry import TEMPLATE_RENDERERS
+from src.rendering.render_service import (
     build_rendered_plots,
     close_rendered_plots,
     export_rendered_plots,

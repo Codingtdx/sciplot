@@ -19,7 +19,7 @@ from src.rendering import (
     resolve_render_options,
 )
 from src.rendering import themes as rendering_themes
-from src.rendering.render import _apply_compact_inside_legend
+from src.rendering.render_curve_support import _apply_compact_inside_legend
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.themes import VisualThemeSpec, visual_theme_ids, visual_theme_soft_overrides
 

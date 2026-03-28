@@ -7,8 +7,11 @@
 ## 项目结构
 
 - `src/`: 绘图内核、数据加载、布局规则、拉伸预处理、拼图后端。
-- `src/rendering/`: 绘图服务层；现在按 `inspect / recommendation / preflight / render / cache / options / io` 拆开，CLI 和 sidecar 都只应该调用这一层。
-- `src/plotting.py`: 仍保留核心绘图实现与公开绘图门面；如果只是复用绘图家族入口，优先从 `src/plotting_families/` 进入，不要继续把新调用点直接绑死到这个大文件。
+- `src/rendering/`: 绘图服务层；现在按 `inspect / recommendation / preflight / render_curve / render_stats / render_heatmap / render_registry / cache / options / io` 拆开，CLI 和 sidecar 只应该调用 `src/core/application/render.py` 或 `src/rendering/render_service.py`，不要再直连内部 workflow 模块。
+- `src/plotting.py`: 现在只是公开 plotting API 的兼容门面；外部兼容调用继续从这里 import，但内部模块不得再从这里拿私有 helper。
+- `src/plotting_primitives.py`: 通用 plotting primitives 与共享坐标/刻度/几何 helper；`stats / heatmap / curve support` 都从这里拿共享底座。
+- `src/plotting_curve_support.py`: 曲线图族共享 support，承接 `CurveTemplate / shared x layout / stacked layout / edge labels / legend helper` 等曲线专属逻辑。
+- `src/plotting_wide_nmr.py`: wide-NMR 专属 support 与 `plot_wide_nmr` 真正实现；不要再把 wide-NMR 特例逻辑塞回 `src/plotting.py`。
 - `src/plotting_curves.py`: 曲线图族主流程实现，承接 `plot_curves / plot_scatter / curve template / legend` 等编排逻辑；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/plotting_stats.py`: 统计图族实现，承接 `box / bar / violin` 及其共享坐标规则；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/plotting_heatmap.py`: 热图实现，承接 heatmap 主图区与 colorbar 布局；外部兼容调用仍通过 `src/plotting.py` 暴露。
@@ -51,7 +54,7 @@
 - `inspect-file` / `recommend-render` 的 `inspection` 现在在保持旧 `recommendation` 兼容字段的同时，还会返回 richer ranked `recommendations`（含 `rank / score / reason / suitability_hint / score_gap_to_top`）以及顶层 `recommendation_confidence / recommendation_summary`；`wizard` 的 `/plot/type` 只消费这些后端字段做排序与提示，不要在前端再造一套评分逻辑。
 - `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果 GUI 没传显式 `output_dir`，sidecar 默认写到 app-managed `plot_exports` 目录，只有用户明确选目录时才落到用户指定路径。改导出链路时别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
-- 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`，把 `src/plotting.py` 当实现文件，不当接口文件。
+- 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`；`src/plotting.py` 只当公开兼容接口，不当实现文件，也不要再从里面 import 私有 helper。
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
 - Wizard 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
 - 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。

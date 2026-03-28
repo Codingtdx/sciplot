@@ -7,7 +7,7 @@ import numpy as np
 
 from src import plot_style
 from src.data_loader import ReplicateGroup
-from src.plotting import (
+from src.plotting_primitives import (
     MAX_VISIBLE_Y_MAJOR_TICKS,
     AxisLimits,
     AxisMode,

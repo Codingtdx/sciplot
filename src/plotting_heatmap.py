@@ -15,7 +15,7 @@ from src.layout_policy import (
     flag_margin_fallback,
     record_layout_decision,
 )
-from src.plotting import (
+from src.plotting_primitives import (
     _HEATMAP_LAYOUT,
     _compute_heatmap_cax_geometry,
     _format_axis_label,

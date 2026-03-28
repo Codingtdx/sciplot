@@ -5,7 +5,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from src.composer_ops import region_rect_mm, region_slot_id, region_slot_rect_mm
+from src.composer_project import region_rect_mm, region_slot_id, region_slot_rect_mm
 from src.composer_types import PT_TO_MM, ComposerPanel, ComposerProject, ComposerText
 from src.plot_contract import qa_profile
 from src.rendering.models import QAIssue, QAReport
