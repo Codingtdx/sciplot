@@ -20,7 +20,9 @@ const frontendUrl = "http://127.0.0.1:1420/";
 const requiredSidecarRoutes = [
   { method: "get", path: "/meta" },
   { method: "get", path: "/plot-contract" },
-  { method: "post", path: "/data-templates/folder" },
+  { method: "post", path: "/inspect-file" },
+  { method: "post", path: "/compose-preview" },
+  { method: "post", path: "/preprocess-tensile-replicates" },
 ];
 const tauriConfig = JSON.stringify({
   build: {

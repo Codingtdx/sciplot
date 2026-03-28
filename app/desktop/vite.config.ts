@@ -19,16 +19,26 @@ export default defineConfig({
             id.includes("/src/screens/Composer") ||
             id.includes("/src/components/Composer")
           ) {
-            return "composer-screen";
-          }
-          if (id.includes("/src/screens/Wizard")) {
-            return "wizard-screen";
+            return "composer-workbench";
           }
           if (
-            id.includes("/src/screens/Projects") ||
-            id.includes("/src/screens/Settings")
+            id.includes("/src/screens/CodeConsole") ||
+            id.includes("/src/components/CodeConsole")
           ) {
-            return "workbench-screen";
+            return "code-console-workbench";
+          }
+          if (
+            id.includes("/src/screens/Tensile") ||
+            id.includes("/src/screens/DataCleanup")
+          ) {
+            return "data-cleanup-workbench";
+          }
+          if (
+            id.includes("/src/screens/Wizard") ||
+            id.includes("/src/screens/Plot") ||
+            id.includes("/src/components/Plot")
+          ) {
+            return "plot-workbench";
           }
           if (id.includes("node_modules")) {
             return "vendor";

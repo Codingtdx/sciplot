@@ -11,10 +11,12 @@ use tauri::Manager;
 
 const SIDECAR_ADDR: &str = "127.0.0.1:8765";
 const SIDECAR_OPENAPI_PATH: &str = "/openapi.json";
-const REQUIRED_SIDECAR_ROUTES: [(&str, &str); 3] = [
+const REQUIRED_SIDECAR_ROUTES: [(&str, &str); 5] = [
     ("GET", "/meta"),
     ("GET", "/plot-contract"),
-    ("POST", "/data-templates/folder"),
+    ("POST", "/inspect-file"),
+    ("POST", "/compose-preview"),
+    ("POST", "/preprocess-tensile-replicates"),
 ];
 
 struct SidecarState {
@@ -262,7 +264,7 @@ fn start_sidecar() -> Option<Child> {
     }
 
     eprintln!(
-        "[desktop] failed to start a compatible sidecar. Plot template folder requests will stay unavailable."
+        "[desktop] failed to start a compatible sidecar. Core workbench routes will stay unavailable."
     );
     None
 }

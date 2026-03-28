@@ -1,6 +1,12 @@
 # Data-to-Template v1 Handoff
 **Status:** v1 flow is functionally complete and considered shippable after stabilization.
 
+Historical note (2026-03-28):
+
+- This document describes the Plot-side data-to-template refactor, not the canonical whole-app information architecture.
+- For current app-level product scope, workflows, and IA rules, use `README.md` and `docs/product-architecture.md`.
+- Older desktop-shell references in this handoff should be read as implementation history, not as the current app-shell truth.
+
 ## 1. Title + status
 - This document is the handoff for the **v1 data-to-template flow** refactor.
 - The v1 flow is **shippable / functionally complete** for current scope.
@@ -81,17 +87,17 @@ Sidecar API/schema boundaries:
 - `app/sidecar/server_utils.py`
   - option payload normalization and route utilities.
 
-Desktop runtime/project seams:
-- `app/desktop/src/lib/workbench.ts`
-  - compatibility template mapping and model-specific compatibility text.
-- `app/desktop/src/lib/runtime.ts`
-  - runtime payload parsing/guards for sidecar responses.
-- `app/desktop/src/lib/types.ts`
-  - desktop-side type boundaries for inspect/recommend/options payloads.
-- `app/desktop/src/lib/projects.ts`
-  - project persistence structures for wizard/composer.
-- `app/desktop/src/lib/wizard.ts`
-  - wizard flow state helpers.
+Desktop continuity seams:
+- `app/desktop/src/App.tsx`
+  - active runtime foundation entry that re-exports the current desktop shell stub.
+- `app/desktop/src/entry/DesktopApp.tsx`
+  - foundation-level desktop shell placeholder aligned to the retained four-workbench model.
+- `app/desktop/src/mock/**`
+  - protected Plot-only mock reference; useful for local Plot-flow continuity, but not for whole-app IA decisions.
+- `README.md`
+  - maintainer-facing summary of the retained workbench model.
+- `docs/product-architecture.md`
+  - canonical app-level IA and workflow normalization reference.
 
 ## 5. Locked design decisions
 - **Publication profile is the hard authority.**
@@ -127,6 +133,7 @@ Intentionally preserved:
 - Recommendation quality is rule-driven and may not match every niche domain preference.
 - Some preflight guidance is warning-level rather than blocking by design.
 - No broader UI redesign in this release.
+- No assumption that the protected Plot mock defines the whole app shell.
 - No endpoint expansion in this release.
 - No Plotly donor-code transplantation.
 
@@ -134,6 +141,7 @@ Intentionally preserved:
 - Tune recommendation rules/priors using real representative datasets.
 - Extend regression coverage for edge cases (sparse/discrete/ambiguous structures).
 - Continue minor wording and UX polish where it improves current flow clarity.
+- Keep Plot subsystem improvements aligned with the retained four-workbench app model rather than restoring old app-shell assumptions.
 - Validate behavior with real-world data before expanding breadth.
 
 ## 10. What future contributors should NOT do
@@ -142,6 +150,7 @@ Intentionally preserved:
 - Do not add template families without full recommendation/preflight/render/export integration.
 - Do not introduce adaptive/learned ranking casually.
 - Do not broaden wizard/UI without explicit product justification.
+- Do not treat old wizard/workbench shell files as the current product IA truth.
 - Do not expand scope just because Plotly has additional chart types.
 
 ## 11. Validation / release readiness

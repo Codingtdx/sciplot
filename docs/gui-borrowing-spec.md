@@ -1,10 +1,11 @@
 # SciPlot GUI Borrowing Spec
 
-This document captures the desktop UI rules borrowed from the macOS 26 reference file and translates them into concrete implementation constraints for the SciPlot rebuild.
+This document captures the desktop UI rules borrowed from the macOS 26 reference file and translates them into implementation constraints for the retained SciPlot product model.
 
 Reference basis:
+
 - Source: macOS 26 community reference
-- Scope used: one single screenshot read of the provided node
+- Scope used: one screenshot read of the provided node
 - Purpose: visual borrowing only, not workflow borrowing
 
 ## Borrow Directly
@@ -26,11 +27,11 @@ Reference basis:
 
 ### Sidebar Behavior
 
-- Sidebar width should feel fixed and stable, around a compact desktop-navigation width, not a collapsible web-app rail.
+- Sidebar width should feel fixed and stable, around a compact desktop-navigation width.
 - Sidebar groups should be stacked with roomy vertical spacing and compact internal padding.
-- Navigation items should use rounded-rectangle selection backgrounds, soft hover fills, and low-contrast icon + label pairs.
+- Navigation items should use rounded-rectangle selection backgrounds, soft hover fills, and low-contrast icon-plus-label pairs.
 - Active state should be visibly filled and elevated, not only color-tinted text.
-- Sidebar footer can host secondary destinations such as Settings, but these must remain visually subordinate.
+- Sidebar footer or utility group can host secondary actions such as recents, open/save, or runtime controls, but these must remain visually subordinate.
 
 ### Surface Hierarchy
 
@@ -68,7 +69,7 @@ Reference basis:
 - Use wide row height, soft grid separation, and strong alignment rather than dense spreadsheet visuals.
 - Keep header rows quiet and utility-like.
 - Selected rows should use filled highlight, not only a left border or checkmark.
-- Treat tables as content panels inside the workspace, not as full-window spreadsheet replacements unless the screen specifically demands it.
+- Treat tables as content panels inside the workspace, not as full-window spreadsheet replacements unless the workbench specifically demands it.
 
 ### Inspector And Panel Styling
 
@@ -83,45 +84,46 @@ Reference basis:
 - Do not copy multi-window OS workflows into the product.
 - Do not copy desktop wallpaper or OS chrome as literal product background content.
 - Do not use top-row app switching tabs as primary navigation.
-- Do not inherit file-browser-first workflows when SciPlot needs dataset-first and chart-first flows.
-- Do not reproduce empty demo windows or generic settings pages that weaken the product-specific flow.
-- Do not overuse translucency if it reduces chart readability.
+- Do not inherit file-browser-first workflows when SciPlot needs data-first, canvas-first, and code-first workbenches.
+- Do not reproduce generic settings pages or dashboard views that weaken the product-specific flow.
+- Do not overuse translucency if it reduces chart, table, or code readability.
 
 ## Product Mapping
 
-### AppShell
+### App Shell
 
 - Borrow the floating macOS-style window, titlebar, traffic lights, soft radius, shadow, and fixed left sidebar.
-- Replace OS app categories with SciPlot navigation only: Start, Plot Import, Plot Template, Plot Refine.
-- Keep the main workspace broad and calm, with optional right-side contextual inspector only when the screen needs one.
+- Replace OS app categories with SciPlot navigation only: `Plot`, `Data Cleanup`, `Composer`, `Code Console`.
+- Keep the main workspace broad and calm, with optional right-side contextual inspector only when the current workbench needs one.
+- Keep utilities secondary rather than restoring `Start`, `Project`, or `Settings` as primary destinations.
 
-### Start
+### Plot
 
-- Borrow the quiet workspace sheet, large breathing room, soft grouped action cards, and desktop empty-state tone.
-- Do not make Start a dashboard.
-- Use a single dominant start surface with recent datasets, primary entry actions, and lightweight onboarding cues.
+- Borrow the quiet workspace sheet, table clarity, recommendation hierarchy, and stable inspector rhythm.
+- Use local Plot navigation for `Import -> Inspect -> Template -> Refine -> Preflight -> Export`.
+- Keep preview and export tied to the Plot workflow itself rather than separate app destinations.
 
-### Plot Import
+### Data Cleanup
 
-- Borrow Finder-like list/table clarity and panel calmness, but not Finder workflow structure.
-- Center the screen on dataset intake: source selection, detected sheets, dataset summary, and import readiness.
-- Keep the dominant area as a dataset browser/preview workspace with a compact context panel.
+- Borrow structured intake sheets, compare-table calmness, and utility-panel hierarchy.
+- Center the workbench on cleanup and quality control, not on raw backend terminology.
+- Keep `Open in Plot` as an explicit handoff action rather than an automatic redirect.
 
-### Plot Template
+### Composer
 
-- Borrow selection fills, grouped panels, and preference-sheet tone.
-- Make recommendations the main content, with one clearly preferred template and a ranked set of alternatives beneath or beside it.
-- Avoid gallery chaos; use fewer, larger recommendation cards.
+- Borrow split-pane stability, panel hierarchy, and strong canvas framing.
+- Make the canvas dominant and keep controls in supporting trays and inspectors.
+- Avoid turning Composer into a settings-first or form-first experience.
 
-### Plot Refine
+### Code Console
 
-- Borrow inspector rhythm, native control styling, and stable split-pane hierarchy.
-- Make the chart preview the dominant surface.
-- Put export inline in the chart workflow, not as a distant terminal step.
-- Keep controls in a right inspector or bottom utility strip, but never overpower the preview canvas.
+- Borrow quiet inspector grouping, compact desktop controls, and strong result-surface hierarchy.
+- Treat the workbench as a serious scripting and controlled-runner surface.
+- Keep prompt/code and outputs central; keep context binding nearby but secondary.
 
 ## Implementation Notes
 
-- Start implementation from shell and component primitives, not from old SciPlot screens.
-- Preserve the borrowed desktop language consistently across all screens before adding feature-specific variations.
-- If a screen needs a new component, style it as if it belongs to the borrowed macOS desktop family first, then adapt for SciPlot semantics.
+- Start implementation from shell and component primitives, not from the protected mock's current app-level navigation.
+- Preserve the borrowed desktop language consistently across all four workbenches before adding feature-specific variations.
+- If a workbench needs a new component, style it as if it belongs to the borrowed macOS desktop family first, then adapt for SciPlot semantics.
+- The protected mock under `app/desktop/src/mock/**` remains a Plot-only reference, not the authoritative whole-app IA.

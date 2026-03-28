@@ -2,7 +2,7 @@
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
-> **Desktop GUI status (2026-03-28):** `app/desktop/src` 已进入新的 code-first foundation 阶段。当前活动桌面前端由 `Mac*` 组件层、单一 Plot 工作流屏幕和统一 `styles.css` 主题层驱动；不要恢复旧 Wizard/Workbench 多工作区结构。
+> **Desktop GUI status (2026-03-28):** `app/desktop/src` 已进入新的 code-first foundation 阶段。当前活动桌面前端以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个保留 workbench 作为 app-level product model；`app/desktop/src/mock/**` 里的当前 mock 仍是受保护的 Plot-only 参考，不代表 whole-app IA，也不要在非 mock-design pass 里改它。
 
 ## 项目结构
 
@@ -19,10 +19,10 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/desktop/src/`: 当前活动桌面前端入口；`App.tsx` 只负责 shell 装配、路由切换和 sidecar/store 协调，不要再把整个 GUI 重新堆回单文件巨型视图。
-- `app/desktop/src/components/mac/`: 本地 macOS 风格组件层，承接 `MacWindowShell / MacTitlebar / MacSidebar / MacPanel / MacButton / MacSelect / MacSegmentedControl / MacInspectorSection / MacStatusPill` 这些可复用基础件；新的桌面界面优先复用这里。
-- `app/desktop/src/screens/`: 当前活动 Plot 工作流屏幕层；`Start / PlotImport / PlotTemplate / PlotRefine` 的结构与行为以这里为准。
+- `app/desktop/src/`: 当前活动桌面前端基础入口；`App.tsx` / `entry/DesktopApp.tsx` 负责 foundation shell、运行时装配与后续 workbench 接回点，不要把整个 GUI 重新堆回单文件巨型视图。
+- `app/desktop/src/mock/`: 当前受保护的 Plot-only mock 参考；它保留 runnable mount 供后续 mock-design pass 使用，但不代表 app-level IA，也不要在本类 foundation pass 里修改。
 - `app/desktop/src/styles.css`: 桌面端单一主题层与共享样式入口；使用 CSS variables 维护窗口、表面、控件和断点规则，不要再并行维护第二套主题真相源。
+- `README.md` + `docs/product-architecture.md`: 当前 whole-app 产品模型、4 个 retained workbench、canonical workflow 与 IA 原则说明；做 mock、shell、路由、文案或导航清理前先看这里。
 - `app/desktop/scripts/tauri-smoke.mjs`: 更接近真实桌面宿主的 Tauri 启动 smoke；会复用或拉起本地 Vite、真实 sidecar，并确认原生 `sciplot-god-desktop` 进程已起来。
 - `Launch_Plotter.command`: 桌面端唯一启动器；只负责拉起当前 Tauri 开发宿主，失败时直接报错，不再提供任何 PySide / 终端 fallback。
 - `scripts/smoke_check.py`: Python 回归主入口，会检查绘图、拼图、拉伸预处理，并写出 `figures/debug_outputs/smoke_report.json`；如果需要保留本轮 smoke 的输入/输出产物供人工审图，可设置 `CODEGOD_SMOKE_CAPTURE_DIR=/绝对路径`。
@@ -51,34 +51,37 @@
 - CLI、GUI、脚本都可以继续 import `make_plot.py`，但新增逻辑必须写进 `src/rendering/`，不要再把识别、预检或渲染逻辑回填进 CLI 壳。
 - sidecar endpoint 必须声明显式响应模型；不要再返回“随手拼的 dict”。
 - `preflight-render`、`render-preview`、`export-render`、`compose-preview` 现在都会返回统一的 `submission_report`；它是投稿检查摘要，不是新的 blocker 通道。真正阻止导出的一律仍走 preflight / Composer overlap 校验。
-- `inspect-file` / `recommend-render` 的 `inspection` 现在在保持旧 `recommendation` 兼容字段的同时，还会返回 richer ranked `recommendations`（含 `rank / score / reason / suitability_hint / score_gap_to_top`）以及顶层 `recommendation_confidence / recommendation_summary`；`wizard` 的 `/plot/type` 只消费这些后端字段做排序与提示，不要在前端再造一套评分逻辑。
+- `inspect-file` / `recommend-render` 的 `inspection` 现在在保持旧 `recommendation` 兼容字段的同时，还会返回 richer ranked `recommendations`（含 `rank / score / reason / suitability_hint / score_gap_to_top`）以及顶层 `recommendation_confidence / recommendation_summary`；Plot 的模板选择层只消费这些后端字段做排序与提示，不要在前端再造一套评分逻辑。
 - `export-render` 除了 PDF，还会在输出目录旁写出 preview PNG、normalized options、inspection、preflight、submission report、manifest 这些 bundle 产物；如果 GUI 没传显式 `output_dir`，sidecar 默认写到 app-managed `plot_exports` 目录，只有用户明确选目录时才落到用户指定路径。改导出链路时别漏掉这些伴随文件，也别让桌面端的“打开输出目录”按钮失效。
 - 绘图输入解析缓存统一放在 `src/rendering/cache.py`，键是 `(path, sheet, file_mtime_ns)`；如果改了 loader 或预检逻辑，要考虑缓存命中、失效和 clone 语义。
 - 如果只是新增某个绘图家族的调用点，优先走 `src/plotting_families/`；`src/plotting.py` 只当公开兼容接口，不当实现文件，也不要再从里面 import 私有 helper。
-- 前端打开项目时必须经过运行时校验和归一化，不要再用 `as WizardProject` / `as ComposerProject` 这类强转把不可信 payload 直接吃进去。
-- Wizard 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
-- 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问统一走 `app/desktop/src/lib/tauri-dialog.ts`、`app/desktop/src/lib/tauri-webview.ts` 这类入口，不要在页面里散落调用。
+- 前端打开项目时必须经过运行时校验和归一化，不要再用 TS 强转把不可信 payload 直接吃进去。
+- Plot 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
+- 桌面端现在只支持 Tauri 宿主；文件对话框、拖放事件等桌面运行时访问应统一收敛到明确的 runtime adapter 入口，不要在页面里散落调用或静默吞错。
 - `Launch_Plotter.command` 只代表当前 Tauri 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 文件对话框依赖 `app/desktop/src-tauri/capabilities/` 里的 capability 配置；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
-- 桌面端当前默认先进入 `Start`，再沿 `Plot Import -> Plot Template -> Plot Refine` 进入单一 Plot 工作流；`tensile / composer / code-console / settings` 相关业务逻辑仍可保留为库或后端能力，但不再作为当前 shell 的活动 workspace 挂载。
+- 桌面端当前的 app-level product model 以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
+- 设计或 mock 规划时要明确区分 canonical internal workflow 和 user-visible UI workflow：detect / normalize / map / validate / handoff / automation 这类系统步骤可以隐藏或并入更大的 work surface，只有用户需要定位、决策、复核、调整、确认、导出或交接时才应暴露成可见步骤。
+- 当前受保护 mock 仍展示 `Start -> Plot Import -> Plot Template -> Plot Refine` 这一条 Plot-only 参考流；它服务于后续 mock-design pass，但不是 whole-app IA 真相源，也不要在非 mock pass 里改 `app/desktop/src/mock/**` 与 `app/desktop/src/main.tsx`。
 - 桌面端 workspace 默认只保留一个纵向滚动根：`app-main`。除非是明确设计的局部画布/代码横向预览，不要再给页面内部叠第二层默认纵向滚动容器。
 - `PreviewPane` 的普通滚轮应继续服务页面滚动；只有 `Ctrl/Cmd + wheel` 才用于缩放，双击回到 reset/fit。不要再让预览面板吞掉默认页面滚动。
-- 当前单图 Plot 流程默认是 `Start -> Plot Import -> Plot Template -> Plot Refine`；不要再把旧的 staged wizard 子路由恢复成主入口，也不要重新堆回第二套 workbench/workspace 导航。
-- `inspect` 仍在导入和切 sheet 后立即执行，但现在留在 `Plot Import` 内完成；`render-preview`、readiness check 与 export 都收敛在 `Plot Refine` 内联完成，不要再改回跨多个子阶段屏幕的重向导心智模型。
-- `Plot Template` 默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
-- 拉伸整理和拉伸对比现在收敛到独立 `tensile` 工作台；`wizard` 只保留通用单图绘图流，不再承载 tensile preprocess / compare UI。
-- `tensile` 工作台支持整理 raw tensile CSV、补录任意组数的已整理 workbook，并一键导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在 tensile 运行时 store，不写进项目文件 schema。
-- tensile preprocess 成功后默认停留在 `tensile` 页面，不再自动抢占 `wizard`；只有显式点击“在绘图中打开”时，才会把整理结果送进 `wizard` 继续 inspect / preflight / render。
-- 最近记录现在由 `Start` 直接承接，不再保留独立 `projects/recents` workspace；如果只是做一张图，优先记住最近数据文件，不要强迫用户先保存 plot 项目。
-- `wizard` 导入阶段现在可以一键触发 sidecar materialize `example template folder / blank template folder`；这些 workbook 要写到 app-managed stable 目录并按需覆盖刷新，不能再每次动作都散落新的 temp folder。这些模板和 folder 只是输入模板、格式引导与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
-- `code-console` 工作台现在收敛为“数据绑定/inspect + chart type 选择 + prompt 复制器 + repo-native Python runner”：前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
-- `code-console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
-- `code-console` 的主流程是 `Load data or reuse Plot data -> inspect -> choose chart type -> Copy prompt -> Ask external AI -> Paste code -> Run`；默认不要把长 prompt body 常驻铺满页面，也不要把 Console 做成第二套重配置表单。
-- `code-console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。runner 的 managed run/output 目录要走 app-managed cache/data 路径并做 retention/cleanup，不能无上限堆积。
-- `settings` 现在应提供轻量的 app-managed 文件入口和清理入口，用于 reveal/refresh/prune template folders、managed plot exports 和 code-console runs；这类清理只作用于 app-generated artifacts，不能干扰用户显式选择的导出目录。
+- Plot 的 canonical local workflow 是 `Import -> Inspect -> Template -> Refine -> Preflight -> Export`；不要再把旧的 staged 子路由恢复成 app-level 主入口，也不要把 Plot 子步骤重新堆回一级导航。
+- `inspect` 仍在导入和切 sheet 后立即执行，但它属于 Plot 的 `Import` 本地阶段；preview、readiness check 与 export 都收敛在 `Refine` 内联完成，不要再改回跨多个 app-level 屏幕的心智模型。
+- Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
+- `Data Cleanup / 数据整理` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
+- `Data Cleanup` 工作台支持 intake raw tensile CSV、补录任意组数的已整理 workbook、做 QC compare，并导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在运行时 store，不写进项目文件 schema。
+- 如果要做面向用户的 mock，Data Cleanup 的 user-visible workflow 默认优先压缩为 `Import -> Review & Clean -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
+- Data Cleanup preprocess 成功后默认停留在 `Data Cleanup` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
+- 最近记录、open/save、managed files 与 runtime cleanup 都属于 utility affordance；不要再把 `Start` 或 `projects/recents` 还原成一级 workspace。
+- Plot 导入阶段如需 sidecar materialize `example template folder / blank template folder`，这些 workbook 仍要写到 app-managed stable 目录并按需覆盖刷新；它们只是输入模板与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
+- `Code Console` 是一级主工作台，不是 utility；前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
+- `Code Console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
+- `Code Console` 的主流程是 `Bind Context -> Inspect Inputs -> Prompt/Code -> Run -> Outputs -> Handoff`；默认不要把长 prompt body 常驻铺满页面，也不要把 Console 做成第二套重配置表单。
+- `Code Console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。runner 的 managed run/output 目录要走 app-managed cache/data 路径并做 retention/cleanup，不能无上限堆积。
+- runtime/appearance/managed-file 清理入口如有需要，只能作为 utility surface，用于 reveal/refresh/prune template folders、managed plot exports 和 code-console runs；这类清理只作用于 app-generated artifacts，不能干扰用户显式选择的导出目录。
 - `scripts/debug_refresh.py` 的真实数据路径只允许从 `CODEGOD_DEBUG_REFRESH_*` 环境变量注入；不要再把个人机器绝对路径直接提交进仓库。
 - Python / Node 开发环境以 `.python-version`、`.nvmrc` 和 `requirements.txt` + `requirements-constraints.txt` 为准；不要再依赖“本机刚好装得上”的浮动版本。
-- 当 `wizard` 或 `composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
+- 当 `Plot` 或 `Composer` 已有当前会话内容时，打开另一份数据文件/项目文件前应先明确提醒“将替换当前会话”；不要静默把当前工作区直接重置掉。
 - Composer 项目现在只有 `version: 2` 合法；保存和打开都必须走 `layout_grid + regions + panels + texts` 结构，不再兼容旧的 `panels-only` v1。
 - Composer drawable 的运行时字段除了几何和层级外，还包括 `group_id / locked / hidden / crop_rect / region_id / slot_id`；如果改了拼图项目 schema，必须同时更新 sidecar schema、前端运行时校验和本说明。
 
@@ -117,7 +120,7 @@
   - `frequency_sweep curve` 导出 `freq_*_curve.pdf`
   - `temperature_sweep curve` 导出 `temp_*_curve.pdf`
   - `stress_relaxation curve` 导出 `stress_relaxation_sigma_over_sigma0_curve.pdf`
-- `wizard` 前端当前使用的兼容模板映射是：
+- Plot 模板选择层当前使用的兼容模板映射是：
   - `frequency_sweep / temperature_sweep / stress_relaxation -> point_line, curve`
   - `tensile_curve -> curve, point_line, replicate_curves_with_band, stacked_curve, segmented_stacked_curve, scatter, scatter_fit, scatter_with_fit`
   - `curve_table -> curve, point_line, replicate_curves_with_band, stacked_curve, segmented_stacked_curve, scatter, scatter_fit, scatter_with_fit`
@@ -196,9 +199,9 @@
 
 - `pytest`
 - `scripts/smoke_check.py` 中的 tensile preprocess 段
-- `app/desktop/src/screens/TensileScreen.test.tsx`
-- `app/desktop/src/screens/WizardScreen.test.tsx`
-- 确认生成的 workbook 能在 tensile 工作台显示整理结果，并且点击“在绘图中打开”后可继续 `inspect / preflight / render`
+- `tests/test_sidecar_active_routes.py`
+- `app/desktop npm test` 中覆盖当前 foundation shell 的用例（如果本轮改了桌面文案、入口或导航假设）
+- 确认生成的 workbook 能在 `Data Cleanup` 工作台显示整理结果，并且点击“在绘图中打开”后可继续 Plot 的 `inspect / preflight / render`
 
 改 GUI 选项或状态流时，至少回归：
 
@@ -226,8 +229,11 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一目标宿主是 Tauri。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留 Tauri。
-- 不要把当前 Plot 前端再改回旧 wizard/多工作区路线，也不要把所有步骤塞回一个无层次的大表单；单图流程默认应该保持 `Start -> Plot Import -> Plot Template -> Plot Refine`。
-- 不要把 tensile compare 清单做成“必须先保存项目才能继续”的流；它应该是 `tensile` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 `wizard` 主输入。
+- 不要让当前受保护 mock 或 Plot-only 参考流反向定义 whole-app IA；app-level retained model 始终是 `Plot / Data Cleanup / Composer / Code Console`。
+- 不要重新把 `Start / Home / Project / Settings` 恢复成一级产品区；这些概念最多只能作为 utility surface 或历史兼容层存在。
+- 不要把 Plot 的本地步骤塞回一级导航，也不要把所有 Plot 控件重新堆成一个无层次的大表单；Plot 的 canonical local flow 仍应保持 `Import -> Inspect -> Template -> Refine -> Preflight -> Export`。
+- 不要把 detect / normalize / map / preflight / handoff 之类内部系统步骤逐个翻译成 mock 页面；除非用户必须实际操作，否则应并入更大的 decision-oriented work surface。
+- 不要把 Data Cleanup compare 清单做成“必须先保存项目才能继续”的流；它应该是 `Data Cleanup / 数据整理` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 Plot 主输入。
 - 不要把不兼容模板重新放回 `Plot Template` 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
@@ -238,7 +244,7 @@
 - 不要在导出里把所有 PDF 先栅格化；graph 和 PDF asset 应尽量保持矢量。
 - 改对齐规则时，要同时想到 `single_panel`、`wide_nmr`、`heatmap` 三类约束。
 - 改 loader、inspect、preflight 或 render 时，要同时想到 `src/rendering/cache.py` 的缓存失效，不要让旧解析结果穿透到新请求。
-- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 tensile 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 render 能不能继续。
+- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 `Data Cleanup` 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 Plot render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
 - `scripts/debug_refresh.py` 的真实数据入口只认 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`；不要把个人绝对路径或私有目录结构写回仓库。
 - `scripts/clean_repo.py` 默认不应删除当前激活的 `.venv`；如果要清 `app/desktop/node_modules/`，必须显式传 `--include-node-modules`，不要把“重装成本高”的依赖目录做成隐式默认删除项。

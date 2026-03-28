@@ -21,7 +21,7 @@ def _route_signatures() -> set[tuple[str, str]]:
     return signatures
 
 
-def test_active_sidecar_routes_keep_phase_a_surface() -> None:
+def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     signatures = _route_signatures()
 
     assert ("GET", "/health") in signatures
@@ -36,23 +36,8 @@ def test_active_sidecar_routes_keep_phase_a_surface() -> None:
     assert ("POST", "/inspect-tensile-workbook") in signatures
     assert ("POST", "/export-tensile-comparison") in signatures
 
-    for forbidden in {
-        ("POST", "/code-console/generate"),
-        ("POST", "/code-console/export-bundle"),
-        ("POST", "/code-console/run"),
-        ("POST", "/save-project"),
-        ("POST", "/open-project"),
-        ("POST", "/data-templates/materialize"),
-        ("POST", "/data-templates/folder"),
-        ("GET", "/data-templates"),
-        ("GET", "/managed-storage"),
-        ("POST", "/managed-storage/cleanup"),
-        ("POST", "/open-path"),
-    }:
-        assert forbidden not in signatures
 
-
-def test_meta_endpoints_stay_live_without_product_routes() -> None:
+def test_meta_endpoints_stay_live_for_retained_foundation() -> None:
     health = client.get("/health")
     meta = client.get("/meta")
     contract = client.get("/plot-contract")
