@@ -1,12 +1,18 @@
 import Foundation
 
 struct RepoLocator {
-    let fileManager: FileManager = .default
-    let bundle: Bundle = .main
+    let fileManager: FileManager
+    let bundle: Bundle
+
+    init(fileManager: FileManager = .default, bundle: Bundle = .main) {
+        self.fileManager = fileManager
+        self.bundle = bundle
+    }
 
     func locateRepositoryRoot() throws -> URL {
         let candidates = [
             infoPlistHint(),
+            bundleLocation(),
             currentWorkingDirectory(),
         ].compactMap { $0 }
 
@@ -26,18 +32,28 @@ struct RepoLocator {
         return URL(fileURLWithPath: hint, isDirectory: true)
     }
 
+    func bundleLocation() -> URL? {
+        bundle.bundleURL
+    }
+
     func currentWorkingDirectory() -> URL? {
         URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
     }
 
     func verifyRepository(startingAt url: URL) -> URL? {
         var candidate = url
+        var visitedPaths: Set<String> = []
 
         if !candidate.hasDirectoryPath {
             candidate.deleteLastPathComponent()
         }
 
         while true {
+            let candidatePath = candidate.standardizedFileURL.path
+            guard visitedPaths.insert(candidatePath).inserted else {
+                return nil
+            }
+
             let agentsURL = candidate.appendingPathComponent("AGENTS.md", isDirectory: false)
             let pyprojectURL = candidate.appendingPathComponent("pyproject.toml", isDirectory: false)
 
@@ -45,8 +61,8 @@ struct RepoLocator {
                 return candidate
             }
 
-            let parent = candidate.deletingLastPathComponent()
-            if parent.path == candidate.path {
+            let parent = candidate.deletingLastPathComponent().standardizedFileURL
+            if parent.path == candidatePath {
                 return nil
             }
             candidate = parent

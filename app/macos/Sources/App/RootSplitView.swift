@@ -15,30 +15,7 @@ struct RootSplitView: View {
             activeWorkbenchView
                 .navigationTitle(model.selectedWorkbench.title)
                 .toolbar {
-                    ToolbarItemGroup(placement: .automatic) {
-                        Button("Import", systemImage: "tray.and.arrow.down") {
-                            model.beginImportForActiveWorkbench()
-                        }
-
-                        Button("Export", systemImage: "square.and.arrow.up") {
-                            Task { await model.exportActiveWorkbench() }
-                        }
-
-                        Button("Reveal", systemImage: "folder") {
-                            model.revealActiveOutput()
-                        }
-
-                        Button(
-                            model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
-                            systemImage: model.inspectorPresented ? "sidebar.right" : "sidebar.right"
-                        ) {
-                            model.toggleInspector()
-                        }
-                    }
-
-                    ToolbarItem(placement: .status) {
-                        runtimeStatusView
-                    }
+                    activeToolbarContent
                 }
         }
         .inspector(isPresented: $model.inspectorPresented) {
@@ -91,6 +68,81 @@ struct RootSplitView: View {
             ComposerInspectorView(session: model.composerSession)
         case .codeConsole:
             CodeConsoleContextView(session: model.codeConsoleSession)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var activeToolbarContent: some ToolbarContent {
+        if model.selectedWorkbench == .composer {
+            composerToolbarContent
+        } else {
+            defaultToolbarContent
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var defaultToolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Button("Import", systemImage: "tray.and.arrow.down") {
+                model.beginImportForActiveWorkbench()
+            }
+
+            Button("Export", systemImage: "square.and.arrow.up") {
+                Task { await model.exportActiveWorkbench() }
+            }
+
+            Button("Reveal", systemImage: "folder") {
+                model.revealActiveOutput()
+            }
+
+            Button(
+                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                model.toggleInspector()
+            }
+        }
+
+        ToolbarItem(placement: .status) {
+            runtimeStatusView
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var composerToolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            if let errorMessage = model.composerSession.errorMessage {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help(errorMessage)
+            }
+
+            Menu {
+                Button("Graph PDF", systemImage: "chart.xyaxis.line") {
+                    model.beginComposerImport(kind: .graph)
+                }
+
+                Button("Asset File", systemImage: "photo") {
+                    model.beginComposerImport(kind: .asset)
+                }
+            } label: {
+                Label("Import", systemImage: "tray.and.arrow.down")
+            }
+
+            Button("Export", systemImage: "square.and.arrow.up") {
+                Task { await model.exportActiveWorkbench() }
+            }
+
+            Button("Guide", systemImage: "questionmark.circle") {
+                model.showComposerGuide()
+            }
+
+            Button(
+                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                model.toggleInspector()
+            }
         }
     }
 

@@ -15,6 +15,7 @@ from src.composer import (
     compose_export_pdf,
     compose_preview_png,
     import_panels_from_paths,
+    resolve_panel_labels,
     validate_non_overlapping_panels,
 )
 
@@ -129,6 +130,27 @@ def _assert_rgb_close(actual: tuple[int, int, int], expected: tuple[int, int, in
     )
 
 
+def _box_contains_nonwhite_pixels(
+    image: Image.Image,
+    *,
+    x0_mm: float,
+    y0_mm: float,
+    width_mm: float,
+    height_mm: float,
+    dpi: int = 144,
+) -> bool:
+    left = max(0, int(round(x0_mm / 25.4 * dpi)))
+    top = max(0, int(round(y0_mm / 25.4 * dpi)))
+    right = min(image.width, int(round((x0_mm + width_mm) / 25.4 * dpi)))
+    bottom = min(image.height, int(round((y0_mm + height_mm) / 25.4 * dpi)))
+
+    for x_px in range(left, max(left + 1, right)):
+        for y_px in range(top, max(top + 1, bottom)):
+            if image.getpixel((x_px, y_px)) != (255, 255, 255):
+                return True
+    return False
+
+
 def test_import_graph_pdf_spans_two_cells_for_120x55(tmp_path: Path) -> None:
     graph_path = _write_pdf(tmp_path / "double-wide.pdf", 120.0, 55.0)
 
@@ -177,6 +199,76 @@ def test_invalid_graph_size_requires_asset_mode(tmp_path: Path) -> None:
         assert "Use asset mode instead" in str(exc)
     else:
         raise AssertionError("Unexpectedly accepted an unsupported graph PDF size.")
+
+
+def test_auto_panel_labels_resolve_to_uppercase_letters() -> None:
+    project = ComposerProject(
+        panels=[
+            ComposerPanel(
+                id="panel-2",
+                file_path="/tmp/panel-2.pdf",
+                page_index=0,
+                x_mm=60,
+                y_mm=0,
+                w_mm=60,
+                h_mm=55,
+                kind="graph",
+            ),
+            ComposerPanel(
+                id="panel-1",
+                file_path="/tmp/panel-1.pdf",
+                page_index=0,
+                x_mm=0,
+                y_mm=0,
+                w_mm=60,
+                h_mm=55,
+                kind="graph",
+            ),
+        ],
+        auto_labels=True,
+    )
+
+    assert resolve_panel_labels(project) == {
+        "panel-1": "A",
+        "panel-2": "B",
+    }
+
+
+def test_manual_graph_label_renders_in_preview_and_export_when_auto_labels_disabled(tmp_path: Path) -> None:
+    graph_path = _write_pdf(tmp_path / "graph.pdf", 60.0, 55.0)
+    output_path = tmp_path / "manual-label-export.pdf"
+    project = ComposerProject(
+        panels=[
+            ComposerPanel(
+                id="panel-graph",
+                file_path=str(graph_path),
+                page_index=0,
+                x_mm=0,
+                y_mm=2.5,
+                w_mm=60,
+                h_mm=55,
+                kind="graph",
+                label="Z",
+            ),
+        ],
+        auto_labels=False,
+    )
+
+    preview_image = _image_from_png_bytes(compose_preview_png(project, dpi=144))
+    compose_export_pdf(project, output_path)
+    export_image = _render_pdf_page_image(output_path, dpi=144)
+
+    document = fitz.open(output_path)
+    try:
+        exported_text = document.load_page(0).get_text()
+    finally:
+        document.close()
+
+    label_box = dict(x0_mm=0.5, y0_mm=2.5, width_mm=12, height_mm=8)
+
+    assert _box_contains_nonwhite_pixels(preview_image, **label_box)
+    assert _box_contains_nonwhite_pixels(export_image, **label_box)
+    assert "Z" in exported_text
 
 
 def test_hidden_text_is_excluded_from_export_pdf(tmp_path: Path) -> None:
@@ -286,13 +378,13 @@ def test_export_pdf_preserves_pdf_xobjects_and_raster_images(tmp_path: Path) -> 
         document.close()
 
     assert layer_names == {
-        "Graph/panel-graph [a]",
+        "Graph/panel-graph [A]",
         "Asset/panel-pdf asset.pdf",
         "Asset/panel-raster asset.png",
         "Text/text-visible Overlay Text",
     }
     assert form_layer_names == {
-        "Graph/panel-graph [a]",
+        "Graph/panel-graph [A]",
         "Asset/panel-pdf asset.pdf",
         "Text/text-visible Overlay Text",
     }
@@ -352,12 +444,12 @@ def test_export_pdf_assigns_stable_layer_names_to_visible_drawables(tmp_path: Pa
         document.close()
 
     assert layer_names == {
-        "Graph/panel-graph [a]",
+        "Graph/panel-graph [A]",
         "Structure Asset/panel-raster asset.png",
         "Text/text-visible Overlay Text",
     }
     assert form_layer_names == {
-        "Graph/panel-graph [a]",
+        "Graph/panel-graph [A]",
         "Text/text-visible Overlay Text",
     }
     assert image_layer_names == {"Structure Asset/panel-raster asset.png"}

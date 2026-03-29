@@ -22,7 +22,7 @@ Default user-visible flow examples for future mock work:
 
 - `Plot`: `Import -> Template -> Refine & Export`
 - `Data Cleanup`: `Import -> Review & Clean -> Compare -> Export / Open in Plot`
-- `Composer`: `Assets -> Compose -> Review -> Export`
+- `Composer`: `Library -> Compose & Inspect -> Export`
 - `Code Console`: `Context -> Code -> Run -> Outputs`
 
 ## Core Workbenches
@@ -60,8 +60,16 @@ Canonical workflow:
 Notes:
 
 - Composer is canvas-first.
+- Prefer one focused workbench surface over a stage-heavy local flow unless stages are truly necessary.
 - Keep layout, crop, overlap, and export invariants intact.
 - Project files may still exist as utility persistence, but `Project` is not a primary product area.
+
+## Desktop UI Conventions
+
+- Put import, export, help, and inspector controls in the top-right utility action area of a workbench.
+- Avoid permanent issue banners in normal workbench UI; surface runtime issues in lighter utility or inspector affordances when possible.
+- Prefer one focused workspace over stage-heavy flows unless the stages are truly required by product logic.
+- Composer is the first workbench using this refined pattern: left library, center workspace, right inspector, and top-right utility actions.
 
 ### Code Console
 

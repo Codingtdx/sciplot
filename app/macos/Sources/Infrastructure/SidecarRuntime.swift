@@ -145,6 +145,7 @@ final class SidecarRuntime {
         process.executableURL = pythonURL
         process.arguments = ["-m", "app.sidecar.server"]
         process.currentDirectoryURL = repoRoot
+        process.environment = sidecarEnvironment(repoRoot: repoRoot)
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
@@ -159,6 +160,25 @@ final class SidecarRuntime {
             status = .failed(error.localizedDescription)
             throw SidecarError.startupFailed(error.localizedDescription)
         }
+    }
+
+    private func sidecarEnvironment(repoRoot: URL) -> [String: String] {
+        let inherited = ProcessInfo.processInfo.environment
+        var environment: [String: String] = [:]
+
+        for key in ["HOME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "PATH"] {
+            if let value = inherited[key], !value.isEmpty {
+                environment[key] = value
+            }
+        }
+
+        if environment["PATH"] == nil {
+            environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        }
+
+        environment["PWD"] = repoRoot.path
+        environment["PYTHONUNBUFFERED"] = "1"
+        return environment
     }
 
     private func bind(pipe: Pipe, prefix: String) {

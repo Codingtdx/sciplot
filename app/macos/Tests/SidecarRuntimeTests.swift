@@ -15,16 +15,74 @@ final class SidecarRuntimeTests: XCTestCase {
         let tempRoot = try makeRepositoryFixture()
         let nested = tempRoot.appendingPathComponent("nested/workbench", isDirectory: true)
         try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
 
         FileManager.default.changeCurrentDirectoryPath(nested.path)
 
-        let located = try RepoLocator().locateRepositoryRoot()
+        let located = try RepoLocator(fileManager: .default, bundle: bundle).locateRepositoryRoot()
         XCTAssertEqual(canonicalPath(located), canonicalPath(tempRoot))
+    }
+
+    func testRepoLocatorUsesRepoRootHintFromBundleInfoPlist() throws {
+        let repoRoot = try makeRepositoryFixture()
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: ["RepoRootHint": repoRoot.path]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
+
+        FileManager.default.changeCurrentDirectoryPath(FileManager.default.homeDirectoryForCurrentUser.path)
+
+        let located = try RepoLocator(fileManager: .default, bundle: bundle).locateRepositoryRoot()
+        XCTAssertEqual(canonicalPath(located), canonicalPath(repoRoot))
+    }
+
+    func testRepoLocatorFallsBackToBundleLocationWhenHintMissing() throws {
+        let repoRoot = try makeRepositoryFixture()
+        let bundleURL = try makeAppBundleFixture(
+            at: repoRoot
+                .appendingPathComponent("app/macos/.derivedData/Build/Products/Debug", isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
+
+        FileManager.default.changeCurrentDirectoryPath(FileManager.default.homeDirectoryForCurrentUser.path)
+
+        let located = try RepoLocator(fileManager: .default, bundle: bundle).locateRepositoryRoot()
+        XCTAssertEqual(canonicalPath(located), canonicalPath(repoRoot))
     }
 
     @MainActor
     func testEnsureRunningReusesCompatibleSidecar() async throws {
         let repoRoot = try makeRepositoryFixture()
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
         FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
 
         let session = makeStubbedSession { request in
@@ -57,6 +115,7 @@ final class SidecarRuntimeTests: XCTestCase {
         }
 
         let runtime = SidecarRuntime(
+            locator: RepoLocator(fileManager: .default, bundle: bundle),
             session: session,
             startupTimeoutNanoseconds: 100_000_000,
             probeIntervalNanoseconds: 10_000_000
@@ -72,6 +131,16 @@ final class SidecarRuntimeTests: XCTestCase {
     @MainActor
     func testEnsureRunningFailsWhenSpawnedSidecarNeverBecomesCompatible() async throws {
         let repoRoot = try makeRepositoryFixture(includePythonStub: true)
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
         FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
 
         let session = makeStubbedSession { request in
@@ -79,6 +148,7 @@ final class SidecarRuntimeTests: XCTestCase {
         }
 
         let runtime = SidecarRuntime(
+            locator: RepoLocator(fileManager: .default, bundle: bundle),
             session: session,
             startupTimeoutNanoseconds: 200_000_000,
             probeIntervalNanoseconds: 20_000_000
@@ -114,6 +184,39 @@ final class SidecarRuntimeTests: XCTestCase {
         }
 
         return root
+    }
+
+    private func makeAppBundleFixture(
+        at bundleURL: URL,
+        infoValues: [String: String]
+    ) throws -> URL {
+        let contents = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+        let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
+        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+
+        let executableURL = macOS.appendingPathComponent("SciPlot God", isDirectory: false)
+        try "#!/bin/sh\nexit 0\n".write(to: executableURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executableURL.path
+        )
+
+        var info: [String: String] = [
+            "CFBundleExecutable": "SciPlot God",
+            "CFBundleIdentifier": "com.codegod.desktop.tests.fixture",
+            "CFBundleName": "SciPlot God",
+            "CFBundlePackageType": "APPL",
+        ]
+        info.merge(infoValues) { _, new in new }
+
+        let infoData = try PropertyListSerialization.data(
+            fromPropertyList: info,
+            format: .xml,
+            options: 0
+        )
+        try infoData.write(to: contents.appendingPathComponent("Info.plist", isDirectory: false))
+
+        return bundleURL
     }
 
     private func makeStubbedSession(

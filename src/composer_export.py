@@ -10,8 +10,15 @@ from PIL import Image
 
 from src.composer_assets import is_pdf_path, is_raster_path
 from src.composer_project import normalize_crop_rect, normalize_project
-from src.composer_preview import crop_image, panel_label_text, panel_thumbnail_png, sorted_drawables
-from src.composer_types import PT_TO_MM, ComposerPanel, ComposerProject, ComposerText, mm_to_pt
+from src.composer_preview import (
+    PANEL_LABEL_FONT_SIZE_PT,
+    crop_image,
+    panel_label_origin_mm,
+    panel_label_text,
+    panel_thumbnail_png,
+    sorted_drawables,
+)
+from src.composer_types import ComposerPanel, ComposerProject, ComposerText, mm_to_pt
 
 
 def pdf_clip_rect(panel: ComposerPanel, source_rect: fitz.Rect) -> fitz.Rect:
@@ -145,17 +152,18 @@ def compose_export_pdf(project: ComposerProject, output_path: str | Path) -> Pat
             else:
                 raise ValueError(f"Unsupported panel asset type: {panel.file_path}")
 
-            if normalized.auto_labels and panel.kind == "graph":
+            if panel.kind == "graph":
                 label = panel_label_text(normalized, panel)
                 if label:
+                    label_x_mm, label_y_mm = panel_label_origin_mm(normalized, panel)
                     draw_text_pdf_with_oc(
                         page,
                         ComposerText(
                             id=f"{panel.id}:label",
                             text=label,
-                            x_mm=panel.x_mm + (8.0 * PT_TO_MM),
-                            y_mm=panel.y_mm + (3.0 * PT_TO_MM),
-                            font_size_pt=9,
+                            x_mm=label_x_mm,
+                            y_mm=label_y_mm,
+                            font_size_pt=PANEL_LABEL_FONT_SIZE_PT,
                             align="left",
                         ),
                         panel_ocg,

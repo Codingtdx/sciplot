@@ -11,6 +11,10 @@ from src.composer_assets import is_pdf_path, is_raster_path
 from src.composer_project import normalize_project, resolve_panel_labels
 from src.composer_types import ComposerCropRect, ComposerPanel, ComposerProject, ComposerText, mm_to_px
 
+PANEL_LABEL_OFFSET_X_MM = 1.0
+PANEL_LABEL_OFFSET_Y_MM = 0.8
+PANEL_LABEL_FONT_SIZE_PT = 9.0
+
 
 def _font(size: int) -> ImageFont.ImageFont:
     try:
@@ -87,13 +91,21 @@ def panel_label_text(project: ComposerProject, panel: ComposerPanel) -> str:
     return resolve_panel_labels(project).get(panel.id, "")
 
 
+def panel_label_origin_mm(project: ComposerProject, panel: ComposerPanel) -> tuple[float, float]:
+    del project
+    return (
+        max(panel.x_mm + PANEL_LABEL_OFFSET_X_MM, 0.0),
+        max(panel.y_mm + PANEL_LABEL_OFFSET_Y_MM, 0.0),
+    )
+
+
 def compose_preview_png(project: ComposerProject, *, dpi: int = 144) -> bytes:
     normalized = normalize_project(project)
     canvas_width_px = mm_to_px(normalized.canvas_width_mm, dpi)
     canvas_height_px = mm_to_px(normalized.canvas_height_mm, dpi)
     canvas_image = Image.new("RGBA", (canvas_width_px, canvas_height_px), (255, 255, 255, 255))
     draw = ImageDraw.Draw(canvas_image)
-    label_font = _font(max(10, int(round(9 * dpi / 72.0))))
+    label_font = _font(max(10, int(round(PANEL_LABEL_FONT_SIZE_PT * dpi / 72.0))))
 
     for kind, drawable in sorted_drawables(normalized):
         if kind == "panel":
@@ -108,10 +120,16 @@ def compose_preview_png(project: ComposerProject, *, dpi: int = 144) -> bytes:
             x_px = mm_to_px(panel.x_mm, dpi)
             y_px = mm_to_px(panel.y_mm, dpi)
             canvas_image.alpha_composite(panel_image, (x_px, y_px))
-            if normalized.auto_labels and panel.kind == "graph":
+            if panel.kind == "graph":
                 label = panel_label_text(normalized, panel)
                 if label:
-                    draw.text((x_px + 8, y_px + 8), label, font=label_font, fill=(24, 24, 24))
+                    label_x_mm, label_y_mm = panel_label_origin_mm(normalized, panel)
+                    draw.text(
+                        (mm_to_px(label_x_mm, dpi), mm_to_px(label_y_mm, dpi)),
+                        label,
+                        font=label_font,
+                        fill=(24, 24, 24),
+                    )
         else:
             text = cast(ComposerText, drawable)
             if text.hidden:
@@ -127,7 +145,11 @@ __all__ = [
     "compose_preview_png",
     "crop_image",
     "draw_text",
+    "panel_label_origin_mm",
     "panel_label_text",
     "panel_thumbnail_png",
+    "PANEL_LABEL_FONT_SIZE_PT",
+    "PANEL_LABEL_OFFSET_X_MM",
+    "PANEL_LABEL_OFFSET_Y_MM",
     "sorted_drawables",
 ]

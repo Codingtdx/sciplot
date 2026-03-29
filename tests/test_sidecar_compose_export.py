@@ -215,13 +215,13 @@ def test_compose_export_endpoint_preserves_pdf_and_raster_resources(tmp_path: Pa
         document.close()
 
     assert layer_names == {
-        "Graph/panel-1 [a]",
+        "Graph/panel-1 [A]",
         "Asset/panel-2 asset.pdf",
         "Asset/panel-3 asset.png",
         "Text/text-1 Endpoint Overlay",
     }
     assert form_layer_names == {
-        "Graph/panel-1 [a]",
+        "Graph/panel-1 [A]",
         "Asset/panel-2 asset.pdf",
         "Text/text-1 Endpoint Overlay",
     }

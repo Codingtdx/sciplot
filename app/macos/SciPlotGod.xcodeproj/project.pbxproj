@@ -22,6 +22,7 @@
 		C0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */; };
 		C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */; };
 		C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */; };
+		C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */; };
 		C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */; };
 		C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */; };
 		C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */; };
@@ -91,6 +92,7 @@
 		B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerInspectorView.swift; sourceTree = "<group>"; };
 		B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSession.swift; sourceTree = "<group>"; };
 		B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerWorkbenchView.swift; sourceTree = "<group>"; };
+		B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerPanelThumbnailView.swift; sourceTree = "<group>"; };
 		B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupCompareView.swift; sourceTree = "<group>"; };
 		B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupExportView.swift; sourceTree = "<group>"; };
 		B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupImportView.swift; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 				B0000000000000000000000B /* Sources/Features/Composer/ComposerAssetBrowserView.swift */,
 				B0000000000000000000000C /* Sources/Features/Composer/ComposerCanvasView.swift */,
 				B0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift */,
+				B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */,
 				B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */,
 				B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */,
 				B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */,
@@ -347,6 +350,7 @@
 				C0000000000000000000000D /* Sources/Features/Composer/ComposerInspectorView.swift in Sources */,
 				C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */,
 				C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */,
+				C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */,
 				C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */,
 				C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */,
 				C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */,
@@ -434,7 +438,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_TESTABILITY = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
@@ -461,7 +466,8 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = NO;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;

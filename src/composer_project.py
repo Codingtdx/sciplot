@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from string import ascii_lowercase
+from string import ascii_uppercase
 from typing import Any, Literal
 
 from src.composer_types import (
@@ -302,9 +302,9 @@ def resolve_panel_labels(project: ComposerProject) -> dict[str, str]:
     )
     return {
         panel.id: (
-            ascii_lowercase[index]
-            if index < len(ascii_lowercase)
-            else chr(ord("a") + index)
+            ascii_uppercase[index]
+            if index < len(ascii_uppercase)
+            else chr(ord("A") + index)
         )
         for index, panel in enumerate(ordered)
     }

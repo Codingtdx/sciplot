@@ -76,10 +76,14 @@ final class AppModel {
         case .dataCleanup:
             dataCleanupSession.isRawImporterPresented = true
         case .composer:
-            composerSession.beginImport(kind: .graph)
+            beginComposerImport(kind: .graph)
         case .codeConsole:
             break
         }
+    }
+
+    func beginComposerImport(kind: ComposerImportKind) {
+        composerSession.beginImport(kind: kind)
     }
 
     func exportActiveWorkbench() async {
@@ -110,6 +114,10 @@ final class AppModel {
 
     func toggleInspector() {
         inspectorPresented.toggle()
+    }
+
+    func showComposerGuide() {
+        composerSession.showGuide()
     }
 
     func openInPlot(workbookURL: URL, preferredSheet: SheetValue) {
