@@ -66,6 +66,59 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertNil(session.selectedRegionID)
     }
 
+    func testBoardQuickActionStateTracksMergeableSelectionAndClearsForPanelSelection() {
+        let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 2, row: 2, zIndex: 0),
+        ]
+
+        session.updateCellSelection(.init(col: 0, row: 0), additive: false, extend: false)
+        session.updateCellSelection(.init(col: 1, row: 0), additive: false, extend: true)
+
+        XCTAssertEqual(
+            session.boardQuickActionState,
+            .mergeableMultiCellSelection(
+                ComposerCellSelection(origin: .init(col: 0, row: 0), colSpan: 2, rowSpan: 1)
+            )
+        )
+
+        session.selectPanelOnCanvas("panel-1")
+        XCTAssertNil(session.boardQuickActionState)
+
+        session.updateCellSelection(.init(col: 0, row: 0), additive: false, extend: false)
+        session.updateCellSelection(.init(col: 1, row: 0), additive: false, extend: true)
+        XCTAssertEqual(
+            session.boardQuickActionState,
+            .mergeableMultiCellSelection(
+                ComposerCellSelection(origin: .init(col: 0, row: 0), colSpan: 2, rowSpan: 1)
+            )
+        )
+    }
+
+    func testBoardQuickActionStateOnlyTracksEmptyMergedRegions() {
+        let session = ComposerSession()
+        let emptyRegion = ComposerRegionPayload(
+            id: "region-free-1",
+            kind: "free",
+            col: 0,
+            row: 0,
+            colSpan: 2,
+            rowSpan: 1,
+            label: nil,
+            locked: false,
+            slotKind: nil
+        )
+        session.project.regions = [emptyRegion]
+
+        session.selectRegion(emptyRegion.id)
+        XCTAssertEqual(session.boardQuickActionState, .emptyMergedRegion(emptyRegion))
+
+        session.project.panels = [
+            assetPanel(id: "asset-1", regionID: emptyRegion.id, xMm: 0, yMm: 2.5, wMm: 120, hMm: 55, zIndex: 0),
+        ]
+        XCTAssertNil(session.boardQuickActionState)
+    }
+
     func testLibraryReorderReflowsBoardIntoCanonicalOrder() {
         let session = ComposerSession()
         session.project.panels = [

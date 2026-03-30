@@ -5,12 +5,12 @@ struct ComposerCanvasView: View {
     @Bindable var session: ComposerSession
 
     @State private var hoveredDropTarget: ComposerPlacementTarget?
-    @State private var dismissedPopoverToken: String?
+    @State private var activeQuickActionToken: String?
 
     var body: some View {
         GeometryReader { geometry in
             let metrics = ComposerCanvasMetrics(project: session.project, size: geometry.size)
-            let popoverContext = selectionPopoverContext()
+            let quickActionContext = boardQuickActionContext()
 
             ZStack(alignment: .topLeading) {
                 ComposerCanvasBoard(metrics: metrics)
@@ -135,46 +135,49 @@ struct ComposerCanvasView: View {
                     )
                 }
 
-                if let popoverContext, let popoverRect = popoverContext.rect(in: session) {
+                if let quickActionContext,
+                   let quickActionRect = session.boardQuickActionRectMm(for: quickActionContext) {
                     Color.clear
                         .frame(
-                            width: max(popoverRect.width * metrics.scale, 1),
-                            height: max(popoverRect.height * metrics.scale, 1)
+                            width: max(quickActionRect.width * metrics.scale, 1),
+                            height: max(quickActionRect.height * metrics.scale, 1)
                         )
-                        .position(metrics.rect(forMmRect: popoverRect).center)
+                        .position(metrics.rect(forMmRect: quickActionRect).center)
+                        .id(quickActionContext.token)
                         .anchorPreference(
                             key: ComposerSelectionAnchorPreferenceKey.self,
                             value: .bounds
                         ) { anchor in
-                            ComposerSelectionAnchorPreference(anchor: anchor, token: popoverContext.token)
+                            ComposerSelectionAnchorPreference(anchor: anchor, token: quickActionContext.token)
                         }
                 }
             }
             .overlayPreferenceValue(ComposerSelectionAnchorPreferenceKey.self) { preference in
                 GeometryReader { proxy in
                     if let preference,
-                       let popoverContext,
-                       popoverContext.token == preference.token {
+                       let quickActionContext,
+                       quickActionContext.token == preference.token {
                         let anchorRect = proxy[preference.anchor]
                         Color.clear
                             .frame(width: max(anchorRect.width, 1), height: max(anchorRect.height, 1))
                             .position(x: anchorRect.midX, y: anchorRect.midY)
+                            .id(quickActionContext.token)
                             .popover(
-                                isPresented: popoverBinding(for: popoverContext),
+                                isPresented: quickActionPopoverBinding(for: quickActionContext.token),
                                 attachmentAnchor: .rect(.bounds),
-                                arrowEdge: .top
+                                arrowEdge: .bottom
                             ) {
-                                ComposerQuickActionPopover(
+                                ComposerBoardQuickActionPopover(
                                     session: session,
-                                    context: popoverContext
+                                    context: quickActionContext
                                 )
                             }
                     }
                 }
             }
-            .onChange(of: popoverContext?.token) { _, _ in
+            .onChange(of: quickActionContext?.token) { _, newToken in
                 hoveredDropTarget = nil
-                dismissedPopoverToken = nil
+                activeQuickActionToken = newToken
             }
         }
     }
@@ -203,25 +206,16 @@ struct ComposerCanvasView: View {
         NSApp.currentEvent?.modifierFlags.contains(.shift) == true
     }
 
-    private func selectionPopoverContext() -> ComposerQuickActionContext? {
-        if let selection = session.selectedCellSelection {
-            return .cellSelection(selection)
-        }
-        if let region = session.selectedFreeRegion {
-            return .mergedRegion(region)
-        }
-        if let panel = session.selectedPanel, !panel.hidden {
-            return .panel(panel)
-        }
-        return nil
+    private func boardQuickActionContext() -> ComposerBoardQuickActionState? {
+        session.boardQuickActionState
     }
 
-    private func popoverBinding(for context: ComposerQuickActionContext) -> Binding<Bool> {
+    private func quickActionPopoverBinding(for token: String) -> Binding<Bool> {
         Binding(
-            get: { dismissedPopoverToken != context.token },
+            get: { activeQuickActionToken == token },
             set: { isPresented in
                 if !isPresented {
-                    dismissedPopoverToken = context.token
+                    activeQuickActionToken = nil
                 }
             }
         )
@@ -531,14 +525,14 @@ private struct ComposerPanelDragPreview: View {
     }
 }
 
-private struct ComposerQuickActionPopover: View {
+private struct ComposerBoardQuickActionPopover: View {
     @Bindable var session: ComposerSession
-    let context: ComposerQuickActionContext
+    let context: ComposerBoardQuickActionState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch context {
-            case let .cellSelection(selection):
+            case let .mergeableMultiCellSelection(selection):
                 Text(selection.cellCount > 1 ? "\(selection.colSpan)x\(selection.rowSpan) selection" : "Cell \(session.cellDisplayLabel(selection.origin))")
                     .font(.headline)
 
@@ -566,7 +560,7 @@ private struct ComposerQuickActionPopover: View {
                 }
                 .buttonStyle(.bordered)
 
-            case let .mergedRegion(region):
+            case let .emptyMergedRegion(region):
                 Text("Merged region")
                     .font(.headline)
 
@@ -588,26 +582,6 @@ private struct ComposerQuickActionPopover: View {
                     }
                     .buttonStyle(.bordered)
                 }
-
-                Button("Clear Selection") {
-                    session.clearTransientEditingState()
-                }
-                .buttonStyle(.bordered)
-
-            case let .panel(panel):
-                Text(panel.kind == "graph" ? "Graph panel" : "Asset panel")
-                    .font(.headline)
-
-                Text(session.placementSummary(for: panel))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button("Remove From Board") {
-                    session.selectPanelOnCanvas(panel.id)
-                    session.removeSelectedPanelFromBoard()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(panel.locked)
 
                 Button("Clear Selection") {
                     session.clearTransientEditingState()
@@ -704,44 +678,6 @@ private struct ComposerSelectionAnchorPreferenceKey: PreferenceKey {
 
     static func reduce(value: inout ComposerSelectionAnchorPreference?, nextValue: () -> ComposerSelectionAnchorPreference?) {
         value = nextValue() ?? value
-    }
-}
-
-private enum ComposerQuickActionContext {
-    case cellSelection(ComposerCellSelection)
-    case mergedRegion(ComposerRegionPayload)
-    case panel(ComposerPanelPayload)
-
-    var token: String {
-        switch self {
-        case let .cellSelection(selection):
-            return "cells:\(selection.origin.col),\(selection.origin.row),\(selection.colSpan),\(selection.rowSpan)"
-        case let .mergedRegion(region):
-            return "region:\(region.id)"
-        case let .panel(panel):
-            return "panel:\(panel.id)"
-        }
-    }
-
-    @MainActor
-    func rect(in session: ComposerSession) -> CGRect? {
-        switch self {
-        case let .cellSelection(selection):
-            if selection.cellCount == 1 {
-                return session.targetRectMm(for: .cell(selection.origin))
-            }
-            return session.targetRectMm(
-                for: .graphSpan(
-                    origin: selection.origin,
-                    colSpan: selection.colSpan,
-                    rowSpan: selection.rowSpan
-                )
-            )
-        case let .mergedRegion(region):
-            return session.regionRectMm(for: region)
-        case let .panel(panel):
-            return session.panelRectMm(for: panel)
-        }
     }
 }
 

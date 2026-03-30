@@ -56,6 +56,20 @@ enum ComposerPlacementTarget: Hashable, Sendable {
     }
 }
 
+enum ComposerBoardQuickActionState: Equatable, Sendable {
+    case mergeableMultiCellSelection(ComposerCellSelection)
+    case emptyMergedRegion(ComposerRegionPayload)
+
+    var token: String {
+        switch self {
+        case let .mergeableMultiCellSelection(selection):
+            return "mergeable:\(selection.origin.col),\(selection.origin.row),\(selection.colSpan),\(selection.rowSpan)"
+        case let .emptyMergedRegion(region):
+            return "empty-region:\(region.id)"
+        }
+    }
+}
+
 struct ComposerPanelDragPayload: Codable, Hashable, Sendable, Transferable {
     let panelID: String
     let sourceSurface: ComposerPanelSourceSurface
@@ -161,6 +175,19 @@ final class ComposerSession {
             colSpan: selection.colSpan,
             rowSpan: selection.rowSpan
         )
+    }
+
+    var boardQuickActionState: ComposerBoardQuickActionState? {
+        if let selection = selectedCellSelection,
+           selection.cellCount > 1,
+           canMergeSelectedCells {
+            return .mergeableMultiCellSelection(selection)
+        }
+        if let region = selectedFreeRegion,
+           canUnmergeSelectedRegion {
+            return .emptyMergedRegion(region)
+        }
+        return nil
     }
 
     var activePlacementPanelID: String? {
@@ -659,6 +686,21 @@ final class ComposerSession {
         case let .graphSpan(origin, colSpan, rowSpan):
             let selection = ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan)
             return rectMm(for: selection, in: project)
+        }
+    }
+
+    func boardQuickActionRectMm(for state: ComposerBoardQuickActionState) -> CGRect? {
+        switch state {
+        case let .mergeableMultiCellSelection(selection):
+            return targetRectMm(
+                for: .graphSpan(
+                    origin: selection.origin,
+                    colSpan: selection.colSpan,
+                    rowSpan: selection.rowSpan
+                )
+            )
+        case let .emptyMergedRegion(region):
+            return regionRectMm(for: region)
         }
     }
 
