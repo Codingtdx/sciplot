@@ -17,7 +17,6 @@ struct ComposerAssetBrowserView: View {
                     ForEach(session.orderedPanels) { panel in
                         ComposerLibraryRow(
                             panel: panel,
-                            isReplacementArmed: session.isReplacementArmed(for: panel.id),
                             resolvedLabel: session.resolvedLabel(for: panel),
                             placementSummary: session.placementSummary(for: panel)
                         ) {
@@ -31,16 +30,22 @@ struct ComposerAssetBrowserView: View {
                                 session.focusPanel(panel.id)
                             }
 
-                            if !panel.locked {
-                                Button(
-                                    session.isReplacementArmed(for: panel.id) ? "Replacing…" : "Replace"
-                                ) {
-                                    session.beginReplacement(for: panel.id)
+                            if let target = session.selectedPlacementTarget,
+                               session.canPlace(panelID: panel.id, in: target) {
+                                Button(panel.hidden ? "Place Here" : "Move Here") {
+                                    session.focusPanel(panel.id)
+                                    session.place(panelID: panel.id, in: target)
                                 }
-                                .disabled(session.isReplacementArmed(for: panel.id))
                             }
 
-                            if session.selectedPanelID == panel.id || session.isReplacementArmed(for: panel.id) {
+                            if !panel.hidden && !panel.locked {
+                                Button("Remove From Board") {
+                                    session.focusPanel(panel.id)
+                                    session.removeSelectedPanelFromBoard()
+                                }
+                            }
+
+                            if session.selectedPanelID == panel.id {
                                 Button("Clear Selection") {
                                     session.clearTransientEditingState()
                                 }
@@ -84,7 +89,6 @@ struct ComposerAssetBrowserView: View {
 
 private struct ComposerLibraryRow: View {
     let panel: ComposerPanelPayload
-    let isReplacementArmed: Bool
     let resolvedLabel: String
     let placementSummary: String
     let onDragStarted: () -> Void
@@ -160,12 +164,6 @@ private struct ComposerLibraryRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-
-                if isReplacementArmed {
-                    Label("Replace armed", systemImage: "arrow.triangle.swap")
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
-                }
             }
         }
         .padding(.vertical, 4)

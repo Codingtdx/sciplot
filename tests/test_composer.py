@@ -229,8 +229,8 @@ def test_auto_panel_labels_resolve_to_uppercase_letters() -> None:
     )
 
     assert resolve_panel_labels(project) == {
-        "panel-1": "A",
-        "panel-2": "B",
+        "panel-2": "A",
+        "panel-1": "B",
     }
 
 
@@ -494,6 +494,45 @@ def test_preview_and_export_preserve_topmost_raster_z_order(tmp_path: Path) -> N
     _assert_rgb_close(_sample_rgb_at_mm(export_image, 40, 35), (37, 99, 235))
     _assert_rgb_close(_sample_rgb_at_mm(preview_image, 24, 24), (230, 57, 70))
     _assert_rgb_close(_sample_rgb_at_mm(export_image, 24, 24), (230, 57, 70))
+
+
+def test_preview_and_export_use_canonical_panel_order_when_z_index_is_stale(tmp_path: Path) -> None:
+    upper_in_order_path = _write_png(tmp_path / "canonical-first.png", (37, 99, 235))
+    topmost_in_order_path = _write_png(tmp_path / "canonical-second.png", (230, 57, 70))
+    export_path = tmp_path / "canonical-order-export.pdf"
+    project = ComposerProject(
+        panels=[
+            ComposerPanel(
+                id="panel-blue",
+                file_path=str(upper_in_order_path),
+                page_index=0,
+                x_mm=20,
+                y_mm=20,
+                w_mm=40,
+                h_mm=30,
+                kind="asset",
+                z_index=10,
+            ),
+            ComposerPanel(
+                id="panel-red",
+                file_path=str(topmost_in_order_path),
+                page_index=0,
+                x_mm=30,
+                y_mm=25,
+                w_mm=40,
+                h_mm=30,
+                kind="asset",
+                z_index=0,
+            ),
+        ]
+    )
+
+    preview_image = _image_from_png_bytes(compose_preview_png(project, dpi=144))
+    compose_export_pdf(project, export_path)
+    export_image = _render_pdf_page_image(export_path, dpi=144)
+
+    _assert_rgb_close(_sample_rgb_at_mm(preview_image, 40, 35), (230, 57, 70))
+    _assert_rgb_close(_sample_rgb_at_mm(export_image, 40, 35), (230, 57, 70))
 
 
 def test_preview_and_export_apply_pdf_crop_rect_consistently(tmp_path: Path) -> None:

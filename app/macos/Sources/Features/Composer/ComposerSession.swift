@@ -69,6 +69,20 @@ extension UTType {
     static let composerPanelDragPayload = UTType(exportedAs: "com.codegod.composer-panel-drag")
 }
 
+private struct ComposerBoardOrderingKey: Comparable {
+    let row: Int
+    let col: Int
+    let area: Int
+    let panelID: String
+
+    static func < (lhs: ComposerBoardOrderingKey, rhs: ComposerBoardOrderingKey) -> Bool {
+        if lhs.row != rhs.row { return lhs.row < rhs.row }
+        if lhs.col != rhs.col { return lhs.col < rhs.col }
+        if lhs.area != rhs.area { return lhs.area < rhs.area }
+        return lhs.panelID < rhs.panelID
+    }
+}
+
 @MainActor
 @Observable
 final class ComposerSession {
@@ -89,8 +103,9 @@ final class ComposerSession {
     var isGuidePresented = false
     var isPreviewing = false
     var isExporting = false
-    var armedReplacementPanelID: String?
     var activeDragPanelID: String?
+
+    @ObservationIgnored private var selectionAnchorCell: ComposerGridCell?
 
     init(previewDelayNanoseconds: UInt64 = 300_000_000) {
         self.previewDelayNanoseconds = previewDelayNanoseconds
@@ -103,6 +118,10 @@ final class ComposerSession {
 
     var orderedPanels: [ComposerPanelPayload] {
         project.panels
+    }
+
+    var visibleBoardPanels: [ComposerPanelPayload] {
+        project.panels.filter { !$0.hidden && placementTarget(for: $0) != nil }
     }
 
     var selectedPanel: ComposerPanelPayload? {
@@ -145,7 +164,7 @@ final class ComposerSession {
     }
 
     var activePlacementPanelID: String? {
-        activeDragPanelID ?? armedReplacementPanelID
+        activeDragPanelID ?? focusedPanelID
     }
 
     var activePlacementPanel: ComposerPanelPayload? {
@@ -164,14 +183,14 @@ final class ComposerSession {
         guard let selection = selectedCellSelection, selection.cellCount > 1 else {
             return false
         }
-        return cellsAreAvailable(Set(selection.cells))
+        return selection.cells.allSatisfy { isCellMergeable($0) }
     }
 
     var canUnmergeSelectedRegion: Bool {
-        guard let region = selectedFreeRegion else {
+        guard let region = selectedFreeRegion, !region.locked else {
             return false
         }
-        return !region.locked
+        return regionOccupants(regionID: region.id).isEmpty
     }
 
     var canPlaceFocusedPanelInSelectedTarget: Bool {
@@ -183,94 +202,43 @@ final class ComposerSession {
 
     var mergeGuidance: String {
         guard !selectedCells.isEmpty else {
-            return "Select adjacent cells on the 3x3 grid to merge them into one free region."
+            return "Select adjacent empty cells on the 3x3 grid to merge them into one region."
         }
         guard let selection = selectedCellSelection else {
-            return "Use a rectangular cell selection for merge actions."
+            return "Use a rectangular cell selection for merge."
         }
         guard selection.cellCount > 1 else {
-            return "A single cell is ready for placement. Select more cells if you want to merge."
+            return "A single cell is selected. Add adjacent cells if you want to merge."
         }
-        guard cellsAreAvailable(Set(selection.cells)) else {
-            return "Merge is available only for empty cells that are not already covered by another region."
+        guard canMergeSelectedCells else {
+            return "Merge requires an empty rectangular selection with no existing panel or merged-region coverage."
         }
         return "This \(selection.colSpan)x\(selection.rowSpan) selection can be merged into one free region."
     }
 
     var placementGuidance: String {
         guard let panel = selectedPanel else {
-            if let armedReplacementPanelID, let replacementPanel = panelByID(armedReplacementPanelID) {
-                return "Replace mode is armed for \(replacementPanel.kind == "graph" ? "this graph" : "this asset"). Click or drop onto a valid target."
-            }
-            return "Choose a panel from the library or canvas to place it into the grid."
+            return "Select a panel from the Library or the board, then choose a target cell or merged region."
         }
-
+        if panel.hidden {
+            return "This panel is off the board. Select a target and place it back into the composition."
+        }
         if panel.locked {
-            return "Unlock this panel before moving or reassigning it."
+            return "Unlock this panel before moving it on the board."
         }
-
         guard let target = selectedPlacementTarget else {
-            if armedReplacementPanelID == panel.id {
-                return "Replace mode is armed. Choose a valid cell, merged region, or graph span."
-            }
-            return "Select a cell or merged region to place the focused panel."
+            return "Drag the panel directly, or select a destination cell / region to move it there."
         }
-
-        switch target {
-        case let .freeRegion(regionID):
-            guard let region = regionByID(regionID) else {
-                return "Select a valid merged region."
-            }
-            if region.locked {
-                return "Unlock this merged region before placing an asset into it or unmerging it."
-            }
-            if panel.kind == "graph" {
-                return "Graphs stay tied to graph regions. Select a matching graph span instead of a free merged region."
-            }
-            return "Place this asset into the selected merged region."
-        case let .cell(cell):
-            if panel.kind == "graph" {
-                let requiredSpan = graphSpan(for: panel)
-                if requiredSpan.colSpan != 1 || requiredSpan.rowSpan != 1 {
-                    return "This graph needs a \(requiredSpan.colSpan)x\(requiredSpan.rowSpan) graph span."
-                }
-                return canPlace(panelID: panel.id, in: target)
-                    ? "Move this graph into \(cellDisplayLabel(cell))."
-                    : "That cell is already occupied."
-            }
-            return "Place this asset into \(cellDisplayLabel(cell))."
-        case let .graphSpan(origin, colSpan, rowSpan):
-            if panel.kind != "graph" {
-                return "Assets can snap into cells or merged regions. Merge this selection first if you want a shared free region."
-            }
-
-            let requiredSpan = graphSpan(for: panel)
-            if requiredSpan.colSpan != colSpan || requiredSpan.rowSpan != rowSpan {
-                return "This graph needs a \(requiredSpan.colSpan)x\(requiredSpan.rowSpan) graph span."
-            }
-
-            let trailingCell = ComposerGridCell(col: origin.col + colSpan - 1, row: origin.row + rowSpan - 1)
-            let summary = "\(cellDisplayLabel(origin))-\(cellDisplayLabel(trailingCell))"
-            return canPlace(panelID: panel.id, in: target)
-                ? "Move this graph into \(summary)."
-                : "Those target cells are already occupied."
-        }
+        return canPlace(panelID: panel.id, in: target)
+            ? "This destination is valid."
+            : "That destination is not valid for the selected panel."
     }
 
     var placementActionTitle: String {
         guard let panel = selectedPanel else {
-            return "Place Panel"
+            return "Place Here"
         }
-        if armedReplacementPanelID == panel.id {
-            return "Replace At Selection"
-        }
-        if panel.kind == "graph" {
-            return "Move Graph Into Selection"
-        }
-        if selectedFreeRegion != nil {
-            return "Place Asset In Region"
-        }
-        return "Place Asset In Cell"
+        return panel.hidden ? "Place Here" : "Move Here"
     }
 
     func configure(client: any SidecarClienting) {
@@ -301,6 +269,8 @@ final class ComposerSession {
         }
 
         do {
+            let previous = project
+            let previousPanelIDs = Set(previous.panels.map(\.id))
             let response = try await client.importComposerPanels(
                 .init(
                     project: project,
@@ -308,14 +278,25 @@ final class ComposerSession {
                     kind: pendingImportKind.rawValue
                 )
             )
-            let previous = project
-            project = response
+
+            var candidate = response
+            let importedPanelIDs = Set(candidate.panels.map(\.id)).subtracting(previousPanelIDs)
+            let reflowed = reflowVisiblePanels(in: &candidate)
+            if !reflowed {
+                hidePanels(withIDs: importedPanelIDs, in: &candidate)
+                _ = reflowVisiblePanels(in: &candidate)
+                errorMessage = importedPanelIDs.isEmpty
+                    ? "The current board layout cannot fit the requested panel sequence."
+                    : "Some imported panels could not fit the current board layout and were kept off the board."
+            } else {
+                errorMessage = nil
+            }
+
+            syncPanelZIndices(in: &candidate)
+            project = candidate
             exportURL = nil
-            errorMessage = nil
             clearTargetSelection()
-            armedReplacementPanelID = nil
-            activeDragPanelID = nil
-            focusedPanelID = project.panels.last?.id
+            focusedPanelID = candidate.panels.last?.id
             registerUndo(previousProject: previous, actionName: "Import Panels")
             schedulePreview()
         } catch {
@@ -347,43 +328,16 @@ final class ComposerSession {
     }
 
     func focusPanel(_ panelID: String?) {
-        if armedReplacementPanelID != panelID {
-            armedReplacementPanelID = nil
-        }
         focusedPanelID = panelID
     }
 
     func selectPanelOnCanvas(_ panelID: String?) {
-        if armedReplacementPanelID != panelID {
-            armedReplacementPanelID = nil
-        }
         focusedPanelID = panelID
         clearTargetSelection()
-    }
-
-    func beginReplacingSelectedPanel() {
-        guard let selectedPanelID else {
-            return
-        }
-        beginReplacement(for: selectedPanelID)
-    }
-
-    func beginReplacement(for panelID: String) {
-        guard let panel = panelByID(panelID), !panel.locked else {
-            return
-        }
-        focusedPanelID = panelID
-        clearTargetSelection()
-        armedReplacementPanelID = panelID
-    }
-
-    func isReplacementArmed(for panelID: String) -> Bool {
-        armedReplacementPanelID == panelID
     }
 
     func clearTransientEditingState() {
         focusedPanelID = nil
-        armedReplacementPanelID = nil
         activeDragPanelID = nil
         clearTargetSelection()
     }
@@ -407,32 +361,49 @@ final class ComposerSession {
         guard !fromOffsets.isEmpty else {
             return
         }
-        mutateProject(actionName: "Reorder Panels") { project in
-            project.panels.move(fromOffsets: fromOffsets, toOffset: toOffset)
+
+        let previous = project
+        var candidate = project
+        candidate.panels.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        guard reflowVisiblePanels(in: &candidate) else {
+            errorMessage = "The current board layout cannot fit the requested panel sequence."
+            return
         }
+        syncPanelZIndices(in: &candidate)
+        commitProject(candidate, previousProject: previous, actionName: "Reorder Panels")
     }
 
-    func toggleCellSelection(_ cell: ComposerGridCell, additive: Bool) {
-        if additive {
+    func updateCellSelection(_ cell: ComposerGridCell, additive: Bool, extend: Bool) {
+        if extend, let selectionAnchorCell {
+            selectedCells = Set(rectangularCells(from: selectionAnchorCell, to: cell))
+        } else if additive {
             if selectedCells.contains(cell) {
                 selectedCells.remove(cell)
             } else {
                 selectedCells.insert(cell)
             }
+            selectionAnchorCell = selectionAnchorCell ?? cell
         } else {
             selectedCells = [cell]
+            selectionAnchorCell = cell
         }
         selectedRegionID = nil
+    }
+
+    func toggleCellSelection(_ cell: ComposerGridCell, additive: Bool) {
+        updateCellSelection(cell, additive: additive, extend: false)
     }
 
     func selectRegion(_ regionID: String?) {
         selectedRegionID = regionID
         selectedCells.removeAll()
+        selectionAnchorCell = nil
     }
 
     func clearTargetSelection() {
         selectedRegionID = nil
         selectedCells.removeAll()
+        selectionAnchorCell = nil
     }
 
     func setAutoLabels(_ enabled: Bool) {
@@ -442,8 +413,9 @@ final class ComposerSession {
     }
 
     func updateSelectedPanel(label: String) {
+        guard let selectedPanelID else { return }
         mutateProject(actionName: "Edit Panel Label") { project in
-            guard let index = project.panels.firstIndex(where: { $0.id == focusedPanelID }) else {
+            guard let index = project.panels.firstIndex(where: { $0.id == selectedPanelID }) else {
                 return
             }
             project.panels[index].label = label.isEmpty ? nil : label
@@ -451,21 +423,41 @@ final class ComposerSession {
     }
 
     func updateSelectedPanel(hidden: Bool) {
-        mutateProject(actionName: "Toggle Panel Visibility") { project in
-            guard let index = project.panels.firstIndex(where: { $0.id == focusedPanelID }) else {
-                return
-            }
-            project.panels[index].hidden = hidden
+        guard let selectedPanelID else { return }
+        if hidden {
+            removePanelFromBoard(selectedPanelID)
+            return
         }
+
+        let previous = project
+        var candidate = project
+        guard let index = candidate.panels.firstIndex(where: { $0.id == selectedPanelID }) else {
+            return
+        }
+        candidate.panels[index].hidden = false
+        guard reflowVisiblePanels(in: &candidate) else {
+            errorMessage = "The current board layout cannot fit this panel on the board."
+            return
+        }
+        syncPanelZIndices(in: &candidate)
+        commitProject(candidate, previousProject: previous, actionName: "Show Panel")
     }
 
     func updateSelectedPanel(locked: Bool) {
+        guard let selectedPanelID else { return }
         mutateProject(actionName: "Toggle Panel Lock") { project in
-            guard let index = project.panels.firstIndex(where: { $0.id == focusedPanelID }) else {
+            guard let index = project.panels.firstIndex(where: { $0.id == selectedPanelID }) else {
                 return
             }
             project.panels[index].locked = locked
         }
+    }
+
+    func removeSelectedPanelFromBoard() {
+        guard let selectedPanelID else {
+            return
+        }
+        removePanelFromBoard(selectedPanelID)
     }
 
     func mergeSelectedCells() {
@@ -473,41 +465,40 @@ final class ComposerSession {
             return
         }
 
-        let newRegionID = nextAvailableID(prefix: "region", existing: project.regions.map(\.id))
-        mutateProject(actionName: "Merge Cells") { project in
-            project.regions.append(
-                ComposerRegionPayload(
-                    id: newRegionID,
-                    kind: "free",
-                    col: selection.origin.col,
-                    row: selection.origin.row,
-                    colSpan: selection.colSpan,
-                    rowSpan: selection.rowSpan,
-                    label: nil,
-                    locked: false,
-                    slotKind: nil
-                )
+        let previous = project
+        var candidate = project
+        let newRegionID = nextAvailableID(prefix: "region", existing: candidate.regions.map(\.id))
+        candidate.regions.append(
+            ComposerRegionPayload(
+                id: newRegionID,
+                kind: "free",
+                col: selection.origin.col,
+                row: selection.origin.row,
+                colSpan: selection.colSpan,
+                rowSpan: selection.rowSpan,
+                label: nil,
+                locked: false,
+                slotKind: nil
             )
-        }
+        )
+        commitProject(candidate, previousProject: previous, actionName: "Merge Cells")
         selectedRegionID = newRegionID
         selectedCells.removeAll()
+        selectionAnchorCell = nil
     }
 
     func unmergeSelectedRegion() {
-        guard let region = selectedFreeRegion, !region.locked else {
+        guard let region = selectedFreeRegion, canUnmergeSelectedRegion else {
             return
         }
 
-        let regionID = region.id
-        mutateProject(actionName: "Unmerge Region") { project in
-            project.regions.removeAll { $0.id == regionID }
-            for index in project.panels.indices where project.panels[index].regionID == regionID {
-                project.panels[index].regionID = nil
-            }
-            for index in project.texts.indices where project.texts[index].regionID == regionID {
-                project.texts[index].regionID = nil
-            }
+        let previous = project
+        var candidate = project
+        candidate.regions.removeAll { $0.id == region.id }
+        for index in candidate.texts.indices where candidate.texts[index].regionID == region.id {
+            candidate.texts[index].regionID = nil
         }
+        commitProject(candidate, previousProject: previous, actionName: "Unmerge Region")
         selectedRegionID = nil
     }
 
@@ -523,33 +514,26 @@ final class ComposerSession {
             return
         }
 
-        switch target {
-        case let .cell(cell):
-            guard let panel = panelByID(panelID) else {
+        let previous = project
+        var candidate = project
+        let occupantID = occupantPanelID(at: target, in: candidate, excluding: [panelID])
+        let sourceTarget = placementTarget(forPanelID: panelID, in: candidate)
+
+        if let occupantID {
+            guard let sourceTarget else {
+                errorMessage = "Only panels already on the board can swap positions."
                 return
             }
-            if panel.kind == "graph" {
-                placeGraph(
-                    panelID: panelID,
-                    in: ComposerCellSelection(origin: cell, colSpan: 1, rowSpan: 1)
-                )
-            } else {
-                placeAsset(panelID: panelID, in: cell)
-            }
-        case let .freeRegion(regionID):
-            guard let region = regionByID(regionID) else {
-                return
-            }
-            placeAsset(panelID: panelID, in: region)
-        case let .graphSpan(origin, colSpan, rowSpan):
-            placeGraph(
-                panelID: panelID,
-                in: ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan)
-            )
+            applyPlacement(panelID: panelID, to: target, in: &candidate)
+            applyPlacement(panelID: occupantID, to: sourceTarget, in: &candidate)
+        } else {
+            applyPlacement(panelID: panelID, to: target, in: &candidate)
         }
 
+        rewriteCanonicalOrderFromBoard(in: &candidate)
+        syncPanelZIndices(in: &candidate)
+        commitProject(candidate, previousProject: previous, actionName: "Move Panel")
         focusedPanelID = panelID
-        armedReplacementPanelID = nil
         activeDragPanelID = nil
         clearTargetSelection()
     }
@@ -558,52 +542,42 @@ final class ComposerSession {
         guard let panel = panelByID(panelID), !panel.locked else {
             return false
         }
+        if !isStructurallyCompatible(panel: panel, with: target, in: project) {
+            return false
+        }
 
-        switch target {
-        case let .cell(cell):
-            if panel.kind == "graph" {
-                let requiredSpan = graphSpan(for: panel)
-                guard requiredSpan.colSpan == 1, requiredSpan.rowSpan == 1 else {
-                    return false
-                }
-            }
-            return cellsAreAvailable(Set([cell]), allowingRegionID: panel.regionID)
-        case let .freeRegion(regionID):
-            guard panel.kind == "asset",
-                  let region = regionByID(regionID),
-                  region.kind == "free",
-                  !region.locked
+        let occupantID = occupantPanelID(at: target, in: project, excluding: [panelID])
+        let sourceTarget = placementTarget(forPanelID: panelID, in: project)
+
+        if let occupantID {
+            guard let occupant = panelByID(occupantID), !occupant.locked,
+                  let sourceTarget
             else {
                 return false
             }
-            return true
-        case let .graphSpan(origin, colSpan, rowSpan):
-            guard panel.kind == "graph" else {
+            guard isStructurallyCompatible(panel: occupant, with: sourceTarget, in: project) else {
                 return false
             }
-            let requiredSpan = graphSpan(for: panel)
-            guard requiredSpan.colSpan == colSpan, requiredSpan.rowSpan == rowSpan else {
-                return false
-            }
-            let selection = ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan)
-            return cellsAreAvailable(Set(selection.cells), allowingRegionID: panel.regionID)
+            return targetIsAvailable(target, in: project, excluding: [panelID, occupantID]) &&
+                targetIsAvailable(sourceTarget, in: project, excluding: [panelID, occupantID])
         }
+
+        return targetIsAvailable(target, in: project, excluding: [panelID])
     }
 
     func graphCompatibleTargets(for panelID: String) -> [ComposerPlacementTarget] {
         guard let panel = panelByID(panelID), panel.kind == "graph" else {
             return []
         }
-
-        let span = graphSpan(for: panel)
+        let span = graphSpan(for: panel, in: project)
         guard span.colSpan > 1 || span.rowSpan > 1 else {
             return []
         }
 
         let maxCol = max(0, project.layoutGrid.columns - span.colSpan)
         let maxRow = max(0, project.layoutGrid.rows - span.rowSpan)
-
         var targets: [ComposerPlacementTarget] = []
+
         for row in 0 ... maxRow {
             for col in 0 ... maxCol {
                 let target = ComposerPlacementTarget.graphSpan(
@@ -611,7 +585,7 @@ final class ComposerSession {
                     colSpan: span.colSpan,
                     rowSpan: span.rowSpan
                 )
-                if canPlace(panelID: panelID, in: target) {
+                if isStructurallyCompatible(panel: panel, with: target, in: project) {
                     targets.append(target)
                 }
             }
@@ -619,117 +593,88 @@ final class ComposerSession {
         return targets
     }
 
-    func releaseFocusedAssetFromRegion() {
-        guard let panel = selectedPanel, panel.kind == "asset", panel.regionID != nil else {
-            return
-        }
-
-        mutateProject(actionName: "Release Asset From Region") { project in
-            guard let index = project.panels.firstIndex(where: { $0.id == panel.id }) else {
-                return
-            }
-            project.panels[index].regionID = nil
-        }
-    }
-
     func placementSummary(for panel: ComposerPanelPayload) -> String {
-        if panel.kind == "graph", let region = regionForPanel(panel) {
-            return regionSummary(region)
+        if panel.hidden {
+            return "Off Board"
         }
-        if let regionID = panel.regionID, let region = regionByID(regionID) {
+        switch placementTarget(for: panel) {
+        case let .freeRegion(regionID):
+            guard let region = regionByID(regionID) else {
+                return "Merged Region"
+            }
             return "Merged region \(regionSummary(region))"
+        case let .cell(cell):
+            return "Cell \(cellDisplayLabel(cell))"
+        case let .graphSpan(origin, colSpan, rowSpan):
+            if colSpan == 1, rowSpan == 1 {
+                return "Cell \(cellDisplayLabel(origin))"
+            }
+            let trailingCell = ComposerGridCell(col: origin.col + colSpan - 1, row: origin.row + rowSpan - 1)
+            return "\(cellDisplayLabel(origin))-\(cellDisplayLabel(trailingCell))"
+        case nil:
+            return "Off Board"
         }
-        if let matchedCell = cellMatchingPanel(panel) {
-            return "Cell \(cellDisplayLabel(matchedCell))"
-        }
-        return "Free placement"
     }
 
     func resolvedLabel(for panel: ComposerPanelPayload) -> String {
-        let graphPanels = project.panels.filter { $0.kind == "graph" }
+        guard panel.kind == "graph" else {
+            return panel.label ?? ""
+        }
         if !project.autoLabels {
             return panel.label ?? ""
         }
-
-        let ordered = graphPanels.sorted {
-            if $0.yMm != $1.yMm { return $0.yMm < $1.yMm }
-            if $0.xMm != $1.xMm { return $0.xMm < $1.xMm }
-            return $0.id < $1.id
+        let orderedGraphPanels = project.panels.filter {
+            !$0.hidden && $0.kind == "graph" && placementTarget(for: $0) != nil
         }
-
-        guard let index = ordered.firstIndex(where: { $0.id == panel.id }) else {
+        guard let index = orderedGraphPanels.firstIndex(where: { $0.id == panel.id }) else {
             return panel.label ?? ""
         }
-
-        let scalar = UnicodeScalar(65 + index).map(String.init)
-        return scalar ?? panel.label ?? ""
+        guard let scalar = UnicodeScalar(65 + index) else {
+            return panel.label ?? ""
+        }
+        return String(scalar)
     }
 
     func cellRectMm(for cell: ComposerGridCell) -> CGRect {
-        let grid = project.layoutGrid
-        return CGRect(
-            x: grid.frameXMm + Double(cell.col) * grid.cellWidthMm,
-            y: grid.frameYMm + Double(cell.row) * grid.cellHeightMm,
-            width: grid.cellWidthMm,
-            height: grid.cellHeightMm
-        )
+        cellRectMm(for: cell, in: project)
     }
 
     func panelRectMm(for panel: ComposerPanelPayload) -> CGRect {
-        CGRect(
-            x: panel.xMm,
-            y: panel.yMm,
-            width: panel.wMm,
-            height: panel.hMm
-        )
+        CGRect(x: panel.xMm, y: panel.yMm, width: panel.wMm, height: panel.hMm)
     }
 
     func regionRectMm(for region: ComposerRegionPayload) -> CGRect {
-        let grid = project.layoutGrid
-        return CGRect(
-            x: grid.frameXMm + Double(region.col) * grid.cellWidthMm,
-            y: grid.frameYMm + Double(region.row) * grid.cellHeightMm,
-            width: Double(region.colSpan) * grid.cellWidthMm,
-            height: Double(region.rowSpan) * grid.cellHeightMm
-        )
+        regionRectMm(for: region, in: project)
     }
 
     func targetRectMm(for target: ComposerPlacementTarget) -> CGRect? {
         switch target {
         case let .cell(cell):
-            return cellRectMm(for: cell)
+            return cellRectMm(for: cell, in: project)
         case let .freeRegion(regionID):
             guard let region = regionByID(regionID) else {
                 return nil
             }
-            return regionRectMm(for: region)
+            return regionRectMm(for: region, in: project)
         case let .graphSpan(origin, colSpan, rowSpan):
             let selection = ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan)
-            let first = cellRectMm(for: selection.origin)
-            return CGRect(
-                x: first.minX,
-                y: first.minY,
-                width: Double(colSpan) * project.layoutGrid.cellWidthMm,
-                height: Double(rowSpan) * project.layoutGrid.cellHeightMm
-            )
+            return rectMm(for: selection, in: project)
         }
     }
 
     func regionCovering(cell: ComposerGridCell) -> ComposerRegionPayload? {
         project.regions.first { region in
-            cell.col >= region.col &&
-                cell.col < region.col + region.colSpan &&
-                cell.row >= region.row &&
-                cell.row < region.row + region.rowSpan
+            let cells = cells(for: region)
+            return cells.contains(cell)
         }
     }
 
     func panelForRegion(_ regionID: String) -> ComposerPanelPayload? {
-        project.panels.first { $0.regionID == regionID }
+        project.panels.first { !$0.hidden && $0.regionID == regionID }
     }
 
     func panelsAssigned(to regionID: String) -> [ComposerPanelPayload] {
-        project.panels.filter { $0.regionID == regionID }
+        project.panels.filter { !$0.hidden && $0.regionID == regionID }
     }
 
     func regionSummary(_ region: ComposerRegionPayload) -> String {
@@ -752,9 +697,7 @@ final class ComposerSession {
     func schedulePreview() {
         previewTask?.cancel()
         previewTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
+            guard let self else { return }
             try? await Task.sleep(nanoseconds: self.previewDelayNanoseconds)
             await self.requestPreview()
         }
@@ -780,7 +723,20 @@ final class ComposerSession {
         let previous = project
         mutation(&project)
         exportURL = nil
+        errorMessage = nil
         registerUndo(previousProject: previous, actionName: actionName)
+        schedulePreview()
+    }
+
+    private func commitProject(
+        _ nextProject: ComposerRequestPayload,
+        previousProject: ComposerRequestPayload,
+        actionName: String
+    ) {
+        project = nextProject
+        exportURL = nil
+        errorMessage = nil
+        registerUndo(previousProject: previousProject, actionName: actionName)
         schedulePreview()
     }
 
@@ -824,11 +780,19 @@ final class ComposerSession {
             colSpan: maxCol - minCol + 1,
             rowSpan: maxRow - minRow + 1
         )
+        return Set(selection.cells) == cells ? selection : nil
+    }
 
-        guard Set(selection.cells) == cells else {
-            return nil
+    private func rectangularCells(from start: ComposerGridCell, to end: ComposerGridCell) -> [ComposerGridCell] {
+        let minCol = min(start.col, end.col)
+        let maxCol = max(start.col, end.col)
+        let minRow = min(start.row, end.row)
+        let maxRow = max(start.row, end.row)
+        return (minRow ... maxRow).flatMap { row in
+            (minCol ... maxCol).map { col in
+                ComposerGridCell(col: col, row: row)
+            }
         }
-        return selection
     }
 
     private func panelByID(_ panelID: String?) -> ComposerPanelPayload? {
@@ -838,131 +802,73 @@ final class ComposerSession {
         return project.panels.first { $0.id == panelID }
     }
 
+    private func panelByID(_ panelID: String?, in project: ComposerRequestPayload) -> ComposerPanelPayload? {
+        guard let panelID else {
+            return nil
+        }
+        return project.panels.first { $0.id == panelID }
+    }
+
     private func graphSpan(
         for panel: ComposerPanelPayload,
-        in project: ComposerRequestPayload? = nil
+        in project: ComposerRequestPayload
     ) -> (colSpan: Int, rowSpan: Int, slotKind: String?) {
-        let activeProject = project ?? self.project
-
-        if let region = regionForPanel(panel, in: activeProject) {
+        if let regionID = panel.regionID,
+           let region = regionByID(regionID, in: project),
+           region.kind == "graph"
+        {
             return (region.colSpan, region.rowSpan, region.slotKind)
         }
-
-        let grid = activeProject.layoutGrid
-        let colSpan = max(1, Int(round(panel.wMm / grid.cellWidthMm)))
-        let rowSpan = max(1, Int(round(panel.hMm / grid.cellHeightMm)))
+        let colSpan = max(1, Int(round(panel.wMm / project.layoutGrid.cellWidthMm)))
+        let rowSpan = max(1, Int(round(panel.hMm / project.layoutGrid.cellHeightMm)))
         let slotKind = (colSpan == 1 && rowSpan == 2) ? "structure" : nil
         return (colSpan, rowSpan, slotKind)
     }
 
-    private func regionForPanel(
-        _ panel: ComposerPanelPayload,
-        in project: ComposerRequestPayload? = nil
-    ) -> ComposerRegionPayload? {
-        guard let regionID = panel.regionID else {
-            return nil
-        }
-        return regionByID(regionID, in: project)
+    private func regionByID(_ regionID: String) -> ComposerRegionPayload? {
+        project.regions.first { $0.id == regionID }
     }
 
-    private func regionByID(
-        _ regionID: String,
-        in project: ComposerRequestPayload? = nil
-    ) -> ComposerRegionPayload? {
-        let activeProject = project ?? self.project
-        return activeProject.regions.first { $0.id == regionID }
+    private func regionByID(_ regionID: String, in project: ComposerRequestPayload) -> ComposerRegionPayload? {
+        project.regions.first { $0.id == regionID }
     }
 
-    private func cellsAreAvailable(_ cells: Set<ComposerGridCell>, allowingRegionID: String? = nil) -> Bool {
-        for cell in cells {
-            if let region = regionCovering(cell: cell), region.id != allowingRegionID {
-                return false
-            }
-        }
-        return true
+    private func regionRectMm(for region: ComposerRegionPayload, in project: ComposerRequestPayload) -> CGRect {
+        CGRect(
+            x: project.layoutGrid.frameXMm + Double(region.col) * project.layoutGrid.cellWidthMm,
+            y: project.layoutGrid.frameYMm + Double(region.row) * project.layoutGrid.cellHeightMm,
+            width: Double(region.colSpan) * project.layoutGrid.cellWidthMm,
+            height: Double(region.rowSpan) * project.layoutGrid.cellHeightMm
+        )
     }
 
-    private func placeGraph(panelID: String, in selection: ComposerCellSelection) {
-        let targetRect = CGRect(
+    private func cellRectMm(for cell: ComposerGridCell, in project: ComposerRequestPayload) -> CGRect {
+        CGRect(
+            x: project.layoutGrid.frameXMm + Double(cell.col) * project.layoutGrid.cellWidthMm,
+            y: project.layoutGrid.frameYMm + Double(cell.row) * project.layoutGrid.cellHeightMm,
+            width: project.layoutGrid.cellWidthMm,
+            height: project.layoutGrid.cellHeightMm
+        )
+    }
+
+    private func rectMm(for selection: ComposerCellSelection, in project: ComposerRequestPayload) -> CGRect {
+        CGRect(
             x: project.layoutGrid.frameXMm + Double(selection.origin.col) * project.layoutGrid.cellWidthMm,
             y: project.layoutGrid.frameYMm + Double(selection.origin.row) * project.layoutGrid.cellHeightMm,
             width: Double(selection.colSpan) * project.layoutGrid.cellWidthMm,
             height: Double(selection.rowSpan) * project.layoutGrid.cellHeightMm
         )
-
-        mutateProject(actionName: "Move Graph Panel") { project in
-            guard let panelIndex = project.panels.firstIndex(where: { $0.id == panelID }) else {
-                return
-            }
-
-            let span = graphSpan(for: project.panels[panelIndex], in: project)
-            if let regionID = project.panels[panelIndex].regionID,
-               let regionIndex = project.regions.firstIndex(where: { $0.id == regionID }) {
-                project.regions[regionIndex].kind = "graph"
-                project.regions[regionIndex].col = selection.origin.col
-                project.regions[regionIndex].row = selection.origin.row
-                project.regions[regionIndex].colSpan = span.colSpan
-                project.regions[regionIndex].rowSpan = span.rowSpan
-                project.regions[regionIndex].slotKind = span.slotKind
-            } else {
-                let regionID = nextAvailableID(prefix: "region", existing: project.regions.map(\.id))
-                project.regions.append(
-                    ComposerRegionPayload(
-                        id: regionID,
-                        kind: "graph",
-                        col: selection.origin.col,
-                        row: selection.origin.row,
-                        colSpan: span.colSpan,
-                        rowSpan: span.rowSpan,
-                        label: nil,
-                        locked: false,
-                        slotKind: span.slotKind
-                    )
-                )
-                project.panels[panelIndex].regionID = regionID
-            }
-
-            project.panels[panelIndex].kind = "graph"
-            project.panels[panelIndex].xMm = targetRect.minX
-            project.panels[panelIndex].yMm = targetRect.minY
-            project.panels[panelIndex].wMm = targetRect.width
-            project.panels[panelIndex].hMm = targetRect.height
-        }
     }
 
-    private func placeAsset(panelID: String, in region: ComposerRegionPayload) {
-        let rect = regionRectMm(for: region)
-        mutateProject(actionName: "Place Asset") { project in
-            guard let panelIndex = project.panels.firstIndex(where: { $0.id == panelID }) else {
-                return
-            }
-            project.panels[panelIndex].regionID = region.id
-            project.panels[panelIndex].xMm = rect.minX
-            project.panels[panelIndex].yMm = rect.minY
-            project.panels[panelIndex].wMm = rect.width
-            project.panels[panelIndex].hMm = rect.height
-        }
-    }
-
-    private func placeAsset(panelID: String, in cell: ComposerGridCell) {
-        let rect = cellRectMm(for: cell)
-        mutateProject(actionName: "Place Asset") { project in
-            guard let panelIndex = project.panels.firstIndex(where: { $0.id == panelID }) else {
-                return
-            }
-            project.panels[panelIndex].regionID = nil
-            project.panels[panelIndex].xMm = rect.minX
-            project.panels[panelIndex].yMm = rect.minY
-            project.panels[panelIndex].wMm = rect.width
-            project.panels[panelIndex].hMm = rect.height
-        }
-    }
-
-    private func cellMatchingPanel(_ panel: ComposerPanelPayload) -> ComposerGridCell? {
+    private func cellMatchingPanel(_ panel: ComposerPanelPayload, in project: ComposerRequestPayload) -> ComposerGridCell? {
         let tolerance = 0.25
-
-        for cell in allGridCells {
-            let rect = cellRectMm(for: cell)
+        let cells = (0 ..< project.layoutGrid.rows).flatMap { row in
+            (0 ..< project.layoutGrid.columns).map { col in
+                ComposerGridCell(col: col, row: row)
+            }
+        }
+        for cell in cells {
+            let rect = cellRectMm(for: cell, in: project)
             if abs(panel.xMm - rect.minX) <= tolerance,
                abs(panel.yMm - rect.minY) <= tolerance,
                abs(panel.wMm - rect.width) <= tolerance,
@@ -970,8 +876,167 @@ final class ComposerSession {
                 return cell
             }
         }
-
         return nil
+    }
+
+    private func placementTarget(for panel: ComposerPanelPayload) -> ComposerPlacementTarget? {
+        placementTarget(for: panel, in: project)
+    }
+
+    private func placementTarget(forPanelID panelID: String, in project: ComposerRequestPayload) -> ComposerPlacementTarget? {
+        guard let panel = panelByID(panelID, in: project) else {
+            return nil
+        }
+        return placementTarget(for: panel, in: project)
+    }
+
+    private func placementTarget(for panel: ComposerPanelPayload, in project: ComposerRequestPayload) -> ComposerPlacementTarget? {
+        guard !panel.hidden else {
+            return nil
+        }
+        if let regionID = panel.regionID, let region = regionByID(regionID, in: project) {
+            if region.kind == "free" {
+                return .freeRegion(region.id)
+            }
+            if region.colSpan == 1, region.rowSpan == 1 {
+                return .cell(.init(col: region.col, row: region.row))
+            }
+            return .graphSpan(
+                origin: .init(col: region.col, row: region.row),
+                colSpan: region.colSpan,
+                rowSpan: region.rowSpan
+            )
+        }
+        if let matchedCell = cellMatchingPanel(panel, in: project) {
+            return .cell(matchedCell)
+        }
+        return nil
+    }
+
+    private func cells(for region: ComposerRegionPayload) -> [ComposerGridCell] {
+        (region.row ..< region.row + region.rowSpan).flatMap { row in
+            (region.col ..< region.col + region.colSpan).map { col in
+                ComposerGridCell(col: col, row: row)
+            }
+        }
+    }
+
+    private func cells(for target: ComposerPlacementTarget, in project: ComposerRequestPayload) -> [ComposerGridCell] {
+        switch target {
+        case let .cell(cell):
+            return [cell]
+        case let .freeRegion(regionID):
+            guard let region = regionByID(regionID, in: project) else {
+                return []
+            }
+            return cells(for: region)
+        case let .graphSpan(origin, colSpan, rowSpan):
+            return ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan).cells
+        }
+    }
+
+    private func freeRegions(in project: ComposerRequestPayload) -> [ComposerRegionPayload] {
+        project.regions
+            .filter { $0.kind == "free" }
+            .sorted { lhs, rhs in
+                if lhs.row != rhs.row { return lhs.row < rhs.row }
+                if lhs.col != rhs.col { return lhs.col < rhs.col }
+                return lhs.id < rhs.id
+            }
+    }
+
+    private func structuralBlockedCells(in project: ComposerRequestPayload) -> Set<ComposerGridCell> {
+        Set(freeRegions(in: project).flatMap(cells(for:)))
+    }
+
+    private func panelOccupiedCells(panelID: String? = nil, in project: ComposerRequestPayload, excluding excludedPanelIDs: Set<String>) -> Set<ComposerGridCell> {
+        let occupiedCells: [ComposerGridCell] = project.panels
+            .filter { !$0.hidden && !excludedPanelIDs.contains($0.id) && (panelID == nil || $0.id == panelID) }
+            .flatMap { panel in
+                guard let target = placementTarget(for: panel, in: project) else {
+                    return [ComposerGridCell]()
+                }
+                switch target {
+                case .freeRegion:
+                    return []
+                default:
+                    return cells(for: target, in: project)
+                }
+            }
+        return Set(occupiedCells)
+    }
+
+    private func targetIsAvailable(
+        _ target: ComposerPlacementTarget,
+        in project: ComposerRequestPayload,
+        excluding excludedPanelIDs: Set<String>
+    ) -> Bool {
+        switch target {
+        case let .freeRegion(regionID):
+            guard let region = regionByID(regionID, in: project),
+                  region.kind == "free",
+                  !region.locked
+            else {
+                return false
+            }
+            return regionOccupants(regionID: regionID, in: project, excluding: excludedPanelIDs).isEmpty
+        case .cell, .graphSpan:
+            let structuralBlocked = structuralBlockedCells(in: project)
+            let occupied = panelOccupiedCells(in: project, excluding: excludedPanelIDs)
+            let targetCells = Set(cells(for: target, in: project))
+            return structuralBlocked.isDisjoint(with: targetCells) && occupied.isDisjoint(with: targetCells)
+        }
+    }
+
+    private func isStructurallyCompatible(
+        panel: ComposerPanelPayload,
+        with target: ComposerPlacementTarget,
+        in project: ComposerRequestPayload
+    ) -> Bool {
+        switch target {
+        case .cell:
+            if panel.kind != "graph" {
+                return true
+            }
+            let span = graphSpan(for: panel, in: project)
+            return span.colSpan == 1 && span.rowSpan == 1
+        case let .freeRegion(regionID):
+            guard panel.kind == "asset",
+                  let region = regionByID(regionID, in: project)
+            else {
+                return false
+            }
+            return region.kind == "free"
+        case let .graphSpan(_, colSpan, rowSpan):
+            guard panel.kind == "graph" else {
+                return false
+            }
+            let span = graphSpan(for: panel, in: project)
+            return span.colSpan == colSpan && span.rowSpan == rowSpan
+        }
+    }
+
+    private func occupantPanelID(
+        at target: ComposerPlacementTarget,
+        in project: ComposerRequestPayload,
+        excluding excludedPanelIDs: Set<String>
+    ) -> String? {
+        project.panels.first { panel in
+            guard !panel.hidden, !excludedPanelIDs.contains(panel.id) else {
+                return false
+            }
+            return placementTarget(for: panel, in: project) == target
+        }?.id
+    }
+
+    private func regionOccupants(regionID: String, in project: ComposerRequestPayload? = nil, excluding excludedPanelIDs: Set<String> = []) -> [ComposerPanelPayload] {
+        let activeProject = project ?? self.project
+        return activeProject.panels.filter { !$0.hidden && $0.regionID == regionID && !excludedPanelIDs.contains($0.id) }
+    }
+
+    private func isCellMergeable(_ cell: ComposerGridCell) -> Bool {
+        regionCovering(cell: cell) == nil &&
+            occupantPanelID(at: .cell(cell), in: project, excluding: []) == nil
     }
 
     private func nextAvailableID(prefix: String, existing: [String]) -> String {
@@ -981,5 +1046,312 @@ final class ComposerSession {
             candidate += 1
         }
         return "\(prefix)-\(candidate)"
+    }
+
+    private func syncPanelZIndices(in project: inout ComposerRequestPayload) {
+        for index in project.panels.indices {
+            project.panels[index].zIndex = index
+        }
+    }
+
+    private func hidePanels(withIDs panelIDs: Set<String>, in project: inout ComposerRequestPayload) {
+        guard !panelIDs.isEmpty else {
+            return
+        }
+        for index in project.panels.indices where panelIDs.contains(project.panels[index].id) {
+            hidePanel(at: index, in: &project)
+        }
+    }
+
+    private func hidePanel(at index: Int, in project: inout ComposerRequestPayload) {
+        let regionID = project.panels[index].regionID
+        project.panels[index].hidden = true
+        project.panels[index].regionID = nil
+        if project.panels[index].kind == "graph", let regionID {
+            project.regions.removeAll { $0.kind == "graph" && $0.id == regionID }
+        }
+    }
+
+    private func removePanelFromBoard(_ panelID: String) {
+        guard let panel = panelByID(panelID), !panel.locked else {
+            return
+        }
+
+        let previous = project
+        var candidate = project
+        guard let index = candidate.panels.firstIndex(where: { $0.id == panelID }) else {
+            return
+        }
+        hidePanel(at: index, in: &candidate)
+        _ = reflowVisiblePanels(in: &candidate)
+        rewriteCanonicalOrderFromBoard(in: &candidate)
+        syncPanelZIndices(in: &candidate)
+        commitProject(candidate, previousProject: previous, actionName: "Remove From Board")
+        focusedPanelID = panelID
+        clearTargetSelection()
+    }
+
+    private func firstAvailableGraphSelection(
+        for panel: ComposerPanelPayload,
+        in project: ComposerRequestPayload,
+        occupiedCells: Set<ComposerGridCell>
+    ) -> ComposerCellSelection? {
+        let span = graphSpan(for: panel, in: project)
+        let maxCol = max(0, project.layoutGrid.columns - span.colSpan)
+        let maxRow = max(0, project.layoutGrid.rows - span.rowSpan)
+        let structuralBlocked = structuralBlockedCells(in: project)
+
+        for row in 0 ... maxRow {
+            for col in 0 ... maxCol {
+                let selection = ComposerCellSelection(
+                    origin: ComposerGridCell(col: col, row: row),
+                    colSpan: span.colSpan,
+                    rowSpan: span.rowSpan
+                )
+                let selectionCells = Set(selection.cells)
+                if structuralBlocked.isDisjoint(with: selectionCells),
+                   occupiedCells.isDisjoint(with: selectionCells) {
+                    return selection
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func firstAvailableAssetTarget(
+        in project: ComposerRequestPayload,
+        occupiedCells: Set<ComposerGridCell>,
+        usedFreeRegionIDs: Set<String>
+    ) -> ComposerPlacementTarget? {
+        let blockedCells = structuralBlockedCells(in: project)
+        var rankedTargets: [(row: Int, col: Int, target: ComposerPlacementTarget)] = []
+
+        for region in freeRegions(in: project) where !region.locked && !usedFreeRegionIDs.contains(region.id) {
+            rankedTargets.append((row: region.row, col: region.col, target: .freeRegion(region.id)))
+        }
+
+        for row in 0 ..< project.layoutGrid.rows {
+            for col in 0 ..< project.layoutGrid.columns {
+                let cell = ComposerGridCell(col: col, row: row)
+                guard !blockedCells.contains(cell), !occupiedCells.contains(cell) else {
+                    continue
+                }
+                rankedTargets.append((row: row, col: col, target: .cell(cell)))
+            }
+        }
+
+        rankedTargets.sort {
+            if $0.row != $1.row { return $0.row < $1.row }
+            if $0.col != $1.col { return $0.col < $1.col }
+            switch ($0.target, $1.target) {
+            case (.freeRegion, .cell):
+                return true
+            case (.cell, .freeRegion):
+                return false
+            default:
+                return false
+            }
+        }
+        return rankedTargets.first?.target
+    }
+
+    private func reflowVisiblePanels(in project: inout ComposerRequestPayload) -> Bool {
+        let sourceProject = project
+        let visiblePanelIDs = sourceProject.panels.filter { !$0.hidden }.map(\.id)
+        let freeRegionTargets = freeRegions(in: sourceProject)
+        let previousTargets: [String: ComposerPlacementTarget] = Dictionary(
+            uniqueKeysWithValues: visiblePanelIDs.compactMap { panelID in
+                guard let panel = panelByID(panelID, in: sourceProject),
+                      let target = placementTarget(for: panel, in: sourceProject)
+                else {
+                    return nil
+                }
+                return (panelID, target)
+            }
+        )
+
+        var candidate = project
+        candidate.regions = freeRegionTargets
+        var occupiedCells = structuralBlockedCells(in: candidate)
+        var usedFreeRegionIDs: Set<String> = []
+
+        for index in candidate.panels.indices {
+            if candidate.panels[index].hidden {
+                candidate.panels[index].regionID = nil
+            } else {
+                candidate.panels[index].regionID = nil
+            }
+        }
+
+        for panelID in visiblePanelIDs {
+            guard let panelIndex = candidate.panels.firstIndex(where: { $0.id == panelID }) else {
+                return false
+            }
+
+            let sourcePanel = sourceProject.panels[panelIndex]
+            if sourcePanel.kind == "graph" {
+                guard let selection = firstAvailableGraphSelection(
+                    for: sourcePanel,
+                    in: sourceProject,
+                    occupiedCells: occupiedCells
+                ) else {
+                    return false
+                }
+                applyPlacement(panelID: panelID, to: selection.cellCount == 1 ? .cell(selection.origin) : .graphSpan(
+                    origin: selection.origin,
+                    colSpan: selection.colSpan,
+                    rowSpan: selection.rowSpan
+                ), in: &candidate)
+                occupiedCells.formUnion(selection.cells)
+            } else {
+                guard let target = firstAvailableAssetTarget(
+                    in: candidate,
+                    occupiedCells: occupiedCells,
+                    usedFreeRegionIDs: usedFreeRegionIDs
+                ) else {
+                    return false
+                }
+                applyPlacement(panelID: panelID, to: target, in: &candidate)
+                switch target {
+                case let .freeRegion(regionID):
+                    usedFreeRegionIDs.insert(regionID)
+                case let .cell(cell):
+                    occupiedCells.insert(cell)
+                case .graphSpan:
+                    break
+                }
+            }
+        }
+
+        for panel in sourceProject.panels where !panel.hidden && panel.locked {
+            if placementTarget(forPanelID: panel.id, in: candidate) != previousTargets[panel.id] {
+                return false
+            }
+        }
+
+        project = candidate
+        return true
+    }
+
+    private func applyPlacement(
+        panelID: String,
+        to target: ComposerPlacementTarget,
+        in project: inout ComposerRequestPayload
+    ) {
+        guard let panelIndex = project.panels.firstIndex(where: { $0.id == panelID }) else {
+            return
+        }
+
+        let previousRegionID = project.panels[panelIndex].regionID
+        if project.panels[panelIndex].kind == "graph", let previousRegionID {
+            project.regions.removeAll { $0.kind == "graph" && $0.id == previousRegionID }
+        }
+
+        project.panels[panelIndex].hidden = false
+        project.panels[panelIndex].slotID = nil
+
+        switch target {
+        case let .cell(cell):
+            if project.panels[panelIndex].kind == "graph" {
+                let span = graphSpan(for: project.panels[panelIndex], in: project)
+                let regionID = previousRegionID ?? nextAvailableID(prefix: "region", existing: project.regions.map(\.id))
+                let region = ComposerRegionPayload(
+                    id: regionID,
+                    kind: "graph",
+                    col: cell.col,
+                    row: cell.row,
+                    colSpan: span.colSpan,
+                    rowSpan: span.rowSpan,
+                    label: nil,
+                    locked: false,
+                    slotKind: span.slotKind
+                )
+                project.regions.append(region)
+                let rect = regionRectMm(for: region, in: project)
+                project.panels[panelIndex].regionID = region.id
+                project.panels[panelIndex].xMm = rect.minX
+                project.panels[panelIndex].yMm = rect.minY
+                project.panels[panelIndex].wMm = rect.width
+                project.panels[panelIndex].hMm = rect.height
+            } else {
+                let rect = cellRectMm(for: cell, in: project)
+                project.panels[panelIndex].regionID = nil
+                project.panels[panelIndex].xMm = rect.minX
+                project.panels[panelIndex].yMm = rect.minY
+                project.panels[panelIndex].wMm = rect.width
+                project.panels[panelIndex].hMm = rect.height
+            }
+        case let .freeRegion(regionID):
+            guard let region = regionByID(regionID, in: project) else {
+                return
+            }
+            let rect = regionRectMm(for: region, in: project)
+            project.panels[panelIndex].regionID = region.id
+            project.panels[panelIndex].xMm = rect.minX
+            project.panels[panelIndex].yMm = rect.minY
+            project.panels[panelIndex].wMm = rect.width
+            project.panels[panelIndex].hMm = rect.height
+        case let .graphSpan(origin, colSpan, rowSpan):
+            let span = graphSpan(for: project.panels[panelIndex], in: project)
+            guard span.colSpan == colSpan, span.rowSpan == rowSpan else {
+                return
+            }
+            let regionID = previousRegionID ?? nextAvailableID(prefix: "region", existing: project.regions.map(\.id))
+            let region = ComposerRegionPayload(
+                id: regionID,
+                kind: "graph",
+                col: origin.col,
+                row: origin.row,
+                colSpan: colSpan,
+                rowSpan: rowSpan,
+                label: nil,
+                locked: false,
+                slotKind: span.slotKind
+            )
+            project.regions.append(region)
+            let rect = regionRectMm(for: region, in: project)
+            project.panels[panelIndex].regionID = region.id
+            project.panels[panelIndex].xMm = rect.minX
+            project.panels[panelIndex].yMm = rect.minY
+            project.panels[panelIndex].wMm = rect.width
+            project.panels[panelIndex].hMm = rect.height
+        }
+    }
+
+    private func rewriteCanonicalOrderFromBoard(in project: inout ComposerRequestPayload) {
+        let hiddenPanels = project.panels.filter(\.hidden)
+        let visiblePanels = project.panels.filter { !$0.hidden }
+        let orderedVisible = visiblePanels.sorted { lhs, rhs in
+            boardOrderingKey(for: lhs, in: project) < boardOrderingKey(for: rhs, in: project)
+        }
+        let hiddenIDs = Set(hiddenPanels.map(\.id))
+        project.panels = orderedVisible + project.panels.filter { hiddenIDs.contains($0.id) }
+    }
+
+    private func boardOrderingKey(for panel: ComposerPanelPayload, in project: ComposerRequestPayload) -> ComposerBoardOrderingKey {
+        switch placementTarget(for: panel, in: project) {
+        case let .cell(cell):
+            return ComposerBoardOrderingKey(row: cell.row, col: cell.col, area: 1, panelID: panel.id)
+        case let .freeRegion(regionID):
+            if let region = regionByID(regionID, in: project) {
+                return ComposerBoardOrderingKey(
+                    row: region.row,
+                    col: region.col,
+                    area: region.colSpan * region.rowSpan,
+                    panelID: panel.id
+                )
+            }
+        case let .graphSpan(origin, colSpan, rowSpan):
+            return ComposerBoardOrderingKey(
+                row: origin.row,
+                col: origin.col,
+                area: colSpan * rowSpan,
+                panelID: panel.id
+            )
+        case nil:
+            break
+        }
+        return ComposerBoardOrderingKey(row: .max, col: .max, area: .max, panelID: panel.id)
     }
 }

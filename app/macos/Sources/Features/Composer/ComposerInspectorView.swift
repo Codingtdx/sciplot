@@ -16,21 +16,30 @@ struct ComposerInspectorView: View {
     private var selectionSection: some View {
         Section("Selection") {
             if let region = session.selectedFreeRegion {
-                LabeledContent("Type", value: "Merged free region")
+                LabeledContent("Target", value: "Merged free region")
                 LabeledContent("Span", value: "\(region.colSpan)x\(region.rowSpan)")
                 LabeledContent("Coverage", value: session.regionSummary(region))
             } else if let selection = session.selectedCellSelection {
-                LabeledContent("Type", value: selection.cellCount > 1 ? "Cell selection" : "Single cell")
+                LabeledContent("Target", value: selection.cellCount > 1 ? "Cell selection" : "Single cell")
                 LabeledContent("Cells", value: "\(selection.cellCount)")
                 LabeledContent("Span", value: "\(selection.colSpan)x\(selection.rowSpan)")
                 LabeledContent("Coverage", value: cellSelectionSummary(selection))
-            } else if let panel = session.selectedPanel {
-                LabeledContent("Type", value: panel.kind == "graph" ? "Graph panel" : "Asset panel")
-                LabeledContent("Placement", value: session.placementSummary(for: panel))
-                LabeledContent("File", value: URL(fileURLWithPath: panel.filePath).lastPathComponent)
-            } else {
+            } else if session.selectedPanel == nil {
                 Text("Select cells, a merged region, or a placed panel to edit the composition.")
                     .foregroundStyle(.secondary)
+            }
+
+            if let panel = session.selectedPanel {
+                if session.selectedCellSelection != nil || session.selectedFreeRegion != nil {
+                    Divider()
+                }
+                LabeledContent("Panel", value: panel.kind == "graph" ? "Graph" : "Asset")
+                LabeledContent("Placement", value: session.placementSummary(for: panel))
+                LabeledContent("File", value: URL(fileURLWithPath: panel.filePath).lastPathComponent)
+
+                if panel.kind == "graph", !session.resolvedLabel(for: panel).isEmpty {
+                    LabeledContent("Label", value: session.resolvedLabel(for: panel))
+                }
             }
 
             if let errorMessage = session.errorMessage {
@@ -69,26 +78,27 @@ struct ComposerInspectorView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!session.canUnmergeSelectedRegion)
 
+                if session.canPlaceFocusedPanelInSelectedTarget {
+                    Button(session.placementActionTitle) {
+                        session.placeFocusedPanelInSelectedTarget()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 Button("Clear Selection") {
                     session.clearTransientEditingState()
                 }
                 .buttonStyle(.bordered)
-            } else if let panel = session.selectedPanel {
-                ComposerPanelThumbnailView(
-                    url: URL(fileURLWithPath: panel.filePath),
-                    size: CGSize(width: 260, height: 160),
-                    cornerRadius: 18
-                )
-                .frame(height: 160)
+            }
 
-                Toggle(
-                    "Hidden",
-                    isOn: Binding(
-                        get: { panel.hidden },
-                        set: { session.updateSelectedPanel(hidden: $0) }
-                    )
-                )
+            if session.canPlaceFocusedPanelInSelectedTarget {
+                Button(session.placementActionTitle) {
+                    session.placeFocusedPanelInSelectedTarget()
+                }
+                .buttonStyle(.borderedProminent)
+            }
 
+            if let panel = session.selectedPanel {
                 Toggle(
                     "Locked",
                     isOn: Binding(
@@ -96,6 +106,14 @@ struct ComposerInspectorView: View {
                         set: { session.updateSelectedPanel(locked: $0) }
                     )
                 )
+
+                if !panel.hidden {
+                    Button("Remove From Board") {
+                        session.removeSelectedPanelFromBoard()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(panel.locked)
+                }
 
                 if panel.kind == "graph" {
                     Toggle(
@@ -114,39 +132,18 @@ struct ComposerInspectorView: View {
                         )
                     )
                     .disabled(session.project.autoLabels)
-
-                    if !session.resolvedLabel(for: panel).isEmpty {
-                        LabeledContent("Resolved Label", value: session.resolvedLabel(for: panel))
-                    }
-                } else if panel.regionID != nil {
-                    Button("Release From Region") {
-                        session.releaseFocusedAssetFromRegion()
-                    }
-                    .buttonStyle(.bordered)
                 }
+            }
 
+            if session.selectedCellSelection != nil || session.selectedFreeRegion != nil || session.selectedPanel != nil {
                 Text(session.placementGuidance)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                HStack {
-                    Button("Replace") {
-                        session.beginReplacingSelectedPanel()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(panel.locked)
-
-                    Button("Clear Selection") {
-                        session.clearTransientEditingState()
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                Button(session.placementActionTitle) {
-                    session.placeFocusedPanelInSelectedTarget()
+                Button("Clear Selection") {
+                    session.clearTransientEditingState()
                 }
                 .buttonStyle(.bordered)
-                .disabled(!session.canPlaceFocusedPanelInSelectedTarget)
             } else {
                 Text("The current selection controls what actions appear here.")
                     .foregroundStyle(.secondary)
@@ -162,10 +159,10 @@ struct ComposerInspectorView: View {
                     title: "Rendering preview",
                     message: "The sidecar is recomposing the current figure."
                 )
-                .frame(height: 200)
+                .frame(height: 180)
             } else if let preview = session.previewResponse {
                 Base64PreviewImageView(base64PNG: preview.pngBase64)
-                    .frame(height: 220)
+                    .frame(height: 200)
 
                 if let report = preview.submissionReport {
                     Label(

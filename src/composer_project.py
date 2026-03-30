@@ -100,8 +100,8 @@ def drawable_z_pairs(
     project: ComposerProject,
 ) -> list[tuple[Literal["panel", "text"], str, int]]:
     pairs: list[tuple[Literal["panel", "text"], str, int]] = []
-    for panel in project.panels:
-        pairs.append(("panel", panel.id, int(panel.z_index)))
+    for index, panel in enumerate(project.panels):
+        pairs.append(("panel", panel.id, index))
     for text in project.texts:
         pairs.append(("text", text.id, int(text.z_index)))
     return sorted(pairs, key=lambda item: (item[2], item[0], item[1]))
@@ -293,20 +293,18 @@ def project_from_dict(data: dict[str, Any]) -> ComposerProject:
 
 
 def resolve_panel_labels(project: ComposerProject) -> dict[str, str]:
-    graph_panels = [panel for panel in project.panels if panel.kind == "graph"]
+    graph_panels = [
+        panel for panel in project.panels if panel.kind == "graph" and not panel.hidden
+    ]
     if not project.auto_labels:
         return {panel.id: panel.label or "" for panel in graph_panels}
-    ordered = sorted(
-        graph_panels,
-        key=lambda panel: (round(panel.y_mm, 3), round(panel.x_mm, 3), panel.id),
-    )
     return {
         panel.id: (
             ascii_uppercase[index]
             if index < len(ascii_uppercase)
             else chr(ord("A") + index)
         )
-        for index, panel in enumerate(ordered)
+        for index, panel in enumerate(graph_panels)
     }
 
 

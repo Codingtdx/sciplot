@@ -20,19 +20,29 @@ struct ComposerCanvasView: View {
                         rect: metrics.rect(for: cell),
                         label: session.cellDisplayLabel(cell),
                         isSelected: session.selectedCells.contains(cell),
+                        isMergeable: session.selectedCells.contains(cell) && session.canMergeSelectedCells,
                         isCoveredByRegion: session.regionCovering(cell: cell) != nil,
                         isHoveredDropTarget: hoveredDropTarget == .cell(cell),
+                        canPlaceHere: session.activePlacementPanelID.map { session.canPlace(panelID: $0, in: .cell(cell)) } == true,
                         onTap: {
-                            session.toggleCellSelection(cell, additive: isCommandModifierPressed)
+                            session.updateCellSelection(
+                                cell,
+                                additive: isCommandModifierPressed,
+                                extend: isShiftModifierPressed
+                            )
                         },
                         onSelectOnly: {
-                            session.toggleCellSelection(cell, additive: false)
+                            session.updateCellSelection(cell, additive: false, extend: false)
                         },
                         onClearSelection: {
                             session.clearTransientEditingState()
                         },
                         onMerge: {
                             session.mergeSelectedCells()
+                        },
+                        onPlaceHere: {
+                            session.updateCellSelection(cell, additive: false, extend: false)
+                            session.placeFocusedPanelInSelectedTarget()
                         }
                     )
                     .dropDestination(
@@ -52,12 +62,17 @@ struct ComposerCanvasView: View {
                         title: session.regionSummary(region),
                         isSelected: session.selectedRegionID == region.id,
                         isHoveredDropTarget: hoveredDropTarget == .freeRegion(region.id),
+                        canPlaceHere: session.activePlacementPanelID.map { session.canPlace(panelID: $0, in: .freeRegion(region.id)) } == true,
                         onTap: {
                             session.selectRegion(region.id)
                         },
                         onUnmerge: {
                             session.selectRegion(region.id)
                             session.unmergeSelectedRegion()
+                        },
+                        onPlaceHere: {
+                            session.selectRegion(region.id)
+                            session.placeFocusedPanelInSelectedTarget()
                         },
                         onClearSelection: {
                             session.clearTransientEditingState()
@@ -101,13 +116,12 @@ struct ComposerCanvasView: View {
                         rect: metrics.rect(for: panel),
                         label: panel.kind == "graph" ? session.resolvedLabel(for: panel) : "",
                         isSelected: session.selectedPanelID == panel.id,
-                        isReplacementArmed: session.isReplacementArmed(for: panel.id),
                         onTap: {
                             session.selectPanelOnCanvas(panel.id)
                         },
-                        onReplace: {
+                        onRemoveFromBoard: {
                             session.selectPanelOnCanvas(panel.id)
-                            session.beginReplacingSelectedPanel()
+                            session.removeSelectedPanelFromBoard()
                         },
                         onClearSelection: {
                             session.clearTransientEditingState()
@@ -166,14 +180,7 @@ struct ComposerCanvasView: View {
     }
 
     private var visiblePanels: [ComposerPanelPayload] {
-        session.orderedPanels
-            .filter { !$0.hidden }
-            .sorted { lhs, rhs in
-                if lhs.zIndex != rhs.zIndex {
-                    return lhs.zIndex < rhs.zIndex
-                }
-                return lhs.id < rhs.id
-            }
+        session.visibleBoardPanels
     }
 
     private var freeRegions: [ComposerRegionPayload] {
@@ -192,9 +199,13 @@ struct ComposerCanvasView: View {
         NSApp.currentEvent?.modifierFlags.contains(.command) == true
     }
 
+    private var isShiftModifierPressed: Bool {
+        NSApp.currentEvent?.modifierFlags.contains(.shift) == true
+    }
+
     private func selectionPopoverContext() -> ComposerQuickActionContext? {
-        if let selection = session.selectedCellSelection, selection.cellCount > 1 {
-            return .multiCell(selection)
+        if let selection = session.selectedCellSelection {
+            return .cellSelection(selection)
         }
         if let region = session.selectedFreeRegion {
             return .mergedRegion(region)
@@ -291,12 +302,15 @@ private struct ComposerCanvasCellView: View {
     let rect: CGRect
     let label: String
     let isSelected: Bool
+    let isMergeable: Bool
     let isCoveredByRegion: Bool
     let isHoveredDropTarget: Bool
+    let canPlaceHere: Bool
     let onTap: () -> Void
     let onSelectOnly: () -> Void
     let onClearSelection: () -> Void
     let onMerge: () -> Void
+    let onPlaceHere: () -> Void
 
     var body: some View {
         RoundedRectangle(cornerRadius: 18)
@@ -318,6 +332,9 @@ private struct ComposerCanvasCellView: View {
             .contextMenu {
                 Button("Select Cell", action: onSelectOnly)
                 Button("Merge", action: onMerge)
+                    .disabled(!isMergeable)
+                Button("Place Here", action: onPlaceHere)
+                    .disabled(!canPlaceHere)
                 Divider()
                 Button("Clear Selection", action: onClearSelection)
             }
@@ -326,6 +343,9 @@ private struct ComposerCanvasCellView: View {
     private var fillColor: Color {
         if isHoveredDropTarget {
             return .accentColor.opacity(0.18)
+        }
+        if isMergeable {
+            return .accentColor.opacity(0.16)
         }
         if isSelected {
             return .accentColor.opacity(0.12)
@@ -340,6 +360,9 @@ private struct ComposerCanvasCellView: View {
         if isHoveredDropTarget {
             return .accentColor
         }
+        if isMergeable {
+            return .accentColor.opacity(0.95)
+        }
         if isSelected {
             return .accentColor.opacity(0.8)
         }
@@ -351,7 +374,7 @@ private struct ComposerCanvasCellView: View {
     }
 
     private var dashPattern: [CGFloat] {
-        isHoveredDropTarget ? [] : [5, 5]
+        (isHoveredDropTarget || isMergeable) ? [] : [5, 5]
     }
 }
 
@@ -360,8 +383,10 @@ private struct ComposerFreeRegionView: View {
     let title: String
     let isSelected: Bool
     let isHoveredDropTarget: Bool
+    let canPlaceHere: Bool
     let onTap: () -> Void
     let onUnmerge: () -> Void
+    let onPlaceHere: () -> Void
     let onClearSelection: () -> Void
 
     var body: some View {
@@ -388,6 +413,8 @@ private struct ComposerFreeRegionView: View {
             .onTapGesture(perform: onTap)
             .contextMenu {
                 Button("Unmerge", action: onUnmerge)
+                Button("Place Here", action: onPlaceHere)
+                    .disabled(!canPlaceHere)
                 Divider()
                 Button("Clear Selection", action: onClearSelection)
             }
@@ -428,9 +455,8 @@ private struct ComposerPlacedPanelView: View {
     let rect: CGRect
     let label: String
     let isSelected: Bool
-    let isReplacementArmed: Bool
     let onTap: () -> Void
-    let onReplace: () -> Void
+    let onRemoveFromBoard: () -> Void
     let onClearSelection: () -> Void
     let onDragStarted: () -> Void
     let onDragEnded: () -> Void
@@ -444,7 +470,7 @@ private struct ComposerPlacedPanelView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(borderColor, lineWidth: isSelected || isReplacementArmed ? 2.5 : 1)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 2.5 : 1)
             )
 
             if panel.kind == "graph", !label.isEmpty {
@@ -457,15 +483,6 @@ private struct ComposerPlacedPanelView: View {
                     .offset(x: -10, y: -10)
             }
 
-            if isReplacementArmed {
-                Label("Replace", systemImage: "arrow.triangle.swap")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(.orange.opacity(0.14), in: Capsule())
-                    .padding(10)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            }
         }
         .frame(width: rect.width, height: rect.height)
         .position(rect.center)
@@ -473,7 +490,7 @@ private struct ComposerPlacedPanelView: View {
         .shadow(color: .black.opacity(isSelected ? 0.08 : 0.03), radius: 10, y: 6)
         .onTapGesture(perform: onTap)
         .contextMenu {
-            Button("Replace", action: onReplace)
+            Button("Remove From Board", action: onRemoveFromBoard)
             Divider()
             Button("Clear Selection", action: onClearSelection)
         }
@@ -490,9 +507,6 @@ private struct ComposerPlacedPanelView: View {
     }
 
     private var borderColor: Color {
-        if isReplacementArmed {
-            return .orange
-        }
         if isSelected {
             return .accentColor
         }
@@ -524,19 +538,33 @@ private struct ComposerQuickActionPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch context {
-            case let .multiCell(selection):
-                Text("\(selection.colSpan)x\(selection.rowSpan) selection")
+            case let .cellSelection(selection):
+                Text(selection.cellCount > 1 ? "\(selection.colSpan)x\(selection.rowSpan) selection" : "Cell \(session.cellDisplayLabel(selection.origin))")
                     .font(.headline)
 
                 Text(session.mergeGuidance)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Button("Merge") {
-                    session.mergeSelectedCells()
+                if selection.cellCount > 1 {
+                    Button("Merge") {
+                        session.mergeSelectedCells()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!session.canMergeSelectedCells)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!session.canMergeSelectedCells)
+
+                if session.canPlaceFocusedPanelInSelectedTarget {
+                    Button(session.placementActionTitle) {
+                        session.placeFocusedPanelInSelectedTarget()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Button("Clear Selection") {
+                    session.clearTransientEditingState()
+                }
+                .buttonStyle(.bordered)
 
             case let .mergedRegion(region):
                 Text("Merged region")
@@ -553,6 +581,19 @@ private struct ComposerQuickActionPopover: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!session.canUnmergeSelectedRegion)
 
+                if session.canPlaceFocusedPanelInSelectedTarget {
+                    Button(session.placementActionTitle) {
+                        session.selectRegion(region.id)
+                        session.placeFocusedPanelInSelectedTarget()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Button("Clear Selection") {
+                    session.clearTransientEditingState()
+                }
+                .buttonStyle(.bordered)
+
             case let .panel(panel):
                 Text(panel.kind == "graph" ? "Graph panel" : "Asset panel")
                     .font(.headline)
@@ -561,14 +602,14 @@ private struct ComposerQuickActionPopover: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Button("Replace") {
+                Button("Remove From Board") {
                     session.selectPanelOnCanvas(panel.id)
-                    session.beginReplacingSelectedPanel()
+                    session.removeSelectedPanelFromBoard()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(panel.locked)
 
-                Button("Clear") {
+                Button("Clear Selection") {
                     session.clearTransientEditingState()
                 }
                 .buttonStyle(.bordered)
@@ -667,13 +708,13 @@ private struct ComposerSelectionAnchorPreferenceKey: PreferenceKey {
 }
 
 private enum ComposerQuickActionContext {
-    case multiCell(ComposerCellSelection)
+    case cellSelection(ComposerCellSelection)
     case mergedRegion(ComposerRegionPayload)
     case panel(ComposerPanelPayload)
 
     var token: String {
         switch self {
-        case let .multiCell(selection):
+        case let .cellSelection(selection):
             return "cells:\(selection.origin.col),\(selection.origin.row),\(selection.colSpan),\(selection.rowSpan)"
         case let .mergedRegion(region):
             return "region:\(region.id)"
@@ -685,7 +726,10 @@ private enum ComposerQuickActionContext {
     @MainActor
     func rect(in session: ComposerSession) -> CGRect? {
         switch self {
-        case let .multiCell(selection):
+        case let .cellSelection(selection):
+            if selection.cellCount == 1 {
+                return session.targetRectMm(for: .cell(selection.origin))
+            }
             return session.targetRectMm(
                 for: .graphSpan(
                     origin: selection.origin,

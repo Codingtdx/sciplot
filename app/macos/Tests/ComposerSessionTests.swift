@@ -26,252 +26,222 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertEqual(session.exportURL?.path, "/tmp/composer-export.pdf")
     }
 
-    func testMergeSelectedCellsCreatesFreeRegion() {
+    func testShiftSelectionMergeCreatesFreeRegionWithoutChangingPanelOrder() {
         let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 2, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 0, row: 1, zIndex: 1),
+        ]
 
-        session.toggleCellSelection(.init(col: 0, row: 0), additive: false)
-        session.toggleCellSelection(.init(col: 1, row: 0), additive: true)
+        session.updateCellSelection(.init(col: 0, row: 0), additive: false, extend: false)
+        session.updateCellSelection(.init(col: 1, row: 0), additive: false, extend: true)
         session.mergeSelectedCells()
 
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-1", "panel-2"])
         XCTAssertEqual(session.project.regions.count, 1)
         XCTAssertEqual(session.project.regions.first?.kind, "free")
         XCTAssertEqual(session.project.regions.first?.colSpan, 2)
         XCTAssertEqual(session.project.regions.first?.rowSpan, 1)
-        XCTAssertEqual(session.selectedRegionID, session.project.regions.first?.id)
     }
 
-    func testUnmergeSelectedRegionRemovesFreeRegion() {
+    func testUnmergeSelectedRegionRemovesFreeRegionWithoutChangingCanonicalOrder() {
         let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 2, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 0, row: 1, zIndex: 1),
+        ]
 
         session.toggleCellSelection(.init(col: 0, row: 0), additive: false)
         session.toggleCellSelection(.init(col: 1, row: 0), additive: true)
         session.mergeSelectedCells()
+        let regionID = session.project.regions.first?.id
 
-        XCTAssertEqual(session.project.regions.count, 1)
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-1", "panel-2"])
 
+        session.selectRegion(regionID)
         session.unmergeSelectedRegion()
 
         XCTAssertTrue(session.project.regions.isEmpty)
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-1", "panel-2"])
         XCTAssertNil(session.selectedRegionID)
     }
 
-    func testPlaceFocusedGraphMovesRegionIntoCompatibleSelection() {
-        let session = ComposerSession()
-        session.project = TestPayloads.composerProject()
-        session.focusPanel("panel-1")
-
-        session.toggleCellSelection(.init(col: 2, row: 2), additive: false)
-        session.placeFocusedPanelInSelectedTarget()
-
-        XCTAssertEqual(session.project.regions.first?.col, 2)
-        XCTAssertEqual(session.project.regions.first?.row, 2)
-        XCTAssertEqual(session.project.panels.first?.xMm, 120)
-        XCTAssertEqual(session.project.panels.first?.yMm, 112.5)
-        XCTAssertEqual(session.placementSummary(for: session.project.panels[0]), "C3")
-    }
-
-    func testPlaceUsesExplicitPanelIDAndGraphSpanTarget() {
-        let session = ComposerSession()
-        session.project = TestPayloads.composerProject()
-
-        let target = ComposerPlacementTarget.graphSpan(
-            origin: ComposerGridCell(col: 1, row: 1),
-            colSpan: 1,
-            rowSpan: 1
-        )
-
-        XCTAssertTrue(session.canPlace(panelID: "panel-1", in: target))
-
-        session.place(panelID: "panel-1", in: target)
-
-        XCTAssertEqual(session.project.regions.first?.col, 1)
-        XCTAssertEqual(session.project.regions.first?.row, 1)
-        XCTAssertEqual(session.project.panels.first?.xMm, 60)
-        XCTAssertEqual(session.project.panels.first?.yMm, 57.5)
-        XCTAssertNil(session.armedReplacementPanelID)
-    }
-
-    func testPlaceFocusedAssetSnapsToCellAndMergedRegion() {
+    func testLibraryReorderReflowsBoardIntoCanonicalOrder() {
         let session = ComposerSession()
         session.project.panels = [
-            ComposerPanelPayload(
-                id: "asset-1",
-                filePath: "/tmp/asset.png",
-                pageIndex: 0,
-                xMm: 12,
-                yMm: 12,
-                wMm: 18,
-                hMm: 18,
-                locked: false,
-                hidden: false,
-                label: nil,
-                kind: "asset",
-                zIndex: 0,
-                groupID: nil,
-                regionID: nil,
-                slotID: nil,
-                cropRect: .init()
-            ),
+            graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 1, row: 0, zIndex: 1),
         ]
-        session.focusPanel("asset-1")
-
-        session.toggleCellSelection(.init(col: 1, row: 1), additive: false)
-        session.placeFocusedPanelInSelectedTarget()
-
-        XCTAssertEqual(session.project.panels[0].xMm, 60)
-        XCTAssertEqual(session.project.panels[0].yMm, 57.5)
-        XCTAssertNil(session.project.panels[0].regionID)
-        XCTAssertEqual(session.placementSummary(for: session.project.panels[0]), "Cell B2")
-
-        session.toggleCellSelection(.init(col: 0, row: 0), additive: false)
-        session.toggleCellSelection(.init(col: 1, row: 0), additive: true)
-        session.mergeSelectedCells()
-        session.placeFocusedPanelInSelectedTarget()
-
-        XCTAssertEqual(session.project.panels[0].regionID, session.project.regions.first?.id)
-        XCTAssertEqual(session.project.panels[0].xMm, 0)
-        XCTAssertEqual(session.project.panels[0].yMm, 2.5)
-        XCTAssertEqual(session.project.panels[0].wMm, 120)
-        XCTAssertEqual(session.project.panels[0].hMm, 55)
-    }
-
-    func testPlaceUsesExplicitPanelIDForAssetTargets() throws {
-        let session = ComposerSession()
-        session.project.panels = [
-            ComposerPanelPayload(
-                id: "asset-1",
-                filePath: "/tmp/asset.png",
-                pageIndex: 0,
-                xMm: 10,
-                yMm: 10,
-                wMm: 20,
-                hMm: 20,
-                locked: false,
-                hidden: false,
-                label: nil,
-                kind: "asset",
-                zIndex: 0,
-                groupID: nil,
-                regionID: nil,
-                slotID: nil,
-                cropRect: .init()
-            ),
-        ]
-
-        let cellTarget = ComposerPlacementTarget.cell(.init(col: 2, row: 1))
-        XCTAssertTrue(session.canPlace(panelID: "asset-1", in: cellTarget))
-
-        session.place(panelID: "asset-1", in: cellTarget)
-
-        XCTAssertEqual(session.project.panels[0].xMm, 120)
-        XCTAssertEqual(session.project.panels[0].yMm, 57.5)
-
-        session.toggleCellSelection(.init(col: 0, row: 1), additive: false)
-        session.toggleCellSelection(.init(col: 1, row: 1), additive: true)
-        session.mergeSelectedCells()
-
-        let freeRegionID = try XCTUnwrap(session.project.regions.first?.id)
-        let freeRegionTarget = ComposerPlacementTarget.freeRegion(freeRegionID)
-        XCTAssertTrue(session.canPlace(panelID: "asset-1", in: freeRegionTarget))
-
-        session.place(panelID: "asset-1", in: freeRegionTarget)
-
-        XCTAssertEqual(session.project.panels[0].regionID, freeRegionID)
-        XCTAssertEqual(session.project.panels[0].xMm, 0)
-        XCTAssertEqual(session.project.panels[0].yMm, 57.5)
-        XCTAssertEqual(session.project.panels[0].wMm, 120)
-        XCTAssertEqual(session.project.panels[0].hMm, 55)
-    }
-
-    func testMovePanelsPreservesProjectPanelOrder() {
-        let session = ComposerSession()
-        session.project = TestPayloads.composerProject()
-        session.project.panels.append(
-            ComposerPanelPayload(
-                id: "panel-3",
-                filePath: "/tmp/panel-3.pdf",
-                pageIndex: 0,
-                xMm: 120,
-                yMm: 57.5,
-                wMm: 60,
-                hMm: 55,
-                locked: false,
-                hidden: false,
-                label: nil,
-                kind: "graph",
-                zIndex: 2,
-                groupID: nil,
-                regionID: nil,
-                slotID: nil,
-                cropRect: .init()
-            )
-        )
 
         session.movePanels(fromOffsets: IndexSet(integer: 1), toOffset: 0)
 
-        XCTAssertEqual(session.project.panels.map(\.id), ["panel-3", "panel-1"])
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-2", "panel-1"])
+        XCTAssertEqual(session.project.panels[0].xMm, 0)
+        XCTAssertEqual(session.project.panels[0].yMm, 2.5)
+        XCTAssertEqual(session.project.panels[1].xMm, 60)
+        XCTAssertEqual(session.project.panels[1].yMm, 2.5)
+        XCTAssertEqual(session.project.panels.map(\.zIndex), [0, 1])
     }
 
-    func testReplaceStateArmsAndClearsWithoutDeletingContent() {
+    func testLibraryReorderPreservesMergedRegionTopologyWhileReflowingBoard() {
         let session = ComposerSession()
-        session.project = TestPayloads.composerProject()
+        let freeRegion = ComposerRegionPayload(
+            id: "region-free-1",
+            kind: "free",
+            col: 0,
+            row: 0,
+            colSpan: 2,
+            rowSpan: 1,
+            label: nil,
+            locked: false,
+            slotKind: nil
+        )
+        session.project.regions = [freeRegion]
+        session.project.panels = [
+            assetPanel(id: "asset-1", regionID: freeRegion.id, xMm: 0, yMm: 2.5, wMm: 120, hMm: 55, zIndex: 0),
+            graphPanel(id: "panel-1", col: 2, row: 0, zIndex: 1, regionID: "region-graph-1"),
+            graphPanel(id: "panel-2", col: 0, row: 1, zIndex: 2, regionID: "region-graph-2"),
+        ]
+        session.project.regions.append(graphRegion(id: "region-graph-1", col: 2, row: 0))
+        session.project.regions.append(graphRegion(id: "region-graph-2", col: 0, row: 1))
 
-        session.selectPanelOnCanvas("panel-1")
-        session.beginReplacingSelectedPanel()
+        session.movePanels(fromOffsets: IndexSet(integer: 2), toOffset: 0)
 
-        XCTAssertEqual(session.armedReplacementPanelID, "panel-1")
-        XCTAssertEqual(session.selectedPanelID, "panel-1")
-        XCTAssertEqual(session.project.panels.count, 1)
-
-        session.clearTransientEditingState()
-
-        XCTAssertNil(session.armedReplacementPanelID)
-        XCTAssertNil(session.selectedPanelID)
-        XCTAssertEqual(session.project.panels.count, 1)
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-2", "asset-1", "panel-1"])
+        XCTAssertEqual(session.project.regions.filter { $0.kind == "free" }.count, 1)
+        XCTAssertEqual(session.project.regions.first { $0.kind == "free" }?.colSpan, 2)
+        XCTAssertEqual(session.project.panels[0].xMm, 120)
+        XCTAssertEqual(session.project.panels[0].yMm, 2.5)
+        XCTAssertEqual(session.project.panels[1].regionID, freeRegion.id)
+        XCTAssertEqual(session.project.panels[2].xMm, 0)
+        XCTAssertEqual(session.project.panels[2].yMm, 57.5)
     }
 
-    func testResolvedLabelsUseUppercaseAutoLabels() {
+    func testBoardMoveToEmptyTargetRewritesCanonicalOrder() {
         let session = ComposerSession()
         session.project.panels = [
-            ComposerPanelPayload(
-                id: "panel-2",
-                filePath: "/tmp/panel-2.pdf",
-                pageIndex: 0,
-                xMm: 60,
-                yMm: 2.5,
-                wMm: 60,
-                hMm: 55,
-                locked: false,
-                hidden: false,
-                label: nil,
-                kind: "graph",
-                zIndex: 0,
-                groupID: nil,
-                regionID: nil,
-                slotID: nil,
-                cropRect: .init()
-            ),
-            ComposerPanelPayload(
-                id: "panel-1",
-                filePath: "/tmp/panel-1.pdf",
-                pageIndex: 0,
-                xMm: 0,
-                yMm: 2.5,
-                wMm: 60,
-                hMm: 55,
-                locked: false,
-                hidden: false,
-                label: nil,
-                kind: "graph",
-                zIndex: 1,
-                groupID: nil,
-                regionID: nil,
-                slotID: nil,
-                cropRect: .init()
-            ),
+            graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 1, row: 0, zIndex: 1),
         ]
 
-        XCTAssertEqual(session.resolvedLabel(for: session.project.panels[1]), "A")
-        XCTAssertEqual(session.resolvedLabel(for: session.project.panels[0]), "B")
+        session.place(panelID: "panel-1", in: .cell(.init(col: 2, row: 1)))
+
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-2", "panel-1"])
+        XCTAssertEqual(session.project.panels[0].xMm, 60)
+        XCTAssertEqual(session.project.panels[0].yMm, 2.5)
+        XCTAssertEqual(session.project.panels[1].xMm, 120)
+        XCTAssertEqual(session.project.panels[1].yMm, 57.5)
     }
+
+    func testBoardSwapRewritesCanonicalOrderAndSwapsPositions() {
+        let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 1, row: 0, zIndex: 1),
+        ]
+
+        XCTAssertTrue(session.canPlace(panelID: "panel-2", in: .cell(.init(col: 0, row: 0))))
+
+        session.place(panelID: "panel-2", in: .cell(.init(col: 0, row: 0)))
+
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-2", "panel-1"])
+        XCTAssertEqual(session.project.panels[0].xMm, 0)
+        XCTAssertEqual(session.project.panels[1].xMm, 60)
+    }
+
+    func testRemoveFromBoardKeepsPanelInLibraryOrderButExcludesItFromBoard() {
+        let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0),
+            graphPanel(id: "panel-2", col: 1, row: 0, zIndex: 1),
+        ]
+
+        session.selectPanelOnCanvas("panel-1")
+        session.removeSelectedPanelFromBoard()
+
+        XCTAssertEqual(session.project.panels.map(\.id), ["panel-2", "panel-1"])
+        XCTAssertTrue(session.project.panels[1].hidden)
+        XCTAssertEqual(session.visibleBoardPanels.map(\.id), ["panel-2"])
+    }
+
+    func testResolvedLabelsFollowCanonicalPanelOrder() {
+        let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "panel-2", col: 0, row: 0, zIndex: 0),
+            graphPanel(id: "panel-1", col: 1, row: 0, zIndex: 1),
+        ]
+
+        XCTAssertEqual(session.resolvedLabel(for: session.project.panels[0]), "A")
+        XCTAssertEqual(session.resolvedLabel(for: session.project.panels[1]), "B")
+    }
+}
+
+private func graphPanel(
+    id: String,
+    col: Int,
+    row: Int,
+    zIndex: Int,
+    regionID: String? = nil
+) -> ComposerPanelPayload {
+    ComposerPanelPayload(
+        id: id,
+        filePath: "/tmp/\(id).pdf",
+        pageIndex: 0,
+        xMm: Double(col) * 60.0,
+        yMm: 2.5 + Double(row) * 55.0,
+        wMm: 60,
+        hMm: 55,
+        locked: false,
+        hidden: false,
+        label: nil,
+        kind: "graph",
+        zIndex: zIndex,
+        groupID: nil,
+        regionID: regionID,
+        slotID: nil,
+        cropRect: .init()
+    )
+}
+
+private func assetPanel(
+    id: String,
+    regionID: String?,
+    xMm: Double,
+    yMm: Double,
+    wMm: Double,
+    hMm: Double,
+    zIndex: Int
+) -> ComposerPanelPayload {
+    ComposerPanelPayload(
+        id: id,
+        filePath: "/tmp/\(id).png",
+        pageIndex: 0,
+        xMm: xMm,
+        yMm: yMm,
+        wMm: wMm,
+        hMm: hMm,
+        locked: false,
+        hidden: false,
+        label: nil,
+        kind: "asset",
+        zIndex: zIndex,
+        groupID: nil,
+        regionID: regionID,
+        slotID: nil,
+        cropRect: .init()
+    )
+}
+
+private func graphRegion(id: String, col: Int, row: Int) -> ComposerRegionPayload {
+    ComposerRegionPayload(
+        id: id,
+        kind: "graph",
+        col: col,
+        row: row,
+        colSpan: 1,
+        rowSpan: 1,
+        label: nil,
+        locked: false,
+        slotKind: nil
+    )
 }

@@ -65,11 +65,18 @@ def sorted_drawables(
     project: ComposerProject,
 ) -> list[tuple[Literal["panel", "text"], ComposerPanel | ComposerText]]:
     drawables: list[tuple[Literal["panel", "text"], ComposerPanel | ComposerText]] = []
+    panel_order = {panel.id: index for index, panel in enumerate(project.panels)}
     for panel in project.panels:
         drawables.append(("panel", panel))
     for text in project.texts:
         drawables.append(("text", text))
-    drawables.sort(key=lambda item: (item[1].z_index, 0 if item[0] == "panel" else 1, item[1].id))
+    drawables.sort(
+        key=lambda item: (
+            item[1].z_index,
+            0 if item[0] == "panel" else 1,
+            panel_order.get(item[1].id, 0) if item[0] == "panel" else item[1].id,
+        )
+    )
     return drawables
 
 
