@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from src import plot_style
 from src.plot_contract import (
     default_options_for_template,
@@ -30,6 +32,43 @@ def resolve_size(size_text: str | None, template: str) -> tuple[float, float]:
     return size_spec.width_mm, size_spec.height_mm
 
 
+def _ensure_template_option_supported(template: str, option_id: str) -> None:
+    spec = template_contract(template)
+    if option_id not in spec.editable_options:
+        raise ValueError(
+            f"Template `{template}` does not support option `{option_id}`. "
+            f"Supported editable options: {', '.join(spec.editable_options)}"
+        )
+
+
+def _normalize_manual_bound(template: str, option_id: str, value: float | None) -> float | None:
+    if value is None:
+        return None
+    _ensure_template_option_supported(template, option_id)
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise ValueError(f"`{option_id}` must be a finite number.")
+    return numeric
+
+
+def _normalize_series_order(template: str, series_order: list[str] | tuple[str, ...] | None) -> tuple[str, ...] | None:
+    if series_order is None:
+        return None
+    _ensure_template_option_supported(template, "series_order")
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for item in series_order:
+        label = str(item).strip()
+        if not label:
+            continue
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(label)
+    return tuple(cleaned) if cleaned else None
+
+
 def resolve_render_options(
     *,
     template: str,
@@ -37,6 +76,11 @@ def resolve_render_options(
     xscale: str | None = None,
     yscale: str | None = None,
     reverse_x: bool | None = None,
+    x_min: float | None = None,
+    x_max: float | None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    series_order: list[str] | tuple[str, ...] | None = None,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
@@ -74,6 +118,11 @@ def resolve_render_options(
         show_colorbar=defaults.get("show_colorbar", True) if show_colorbar is None else show_colorbar,
         style_preset=normalized_style,
         palette_preset=resolved_palette,
+        x_min=_normalize_manual_bound(template, "x_min", x_min),
+        x_max=_normalize_manual_bound(template, "x_max", x_max),
+        y_min=_normalize_manual_bound(template, "y_min", y_min),
+        y_max=_normalize_manual_bound(template, "y_max", y_max),
+        series_order=_normalize_series_order(template, series_order),
         use_sidecar=use_sidecar,
         visual_theme_id=resolved_theme or None,
     )

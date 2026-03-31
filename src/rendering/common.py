@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from src.text_normalization import canonicalize_token, normalize_label, slugify_
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
 TENSILE_LINEAR_SCALE_ERROR = "Tensile curves must use linear axes. Log x / y is not supported."
+_BAR_ZERO_BASELINE_TEMPLATES = {"bar", "grouped_bar_compare", "grouped_bar_error"}
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,69 @@ def style_preflight_warnings(options: RenderOptions) -> tuple[str, ...]:
     if options.style_preset == "nature":
         return ("The Nature preset is active, so official figure constraints take priority.",)
     return ()
+
+
+def manual_axis_overrides(
+    options: RenderOptions,
+) -> tuple[tuple[float | None, float | None] | None, tuple[float | None, float | None] | None]:
+    x_override = None if options.x_min is None and options.x_max is None else (options.x_min, options.x_max)
+    y_override = None if options.y_min is None and options.y_max is None else (options.y_min, options.y_max)
+    return x_override, y_override
+
+
+def merge_axis_override_bounds(
+    base: tuple[float | None, float | None] | None,
+    override: tuple[float | None, float | None] | None,
+) -> tuple[float | None, float | None] | None:
+    if override is None:
+        return base
+    if base is None:
+        return override
+    return (
+        override[0] if override[0] is not None else base[0],
+        override[1] if override[1] is not None else base[1],
+    )
+
+
+def _validate_axis_bound_pair(
+    *,
+    axis_label: str,
+    bounds: tuple[float | None, float | None] | None,
+    scale: str,
+) -> None:
+    if bounds is None:
+        return
+    lower, upper = bounds
+    if lower is not None and upper is not None and lower >= upper:
+        raise ValueError(f"`{axis_label}_min` must be smaller than `{axis_label}_max`.")
+    if scale == "log":
+        if lower is not None and lower <= 0:
+            raise ValueError(f"`{axis_label}_min` must be > 0 when `{axis_label}scale` is log.")
+        if upper is not None and upper <= 0:
+            raise ValueError(f"`{axis_label}_max` must be > 0 when `{axis_label}scale` is log.")
+
+
+def validate_manual_axis_overrides(
+    options: RenderOptions,
+    *,
+    template: str,
+    is_tensile_curve: bool = False,
+) -> None:
+    x_override, y_override = manual_axis_overrides(options)
+    _validate_axis_bound_pair(axis_label="x", bounds=x_override, scale=options.xscale)
+    _validate_axis_bound_pair(axis_label="y", bounds=y_override, scale=options.yscale)
+
+    if template in _BAR_ZERO_BASELINE_TEMPLATES:
+        if options.y_min is not None and not math.isclose(options.y_min, 0.0, rel_tol=0.0, abs_tol=1e-9):
+            raise ValueError(f"`{template}` keeps a zero baseline, so `y_min` must be exactly 0.")
+        if options.y_max is not None and options.y_max <= 0:
+            raise ValueError(f"`{template}` keeps a zero baseline, so `y_max` must be > 0.")
+
+    if is_tensile_curve:
+        if options.y_min is not None and options.y_min >= 0:
+            raise ValueError("Tensile curves must include 0 with lower padding, so `y_min` must be < 0.")
+        if options.y_max is not None and options.y_max <= 0:
+            raise ValueError("Tensile curves must include 0 and positive stress values, so `y_max` must be > 0.")
 
 
 def to_curve_series(series_list: list[RheologySeries]) -> list[CurveSeries]:
@@ -407,6 +472,8 @@ __all__ = [
     "append_multi_output_warning",
     "humanize_preflight_exception",
     "load_segmented_config",
+    "manual_axis_overrides",
+    "merge_axis_override_bounds",
     "load_rheology_bundle_series",
     "looks_like_tensile_curve",
     "predict_bar_box_slug",
@@ -416,6 +483,7 @@ __all__ = [
     "style_preflight_warnings",
     "TENSILE_LINEAR_SCALE_ERROR",
     "to_curve_series",
+    "validate_manual_axis_overrides",
     "validate_rheology_bundle_scales",
     "validate_series_scales",
 ]

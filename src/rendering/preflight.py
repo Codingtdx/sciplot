@@ -13,14 +13,17 @@ from src.rendering.common import (
     append_multi_output_warning,
     humanize_preflight_exception,
     load_segmented_config,
+    looks_like_tensile_curve,
     preview_output_filenames,
     style_preflight_warnings,
     summarize_replicate_distribution,
+    validate_manual_axis_overrides,
     validate_rheology_bundle_scales,
     validate_series_scales,
 )
 from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
+from src.rendering.series_order import unknown_series_order_labels
 from src.rendering.template_lifecycle import template_family_ids, template_identity
 from src.submission import build_render_submission_report
 
@@ -58,22 +61,58 @@ def preflight_render_request(
             }:
                 if template in _MEAN_BAND_TEMPLATES:
                     raise ValueError(f"{template} is not supported for rheology export bundles.")
-                validate_rheology_bundle_scales(
+                validate_manual_axis_overrides(options, template=template)
+                metric_series = validate_rheology_bundle_scales(
                     normalized_dataset.model,
                     input_path,
                     sheet,
                     xscale=options.xscale,
                     yscale=options.yscale,
                 )
+                unknown_series = unknown_series_order_labels(
+                    [series.sample for series_list in metric_series.values() for series in series_list],
+                    options.series_order,
+                )
+                if unknown_series:
+                    raise ValueError(
+                        "series_order contains unknown series labels: " + ", ".join(unknown_series)
+                    )
             else:
                 curve_series = load_curve_table_cached(input_path, sheet)
                 validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
+                validate_manual_axis_overrides(
+                    options,
+                    template=template,
+                    is_tensile_curve=looks_like_tensile_curve(curve_series),
+                )
+                unknown_series = unknown_series_order_labels(
+                    [series.sample for series in curve_series],
+                    options.series_order,
+                )
+                if unknown_series:
+                    raise ValueError(
+                        "series_order contains unknown series labels: " + ", ".join(unknown_series)
+                    )
                 if template in _MEAN_BAND_TEMPLATES:
                     aligned_replicate_band(curve_series)
         elif template == "stacked_curve":
-            load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_cached(input_path, sheet)
+            validate_manual_axis_overrides(options, template=template)
+            unknown_series = unknown_series_order_labels(
+                [series.sample for series in curve_series],
+                options.series_order,
+            )
+            if unknown_series:
+                raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
         elif template == "segmented_stacked_curve":
             curve_series = load_curve_table_cached(input_path, sheet)
+            validate_manual_axis_overrides(options, template=template)
+            unknown_series = unknown_series_order_labels(
+                [series.sample for series in curve_series],
+                options.series_order,
+            )
+            if unknown_series:
+                raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
             load_segmented_config(
                 input_path,
                 curve_series,
@@ -82,9 +121,31 @@ def preflight_render_request(
         elif template in {"scatter"} | _BUBBLE_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
+            validate_manual_axis_overrides(
+                options,
+                template=template,
+                is_tensile_curve=looks_like_tensile_curve(curve_series),
+            )
+            unknown_series = unknown_series_order_labels(
+                [series.sample for series in curve_series],
+                options.series_order,
+            )
+            if unknown_series:
+                raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
         elif template in _FIT_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
+            validate_manual_axis_overrides(
+                options,
+                template=template,
+                is_tensile_curve=looks_like_tensile_curve(curve_series),
+            )
+            unknown_series = unknown_series_order_labels(
+                [series.sample for series in curve_series],
+                options.series_order,
+            )
+            if unknown_series:
+                raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
             if not curve_series:
                 raise ValueError("No valid X/Y series found.")
             for series in curve_series:
@@ -113,6 +174,13 @@ def preflight_render_request(
             groups = load_replicate_table_cached(input_path, sheet)
             if not groups:
                 raise ValueError("No valid groups were found in the replicate table.")
+            validate_manual_axis_overrides(options, template=template)
+            unknown_groups = unknown_series_order_labels(
+                [group.group for group in groups],
+                options.series_order,
+            )
+            if unknown_groups:
+                raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))
             summary = summarize_replicate_distribution(groups)
             if template in _GROUPED_BAR_ERROR_TEMPLATES | {"distribution_compare"} and len(groups) < 2:
                 raise ValueError(f"{template} requires at least two replicate groups.")

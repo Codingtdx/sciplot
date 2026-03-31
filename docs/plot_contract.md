@@ -37,7 +37,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Standard single-panel curve plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -47,7 +47,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Standard single-panel curve plot with markers.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `multi_output_bundle_notice`
@@ -57,7 +57,7 @@
 - Category: `stacked_spectrum`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
-- Editable options: `size`, `reverse_x`, `baseline`, `style_preset`, `palette_preset`
+- Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-column stacked curves for spectrum-like figures.
 - Hard rules: `non_blank_pdf`
 - Soft rules: None
@@ -67,7 +67,7 @@
 - Category: `wide_nmr`
 - Default size: `60x110`
 - Allowed sizes: `60x110`
-- Editable options: `size`, `reverse_x`, `baseline`, `style_preset`, `palette_preset`, `use_sidecar`
+- Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`, `use_sidecar`
 - Description: Wide NMR double-height panel with left/right/bottom alignment and a reserved structure area on top.
 - Hard rules: `wide_nmr_horizontal_alignment`, `wide_nmr_structure_reserve`, `wide_nmr_segment_alignment`, `non_blank_pdf`
 - Soft rules: None
@@ -77,7 +77,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical bar chart.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -87,7 +87,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical box plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -97,7 +97,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Box plot with deterministic strip-point overlay emphasis.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -107,7 +107,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical violin plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -117,7 +117,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Violin distribution with a compact box-summary overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -127,7 +127,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Grouped bar comparison with deterministic spacing and raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -137,7 +137,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Grouped bar means with deterministic error bars and raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -147,7 +147,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Group means as points with deterministic error bars and optional raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -157,7 +157,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Group means as lollipop stems with deterministic error bars and optional raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -167,7 +167,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single structural family for group-wise distribution comparison with deterministic internal variant selection.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -177,7 +177,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `style_preset`, `palette_preset`
+- Editable options: `size`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Density-normalized histogram overlays with deterministic smoothed density lines.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
@@ -187,7 +187,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -197,7 +197,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with deterministic bubble-size encoding from signal magnitude.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -207,7 +207,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with a deterministic linear fit overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -217,7 +217,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with a deterministic linear fit overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -227,7 +227,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel curve plot with a replicate mean band overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -237,7 +237,7 @@
 - Category: `single_panel`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `style_preset`, `palette_preset`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel curve plot with a replicate mean band overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None

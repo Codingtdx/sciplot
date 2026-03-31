@@ -71,8 +71,8 @@ final class SidecarRuntimeTests: XCTestCase {
     }
 
     @MainActor
-    func testEnsureRunningReusesCompatibleSidecar() async throws {
-        let repoRoot = try makeRepositoryFixture()
+    func testEnsureRunningStartsManagedSidecarEvenWhenPayloadLooksCompatible() async throws {
+        let repoRoot = try makeRepositoryFixture(includePythonStub: true)
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -85,15 +85,17 @@ final class SidecarRuntimeTests: XCTestCase {
         }
         FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
 
+        let metaData = try encodeJSON(TestPayloads.meta())
+        let contractData = try encodeJSON(TestPayloads.contract())
         let session = makeStubbedSession { request in
-            switch request.url?.lastPathComponent {
-            case "health":
+            switch request.url?.path {
+            case "/health":
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
                     body: #"{"status":"ok","version":"5.0.0"}"#
                 )
-            case "openapi.json":
+            case "/openapi.json":
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
@@ -109,6 +111,10 @@ final class SidecarRuntimeTests: XCTestCase {
                     }
                     """
                 )
+            case "/meta":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
+            case "/plot-contract":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: contractData, as: UTF8.self))
             default:
                 throw URLError(.badURL)
             }
@@ -125,7 +131,8 @@ final class SidecarRuntimeTests: XCTestCase {
 
         XCTAssertEqual(runtime.status, .running)
         XCTAssertEqual(runtime.repoRootURL.map(canonicalPath), canonicalPath(repoRoot))
-        XCTAssertTrue(runtime.logs.contains(where: { $0.contains("Reusing a compatible sidecar") }))
+        XCTAssertTrue(runtime.logs.contains(where: { $0.contains("Started sidecar process") }))
+        XCTAssertFalse(runtime.logs.contains(where: { $0.contains("Reusing a compatible sidecar") }))
     }
 
     @MainActor
@@ -226,6 +233,12 @@ final class SidecarRuntimeTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func encodeJSON<T: Encodable>(_ value: T) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return try encoder.encode(value)
     }
 
     private static func jsonResponse(

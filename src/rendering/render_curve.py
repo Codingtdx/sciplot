@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +17,10 @@ from src.rendering.common import (
     load_rheology_bundle_series,
     load_segmented_config,
     looks_like_tensile_curve,
+    manual_axis_overrides,
+    merge_axis_override_bounds,
     rheology_output_filenames,
+    validate_manual_axis_overrides,
     validate_series_scales,
 )
 from src.rendering.dataset_models import build_normalized_dataset
@@ -34,6 +39,7 @@ from src.rendering.render_curve_support import (
     _prefer_direct_labels,
 )
 from src.rendering.render_support import _rendered_plot_with_qa
+from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
 
 
 def _render_curve_candidate(
@@ -81,6 +87,7 @@ def _render_curve_candidate(
             * (combined_fix.collection_size_scale if combined_fix.collection_size_scale != 1.0 else 1.0),
             visible_xticks=base_kwargs.get("visible_xticks"),
             xlim=base_kwargs.get("xlim"),
+            ylim=base_kwargs.get("ylim"),
             y_padding_top=(
                 _float_plot_kw(base_kwargs, "y_padding_top", 0.12) + 0.04
                 if compact_legend
@@ -128,6 +135,7 @@ def _render_curve_candidate(
             series_label_side=direct_label_side or str(base_kwargs.get("series_label_side", "auto")),
             visible_xticks=base_kwargs.get("visible_xticks"),
             xlim=base_kwargs.get("xlim"),
+            ylim=base_kwargs.get("ylim"),
             y_padding_top=(
                 _float_plot_kw(base_kwargs, "y_padding_top", 0.18) + 0.04
                 if compact_legend
@@ -156,6 +164,34 @@ def _render_curve_candidate(
     )
     return rendered, strategy
 
+
+def _with_manual_axis_overrides(
+    base_kwargs: dict[str, object],
+    options: RenderOptions,
+) -> dict[str, object]:
+    resolved = dict(base_kwargs)
+    x_override, y_override = manual_axis_overrides(options)
+    if x_override is not None:
+        resolved["xlim"] = merge_axis_override_bounds(
+            cast(tuple[float | None, float | None] | None, resolved.get("xlim")),
+            x_override,
+        )
+        if "visible_xticks" in resolved:
+            resolved["visible_xticks"] = None
+    if y_override is not None:
+        resolved["ylim"] = merge_axis_override_bounds(
+            cast(tuple[float | None, float | None] | None, resolved.get("ylim")),
+            y_override,
+        )
+    return resolved
+
+
+def _ensure_known_series_order(series_list, series_order) -> None:
+    unknown = unknown_series_order_labels([series.sample for series in series_list], series_order)
+    if unknown:
+        raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown))
+
+
 def _render_curve_like_plot(
     *,
     filename: str,
@@ -166,7 +202,7 @@ def _render_curve_like_plot(
     scatter: bool = False,
     base_kwargs: dict[str, object] | None = None,
 ) -> RenderedPlot:
-    resolved_kwargs = dict(base_kwargs or {})
+    resolved_kwargs = _with_manual_axis_overrides(dict(base_kwargs or {}), options)
     candidates = [
         _render_curve_candidate(
             filename=filename,
@@ -225,6 +261,13 @@ def _render_rheology_bundle(
     options: RenderOptions,
 ) -> list[RenderedPlot]:
     metric_series = load_rheology_bundle_series(bundle, input_path, sheet)
+    validate_manual_axis_overrides(options, template=template)
+    metric_series = {
+        metric_name: reorder_curve_series(series_list, options.series_order)
+        for metric_name, series_list in metric_series.items()
+    }
+    for series_list in metric_series.values():
+        _ensure_known_series_order(series_list, options.series_order)
     output_filenames = rheology_output_filenames(bundle, template)
     show_markers = template == "point_line"
 
@@ -275,9 +318,12 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
     normalized_dataset = build_normalized_dataset(input_path, sheet)
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         return _render_rheology_bundle(normalized_dataset.model, "curve", input_path, sheet, options)
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template="curve", is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     return [
         _render_curve_like_plot(
             filename=f"{input_path.stem}_curve.pdf",
@@ -294,9 +340,12 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         return _render_rheology_bundle(normalized_dataset.model, "point_line", input_path, sheet, options)
 
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template="point_line", is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     return [
         _render_curve_like_plot(
             filename=f"{input_path.stem}_point_line.pdf",
@@ -309,8 +358,10 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
     ]
 
 def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    validate_manual_axis_overrides(options, template="stacked_curve")
     fig, _ = plot_curves(
         series_list,
         show_markers=False,
@@ -341,8 +392,12 @@ def _render_segmented_stacked_curve(
     sheet: str | int,
     options: RenderOptions,
 ) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
+    validate_manual_axis_overrides(options, template="segmented_stacked_curve")
     config = load_segmented_config(input_path, series_list, use_sidecar=options.use_sidecar)
+    if options.series_order:
+        config = replace(config, series_order=tuple(series.sample for series in series_list))
     fig, _ = plot_wide_nmr(
         series_list,
         config,
@@ -361,9 +416,12 @@ def _render_segmented_stacked_curve(
     ]
 
 def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template="scatter", is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     return [
         _render_curve_like_plot(
             filename=f"{input_path.stem}_scatter.pdf",
@@ -397,9 +455,12 @@ def _bubble_size_profile(values: np.ndarray) -> np.ndarray:
     return sizes
 
 def _render_bubble_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template="bubble_scatter", is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     rendered = _render_curve_like_plot(
         filename=f"{input_path.stem}_bubble_scatter.pdf",
         template="bubble_scatter",
@@ -462,9 +523,12 @@ def _render_scatter_fit_like(
     template: str,
     filename_suffix: str,
 ) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template=template, is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     rendered = _render_curve_like_plot(
         filename=f"{input_path.stem}_{filename_suffix}.pdf",
         template=template,
@@ -531,9 +595,12 @@ def _render_replicate_band_like(
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         raise ValueError(f"{template} is not supported for rheology export bundles.")
 
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    axis_mode = "auto_positive" if looks_like_tensile_curve(series_list) else "auto"
+    is_tensile_curve = looks_like_tensile_curve(series_list)
+    validate_manual_axis_overrides(options, template=template, is_tensile_curve=is_tensile_curve)
+    axis_mode = "auto_positive" if is_tensile_curve else "auto"
     rendered = _render_curve_like_plot(
         filename=f"{input_path.stem}_{filename_suffix}.pdf",
         template=template,

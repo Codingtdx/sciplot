@@ -22,6 +22,7 @@ final class SidecarRuntime {
     var repoRootURL: URL?
 
     @ObservationIgnored private var childProcess: Process?
+    @ObservationIgnored private var lastCompatibilityFailure: String?
     @ObservationIgnored private let requiredRoutes: Set<SidecarRouteSignature> = [
         .init(method: "GET", path: "/meta"),
         .init(method: "GET", path: "/plot-contract"),
@@ -53,12 +54,6 @@ final class SidecarRuntime {
         let repoRoot = try locator.locateRepositoryRoot()
         repoRootURL = repoRoot
 
-        if try await probeCompatibility() {
-            appendLog("[runtime] Reusing a compatible sidecar at \(baseURL.absoluteString).")
-            status = .running
-            return
-        }
-
         try await terminateIncompatibleListeners()
         try startSidecarProcess(repoRoot: repoRoot)
         try await waitForCompatibility(timeoutNanoseconds: startupTimeoutNanoseconds)
@@ -70,13 +65,74 @@ final class SidecarRuntime {
             _ = try await fetchHealth()
             let (_, response) = try await session.data(from: baseURL.appendingPathComponent("openapi.json"))
             guard let http = response as? HTTPURLResponse, 200 ..< 300 ~= http.statusCode else {
+                reportCompatibilityFailure("openapi.json returned a non-2xx status.")
                 return false
             }
 
             let routes = try await fetchOpenAPIRoutes()
             let missing = requiredRoutes.subtracting(routes)
-            return missing.isEmpty
+            guard missing.isEmpty else {
+                let missingText = missing
+                    .map { "\($0.method) \($0.path)" }
+                    .sorted()
+                    .joined(separator: ", ")
+                reportCompatibilityFailure("Missing required routes: \(missingText).")
+                return false
+            }
+
+            let payloadCompatible = try await probePayloadCompatibility()
+            if payloadCompatible {
+                lastCompatibilityFailure = nil
+            }
+            return payloadCompatible
         } catch {
+            reportCompatibilityFailure(error.localizedDescription)
+            return false
+        }
+    }
+
+    private func probePayloadCompatibility() async throws -> Bool {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        do {
+            let (metaData, metaResponse) = try await session.data(from: baseURL.appendingPathComponent("meta"))
+            guard let metaHTTP = metaResponse as? HTTPURLResponse, 200 ..< 300 ~= metaHTTP.statusCode else {
+                reportCompatibilityFailure("/meta returned a non-2xx status.")
+                return false
+            }
+            let meta: SidecarMetaResponse
+            do {
+                meta = try decoder.decode(SidecarMetaResponse.self, from: metaData)
+            } catch {
+                reportCompatibilityFailure("/meta decode failed: \(error.localizedDescription)")
+                return false
+            }
+            guard !meta.templates.isEmpty else {
+                reportCompatibilityFailure("/meta contains no templates.")
+                return false
+            }
+
+            let (contractData, contractResponse) = try await session.data(from: baseURL.appendingPathComponent("plot-contract"))
+            guard let contractHTTP = contractResponse as? HTTPURLResponse, 200 ..< 300 ~= contractHTTP.statusCode else {
+                reportCompatibilityFailure("/plot-contract returned a non-2xx status.")
+                return false
+            }
+            let contract: PlotContractResponse
+            do {
+                contract = try decoder.decode(PlotContractResponse.self, from: contractData)
+            } catch {
+                reportCompatibilityFailure("/plot-contract decode failed: \(error.localizedDescription)")
+                return false
+            }
+            guard !contract.templates.isEmpty else {
+                reportCompatibilityFailure("/plot-contract contains no templates.")
+                return false
+            }
+
+            return true
+        } catch {
+            reportCompatibilityFailure(error.localizedDescription)
             return false
         }
     }
@@ -130,7 +186,8 @@ final class SidecarRuntime {
             try await Task.sleep(nanoseconds: probeIntervalNanoseconds)
         }
 
-        throw SidecarError.startupFailed("Timed out while waiting for the sidecar to expose the required routes.")
+        let detail = lastCompatibilityFailure ?? "No additional probe detail captured."
+        throw SidecarError.startupFailed("Timed out waiting for compatible sidecar payloads. Last probe failure: \(detail)")
     }
 
     private func startSidecarProcess(repoRoot: URL) throws {
@@ -269,5 +326,13 @@ final class SidecarRuntime {
         if logs.count > 200 {
             logs.removeFirst(logs.count - 200)
         }
+    }
+
+    private func reportCompatibilityFailure(_ reason: String) {
+        guard lastCompatibilityFailure != reason else {
+            return
+        }
+        lastCompatibilityFailure = reason
+        appendLog("[runtime] Compatibility probe failed: \(reason)")
     }
 }

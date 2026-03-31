@@ -3,217 +3,405 @@ import SwiftUI
 struct PlotInspectorView: View {
     @Bindable var session: PlotSession
     @State private var diagnosticsExpanded = false
+    @State private var sourceRuntimeExpanded = false
 
     var body: some View {
         Form {
-            sourceSection
-            optionsSection
-            readinessAndExportSection
-            diagnosticsSection
+            plotOptionsSection
+            axesSection
+
+            if session.shouldShowSeriesLegendControls {
+                seriesSection
+            }
+
+            exportSection
+            diagnosticsDisclosure
+            sourceRuntimeDisclosure
         }
         .formStyle(.grouped)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    @ViewBuilder
-    private var sourceSection: some View {
-        Section("Source") {
-            if let selectedSourcePath = session.selectedSourcePath {
-                LabeledContent("Path", value: selectedSourcePath)
-                    .textSelection(.enabled)
-                LabeledContent("Sheet", value: session.selectedSheet.displayName)
-
-                if session.isInspecting {
-                    Label("Inspecting source…", systemImage: "arrow.triangle.2.circlepath")
-                        .foregroundStyle(.secondary)
-                        .font(.footnote)
-                }
-                if let modelLabel = session.inspectionResponse?.inspection.modelLabel {
-                    LabeledContent("Model", value: modelLabel)
-                }
-            } else {
-                Text("Import a Plot source to begin.")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var optionsSection: some View {
-        Section("Options") {
+    private var plotOptionsSection: some View {
+        Section("Plot Options") {
             if let template = session.selectedTemplateSummary {
-                if session.editableOptionIDs.contains("size") {
-                    Picker("Canvas size", selection: $session.renderOptions.size.replacingNil(with: template.defaultSize)) {
-                        ForEach(session.allowedSizes) { size in
-                            Text(size.label).tag(Optional(size.id))
+                if session.editableOptionIDs.contains("size") && session.allowedSizes.count > 1 {
+                    LabeledContent("Canvas") {
+                        Picker("", selection: sizeBinding(defaultSize: template.defaultSize)) {
+                            ForEach(session.allowedSizes) { size in
+                                Text(size.label).tag(size.id)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                } else {
+                    LabeledContent("Canvas", value: sizeLabel(for: template.defaultSize))
+                }
+
+                if !session.availableStyles.isEmpty {
+                    if session.availableStyles.count > 1 {
+                        LabeledContent("Style") {
+                            Picker("", selection: stringBinding(
+                                get: { session.renderOptions.stylePreset },
+                                set: { newValue in
+                                    session.updateRenderOptions(policy: .immediate) { $0.stylePreset = newValue }
+                                }
+                            )) {
+                                ForEach(session.availableStyles) { style in
+                                    Text(style.label).tag(style.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                    } else if let style = session.availableStyles.first {
+                        LabeledContent("Style", value: style.label)
                     }
                 }
 
-                if session.editableOptionIDs.contains("xscale") {
-                    Picker("X scale", selection: $session.renderOptions.xscale.replacingNil(with: "linear")) {
-                        Text("Linear").tag(Optional("linear"))
-                        Text("Log").tag(Optional("log"))
-                    }
-                }
-
-                if session.editableOptionIDs.contains("yscale") {
-                    Picker("Y scale", selection: $session.renderOptions.yscale.replacingNil(with: "linear")) {
-                        Text("Linear").tag(Optional("linear"))
-                        Text("Log").tag(Optional("log"))
-                    }
-                }
-
-                if session.editableOptionIDs.contains("reverse_x") {
-                    Toggle("Reverse X", isOn: $session.renderOptions.reverseX)
-                }
-
-                if session.editableOptionIDs.contains("baseline") {
-                    TextField(
-                        "Baseline",
-                        text: Binding(
-                            get: { session.renderOptions.baseline ?? "" },
-                            set: { session.renderOptions.baseline = $0.isEmpty ? nil : $0 }
-                        )
-                    )
-                }
-
-                if session.editableOptionIDs.contains("show_colorbar") {
-                    Toggle(
-                        "Show colorbar",
-                        isOn: Binding(
-                            get: { session.renderOptions.showColorbar ?? false },
-                            set: { session.renderOptions.showColorbar = $0 }
-                        )
-                    )
-                }
-
-                Picker("Style", selection: $session.renderOptions.stylePreset) {
-                    ForEach(session.availableStyles) { style in
-                        Text(style.label).tag(style.id)
-                    }
-                }
-
-                Picker("Palette", selection: $session.renderOptions.palettePreset) {
-                    ForEach(session.availablePalettes) { palette in
-                        Text(palette.label).tag(palette.id)
+                if !session.availablePalettes.isEmpty {
+                    if session.availablePalettes.count > 1 {
+                        LabeledContent("Palette") {
+                            Picker("", selection: stringBinding(
+                                get: { session.renderOptions.palettePreset },
+                                set: { newValue in
+                                    session.updateRenderOptions(policy: .immediate) { $0.palettePreset = newValue }
+                                }
+                            )) {
+                                ForEach(session.availablePalettes) { palette in
+                                    Text(palette.label).tag(palette.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                    } else if let palette = session.availablePalettes.first {
+                        LabeledContent("Palette", value: palette.label)
                     }
                 }
 
                 if let themes = session.metadata?.visualThemes, !themes.isEmpty {
-                    Picker(
-                        "Visual theme",
-                        selection: Binding(
-                            get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
-                            set: { session.renderOptions.visualThemeID = $0.isEmpty ? nil : $0 }
-                        )
-                    ) {
-                        ForEach(themes) { theme in
-                            Text(theme.label).tag(theme.id)
+                    if themes.count > 1 {
+                        LabeledContent("Theme") {
+                            Picker("", selection: stringBinding(
+                                get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
+                                set: { newValue in
+                                    session.updateRenderOptions(policy: .immediate) { $0.visualThemeID = newValue.isEmpty ? nil : newValue }
+                                }
+                            )) {
+                                ForEach(themes) { theme in
+                                    Text(theme.label).tag(theme.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
                         }
+                    } else if let theme = themes.first {
+                        LabeledContent("Theme", value: theme.label)
+                    }
+                }
+
+                if session.editableOptionIDs.contains("show_colorbar") {
+                    LabeledContent("Colorbar") {
+                        Toggle("", isOn: boolBinding(
+                            get: { session.renderOptions.showColorbar ?? false },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .immediate) { $0.showColorbar = newValue }
+                            }
+                        ))
+                        .labelsHidden()
                     }
                 }
             } else {
-                Text("Choose a compatible template to edit render options.")
+                Text("Choose a compatible template to edit plot options.")
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder
-    private var readinessAndExportSection: some View {
-        Section("Readiness & Export") {
-            Button("Run Preflight") {
-                Task { await session.runPreflight() }
+    private var axesSection: some View {
+        Section("Axes") {
+            if session.editableOptionIDs.contains("xscale") || session.selectedTemplateSummary != nil {
+                LabeledContent("X scale") {
+                    Picker("", selection: stringBinding(
+                        get: { session.renderOptions.xscale ?? "linear" },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .immediate) { $0.xscale = newValue }
+                        }
+                    )) {
+                        Text("Linear").tag("linear")
+                        Text("Log").tag("log")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
             }
-            .disabled(!session.hasRenderableSelection || session.isRunningPreflight)
 
-            if session.isRunningPreflight {
-                Label("Running preflight…", systemImage: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(.secondary)
-                    .font(.footnote)
+            if session.editableOptionIDs.contains("yscale") || session.selectedTemplateSummary != nil {
+                LabeledContent("Y scale") {
+                    Picker("", selection: stringBinding(
+                        get: { session.renderOptions.yscale ?? "linear" },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .immediate) { $0.yscale = newValue }
+                        }
+                    )) {
+                        Text("Linear").tag("linear")
+                        Text("Log").tag("log")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
             }
 
-            if let preflight = session.preflightResponse {
-                LabeledContent(
-                    "Readiness",
-                    value: preflight.preflight.errors.isEmpty ? "Ready" : "Blocked"
+            if session.editableOptionIDs.contains("reverse_x") {
+                LabeledContent("Reverse X") {
+                    Toggle("", isOn: boolBinding(
+                        get: { session.renderOptions.reverseX },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .immediate) { $0.reverseX = newValue }
+                        }
+                    ))
+                    .labelsHidden()
+                }
+            }
+
+            if session.editableOptionIDs.contains("x_min") || session.editableOptionIDs.contains("x_max") {
+                axisRangeRow(
+                    title: "X range",
+                    lowerTitle: "Min",
+                    upperTitle: "Max",
+                    lowerBinding: numericTextBinding(
+                        get: { session.renderOptions.xMin },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .debounced) { $0.xMin = newValue }
+                        }
+                    ),
+                    upperBinding: numericTextBinding(
+                        get: { session.renderOptions.xMax },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .debounced) { $0.xMax = newValue }
+                        }
+                    )
                 )
-                if !preflight.preflight.warnings.isEmpty {
-                    ForEach(preflight.preflight.warnings, id: \.self) { warning in
-                        Label(warning, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                            .font(.footnote)
-                    }
-                }
-                if !preflight.preflight.errors.isEmpty {
-                    ForEach(preflight.preflight.errors, id: \.self) { error in
-                        Label(error, systemImage: "xmark.octagon.fill")
-                            .foregroundStyle(.red)
-                            .font(.footnote)
-                    }
-                }
             }
 
-            Button("Export") {
-                Task { await session.exportCurrentSelection() }
+            if session.editableOptionIDs.contains("y_min") || session.editableOptionIDs.contains("y_max") {
+                axisRangeRow(
+                    title: "Y range",
+                    lowerTitle: "Min",
+                    upperTitle: "Max",
+                    lowerBinding: numericTextBinding(
+                        get: { session.renderOptions.yMin },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .debounced) { $0.yMin = newValue }
+                        }
+                    ),
+                    upperBinding: numericTextBinding(
+                        get: { session.renderOptions.yMax },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .debounced) { $0.yMax = newValue }
+                        }
+                    )
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!session.hasRenderableSelection || session.isExporting)
 
-            if session.isExporting {
-                Label("Exporting Plot…", systemImage: "arrow.triangle.2.circlepath")
+            if session.editableOptionIDs.contains("baseline") {
+                LabeledContent("Baseline") {
+                    TextField(
+                        "Baseline",
+                        text: stringBinding(
+                            get: { session.renderOptions.baseline ?? "" },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.baseline = newValue.isEmpty ? nil : newValue }
+                            }
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private var seriesSection: some View {
+        Section("Series / Legend") {
+            if session.seriesOrderLabels.isEmpty {
+                Text("No series labels are available for the current selection.")
                     .foregroundStyle(.secondary)
-                    .font(.footnote)
+            } else {
+                SortableSeriesListView(
+                    title: "Legend order",
+                    detail: "Drag or tap to reorder legend entries. Session-only.",
+                    items: Binding(
+                        get: { session.seriesOrderLabels },
+                        set: { session.setSeriesOrder($0) }
+                    ),
+                    canEdit: session.canEditSeriesOrder
+                )
+
+                Button("Reset Series Order") {
+                    session.resetSeriesOrder()
+                }
+                .disabled(!session.canEditSeriesOrder || session.renderOptions.seriesOrder == nil)
             }
+        }
+    }
+
+    private var exportSection: some View {
+        Section("Export") {
+            LabeledContent("State", value: session.liveStatusLabel)
 
             if let exportResponse = session.exportResponse {
                 LabeledContent("Outputs", value: "\(exportResponse.outputs.count)")
-                if let latestExportDestinationDescription = session.latestExportDestinationDescription {
-                    LabeledContent("Destination", value: latestExportDestinationDescription)
+                if let destination = session.latestExportDestinationDescription {
+                    LabeledContent("Destination", value: destination)
                 }
                 Button("Reveal Latest Export") {
                     session.revealLatestExport()
                 }
                 .disabled(session.userExportURLs.isEmpty)
-            }
-            if let report = session.previewResponse?.submissionReport {
-                LabeledContent("Submission", value: report.readiness)
+            } else {
+                Text("Use the toolbar export action to write the current canvas state.")
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder
-    private var diagnosticsSection: some View {
-        Section("Diagnostics") {
-            let entries = diagnosticEntries
-
-            if entries.isEmpty {
-                Text("No active diagnostics.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                DisclosureGroup("Show Diagnostics", isExpanded: $diagnosticsExpanded) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(entries) { entry in
+    private var diagnosticsDisclosure: some View {
+        Section {
+            DisclosureGroup("Diagnostics", isExpanded: $diagnosticsExpanded) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if diagnosticEntries.isEmpty {
+                        Text("No active diagnostics.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(diagnosticEntries) { entry in
                             Label(entry.message, systemImage: entry.systemImage)
                                 .foregroundStyle(entry.style)
                                 .font(.footnote)
                                 .textSelection(.enabled)
                         }
                     }
-                    .padding(.top, 4)
                 }
+                .padding(.top, 4)
             }
         }
     }
-}
 
-private extension Binding where Value == String? {
-    func replacingNil(with defaultValue: String) -> Binding<String?> {
-        Binding<String?>(
-            get: { wrappedValue ?? defaultValue },
-            set: { wrappedValue = $0 }
+    private var sourceRuntimeDisclosure: some View {
+        Section {
+            DisclosureGroup("Source & Runtime", isExpanded: $sourceRuntimeExpanded) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let filename = session.selectedSourceFilename {
+                        LabeledContent("File", value: filename)
+                    }
+                    if let path = session.selectedSourcePath {
+                        LabeledContent("Path", value: path)
+                    }
+                    LabeledContent("Sheet", value: session.selectedSheet.displayName)
+                    LabeledContent("Status", value: session.liveStatusLabel)
+
+                    HStack(spacing: 10) {
+                        Button("View Raw Data") {
+                            session.showSourceInspector()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(session.inspectionResponse == nil)
+
+                        Button("Open Source") {
+                            session.openCurrentSource()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(session.selectedFileURL == nil)
+
+                        Button("Reveal Source") {
+                            session.revealCurrentSource()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(session.selectedFileURL == nil)
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func sizeBinding(defaultSize: String) -> Binding<String> {
+        stringBinding(
+            get: { session.renderOptions.size ?? defaultSize },
+            set: { newValue in
+                session.updateRenderOptions(policy: .immediate) { $0.size = newValue }
+            }
         )
+    }
+
+    private func stringBinding(
+        get: @escaping @Sendable () -> String,
+        set: @escaping @Sendable (String) -> Void
+    ) -> Binding<String> {
+        Binding(get: get, set: set)
+    }
+
+    private func boolBinding(
+        get: @escaping @Sendable () -> Bool,
+        set: @escaping @Sendable (Bool) -> Void
+    ) -> Binding<Bool> {
+        Binding(get: get, set: set)
+    }
+
+    private func numericTextBinding(
+        get: @escaping () -> Double?,
+        set: @escaping (Double?) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let value = get() else {
+                    return ""
+                }
+                return value.formatted(.number.precision(.fractionLength(0...4)))
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    set(nil)
+                } else if let parsed = Double(trimmed) {
+                    set(parsed)
+                }
+            }
+        )
+    }
+
+    private func axisRangeRow(
+        title: String,
+        lowerTitle: String,
+        upperTitle: String,
+        lowerBinding: Binding<String>,
+        upperBinding: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+
+            HStack(spacing: 10) {
+                labeledField(label: lowerTitle, binding: lowerBinding)
+                labeledField(label: upperTitle, binding: upperBinding)
+            }
+        }
+    }
+
+    private func labeledField(label: String, binding: Binding<String>) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(label, text: binding)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 84)
+        }
+    }
+
+    private func sizeLabel(for sizeID: String) -> String {
+        session.allowedSizes.first(where: { $0.id == sizeID })?.label ?? sizeID
     }
 }
 

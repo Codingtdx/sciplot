@@ -1,11 +1,10 @@
 import Foundation
 import Observation
+import CoreGraphics
 
-enum PlotWorkspaceMode: String, CaseIterable, Identifiable {
-    case review
-    case refine
-
-    var id: String { rawValue }
+enum PlotPreviewRefreshPolicy {
+    case immediate
+    case debounced
 }
 
 struct PlotTemplateGalleryItem: Identifiable, Hashable {
@@ -38,29 +37,29 @@ final class PlotSession {
     typealias PlotExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool) -> URL?
     typealias PlotExportMaterializer = @MainActor (_ sourceURLs: [URL], _ destinationURL: URL) throws -> [URL]
 
+    private let previewDebounceNanoseconds: UInt64 = 250_000_000
+
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private let chooseExportDestination: PlotExportDestinationChooser
     @ObservationIgnored private let materializeExport: PlotExportMaterializer
     @ObservationIgnored private var inspectedInputPath: String?
     @ObservationIgnored private var inspectedSheet: SheetValue?
+    @ObservationIgnored private var inspectionTask: Task<Void, Never>?
+    @ObservationIgnored private var previewTask: Task<Void, Never>?
+    @ObservationIgnored private var inspectionRevision = 0
+    @ObservationIgnored private var previewRevision = 0
     @ObservationIgnored private var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
 
-    var workspaceMode: PlotWorkspaceMode = .review
     var isImporterPresented = false
+    var isGuidePresented = false
+    var isSourceInspectorPresented = false
     var selectedFileURL: URL?
     var selectedSheet: SheetValue = .index(0)
     var inspectionResponse: InspectFileResponse?
     var metadata: SidecarMetaResponse?
     var contract: PlotContractResponse?
     var selectedTemplateID: String?
-    var renderOptions = RenderOptionsPayload() {
-        didSet {
-            guard renderOptions != oldValue else {
-                return
-            }
-            invalidateRenderArtifacts()
-        }
-    }
+    var renderOptions = RenderOptionsPayload()
     var previewResponse: RenderPreviewResponse?
     var preflightResponse: PreflightRenderResponse?
     var exportResponse: ExportRenderResponse?
@@ -101,22 +100,33 @@ final class PlotSession {
         return inspectedInputPath != selectedFileURL.path || inspectedSheet != selectedSheet || inspectionResponse == nil
     }
 
-    var canContinueToRefine: Bool {
-        hasRenderableSelection
-            && !isInspecting
-            && !isPreviewing
-            && (workspaceMode != .refine || previewResponse == nil)
-    }
-
-    var inspectOrReviewActionTitle: String {
-        needsInspection ? "Inspect" : "Review"
-    }
-
-    var canInspectOrReviewAction: Bool {
-        if needsInspection {
-            return selectedFileURL != nil && !isInspecting
+    var liveStatusLabel: String {
+        if selectedFileURL == nil {
+            return "Awaiting import"
         }
-        return workspaceMode != .review
+        if isInspecting {
+            return "Inspecting source"
+        }
+        if isPreviewing {
+            return previewResponse == nil ? "Rendering preview" : "Refreshing preview"
+        }
+        if previewResponse != nil {
+            return "Preview ready"
+        }
+        return "Ready"
+    }
+
+    var liveStatusSymbol: String {
+        if errorMessage != nil {
+            return "exclamationmark.triangle.fill"
+        }
+        if isInspecting || isPreviewing {
+            return "arrow.triangle.2.circlepath"
+        }
+        if previewResponse != nil {
+            return "checkmark.circle.fill"
+        }
+        return "circle.dashed"
     }
 
     var selectedSourceFilename: String? {
@@ -137,132 +147,86 @@ final class PlotSession {
         renderOptions.stylePreset = meta.defaults.stylePreset
         renderOptions.palettePreset = meta.defaults.palettePreset
         renderOptions.visualThemeID = meta.visualThemes.first?.id
+        schedulePreviewRefresh(policy: .immediate)
     }
 
+    func showGuide() {
+        isGuidePresented = true
+    }
+
+    func dismissGuide() {
+        isGuidePresented = false
+    }
+
+    func showSourceInspector() {
+        isSourceInspectorPresented = true
+    }
+
+    func dismissSourceInspector() {
+        isSourceInspectorPresented = false
+    }
+
+    func importFile(_ url: URL) {
+        prepareSource(url: url, sheet: .index(0), resetTemplate: true)
+        scheduleInspection()
+    }
+
+    /// Backward-compatible shim for older tests and callers.
     func handleImportedFile(_ url: URL) {
-        selectedFileURL = url
-        selectedSheet = .index(0)
-        inspectionResponse = nil
-        selectedTemplateID = nil
-        inspectedInputPath = nil
-        inspectedSheet = nil
-        invalidateRenderArtifacts()
-        userExportURLs = []
-        errorMessage = nil
-        workspaceMode = .review
+        importFile(url)
     }
 
     func importFileAndInspect(_ url: URL) async {
-        handleImportedFile(url)
-        await inspectCurrentFile()
+        importFile(url)
+        await waitUntilInspectionFinishes(for: url)
     }
 
     func seedFromCleanup(workbookURL: URL, preferredSheet: SheetValue) {
-        handleImportedFile(workbookURL)
-        selectedSheet = preferredSheet
-        Task {
-            await inspectCurrentFile()
-        }
+        prepareSource(url: workbookURL, sheet: preferredSheet, resetTemplate: true)
+        scheduleInspection()
     }
 
-    func selectSheetAndReinspect(_ sheet: SheetValue) async {
+    func setSelectedSheet(_ sheet: SheetValue) {
         guard selectedFileURL != nil else {
             selectedSheet = sheet
             return
         }
-
         guard selectedSheet != sheet || needsInspection else {
             return
         }
-
         selectedSheet = sheet
-        inspectionResponse = nil
-        selectedTemplateID = nil
-        inspectedInputPath = nil
-        inspectedSheet = nil
-        invalidateRenderArtifacts()
-        workspaceMode = .review
-        await inspectCurrentFile()
+        previewRevision += 1
+        cancelPreviewTask()
+        isPreviewing = false
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+        scheduleInspection()
     }
 
-    func inspectCurrentFile() async {
-        guard let client, let selectedFileURL else {
+    func selectSheetAndReinspect(_ sheet: SheetValue) async {
+        setSelectedSheet(sheet)
+        guard let selectedFileURL else {
             return
         }
-
-        isInspecting = true
-        errorMessage = nil
-
-        defer { isInspecting = false }
-
-        do {
-            let response = try await client.inspectFile(
-                .init(inputPath: selectedFileURL.path, sheet: selectedSheet)
-            )
-            inspectionResponse = response
-            selectedSheet = response.sheet
-            inspectedInputPath = selectedFileURL.path
-            inspectedSheet = response.sheet
-            chooseInitialTemplate(from: response)
-            workspaceMode = .review
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func runInspectOrReviewAction() async {
-        if needsInspection {
-            await inspectCurrentFile()
-        } else {
-            returnToReview()
-        }
+        await waitUntilInspectionFinishes(for: selectedFileURL)
     }
 
     func chooseTemplate(_ templateID: String) {
         guard selectedTemplateID != templateID else {
             return
         }
-        selectedTemplateID = templateID
-        resetRenderOptions(for: templateID)
-        workspaceMode = .review
-        userExportURLs = []
+        setTemplate(templateID, shouldResetRenderOptions: true)
+        schedulePreviewRefresh(policy: .immediate)
+    }
+
+    func updateRenderOptions(
+        policy: PlotPreviewRefreshPolicy = .debounced,
+        mutate: (inout RenderOptionsPayload) -> Void
+    ) {
+        mutate(&renderOptions)
+        invalidateSubmissionArtifacts()
         errorMessage = nil
-        invalidateRenderArtifacts()
-    }
-
-    func renderPreviewIfNeeded() async {
-        guard previewResponse == nil else {
-            return
-        }
-        await renderPreview()
-    }
-
-    func continueToRefine() async {
-        guard canContinueToRefine else {
-            return
-        }
-        workspaceMode = .refine
-        await renderPreviewIfNeeded()
-    }
-
-    func returnToReview() {
-        workspaceMode = .review
-    }
-
-    func renderPreview() async {
-        guard let request = currentRenderRequest() else {
-            return
-        }
-
-        isPreviewing = true
-        errorMessage = nil
-        defer { isPreviewing = false }
-
-        do {
-            previewResponse = try await client?.renderPreview(request)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        schedulePreviewRefresh(policy: policy)
     }
 
     func runPreflight() async {
@@ -327,6 +291,20 @@ final class PlotSession {
         }
     }
 
+    func openCurrentSource() {
+        guard let selectedFileURL else {
+            return
+        }
+        WorkspaceBridge.open(selectedFileURL)
+    }
+
+    func revealCurrentSource() {
+        guard let selectedFileURL else {
+            return
+        }
+        WorkspaceBridge.reveal([selectedFileURL])
+    }
+
     var latestExportDestinationDescription: String? {
         guard !userExportURLs.isEmpty else {
             return nil
@@ -358,18 +336,18 @@ final class PlotSession {
         }
 
         guard inspectionResponse != nil else {
-            return templates.map { template in
+            return templates.prefix(5).map { template in
                 PlotTemplateGalleryItem(
                     id: template.id,
                     title: template.label,
-                    hint: shortGalleryHint(for: template),
+                    hint: "Inspect first",
                     selectable: false
                 )
             }
         }
 
         let summariesByID = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
-        return compatibleRecommendations.map { recommendation in
+        return compatibleRecommendations.prefix(5).map { recommendation in
             let summary = summariesByID[recommendation.templateID]
             return PlotTemplateGalleryItem(
                 id: recommendation.templateID,
@@ -395,10 +373,6 @@ final class PlotSession {
 
     var compatibleTemplateIDs: Set<String> {
         Set(compatibleRecommendations.map(\.templateID))
-    }
-
-    var unavailableTemplateCount: Int {
-        max(0, availableTemplateSummaries.count - compatibleTemplateIDs.count)
     }
 
     var selectedTemplateRecommendation: TemplateRecommendationResponse? {
@@ -463,6 +437,54 @@ final class PlotSession {
         } ?? []
     }
 
+    var candidateSeriesLabels: [String] {
+        inspectionResponse?.dataset?.candidateRoles.series ?? []
+    }
+
+    var shouldShowSeriesLegendControls: Bool {
+        editableOptionIDs.contains("series_order") && candidateSeriesLabels.count > 1
+    }
+
+    var seriesOrderLabels: [String] {
+        guard shouldShowSeriesLegendControls else {
+            return []
+        }
+
+        if let explicit = renderOptions.seriesOrder, !explicit.isEmpty {
+            return explicit
+        }
+
+        return candidateSeriesLabels
+    }
+
+    var canEditSeriesOrder: Bool {
+        shouldShowSeriesLegendControls
+    }
+
+    func setSeriesOrder(_ labels: [String]) {
+        guard shouldShowSeriesLegendControls else {
+            return
+        }
+        let cleaned = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        renderOptions.seriesOrder = cleaned.isEmpty ? nil : cleaned
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+        schedulePreviewRefresh(policy: .immediate)
+    }
+
+    func moveSeriesOrder(from source: IndexSet, to destination: Int) {
+        var labels = seriesOrderLabels
+        labels.move(fromOffsets: source, toOffset: destination)
+        setSeriesOrder(labels)
+    }
+
+    func resetSeriesOrder() {
+        renderOptions.seriesOrder = nil
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+        schedulePreviewRefresh(policy: .immediate)
+    }
+
     var candidateRoleRows: [(String, String)] {
         guard let roles = inspectionResponse?.dataset?.candidateRoles else {
             return []
@@ -499,6 +521,18 @@ final class PlotSession {
             .sorted { $0.key < $1.key }
     }
 
+    func templateThumbnailAspectRatio(for templateID: String) -> CGFloat {
+        guard let summary = templateSummary(for: templateID),
+              let size = metadata?.sizes.first(where: { $0.id == summary.defaultSize })
+        else {
+            return 60.0 / 55.0
+        }
+        guard size.heightMm > 0 else {
+            return 60.0 / 55.0
+        }
+        return CGFloat(size.widthMm / size.heightMm)
+    }
+
     func thumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
         if let cached = thumbnailKindCache[templateID] {
             return cached
@@ -507,6 +541,163 @@ final class PlotSession {
         let resolved = resolveThumbnailKind(for: templateID)
         thumbnailKindCache[templateID] = resolved
         return resolved
+    }
+
+    private func prepareSource(url: URL, sheet: SheetValue, resetTemplate: Bool) {
+        cancelInspectionTask()
+        previewRevision += 1
+        cancelPreviewTask()
+        isPreviewing = false
+        selectedFileURL = url
+        selectedSheet = sheet
+        inspectionResponse = nil
+        inspectedInputPath = nil
+        inspectedSheet = nil
+        if resetTemplate {
+            selectedTemplateID = nil
+        }
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+    }
+
+    private func scheduleInspection() {
+        guard let request = currentInspectionRequest() else {
+            return
+        }
+
+        inspectionRevision += 1
+        let revision = inspectionRevision
+        cancelInspectionTask()
+        isInspecting = true
+        errorMessage = nil
+
+        inspectionTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performInspection(request: request, revision: revision)
+        }
+    }
+
+    private func performInspection(request: FileRequest, revision: Int) async {
+        guard let client else {
+            if revision == inspectionRevision {
+                isInspecting = false
+                inspectionTask = nil
+            }
+            return
+        }
+
+        do {
+            let response = try await client.inspectFile(request)
+            guard revision == inspectionRevision else {
+                return
+            }
+            applyInspectionResponse(response)
+            isInspecting = false
+            inspectionTask = nil
+        } catch {
+            guard revision == inspectionRevision else {
+                return
+            }
+            errorMessage = error.localizedDescription
+            isInspecting = false
+            inspectionTask = nil
+        }
+    }
+
+    private func applyInspectionResponse(_ response: InspectFileResponse) {
+        inspectionResponse = response
+        selectedSheet = response.sheet
+        inspectedInputPath = response.inputPath
+        inspectedSheet = response.sheet
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+
+        if shouldAutoSelectTemplate(after: response) {
+            let preferredTemplateID = response.inspection.primaryRecommendation.first?.templateID
+                ?? response.inspection.recommendation.template
+            setTemplate(preferredTemplateID, shouldResetRenderOptions: true)
+        }
+
+        schedulePreviewRefresh(policy: .immediate)
+    }
+
+    private func shouldAutoSelectTemplate(after _: InspectFileResponse) -> Bool {
+        guard let selectedTemplateID else {
+            return true
+        }
+        return !compatibleTemplateIDs.contains(selectedTemplateID)
+    }
+
+    private func setTemplate(_ templateID: String, shouldResetRenderOptions: Bool) {
+        selectedTemplateID = templateID
+        if shouldResetRenderOptions {
+            resetRenderOptions(for: templateID)
+        }
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+    }
+
+    private func schedulePreviewRefresh(policy: PlotPreviewRefreshPolicy) {
+        guard let request = currentRenderRequest() else {
+            return
+        }
+
+        previewRevision += 1
+        let revision = previewRevision
+        cancelPreviewTask()
+        isPreviewing = true
+        errorMessage = nil
+
+        let delay = policy == .debounced ? previewDebounceNanoseconds : 0
+        previewTask = Task { [weak self] in
+            guard let self else { return }
+            if delay > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: delay)
+                } catch {
+                    return
+                }
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            await self.performPreview(request: request, revision: revision)
+        }
+    }
+
+    private func performPreview(request: RenderRequest, revision: Int) async {
+        guard let client else {
+            if revision == previewRevision {
+                isPreviewing = false
+                previewTask = nil
+            }
+            return
+        }
+
+        do {
+            let response = try await client.renderPreview(request)
+            guard revision == previewRevision else {
+                return
+            }
+            previewResponse = response
+            isPreviewing = false
+            errorMessage = nil
+            previewTask = nil
+        } catch {
+            guard revision == previewRevision else {
+                return
+            }
+            errorMessage = error.localizedDescription
+            isPreviewing = false
+            previewTask = nil
+        }
+    }
+
+    private func currentInspectionRequest() -> FileRequest? {
+        guard let selectedFileURL else {
+            return nil
+        }
+        return .init(inputPath: selectedFileURL.path, sheet: selectedSheet)
     }
 
     private func currentRenderRequest() -> RenderRequest? {
@@ -526,15 +717,6 @@ final class PlotSession {
         )
     }
 
-    private func chooseInitialTemplate(from response: InspectFileResponse) {
-        let preferredTemplateID = response.inspection.primaryRecommendation.first?.templateID
-            ?? response.inspection.recommendation.template
-        selectedTemplateID = preferredTemplateID
-        resetRenderOptions(for: preferredTemplateID)
-        invalidateRenderArtifacts()
-        errorMessage = nil
-    }
-
     private func resetRenderOptions(for templateID: String) {
         let template = metadata?.templates.first { $0.id == templateID }
         let recommendation = inspectionResponse?.inspection.recommendation
@@ -544,6 +726,7 @@ final class PlotSession {
             xscale: recommendation?.xscale,
             yscale: recommendation?.yscale,
             reverseX: recommendation?.reverseX ?? false,
+            seriesOrder: nil,
             baseline: recommendation?.baseline,
             showColorbar: recommendation?.showColorbar,
             stylePreset: defaultStyle(for: template),
@@ -599,36 +782,24 @@ final class PlotSession {
         return model == "frequency_sweep" || model == "temperature_sweep" || model == "stress_relaxation"
     }
 
-    private func shortGalleryHint(for template: MetaTemplateSummary) -> String {
-        switch template.category.lowercased() {
-        case "curve":
-            return "Curve"
-        case "stats":
-            return "Statistics"
-        case "heatmap":
-            return "Heatmap"
-        default:
-            return "Template"
-        }
-    }
-
     private func shortCompatibilityHint(from recommendation: TemplateRecommendationResponse) -> String {
         let text = recommendation.suitabilityHint.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty {
-            return truncateHint(text)
+            let lower = text.lowercased()
+            if lower.contains("recommend") {
+                return "Recommended"
+            }
+            if lower.contains("fallback") {
+                return "Fallback"
+            }
+            if lower.contains("compat") {
+                return "Compatible"
+            }
         }
         if let rank = recommendation.rank {
-            return rank == 1 ? "Top match" : "Rank #\(rank)"
+            return rank == 1 ? "Recommended" : "Compatible"
         }
         return "Compatible"
-    }
-
-    private func truncateHint(_ text: String, limit: Int = 28) -> String {
-        guard text.count > limit else {
-            return text
-        }
-        let index = text.index(text.startIndex, offsetBy: limit)
-        return "\(text[..<index])…"
     }
 
     private func resolveThumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
@@ -659,10 +830,36 @@ final class PlotSession {
         return .fallback
     }
 
-    private func invalidateRenderArtifacts() {
-        previewResponse = nil
+    private func invalidateSubmissionArtifacts() {
         preflightResponse = nil
         exportResponse = nil
         userExportURLs = []
+    }
+
+    private func cancelInspectionTask() {
+        inspectionTask?.cancel()
+        inspectionTask = nil
+    }
+
+    private func cancelPreviewTask() {
+        previewTask?.cancel()
+        previewTask = nil
+    }
+
+    private func waitUntilInspectionFinishes(for expectedFileURL: URL?) async {
+        let deadline = Date().addingTimeInterval(5.0)
+        while Date() < deadline {
+            if !isInspecting {
+                if let expectedFileURL {
+                    if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
+                        return
+                    }
+                } else if inspectionResponse != nil || errorMessage != nil {
+                    return
+                }
+            }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
     }
 }

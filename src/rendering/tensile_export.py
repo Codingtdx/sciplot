@@ -19,10 +19,10 @@ from src.rendering.tensile_loading import (
 )
 from src.rendering.tensile_models import (
     COMPARISON_CURVE_FILENAME,
-    LoadedTensileWorkbook,
     METRIC_NAMES,
     METRIC_UNITS,
     SUMMARY_COLUMNS,
+    LoadedTensileWorkbook,
     TensileComparisonExport,
 )
 from src.tensile_replicates import REPRESENTATIVE_CURVE_SHEET, SUMMARY_SHEET

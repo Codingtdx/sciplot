@@ -65,9 +65,63 @@ enum TestPayloads {
                     implementationID: "bar"
                 ),
             ],
-            templateIDs: ["curve", "bar"],
-            sizeIDs: ["single_panel", "double_panel"],
-            palettePresetIDs: ["aqua_graphite"],
+            templateIds: ["curve", "bar"],
+            sizeIds: ["single_panel", "double_panel"],
+            palettePresetIds: ["aqua_graphite"],
+            visualThemes: [
+                .init(id: "paper", label: "Paper", description: "Paper preview"),
+            ]
+        )
+    }
+
+    static func multiSeriesMeta() -> SidecarMetaResponse {
+        SidecarMetaResponse(
+            version: 1,
+            defaults: .init(stylePreset: "journal_calm", palettePreset: "aqua_graphite"),
+            sizes: [
+                .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
+                .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
+            ],
+            styles: [
+                .init(
+                    id: "journal_calm",
+                    label: "Journal Calm",
+                    public: true,
+                    description: "Default publication style.",
+                    hardConstraints: true,
+                    presetNote: "Repo default"
+                ),
+            ],
+            palettes: [
+                .init(
+                    id: "aqua_graphite",
+                    label: "Aqua Graphite",
+                    public: true,
+                    description: "Default palette.",
+                    swatches: ["#112233", "#445566"]
+                ),
+            ],
+            templates: [
+                .init(
+                    id: "curve",
+                    label: "Curve",
+                    description: "Continuous curve template.",
+                    category: "curve",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: ["size", "xscale", "yscale", "series_order", "style_preset", "palette_preset"],
+                    defaultOptions: [:],
+                    availableStyles: ["journal_calm"],
+                    availablePalettes: ["aqua_graphite"],
+                    canonicalID: "curve",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "curve"
+                ),
+            ],
+            templateIds: ["curve"],
+            sizeIds: ["single_panel", "double_panel"],
+            palettePresetIds: ["aqua_graphite"],
             visualThemes: [
                 .init(id: "paper", label: "Paper", description: "Paper preview"),
             ]
@@ -216,6 +270,123 @@ enum TestPayloads {
                     [.number(0.0), .number(0.0)],
                     [.number(0.1), .number(6.2)],
                     [.number(0.2), .number(12.0)],
+                ]
+            )
+        )
+    }
+
+    static func multiSeriesInspectFile(path: String = "/tmp/sample.csv") -> InspectFileResponse {
+        InspectFileResponse(
+            inputPath: path,
+            sheet: .name("Representative_Curve"),
+            sheetNames: ["Representative_Curve", "Strength_Box"],
+            inspection: .init(
+                model: "frequency_sweep",
+                modelLabel: "Frequency Sweep",
+                recommendation: .init(
+                    template: "curve",
+                    reason: "Compatible with the multi-series curve data model.",
+                    size: "single_panel",
+                    xscale: "linear",
+                    yscale: "linear",
+                    reverseX: false,
+                    baseline: nil,
+                    showColorbar: nil,
+                    stylePreset: "journal_calm",
+                    palettePreset: "aqua_graphite",
+                    useSidecar: true
+                ),
+                recommendations: [
+                    .init(
+                        templateID: "curve",
+                        canonicalID: "curve",
+                        role: "plot",
+                        lifecyclePolicy: "stable",
+                        implementationID: "curve",
+                        score: 0.98,
+                        rank: 1,
+                        reason: "Best fit for this multi-series curve.",
+                        suitabilityHint: "Recommended",
+                        scoreGapToTop: 0,
+                        whyHardMatch: ["Detected curve series labels."],
+                        whySoftPrior: ["Shared axis frame."],
+                        inferredMapping: ["x": "Frequency", "y": "Modulus"],
+                        optionalEnhancements: [],
+                        previewConfigSummary: [:]
+                    ),
+                ],
+                primaryRecommendation: [
+                    .init(
+                        templateID: "curve",
+                        canonicalID: "curve",
+                        role: "plot",
+                        lifecyclePolicy: "stable",
+                        implementationID: "curve",
+                        score: 0.98,
+                        rank: 1,
+                        reason: "Best fit for this multi-series curve.",
+                        suitabilityHint: "Recommended",
+                        scoreGapToTop: 0,
+                        whyHardMatch: ["Detected curve series labels."],
+                        whySoftPrior: ["Shared axis frame."],
+                        inferredMapping: ["x": "Frequency", "y": "Modulus"],
+                        optionalEnhancements: [],
+                        previewConfigSummary: [:]
+                    ),
+                ],
+                alternativeRecommendations: [],
+                advancedTemplates: [],
+                recommendationConfidence: 0.95,
+                recommendationSummary: "Curve is the recommended plot template.",
+                warnings: [],
+                signals: ["frequency_sweep"]
+            ),
+            dataset: .init(
+                datasetID: "dataset-2",
+                sourcePath: path,
+                sheet: .name("Representative_Curve"),
+                model: "frequency_sweep",
+                rawRows: 4,
+                rawCols: 2,
+                columnProfiles: [
+                    .init(
+                        name: "Frequency",
+                        headerPreview: ["Frequency"],
+                        inferredType: "numeric",
+                        nonEmptyCount: 4,
+                        missingCount: 0,
+                        minValue: 0.1,
+                        maxValue: 100.0
+                    ),
+                    .init(
+                        name: "Modulus",
+                        headerPreview: ["Modulus"],
+                        inferredType: "numeric",
+                        nonEmptyCount: 4,
+                        missingCount: 0,
+                        minValue: 1.0,
+                        maxValue: 30.0
+                    ),
+                ],
+                candidateRoles: .init(
+                    x: ["Frequency"],
+                    y: ["Modulus"],
+                    z: [],
+                    group: [],
+                    sample: [],
+                    value: [],
+                    metric: [],
+                    label: [],
+                    series: ["Series A", "Series B"]
+                ),
+                dataShapes: ["curve_table"],
+                semanticSignals: ["frequency_sweep"],
+                qualityFlags: [],
+                sampleRows: [
+                    [.number(0.1), .number(1.0)],
+                    [.number(1.0), .number(5.5)],
+                    [.number(10.0), .number(17.0)],
+                    [.number(100.0), .number(28.0)],
                 ]
             )
         )

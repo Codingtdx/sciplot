@@ -9,13 +9,33 @@ from src import plot_style
 from src.plotting_families.stats_family import plot_bar, plot_box, plot_point_error, plot_violin
 from src.plotting_primitives import _format_axis_label
 from src.rendering.cache import load_replicate_table_cached
-from src.rendering.common import predict_bar_box_slug, summarize_replicate_distribution
+from src.rendering.common import (
+    manual_axis_overrides,
+    predict_bar_box_slug,
+    summarize_replicate_distribution,
+    validate_manual_axis_overrides,
+)
 from src.rendering.models import RenderedPlot, RenderOptions
 from src.rendering.render_support import _rendered_plot_with_qa, _stats_profile
+from src.rendering.series_order import reorder_replicate_groups, unknown_series_order_labels
+
+
+def _ordered_groups(input_path: Path, sheet: str | int, options: RenderOptions):
+    groups = reorder_replicate_groups(load_replicate_table_cached(input_path, sheet), options.series_order)
+    unknown_groups = unknown_series_order_labels([group.group for group in groups], options.series_order)
+    if unknown_groups:
+        raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))
+    return groups
+
+
+def _manual_y_override(options: RenderOptions) -> tuple[float | None, float | None] | None:
+    _, y_override = manual_axis_overrides(options)
+    return y_override
 
 
 def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="bar")
     stats_profile = _stats_profile(groups)
     fig, _ = plot_bar(
         groups,
@@ -27,6 +47,7 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         show_raw_points=stats_profile.show_raw_points,
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        ylim=_manual_y_override(options),
     )
     return [
         _rendered_plot_with_qa(
@@ -40,7 +61,8 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
     ]
 
 def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="box")
     stats_profile = _stats_profile(groups)
     fig, _ = plot_box(
         groups,
@@ -48,6 +70,7 @@ def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         height_mm=options.height_mm,
         box_width=stats_profile.box_width,
         spacing_scale=stats_profile.spacing_scale,
+        ylim=_manual_y_override(options),
     )
     return [
         _rendered_plot_with_qa(
@@ -60,7 +83,8 @@ def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> l
     ]
 
 def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="violin")
     stats_profile = _stats_profile(groups)
     fig, _ = plot_violin(
         groups,
@@ -68,6 +92,7 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
         height_mm=options.height_mm,
         violin_width=stats_profile.violin_width,
         spacing_scale=stats_profile.spacing_scale,
+        ylim=_manual_y_override(options),
     )
     return [
         _rendered_plot_with_qa(
@@ -100,7 +125,8 @@ def _render_grouped_bar_error(input_path: Path, sheet: str | int, options: Rende
     )
 
 def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="point_error")
     if not groups:
         raise ValueError("No valid groups were found in the replicate table.")
     stats_profile = _stats_profile(groups)
@@ -115,6 +141,7 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
         show_raw_points=stats_profile.show_raw_points,
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        ylim=_manual_y_override(options),
     )
     return [
         _rendered_plot_with_qa(
@@ -132,7 +159,8 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
     ]
 
 def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="lollipop_error")
     if not groups:
         raise ValueError("No valid groups were found in the replicate table.")
     stats_profile = _stats_profile(groups)
@@ -148,6 +176,7 @@ def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOp
         show_raw_points=stats_profile.show_raw_points,
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        ylim=_manual_y_override(options),
     )
     palette = plot_style.get_categorical_palette(n_colors=len(groups))
     means = np.array([float(group.data.mean()) for group in groups], dtype=float)
@@ -192,7 +221,8 @@ def _render_grouped_bar_error_like(
     filename_suffix: str,
     profile_autofix: str,
 ) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template=template)
     if len(groups) < 2:
         raise ValueError(f"{template} requires at least two replicate groups.")
     stats_profile = _stats_profile(groups)
@@ -206,6 +236,7 @@ def _render_grouped_bar_error_like(
         show_raw_points=True,
         raw_point_size=max(stats_profile.raw_point_size, 10.0),
         raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
+        ylim=_manual_y_override(options),
     )
     return [
         _rendered_plot_with_qa(
@@ -269,7 +300,8 @@ def _distribution_compare_variant(groups) -> tuple[str, str]:
     return ("strip_box", "Moderate group/replicate density defaults to strip+box for balanced spread and readability.")
 
 def _render_distribution_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="distribution_compare")
     if len(groups) < 2:
         raise ValueError("distribution_compare requires at least two replicate groups.")
     stats_profile = _stats_profile(groups)
@@ -283,6 +315,7 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             height_mm=options.height_mm,
             violin_width=stats_profile.violin_width,
             spacing_scale=stats_profile.spacing_scale,
+            ylim=_manual_y_override(options),
         )
     else:
         fig, ax = plot_box(
@@ -291,6 +324,7 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             height_mm=options.height_mm,
             box_width=stats_profile.box_width,
             spacing_scale=stats_profile.spacing_scale,
+            ylim=_manual_y_override(options),
         )
         if variant == "strip_box":
             _emphasize_strip_point_overlay(
@@ -311,7 +345,8 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
     ]
 
 def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="box_strip")
     if not groups:
         raise ValueError("No valid groups were found in the replicate table.")
     stats_profile = _stats_profile(groups)
@@ -321,6 +356,7 @@ def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions
         height_mm=options.height_mm,
         box_width=stats_profile.box_width,
         spacing_scale=stats_profile.spacing_scale,
+        ylim=_manual_y_override(options),
     )
     _emphasize_strip_point_overlay(
         ax,
@@ -342,7 +378,8 @@ def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions
     ]
 
 def _render_violin_box(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="violin_box")
     if not groups:
         raise ValueError("No valid groups were found in the replicate table.")
     stats_profile = _stats_profile(groups)
@@ -352,6 +389,7 @@ def _render_violin_box(input_path: Path, sheet: str | int, options: RenderOption
         height_mm=options.height_mm,
         violin_width=stats_profile.violin_width,
         spacing_scale=stats_profile.spacing_scale,
+        ylim=_manual_y_override(options),
     )
     positions = np.asarray(ax.get_xticks(), dtype=float)
     if positions.size == len(groups):
@@ -389,7 +427,8 @@ def _gaussian_density(values: np.ndarray, x_grid: np.ndarray) -> np.ndarray:
     return kernel.mean(axis=1) / bandwidth
 
 def _render_histogram_density(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = load_replicate_table_cached(input_path, sheet)
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="histogram_density")
     if not groups:
         raise ValueError("No valid groups were found in the replicate table.")
 
@@ -453,6 +492,20 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
         ax.set_ylim(bottom=0.0, top=density_max * 1.16)
     else:
         ax.set_ylim(bottom=0.0)
+
+    x_override, y_override = manual_axis_overrides(options)
+    if x_override is not None:
+        x_low, x_high = ax.get_xlim()
+        ax.set_xlim(
+            x_override[0] if x_override[0] is not None else x_low,
+            x_override[1] if x_override[1] is not None else x_high,
+        )
+    if y_override is not None:
+        y_low, y_high = ax.get_ylim()
+        ax.set_ylim(
+            y_override[0] if y_override[0] is not None else y_low,
+            y_override[1] if y_override[1] is not None else y_high,
+        )
 
     autofixes = ["histogram_density_overlay"]
     if discrete_binning:

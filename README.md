@@ -98,6 +98,12 @@ Notes:
 - For direct validation, run:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' build`
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' test`
+- Native macOS runtime now treats sidecar ownership as app-managed only:
+  - it does not trust/reuse arbitrary existing listeners on `127.0.0.1:8765`
+  - the legacy "reuse existing sidecar listener" path has been removed from runtime startup
+  - it validates `/meta` and `/plot-contract` payload compatibility before considering a process usable
+  - if an incompatible/legacy listener is detected, runtime will replace it and start the repo `.venv` sidecar (`python -m app.sidecar.server`)
+  - for Swift decoding mirrors, avoid `*IDs` acronym fields with `convertFromSnakeCase`; use `*Ids` plus schema decoding tests that assert real snake_case payloads (for example `template_ids`)
 - Treat `app/desktop` as a legacy/reference area for the protected mock and migration history, not as the supported desktop runtime.
 
 ## Utilities, Not Primary Workbenches

@@ -569,6 +569,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -609,6 +614,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -649,6 +659,7 @@
         "size",
         "reverse_x",
         "baseline",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -685,6 +696,7 @@
         "size",
         "reverse_x",
         "baseline",
+        "series_order",
         "style_preset",
         "palette_preset",
         "use_sidecar"
@@ -724,6 +736,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -759,6 +774,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -795,6 +813,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -830,6 +851,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -866,6 +890,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -902,6 +929,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -938,6 +968,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -974,6 +1007,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1010,6 +1046,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1046,6 +1085,9 @@
       ],
       "editable_options": [
         "size",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1082,6 +1124,11 @@
       ],
       "editable_options": [
         "size",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1121,6 +1168,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1161,6 +1213,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1201,6 +1258,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1241,6 +1303,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1281,6 +1348,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],
@@ -1321,6 +1393,11 @@
         "xscale",
         "yscale",
         "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "series_order",
         "style_preset",
         "palette_preset"
       ],

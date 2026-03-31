@@ -1,3 +1,7 @@
+"""Sidecar schema facade."""
+
+# ruff: noqa: F401, I001
+
 from __future__ import annotations
 
 from app.sidecar.schemas_common import (
@@ -47,3 +51,45 @@ from app.sidecar.schemas_tensile import (
     TensileWorkbookRequest,
     TensileWorkbookSummaryResponse,
 )
+
+__all__ = [
+    "ComposerImportRequest",
+    "ComposerPreviewResponse",
+    "ComposerProjectResponse",
+    "ComposerRequest",
+    "ExportRenderRequest",
+    "ExportRenderResponse",
+    "FileRequest",
+    "HealthResponse",
+    "InspectFileResponse",
+    "InputInspectionResponse",
+    "PathResponse",
+    "PanelThumbnailResponse",
+    "PlotCandidateRolesResponse",
+    "PlotColumnProfileResponse",
+    "PlotDatasetPreviewResponse",
+    "PreflightRenderResponse",
+    "PreflightResultResponse",
+    "PreviewItemResponse",
+    "QAReportResponse",
+    "QAIssueResponse",
+    "RecommendationResponse",
+    "RenderOptionsPayload",
+    "RenderPreviewResponse",
+    "RenderRequest",
+    "StrictModel",
+    "SubmissionCheckResponse",
+    "SubmissionReportResponse",
+    "TensileComparisonExportRequest",
+    "TensileComparisonExportResponse",
+    "TensileMetricSummaryResponse",
+    "TensileReplicateRequest",
+    "TensileReplicateResponseModel",
+    "TensileWorkbookRequest",
+    "TensileWorkbookSummaryResponse",
+    "TemplateRecommendationResponse",
+    "composer_project_from_request",
+    "rendered_plots_to_preview_payload",
+    "serialize_dataclass",
+    "ThumbnailRequest",
+]

@@ -5,6 +5,11 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var xscale: String?
     var yscale: String?
     var reverseX: Bool
+    var xMin: Double?
+    var xMax: Double?
+    var yMin: Double?
+    var yMax: Double?
+    var seriesOrder: [String]?
     var baseline: String?
     var showColorbar: Bool?
     var stylePreset: String
@@ -17,6 +22,11 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         xscale: String? = nil,
         yscale: String? = nil,
         reverseX: Bool = false,
+        xMin: Double? = nil,
+        xMax: Double? = nil,
+        yMin: Double? = nil,
+        yMax: Double? = nil,
+        seriesOrder: [String]? = nil,
         baseline: String? = nil,
         showColorbar: Bool? = nil,
         stylePreset: String = "journal_calm",
@@ -28,6 +38,11 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.xscale = xscale
         self.yscale = yscale
         self.reverseX = reverseX
+        self.xMin = xMin
+        self.xMax = xMax
+        self.yMin = yMin
+        self.yMax = yMax
+        self.seriesOrder = seriesOrder
         self.baseline = baseline
         self.showColorbar = showColorbar
         self.stylePreset = stylePreset
@@ -41,6 +56,11 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case xscale
         case yscale
         case reverseX
+        case xMin
+        case xMax
+        case yMin
+        case yMax
+        case seriesOrder
         case baseline
         case showColorbar
         case stylePreset
@@ -376,9 +396,9 @@ struct SidecarMetaResponse: Codable, Equatable, Sendable {
     let styles: [MetaStyleResponse]
     let palettes: [MetaPaletteResponse]
     let templates: [MetaTemplateSummary]
-    let templateIDs: [String]
-    let sizeIDs: [String]
-    let palettePresetIDs: [String]
+    let templateIds: [String]
+    let sizeIds: [String]
+    let palettePresetIds: [String]
     let visualThemes: [VisualThemeResponse]
 }
 

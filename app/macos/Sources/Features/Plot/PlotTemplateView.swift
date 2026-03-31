@@ -13,60 +13,60 @@ enum PlotTemplateThumbnailKind: String, Sendable {
 
 struct PlotTemplateView: View {
     @Bindable var session: PlotSession
-    private let columns = [
-        GridItem(.adaptive(minimum: 126, maximum: 156), spacing: 10, alignment: .top),
-    ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Templates")
                     .font(.headline)
                 Spacer()
-                if session.inspectionResponse != nil, session.unavailableTemplateCount > 0 {
-                    Text("\(session.unavailableTemplateCount) unavailable")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Top 5")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if session.templateGalleryItems.isEmpty {
                 ContentUnavailableView(
-                    "No templates available",
+                    "No templates yet",
                     systemImage: "rectangle.grid.2x2",
-                    description: Text("Template identities appear after metadata is loaded.")
+                    description: Text("Import a file from the toolbar to inspect template recommendations.")
                 )
-                .frame(maxWidth: .infinity, minHeight: 120)
+                .frame(maxWidth: .infinity, minHeight: 160)
             } else {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-                    ForEach(session.templateGalleryItems) { item in
-                        Button {
-                            guard item.selectable else {
-                                return
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(session.templateGalleryItems) { item in
+                            Button {
+                                guard item.selectable else {
+                                    return
+                                }
+                                session.chooseTemplate(item.id)
+                            } label: {
+                                PlotTemplateCard(
+                                    title: item.title,
+                                    hint: item.hint,
+                                    kind: session.thumbnailKind(for: item.id),
+                                    aspectRatio: session.templateThumbnailAspectRatio(for: item.id),
+                                    selected: session.selectedTemplateID == item.id,
+                                    enabled: item.selectable
+                                )
                             }
-                            session.chooseTemplate(item.id)
-                        } label: {
-                            PlotTemplateCard(
-                                title: item.title,
-                                hint: item.hint,
-                                kind: session.thumbnailKind(for: item.id),
-                                selected: session.selectedTemplateID == item.id,
-                                enabled: item.selectable
-                            )
+                            .buttonStyle(.plain)
+                            .disabled(!item.selectable)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(!item.selectable)
                     }
                 }
             }
         }
         .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.quinary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
 struct PlotTemplateThumbnailView: View {
     let kind: PlotTemplateThumbnailKind
+    let aspectRatio: CGFloat
 
     var body: some View {
         Canvas { context, size in
@@ -97,6 +97,7 @@ struct PlotTemplateThumbnailView: View {
             }
         }
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+        .aspectRatio(aspectRatio, contentMode: .fit)
     }
 
     private func drawAxes(in rect: CGRect, context: inout GraphicsContext, axisColor: Color) {
@@ -226,24 +227,34 @@ private struct PlotTemplateCard: View {
     let title: String
     let hint: String
     let kind: PlotTemplateThumbnailKind
+    let aspectRatio: CGFloat
     let selected: Bool
     let enabled: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            PlotTemplateThumbnailView(kind: kind)
-                .frame(height: 70)
+        VStack(alignment: .leading, spacing: 8) {
+            PlotTemplateThumbnailView(kind: kind, aspectRatio: aspectRatio)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 46, idealHeight: 62, maxHeight: 88)
 
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
-            Text(hint)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                Spacer(minLength: 4)
+
+                Text(hint)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.quinary.opacity(0.35), in: Capsule())
+            }
         }
-        .padding(8)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -257,6 +268,6 @@ private struct PlotTemplateCard: View {
     }
 
     private var cardBackground: some ShapeStyle {
-        selected ? AnyShapeStyle(Color.accentColor.opacity(0.08)) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
+        selected ? AnyShapeStyle(Color.accentColor.opacity(0.10)) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
     }
 }

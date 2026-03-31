@@ -89,11 +89,12 @@ struct RootSplitView: View {
                 model.beginImportForActiveWorkbench()
             }
 
-            if model.plotSession.needsInspection {
-                Button("Inspect", systemImage: "magnifyingglass") {
-                    Task { await model.plotSession.inspectCurrentFile() }
-                }
-                .disabled(model.plotSession.selectedFileURL == nil || model.plotSession.isInspecting)
+            Button("Export", systemImage: "square.and.arrow.up") {
+                Task { await model.exportActiveWorkbench() }
+            }
+
+            Button("Help", systemImage: "questionmark.circle") {
+                model.plotSession.showGuide()
             }
 
             Button(
@@ -102,10 +103,6 @@ struct RootSplitView: View {
             ) {
                 model.toggleInspector()
             }
-        }
-
-        ToolbarItem(placement: .status) {
-            runtimeStatusView
         }
     }
 

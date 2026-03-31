@@ -1,6 +1,5 @@
-from app.sidecar.server import app
-
 import make_plot
+from app.sidecar.server import app
 
 
 def test_make_plot_shim_exposes_cli_main() -> None:

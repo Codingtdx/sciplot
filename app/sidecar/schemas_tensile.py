@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pydantic import Field
-
 from app.sidecar.schemas_common import StrictModel
 
 

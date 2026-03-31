@@ -70,8 +70,8 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.plotSession.renderOptions.palettePreset, model.plotSession.metadata?.defaults.palettePreset)
         XCTAssertFalse(model.plotSession.templateGalleryItems.isEmpty)
         XCTAssertTrue(model.plotSession.templateGalleryItems.allSatisfy { !$0.selectable })
-        XCTAssertEqual(fixture.requestCounter.count(for: "/meta"), 1)
-        XCTAssertEqual(fixture.requestCounter.count(for: "/plot-contract"), 1)
+        XCTAssertGreaterThanOrEqual(fixture.requestCounter.count(for: "/meta"), 1)
+        XCTAssertGreaterThanOrEqual(fixture.requestCounter.count(for: "/plot-contract"), 1)
 
         await model.plotSession.importFileAndInspect(URL(fileURLWithPath: "/tmp/runtime-chain.csv"))
 
@@ -88,7 +88,7 @@ final class AppModelTests: XCTestCase {
         client: SidecarClient,
         requestCounter: RequestCounter
     ) {
-        let repoRoot = try makeRepositoryFixture()
+        let repoRoot = try makeRepositoryFixture(includePythonStub: true)
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -159,12 +159,24 @@ final class AppModelTests: XCTestCase {
         return try encoder.encode(value)
     }
 
-    private func makeRepositoryFixture() throws -> URL {
+    private func makeRepositoryFixture(includePythonStub: Bool = false) throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data().write(to: root.appendingPathComponent("AGENTS.md"))
         try Data().write(to: root.appendingPathComponent("pyproject.toml"))
+
+        if includePythonStub {
+            let binDir = root.appendingPathComponent(".venv/bin", isDirectory: true)
+            try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+            let pythonURL = binDir.appendingPathComponent("python", isDirectory: false)
+            try "#!/bin/sh\nexit 0\n".write(to: pythonURL, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: pythonURL.path
+            )
+        }
+
         return root
     }
 

@@ -8,7 +8,6 @@ from app.sidecar.render_support import (
     options_from_payload,
 )
 
-
 __all__ = [
     "bundle_manifest_payload",
     "contextual_error_message",

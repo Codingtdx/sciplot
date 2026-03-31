@@ -63,6 +63,7 @@
 - 前端打开项目时必须经过运行时校验和归一化，不要再用 TS 强转把不可信 payload 直接吃进去。
 - Plot 项目文件和运行时 store 里的渲染选项现在都要保留 `style_preset`；如果改 render options schema，必须同时更新 sidecar schema、桌面运行时 parser、持久化读写和本说明。
 - 桌面端当前受支持宿主是 `app/macos` 原生 SwiftUI 应用；文件导入、目录选择、Finder reveal、sidecar 拉起等运行时访问应统一收敛到明确的 Swift runtime 入口，不要在页面里散落调用或静默吞错。
+- 原生 macOS runtime 对 sidecar 的策略是“app-managed ownership”：不要再依赖“复用端口上已有 sidecar”来凑兼容。`/meta` 与 `/plot-contract` payload 不可解码或模板集合为空时，必须判定为不兼容并替换为 repo `.venv` 启动的 sidecar。
 - `Launch_Plotter.command` 现在代表原生 macOS 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 原生桌面文件对话框优先走 `fileImporter`、`NSOpenPanel`、`NSSavePanel` 这类一方 API；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
 - 桌面端当前的 app-level product model 以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
@@ -219,6 +220,8 @@
 ## 常见坑
 
 - sidecar 是 GUI 的唯一后端真相源。不要绕过 `/meta` 去本地拼模板列表。
+- 不要把“端口能连通”当作 sidecar 可用性的充分条件；`/meta`、`/plot-contract` payload 形状不兼容时必须视为旧 sidecar 并替换。
+- Swift sidecar mirror 若使用 `JSONDecoder.keyDecodingStrategy = .convertFromSnakeCase`，不要把字段命名成 `*IDs`；统一用 `*Ids` 并补真实 snake_case payload 解码测试，避免 `template_ids` 一类字段被误判为缺失。
 - 不要复制模板、尺寸、palette 或默认参数到第二个文件里做“临时常量”。
 - 不要把新模板或例外规则偷偷塞进 `plotting.py`、`make_plot.py`、`src/rendering/` 或前端选项，而不回写契约和说明。
 - 只要代码改动已经让开发说明中的某一条不再准确，就必须同一轮改 `AGENTS.md`；禁止“代码先合，说明以后再补”。

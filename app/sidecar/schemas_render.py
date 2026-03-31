@@ -20,6 +20,11 @@ class RenderOptionsPayload(StrictModel):
     xscale: str | None = None
     yscale: str | None = None
     reverse_x: bool = False
+    x_min: float | None = None
+    x_max: float | None = None
+    y_min: float | None = None
+    y_max: float | None = None
+    series_order: list[str] | None = None
     baseline: str | None = None
     show_colorbar: bool | None = None
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET

@@ -1,168 +1,176 @@
+import Foundation
 import XCTest
 @testable import SciPlotGodMac
 
 @MainActor
 final class PlotSessionTests: XCTestCase {
-    func testPlotHappyPathImportInspectContinuePreviewAndExport() async throws {
+    func testImportAutomaticallyInspectsSelectsTemplateAndRendersPreview() async throws {
         let client = MockSidecarClient()
-        let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/custom_curve.pdf")
-        var chooserCalls: [(String, Bool)] = []
-        var materializeCalls: [([URL], URL)] = []
-        let session = PlotSession(
-            chooseExportDestination: { suggestedName, isMultiOutput in
-                chooserCalls.append((suggestedName, isMultiOutput))
-                return destinationURL
-            },
-            materializeExport: { sourceURLs, destination in
-                materializeCalls.append((sourceURLs, destination))
-                return [destination]
-            }
-        )
+        let session = PlotSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/sample.csv"))
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
 
-        XCTAssertEqual(session.workspaceMode, .review)
-        XCTAssertFalse(session.needsInspection)
-        XCTAssertEqual(session.selectedTemplateID, "curve")
-        XCTAssertEqual(session.sampleRows.count, 3)
+        await waitUntil(
+            { session.previewResponse != nil && session.inspectionResponse != nil },
+            timeout: 2.0
+        )
+
         XCTAssertEqual(client.inspectRequests.first?.inputPath, "/tmp/sample.csv")
-
-        await session.continueToRefine()
-
-        XCTAssertEqual(session.workspaceMode, .refine)
+        XCTAssertEqual(client.inspectRequests.first?.sheet, .index(0))
+        XCTAssertEqual(session.selectedSheet, .name("Representative_Curve"))
+        XCTAssertEqual(session.selectedTemplateID, "curve")
         XCTAssertEqual(client.renderRequests.first?.template, "curve")
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.png")
-
-        await session.runPreflight()
-        await session.exportCurrentSelection()
-
-        XCTAssertEqual(client.preflightRequests.first?.template, "curve")
-        XCTAssertEqual(client.exportRequests.first?.template, "curve")
-        XCTAssertEqual(session.exportResponse?.manifestPath, "/tmp/plot_exports/manifest.json")
-        XCTAssertEqual(chooserCalls.count, 1)
-        XCTAssertEqual(chooserCalls.first?.1, false)
-        XCTAssertEqual(materializeCalls.count, 1)
-        XCTAssertEqual(materializeCalls.first?.1, destinationURL)
-        XCTAssertEqual(materializeCalls.first?.0.first?.path, "/tmp/plot_exports/sample_curve.pdf")
-        XCTAssertEqual(session.userExportURLs, [destinationURL])
+        XCTAssertEqual(session.liveStatusLabel, "Preview ready")
     }
 
-    func testSelectingSheetReinspectsAndInvalidatesRenderArtifacts() async {
+    func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/sample.csv"))
-        await session.continueToRefine()
-        await session.runPreflight()
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
-        XCTAssertNotNil(session.previewResponse)
-        XCTAssertNotNil(session.preflightResponse)
-
-        client.inspectResponse = InspectFileResponse(
-            inputPath: "/tmp/sample.csv",
-            sheet: .name("Strength_Box"),
-            sheetNames: ["Representative_Curve", "Strength_Box"],
-            inspection: client.inspectResponse.inspection,
-            dataset: client.inspectResponse.dataset
-        )
-
-        await session.selectSheetAndReinspect(.name("Strength_Box"))
-
-        XCTAssertEqual(client.inspectRequests.count, 2)
-        XCTAssertEqual(client.inspectRequests.last?.sheet, .name("Strength_Box"))
-        XCTAssertEqual(session.selectedSheet, .name("Strength_Box"))
-        XCTAssertEqual(session.workspaceMode, .review)
-        XCTAssertFalse(session.needsInspection)
-        XCTAssertNil(session.previewResponse)
-        XCTAssertNil(session.preflightResponse)
-        XCTAssertNil(session.exportResponse)
-    }
-
-    func testCleanupSeedTriggersImmediateInspectAndStaysInReview() async {
-        let client = MockSidecarClient()
-        let session = PlotSession()
-        session.configure(client: client)
-        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
-
-        session.seedFromCleanup(
-            workbookURL: URL(fileURLWithPath: "/tmp/cleanup_prepared.xlsx"),
-            preferredSheet: .name("Strength_Box")
-        )
-
-        for _ in 0..<20 where client.inspectRequests.isEmpty {
-            await Task.yield()
-            try? await Task.sleep(nanoseconds: 10_000_000)
+        let initialPreview = session.previewResponse
+        client.inspectHandler = { request in
+            try await Task.sleep(nanoseconds: 120_000_000)
+            return InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: .name("Strength_Box"),
+                sheetNames: ["Representative_Curve", "Strength_Box"],
+                inspection: client.inspectResponse.inspection,
+                dataset: client.inspectResponse.dataset
+            )
+        }
+        client.renderHandler = { request in
+            try await Task.sleep(nanoseconds: 120_000_000)
+            return RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [
+                    .init(filename: "strength_box_preview.png", pngBase64: TestPayloads.pngBase64, qa: nil),
+                ],
+                submissionReport: TestPayloads.submissionReport()
+            )
         }
 
-        XCTAssertEqual(client.inspectRequests.count, 1)
-        XCTAssertEqual(client.inspectRequests.first?.inputPath, "/tmp/cleanup_prepared.xlsx")
-        XCTAssertEqual(client.inspectRequests.first?.sheet, .name("Strength_Box"))
-        XCTAssertEqual(session.workspaceMode, .review)
+        session.setSelectedSheet(.name("Strength_Box"))
+
+        XCTAssertEqual(session.previewResponse, initialPreview)
+        XCTAssertTrue(session.isInspecting)
+
+        await waitUntil(
+            { session.previewResponse?.previews.first?.filename == "strength_box_preview.png" },
+            timeout: 3.0
+        )
+
+        XCTAssertEqual(client.inspectRequests.last?.sheet, .name("Strength_Box"))
+        XCTAssertEqual(client.renderRequests.last?.sheet, .name("Strength_Box"))
+        XCTAssertEqual(session.selectedSheet, .name("Strength_Box"))
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "strength_box_preview.png")
     }
 
-    func testTemplateGalleryUsesMetaBeforeInspectAndCompatibleAfterInspect() async {
+    func testTemplateChangeRefreshesPreviewWithoutClearingTheLastResult() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        XCTAssertEqual(session.templateGalleryItems.map(\.id), ["curve", "bar"])
-        XCTAssertTrue(session.templateGalleryItems.allSatisfy { !$0.selectable })
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "sample_curve.png" }, timeout: 2.0)
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/sample.csv"))
+        let initialPreview = session.previewResponse
+        client.renderHandler = { request in
+            try await Task.sleep(nanoseconds: 120_000_000)
+            return RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [
+                    .init(
+                        filename: request.template == "bar" ? "sample_bar.png" : "sample_curve.png",
+                        pngBase64: TestPayloads.pngBase64,
+                        qa: nil
+                    ),
+                ],
+                submissionReport: TestPayloads.submissionReport()
+            )
+        }
 
-        XCTAssertEqual(session.templateGalleryItems.map(\.id), ["curve"])
-        XCTAssertTrue(session.templateGalleryItems.allSatisfy(\.selectable))
-        XCTAssertEqual(session.unavailableTemplateCount, 1)
+        session.chooseTemplate("bar")
+
+        XCTAssertEqual(session.previewResponse, initialPreview)
+        XCTAssertTrue(session.isPreviewing)
+
+        await waitUntil(
+            { session.previewResponse?.previews.first?.filename == "sample_bar.png" },
+            timeout: 3.0
+        )
+
+        XCTAssertEqual(client.renderRequests.last?.template, "bar")
+        XCTAssertEqual(session.selectedTemplateID, "bar")
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_bar.png")
     }
 
-    func testImportInspectPipelinePopulatesSourceAndCompatibleTemplatesAfterBootstrapState() async {
+    func testDebouncedNumericEditsRefreshOnlyAfterThePause() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        XCTAssertFalse(session.templateGalleryItems.isEmpty)
-        XCTAssertTrue(session.templateGalleryItems.allSatisfy { !$0.selectable })
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/runtime-symptom.csv"))
+        let initialRenderCount = client.renderRequests.count
+        session.updateRenderOptions(policy: .debounced) { $0.xMin = 1.0 }
+        try await Task.sleep(nanoseconds: 80_000_000)
+        session.updateRenderOptions(policy: .debounced) { $0.xMin = 2.0 }
 
-        XCTAssertEqual(session.selectedSourcePath, "/tmp/runtime-symptom.csv")
-        XCTAssertEqual(client.inspectRequests.count, 1)
-        XCTAssertEqual(client.inspectRequests.first?.inputPath, "/tmp/runtime-symptom.csv")
-        XCTAssertNotNil(session.inspectionResponse)
-        XCTAssertFalse(session.compatibleRecommendations.isEmpty)
-        XCTAssertFalse(session.templateGalleryItems.isEmpty)
-        XCTAssertTrue(session.templateGalleryItems.allSatisfy(\.selectable))
-        XCTAssertEqual(Set(session.templateGalleryItems.map(\.id)), session.compatibleTemplateIDs)
+        try await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertEqual(client.renderRequests.count, initialRenderCount)
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
+        XCTAssertEqual(session.renderOptions.xMin, 2.0)
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.png")
     }
 
-    func testChangingRenderOptionsInvalidatesPreviewPreflightAndExport() async {
+    func testSeriesLegendControlsOnlyAppearForMultiSeriesTemplates() async throws {
         let client = MockSidecarClient()
+        client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")
+
         let session = PlotSession()
         session.configure(client: client)
-        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.apply(meta: TestPayloads.multiSeriesMeta(), contract: TestPayloads.contract())
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/sample.csv"))
-        await session.continueToRefine()
-        await session.runPreflight()
+        session.importFile(URL(fileURLWithPath: "/tmp/multiseries.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
-        XCTAssertNotNil(session.previewResponse)
-        XCTAssertNotNil(session.preflightResponse)
+        XCTAssertTrue(session.shouldShowSeriesLegendControls)
+        XCTAssertEqual(session.seriesOrderLabels, ["Series A", "Series B"])
 
-        session.renderOptions.xscale = "log"
+        let singleSeriesSession = PlotSession()
+        singleSeriesSession.configure(client: MockSidecarClient())
+        singleSeriesSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        singleSeriesSession.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ singleSeriesSession.previewResponse != nil }, timeout: 2.0)
 
-        XCTAssertNil(session.previewResponse)
-        XCTAssertNil(session.preflightResponse)
-        XCTAssertNil(session.exportResponse)
-        XCTAssertTrue(session.userExportURLs.isEmpty)
+        XCTAssertFalse(singleSeriesSession.shouldShowSeriesLegendControls)
     }
 
-    func testPlotExportUsesBaseStemModeForRheologyMultiOutput() async {
+    func testPlotExportUsesBaseStemModeForRheologyMultiOutput() async throws {
         let client = MockSidecarClient()
         client.inspectResponse = InspectFileResponse(
             inputPath: "/tmp/sample.csv",
@@ -214,13 +222,29 @@ final class PlotSessionTests: XCTestCase {
             }
         )
         session.configure(client: client)
-        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.apply(meta: TestPayloads.multiSeriesMeta(), contract: TestPayloads.contract())
 
-        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/sample.csv"))
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
         session.chooseTemplate("point_line")
         await session.exportCurrentSelection()
 
         XCTAssertEqual(chooserIsMultiOutput, true)
         XCTAssertEqual(session.userExportURLs.count, 2)
+    }
+
+    private func waitUntil(
+        _ condition: @escaping () -> Bool,
+        timeout: TimeInterval
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return
+            }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for PlotSession state")
     }
 }

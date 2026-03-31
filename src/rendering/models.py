@@ -26,6 +26,11 @@ class RenderOptions:
     show_colorbar: bool
     style_preset: str
     palette_preset: str
+    x_min: float | None = None
+    x_max: float | None = None
+    y_min: float | None = None
+    y_max: float | None = None
+    series_order: tuple[str, ...] | None = None
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
 

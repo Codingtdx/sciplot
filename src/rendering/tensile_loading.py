@@ -9,9 +9,9 @@ import pandas as pd
 from src.data_loader import load_curve_table, load_replicate_table, read_raw_table
 from src.rendering.io import ensure_input_path, list_sheet_names
 from src.rendering.tensile_models import (
-    LoadedTensileWorkbook,
     METRIC_NAMES,
     REQUIRED_TENSILE_WORKBOOK_SHEETS,
+    LoadedTensileWorkbook,
     TensileWorkbookSummary,
 )
 from src.tensile_replicates import REPRESENTATIVE_CURVE_SHEET, SUMMARY_SHEET, TensileMetricSummary

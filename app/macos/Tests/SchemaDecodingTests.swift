@@ -135,6 +135,79 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.sizePresets["single_panel"]?.heightMm, 55)
     }
 
+    func testDecodeMetaPayloadWithSnakeCaseIDCollections() throws {
+        let payload = """
+        {
+          "version": 1,
+          "defaults": {
+            "style_preset": "default",
+            "palette_preset": "colorblind_safe"
+          },
+          "sizes": [
+            {
+              "id": "60x55",
+              "label": "60 x 55 mm",
+              "width_mm": 60,
+              "height_mm": 55
+            }
+          ],
+          "styles": [
+            {
+              "id": "default",
+              "label": "Default",
+              "public": true,
+              "description": "Default style",
+              "hard_constraints": true,
+              "preset_note": "Repo default"
+            }
+          ],
+          "palettes": [
+            {
+              "id": "colorblind_safe",
+              "label": "Colorblind Safe",
+              "public": true,
+              "description": "Default palette",
+              "swatches": ["#123456", "#abcdef"]
+            }
+          ],
+          "templates": [
+            {
+              "id": "curve",
+              "label": "Curve",
+              "description": "Continuous curve template.",
+              "category": "curve",
+              "default_size": "60x55",
+              "allowed_sizes": ["60x55"],
+              "editable_options": ["size", "style_preset", "palette_preset"],
+              "default_options": {},
+              "available_styles": ["default"],
+              "available_palettes": ["colorblind_safe"],
+              "canonical_id": "curve",
+              "role": "canonical",
+              "lifecycle_policy": "canonical",
+              "implementation_id": "plot.curve"
+            }
+          ],
+          "template_ids": ["curve"],
+          "size_ids": ["60x55"],
+          "palette_preset_ids": ["colorblind_safe"],
+          "visual_themes": [
+            {
+              "id": "clean_light",
+              "label": "Clean Light",
+              "description": "A minimal theme"
+            }
+          ]
+        }
+        """
+
+        let response = try decoder.decode(SidecarMetaResponse.self, from: Data(payload.utf8))
+        XCTAssertEqual(response.templateIds, ["curve"])
+        XCTAssertEqual(response.sizeIds, ["60x55"])
+        XCTAssertEqual(response.palettePresetIds, ["colorblind_safe"])
+        XCTAssertEqual(response.visualThemes.first?.id, "clean_light")
+    }
+
     func testDecodeComposerPreviewPayload() throws {
         let payload = """
         {

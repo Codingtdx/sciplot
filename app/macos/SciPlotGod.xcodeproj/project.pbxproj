@@ -48,6 +48,8 @@
 		C00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */; };
 		C00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */; };
 		C00000000000000000000028 /* Sources/Shared/UI/StateViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */; };
+		C0000000000000000000003B /* Sources/Shared/UI/OptionRowCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003B /* Sources/Shared/UI/OptionRowCard.swift */; };
+		C0000000000000000000003C /* Sources/Shared/UI/SortableSeriesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003C /* Sources/Shared/UI/SortableSeriesListView.swift */; };
 		C00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */; };
 		C0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */; };
 		C0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */; };
@@ -118,6 +120,8 @@
 		B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/PDFPreviewView.swift; sourceTree = "<group>"; };
 		B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/QuickLookThumbnailView.swift; sourceTree = "<group>"; };
 		B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/StateViews.swift; sourceTree = "<group>"; };
+		B0000000000000000000003B /* Sources/Shared/UI/OptionRowCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/OptionRowCard.swift; sourceTree = "<group>"; };
+		B0000000000000000000003C /* Sources/Shared/UI/SortableSeriesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/UI/SortableSeriesListView.swift; sourceTree = "<group>"; };
 		B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/FileTypeCatalog.swift; sourceTree = "<group>"; };
 		B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/JSONValue.swift; sourceTree = "<group>"; };
 		B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/NativePanels.swift; sourceTree = "<group>"; };
@@ -209,6 +213,8 @@
 				B00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift */,
 				B00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift */,
 				B00000000000000000000028 /* Sources/Shared/UI/StateViews.swift */,
+				B0000000000000000000003B /* Sources/Shared/UI/OptionRowCard.swift */,
+				B0000000000000000000003C /* Sources/Shared/UI/SortableSeriesListView.swift */,
 				B00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift */,
 				B0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift */,
 				B0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift */,
@@ -376,6 +382,8 @@
 				C00000000000000000000026 /* Sources/Shared/UI/PDFPreviewView.swift in Sources */,
 				C00000000000000000000027 /* Sources/Shared/UI/QuickLookThumbnailView.swift in Sources */,
 				C00000000000000000000028 /* Sources/Shared/UI/StateViews.swift in Sources */,
+				C0000000000000000000003B /* Sources/Shared/UI/OptionRowCard.swift in Sources */,
+				C0000000000000000000003C /* Sources/Shared/UI/SortableSeriesListView.swift in Sources */,
 				C00000000000000000000029 /* Sources/Shared/Utilities/FileTypeCatalog.swift in Sources */,
 				C0000000000000000000002A /* Sources/Shared/Utilities/JSONValue.swift in Sources */,
 				C0000000000000000000002B /* Sources/Shared/Utilities/NativePanels.swift in Sources */,

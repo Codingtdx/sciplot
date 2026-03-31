@@ -53,6 +53,8 @@ final class DataCleanupSession {
     var latestPreprocessResponse: TensileReplicateResponseModel?
     var comparisonExportResponse: TensileComparisonExportResponse?
     var comparisonExportDestinationURL: URL?
+    var comparisonWorkbookOrder: [String] = []
+    var primaryWorkbookID: String?
     var groupName = ""
     var errorMessage: String?
     var isBusy = false
@@ -75,11 +77,41 @@ final class DataCleanupSession {
     }
 
     var primaryWorkbookURL: URL? {
-        preparedWorkbooks.first?.url
+        guard let primaryWorkbookID,
+              let workbook = preparedWorkbooks.first(where: { $0.id == primaryWorkbookID })
+        else {
+            return preparedWorkbooks.first?.url
+        }
+        return workbook.url
     }
 
     var primaryPreferredSheet: SheetValue? {
-        preparedWorkbooks.first?.preferredSheet
+        guard let primaryWorkbookID,
+              let workbook = preparedWorkbooks.first(where: { $0.id == primaryWorkbookID })
+        else {
+            return preparedWorkbooks.first?.preferredSheet
+        }
+        return workbook.preferredSheet
+    }
+
+    var orderedPreparedWorkbooks: [PreparedWorkbookItem] {
+        guard !comparisonWorkbookOrder.isEmpty else {
+            return preparedWorkbooks
+        }
+
+        let byID = Dictionary(uniqueKeysWithValues: preparedWorkbooks.map { ($0.id, $0) })
+        var ordered: [PreparedWorkbookItem] = []
+        var seen: Set<String> = []
+        for workbookID in comparisonWorkbookOrder {
+            guard let workbook = byID[workbookID], seen.insert(workbookID).inserted else {
+                continue
+            }
+            ordered.append(workbook)
+        }
+        for workbook in preparedWorkbooks where !seen.contains(workbook.id) {
+            ordered.append(workbook)
+        }
+        return ordered
     }
 
     func handleImportedRawFiles(_ urls: [URL]) async {
@@ -134,6 +166,9 @@ final class DataCleanupSession {
                 warnings: response.warnings
             )
             upsertPreparedWorkbook(item)
+            if primaryWorkbookID == nil {
+                primaryWorkbookID = item.id
+            }
             stage = .review
         } catch {
             errorMessage = error.localizedDescription
@@ -165,6 +200,9 @@ final class DataCleanupSession {
                     warnings: []
                 )
                 upsertPreparedWorkbook(item)
+                if primaryWorkbookID == nil {
+                    primaryWorkbookID = item.id
+                }
             }
             stage = .review
         } catch {
@@ -196,7 +234,7 @@ final class DataCleanupSession {
         do {
             comparisonExportResponse = try await client.exportTensileComparison(
                 .init(
-                    workbookPaths: preparedWorkbooks.map { $0.url.path },
+                    workbookPaths: orderedPreparedWorkbooks.map { $0.url.path },
                     outputDir: directoryURL.path
                 )
             )
@@ -208,10 +246,17 @@ final class DataCleanupSession {
     }
 
     func openPrimaryWorkbookInPlot() {
-        guard let primary = preparedWorkbooks.first else {
+        guard let primary = primaryWorkbookURL,
+              let preferredSheet = primaryPreferredSheet
+        else {
             return
         }
-        openInPlotHandler?(primary.url, primary.preferredSheet)
+        openInPlotHandler?(primary, preferredSheet)
+    }
+
+    func moveComparisonWorkbooks(from source: IndexSet, to destination: Int) {
+        comparisonWorkbookOrder = orderedPreparedWorkbooks.map(\.id)
+        comparisonWorkbookOrder.move(fromOffsets: source, toOffset: destination)
     }
 
     func revealLatestExport() {
@@ -227,6 +272,9 @@ final class DataCleanupSession {
             preparedWorkbooks[existingIndex] = item
         } else {
             preparedWorkbooks.append(item)
+        }
+        if !comparisonWorkbookOrder.contains(item.id) {
+            comparisonWorkbookOrder.append(item.id)
         }
     }
 }

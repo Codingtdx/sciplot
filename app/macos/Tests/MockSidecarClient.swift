@@ -21,6 +21,10 @@ final class MockSidecarClient: SidecarClienting {
     var composePreviewResponse = TestPayloads.composerPreview()
     var composeExportResponse = PathResponse(outputPath: "/tmp/composer-export.pdf")
     var importedComposerProject = TestPayloads.composerProject()
+    var inspectHandler: ((FileRequest) async throws -> InspectFileResponse)?
+    var preflightHandler: ((RenderRequest) async throws -> PreflightRenderResponse)?
+    var renderHandler: ((RenderRequest) async throws -> RenderPreviewResponse)?
+    var exportHandler: ((ExportRenderRequest) async throws -> ExportRenderResponse)?
 
     private(set) var inspectRequests: [FileRequest] = []
     private(set) var preflightRequests: [RenderRequest] = []
@@ -48,21 +52,33 @@ final class MockSidecarClient: SidecarClienting {
 
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse {
         inspectRequests.append(request)
+        if let inspectHandler {
+            return try await inspectHandler(request)
+        }
         return inspectResponse
     }
 
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse {
         preflightRequests.append(request)
+        if let preflightHandler {
+            return try await preflightHandler(request)
+        }
         return preflightResponse
     }
 
     func renderPreview(_ request: RenderRequest) async throws -> RenderPreviewResponse {
         renderRequests.append(request)
+        if let renderHandler {
+            return try await renderHandler(request)
+        }
         return previewResponse
     }
 
     func exportRender(_ request: ExportRenderRequest) async throws -> ExportRenderResponse {
         exportRequests.append(request)
+        if let exportHandler {
+            return try await exportHandler(request)
+        }
         return exportResponse
     }
 
