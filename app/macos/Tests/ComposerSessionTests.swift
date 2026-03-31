@@ -104,7 +104,19 @@ final class ComposerSessionTests: XCTestCase {
 
     func testComposerHappyPathImportPreviewAndExport() async throws {
         let client = MockSidecarClient()
-        let session = ComposerSession(previewDelayNanoseconds: 10_000_000)
+        let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/composer-final.pdf")
+        var chooserSuggestedName: String?
+        var materializeCall: (URL, URL)?
+        let session = ComposerSession(
+            previewDelayNanoseconds: 10_000_000,
+            chooseExportDestination: { suggestedName in
+                chooserSuggestedName = suggestedName
+                return destinationURL
+            },
+            materializeExport: { intermediatePDFURL, destination in
+                materializeCall = (intermediatePDFURL, destination)
+            }
+        )
         session.configure(client: client)
 
         session.beginImport(kind: .graph)
@@ -121,7 +133,28 @@ final class ComposerSessionTests: XCTestCase {
         await session.exportComposition()
 
         XCTAssertEqual(client.composeExportRequests.first?.version, 2)
-        XCTAssertEqual(session.exportURL?.path, "/tmp/composer-export.pdf")
+        XCTAssertEqual(chooserSuggestedName, "composer-composition.pdf")
+        XCTAssertEqual(materializeCall?.0.path, "/tmp/composer-export.pdf")
+        XCTAssertEqual(materializeCall?.1, destinationURL)
+        XCTAssertEqual(session.exportURL, destinationURL)
+    }
+
+    func testComposerExportPassesTiffDestinationToMaterializer() async {
+        let client = MockSidecarClient()
+        let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/composer-final.tiff")
+        var materializeDestination: URL?
+        let session = ComposerSession(
+            chooseExportDestination: { _ in destinationURL },
+            materializeExport: { _, destination in
+                materializeDestination = destination
+            }
+        )
+        session.configure(client: client)
+
+        await session.exportComposition()
+
+        XCTAssertEqual(materializeDestination, destinationURL)
+        XCTAssertEqual(session.exportURL, destinationURL)
     }
 
     func testShiftSelectionMergeCreatesFreeRegionWithoutChangingPanelOrder() {

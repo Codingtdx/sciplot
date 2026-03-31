@@ -34,6 +34,7 @@ final class DataCleanupSessionTests: XCTestCase {
         XCTAssertEqual(session.stage, .export)
         XCTAssertEqual(client.comparisonRequests.first?.workbookPaths.count, 2)
         XCTAssertEqual(session.comparisonExportResponse?.bundleDir, "/tmp/cleanup_bundle")
+        XCTAssertEqual(session.comparisonExportDestinationURL, exportDirectoryURL)
 
         var openedWorkbook: URL?
         var openedSheet: SheetValue?

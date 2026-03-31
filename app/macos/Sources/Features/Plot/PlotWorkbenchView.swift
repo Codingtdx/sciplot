@@ -1,40 +1,31 @@
 import SwiftUI
 
 struct PlotWorkbenchView: View {
-    let session: PlotSession
+    @Bindable var session: PlotSession
     let bootstrapErrorMessage: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Picker("Plot stage", selection: bindingForStage) {
-                    ForEach(PlotStage.allCases) { stage in
-                        Text(stage.title).tag(stage)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 420)
+        VStack(alignment: .leading, spacing: 14) {
+            workspaceHeader
 
-                if let bootstrapErrorMessage {
-                    ErrorStateCard(
-                        title: "Sidecar bootstrap issue",
-                        message: bootstrapErrorMessage,
-                        retryTitle: nil,
-                        retryAction: nil
-                    )
-                }
-
-                switch session.stage {
-                case .importData:
-                    PlotImportView(session: session)
-                case .template:
-                    PlotTemplateView(session: session)
-                case .refineExport:
-                    PlotRefineView(session: session)
-                }
+            if let bootstrapErrorMessage {
+                compactIssueLabel(message: bootstrapErrorMessage)
             }
-            .padding(24)
+
+            if let errorMessage = session.errorMessage {
+                compactIssueLabel(message: errorMessage)
+            }
+
+            switch session.workspaceMode {
+            case .review:
+                PlotImportView(session: session)
+            case .refine:
+                PlotRefineView(session: session)
+            }
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .windowBackgroundColor))
         .fileImporter(
             isPresented: bindingForImporter,
             allowedContentTypes: FileTypeCatalog.plotInputs,
@@ -43,7 +34,7 @@ struct PlotWorkbenchView: View {
             switch result {
             case let .success(urls):
                 if let first = urls.first {
-                    session.handleImportedFile(first)
+                    Task { await session.importFileAndInspect(first) }
                 }
             case let .failure(error):
                 session.errorMessage = error.localizedDescription
@@ -51,17 +42,79 @@ struct PlotWorkbenchView: View {
         }
     }
 
-    private var bindingForStage: Binding<PlotStage> {
-        Binding(
-            get: { session.stage },
-            set: { session.stage = $0 }
-        )
+    private var workspaceHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(session.selectedSourceFilename ?? "No source selected")
+                .font(.title2.weight(.semibold))
+                .lineLimit(1)
+
+            HStack(spacing: 12) {
+                if session.selectedFileURL != nil {
+                    Picker("Sheet", selection: selectedSheetBinding) {
+                        ForEach(session.availableSheets, id: \.self) { sheet in
+                            Text(sheet.displayName).tag(sheet)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 230, alignment: .leading)
+                }
+
+                if session.isInspecting {
+                    Label("Inspecting…", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if session.needsInspection {
+                    Label("Inspect required", systemImage: "magnifyingglass")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if session.workspaceMode == .refine {
+                    Button("Review") {
+                        session.returnToReview()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Button("Continue") {
+                    Task { await session.continueToRefine() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!session.canContinueToRefine)
+            }
+        }
+    }
+
+    private func compactIssueLabel(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .lineLimit(2)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var bindingForImporter: Binding<Bool> {
         Binding(
             get: { session.isImporterPresented },
             set: { session.isImporterPresented = $0 }
+        )
+    }
+
+    private var selectedSheetBinding: Binding<SheetValue> {
+        Binding(
+            get: { session.selectedSheet },
+            set: { newSheet in
+                Task { await session.selectSheetAndReinspect(newSheet) }
+            }
         )
     }
 }

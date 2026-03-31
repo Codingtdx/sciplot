@@ -178,10 +178,10 @@ struct ComposerInspectorView: View {
             }
 
             if session.isExporting {
-                Label("Exporting final PDF…", systemImage: "arrow.triangle.2.circlepath")
+                Label("Exporting composition…", systemImage: "arrow.triangle.2.circlepath")
                     .foregroundStyle(.secondary)
             } else {
-                Text("Use the top-right Export action to write the final composition PDF.")
+                Text("Use Export to save the composition as PDF or TIFF with an explicit destination and file name.")
                     .foregroundStyle(.secondary)
             }
 

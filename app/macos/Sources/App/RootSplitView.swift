@@ -73,10 +73,39 @@ struct RootSplitView: View {
 
     @ToolbarContentBuilder
     private var activeToolbarContent: some ToolbarContent {
-        if model.selectedWorkbench == .composer {
+        if model.selectedWorkbench == .plot {
+            plotToolbarContent
+        } else if model.selectedWorkbench == .composer {
             composerToolbarContent
         } else {
             defaultToolbarContent
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var plotToolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Button("Import", systemImage: "tray.and.arrow.down") {
+                model.beginImportForActiveWorkbench()
+            }
+
+            if model.plotSession.needsInspection {
+                Button("Inspect", systemImage: "magnifyingglass") {
+                    Task { await model.plotSession.inspectCurrentFile() }
+                }
+                .disabled(model.plotSession.selectedFileURL == nil || model.plotSession.isInspecting)
+            }
+
+            Button(
+                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                model.toggleInspector()
+            }
+        }
+
+        ToolbarItem(placement: .status) {
+            runtimeStatusView
         }
     }
 
@@ -131,6 +160,10 @@ struct RootSplitView: View {
 
             Button("Export", systemImage: "square.and.arrow.up") {
                 Task { await model.exportActiveWorkbench() }
+            }
+
+            Button("Reveal", systemImage: "folder") {
+                model.revealActiveOutput()
             }
 
             Button("Guide", systemImage: "questionmark.circle") {

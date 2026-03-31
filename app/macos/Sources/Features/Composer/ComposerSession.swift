@@ -100,10 +100,15 @@ private struct ComposerBoardOrderingKey: Comparable {
 @MainActor
 @Observable
 final class ComposerSession {
+    typealias ComposerExportDestinationChooser = @MainActor (_ suggestedName: String) -> URL?
+    typealias ComposerExportMaterializer = @MainActor (_ intermediatePDFURL: URL, _ destinationURL: URL) throws -> Void
+
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private weak var undoManager: UndoManager?
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private let previewDelayNanoseconds: UInt64
+    @ObservationIgnored private let chooseExportDestination: ComposerExportDestinationChooser
+    @ObservationIgnored private let materializeExport: ComposerExportMaterializer
 
     var project = ComposerRequestPayload()
     var previewResponse: ComposerPreviewResponse?
@@ -121,8 +126,21 @@ final class ComposerSession {
 
     @ObservationIgnored private var selectionAnchorCell: ComposerGridCell?
 
-    init(previewDelayNanoseconds: UInt64 = 300_000_000) {
+    init(
+        previewDelayNanoseconds: UInt64 = 300_000_000,
+        chooseExportDestination: @escaping ComposerExportDestinationChooser = {
+            NativeExportCoordinator.chooseComposerExportLocation(suggestedName: $0)
+        },
+        materializeExport: @escaping ComposerExportMaterializer = {
+            try NativeExportCoordinator.materializeComposerExport(
+                intermediatePDFURL: $0,
+                destinationURL: $1
+            )
+        }
+    ) {
         self.previewDelayNanoseconds = previewDelayNanoseconds
+        self.chooseExportDestination = chooseExportDestination
+        self.materializeExport = materializeExport
     }
 
     var selectedPanelID: String? {
@@ -336,13 +354,19 @@ final class ComposerSession {
             return
         }
 
+        guard let destinationURL = chooseExportDestination(suggestedComposerExportFilename()) else {
+            return
+        }
+
         isExporting = true
         errorMessage = nil
         defer { isExporting = false }
 
         do {
             let response = try await client.composeExport(project)
-            exportURL = URL(fileURLWithPath: response.outputPath)
+            let intermediateURL = URL(fileURLWithPath: response.outputPath)
+            try materializeExport(intermediateURL, destinationURL)
+            exportURL = destinationURL
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -352,6 +376,13 @@ final class ComposerSession {
         if let exportURL {
             WorkspaceBridge.reveal([exportURL])
         }
+    }
+
+    private func suggestedComposerExportFilename() -> String {
+        if let exportURL {
+            return exportURL.lastPathComponent
+        }
+        return "composer-composition.pdf"
     }
 
     func focusPanel(_ panelID: String?) {

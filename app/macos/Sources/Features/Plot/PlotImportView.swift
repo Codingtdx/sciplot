@@ -1,97 +1,68 @@
 import SwiftUI
 
 struct PlotImportView: View {
-    let session: PlotSession
+    @Bindable var session: PlotSession
+    @State private var isDataPreviewExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Select a `.csv`, `.xlsx`, or `.xlsm` data source and inspect the normalized dataset through the sidecar.")
-                        .foregroundStyle(.secondary)
-
-                    if let selectedFileURL = session.selectedFileURL {
-                        KeyValueGrid(values: [
-                            ("Source", selectedFileURL.lastPathComponent),
-                            ("Path", selectedFileURL.path),
-                            ("Sheet", session.selectedSheet.displayName),
-                        ])
-                    } else {
-                        EmptyStateCard(
-                            title: "No data source selected",
-                            message: "Use the import action to choose a file for Plot."
-                        )
-                    }
-
-                    HStack {
-                        if session.availableSheets.count > 1 {
-                            Picker("Sheet", selection: bindingForSheet) {
-                                ForEach(session.availableSheets, id: \.self) { sheet in
-                                    Text(sheet.displayName).tag(sheet)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .frame(maxWidth: 240)
-                        }
-
-                        Spacer()
-
-                        Button("Inspect") {
-                            Task { await session.inspectCurrentFile() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(session.selectedFileURL == nil || session.isInspecting)
-                    }
-                }
-                .padding(12)
+        VStack(alignment: .leading, spacing: 16) {
+            if session.selectedFileURL == nil {
+                ContentUnavailableView(
+                    "Import a Plot source",
+                    systemImage: "tray.and.arrow.down",
+                    description: Text("Choose a `.csv`, `.xlsx`, or `.xlsm` file to inspect and continue.")
+                )
+            } else if session.isInspecting, session.inspectionResponse == nil {
+                BusyStateCard(
+                    title: "Inspecting source",
+                    message: "Loading compatible templates and source summary."
+                )
             }
 
-            if session.isInspecting {
-                BusyStateCard(title: "Inspecting input", message: "The sidecar is reading the dataset structure and recommendations.")
-            } else if let errorMessage = session.errorMessage {
-                ErrorStateCard(
-                    title: "Inspect failed",
-                    message: errorMessage,
-                    retryTitle: "Retry Inspect"
-                ) {
-                    Task { await session.inspectCurrentFile() }
+            PlotTemplateView(session: session)
+
+            if let inspection = session.inspectionResponse {
+                HStack(spacing: 14) {
+                    Label(inspection.inspection.modelLabel, systemImage: "doc.text.magnifyingglass")
+                    Label("\(session.compatibleRecommendations.count) compatible", systemImage: "checkmark.circle")
+                    if let selectedTemplate = session.selectedTemplateSummary?.label {
+                        Label(selectedTemplate, systemImage: "square.grid.2x2")
+                    }
                 }
-            } else if let inspection = session.inspectionResponse {
-                GroupBox("Inspection Summary") {
-                    VStack(alignment: .leading, spacing: 16) {
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+                DisclosureGroup("Data Preview", isExpanded: $isDataPreviewExpanded) {
+                    VStack(alignment: .leading, spacing: 10) {
                         KeyValueGrid(values: [
-                            ("Detected model", inspection.inspection.modelLabel),
-                            ("Recommendation", inspection.inspection.recommendation.template),
-                            ("Confidence", inspection.inspection.recommendationConfidence.formatted(.percent)),
+                            ("Rows", "\(inspection.dataset?.rawRows ?? 0)"),
+                            ("Columns", "\(inspection.dataset?.rawCols ?? 0)"),
+                            ("Shapes", (inspection.dataset?.dataShapes ?? []).prefix(2).joined(separator: ", ")),
+                            ("Quality flags", "\(inspection.dataset?.qualityFlags.count ?? 0)"),
                         ])
 
-                        if !inspection.inspection.warnings.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Warnings")
-                                    .font(.headline)
-                                ForEach(inspection.inspection.warnings, id: \.self) { warning in
-                                    Label(warning, systemImage: "exclamationmark.triangle")
-                                }
-                            }
+                        if session.sampleRows.isEmpty {
+                            Text("No sample rows available.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            PlotSampleTable(session: session)
+                                .frame(minHeight: 170, maxHeight: 210)
                         }
                     }
-                    .padding(12)
+                    .padding(.top, 6)
                 }
-
-                GroupBox("Sample Rows") {
-                    PlotSampleTable(session: session)
-                        .frame(minHeight: 220)
-                        .padding(.top, 8)
-                }
+                .font(.subheadline.weight(.medium))
+            } else if session.selectedFileURL != nil {
+                ContentUnavailableView(
+                    "Inspect this source",
+                    systemImage: "magnifyingglass",
+                    description: Text("Use Inspect to load compatibility and continue with a template.")
+                )
+                .frame(maxWidth: .infinity, minHeight: 120)
             }
         }
-    }
-
-    private var bindingForSheet: Binding<SheetValue> {
-        Binding(
-            get: { session.selectedSheet },
-            set: { session.selectedSheet = $0 }
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

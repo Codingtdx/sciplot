@@ -1,105 +1,262 @@
 import SwiftUI
 
-struct PlotTemplateView: View {
-    let session: PlotSession
+enum PlotTemplateThumbnailKind: String, Sendable {
+    case curve
+    case pointLine
+    case scatter
+    case bar
+    case box
+    case violin
+    case heatmap
+    case fallback
+}
 
-    private let columns = [GridItem(.adaptive(minimum: 260), spacing: 16)]
+struct PlotTemplateView: View {
+    @Bindable var session: PlotSession
+    private let columns = [
+        GridItem(.adaptive(minimum: 126, maximum: 156), spacing: 10, alignment: .top),
+    ]
 
     var body: some View {
-        if session.inspectionResponse == nil {
-            EmptyStateCard(
-                title: "Inspect a file first",
-                message: "Template selection is driven by the sidecar inspection and recommendation payloads."
-            )
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    templateSection(
-                        title: "Recommended Templates",
-                        subtitle: "These templates are compatible with the inspected dataset and come directly from the ranked recommendation payload.",
-                        templates: session.recommendedTemplates,
-                        isEnabled: true
-                    )
-
-                    templateSection(
-                        title: "Unavailable Here",
-                        subtitle: "These contract-backed templates stay visible, but are disabled because the current inspected model does not recommend them.",
-                        templates: session.disabledTemplates,
-                        isEnabled: false
-                    )
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func templateSection(
-        title: String,
-        subtitle: String,
-        templates: [MetaTemplateSummary],
-        isEnabled: Bool
-    ) -> some View {
-        let templateItems = Array(templates.enumerated())
-
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Templates")
                     .font(.headline)
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
+                Spacer()
+                if session.inspectionResponse != nil, session.unavailableTemplateCount > 0 {
+                    Text("\(session.unavailableTemplateCount) unavailable")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(templateItems, id: \.element.id) { _, template in
-                    Button {
-                        session.chooseTemplate(template.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(template.label)
-                                    .font(.headline)
-                                Spacer()
-                                if session.selectedTemplateID == template.id {
-                                    Label("Selected", systemImage: "checkmark.circle.fill")
-                                        .labelStyle(.iconOnly)
-                                        .foregroundStyle(Color.accentColor)
-                                }
+            if session.templateGalleryItems.isEmpty {
+                ContentUnavailableView(
+                    "No templates available",
+                    systemImage: "rectangle.grid.2x2",
+                    description: Text("Template identities appear after metadata is loaded.")
+                )
+                .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                    ForEach(session.templateGalleryItems) { item in
+                        Button {
+                            guard item.selectable else {
+                                return
                             }
-
-                            Text(template.description)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
-
-                            KeyValueGrid(values: [
-                                ("ID", template.id),
-                                ("Category", template.category),
-                                ("Default size", template.defaultSize),
-                            ])
+                            session.chooseTemplate(item.id)
+                        } label: {
+                            PlotTemplateCard(
+                                title: item.title,
+                                hint: item.hint,
+                                kind: session.thumbnailKind(for: item.id),
+                                selected: session.selectedTemplateID == item.id,
+                                enabled: item.selectable
+                            )
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(backgroundStyle(for: template, enabled: isEnabled))
+                        .buttonStyle(.plain)
+                        .disabled(!item.selectable)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!isEnabled)
                 }
+            }
+        }
+        .padding(12)
+        .background(.quinary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+struct PlotTemplateThumbnailView: View {
+    let kind: PlotTemplateThumbnailKind
+
+    var body: some View {
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4)
+            let axisColor = Color.secondary.opacity(0.6)
+            let strokeColor = Color.accentColor
+            let fillColor = Color.accentColor.opacity(0.35)
+
+            drawAxes(in: rect, context: &context, axisColor: axisColor)
+
+            switch kind {
+            case .curve:
+                drawCurve(in: rect, context: &context, color: strokeColor, withPoints: false)
+            case .pointLine:
+                drawCurve(in: rect, context: &context, color: strokeColor, withPoints: true)
+            case .scatter:
+                drawScatter(in: rect, context: &context, color: fillColor)
+            case .bar:
+                drawBars(in: rect, context: &context, color: fillColor)
+            case .box:
+                drawBoxes(in: rect, context: &context, color: strokeColor)
+            case .violin:
+                drawViolins(in: rect, context: &context, color: fillColor)
+            case .heatmap:
+                drawHeatmap(in: rect, context: &context)
+            case .fallback:
+                drawScatter(in: rect, context: &context, color: fillColor)
+            }
+        }
+        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func drawAxes(in rect: CGRect, context: inout GraphicsContext, axisColor: Color) {
+        let left = rect.minX + 10
+        let bottom = rect.maxY - 8
+        var axisPath = Path()
+        axisPath.move(to: CGPoint(x: left, y: rect.minY + 8))
+        axisPath.addLine(to: CGPoint(x: left, y: bottom))
+        axisPath.addLine(to: CGPoint(x: rect.maxX - 6, y: bottom))
+        context.stroke(axisPath, with: .color(axisColor), lineWidth: 1)
+    }
+
+    private func drawCurve(
+        in rect: CGRect,
+        context: inout GraphicsContext,
+        color: Color,
+        withPoints: Bool
+    ) {
+        let points = samplePlotPoints(in: rect)
+        var path = Path()
+        path.move(to: points[0])
+        points.dropFirst().forEach { path.addLine(to: $0) }
+        context.stroke(path, with: .color(color), lineWidth: 1.8)
+
+        guard withPoints else {
+            return
+        }
+        for point in points {
+            let dotRect = CGRect(x: point.x - 1.8, y: point.y - 1.8, width: 3.6, height: 3.6)
+            context.fill(Path(ellipseIn: dotRect), with: .color(color))
+        }
+    }
+
+    private func drawScatter(in rect: CGRect, context: inout GraphicsContext, color: Color) {
+        for point in samplePlotPoints(in: rect) {
+            let dotRect = CGRect(x: point.x - 2.2, y: point.y - 2.2, width: 4.4, height: 4.4)
+            context.fill(Path(ellipseIn: dotRect), with: .color(color))
+        }
+    }
+
+    private func drawBars(in rect: CGRect, context: inout GraphicsContext, color: Color) {
+        let barWidths: CGFloat = 8
+        let baseY = rect.maxY - 8
+        let startX = rect.minX + 18
+        let heights: [CGFloat] = [12, 20, 30, 24]
+        for (index, height) in heights.enumerated() {
+            let x = startX + CGFloat(index) * 12
+            let barRect = CGRect(x: x, y: baseY - height, width: barWidths, height: height)
+            context.fill(Path(roundedRect: barRect, cornerRadius: 2), with: .color(color))
+        }
+    }
+
+    private func drawBoxes(in rect: CGRect, context: inout GraphicsContext, color: Color) {
+        let centers: [CGFloat] = [rect.minX + 24, rect.minX + 40, rect.minX + 56]
+        for center in centers {
+            let boxRect = CGRect(x: center - 4, y: rect.midY - 8, width: 8, height: 14)
+            context.stroke(Path(roundedRect: boxRect, cornerRadius: 2), with: .color(color), lineWidth: 1.5)
+            var whisker = Path()
+            whisker.move(to: CGPoint(x: center, y: boxRect.minY - 6))
+            whisker.addLine(to: CGPoint(x: center, y: boxRect.maxY + 6))
+            context.stroke(whisker, with: .color(color), lineWidth: 1)
+        }
+    }
+
+    private func drawViolins(in rect: CGRect, context: inout GraphicsContext, color: Color) {
+        let centers: [CGFloat] = [rect.minX + 24, rect.minX + 42, rect.minX + 60]
+        for center in centers {
+            var shape = Path()
+            shape.move(to: CGPoint(x: center, y: rect.minY + 16))
+            shape.addQuadCurve(
+                to: CGPoint(x: center, y: rect.maxY - 14),
+                control: CGPoint(x: center + 6, y: rect.midY)
+            )
+            shape.addQuadCurve(
+                to: CGPoint(x: center, y: rect.minY + 16),
+                control: CGPoint(x: center - 6, y: rect.midY)
+            )
+            context.fill(shape, with: .color(color))
+        }
+    }
+
+    private func drawHeatmap(in rect: CGRect, context: inout GraphicsContext) {
+        let cols = 5
+        let rows = 3
+        let cellWidth = (rect.width - 20) / CGFloat(cols)
+        let cellHeight = (rect.height - 18) / CGFloat(rows)
+        let startX = rect.minX + 12
+        let startY = rect.minY + 8
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let t = Double((row * cols) + col) / Double(rows * cols)
+                let rect = CGRect(
+                    x: startX + CGFloat(col) * cellWidth,
+                    y: startY + CGFloat(row) * cellHeight,
+                    width: cellWidth - 1,
+                    height: cellHeight - 1
+                )
+                let color = Color(
+                    hue: 0.58 - (0.35 * t),
+                    saturation: 0.65,
+                    brightness: 0.92 - (0.28 * t)
+                )
+                context.fill(Path(rect), with: .color(color))
             }
         }
     }
 
-    @ViewBuilder
-    private func backgroundStyle(for template: MetaTemplateSummary, enabled: Bool) -> some View {
-        let isSelected = session.selectedTemplateID == template.id
-        let fillColor = enabled
-            ? Color.secondary.opacity(isSelected ? 0.18 : 0.08)
-            : Color.secondary.opacity(0.04)
-        let strokeColor = enabled ? Color.secondary.opacity(0.16) : Color.clear
+    private func samplePlotPoints(in rect: CGRect) -> [CGPoint] {
+        let left = rect.minX + 12
+        let bottom = rect.maxY - 8
+        let width = rect.width - 20
+        let height = rect.height - 16
+        let pairs: [(CGFloat, CGFloat)] = [
+            (0.0, 0.85),
+            (0.22, 0.62),
+            (0.46, 0.5),
+            (0.7, 0.32),
+            (1.0, 0.2),
+        ]
+        return pairs.map { x, y in
+            CGPoint(x: left + (x * width), y: (bottom - (y * height)))
+        }
+    }
+}
 
-        RoundedRectangle(cornerRadius: 18)
-            .fill(fillColor)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(strokeColor, lineWidth: 1)
-            }
+private struct PlotTemplateCard: View {
+    let title: String
+    let hint: String
+    let kind: PlotTemplateThumbnailKind
+    let selected: Bool
+    let enabled: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            PlotTemplateThumbnailView(kind: kind)
+                .frame(height: 70)
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+
+            Text(hint)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(
+                    selected ? Color.accentColor : Color.secondary.opacity(enabled ? 0.2 : 0.08),
+                    lineWidth: selected ? 1.6 : 1
+                )
+        )
+        .opacity(enabled ? 1 : 0.78)
+    }
+
+    private var cardBackground: some ShapeStyle {
+        selected ? AnyShapeStyle(Color.accentColor.opacity(0.08)) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
     }
 }

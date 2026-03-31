@@ -87,7 +87,7 @@ private struct ComposerGuideSheet: View {
                     )
                     guideSection(
                         title: "Export",
-                        text: "Preview and export still use the authoritative sidecar flow. Export creates the final single-page PDF while preserving the existing repo-backed composition rules."
+                        text: "Preview and export still use the authoritative sidecar flow. Export opens a native save dialog and writes either PDF or TIFF to your chosen destination."
                     )
                 }
                 .padding(24)

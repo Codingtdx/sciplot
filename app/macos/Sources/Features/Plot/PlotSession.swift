@@ -1,23 +1,18 @@
 import Foundation
 import Observation
 
-enum PlotStage: String, CaseIterable, Identifiable {
-    case importData
-    case template
-    case refineExport
+enum PlotWorkspaceMode: String, CaseIterable, Identifiable {
+    case review
+    case refine
 
     var id: String { rawValue }
+}
 
-    var title: String {
-        switch self {
-        case .importData:
-            return "Import"
-        case .template:
-            return "Template"
-        case .refineExport:
-            return "Refine & Export"
-        }
-    }
+struct PlotTemplateGalleryItem: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let hint: String
+    let selectable: Bool
 }
 
 struct PlotSampleColumn: Identifiable, Hashable {
@@ -40,9 +35,17 @@ struct PlotSampleRow: Identifiable, Hashable {
 @MainActor
 @Observable
 final class PlotSession {
-    @ObservationIgnored private var client: (any SidecarClienting)?
+    typealias PlotExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool) -> URL?
+    typealias PlotExportMaterializer = @MainActor (_ sourceURLs: [URL], _ destinationURL: URL) throws -> [URL]
 
-    var stage: PlotStage = .importData
+    @ObservationIgnored private var client: (any SidecarClienting)?
+    @ObservationIgnored private let chooseExportDestination: PlotExportDestinationChooser
+    @ObservationIgnored private let materializeExport: PlotExportMaterializer
+    @ObservationIgnored private var inspectedInputPath: String?
+    @ObservationIgnored private var inspectedSheet: SheetValue?
+    @ObservationIgnored private var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
+
+    var workspaceMode: PlotWorkspaceMode = .review
     var isImporterPresented = false
     var selectedFileURL: URL?
     var selectedSheet: SheetValue = .index(0)
@@ -50,7 +53,14 @@ final class PlotSession {
     var metadata: SidecarMetaResponse?
     var contract: PlotContractResponse?
     var selectedTemplateID: String?
-    var renderOptions = RenderOptionsPayload()
+    var renderOptions = RenderOptionsPayload() {
+        didSet {
+            guard renderOptions != oldValue else {
+                return
+            }
+            invalidateRenderArtifacts()
+        }
+    }
     var previewResponse: RenderPreviewResponse?
     var preflightResponse: PreflightRenderResponse?
     var exportResponse: ExportRenderResponse?
@@ -59,9 +69,62 @@ final class PlotSession {
     var isPreviewing = false
     var isRunningPreflight = false
     var isExporting = false
+    var userExportURLs: [URL] = []
+
+    init(
+        chooseExportDestination: @escaping PlotExportDestinationChooser = {
+            NativeExportCoordinator.choosePlotExportLocation(suggestedName: $0, isMultiOutput: $1)
+        },
+        materializeExport: @escaping PlotExportMaterializer = {
+            try NativeExportCoordinator.materializePlotOutputs(sourceURLs: $0, destinationURL: $1)
+        }
+    ) {
+        self.chooseExportDestination = chooseExportDestination
+        self.materializeExport = materializeExport
+    }
 
     var hasSessionContent: Bool {
         selectedFileURL != nil || inspectionResponse != nil || selectedTemplateID != nil
+    }
+
+    var hasRenderableSelection: Bool {
+        selectedFileURL != nil && selectedTemplateID != nil && !needsInspection
+    }
+
+    var needsInspection: Bool {
+        guard let selectedFileURL else {
+            return false
+        }
+        guard let inspectedInputPath, let inspectedSheet else {
+            return true
+        }
+        return inspectedInputPath != selectedFileURL.path || inspectedSheet != selectedSheet || inspectionResponse == nil
+    }
+
+    var canContinueToRefine: Bool {
+        hasRenderableSelection
+            && !isInspecting
+            && !isPreviewing
+            && (workspaceMode != .refine || previewResponse == nil)
+    }
+
+    var inspectOrReviewActionTitle: String {
+        needsInspection ? "Inspect" : "Review"
+    }
+
+    var canInspectOrReviewAction: Bool {
+        if needsInspection {
+            return selectedFileURL != nil && !isInspecting
+        }
+        return workspaceMode != .review
+    }
+
+    var selectedSourceFilename: String? {
+        selectedFileURL?.lastPathComponent
+    }
+
+    var selectedSourcePath: String? {
+        selectedFileURL?.path
     }
 
     func configure(client: any SidecarClienting) {
@@ -81,16 +144,45 @@ final class PlotSession {
         selectedSheet = .index(0)
         inspectionResponse = nil
         selectedTemplateID = nil
-        previewResponse = nil
-        preflightResponse = nil
-        exportResponse = nil
+        inspectedInputPath = nil
+        inspectedSheet = nil
+        invalidateRenderArtifacts()
+        userExportURLs = []
         errorMessage = nil
-        stage = .importData
+        workspaceMode = .review
+    }
+
+    func importFileAndInspect(_ url: URL) async {
+        handleImportedFile(url)
+        await inspectCurrentFile()
     }
 
     func seedFromCleanup(workbookURL: URL, preferredSheet: SheetValue) {
         handleImportedFile(workbookURL)
         selectedSheet = preferredSheet
+        Task {
+            await inspectCurrentFile()
+        }
+    }
+
+    func selectSheetAndReinspect(_ sheet: SheetValue) async {
+        guard selectedFileURL != nil else {
+            selectedSheet = sheet
+            return
+        }
+
+        guard selectedSheet != sheet || needsInspection else {
+            return
+        }
+
+        selectedSheet = sheet
+        inspectionResponse = nil
+        selectedTemplateID = nil
+        inspectedInputPath = nil
+        inspectedSheet = nil
+        invalidateRenderArtifacts()
+        workspaceMode = .review
+        await inspectCurrentFile()
     }
 
     func inspectCurrentFile() async {
@@ -109,20 +201,33 @@ final class PlotSession {
             )
             inspectionResponse = response
             selectedSheet = response.sheet
+            inspectedInputPath = selectedFileURL.path
+            inspectedSheet = response.sheet
             chooseInitialTemplate(from: response)
-            stage = .template
+            workspaceMode = .review
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
+    func runInspectOrReviewAction() async {
+        if needsInspection {
+            await inspectCurrentFile()
+        } else {
+            returnToReview()
+        }
+    }
+
     func chooseTemplate(_ templateID: String) {
+        guard selectedTemplateID != templateID else {
+            return
+        }
         selectedTemplateID = templateID
         resetRenderOptions(for: templateID)
-        previewResponse = nil
-        preflightResponse = nil
-        exportResponse = nil
-        stage = .refineExport
+        workspaceMode = .review
+        userExportURLs = []
+        errorMessage = nil
+        invalidateRenderArtifacts()
     }
 
     func renderPreviewIfNeeded() async {
@@ -130,6 +235,18 @@ final class PlotSession {
             return
         }
         await renderPreview()
+    }
+
+    func continueToRefine() async {
+        guard canContinueToRefine else {
+            return
+        }
+        workspaceMode = .refine
+        await renderPreviewIfNeeded()
+    }
+
+    func returnToReview() {
+        workspaceMode = .review
     }
 
     func renderPreview() async {
@@ -168,8 +285,17 @@ final class PlotSession {
         guard
             let client,
             let selectedFileURL,
-            let selectedTemplateID
+            let selectedTemplateID,
+            hasRenderableSelection
         else {
+            return
+        }
+
+        let isMultiOutput = isMultiOutputTemplate(templateID: selectedTemplateID)
+        guard let destinationURL = chooseExportDestination(
+            suggestedPlotExportFilename(templateID: selectedTemplateID),
+            isMultiOutput
+        ) else {
             return
         }
 
@@ -178,7 +304,7 @@ final class PlotSession {
         defer { isExporting = false }
 
         do {
-            exportResponse = try await client.exportRender(
+            let response = try await client.exportRender(
                 .init(
                     inputPath: selectedFileURL.path,
                     sheet: selectedSheet,
@@ -187,40 +313,108 @@ final class PlotSession {
                     outputDir: nil
                 )
             )
+            let sourceURLs = response.outputs.map { URL(fileURLWithPath: $0) }
+            userExportURLs = try materializeExport(sourceURLs, destinationURL)
+            exportResponse = response
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func revealLatestExport() {
-        if let manifestPath = exportResponse?.manifestPath {
-            WorkspaceBridge.reveal([URL(fileURLWithPath: manifestPath)])
-        } else if let outputDir = exportResponse?.outputDir {
-            WorkspaceBridge.reveal([URL(fileURLWithPath: outputDir)])
+        if !userExportURLs.isEmpty {
+            WorkspaceBridge.reveal(userExportURLs)
         }
     }
 
-    var availableSheets: [SheetValue] {
-        guard let inspectionResponse, !inspectionResponse.sheetNames.isEmpty else {
-            return [.index(0)]
+    var latestExportDestinationDescription: String? {
+        guard !userExportURLs.isEmpty else {
+            return nil
         }
-        return inspectionResponse.sheetNames.map(SheetValue.name)
+        if userExportURLs.count == 1 {
+            return userExportURLs[0].path
+        }
+        return userExportURLs[0].deletingLastPathComponent().path
+    }
+
+    var availableSheets: [SheetValue] {
+        if let inspectionResponse, !inspectionResponse.sheetNames.isEmpty {
+            return inspectionResponse.sheetNames.map(SheetValue.name)
+        }
+        if selectedFileURL != nil {
+            return [selectedSheet]
+        }
+        return [.index(0)]
     }
 
     var availableTemplateSummaries: [MetaTemplateSummary] {
         metadata?.templates ?? []
     }
 
-    var recommendedTemplateIDs: Set<String> {
-        Set(inspectionResponse?.inspection.recommendations.map(\.templateID) ?? [])
+    var templateGalleryItems: [PlotTemplateGalleryItem] {
+        let templates = availableTemplateSummaries
+        guard !templates.isEmpty else {
+            return []
+        }
+
+        guard inspectionResponse != nil else {
+            return templates.map { template in
+                PlotTemplateGalleryItem(
+                    id: template.id,
+                    title: template.label,
+                    hint: shortGalleryHint(for: template),
+                    selectable: false
+                )
+            }
+        }
+
+        let summariesByID = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
+        return compatibleRecommendations.map { recommendation in
+            let summary = summariesByID[recommendation.templateID]
+            return PlotTemplateGalleryItem(
+                id: recommendation.templateID,
+                title: summary?.label ?? recommendation.templateID,
+                hint: shortCompatibilityHint(from: recommendation),
+                selectable: true
+            )
+        }
     }
 
-    var recommendedTemplates: [MetaTemplateSummary] {
-        availableTemplateSummaries.filter { recommendedTemplateIDs.contains($0.id) }
+    var compatibleRecommendations: [TemplateRecommendationResponse] {
+        guard let inspection = inspectionResponse?.inspection else {
+            return []
+        }
+
+        let orderedCandidates = inspection.primaryRecommendation + inspection.alternativeRecommendations + inspection.advancedTemplates
+        let source = orderedCandidates.isEmpty ? inspection.recommendations : orderedCandidates
+        var seen: Set<String> = []
+        return source.filter { candidate in
+            seen.insert(candidate.templateID).inserted
+        }
     }
 
-    var disabledTemplates: [MetaTemplateSummary] {
-        availableTemplateSummaries.filter { !recommendedTemplateIDs.contains($0.id) }
+    var compatibleTemplateIDs: Set<String> {
+        Set(compatibleRecommendations.map(\.templateID))
+    }
+
+    var unavailableTemplateCount: Int {
+        max(0, availableTemplateSummaries.count - compatibleTemplateIDs.count)
+    }
+
+    var selectedTemplateRecommendation: TemplateRecommendationResponse? {
+        guard let selectedTemplateID else {
+            return nil
+        }
+        return compatibleRecommendations.first { $0.templateID == selectedTemplateID }
+            ?? inspectionResponse?.inspection.recommendations.first { $0.templateID == selectedTemplateID }
+    }
+
+    func templateSummary(for templateID: String) -> MetaTemplateSummary? {
+        availableTemplateSummaries.first { $0.id == templateID }
+    }
+
+    func templateLabel(for templateID: String) -> String {
+        templateSummary(for: templateID)?.label ?? templateID
     }
 
     var selectedTemplateSummary: MetaTemplateSummary? {
@@ -269,10 +463,57 @@ final class PlotSession {
         } ?? []
     }
 
+    var candidateRoleRows: [(String, String)] {
+        guard let roles = inspectionResponse?.dataset?.candidateRoles else {
+            return []
+        }
+
+        let pairs: [(String, [String])] = [
+            ("X", roles.x),
+            ("Y", roles.y),
+            ("Z", roles.z),
+            ("Group", roles.group),
+            ("Sample", roles.sample),
+            ("Value", roles.value),
+            ("Metric", roles.metric),
+            ("Label", roles.label),
+            ("Series", roles.series),
+        ]
+
+        return pairs.compactMap { title, values in
+            guard !values.isEmpty else {
+                return nil
+            }
+            return (title, values.prefix(3).joined(separator: ", "))
+        }
+    }
+
+    var inferredMappingRows: [(String, String)] {
+        guard let mapping = selectedTemplateRecommendation?.inferredMapping else {
+            return []
+        }
+
+        return mapping
+            .filter { !$0.value.isEmpty }
+            .map { (key: $0.key, value: $0.value) }
+            .sorted { $0.key < $1.key }
+    }
+
+    func thumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
+        if let cached = thumbnailKindCache[templateID] {
+            return cached
+        }
+
+        let resolved = resolveThumbnailKind(for: templateID)
+        thumbnailKindCache[templateID] = resolved
+        return resolved
+    }
+
     private func currentRenderRequest() -> RenderRequest? {
         guard
             let selectedFileURL,
-            let selectedTemplateID
+            let selectedTemplateID,
+            !needsInspection
         else {
             return nil
         }
@@ -286,12 +527,12 @@ final class PlotSession {
     }
 
     private func chooseInitialTemplate(from response: InspectFileResponse) {
-        if let first = response.inspection.primaryRecommendation.first {
-            chooseTemplate(first.templateID)
-            return
-        }
-
-        chooseTemplate(response.inspection.recommendation.template)
+        let preferredTemplateID = response.inspection.primaryRecommendation.first?.templateID
+            ?? response.inspection.recommendation.template
+        selectedTemplateID = preferredTemplateID
+        resetRenderOptions(for: preferredTemplateID)
+        invalidateRenderArtifacts()
+        errorMessage = nil
     }
 
     private func resetRenderOptions(for templateID: String) {
@@ -334,5 +575,94 @@ final class PlotSession {
         }
 
         return template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "aqua_graphite"
+    }
+
+    private func suggestedPlotExportFilename(templateID: String) -> String {
+        if let exportResponse,
+           let firstOutput = exportResponse.outputs.first
+        {
+            return URL(fileURLWithPath: firstOutput).lastPathComponent
+        }
+        if let selectedFileURL {
+            return "\(selectedFileURL.deletingPathExtension().lastPathComponent)_\(templateID).pdf"
+        }
+        return "\(templateID).pdf"
+    }
+
+    private func isMultiOutputTemplate(templateID: String) -> Bool {
+        guard templateID == "point_line" || templateID == "curve" else {
+            return false
+        }
+        guard let model = inspectionResponse?.inspection.model else {
+            return false
+        }
+        return model == "frequency_sweep" || model == "temperature_sweep" || model == "stress_relaxation"
+    }
+
+    private func shortGalleryHint(for template: MetaTemplateSummary) -> String {
+        switch template.category.lowercased() {
+        case "curve":
+            return "Curve"
+        case "stats":
+            return "Statistics"
+        case "heatmap":
+            return "Heatmap"
+        default:
+            return "Template"
+        }
+    }
+
+    private func shortCompatibilityHint(from recommendation: TemplateRecommendationResponse) -> String {
+        let text = recommendation.suitabilityHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            return truncateHint(text)
+        }
+        if let rank = recommendation.rank {
+            return rank == 1 ? "Top match" : "Rank #\(rank)"
+        }
+        return "Compatible"
+    }
+
+    private func truncateHint(_ text: String, limit: Int = 28) -> String {
+        guard text.count > limit else {
+            return text
+        }
+        let index = text.index(text.startIndex, offsetBy: limit)
+        return "\(text[..<index])…"
+    }
+
+    private func resolveThumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
+        let normalizedID = templateID.lowercased()
+        let category = templateSummary(for: templateID)?.category.lowercased() ?? ""
+
+        if normalizedID.contains("heatmap") || category.contains("heatmap") {
+            return .heatmap
+        }
+        if normalizedID.contains("bar") || normalizedID.contains("hist") || category.contains("stats") {
+            return .bar
+        }
+        if normalizedID.contains("box") {
+            return .box
+        }
+        if normalizedID.contains("violin") {
+            return .violin
+        }
+        if normalizedID.contains("scatter") {
+            return .scatter
+        }
+        if normalizedID.contains("point_line") || normalizedID.contains("pointline") {
+            return .pointLine
+        }
+        if normalizedID.contains("curve") || normalizedID.contains("line") || category.contains("curve") {
+            return .curve
+        }
+        return .fallback
+    }
+
+    private func invalidateRenderArtifacts() {
+        previewResponse = nil
+        preflightResponse = nil
+        exportResponse = nil
+        userExportURLs = []
     }
 }

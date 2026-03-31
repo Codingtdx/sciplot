@@ -52,14 +52,19 @@ final class DataCleanupSession {
     var preparedWorkbooks: [PreparedWorkbookItem] = []
     var latestPreprocessResponse: TensileReplicateResponseModel?
     var comparisonExportResponse: TensileComparisonExportResponse?
+    var comparisonExportDestinationURL: URL?
     var groupName = ""
     var errorMessage: String?
     var isBusy = false
     var openInPlotHandler: ((URL, SheetValue) -> Void)?
 
     init(
-        chooseDirectory: @escaping DirectoryChooser = NativePanels.chooseDirectory,
-        chooseWorkbookSaveLocation: @escaping WorkbookSaveChooser = NativePanels.chooseWorkbookSaveLocation
+        chooseDirectory: @escaping DirectoryChooser = { title, message in
+            NativeExportCoordinator.chooseDirectory(title: title, message: message)
+        },
+        chooseWorkbookSaveLocation: @escaping WorkbookSaveChooser = {
+            NativeExportCoordinator.chooseWorkbookSaveLocation(suggestedName: $0)
+        }
     ) {
         self.chooseDirectory = chooseDirectory
         self.chooseWorkbookSaveLocation = chooseWorkbookSaveLocation
@@ -79,6 +84,7 @@ final class DataCleanupSession {
 
     func handleImportedRawFiles(_ urls: [URL]) async {
         rawInputURLs = urls.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        comparisonExportDestinationURL = nil
         errorMessage = nil
 
         guard !rawInputURLs.isEmpty else {
@@ -102,6 +108,7 @@ final class DataCleanupSession {
         }
 
         isBusy = true
+        comparisonExportDestinationURL = nil
         errorMessage = nil
         defer { isBusy = false }
 
@@ -139,6 +146,7 @@ final class DataCleanupSession {
         }
 
         isBusy = true
+        comparisonExportDestinationURL = nil
         errorMessage = nil
         defer { isBusy = false }
 
@@ -192,6 +200,7 @@ final class DataCleanupSession {
                     outputDir: directoryURL.path
                 )
             )
+            comparisonExportDestinationURL = directoryURL
             stage = .export
         } catch {
             errorMessage = error.localizedDescription
@@ -206,8 +215,8 @@ final class DataCleanupSession {
     }
 
     func revealLatestExport() {
-        if let bundleDir = comparisonExportResponse?.bundleDir {
-            WorkspaceBridge.reveal([URL(fileURLWithPath: bundleDir)])
+        if let comparisonExportDestinationURL {
+            WorkspaceBridge.reveal([comparisonExportDestinationURL])
         } else if let primaryWorkbookURL {
             WorkspaceBridge.reveal([primaryWorkbookURL])
         }

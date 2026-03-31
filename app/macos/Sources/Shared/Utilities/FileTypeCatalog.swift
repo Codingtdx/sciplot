@@ -14,5 +14,6 @@ enum FileTypeCatalog {
     static let cleanupRawInputs = [csv]
     static let cleanupWorkbookInputs = [xlsx, xlsm]
     static let composerImports = [pdf, png, jpeg, webP, tiff]
+    static let composerExport = [pdf, tiff]
     static let workbookExport = [xlsx]
 }
