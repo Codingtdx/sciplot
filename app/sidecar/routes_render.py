@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from fastapi import APIRouter
 
@@ -126,6 +127,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 y_min=payload_options.y_min,
                 y_max=payload_options.y_max,
                 series_order=payload_options.series_order,
+                x_label_override=payload_options.x_label_override,
+                y_label_override=payload_options.y_label_override,
                 baseline=payload_options.baseline,
                 show_colorbar=payload_options.show_colorbar,
                 style_preset=payload_options.style_preset,
@@ -166,9 +169,12 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
             payload_options = request.options
-            managed_output_dir_fn = _dep(
-                "prepare_managed_plot_export_dir",
-                prepare_managed_plot_export_dir,
+            managed_output_dir_fn = cast(
+                Callable[..., Path],
+                _dep(
+                    "prepare_managed_plot_export_dir",
+                    prepare_managed_plot_export_dir,
+                ),
             )
             output_dir = (
                 Path(request.output_dir).expanduser()
@@ -199,6 +205,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 y_min=payload_options.y_min,
                 y_max=payload_options.y_max,
                 series_order=payload_options.series_order,
+                x_label_override=payload_options.x_label_override,
+                y_label_override=payload_options.y_label_override,
                 baseline=payload_options.baseline,
                 show_colorbar=payload_options.show_colorbar,
                 style_preset=payload_options.style_preset,

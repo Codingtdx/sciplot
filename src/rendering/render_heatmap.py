@@ -242,6 +242,22 @@ def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) 
         colorbar_tick_count=layout.colorbar_tick_count,
         colorbar_label_gap_pt=layout.label_gap_pt,
     )
+    if fig.axes:
+        ax = fig.axes[0]
+        ax.set_xlabel(
+            _format_axis_label(
+                table.x_label,
+                table.x_unit,
+                override_label=options.x_label_override,
+            )
+        )
+        ax.set_ylabel(
+            _format_axis_label(
+                table.y_label,
+                table.y_unit,
+                override_label=options.y_label_override,
+            )
+        )
     autofixes = ("heatmap_colorbar_tuned",) if options.show_colorbar else ()
     return [
         _rendered_plot_with_qa(
@@ -296,8 +312,20 @@ def _render_annotated_heatmap(input_path: Path, sheet: str | int, options: Rende
             zorder=4.2,
             clip_on=True,
         )
-    ax.set_xlabel(_format_axis_label(table.x_label, table.x_unit))
-    ax.set_ylabel(_format_axis_label(table.y_label, table.y_unit))
+    ax.set_xlabel(
+        _format_axis_label(
+            table.x_label,
+            table.x_unit,
+            override_label=options.x_label_override,
+        )
+    )
+    ax.set_ylabel(
+        _format_axis_label(
+            table.y_label,
+            table.y_unit,
+            override_label=options.y_label_override,
+        )
+    )
     autofixes = ["annotated_heatmap_labels"]
     if strategy_id != "labels_full":
         autofixes.append("annotated_heatmap_label_layout_policy")

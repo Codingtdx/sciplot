@@ -400,6 +400,26 @@ final class PlotSession {
             ?? inspectionResponse?.inspection.recommendations.first { $0.templateID == selectedTemplateID }
     }
 
+    var recommendedXAxisLabel: String? {
+        if let label = selectedTemplateRecommendation?.inferredMapping["x"], !label.isEmpty {
+            return label
+        }
+        if let label = inspectionResponse?.inspection.primaryRecommendation.first?.inferredMapping["x"], !label.isEmpty {
+            return label
+        }
+        return nil
+    }
+
+    var recommendedYAxisLabel: String? {
+        if let label = selectedTemplateRecommendation?.inferredMapping["y"], !label.isEmpty {
+            return label
+        }
+        if let label = inspectionResponse?.inspection.primaryRecommendation.first?.inferredMapping["y"], !label.isEmpty {
+            return label
+        }
+        return nil
+    }
+
     func templateSummary(for templateID: String) -> MetaTemplateSummary? {
         availableTemplateSummaries.first { $0.id == templateID }
     }
@@ -744,6 +764,8 @@ final class PlotSession {
             yscale: recommendation?.yscale,
             reverseX: recommendation?.reverseX ?? false,
             seriesOrder: nil,
+            xLabelOverride: nil,
+            yLabelOverride: nil,
             baseline: recommendation?.baseline,
             showColorbar: recommendation?.showColorbar,
             stylePreset: defaultStyle(for: template),

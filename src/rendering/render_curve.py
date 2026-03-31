@@ -11,6 +11,7 @@ from src import plot_style
 from src.plotting_curve_support import compute_shared_curve_x_layout
 from src.plotting_families.curve_family import plot_curves, plot_scatter
 from src.plotting_families.spectral_family import plot_wide_nmr
+from src.plotting_primitives import _format_axis_label
 from src.rendering.cache import load_curve_table_cached
 from src.rendering.common import (
     aligned_replicate_band,
@@ -40,6 +41,24 @@ from src.rendering.render_curve_support import (
 )
 from src.rendering.render_support import _rendered_plot_with_qa
 from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
+
+
+def _apply_curve_axis_labels(ax, first, options: RenderOptions, *, preserve_stress_label: bool) -> None:
+    ax.set_xlabel(
+        _format_axis_label(
+            first.x_label,
+            first.x_unit,
+            override_label=options.x_label_override,
+        )
+    )
+    ax.set_ylabel(
+        _format_axis_label(
+            first.y_label,
+            first.y_unit,
+            preserve_stress_label=preserve_stress_label,
+            override_label=options.y_label_override,
+        )
+    )
 
 
 def _render_curve_candidate(
@@ -88,6 +107,7 @@ def _render_curve_candidate(
             visible_xticks=base_kwargs.get("visible_xticks"),
             xlim=base_kwargs.get("xlim"),
             ylim=base_kwargs.get("ylim"),
+            preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
             y_padding_top=(
                 _float_plot_kw(base_kwargs, "y_padding_top", 0.12) + 0.04
                 if compact_legend
@@ -127,6 +147,7 @@ def _render_curve_candidate(
                 else str(base_kwargs.get("legend_mode", "inside_best"))
             ),
             legend_expand_axes=str(base_kwargs.get("legend_expand_axes", "xy")),
+            preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
             series_label_mode=(
                 "edge"
                 if direct_label_side is not None
@@ -162,6 +183,13 @@ def _render_curve_candidate(
         options=options,
         autofixes_applied=tuple(dict.fromkeys([*autofixes, *applied])),
     )
+    if rendered.figure.axes:
+        _apply_curve_axis_labels(
+            rendered.figure.axes[0],
+            series_list[0],
+            options,
+            preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
+        )
     return rendered, strategy
 
 
@@ -331,7 +359,10 @@ def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) ->
             series_list=series_list,
             options=options,
             show_markers=False,
-            base_kwargs={"axis_mode": axis_mode},
+            base_kwargs={
+                "axis_mode": axis_mode,
+                "preserve_stress_label": is_tensile_curve,
+            },
         )
     ]
 
@@ -353,7 +384,10 @@ def _render_point_line(input_path: Path, sheet: str | int, options: RenderOption
             series_list=series_list,
             options=options,
             show_markers=True,
-            base_kwargs={"axis_mode": axis_mode},
+            base_kwargs={
+                "axis_mode": axis_mode,
+                "preserve_stress_label": is_tensile_curve,
+            },
         )
     ]
 
@@ -430,7 +464,10 @@ def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) 
             options=options,
             show_markers=False,
             scatter=True,
-            base_kwargs={"axis_mode": axis_mode},
+            base_kwargs={
+                "axis_mode": axis_mode,
+                "preserve_stress_label": is_tensile_curve,
+            },
         )
     ]
 
@@ -468,7 +505,10 @@ def _render_bubble_scatter(input_path: Path, sheet: str | int, options: RenderOp
         options=options,
         show_markers=False,
         scatter=True,
-        base_kwargs={"axis_mode": axis_mode},
+        base_kwargs={
+            "axis_mode": axis_mode,
+            "preserve_stress_label": is_tensile_curve,
+        },
     )
     ax = rendered.figure.axes[0]
     scatter_collections = [collection for collection in ax.collections if np.asarray(collection.get_offsets()).size]
@@ -536,7 +576,10 @@ def _render_scatter_fit_like(
         options=options,
         show_markers=False,
         scatter=True,
-        base_kwargs={"axis_mode": axis_mode},
+        base_kwargs={
+            "axis_mode": axis_mode,
+            "preserve_stress_label": is_tensile_curve,
+        },
     )
     ax = rendered.figure.axes[0]
     x_line, y_line, fit_label = _fit_line_xy(series_list)
@@ -607,7 +650,10 @@ def _render_replicate_band_like(
         series_list=series_list,
         options=options,
         show_markers=False,
-        base_kwargs={"axis_mode": axis_mode},
+        base_kwargs={
+            "axis_mode": axis_mode,
+            "preserve_stress_label": is_tensile_curve,
+        },
     )
     ax = rendered.figure.axes[0]
     x_band, mean_band, std_band = aligned_replicate_band(series_list)

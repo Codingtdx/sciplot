@@ -10,6 +10,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var yMin: Double?
     var yMax: Double?
     var seriesOrder: [String]?
+    var xLabelOverride: String?
+    var yLabelOverride: String?
     var baseline: String?
     var showColorbar: Bool?
     var stylePreset: String
@@ -27,6 +29,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         yMin: Double? = nil,
         yMax: Double? = nil,
         seriesOrder: [String]? = nil,
+        xLabelOverride: String? = nil,
+        yLabelOverride: String? = nil,
         baseline: String? = nil,
         showColorbar: Bool? = nil,
         stylePreset: String = "journal_calm",
@@ -43,6 +47,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.yMin = yMin
         self.yMax = yMax
         self.seriesOrder = seriesOrder
+        self.xLabelOverride = xLabelOverride
+        self.yLabelOverride = yLabelOverride
         self.baseline = baseline
         self.showColorbar = showColorbar
         self.stylePreset = stylePreset
@@ -61,6 +67,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case yMin
         case yMax
         case seriesOrder
+        case xLabelOverride
+        case yLabelOverride
         case baseline
         case showColorbar
         case stylePreset

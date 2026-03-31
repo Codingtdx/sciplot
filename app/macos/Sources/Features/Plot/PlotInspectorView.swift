@@ -253,36 +253,62 @@ struct PlotInspectorView: View {
     }
 
     private func stringBinding(
-        get: @escaping @Sendable () -> String,
-        set: @escaping @Sendable (String) -> Void
-    ) -> Binding<String> {
-        Binding(get: get, set: set)
-    }
-
-    private func boolBinding(
-        get: @escaping @Sendable () -> Bool,
-        set: @escaping @Sendable (Bool) -> Void
-    ) -> Binding<Bool> {
-        Binding(get: get, set: set)
-    }
-
-    private func numericTextBinding(
-        get: @escaping () -> Double?,
-        set: @escaping (Double?) -> Void
+        get: @escaping @MainActor () -> String,
+        set: @escaping @MainActor (String) -> Void
     ) -> Binding<String> {
         Binding(
             get: {
-                guard let value = get() else {
+                MainActor.assumeIsolated {
+                    get()
+                }
+            },
+            set: { newValue in
+                MainActor.assumeIsolated {
+                    set(newValue)
+                }
+            }
+        )
+    }
+
+    private func boolBinding(
+        get: @escaping @MainActor () -> Bool,
+        set: @escaping @MainActor (Bool) -> Void
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                MainActor.assumeIsolated {
+                    get()
+                }
+            },
+            set: { newValue in
+                MainActor.assumeIsolated {
+                    set(newValue)
+                }
+            }
+        )
+    }
+
+    private func numericTextBinding(
+        get: @escaping @MainActor () -> Double?,
+        set: @escaping @MainActor (Double?) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let value = MainActor.assumeIsolated({
+                    get()
+                }) else {
                     return ""
                 }
                 return value.formatted(.number.precision(.fractionLength(0...4)))
             },
             set: { newValue in
                 let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    set(nil)
-                } else if let parsed = Double(trimmed) {
-                    set(parsed)
+                MainActor.assumeIsolated {
+                    if trimmed.isEmpty {
+                        set(nil)
+                    } else if let parsed = Double(trimmed) {
+                        set(parsed)
+                    }
                 }
             }
         )

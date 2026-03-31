@@ -147,6 +147,27 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
     }
 
+    func testAxisLabelOverridesRefreshPreviewAndReachRenderRequests() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.updateRenderOptions(policy: .debounced) {
+            $0.xLabelOverride = "Extension"
+            $0.yLabelOverride = "Stress"
+        }
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
+
+        XCTAssertEqual(client.renderRequests.last?.options.xLabelOverride, "Extension")
+        XCTAssertEqual(client.renderRequests.last?.options.yLabelOverride, "Stress")
+    }
+
     func testSeriesLegendControlsOnlyAppearForMultiSeriesTemplates() async throws {
         let client = MockSidecarClient()
         client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")

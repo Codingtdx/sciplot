@@ -31,6 +31,8 @@ class RenderOptions:
     y_min: float | None = None
     y_max: float | None = None
     series_order: tuple[str, ...] | None = None
+    x_label_override: str | None = None
+    y_label_override: str | None = None
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
 

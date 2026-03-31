@@ -144,6 +144,7 @@ private struct PlotGuideSheet: View {
                         title: "Inspector",
                         text: "Use the inspector for compact plot options, axis controls, and legend ordering. Keep the canvas dominant and move secondary helpers into lightweight surfaces."
                     )
+                    axisLabelOverridesSection
                     dataTemplatesSection
                     guideSection(
                         title: "Export",
@@ -163,6 +164,73 @@ private struct PlotGuideSheet: View {
             }
         }
         .frame(minWidth: 520, minHeight: 420)
+    }
+
+    private var axisLabelOverridesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Axis Label Overrides")
+                .font(.headline)
+
+            Text("Auto normalization currently includes replacements like frequency -> ω, storage modulus -> G', shear strain -> γ, stress -> σ, and 2theta -> 2θ. Use overrides below when you want exact wording for the current Plot session.")
+                .foregroundStyle(.secondary)
+
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    Text("X label")
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        session.recommendedXAxisLabel ?? "Use recommended label",
+                        text: axisLabelBinding(
+                            get: { session.renderOptions.xLabelOverride },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.xLabelOverride = newValue }
+                            }
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                }
+
+                GridRow {
+                    Text("Y label")
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        session.recommendedYAxisLabel ?? "Use recommended label",
+                        text: axisLabelBinding(
+                            get: { session.renderOptions.yLabelOverride },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.yLabelOverride = newValue }
+                            }
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            if session.recommendedXAxisLabel != nil || session.recommendedYAxisLabel != nil {
+                Text(
+                    "Recommended: X = \(session.recommendedXAxisLabel ?? "Auto"), Y = \(session.recommendedYAxisLabel ?? "Auto")"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 10) {
+                Button("Reset Overrides") {
+                    session.updateRenderOptions(policy: .immediate) {
+                        $0.xLabelOverride = nil
+                        $0.yLabelOverride = nil
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                Text("Session-only. Preview and export both use these overrides.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var dataTemplatesSection: some View {
@@ -205,6 +273,19 @@ private struct PlotGuideSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func axisLabelBinding(
+        get: @escaping () -> String?,
+        set: @escaping (String?) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: { get() ?? "" },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                set(trimmed.isEmpty ? nil : trimmed)
+            }
+        )
     }
 }
 

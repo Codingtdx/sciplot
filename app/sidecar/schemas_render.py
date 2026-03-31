@@ -25,6 +25,8 @@ class RenderOptionsPayload(StrictModel):
     y_min: float | None = None
     y_max: float | None = None
     series_order: list[str] | None = None
+    x_label_override: str | None = None
+    y_label_override: str | None = None
     baseline: str | None = None
     show_colorbar: bool | None = None
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET

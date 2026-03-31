@@ -49,6 +49,15 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         raw_point_alpha=stats_profile.raw_point_alpha,
         ylim=_manual_y_override(options),
     )
+    if fig.axes:
+        first = groups[0]
+        fig.axes[0].set_ylabel(
+            _format_axis_label(
+                first.value_label,
+                first.value_unit,
+                override_label=options.y_label_override,
+            )
+        )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_bar.pdf",
@@ -72,6 +81,15 @@ def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         spacing_scale=stats_profile.spacing_scale,
         ylim=_manual_y_override(options),
     )
+    if fig.axes:
+        first = groups[0]
+        fig.axes[0].set_ylabel(
+            _format_axis_label(
+                first.value_label,
+                first.value_unit,
+                override_label=options.y_label_override,
+            )
+        )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_box.pdf",
@@ -94,6 +112,15 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
         spacing_scale=stats_profile.spacing_scale,
         ylim=_manual_y_override(options),
     )
+    if fig.axes:
+        first = groups[0]
+        fig.axes[0].set_ylabel(
+            _format_axis_label(
+                first.value_label,
+                first.value_unit,
+                override_label=options.y_label_override,
+            )
+        )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_violin.pdf",
@@ -143,6 +170,15 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
         raw_point_alpha=stats_profile.raw_point_alpha,
         ylim=_manual_y_override(options),
     )
+    if fig.axes:
+        first = groups[0]
+        fig.axes[0].set_ylabel(
+            _format_axis_label(
+                first.value_label,
+                first.value_unit,
+                override_label=options.y_label_override,
+            )
+        )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_point_error.pdf",
@@ -196,6 +232,14 @@ def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOp
             alpha=min(0.94, plot_style.current_stroke().line_alpha + 0.08),
             zorder=3.0,
         )
+    first = groups[0]
+    ax.set_ylabel(
+        _format_axis_label(
+            first.value_label,
+            first.value_unit,
+            override_label=options.y_label_override,
+        )
+    )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_lollipop_error.pdf",
@@ -238,6 +282,15 @@ def _render_grouped_bar_error_like(
         raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
         ylim=_manual_y_override(options),
     )
+    if fig.axes:
+        first = groups[0]
+        fig.axes[0].set_ylabel(
+            _format_axis_label(
+                first.value_label,
+                first.value_unit,
+                override_label=options.y_label_override,
+            )
+        )
     return [
         _rendered_plot_with_qa(
             filename=f"{predict_bar_box_slug(groups)}_{filename_suffix}.pdf",
@@ -484,7 +537,13 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
         )
 
     first = groups[0]
-    ax.set_xlabel(_format_axis_label(first.value_label, first.value_unit))
+    ax.set_xlabel(
+        _format_axis_label(
+            first.value_label,
+            first.value_unit,
+            override_label=options.x_label_override,
+        )
+    )
     ax.set_ylabel("Density")
     if len(groups) > 1:
         ax.legend(loc="best", frameon=False)

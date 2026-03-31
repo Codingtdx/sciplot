@@ -69,6 +69,13 @@ def _normalize_series_order(template: str, series_order: list[str] | tuple[str, 
     return tuple(cleaned) if cleaned else None
 
 
+def _normalize_label_override(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
 def resolve_render_options(
     *,
     template: str,
@@ -81,6 +88,8 @@ def resolve_render_options(
     y_min: float | None = None,
     y_max: float | None = None,
     series_order: list[str] | tuple[str, ...] | None = None,
+    x_label_override: str | None = None,
+    y_label_override: str | None = None,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
     style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
@@ -123,6 +132,8 @@ def resolve_render_options(
         y_min=_normalize_manual_bound(template, "y_min", y_min),
         y_max=_normalize_manual_bound(template, "y_max", y_max),
         series_order=_normalize_series_order(template, series_order),
+        x_label_override=_normalize_label_override(x_label_override),
+        y_label_override=_normalize_label_override(y_label_override),
         use_sidecar=use_sidecar,
         visual_theme_id=resolved_theme or None,
     )

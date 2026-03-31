@@ -12,7 +12,7 @@ from matplotlib.ticker import FixedLocator
 from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import ReplicateGroup
 from src.plot_contract import load_plot_contract
-from src.text_normalization import normalize_label, normalize_unit
+from src.text_normalization import _clean_text, canonicalize_token, normalize_label, normalize_unit
 
 LegendMode = str
 
@@ -103,8 +103,16 @@ def _resolved_panel_geometry(
         spacing.top_margin_mm if top_margin_mm is None else top_margin_mm,
     )
 
-def _format_axis_label(label: str, unit: str) -> str:
-    display_label = normalize_label(label)
+def _format_axis_label(
+    label: str,
+    unit: str,
+    *,
+    preserve_stress_label: bool = False,
+    override_label: str | None = None,
+) -> str:
+    display_label = _clean_text(override_label) if override_label else normalize_label(label)
+    if preserve_stress_label and canonicalize_token(display_label) in {"σ", "sigma"}:
+        display_label = "Stress"
     display_unit = normalize_unit(unit)
     return f"{display_label} ({display_unit})" if display_unit else display_label
 

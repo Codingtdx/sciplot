@@ -419,6 +419,7 @@ def plot_curves(
     show_y_ticks: bool = True,
     legend_expand_axes: str = "xy",
     legend_inset_fraction: float | None = None,
+    preserve_stress_label: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_curve_series_input(series_list)
     stroke = plot_style.current_stroke()
@@ -514,7 +515,13 @@ def plot_curves(
 
         first = series_list[0]
         ax.set_xlabel(_format_axis_label(first.x_label, first.x_unit))
-        ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
+        ax.set_ylabel(
+            _format_axis_label(
+                first.y_label,
+                first.y_unit,
+                preserve_stress_label=preserve_stress_label,
+            )
+        )
         if not show_y_ticks:
             ax.tick_params(axis="y", left=False, labelleft=False, which="both")
             ax.spines["left"].set_visible(True)
@@ -602,6 +609,7 @@ def plot_scatter(
     reverse_x: bool = False,
     legend_expand_axes: str = "xy",
     legend_inset_fraction: float | None = None,
+    preserve_stress_label: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_curve_series_input(series_list)
     stroke = plot_style.current_stroke()
@@ -663,7 +671,13 @@ def plot_scatter(
 
     first = series_list[0]
     ax.set_xlabel(_format_axis_label(first.x_label, first.x_unit))
-    ax.set_ylabel(_format_axis_label(first.y_label, first.y_unit))
+    ax.set_ylabel(
+        _format_axis_label(
+            first.y_label,
+            first.y_unit,
+            preserve_stress_label=preserve_stress_label,
+        )
+    )
 
     if legend_mode == "inside_best":
         legend_kwargs, overlap_score, legend_corner_decision = choose_legend_corner_with_policy(
@@ -742,6 +756,7 @@ def plot_curve_template(
         "label_offset_pt": template.label_offset_pt,
         "baseline_mode": template.baseline_mode,
         "show_y_ticks": template.show_y_ticks,
+        "preserve_stress_label": template_name == "tensile_curve",
     }
     params.update(overrides)
     return plot_curves(series_list, **params)  # type: ignore[arg-type]

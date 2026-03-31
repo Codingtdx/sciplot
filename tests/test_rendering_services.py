@@ -458,6 +458,24 @@ def test_tensile_curve_defaults_to_linear_but_allows_log_override(tmp_path: Path
     rendered = build_rendered_plots("curve", input_path, xscale="log", yscale="linear")
     try:
         assert tuple(plot.filename for plot in rendered) == linear_preflight.output_filenames
+        assert rendered[0].figure.axes[0].get_ylabel() == "Stress (MPa)"
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_curve_axis_label_overrides_replace_normalized_display_labels(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        x_label_override="Elapsed Time",
+        y_label_override="Load",
+    )
+    try:
+        ax = rendered[0].figure.axes[0]
+        assert ax.get_xlabel() == "Elapsed Time (s)"
+        assert ax.get_ylabel() == "Load (MPa)"
     finally:
         close_rendered_plots(rendered)
 

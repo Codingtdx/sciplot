@@ -71,6 +71,7 @@ def test_plot_tensile_curve_keeps_zero_as_a_labeled_tick_but_leaves_display_padd
         assert y_low < 0.0
         assert np.any(np.isclose(y_ticks, 0.0))
         assert float(y_ticks.min()) == pytest.approx(0.0, abs=1e-9)
+        assert ax.get_ylabel() == "Stress (MPa)"
     finally:
         plt.close(fig)
 

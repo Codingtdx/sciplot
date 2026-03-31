@@ -30,6 +30,8 @@ def options_from_payload(template: str, payload: RenderOptionsPayload):
         y_min=payload.y_min,
         y_max=payload.y_max,
         series_order=payload.series_order,
+        x_label_override=payload.x_label_override,
+        y_label_override=payload.y_label_override,
         baseline=payload.baseline,
         show_colorbar=payload.show_colorbar,
         style_preset=payload.style_preset or plot_style.DEFAULT_STYLE_PRESET,
