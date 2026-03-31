@@ -22,38 +22,9 @@ struct ComposerCanvasView: View {
                         isSelected: session.selectedCells.contains(cell),
                         isMergeable: session.selectedCells.contains(cell) && session.canMergeSelectedCells,
                         isCoveredByRegion: session.regionCovering(cell: cell) != nil,
-                        isHoveredDropTarget: hoveredDropTarget == .cell(cell),
-                        canPlaceHere: session.activePlacementPanelID.map { session.canPlace(panelID: $0, in: .cell(cell)) } == true,
-                        onTap: {
-                            session.updateCellSelection(
-                                cell,
-                                additive: isCommandModifierPressed,
-                                extend: isShiftModifierPressed
-                            )
-                        },
-                        onSelectOnly: {
-                            session.updateCellSelection(cell, additive: false, extend: false)
-                        },
-                        onClearSelection: {
-                            session.clearTransientEditingState()
-                        },
-                        onMerge: {
-                            session.mergeSelectedCells()
-                        },
-                        onPlaceHere: {
-                            session.updateCellSelection(cell, additive: false, extend: false)
-                            session.placeFocusedPanelInSelectedTarget()
-                        }
+                        isHoveredDropTarget: hoveredDropTarget == .cell(cell)
                     )
-                    .dropDestination(
-                        for: ComposerPanelDragPayload.self,
-                        action: { items, _ in
-                            handleDrop(items, into: .cell(cell))
-                        },
-                        isTargeted: { isTargeted in
-                            updateHoveredDropTarget(isTargeted, for: .cell(cell))
-                        }
-                    )
+                    .allowsHitTesting(false)
                 }
 
                 ForEach(freeRegions) { region in
@@ -61,32 +32,9 @@ struct ComposerCanvasView: View {
                         rect: metrics.rect(for: region),
                         title: session.regionSummary(region),
                         isSelected: session.selectedRegionID == region.id,
-                        isHoveredDropTarget: hoveredDropTarget == .freeRegion(region.id),
-                        canPlaceHere: session.activePlacementPanelID.map { session.canPlace(panelID: $0, in: .freeRegion(region.id)) } == true,
-                        onTap: {
-                            session.selectRegion(region.id)
-                        },
-                        onUnmerge: {
-                            session.selectRegion(region.id)
-                            session.unmergeSelectedRegion()
-                        },
-                        onPlaceHere: {
-                            session.selectRegion(region.id)
-                            session.placeFocusedPanelInSelectedTarget()
-                        },
-                        onClearSelection: {
-                            session.clearTransientEditingState()
-                        }
+                        isHoveredDropTarget: hoveredDropTarget == .freeRegion(region.id)
                     )
-                    .dropDestination(
-                        for: ComposerPanelDragPayload.self,
-                        action: { items, _ in
-                            handleDrop(items, into: .freeRegion(region.id))
-                        },
-                        isTargeted: { isTargeted in
-                            updateHoveredDropTarget(isTargeted, for: .freeRegion(region.id))
-                        }
-                    )
+                    .allowsHitTesting(false)
                 }
 
                 if let graphSpanPanelID = graphSpanOverlayPanelID {
@@ -97,15 +45,7 @@ struct ComposerCanvasView: View {
                                 label: graphSpanLabel(for: target),
                                 isHoveredDropTarget: hoveredDropTarget == target
                             )
-                            .dropDestination(
-                                for: ComposerPanelDragPayload.self,
-                                action: { items, _ in
-                                    handleDrop(items, into: target)
-                                },
-                                isTargeted: { isTargeted in
-                                    updateHoveredDropTarget(isTargeted, for: target)
-                                }
-                            )
+                            .allowsHitTesting(false)
                         }
                     }
                 }
@@ -115,25 +55,20 @@ struct ComposerCanvasView: View {
                         panel: panel,
                         rect: metrics.rect(for: panel),
                         label: panel.kind == "graph" ? session.resolvedLabel(for: panel) : "",
-                        isSelected: session.selectedPanelID == panel.id,
-                        onTap: {
-                            session.selectPanelOnCanvas(panel.id)
-                        },
-                        onRemoveFromBoard: {
-                            session.selectPanelOnCanvas(panel.id)
-                            session.removeSelectedPanelFromBoard()
-                        },
-                        onClearSelection: {
-                            session.clearTransientEditingState()
-                        },
-                        onDragStarted: {
-                            session.beginPanelDrag(panel.id)
-                        },
-                        onDragEnded: {
-                            session.endPanelDrag(panel.id)
-                        }
+                        isSelected: session.selectedPanelID == panel.id
                     )
+                    .allowsHitTesting(false)
                 }
+
+                ComposerBoardInteractionLayer(
+                    session: session,
+                    metrics: metrics,
+                    visiblePanels: visiblePanels,
+                    freeRegions: freeRegions,
+                    hoveredDropTarget: $hoveredDropTarget
+                )
+                .frame(width: metrics.frameRect.width, height: metrics.frameRect.height)
+                .position(metrics.frameRect.center)
 
                 if let quickActionContext,
                    let quickActionRect = session.boardQuickActionRectMm(for: quickActionContext) {
@@ -144,6 +79,7 @@ struct ComposerCanvasView: View {
                         )
                         .position(metrics.rect(forMmRect: quickActionRect).center)
                         .id(quickActionContext.token)
+                        .allowsHitTesting(false)
                         .anchorPreference(
                             key: ComposerSelectionAnchorPreferenceKey.self,
                             value: .bounds
@@ -162,6 +98,7 @@ struct ComposerCanvasView: View {
                             .frame(width: max(anchorRect.width, 1), height: max(anchorRect.height, 1))
                             .position(x: anchorRect.midX, y: anchorRect.midY)
                             .id(quickActionContext.token)
+                            .allowsHitTesting(false)
                             .popover(
                                 isPresented: quickActionPopoverBinding(for: quickActionContext.token),
                                 attachmentAnchor: .rect(.bounds),
@@ -198,14 +135,6 @@ struct ComposerCanvasView: View {
         return targets.isEmpty ? nil : panel.id
     }
 
-    private var isCommandModifierPressed: Bool {
-        NSApp.currentEvent?.modifierFlags.contains(.command) == true
-    }
-
-    private var isShiftModifierPressed: Bool {
-        NSApp.currentEvent?.modifierFlags.contains(.shift) == true
-    }
-
     private func boardQuickActionContext() -> ComposerBoardQuickActionState? {
         session.boardQuickActionState
     }
@@ -219,25 +148,6 @@ struct ComposerCanvasView: View {
                 }
             }
         )
-    }
-
-    private func updateHoveredDropTarget(_ isTargeted: Bool, for target: ComposerPlacementTarget) {
-        if isTargeted,
-           let panelID = session.activePlacementPanelID,
-           session.canPlace(panelID: panelID, in: target) {
-            hoveredDropTarget = target
-        } else if hoveredDropTarget == target {
-            hoveredDropTarget = nil
-        }
-    }
-
-    private func handleDrop(_ items: [ComposerPanelDragPayload], into target: ComposerPlacementTarget) -> Bool {
-        guard let payload = items.first, session.canPlace(panelID: payload.panelID, in: target) else {
-            return false
-        }
-        session.place(panelID: payload.panelID, in: target)
-        hoveredDropTarget = nil
-        return true
     }
 
     private func rect(for target: ComposerPlacementTarget, metrics: ComposerCanvasMetrics) -> CGRect? {
@@ -299,12 +209,6 @@ private struct ComposerCanvasCellView: View {
     let isMergeable: Bool
     let isCoveredByRegion: Bool
     let isHoveredDropTarget: Bool
-    let canPlaceHere: Bool
-    let onTap: () -> Void
-    let onSelectOnly: () -> Void
-    let onClearSelection: () -> Void
-    let onMerge: () -> Void
-    let onPlaceHere: () -> Void
 
     var body: some View {
         RoundedRectangle(cornerRadius: 18)
@@ -322,16 +226,6 @@ private struct ComposerCanvasCellView: View {
             .frame(width: rect.width, height: rect.height)
             .position(rect.center)
             .contentShape(RoundedRectangle(cornerRadius: 18))
-            .onTapGesture(perform: onTap)
-            .contextMenu {
-                Button("Select Cell", action: onSelectOnly)
-                Button("Merge", action: onMerge)
-                    .disabled(!isMergeable)
-                Button("Place Here", action: onPlaceHere)
-                    .disabled(!canPlaceHere)
-                Divider()
-                Button("Clear Selection", action: onClearSelection)
-            }
     }
 
     private var fillColor: Color {
@@ -377,11 +271,6 @@ private struct ComposerFreeRegionView: View {
     let title: String
     let isSelected: Bool
     let isHoveredDropTarget: Bool
-    let canPlaceHere: Bool
-    let onTap: () -> Void
-    let onUnmerge: () -> Void
-    let onPlaceHere: () -> Void
-    let onClearSelection: () -> Void
 
     var body: some View {
         RoundedRectangle(cornerRadius: 22)
@@ -404,14 +293,6 @@ private struct ComposerFreeRegionView: View {
             .frame(width: rect.width, height: rect.height)
             .position(rect.center)
             .contentShape(RoundedRectangle(cornerRadius: 22))
-            .onTapGesture(perform: onTap)
-            .contextMenu {
-                Button("Unmerge", action: onUnmerge)
-                Button("Place Here", action: onPlaceHere)
-                    .disabled(!canPlaceHere)
-                Divider()
-                Button("Clear Selection", action: onClearSelection)
-            }
     }
 }
 
@@ -449,11 +330,6 @@ private struct ComposerPlacedPanelView: View {
     let rect: CGRect
     let label: String
     let isSelected: Bool
-    let onTap: () -> Void
-    let onRemoveFromBoard: () -> Void
-    let onClearSelection: () -> Void
-    let onDragStarted: () -> Void
-    let onDragEnded: () -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -482,22 +358,6 @@ private struct ComposerPlacedPanelView: View {
         .position(rect.center)
         .contentShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(isSelected ? 0.08 : 0.03), radius: 10, y: 6)
-        .onTapGesture(perform: onTap)
-        .contextMenu {
-            Button("Remove From Board", action: onRemoveFromBoard)
-            Divider()
-            Button("Clear Selection", action: onClearSelection)
-        }
-        .draggable(
-            ComposerPanelDragPayload(panelID: panel.id, sourceSurface: .canvas)
-        ) {
-            ComposerPanelDragPreview(panel: panel)
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in onDragStarted() }
-                .onEnded { _ in onDragEnded() }
-        )
     }
 
     private var borderColor: Color {
@@ -505,23 +365,6 @@ private struct ComposerPlacedPanelView: View {
             return .accentColor
         }
         return Color.black.opacity(0.12)
-    }
-}
-
-private struct ComposerPanelDragPreview: View {
-    let panel: ComposerPanelPayload
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(panel.kind == "graph" ? "Graph" : "Asset", systemImage: panel.kind == "graph" ? "chart.xyaxis.line" : "photo")
-                .font(.caption.weight(.semibold))
-            Text(URL(fileURLWithPath: panel.filePath).lastPathComponent)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -594,6 +437,338 @@ private struct ComposerBoardQuickActionPopover: View {
     }
 }
 
+private enum ComposerBoardInputState {
+    case idle
+    case panelInteraction(panelID: String, startPoint: CGPoint, canDrag: Bool, didMove: Bool)
+    case cellSelection(mode: ComposerBoardCellSelectionMode, lastCell: ComposerGridCell)
+    case regionSelection(regionID: String)
+}
+
+private enum ComposerBoardCellSelectionMode {
+    case dragRectangle
+    case extendFromAnchor
+    case toggle
+}
+
+private enum ComposerBoardHitTarget {
+    case panel(String)
+    case region(String)
+    case cell(ComposerGridCell)
+}
+
+private struct ComposerBoardModifierState {
+    let additive: Bool
+    let extend: Bool
+}
+
+@MainActor
+private struct ComposerBoardInteractionLayer: View {
+    @Bindable var session: ComposerSession
+    let metrics: ComposerCanvasMetrics
+    let visiblePanels: [ComposerPanelPayload]
+    let freeRegions: [ComposerRegionPayload]
+    @Binding var hoveredDropTarget: ComposerPlacementTarget?
+
+    @State private var interactionState: ComposerBoardInputState = .idle
+
+    var body: some View {
+        let boardGeometry = metrics.boardGeometry
+
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(boardGesture(boardGeometry: boardGeometry))
+            .contextMenu {
+                if session.canMergeSelectedCells {
+                    Button("Merge") {
+                        session.mergeSelectedCells()
+                    }
+                }
+
+                if session.canUnmergeSelectedRegion {
+                    Button("Unmerge") {
+                        session.unmergeSelectedRegion()
+                    }
+                }
+
+                if session.canPlaceFocusedPanelInSelectedTarget {
+                    Button(session.placementActionTitle) {
+                        session.placeFocusedPanelInSelectedTarget()
+                    }
+                }
+
+                if !session.selectedCells.isEmpty || session.selectedFreeRegion != nil || session.selectedPanel != nil {
+                    Divider()
+                    Button("Clear Selection") {
+                        session.clearTransientEditingState()
+                    }
+                }
+            }
+            .dropDestination(for: ComposerPanelDragPayload.self) { items, location in
+                handleExternalDrop(items, at: location, boardGeometry: boardGeometry)
+            } isTargeted: { isTargeted in
+                if !isTargeted {
+                    hoveredDropTarget = nil
+                }
+            }
+            .onDisappear {
+                hoveredDropTarget = nil
+                interactionState = .idle
+            }
+    }
+
+    private func boardGesture(boardGeometry: ComposerBoardGeometry) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { value in
+                if case .idle = interactionState {
+                    beginInteraction(at: value.startLocation, boardGeometry: boardGeometry)
+                }
+                updateInteraction(at: value.location, boardGeometry: boardGeometry)
+            }
+            .onEnded { value in
+                if case .idle = interactionState {
+                    beginInteraction(at: value.startLocation, boardGeometry: boardGeometry)
+                }
+                finishInteraction(at: value.location, boardGeometry: boardGeometry)
+            }
+    }
+
+    private func beginInteraction(at point: CGPoint, boardGeometry: ComposerBoardGeometry) {
+        hoveredDropTarget = nil
+
+        switch hitTarget(at: point, boardGeometry: boardGeometry) {
+        case let .panel(panelID):
+            guard let panel = visiblePanels.first(where: { $0.id == panelID }) else {
+                interactionState = .idle
+                return
+            }
+            session.selectPanelOnCanvas(panelID)
+            if !panel.locked {
+                session.beginPanelDrag(panelID)
+            }
+            interactionState = .panelInteraction(
+                panelID: panelID,
+                startPoint: point,
+                canDrag: !panel.locked,
+                didMove: false
+            )
+
+        case let .region(regionID):
+            session.selectRegion(regionID)
+            interactionState = .regionSelection(regionID: regionID)
+
+        case let .cell(cell):
+            let modifiers = currentModifierState()
+            if modifiers.extend {
+                session.extendCellSelection(to: cell)
+                interactionState = .cellSelection(mode: .extendFromAnchor, lastCell: cell)
+            } else if modifiers.additive {
+                session.toggleCellSelection(cell)
+                interactionState = .cellSelection(mode: .toggle, lastCell: cell)
+            } else {
+                session.beginCellDragSelection(at: cell)
+                interactionState = .cellSelection(mode: .dragRectangle, lastCell: cell)
+            }
+
+        case nil:
+            interactionState = .idle
+        }
+    }
+
+    private func currentModifierState() -> ComposerBoardModifierState {
+        let flags = NSApp.currentEvent?.modifierFlags ?? []
+        return ComposerBoardModifierState(
+            additive: flags.contains(.command),
+            extend: flags.contains(.shift)
+        )
+    }
+
+    private func updateInteraction(at point: CGPoint, boardGeometry: ComposerBoardGeometry) {
+        switch interactionState {
+        case let .panelInteraction(panelID, startPoint, canDrag, didMove):
+            guard canDrag else {
+                return
+            }
+            let moved = didMove || startPoint.distance(to: point) >= 4
+            if moved {
+                hoveredDropTarget = resolvePlacementTarget(
+                    for: panelID,
+                    at: point,
+                    boardGeometry: boardGeometry
+                )
+            }
+            interactionState = .panelInteraction(
+                panelID: panelID,
+                startPoint: startPoint,
+                canDrag: canDrag,
+                didMove: moved
+            )
+
+        case let .cellSelection(mode, lastCell):
+            guard let cell = boardGeometry.clampedCell(at: point), cell != lastCell else {
+                return
+            }
+            switch mode {
+            case .dragRectangle:
+                session.updateCellDragSelection(to: cell)
+            case .extendFromAnchor:
+                session.extendCellSelection(to: cell)
+            case .toggle:
+                break
+            }
+            interactionState = .cellSelection(mode: mode, lastCell: cell)
+
+        case .regionSelection, .idle:
+            break
+        }
+    }
+
+    private func finishInteraction(at point: CGPoint, boardGeometry: ComposerBoardGeometry) {
+        defer {
+            hoveredDropTarget = nil
+            interactionState = .idle
+        }
+
+        switch interactionState {
+        case let .panelInteraction(panelID, _, canDrag, didMove):
+            if canDrag,
+               didMove,
+               let target = resolvePlacementTarget(for: panelID, at: point, boardGeometry: boardGeometry)
+            {
+                session.place(panelID: panelID, in: target)
+            }
+            session.endPanelDrag(panelID)
+
+        case .cellSelection, .regionSelection, .idle:
+            break
+        }
+    }
+
+    private func handleExternalDrop(
+        _ items: [ComposerPanelDragPayload],
+        at point: CGPoint,
+        boardGeometry: ComposerBoardGeometry
+    ) -> Bool {
+        guard let payload = items.first,
+              let target = resolvePlacementTarget(for: payload.panelID, at: point, boardGeometry: boardGeometry),
+              session.canPlace(panelID: payload.panelID, in: target)
+        else {
+            hoveredDropTarget = nil
+            return false
+        }
+
+        session.place(panelID: payload.panelID, in: target)
+        session.endPanelDrag(payload.panelID)
+        hoveredDropTarget = nil
+        return true
+    }
+
+    private func hitTarget(at point: CGPoint, boardGeometry: ComposerBoardGeometry) -> ComposerBoardHitTarget? {
+        if let panel = panel(at: point, excluding: nil, boardGeometry: boardGeometry) {
+            return .panel(panel.id)
+        }
+        if let region = freeRegion(at: point, boardGeometry: boardGeometry) {
+            return .region(region.id)
+        }
+        if let cell = boardGeometry.cell(at: point) {
+            return .cell(cell)
+        }
+        return nil
+    }
+
+    private func resolvePlacementTarget(
+        for panelID: String,
+        at point: CGPoint,
+        boardGeometry: ComposerBoardGeometry
+    ) -> ComposerPlacementTarget? {
+        if let occupant = panel(at: point, excluding: panelID, boardGeometry: boardGeometry),
+           let target = session.placementTargetForPanelID(occupant.id),
+           session.canPlace(panelID: panelID, in: target)
+        {
+            return target
+        }
+
+        if let graphTarget = graphSpanTarget(for: panelID, at: point, boardGeometry: boardGeometry),
+           session.canPlace(panelID: panelID, in: graphTarget)
+        {
+            return graphTarget
+        }
+
+        if let region = freeRegion(at: point, boardGeometry: boardGeometry) {
+            let target = ComposerPlacementTarget.freeRegion(region.id)
+            if session.canPlace(panelID: panelID, in: target) {
+                return target
+            }
+        }
+
+        if let cell = boardGeometry.clampedCell(at: point) {
+            let target = ComposerPlacementTarget.cell(cell)
+            if session.canPlace(panelID: panelID, in: target) {
+                return target
+            }
+        }
+
+        return nil
+    }
+
+    private func graphSpanTarget(
+        for panelID: String,
+        at point: CGPoint,
+        boardGeometry: ComposerBoardGeometry
+    ) -> ComposerPlacementTarget? {
+        let candidates = session.graphCompatibleTargets(for: panelID).compactMap { target -> (ComposerPlacementTarget, CGFloat)? in
+            guard let rect = rect(for: target, boardGeometry: boardGeometry),
+                  rect.contains(point)
+            else {
+                return nil
+            }
+            return (target, rect.center.distance(to: point))
+        }
+
+        return candidates.min { lhs, rhs in
+            lhs.1 < rhs.1
+        }?.0
+    }
+
+    private func panel(
+        at point: CGPoint,
+        excluding excludedPanelID: String?,
+        boardGeometry: ComposerBoardGeometry
+    ) -> ComposerPanelPayload? {
+        visiblePanels
+            .reversed()
+            .first { panel in
+                panel.id != excludedPanelID && boardGeometry.rect(for: panel).contains(point)
+            }
+    }
+
+    private func freeRegion(at point: CGPoint, boardGeometry: ComposerBoardGeometry) -> ComposerRegionPayload? {
+        freeRegions
+            .reversed()
+            .first { region in
+                boardGeometry.rect(for: region).contains(point)
+            }
+    }
+
+    private func rect(
+        for target: ComposerPlacementTarget,
+        boardGeometry: ComposerBoardGeometry
+    ) -> CGRect? {
+        switch target {
+        case let .cell(cell):
+            return boardGeometry.rect(for: cell)
+        case let .freeRegion(regionID):
+            guard let region = freeRegions.first(where: { $0.id == regionID }) else {
+                return nil
+            }
+            return boardGeometry.rect(for: region)
+        case let .graphSpan(origin, colSpan, rowSpan):
+            return boardGeometry.rect(
+                for: ComposerCellSelection(origin: origin, colSpan: colSpan, rowSpan: rowSpan)
+            )
+        }
+    }
+}
+
 private struct ComposerCanvasMetrics {
     let project: ComposerRequestPayload
     let size: CGSize
@@ -625,6 +800,10 @@ private struct ComposerCanvasMetrics {
             width: CGFloat(project.layoutGrid.frameWidthMm) * scale,
             height: CGFloat(project.layoutGrid.frameHeightMm) * scale
         )
+    }
+
+    var boardGeometry: ComposerBoardGeometry {
+        ComposerBoardGeometry(project: project, boardSize: frameRect.size)
     }
 
     func rect(for cell: ComposerGridCell) -> CGRect {
@@ -668,6 +847,86 @@ private struct ComposerCanvasMetrics {
     }
 }
 
+struct ComposerBoardGeometry {
+    let project: ComposerRequestPayload
+    let boardSize: CGSize
+    let scale: CGFloat
+
+    init(project: ComposerRequestPayload, boardSize: CGSize) {
+        self.project = project
+        self.boardSize = boardSize
+        let frameWidth = max(CGFloat(project.layoutGrid.frameWidthMm), 1)
+        self.scale = boardSize.width / frameWidth
+    }
+
+    func rect(for cell: ComposerGridCell) -> CGRect {
+        CGRect(
+            x: CGFloat(cell.col) * cellWidth,
+            y: CGFloat(cell.row) * cellHeight,
+            width: cellWidth,
+            height: cellHeight
+        )
+    }
+
+    func rect(for selection: ComposerCellSelection) -> CGRect {
+        CGRect(
+            x: CGFloat(selection.origin.col) * cellWidth,
+            y: CGFloat(selection.origin.row) * cellHeight,
+            width: CGFloat(selection.colSpan) * cellWidth,
+            height: CGFloat(selection.rowSpan) * cellHeight
+        )
+    }
+
+    func rect(for region: ComposerRegionPayload) -> CGRect {
+        CGRect(
+            x: CGFloat(region.col) * cellWidth,
+            y: CGFloat(region.row) * cellHeight,
+            width: CGFloat(region.colSpan) * cellWidth,
+            height: CGFloat(region.rowSpan) * cellHeight
+        )
+    }
+
+    func rect(for panel: ComposerPanelPayload) -> CGRect {
+        CGRect(
+            x: CGFloat(panel.xMm - project.layoutGrid.frameXMm) * scale,
+            y: CGFloat(panel.yMm - project.layoutGrid.frameYMm) * scale,
+            width: CGFloat(panel.wMm) * scale,
+            height: CGFloat(panel.hMm) * scale
+        )
+    }
+
+    func cell(at point: CGPoint) -> ComposerGridCell? {
+        guard point.x >= 0,
+              point.y >= 0,
+              point.x < boardSize.width,
+              point.y < boardSize.height
+        else {
+            return nil
+        }
+        return clampedCell(at: point)
+    }
+
+    func clampedCell(at point: CGPoint) -> ComposerGridCell? {
+        guard project.layoutGrid.columns > 0, project.layoutGrid.rows > 0 else {
+            return nil
+        }
+
+        let clampedX = min(max(point.x, 0), max(boardSize.width - 0.001, 0))
+        let clampedY = min(max(point.y, 0), max(boardSize.height - 0.001, 0))
+        let col = min(project.layoutGrid.columns - 1, max(0, Int(floor(clampedX / cellWidth))))
+        let row = min(project.layoutGrid.rows - 1, max(0, Int(floor(clampedY / cellHeight))))
+        return ComposerGridCell(col: col, row: row)
+    }
+
+    private var cellWidth: CGFloat {
+        CGFloat(project.layoutGrid.cellWidthMm) * scale
+    }
+
+    private var cellHeight: CGFloat {
+        CGFloat(project.layoutGrid.cellHeightMm) * scale
+    }
+}
+
 private struct ComposerSelectionAnchorPreference {
     let anchor: Anchor<CGRect>
     let token: String
@@ -684,5 +943,13 @@ private struct ComposerSelectionAnchorPreferenceKey: PreferenceKey {
 private extension CGRect {
     var center: CGPoint {
         CGPoint(x: midX, y: midY)
+    }
+}
+
+private extension CGPoint {
+    func distance(to other: CGPoint) -> CGFloat {
+        let dx = x - other.x
+        let dy = y - other.y
+        return sqrt(dx * dx + dy * dy)
     }
 }

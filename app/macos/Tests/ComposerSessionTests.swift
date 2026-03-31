@@ -4,6 +4,104 @@ import XCTest
 
 @MainActor
 final class ComposerSessionTests: XCTestCase {
+    func testBoardGeometryResolvesAllNineCellsFromBoardLocalPoints() {
+        let geometry = ComposerBoardGeometry(
+            project: ComposerRequestPayload(),
+            boardSize: CGSize(width: 360, height: 330)
+        )
+
+        for row in 0 ..< 3 {
+            for col in 0 ..< 3 {
+                let cell = ComposerGridCell(col: col, row: row)
+                let rect = geometry.rect(for: cell)
+                let center = CGPoint(x: rect.midX, y: rect.midY)
+                XCTAssertEqual(geometry.cell(at: center), cell)
+            }
+        }
+    }
+
+    func testSingleCellSelectionTracksExactClickedCell() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 1, row: 2))
+
+        XCTAssertEqual(session.selectedCells, Set([.init(col: 1, row: 2)]))
+        XCTAssertEqual(session.selectedCellSelection, .init(origin: .init(col: 1, row: 2), colSpan: 1, rowSpan: 1))
+    }
+
+    func testCommandToggleSelectionTracksExactCells() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 0, row: 1))
+        session.toggleCellSelection(.init(col: 1, row: 1))
+
+        XCTAssertEqual(session.selectedCells, Set([.init(col: 0, row: 1), .init(col: 1, row: 1)]))
+    }
+
+    func testShiftExtensionBuildsRectangularSelectionFromAnchor() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 0, row: 0))
+        session.extendCellSelection(to: .init(col: 1, row: 1))
+
+        XCTAssertEqual(
+            session.selectedCells,
+            Set([
+                .init(col: 0, row: 0),
+                .init(col: 1, row: 0),
+                .init(col: 0, row: 1),
+                .init(col: 1, row: 1),
+            ])
+        )
+        XCTAssertEqual(session.selectedCellSelection, .init(origin: .init(col: 0, row: 0), colSpan: 2, rowSpan: 2))
+    }
+
+    func testDragSelectionBuildsRectangularSelection() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 1, row: 0))
+        session.updateCellDragSelection(to: .init(col: 2, row: 2))
+
+        XCTAssertEqual(
+            session.selectedCells,
+            Set([
+                .init(col: 1, row: 0),
+                .init(col: 2, row: 0),
+                .init(col: 1, row: 1),
+                .init(col: 2, row: 1),
+                .init(col: 1, row: 2),
+                .init(col: 2, row: 2),
+            ])
+        )
+        XCTAssertEqual(session.selectedCellSelection, .init(origin: .init(col: 1, row: 0), colSpan: 2, rowSpan: 3))
+    }
+
+    func testMergeAvailabilityRequiresEmptyRectangularSelection() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 0, row: 0))
+        session.updateCellDragSelection(to: .init(col: 1, row: 0))
+        XCTAssertTrue(session.canMergeSelectedCells)
+
+        session.project.panels = [
+            graphPanel(id: "panel-1", col: 1, row: 0, zIndex: 0),
+        ]
+        XCTAssertFalse(session.canMergeSelectedCells)
+    }
+
+    func testMergeCreatesSelectableMergedRegion() {
+        let session = ComposerSession()
+
+        session.beginCellDragSelection(at: .init(col: 0, row: 0))
+        session.updateCellDragSelection(to: .init(col: 1, row: 0))
+        session.mergeSelectedCells()
+
+        XCTAssertNotNil(session.selectedRegionID)
+        XCTAssertEqual(session.selectedFreeRegion?.id, session.selectedRegionID)
+        XCTAssertEqual(session.selectedFreeRegion?.colSpan, 2)
+        XCTAssertEqual(session.selectedFreeRegion?.rowSpan, 1)
+    }
+
     func testComposerHappyPathImportPreviewAndExport() async throws {
         let client = MockSidecarClient()
         let session = ComposerSession(previewDelayNanoseconds: 10_000_000)

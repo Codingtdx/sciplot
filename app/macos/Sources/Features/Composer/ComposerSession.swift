@@ -417,6 +417,29 @@ final class ComposerSession {
         selectedRegionID = nil
     }
 
+    func beginCellDragSelection(at cell: ComposerGridCell) {
+        selectedCells = [cell]
+        selectionAnchorCell = cell
+        selectedRegionID = nil
+    }
+
+    func updateCellDragSelection(to cell: ComposerGridCell) {
+        guard let selectionAnchorCell else {
+            beginCellDragSelection(at: cell)
+            return
+        }
+        selectedCells = Set(rectangularCells(from: selectionAnchorCell, to: cell))
+        selectedRegionID = nil
+    }
+
+    func extendCellSelection(to cell: ComposerGridCell) {
+        updateCellSelection(cell, additive: false, extend: true)
+    }
+
+    func toggleCellSelection(_ cell: ComposerGridCell) {
+        updateCellSelection(cell, additive: true, extend: false)
+    }
+
     func toggleCellSelection(_ cell: ComposerGridCell, additive: Bool) {
         updateCellSelection(cell, additive: additive, extend: false)
     }
@@ -713,6 +736,10 @@ final class ComposerSession {
 
     func panelForRegion(_ regionID: String) -> ComposerPanelPayload? {
         project.panels.first { !$0.hidden && $0.regionID == regionID }
+    }
+
+    func placementTargetForPanelID(_ panelID: String) -> ComposerPlacementTarget? {
+        placementTarget(forPanelID: panelID, in: project)
     }
 
     func panelsAssigned(to regionID: String) -> [ComposerPanelPayload] {
