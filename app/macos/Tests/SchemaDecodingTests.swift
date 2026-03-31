@@ -95,6 +95,46 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.metrics.first?.label, "Strength")
     }
 
+    func testDecodePlotContractSizePresetsWithoutIDField() throws {
+        let payload = """
+        {
+          "version": 1,
+          "defaults": {
+            "style_preset": "journal_calm",
+            "palette_preset": "aqua_graphite"
+          },
+          "size_presets": {
+            "single_panel": {
+              "label": "Single Panel",
+              "width_mm": 60,
+              "height_mm": 55
+            }
+          },
+          "styles": {},
+          "palettes": {},
+          "templates": {
+            "curve": {
+              "label": "Curve",
+              "description": "Continuous curve template.",
+              "category": "curve",
+              "default_size": "single_panel",
+              "allowed_sizes": ["single_panel"],
+              "editable_options": ["size", "xscale", "yscale"],
+              "default_options": {},
+              "available_styles": ["journal_calm"],
+              "available_palettes": ["aqua_graphite"],
+              "hard_rules": [],
+              "soft_rules": []
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(PlotContractResponse.self, from: Data(payload.utf8))
+        XCTAssertEqual(response.sizePresets["single_panel"]?.widthMm, 60)
+        XCTAssertEqual(response.sizePresets["single_panel"]?.heightMm, 55)
+    }
+
     func testDecodeComposerPreviewPayload() throws {
         let payload = """
         {

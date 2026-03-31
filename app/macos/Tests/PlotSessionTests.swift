@@ -120,6 +120,27 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.unavailableTemplateCount, 1)
     }
 
+    func testImportInspectPipelinePopulatesSourceAndCompatibleTemplatesAfterBootstrapState() async {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        XCTAssertFalse(session.templateGalleryItems.isEmpty)
+        XCTAssertTrue(session.templateGalleryItems.allSatisfy { !$0.selectable })
+
+        await session.importFileAndInspect(URL(fileURLWithPath: "/tmp/runtime-symptom.csv"))
+
+        XCTAssertEqual(session.selectedSourcePath, "/tmp/runtime-symptom.csv")
+        XCTAssertEqual(client.inspectRequests.count, 1)
+        XCTAssertEqual(client.inspectRequests.first?.inputPath, "/tmp/runtime-symptom.csv")
+        XCTAssertNotNil(session.inspectionResponse)
+        XCTAssertFalse(session.compatibleRecommendations.isEmpty)
+        XCTAssertFalse(session.templateGalleryItems.isEmpty)
+        XCTAssertTrue(session.templateGalleryItems.allSatisfy(\.selectable))
+        XCTAssertEqual(Set(session.templateGalleryItems.map(\.id)), session.compatibleTemplateIDs)
+    }
+
     func testChangingRenderOptionsInvalidatesPreviewPreflightAndExport() async {
         let client = MockSidecarClient()
         let session = PlotSession()

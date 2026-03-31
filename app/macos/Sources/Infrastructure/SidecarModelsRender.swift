@@ -396,10 +396,16 @@ struct ContractTemplateResponse: Codable, Equatable, Sendable {
     let softRules: [String]
 }
 
+struct ContractSizePresetResponse: Codable, Equatable, Sendable {
+    let label: String
+    let widthMm: Double
+    let heightMm: Double
+}
+
 struct PlotContractResponse: Codable, Equatable, Sendable {
     let version: Int
     let defaults: MetaDefaultsResponse
-    let sizePresets: [String: MetaSizeResponse]
+    let sizePresets: [String: ContractSizePresetResponse]
     let styles: [String: JSONValue]
     let palettes: [String: JSONValue]
     let templates: [String: ContractTemplateResponse]

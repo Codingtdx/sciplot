@@ -79,7 +79,7 @@ enum TestPayloads {
             version: 1,
             defaults: .init(stylePreset: "journal_calm", palettePreset: "aqua_graphite"),
             sizePresets: [
-                "single_panel": .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
+                "single_panel": .init(label: "Single Panel", widthMm: 60, heightMm: 55),
             ],
             styles: [
                 "journal_calm": .string("Journal Calm"),
