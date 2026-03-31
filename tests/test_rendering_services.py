@@ -437,7 +437,7 @@ def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified
     assert options.reverse_x is True
 
 
-def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) -> None:
+def test_tensile_curve_defaults_to_linear_but_allows_log_override(tmp_path: Path) -> None:
     input_path = _write_tensile_curve_table(tmp_path / "tensile_curve.csv")
 
     inspection = inspect_input_file(input_path)
@@ -453,10 +453,13 @@ def test_tensile_curve_defaults_to_linear_and_rejects_log_scale(tmp_path: Path) 
 
     log_options = resolve_render_options(template="curve", xscale="log", yscale="linear")
     log_preflight = preflight_render_request("curve", input_path, 0, log_options)
-    assert log_preflight.errors == ("Tensile curves must use linear axes. Log x / y is not supported.",)
+    assert log_preflight.errors == ()
 
-    with pytest.raises(ValueError, match="Tensile curves must use linear axes"):
-        build_rendered_plots("curve", input_path, xscale="log", yscale="linear")
+    rendered = build_rendered_plots("curve", input_path, xscale="log", yscale="linear")
+    try:
+        assert tuple(plot.filename for plot in rendered) == linear_preflight.output_filenames
+    finally:
+        close_rendered_plots(rendered)
 
 
 def test_frequency_bundle_preflight_matches_multi_output_render(tmp_path: Path) -> None:

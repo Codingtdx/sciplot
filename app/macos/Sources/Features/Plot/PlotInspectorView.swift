@@ -2,21 +2,17 @@ import SwiftUI
 
 struct PlotInspectorView: View {
     @Bindable var session: PlotSession
-    @State private var diagnosticsExpanded = false
-    @State private var sourceRuntimeExpanded = false
 
     var body: some View {
         Form {
             plotOptionsSection
-            axesSection
+            if shouldShowAxesSection {
+                axesSection
+            }
 
             if session.shouldShowSeriesLegendControls {
                 seriesSection
             }
-
-            exportSection
-            diagnosticsDisclosure
-            sourceRuntimeDisclosure
         }
         .formStyle(.grouped)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -122,7 +118,7 @@ struct PlotInspectorView: View {
 
     private var axesSection: some View {
         Section("Axes") {
-            if session.editableOptionIDs.contains("xscale") || session.selectedTemplateSummary != nil {
+            if session.editableOptionIDs.contains("xscale") {
                 LabeledContent("X scale") {
                     Picker("", selection: stringBinding(
                         get: { session.renderOptions.xscale ?? "linear" },
@@ -138,7 +134,7 @@ struct PlotInspectorView: View {
                 }
             }
 
-            if session.editableOptionIDs.contains("yscale") || session.selectedTemplateSummary != nil {
+            if session.editableOptionIDs.contains("yscale") {
                 LabeledContent("Y scale") {
                     Picker("", selection: stringBinding(
                         get: { session.renderOptions.yscale ?? "linear" },
@@ -247,85 +243,6 @@ struct PlotInspectorView: View {
         }
     }
 
-    private var exportSection: some View {
-        Section("Export") {
-            LabeledContent("State", value: session.liveStatusLabel)
-
-            if let exportResponse = session.exportResponse {
-                LabeledContent("Outputs", value: "\(exportResponse.outputs.count)")
-                if let destination = session.latestExportDestinationDescription {
-                    LabeledContent("Destination", value: destination)
-                }
-                Button("Reveal Latest Export") {
-                    session.revealLatestExport()
-                }
-                .disabled(session.userExportURLs.isEmpty)
-            } else {
-                Text("Use the toolbar export action to write the current canvas state.")
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var diagnosticsDisclosure: some View {
-        Section {
-            DisclosureGroup("Diagnostics", isExpanded: $diagnosticsExpanded) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if diagnosticEntries.isEmpty {
-                        Text("No active diagnostics.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(diagnosticEntries) { entry in
-                            Label(entry.message, systemImage: entry.systemImage)
-                                .foregroundStyle(entry.style)
-                                .font(.footnote)
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
-                .padding(.top, 4)
-            }
-        }
-    }
-
-    private var sourceRuntimeDisclosure: some View {
-        Section {
-            DisclosureGroup("Source & Runtime", isExpanded: $sourceRuntimeExpanded) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let filename = session.selectedSourceFilename {
-                        LabeledContent("File", value: filename)
-                    }
-                    if let path = session.selectedSourcePath {
-                        LabeledContent("Path", value: path)
-                    }
-                    LabeledContent("Sheet", value: session.selectedSheet.displayName)
-                    LabeledContent("Status", value: session.liveStatusLabel)
-
-                    HStack(spacing: 10) {
-                        Button("View Raw Data") {
-                            session.showSourceInspector()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(session.inspectionResponse == nil)
-
-                        Button("Open Source") {
-                            session.openCurrentSource()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(session.selectedFileURL == nil)
-
-                        Button("Reveal Source") {
-                            session.revealCurrentSource()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(session.selectedFileURL == nil)
-                    }
-                }
-                .padding(.top, 4)
-            }
-        }
-    }
-
     private func sizeBinding(defaultSize: String) -> Binding<String> {
         stringBinding(
             get: { session.renderOptions.size ?? defaultSize },
@@ -403,37 +320,18 @@ struct PlotInspectorView: View {
     private func sizeLabel(for sizeID: String) -> String {
         session.allowedSizes.first(where: { $0.id == sizeID })?.label ?? sizeID
     }
-}
 
-private struct PlotDiagnosticEntry: Identifiable {
-    let id = UUID()
-    let message: String
-    let systemImage: String
-    let style: Color
-}
-
-private extension PlotInspectorView {
-    var diagnosticEntries: [PlotDiagnosticEntry] {
-        var entries: [PlotDiagnosticEntry] = []
-        if let errorMessage = session.errorMessage {
-            entries.append(
-                PlotDiagnosticEntry(
-                    message: errorMessage,
-                    systemImage: "xmark.circle.fill",
-                    style: .orange
-                )
-            )
-        }
-
-        if let inspection = session.inspectionResponse {
-            entries.append(contentsOf: inspection.inspection.warnings.map {
-                PlotDiagnosticEntry(message: $0, systemImage: "exclamationmark.triangle.fill", style: .orange)
-            })
-            entries.append(contentsOf: inspection.inspection.signals.map {
-                PlotDiagnosticEntry(message: $0, systemImage: "info.circle", style: .secondary)
-            })
-        }
-
-        return entries
+    private var shouldShowAxesSection: Bool {
+        let axisOptionIDs: Set<String> = [
+            "xscale",
+            "yscale",
+            "reverse_x",
+            "x_min",
+            "x_max",
+            "y_min",
+            "y_max",
+            "baseline",
+        ]
+        return !session.editableOptionIDs.isDisjoint(with: axisOptionIDs)
     }
 }

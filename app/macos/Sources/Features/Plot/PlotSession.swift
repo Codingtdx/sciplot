@@ -305,6 +305,23 @@ final class PlotSession {
         WorkspaceBridge.reveal([selectedFileURL])
     }
 
+    func openExampleDataTemplate(named filename: String) {
+        do {
+            let url = try exampleDataTemplateURL(named: filename)
+            WorkspaceBridge.open(url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func revealExampleDataTemplates() {
+        do {
+            WorkspaceBridge.reveal(try availableExampleDataTemplateURLs())
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     var latestExportDestinationDescription: String? {
         guard !userExportURLs.isEmpty else {
             return nil
@@ -828,6 +845,24 @@ final class PlotSession {
             return .curve
         }
         return .fallback
+    }
+
+    private func exampleDataTemplateURL(named filename: String) throws -> URL {
+        let rootURL = try RepoLocator().locateRepositoryRoot()
+        let url = rootURL
+            .appendingPathComponent("examples", isDirectory: true)
+            .appendingPathComponent(filename, isDirectory: false)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        return url
+    }
+
+    private func availableExampleDataTemplateURLs() throws -> [URL] {
+        try [
+            "curve_table.csv",
+            "replicate_table.csv",
+        ].map(exampleDataTemplateURL(named:))
     }
 
     private func invalidateSubmissionArtifacts() {

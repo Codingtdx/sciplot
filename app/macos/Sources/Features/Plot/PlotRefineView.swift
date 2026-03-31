@@ -18,7 +18,7 @@ struct PlotRefineView: View {
     @ViewBuilder
     private var previewSurface: some View {
         if let preview = session.previewResponse?.previews.first {
-            Base64PreviewImageView(base64PNG: preview.pngBase64)
+            Base64PDFPreviewView(base64PDF: preview.pdfBase64)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .textBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))

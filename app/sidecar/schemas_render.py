@@ -192,23 +192,20 @@ class ExportRenderResponse(StrictModel):
 
 def rendered_plots_to_preview_payload(
     rendered_plots: list[Any],
-    *,
-    dpi: int = 160,
 ) -> list[PreviewItemResponse]:
     previews: list[PreviewItemResponse] = []
     for rendered in rendered_plots:
         buffer = BytesIO()
         rendered.figure.savefig(
             buffer,
-            format="png",
-            dpi=dpi,
+            format="pdf",
             facecolor="white",
             bbox_inches=None,
         )
         previews.append(
             PreviewItemResponse(
                 filename=rendered.filename,
-                png_base64=b64encode(buffer.getvalue()).decode("ascii"),
+                pdf_base64=b64encode(buffer.getvalue()).decode("ascii"),
                 qa=(
                     serialize_dataclass(rendered.qa_report)
                     if getattr(rendered, "qa_report", None) is not None

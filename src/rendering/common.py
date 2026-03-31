@@ -28,7 +28,6 @@ from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
-TENSILE_LINEAR_SCALE_ERROR = "Tensile curves must use linear axes. Log x / y is not supported."
 _BAR_ZERO_BASELINE_TEMPLATES = {"bar", "grouped_bar_compare", "grouped_bar_error"}
 
 
@@ -217,8 +216,6 @@ def to_curve_series(series_list: list[RheologySeries]) -> list[CurveSeries]:
 
 
 def validate_series_scales(series_list: list[CurveSeries], *, xscale: str, yscale: str) -> None:
-    if looks_like_tensile_curve(series_list) and (xscale != "linear" or yscale != "linear"):
-        raise ValueError(TENSILE_LINEAR_SCALE_ERROR)
     if xscale == "log":
         for series in series_list:
             if (series.data["x"] <= 0).any():
@@ -481,7 +478,6 @@ __all__ = [
     "rheology_output_filenames",
     "summarize_replicate_distribution",
     "style_preflight_warnings",
-    "TENSILE_LINEAR_SCALE_ERROR",
     "to_curve_series",
     "validate_manual_axis_overrides",
     "validate_rheology_bundle_scales",

@@ -50,7 +50,7 @@ class SubmissionReportResponse(StrictModel):
 
 class PreviewItemResponse(StrictModel):
     filename: str
-    png_base64: str
+    pdf_base64: str
     qa: QAReportResponse | None = None
 
 

@@ -22,7 +22,7 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedSheet, .name("Representative_Curve"))
         XCTAssertEqual(session.selectedTemplateID, "curve")
         XCTAssertEqual(client.renderRequests.first?.template, "curve")
-        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.png")
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
         XCTAssertEqual(session.liveStatusLabel, "Preview ready")
     }
 
@@ -57,7 +57,7 @@ final class PlotSessionTests: XCTestCase {
                 implementationID: request.template,
                 sheet: request.sheet,
                 previews: [
-                    .init(filename: "strength_box_preview.png", pngBase64: TestPayloads.pngBase64, qa: nil),
+                    .init(filename: "strength_box_preview.pdf", pdfBase64: TestPayloads.pdfBase64, qa: nil),
                 ],
                 submissionReport: TestPayloads.submissionReport()
             )
@@ -69,14 +69,14 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertTrue(session.isInspecting)
 
         await waitUntil(
-            { session.previewResponse?.previews.first?.filename == "strength_box_preview.png" },
+            { session.previewResponse?.previews.first?.filename == "strength_box_preview.pdf" },
             timeout: 3.0
         )
 
         XCTAssertEqual(client.inspectRequests.last?.sheet, .name("Strength_Box"))
         XCTAssertEqual(client.renderRequests.last?.sheet, .name("Strength_Box"))
         XCTAssertEqual(session.selectedSheet, .name("Strength_Box"))
-        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "strength_box_preview.png")
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "strength_box_preview.pdf")
     }
 
     func testTemplateChangeRefreshesPreviewWithoutClearingTheLastResult() async throws {
@@ -86,7 +86,7 @@ final class PlotSessionTests: XCTestCase {
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
         session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
-        await waitUntil({ session.previewResponse?.previews.first?.filename == "sample_curve.png" }, timeout: 2.0)
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "sample_curve.pdf" }, timeout: 2.0)
 
         let initialPreview = session.previewResponse
         client.renderHandler = { request in
@@ -101,8 +101,8 @@ final class PlotSessionTests: XCTestCase {
                 sheet: request.sheet,
                 previews: [
                     .init(
-                        filename: request.template == "bar" ? "sample_bar.png" : "sample_curve.png",
-                        pngBase64: TestPayloads.pngBase64,
+                        filename: request.template == "bar" ? "sample_bar.pdf" : "sample_curve.pdf",
+                        pdfBase64: TestPayloads.pdfBase64,
                         qa: nil
                     ),
                 ],
@@ -116,13 +116,13 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertTrue(session.isPreviewing)
 
         await waitUntil(
-            { session.previewResponse?.previews.first?.filename == "sample_bar.png" },
+            { session.previewResponse?.previews.first?.filename == "sample_bar.pdf" },
             timeout: 3.0
         )
 
         XCTAssertEqual(client.renderRequests.last?.template, "bar")
         XCTAssertEqual(session.selectedTemplateID, "bar")
-        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_bar.png")
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_bar.pdf")
     }
 
     func testDebouncedNumericEditsRefreshOnlyAfterThePause() async throws {
@@ -144,7 +144,7 @@ final class PlotSessionTests: XCTestCase {
 
         await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
         XCTAssertEqual(session.renderOptions.xMin, 2.0)
-        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.png")
+        XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
     }
 
     func testSeriesLegendControlsOnlyAppearForMultiSeriesTemplates() async throws {
@@ -231,6 +231,51 @@ final class PlotSessionTests: XCTestCase {
 
         XCTAssertEqual(chooserIsMultiOutput, true)
         XCTAssertEqual(session.userExportURLs.count, 2)
+    }
+
+    func testPlotExportCanMaterializeTIFFOutput() async throws {
+        let client = MockSidecarClient()
+
+        var materializedDestination: URL?
+        let session = PlotSession(
+            chooseExportDestination: { _, _ in
+                URL(fileURLWithPath: "/tmp/user_exports/sample_curve.tiff")
+            },
+            materializeExport: { sourceURLs, destination in
+                XCTAssertEqual(sourceURLs.map(\.pathExtension), ["pdf"])
+                XCTAssertEqual(destination.pathExtension.lowercased(), "tiff")
+                materializedDestination = destination
+                return [destination]
+            }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+        await session.exportCurrentSelection()
+
+        XCTAssertEqual(materializedDestination?.path, "/tmp/user_exports/sample_curve.tiff")
+        XCTAssertEqual(session.userExportURLs.map { $0.pathExtension.lowercased() }, ["tiff"])
+    }
+
+    func testPreviewErrorShowsOnlyUserFacingTailSentence() async throws {
+        let client = MockSidecarClient()
+        client.renderHandler = { _ in
+            throw SidecarError.httpStatus(
+                400,
+                "Could not render the live preview. Tensile curves must use linear axes. Log x / y is not supported."
+            )
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.errorMessage != nil }, timeout: 2.0)
+
+        XCTAssertEqual(session.errorMessage, "Log x / y is not supported.")
     }
 
     private func waitUntil(

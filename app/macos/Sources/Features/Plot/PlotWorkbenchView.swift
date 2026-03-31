@@ -142,8 +142,9 @@ private struct PlotGuideSheet: View {
                     )
                     guideSection(
                         title: "Inspector",
-                        text: "Use the inspector for compact plot options, axis controls, legend ordering, and export status. Raw source review stays secondary."
+                        text: "Use the inspector for compact plot options, axis controls, and legend ordering. Keep the canvas dominant and move secondary helpers into lightweight surfaces."
                     )
+                    dataTemplatesSection
                     guideSection(
                         title: "Export",
                         text: "Export is a toolbar utility. It writes the current state without turning Plot into a step-by-step workflow."
@@ -162,6 +163,36 @@ private struct PlotGuideSheet: View {
             }
         }
         .frame(minWidth: 520, minHeight: 420)
+    }
+
+    private var dataTemplatesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Data File Templates")
+                .font(.headline)
+
+            Text("Open the built-in example tables when you need a quick reference for supported input structure.")
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button("Open Curve Table") {
+                    session.openExampleDataTemplate(named: "curve_table.csv")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Open Replicate Table") {
+                    session.openExampleDataTemplate(named: "replicate_table.csv")
+                }
+                .buttonStyle(.bordered)
+
+                Button("Reveal in Finder") {
+                    session.revealExampleDataTemplates()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func guideSection(title: String, text: String) -> some View {

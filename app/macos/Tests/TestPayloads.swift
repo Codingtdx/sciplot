@@ -3,6 +3,7 @@ import Foundation
 
 enum TestPayloads {
     static let pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9oNnfdcAAAAASUVORK5CYII="
+    static let pdfBase64 = "JVBERi0xLjEKMSAwIG9iajw8Pj5lbmRvYmoKMiAwIG9iajw8IC9UeXBlIC9DYXRhbG9nIC9QYWdlcyAzIDAgUiA+PmVuZG9iagozIDAgb2JqPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFs0IDAgUl0gL0NvdW50IDEgPj5lbmRvYmoKNCAwIG9iajw8IC9UeXBlIC9QYWdlIC9QYXJlbnQgMyAwIFIgL01lZGlhQm94IFswIDAgNzIgNzJdID4+ZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxMCAwMDAwMCBuIAowMDAwMDAwMDMwIDAwMDAwIG4gCjAwMDAwMDAwODEgMDAwMDAgbiAKMDAwMDAwMDEzOCAwMDAwMCBuIAp0cmFpbGVyPDwgL1NpemUgNSAvUm9vdCAyIDAgUiA+PgpzdGFydHhyZWYKMjA5CiUlRU9GCg=="
 
     static func meta() -> SidecarMetaResponse {
         SidecarMetaResponse(
@@ -428,7 +429,7 @@ enum TestPayloads {
             implementationID: "curve",
             sheet: .name("Representative_Curve"),
             previews: [
-                .init(filename: "sample_curve.png", pngBase64: pngBase64, qa: nil),
+                .init(filename: "sample_curve.pdf", pdfBase64: pdfBase64, qa: nil),
             ],
             submissionReport: submissionReport()
         )

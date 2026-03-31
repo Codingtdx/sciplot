@@ -74,9 +74,15 @@ struct CleanupInspectorView: View {
                     value: URL(fileURLWithPath: comparisonExportResponse.comparisonWorkbookPath).lastPathComponent
                 )
                 LabeledContent("Outputs", value: "\(comparisonExportResponse.outputs.count)")
+                if !session.comparisonExportFigureURLs.isEmpty {
+                    LabeledContent(
+                        "Figure format",
+                        value: session.comparisonExportFigureURLs[0].pathExtension.uppercased()
+                    )
+                }
             } else if let primaryWorkbookURL = session.primaryWorkbookURL {
                 LabeledContent("Prepared workbook", value: primaryWorkbookURL.lastPathComponent)
-                Text("Export the comparison bundle to generate the final Data Cleanup handoff package.")
+                Text("Export the comparison bundle to generate the handoff workbook plus editable PDF or 300 dpi TIFF figures.")
                     .foregroundStyle(.secondary)
             } else {
                 Text("No cleanup export output yet.")

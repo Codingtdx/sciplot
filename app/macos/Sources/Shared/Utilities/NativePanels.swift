@@ -5,6 +5,29 @@ import ImageIO
 import PDFKit
 import UniformTypeIdentifiers
 
+enum ExportGraphicFormat: String, Sendable {
+    case pdf
+    case tiff
+
+    var label: String {
+        switch self {
+        case .pdf:
+            return "Editable PDF"
+        case .tiff:
+            return "300 dpi TIFF"
+        }
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .pdf:
+            return "pdf"
+        case .tiff:
+            return "tiff"
+        }
+    }
+}
+
 @MainActor
 enum NativePanels {
     static func chooseSaveLocation(
@@ -37,6 +60,25 @@ enum NativePanels {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
+    static func chooseGraphicExportFormat(title: String, message: String) -> ExportGraphicFormat? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: ExportGraphicFormat.pdf.label)
+        alert.addButton(withTitle: ExportGraphicFormat.tiff.label)
+        alert.addButton(withTitle: "Cancel")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .pdf
+        case .alertSecondButtonReturn:
+            return .tiff
+        default:
+            return nil
+        }
+    }
+
     static func chooseWorkbookSaveLocation(suggestedName: String) -> URL? {
         chooseSaveLocation(
             title: "Save Prepared Workbook",
@@ -65,16 +107,20 @@ enum NativeExportCoordinator {
         if isMultiOutput {
             message = "This template exports a file group. The name you choose is used as the base stem, and each output appends a deterministic suffix."
         } else {
-            message = "Choose where the exported PDF should be written."
+            message = "Choose a destination, file name, and output format for this plot export."
         }
 
         return NativePanels.chooseSaveLocation(
             title: "Export Plot",
             message: message,
             suggestedName: suggestedName,
-            allowedContentTypes: [FileTypeCatalog.pdf],
+            allowedContentTypes: FileTypeCatalog.composerExport,
             prompt: "Export"
         )
+    }
+
+    static func chooseComparisonFigureExportFormat(title: String, message: String) -> ExportGraphicFormat? {
+        NativePanels.chooseGraphicExportFormat(title: title, message: message)
     }
 
     static func chooseDirectory(title: String, message: String) -> URL? {
@@ -111,8 +157,14 @@ enum NativeExportCoordinator {
             throw NativeExportError.missingIntermediateFile(source.path)
         }
 
+        let exportFormat = graphicExportFormat(for: destinationURL)
+
         if sourceURLs.count == 1 {
-            try replaceItem(at: destinationURL, withItemAt: sourceURLs[0])
+            try materializeGraphicOutput(
+                sourceURL: sourceURLs[0],
+                destinationURL: destinationURL,
+                format: exportFormat
+            )
             return [destinationURL]
         }
 
@@ -124,24 +176,88 @@ enum NativeExportCoordinator {
 
         for (index, source) in sourceURLs.enumerated() {
             let suffix = suffixes[index]
-            let sourceExtension = source.pathExtension.isEmpty ? "pdf" : source.pathExtension
+            let sourceExtension = exportFormat.fileExtension
             let finalFilename = suffix.isEmpty
                 ? "\(normalizedStem).\(sourceExtension)"
                 : "\(normalizedStem)_\(suffix).\(sourceExtension)"
             let finalURL = destinationDirectory.appendingPathComponent(finalFilename)
-            try replaceItem(at: finalURL, withItemAt: source)
+            try materializeGraphicOutput(
+                sourceURL: source,
+                destinationURL: finalURL,
+                format: exportFormat
+            )
             finalURLs.append(finalURL)
         }
 
         return finalURLs
     }
 
-    private static func composerExportFormat(for destinationURL: URL) -> ComposerExportFormat {
+    static func materializeComparisonOutputs(
+        sourceURLs: [URL],
+        format: ExportGraphicFormat
+    ) throws -> [URL] {
+        guard !sourceURLs.isEmpty else {
+            throw NativeExportError.noSourceOutputs
+        }
+
+        switch format {
+        case .pdf:
+            return sourceURLs
+        case .tiff:
+            var finalURLs: [URL] = []
+            for sourceURL in sourceURLs {
+                guard FileManager.default.fileExists(atPath: sourceURL.path) else {
+                    throw NativeExportError.missingIntermediateFile(sourceURL.path)
+                }
+                let destinationURL = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+                try materializeGraphicOutput(
+                    sourceURL: sourceURL,
+                    destinationURL: destinationURL,
+                    format: format
+                )
+                if FileManager.default.fileExists(atPath: sourceURL.path),
+                   sourceURL.standardizedFileURL != destinationURL.standardizedFileURL
+                {
+                    try FileManager.default.removeItem(at: sourceURL)
+                }
+                finalURLs.append(destinationURL)
+            }
+            return finalURLs
+        }
+    }
+
+    private static func graphicExportFormat(for destinationURL: URL) -> ExportGraphicFormat {
         let ext = destinationURL.pathExtension.lowercased()
         if ext == "tif" || ext == "tiff" {
             return .tiff
         }
         return .pdf
+    }
+
+    private static func composerExportFormat(for destinationURL: URL) -> ComposerExportFormat {
+        switch graphicExportFormat(for: destinationURL) {
+        case .pdf:
+            return .pdf
+        case .tiff:
+            return .tiff
+        }
+    }
+
+    private static func materializeGraphicOutput(
+        sourceURL: URL,
+        destinationURL: URL,
+        format: ExportGraphicFormat
+    ) throws {
+        switch format {
+        case .pdf:
+            try replaceItem(at: destinationURL, withItemAt: sourceURL)
+        case .tiff:
+            try writeSinglePageTIFF(
+                fromPDFAt: sourceURL,
+                to: destinationURL,
+                dpi: 300
+            )
+        }
     }
 
     private static func replaceItem(at destinationURL: URL, withItemAt sourceURL: URL) throws {

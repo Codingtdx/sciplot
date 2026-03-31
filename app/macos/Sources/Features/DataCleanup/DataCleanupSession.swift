@@ -40,10 +40,14 @@ struct PreparedWorkbookItem: Identifiable, Equatable {
 final class DataCleanupSession {
     typealias DirectoryChooser = @MainActor (_ title: String, _ message: String) -> URL?
     typealias WorkbookSaveChooser = @MainActor (_ suggestedName: String) -> URL?
+    typealias ComparisonFigureFormatChooser = @MainActor (_ title: String, _ message: String) -> ExportGraphicFormat?
+    typealias ComparisonOutputMaterializer = @MainActor (_ sourceURLs: [URL], _ format: ExportGraphicFormat) throws -> [URL]
 
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private let chooseDirectory: DirectoryChooser
     @ObservationIgnored private let chooseWorkbookSaveLocation: WorkbookSaveChooser
+    @ObservationIgnored private let chooseComparisonFigureFormat: ComparisonFigureFormatChooser
+    @ObservationIgnored private let materializeComparisonOutputs: ComparisonOutputMaterializer
 
     var stage: DataCleanupStage = .intake
     var isRawImporterPresented = false
@@ -53,6 +57,7 @@ final class DataCleanupSession {
     var latestPreprocessResponse: TensileReplicateResponseModel?
     var comparisonExportResponse: TensileComparisonExportResponse?
     var comparisonExportDestinationURL: URL?
+    var comparisonExportFigureURLs: [URL] = []
     var comparisonWorkbookOrder: [String] = []
     var primaryWorkbookID: String?
     var groupName = ""
@@ -66,10 +71,18 @@ final class DataCleanupSession {
         },
         chooseWorkbookSaveLocation: @escaping WorkbookSaveChooser = {
             NativeExportCoordinator.chooseWorkbookSaveLocation(suggestedName: $0)
+        },
+        chooseComparisonFigureFormat: @escaping ComparisonFigureFormatChooser = { title, message in
+            NativeExportCoordinator.chooseComparisonFigureExportFormat(title: title, message: message)
+        },
+        materializeComparisonOutputs: @escaping ComparisonOutputMaterializer = {
+            try NativeExportCoordinator.materializeComparisonOutputs(sourceURLs: $0, format: $1)
         }
     ) {
         self.chooseDirectory = chooseDirectory
         self.chooseWorkbookSaveLocation = chooseWorkbookSaveLocation
+        self.chooseComparisonFigureFormat = chooseComparisonFigureFormat
+        self.materializeComparisonOutputs = materializeComparisonOutputs
     }
 
     func configure(client: any SidecarClienting) {
@@ -117,6 +130,7 @@ final class DataCleanupSession {
     func handleImportedRawFiles(_ urls: [URL]) async {
         rawInputURLs = urls.sorted { $0.lastPathComponent < $1.lastPathComponent }
         comparisonExportDestinationURL = nil
+        comparisonExportFigureURLs = []
         errorMessage = nil
 
         guard !rawInputURLs.isEmpty else {
@@ -141,6 +155,7 @@ final class DataCleanupSession {
 
         isBusy = true
         comparisonExportDestinationURL = nil
+        comparisonExportFigureURLs = []
         errorMessage = nil
         defer { isBusy = false }
 
@@ -182,6 +197,7 @@ final class DataCleanupSession {
 
         isBusy = true
         comparisonExportDestinationURL = nil
+        comparisonExportFigureURLs = []
         errorMessage = nil
         defer { isBusy = false }
 
@@ -227,16 +243,28 @@ final class DataCleanupSession {
             return
         }
 
+        guard let figureFormat = chooseComparisonFigureFormat(
+            "Comparison Figure Format",
+            "Choose whether the exported comparison figures should stay as editable PDF or be converted to 300 dpi TIFF."
+        ) else {
+            return
+        }
+
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
 
         do {
-            comparisonExportResponse = try await client.exportTensileComparison(
+            let response = try await client.exportTensileComparison(
                 .init(
                     workbookPaths: orderedPreparedWorkbooks.map { $0.url.path },
                     outputDir: directoryURL.path
                 )
+            )
+            comparisonExportResponse = response
+            comparisonExportFigureURLs = try materializeComparisonOutputs(
+                response.outputs.map { URL(fileURLWithPath: $0) },
+                figureFormat
             )
             comparisonExportDestinationURL = directoryURL
             stage = .export

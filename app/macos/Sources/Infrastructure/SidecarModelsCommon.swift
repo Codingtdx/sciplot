@@ -48,6 +48,6 @@ struct SubmissionReportResponse: Codable, Equatable, Sendable {
 
 struct PreviewItemResponse: Codable, Equatable, Sendable {
     let filename: String
-    let pngBase64: String
+    let pdfBase64: String
     let qa: QAReportResponse?
 }

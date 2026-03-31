@@ -45,7 +45,7 @@ struct CleanupCompareView: View {
 
             GroupBox("Compare") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Use the sidecar comparison export to generate the representative curve comparison workbook and the QC figures.")
+                    Text("Export the comparison workbook plus QC figures, then choose whether the figures stay as editable PDF or convert to 300 dpi TIFF.")
                         .foregroundStyle(.secondary)
 
                     Button("Export Comparison Bundle") {

@@ -8,9 +8,20 @@ final class DataCleanupSessionTests: XCTestCase {
         let outputWorkbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
         let exportDirectoryURL = URL(fileURLWithPath: "/tmp/cleanup_bundle", isDirectory: true)
         let client = MockSidecarClient()
+        var chosenFormat: ExportGraphicFormat?
         let session = DataCleanupSession(
             chooseDirectory: { _, _ in exportDirectoryURL },
-            chooseWorkbookSaveLocation: { _ in outputWorkbookURL }
+            chooseWorkbookSaveLocation: { _ in outputWorkbookURL },
+            chooseComparisonFigureFormat: { _, _ in
+                chosenFormat = .tiff
+                return .tiff
+            },
+            materializeComparisonOutputs: { sourceURLs, format in
+                chosenFormat = format
+                return sourceURLs.map {
+                    $0.deletingPathExtension().appendingPathExtension("tiff")
+                }
+            }
         )
         session.configure(client: client)
 
@@ -35,6 +46,11 @@ final class DataCleanupSessionTests: XCTestCase {
         XCTAssertEqual(client.comparisonRequests.first?.workbookPaths.count, 2)
         XCTAssertEqual(session.comparisonExportResponse?.bundleDir, "/tmp/cleanup_bundle")
         XCTAssertEqual(session.comparisonExportDestinationURL, exportDirectoryURL)
+        XCTAssertEqual(chosenFormat, .tiff)
+        XCTAssertEqual(
+            session.comparisonExportFigureURLs.map(\.lastPathComponent),
+            ["strength_box.tiff", "modulus_bar.tiff"]
+        )
 
         var openedWorkbook: URL?
         var openedSheet: SheetValue?

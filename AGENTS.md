@@ -132,7 +132,7 @@
   - `curve_table -> curve, point_line, replicate_curves_with_band, stacked_curve, segmented_stacked_curve, scatter, scatter_fit, scatter_with_fit`
   - `replicate_table -> distribution_compare, box_strip, point_error, grouped_bar_error, grouped_bar_compare, histogram_density, box, violin, bar`
   - `heatmap_table -> heatmap, annotated_heatmap`
-- 所有识别为 `tensile_curve` 的曲线都必须固定使用 `linear` x/y 坐标；不允许在推荐、预检或渲染阶段退回 `log`。
+- 所有识别为 `tensile_curve` 的曲线默认推荐 `linear` x/y 坐标；推荐不应锁死用户选择，若用户显式改为 `log`，则仍按常规正值约束进行预检与渲染。
 - `tensile_curve` 的 `y` 轴必须始终包含并显示 `0`，但 display bounds 仍要在 `0` 下方留出无标签留白；不要再把 tensile 曲线直接贴在横轴上。
 - 标准 `log` 轴允许 display bounds 超过最后一个标签，但标签只显示 decade 主刻度；不要把 `2×10^n`、`5×10^n` 直接当成主标签端点。
 - 日常渲染会直接吃契约；完整“画完再审”的重校验只在 smoke / 查 bug 时跑。

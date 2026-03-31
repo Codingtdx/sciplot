@@ -12,6 +12,10 @@ struct CleanupExportView: View {
                             ("Bundle directory", comparisonExport.bundleDir),
                             ("Workbook", comparisonExport.comparisonWorkbookPath),
                             ("Outputs", "\(comparisonExport.outputs.count)"),
+                            (
+                                "Figure format",
+                                session.comparisonExportFigureURLs.first?.pathExtension.uppercased() ?? "PDF"
+                            ),
                         ])
 
                         HStack {
@@ -30,7 +34,7 @@ struct CleanupExportView: View {
             } else {
                 EmptyStateCard(
                     title: "No comparison bundle exported yet",
-                    message: "Export the comparison bundle first, or hand the current prepared workbook into Plot."
+                    message: "Export the comparison bundle first to generate the workbook plus editable PDF or 300 dpi TIFF figures, or hand the current prepared workbook into Plot."
                 )
             }
 
