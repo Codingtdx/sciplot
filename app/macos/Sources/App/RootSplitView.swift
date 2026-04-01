@@ -75,8 +75,12 @@ struct RootSplitView: View {
     private var activeToolbarContent: some ToolbarContent {
         if model.selectedWorkbench == .plot {
             plotToolbarContent
+        } else if model.selectedWorkbench == .dataCleanup {
+            dataCleanupToolbarContent
         } else if model.selectedWorkbench == .composer {
             composerToolbarContent
+        } else if model.selectedWorkbench == .codeConsole {
+            codeConsoleToolbarContent
         } else {
             defaultToolbarContent
         }
@@ -103,6 +107,46 @@ struct RootSplitView: View {
             ) {
                 model.toggleInspector()
             }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var dataCleanupToolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Menu {
+                Button(DataCleanupImportKind.rawCSV.title, systemImage: "doc.text") {
+                    model.dataCleanupSession.beginImport(kind: .rawCSV)
+                }
+
+                Button(DataCleanupImportKind.preparedWorkbook.title, systemImage: "tablecells") {
+                    model.dataCleanupSession.beginImport(kind: .preparedWorkbook)
+                }
+            } label: {
+                Label("Import", systemImage: "tray.and.arrow.down")
+            }
+
+            Button("Export", systemImage: "square.and.arrow.up") {
+                Task { await model.exportActiveWorkbench() }
+            }
+
+            Button("Reveal", systemImage: "folder") {
+                model.revealActiveOutput()
+            }
+
+            Button("Guide", systemImage: "questionmark.circle") {
+                model.showDataCleanupGuide()
+            }
+
+            Button(
+                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                model.toggleInspector()
+            }
+        }
+
+        ToolbarItem(placement: .status) {
+            runtimeStatusView
         }
     }
 
@@ -173,6 +217,38 @@ struct RootSplitView: View {
             ) {
                 model.toggleInspector()
             }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var codeConsoleToolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            Button("Import", systemImage: "tray.and.arrow.down") {
+                model.beginImportForActiveWorkbench()
+            }
+
+            Button("Copy Prompt", systemImage: "doc.on.doc") {
+                model.codeConsoleSession.copyPromptToPasteboard()
+            }
+
+            Button("Run", systemImage: "play.fill") {
+                Task { await model.codeConsoleSession.runCurrentCode() }
+            }
+
+            Button("Reveal", systemImage: "folder") {
+                model.revealActiveOutput()
+            }
+
+            Button(
+                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.right"
+            ) {
+                model.toggleInspector()
+            }
+        }
+
+        ToolbarItem(placement: .status) {
+            runtimeStatusView
         }
     }
 

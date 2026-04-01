@@ -25,6 +25,14 @@ class TensileMetricSummaryResponse(StrictModel):
     std: float | None
 
 
+class TensileComparisonFigureOutputResponse(StrictModel):
+    path: str
+    category: str
+    kind: str
+    metric: str | None = None
+    label: str
+
+
 class TensileReplicateResponseModel(StrictModel):
     output_path: str
     group_name: str
@@ -39,10 +47,12 @@ class TensileReplicateResponseModel(StrictModel):
 class TensileWorkbookSummaryResponse(StrictModel):
     workbook_path: str
     label: str
+    preferred_sheet: str
     sheet_names: list[str]
     sample_count: int
     representative_filename: str
     metrics: list[TensileMetricSummaryResponse]
+    warnings: list[str]
 
 
 class TensileComparisonExportResponse(StrictModel):
@@ -50,11 +60,13 @@ class TensileComparisonExportResponse(StrictModel):
     comparison_workbook_path: str
     labels: list[str]
     outputs: list[str]
+    figure_outputs: list[TensileComparisonFigureOutputResponse]
 
 
 __all__ = [
     "TensileComparisonExportRequest",
     "TensileComparisonExportResponse",
+    "TensileComparisonFigureOutputResponse",
     "TensileMetricSummaryResponse",
     "TensileReplicateRequest",
     "TensileReplicateResponseModel",

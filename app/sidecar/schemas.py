@@ -15,6 +15,13 @@ from app.sidecar.schemas_common import (
     SubmissionReportResponse,
     serialize_dataclass,
 )
+from app.sidecar.schemas_code_console import (
+    CodeConsoleContextRequest,
+    CodeConsoleContextResponse,
+    CodeConsoleGeneratedFileResponse,
+    CodeConsoleRunRequest,
+    CodeConsoleRunResponse,
+)
 from app.sidecar.schemas_composer import (
     ComposerImportRequest,
     ComposerPreviewResponse,
@@ -45,6 +52,7 @@ from app.sidecar.schemas_render import (
 from app.sidecar.schemas_tensile import (
     TensileComparisonExportRequest,
     TensileComparisonExportResponse,
+    TensileComparisonFigureOutputResponse,
     TensileMetricSummaryResponse,
     TensileReplicateRequest,
     TensileReplicateResponseModel,
@@ -53,6 +61,11 @@ from app.sidecar.schemas_tensile import (
 )
 
 __all__ = [
+    "CodeConsoleContextRequest",
+    "CodeConsoleContextResponse",
+    "CodeConsoleGeneratedFileResponse",
+    "CodeConsoleRunRequest",
+    "CodeConsoleRunResponse",
     "ComposerImportRequest",
     "ComposerPreviewResponse",
     "ComposerProjectResponse",
@@ -82,6 +95,7 @@ __all__ = [
     "SubmissionReportResponse",
     "TensileComparisonExportRequest",
     "TensileComparisonExportResponse",
+    "TensileComparisonFigureOutputResponse",
     "TensileMetricSummaryResponse",
     "TensileReplicateRequest",
     "TensileReplicateResponseModel",

@@ -16,9 +16,13 @@
 - `src/plotting_stats.py`: 统计图族实现，承接 `box / bar / violin` 及其共享坐标规则；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/plotting_heatmap.py`: 热图实现，承接 heatmap 主图区与 colorbar 布局；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/composer.py`: Composer v2 后端公开入口与真相源门面；外部调用继续统一从这里 import。类型与常量在 `src/composer_types.py`，布局/导入/校验在 `src/composer_ops.py`，预览/导出在 `src/composer_render.py`。
+- `src/code_console_service.py`: Code Console 后端真相源；负责绑定输入上下文、生成外部 AI prompt/starter code，并运行受控 repo-native Python runner。
+- `src/code_console_runtime.py`: Code Console 脚本 helper；runner 内脚本统一从这里读取上下文、加载数据、申请受控输出路径并复用 SciPlot God 风格底座。
+- `src/infrastructure/persistence/code_console_runs.py`: Code Console managed run/output 目录与 retention 规则；不要在 sidecar route 里散落手写目录策略。
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
+- `app/sidecar/routes_code_console.py` + `app/sidecar/schemas_code_console.py`: Code Console 的 prompt/context 与 controlled runner surface；当前原生前端统一通过 `/code-console/context`、`/code-console/run` 走这一层。
 - `app/macos/`: 当前受支持的原生 macOS 前端；手工 Xcode 工程、SwiftUI app shell、sidecar runtime 与 4 个 workbench 的实现都在这里。
 - `app/macos/Sources/App`: SwiftUI `App` root、`NavigationSplitView` shell、toolbar、commands 与 app-level session/runtime 装配。
 - `app/macos/Sources/Infrastructure`: `Process + Pipe` sidecar runtime、`URLSession + Codable` client、repo root 定位与 sidecar schema mirror。
@@ -76,11 +80,14 @@
 - Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
 - `Data Cleanup / 数据整理` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
 - `Data Cleanup` 工作台支持 intake raw tensile CSV、补录任意组数的已整理 workbook、做 QC compare，并导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在运行时 store，不写进项目文件 schema。
+- `Data Cleanup` 原生工作台应保持统一 workbench 形态：左侧 intake / prepared workbook 列表，中间 `Review & Clean + Compare + Export / Open in Plot` 主面，右侧 inspector；不要再把这几个步骤恢复成独立 stage 页面主切换。
+- `inspect-tensile-workbook` 响应现在必须带 `preferred_sheet` 与 `warnings`；`export-tensile-comparison` 除兼容 `outputs` 外还必须带结构化 `figure_outputs`，供原生工作台稳定展示 preview / label / metric 语义，前端不要再靠文件名猜。
 - 如果要做面向用户的 mock，Data Cleanup 的 user-visible workflow 默认优先压缩为 `Import -> Review & Clean -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
 - Data Cleanup preprocess 成功后默认停留在 `Data Cleanup` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
 - 最近记录、open/save、managed files 与 runtime cleanup 都属于 utility affordance；不要再把 `Start` 或 `projects/recents` 还原成一级 workspace。
 - Plot 导入阶段如需 sidecar materialize `example template folder / blank template folder`，这些 workbook 仍要写到 app-managed stable 目录并按需覆盖刷新；它们只是输入模板与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
 - `Code Console` 是一级主工作台，不是 utility；前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
+- Code Console 当前的后端真相源就是 `/code-console/context` 与 `/code-console/run`；不要在前端本地重拼 prompt、上下文 JSON、runner 环境变量或 managed output 目录结构。
 - `Code Console` 的 prompt、runner、AI bundle 和 data template 都不是新的绘图事实源；不要把 contract 常量、视觉默认值、尺寸规则或 plotting rule 复制进前端，也不要绕过 sidecar 在 GUI 本地重新拼最终 prompt、runner 上下文或模板结构。
 - `Code Console` 的主流程是 `Bind Context -> Inspect Inputs -> Prompt/Code -> Run -> Outputs -> Handoff`；默认不要把长 prompt body 常驻铺满页面，也不要把 Console 做成第二套重配置表单。
 - `Code Console` runner 只运行 repo-native Python，不是系统 shell：工作目录是 repo root，但预览和导出产物只认受控 `OUTPUT_DIR`，并且要有 timeout、stdout/stderr、exit code、duration、generated files 这些返回字段。runner 的 managed run/output 目录要走 app-managed cache/data 路径并做 retention/cleanup，不能无上限堆积。

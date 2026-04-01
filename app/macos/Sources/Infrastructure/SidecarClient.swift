@@ -6,6 +6,8 @@ protocol SidecarClienting: AnyObject {
     func fetchMeta() async throws -> SidecarMetaResponse
     func fetchPlotContract() async throws -> PlotContractResponse
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse
+    func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse
+    func runCodeConsole(_ request: CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse
     func renderPreview(_ request: RenderRequest) async throws -> RenderPreviewResponse
     func exportRender(_ request: ExportRenderRequest) async throws -> ExportRenderResponse
@@ -54,6 +56,14 @@ final class SidecarClient: SidecarClienting {
 
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse {
         try await post("inspect-file", body: request)
+    }
+
+    func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse {
+        try await post("code-console/context", body: request)
+    }
+
+    func runCodeConsole(_ request: CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse {
+        try await post("code-console/run", body: request)
     }
 
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse {

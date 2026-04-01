@@ -213,18 +213,19 @@ Do not assume without new evidence:
 
 ### Code Console
 
-Confirmed in current repo/docs:
+Confirmed in current repo/docs/tests:
 
 - bind current data and Plot context into the workbench
+- import a data file directly into Code Console
+- generate fixed prompt/context bundles for external AI use
 - edit code on one controlled runner surface
 - run repo-native Python
+- show runner status, stdout, stderr, exit code, duration, generated files, and previews
+- open the managed output folder
 - review outputs on a dedicated output surface
 
 Strongly implied by recent integrated history:
 
-- generate fixed prompt/context bundles for external AI use
-- show runner status, stdout, stderr, exit code, duration, generated files, and previews
-- open the managed output folder
 - hand generated outputs back into Plot or Composer
 
 Do not assume without new evidence:

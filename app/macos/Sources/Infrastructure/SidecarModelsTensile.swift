@@ -22,6 +22,14 @@ struct TensileMetricSummaryResponse: Codable, Equatable, Sendable {
     let std: Double?
 }
 
+struct TensileComparisonFigureOutputResponse: Codable, Equatable, Sendable {
+    let path: String
+    let category: String
+    let kind: String
+    let metric: String?
+    let label: String
+}
+
 struct TensileReplicateResponseModel: Codable, Equatable, Sendable {
     let outputPath: String
     let groupName: String
@@ -36,10 +44,12 @@ struct TensileReplicateResponseModel: Codable, Equatable, Sendable {
 struct TensileWorkbookSummaryResponse: Codable, Equatable, Sendable {
     let workbookPath: String
     let label: String
+    let preferredSheet: String
     let sheetNames: [String]
     let sampleCount: Int
     let representativeFilename: String
     let metrics: [TensileMetricSummaryResponse]
+    let warnings: [String]
 }
 
 struct TensileComparisonExportResponse: Codable, Equatable, Sendable {
@@ -47,4 +57,5 @@ struct TensileComparisonExportResponse: Codable, Equatable, Sendable {
     let comparisonWorkbookPath: String
     let labels: [String]
     let outputs: [String]
+    let figureOutputs: [TensileComparisonFigureOutputResponse]
 }

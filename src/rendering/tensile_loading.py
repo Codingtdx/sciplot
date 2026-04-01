@@ -23,10 +23,12 @@ def inspect_tensile_workbook(workbook_path: str | Path) -> TensileWorkbookSummar
     return TensileWorkbookSummary(
         workbook_path=loaded.workbook_path,
         label=loaded.base_label,
+        preferred_sheet=REPRESENTATIVE_CURVE_SHEET,
         sheet_names=loaded.sheet_names,
         sample_count=loaded.sample_count,
         representative_filename=loaded.representative_filename,
         metrics=loaded.metrics,
+        warnings=(),
     )
 
 

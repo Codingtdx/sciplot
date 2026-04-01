@@ -24,6 +24,7 @@ from src.rendering.tensile_models import (
     SUMMARY_COLUMNS,
     LoadedTensileWorkbook,
     TensileComparisonExport,
+    TensileComparisonFigureOutput,
 )
 from src.tensile_replicates import REPRESENTATIVE_CURVE_SHEET, SUMMARY_SHEET
 from src.text_normalization import slugify_label
@@ -73,12 +74,13 @@ def export_tensile_comparison_bundle(
             index=False,
         )
 
-    outputs = export_comparison_figures(loaded_sources, labels, bundle_dir)
+    figure_outputs = export_comparison_figures(loaded_sources, labels, bundle_dir)
     return TensileComparisonExport(
         bundle_dir=bundle_dir,
         comparison_workbook_path=comparison_workbook_path,
         labels=tuple(labels),
-        outputs=tuple(outputs),
+        outputs=tuple(item.path for item in figure_outputs),
+        figure_outputs=tuple(figure_outputs),
     )
 
 
@@ -165,10 +167,10 @@ def export_comparison_figures(
     loaded_sources: list[LoadedTensileWorkbook],
     labels: list[str],
     bundle_dir: Path,
-) -> list[Path]:
+) -> list[TensileComparisonFigureOutput]:
     plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
 
-    outputs: list[Path] = []
+    outputs: list[TensileComparisonFigureOutput] = []
     figures = []
     try:
         representative_series = [
@@ -193,7 +195,16 @@ def export_comparison_figures(
             reverse_x=False,
         )
         figures.append(representative_figure)
-        outputs.append(save_pdf(representative_figure, bundle_dir / COMPARISON_CURVE_FILENAME))
+        representative_path = save_pdf(representative_figure, bundle_dir / COMPARISON_CURVE_FILENAME)
+        outputs.append(
+            TensileComparisonFigureOutput(
+                path=representative_path,
+                category="curve",
+                kind="representative_curve",
+                metric=None,
+                label="Representative Curve Compare",
+            )
+        )
 
         for metric_name in METRIC_NAMES:
             groups = [
@@ -208,11 +219,29 @@ def export_comparison_figures(
             metric_slug = slugify_label(metric_name)
             box_figure, _ = plot_box(groups, width_mm=60.0, height_mm=55.0)
             figures.append(box_figure)
-            outputs.append(save_pdf(box_figure, bundle_dir / f"{metric_slug}_box_compare.pdf"))
+            box_path = save_pdf(box_figure, bundle_dir / f"{metric_slug}_box_compare.pdf")
+            outputs.append(
+                TensileComparisonFigureOutput(
+                    path=box_path,
+                    category="metric",
+                    kind="box_compare",
+                    metric=metric_name,
+                    label=f"{metric_name} Box Compare",
+                )
+            )
 
             bar_figure, _ = plot_bar(groups, width_mm=60.0, height_mm=55.0)
             figures.append(bar_figure)
-            outputs.append(save_pdf(bar_figure, bundle_dir / f"{metric_slug}_bar_compare.pdf"))
+            bar_path = save_pdf(bar_figure, bundle_dir / f"{metric_slug}_bar_compare.pdf")
+            outputs.append(
+                TensileComparisonFigureOutput(
+                    path=bar_path,
+                    category="metric",
+                    kind="bar_compare",
+                    metric=metric_name,
+                    label=f"{metric_name} Bar Compare",
+                )
+            )
     finally:
         for figure in figures:
             plt.close(figure)

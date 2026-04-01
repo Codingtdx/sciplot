@@ -11,22 +11,38 @@ struct CleanupExportView: View {
                         KeyValueGrid(values: [
                             ("Bundle directory", comparisonExport.bundleDir),
                             ("Workbook", comparisonExport.comparisonWorkbookPath),
-                            ("Outputs", "\(comparisonExport.outputs.count)"),
+                            ("Outputs", "\(comparisonExport.figureOutputs.count)"),
                             (
                                 "Figure format",
-                                session.comparisonExportFigureURLs.first?.pathExtension.uppercased() ?? "PDF"
+                                session.selectedComparisonFigureItem?.url.pathExtension.uppercased() ?? "PDF"
                             ),
                         ])
 
-                        HStack {
+                        HStack(spacing: 10) {
                             Button("Reveal in Finder") {
                                 session.revealLatestExport()
                             }
+                            .buttonStyle(.bordered)
 
                             Button("Open in Plot") {
                                 session.openPrimaryWorkbookInPlot()
                             }
                             .buttonStyle(.borderedProminent)
+                        }
+
+                        if !session.comparisonFigureItems.isEmpty {
+                            Picker("Figure Preview", selection: previewSelectionBinding) {
+                                ForEach(session.comparisonFigureItems) { item in
+                                    Text(item.label).tag(item.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 320, alignment: .leading)
+
+                            if let figure = session.selectedComparisonFigureItem {
+                                exportPreview(for: figure)
+                                    .frame(minHeight: 320)
+                            }
                         }
                     }
                     .padding(.top, 8)
@@ -44,6 +60,23 @@ struct CleanupExportView: View {
                 }
                 .buttonStyle(.bordered)
             }
+        }
+    }
+
+    private var previewSelectionBinding: Binding<String> {
+        Binding(
+            get: { session.selectedComparisonFigureItem?.id ?? "" },
+            set: { session.selectComparisonFigure(id: $0) }
+        )
+    }
+
+    @ViewBuilder
+    private func exportPreview(for figure: CleanupExportFigureItem) -> some View {
+        if figure.url.pathExtension.lowercased() == "pdf" {
+            PDFPreviewView(url: figure.url)
+                .background(.quinary.opacity(0.2), in: RoundedRectangle(cornerRadius: 18))
+        } else {
+            QuickLookThumbnailView(url: figure.url, size: 440)
         }
     }
 }

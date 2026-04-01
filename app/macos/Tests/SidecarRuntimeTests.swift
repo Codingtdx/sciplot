@@ -105,6 +105,8 @@ final class SidecarRuntimeTests: XCTestCase {
                         "/meta": { "get": {} },
                         "/plot-contract": { "get": {} },
                         "/inspect-file": { "post": {} },
+                        "/code-console/context": { "post": {} },
+                        "/code-console/run": { "post": {} },
                         "/compose-preview": { "post": {} },
                         "/preprocess-tensile-replicates": { "post": {} }
                       }

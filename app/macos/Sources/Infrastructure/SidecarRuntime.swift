@@ -27,6 +27,8 @@ final class SidecarRuntime {
         .init(method: "GET", path: "/meta"),
         .init(method: "GET", path: "/plot-contract"),
         .init(method: "POST", path: "/inspect-file"),
+        .init(method: "POST", path: "/code-console/context"),
+        .init(method: "POST", path: "/code-console/run"),
         .init(method: "POST", path: "/compose-preview"),
         .init(method: "POST", path: "/preprocess-tensile-replicates"),
     ]

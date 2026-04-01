@@ -11,6 +11,8 @@ final class MockSidecarClient: SidecarClienting {
     var metaResponse = TestPayloads.meta()
     var contractResponse = TestPayloads.contract()
     var inspectResponse = TestPayloads.inspectFile()
+    var codeConsoleContextResponse = TestPayloads.codeConsoleContext()
+    var codeConsoleRunResponse = TestPayloads.codeConsoleRun()
     var preflightResponse = TestPayloads.preflight()
     var previewResponse = TestPayloads.renderPreview()
     var exportResponse = TestPayloads.exportRender()
@@ -22,11 +24,15 @@ final class MockSidecarClient: SidecarClienting {
     var composeExportResponse = PathResponse(outputPath: "/tmp/composer-export.pdf")
     var importedComposerProject = TestPayloads.composerProject()
     var inspectHandler: ((FileRequest) async throws -> InspectFileResponse)?
+    var codeConsoleContextHandler: ((CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse)?
+    var codeConsoleRunHandler: ((CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse)?
     var preflightHandler: ((RenderRequest) async throws -> PreflightRenderResponse)?
     var renderHandler: ((RenderRequest) async throws -> RenderPreviewResponse)?
     var exportHandler: ((ExportRenderRequest) async throws -> ExportRenderResponse)?
 
     private(set) var inspectRequests: [FileRequest] = []
+    private(set) var codeConsoleContextRequests: [CodeConsoleContextRequest] = []
+    private(set) var codeConsoleRunRequests: [CodeConsoleRunRequest] = []
     private(set) var preflightRequests: [RenderRequest] = []
     private(set) var renderRequests: [RenderRequest] = []
     private(set) var exportRequests: [ExportRenderRequest] = []
@@ -56,6 +62,22 @@ final class MockSidecarClient: SidecarClienting {
             return try await inspectHandler(request)
         }
         return inspectResponse
+    }
+
+    func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse {
+        codeConsoleContextRequests.append(request)
+        if let codeConsoleContextHandler {
+            return try await codeConsoleContextHandler(request)
+        }
+        return codeConsoleContextResponse
+    }
+
+    func runCodeConsole(_ request: CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse {
+        codeConsoleRunRequests.append(request)
+        if let codeConsoleRunHandler {
+            return try await codeConsoleRunHandler(request)
+        }
+        return codeConsoleRunResponse
     }
 
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse {

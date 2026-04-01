@@ -46,10 +46,12 @@ def test_inspect_tensile_workbook_returns_summary(tmp_path: Path) -> None:
 
     assert summary.workbook_path == workbook_path
     assert summary.label == "solid"
+    assert summary.preferred_sheet == "Representative_Curve"
     assert summary.sample_count == 2
     assert summary.representative_filename in {"BlendSet_A.csv", "BlendSet_B.csv"}
     assert summary.sheet_names[0] == "Representative_Curve"
     assert [metric.label for metric in summary.metrics] == ["Strength", "Modulus", "Elongation"]
+    assert summary.warnings == ()
 
 
 @pytest.mark.parametrize("group_count", [2, 3, 5])
@@ -66,7 +68,15 @@ def test_export_tensile_comparison_bundle_builds_workbook_and_outputs(
     assert result.bundle_dir.exists()
     assert result.comparison_workbook_path.exists()
     assert len(result.outputs) == 7
+    assert len(result.figure_outputs) == 7
     assert all(path.exists() for path in result.outputs)
+    assert [item.path for item in result.figure_outputs] == list(result.outputs)
+    assert result.figure_outputs[0].category == "curve"
+    assert result.figure_outputs[0].kind == "representative_curve"
+    assert result.figure_outputs[0].metric is None
+    assert result.figure_outputs[1].category == "metric"
+    assert result.figure_outputs[1].kind == "box_compare"
+    assert result.figure_outputs[1].metric == "Strength"
 
     with pd.ExcelFile(result.comparison_workbook_path) as workbook:
         assert workbook.sheet_names == [

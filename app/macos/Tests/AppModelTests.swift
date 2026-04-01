@@ -18,7 +18,7 @@ final class AppModelTests: XCTestCase {
         model.switchWorkbench(.dataCleanup)
         model.beginImportForActiveWorkbench()
         XCTAssertEqual(model.selectedWorkbench, .dataCleanup)
-        XCTAssertTrue(model.dataCleanupSession.isRawImporterPresented)
+        XCTAssertTrue(model.dataCleanupSession.isImportMenuPresented)
 
         model.switchWorkbench(.composer)
         model.beginImportForActiveWorkbench()
@@ -109,6 +109,8 @@ final class AppModelTests: XCTestCase {
                 "/meta": { "get": {} },
                 "/plot-contract": { "get": {} },
                 "/inspect-file": { "post": {} },
+                "/code-console/context": { "post": {} },
+                "/code-console/run": { "post": {} },
                 "/compose-preview": { "post": {} },
                 "/preprocess-tensile-replicates": { "post": {} }
               }

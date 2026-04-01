@@ -83,6 +83,76 @@ struct FileRequest: Codable, Equatable, Sendable {
     let sheet: SheetValue
 }
 
+struct CodeConsoleContextRequest: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let template: String?
+    let options: RenderOptionsPayload
+    let sourceKind: String?
+    let sourceLabel: String?
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        template: String? = nil,
+        options: RenderOptionsPayload = RenderOptionsPayload(),
+        sourceKind: String? = nil,
+        sourceLabel: String? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.template = template
+        self.options = options
+        self.sourceKind = sourceKind
+        self.sourceLabel = sourceLabel
+    }
+}
+
+struct CodeConsoleContextResponse: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let sheetNames: [String]
+    let inspection: InputInspectionResponse
+    let dataset: PlotDatasetPreviewResponse?
+    let template: String
+    let options: RenderOptionsPayload
+    let promptText: String
+    let starterCode: String
+    let sourceKind: String?
+    let sourceLabel: String?
+}
+
+struct CodeConsoleRunRequest: Codable, Equatable, Sendable {
+    let context: CodeConsoleContextRequest
+    let code: String
+    let timeoutSeconds: Int
+}
+
+struct CodeConsoleGeneratedFileResponse: Codable, Equatable, Sendable, Identifiable {
+    let path: String
+    let name: String
+    let fileType: String
+    let sizeBytes: Int
+
+    var id: String { path }
+}
+
+struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
+    let status: String
+    let exitCode: Int?
+    let durationSeconds: Double
+    let stdout: String
+    let stderr: String
+    let runDir: String
+    let outputDir: String
+    let scriptPath: String
+    let promptPath: String
+    let contextPath: String
+    let stdoutPath: String
+    let stderrPath: String
+    let generatedFiles: [CodeConsoleGeneratedFileResponse]
+}
+
 struct RenderRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue

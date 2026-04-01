@@ -36,6 +36,7 @@ final class AppModel {
         plotSession.configure(client: resolvedClient)
         dataCleanupSession.configure(client: resolvedClient)
         composerSession.configure(client: resolvedClient)
+        codeConsoleSession.configure(client: resolvedClient)
 
         dataCleanupSession.openInPlotHandler = { [weak self] url, sheet in
             self?.openInPlot(workbookURL: url, preferredSheet: sheet)
@@ -56,6 +57,7 @@ final class AppModel {
             let meta = try await client.fetchMeta()
             let contract = try await client.fetchPlotContract()
             plotSession.apply(meta: meta, contract: contract)
+            codeConsoleSession.apply(meta: meta)
             refreshCodeConsoleContext()
             hasBootstrapped = true
             bootstrapErrorMessage = nil
@@ -74,11 +76,11 @@ final class AppModel {
         case .plot:
             requestPlotImport()
         case .dataCleanup:
-            dataCleanupSession.isRawImporterPresented = true
+            dataCleanupSession.showImportMenu()
         case .composer:
             beginComposerImport(kind: .graph)
         case .codeConsole:
-            break
+            codeConsoleSession.isImporterPresented = true
         }
     }
 
@@ -108,7 +110,7 @@ final class AppModel {
         case .composer:
             composerSession.revealLatestExport()
         case .codeConsole:
-            break
+            codeConsoleSession.revealLatestOutput()
         }
     }
 
@@ -118,6 +120,10 @@ final class AppModel {
 
     func showComposerGuide() {
         composerSession.showGuide()
+    }
+
+    func showDataCleanupGuide() {
+        dataCleanupSession.showGuide()
     }
 
     func openInPlot(workbookURL: URL, preferredSheet: SheetValue) {

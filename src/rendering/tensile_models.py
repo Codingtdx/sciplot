@@ -34,10 +34,21 @@ SUMMARY_COLUMNS = (
 class TensileWorkbookSummary:
     workbook_path: Path
     label: str
+    preferred_sheet: str
     sheet_names: tuple[str, ...]
     sample_count: int
     representative_filename: str
     metrics: tuple[TensileMetricSummary, ...]
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TensileComparisonFigureOutput:
+    path: Path
+    category: str
+    kind: str
+    metric: str | None
+    label: str
 
 
 @dataclass(frozen=True)
@@ -46,6 +57,7 @@ class TensileComparisonExport:
     comparison_workbook_path: Path
     labels: tuple[str, ...]
     outputs: tuple[Path, ...]
+    figure_outputs: tuple[TensileComparisonFigureOutput, ...]
 
 
 @dataclass(frozen=True)
@@ -62,6 +74,7 @@ class LoadedTensileWorkbook:
 
 __all__ = [
     "COMPARISON_CURVE_FILENAME",
+    "TensileComparisonFigureOutput",
     "LoadedTensileWorkbook",
     "METRIC_NAMES",
     "METRIC_UNITS",

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
+from app.sidecar.routes_code_console import create_code_console_router
 from app.sidecar.routes_composer import create_composer_router
 from app.sidecar.routes_meta import create_meta_router
 from app.sidecar.routes_render import create_render_router
@@ -16,6 +17,8 @@ CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/meta"),
     ("GET", "/plot-contract"),
     ("POST", "/inspect-file"),
+    ("POST", "/code-console/context"),
+    ("POST", "/code-console/run"),
     ("POST", "/compose-preview"),
     ("POST", "/preprocess-tensile-replicates"),
 )
@@ -67,6 +70,7 @@ def create_app() -> FastAPI:
     )
     application.include_router(create_meta_router())
     application.include_router(create_render_router())
+    application.include_router(create_code_console_router())
     application.include_router(create_tensile_router())
     application.include_router(create_composer_router())
     return application

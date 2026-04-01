@@ -19,9 +19,12 @@ struct CleanupInspectorView: View {
             LabeledContent("Raw inputs", value: "\(session.rawInputURLs.count)")
             LabeledContent("Prepared workbooks", value: "\(session.preparedWorkbooks.count)")
 
-            if let workbook = session.preparedWorkbooks.first {
+            if let workbook = session.primaryWorkbook {
                 LabeledContent("Primary workbook", value: workbook.url.lastPathComponent)
                 LabeledContent("Preferred sheet", value: workbook.preferredSheet.displayName)
+                if let focusedWorkbook = session.focusedWorkbook {
+                    LabeledContent("Focused workbook", value: focusedWorkbook.url.lastPathComponent)
+                }
             } else {
                 Text("Import raw CSVs or prepared workbooks to start Data Cleanup.")
                     .foregroundStyle(.secondary)
@@ -39,11 +42,22 @@ struct CleanupInspectorView: View {
     @ViewBuilder
     private var primaryActionsSection: some View {
         Section("Primary Actions") {
+            Button("Choose Import Source") {
+                session.showImportMenu()
+            }
+            .buttonStyle(.bordered)
+
             Button("Export Comparison Bundle") {
                 Task { await session.exportComparisonBundle() }
             }
             .buttonStyle(.borderedProminent)
             .disabled(session.preparedWorkbooks.count < 2 || session.isBusy)
+
+            Button("Refresh Workbook Preview") {
+                Task { await session.refreshFocusedReview() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(session.focusedWorkbook == nil)
 
             if !session.preparedWorkbooks.isEmpty {
                 Button("Open in Plot") {
@@ -73,12 +87,13 @@ struct CleanupInspectorView: View {
                     "Comparison workbook",
                     value: URL(fileURLWithPath: comparisonExportResponse.comparisonWorkbookPath).lastPathComponent
                 )
-                LabeledContent("Outputs", value: "\(comparisonExportResponse.outputs.count)")
-                if !session.comparisonExportFigureURLs.isEmpty {
+                LabeledContent("Outputs", value: "\(comparisonExportResponse.figureOutputs.count)")
+                if let selectedFigure = session.selectedComparisonFigureItem {
                     LabeledContent(
                         "Figure format",
-                        value: session.comparisonExportFigureURLs[0].pathExtension.uppercased()
+                        value: selectedFigure.url.pathExtension.uppercased()
                     )
+                    LabeledContent("Selected preview", value: selectedFigure.label)
                 }
             } else if let primaryWorkbookURL = session.primaryWorkbookURL {
                 LabeledContent("Prepared workbook", value: primaryWorkbookURL.lastPathComponent)

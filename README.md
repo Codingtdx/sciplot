@@ -82,6 +82,7 @@ Notes:
 - Code Console is a first-class workbench, not a secondary utility.
 - It should preserve contract-bound context and controlled runner semantics.
 - It is the scripting and AI-control surface for advanced work, not a side panel bolted onto Plot.
+- The current native implementation supports direct data import or Plot/Data Cleanup context binding, prompt copy for external AI, and repo-native Python runs with managed output review.
 
 ## App-Level IA Principles
 

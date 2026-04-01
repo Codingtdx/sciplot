@@ -30,8 +30,11 @@ final class DataCleanupSessionTests: XCTestCase {
         ])
 
         XCTAssertEqual(session.stage, .review)
-        XCTAssertEqual(session.preparedWorkbooks.first?.url, outputWorkbookURL)
+        XCTAssertEqual(session.primaryWorkbook?.url, outputWorkbookURL)
+        XCTAssertEqual(session.focusedWorkbook?.url, outputWorkbookURL)
         XCTAssertEqual(client.preprocessRequests.first?.outputPath, outputWorkbookURL.path)
+        XCTAssertEqual(client.inspectRequests.first?.inputPath, outputWorkbookURL.path)
+        XCTAssertEqual(client.renderRequests.first?.inputPath, outputWorkbookURL.path)
 
         await session.handleImportedWorkbooks([
             URL(fileURLWithPath: "/tmp/second.xlsx"),
@@ -39,6 +42,21 @@ final class DataCleanupSessionTests: XCTestCase {
 
         XCTAssertEqual(session.preparedWorkbooks.count, 2)
         XCTAssertEqual(client.workbookRequests.first?.workbookPath, "/tmp/second.xlsx")
+        XCTAssertEqual(session.focusedWorkbook?.url.path, "/tmp/second.xlsx")
+        XCTAssertEqual(session.primaryWorkbook?.url, outputWorkbookURL)
+
+        session.setPrimaryWorkbook(id: "/tmp/second.xlsx")
+        XCTAssertEqual(session.primaryWorkbook?.url.path, "/tmp/second.xlsx")
+
+        session.removeWorkbook(id: "/tmp/second.xlsx")
+        XCTAssertEqual(session.preparedWorkbooks.count, 1)
+        XCTAssertEqual(session.primaryWorkbook?.url, outputWorkbookURL)
+
+        await session.handleImportedWorkbooks([
+            URL(fileURLWithPath: "/tmp/second.xlsx"),
+        ])
+
+        session.setPrimaryWorkbook(id: "/tmp/second.xlsx")
 
         await session.exportComparisonBundle()
 
@@ -51,6 +69,8 @@ final class DataCleanupSessionTests: XCTestCase {
             session.comparisonExportFigureURLs.map(\.lastPathComponent),
             ["strength_box.tiff", "modulus_bar.tiff"]
         )
+        XCTAssertEqual(session.comparisonFigureItems.first?.label, "Strength Box Compare")
+        XCTAssertEqual(session.selectedComparisonFigureItem?.url.lastPathComponent, "strength_box.tiff")
 
         var openedWorkbook: URL?
         var openedSheet: SheetValue?
@@ -61,7 +81,7 @@ final class DataCleanupSessionTests: XCTestCase {
 
         session.openPrimaryWorkbookInPlot()
 
-        XCTAssertEqual(openedWorkbook, outputWorkbookURL)
+        XCTAssertEqual(openedWorkbook?.path, "/tmp/second.xlsx")
         XCTAssertEqual(openedSheet, .name("Representative_Curve"))
     }
 }

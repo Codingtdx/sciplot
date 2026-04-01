@@ -276,6 +276,66 @@ enum TestPayloads {
         )
     }
 
+    static func codeConsoleContext(path: String = "/tmp/sample.csv") -> CodeConsoleContextResponse {
+        CodeConsoleContextResponse(
+            inputPath: path,
+            sheet: .name("Representative_Curve"),
+            sheetNames: ["Representative_Curve", "Strength_Box"],
+            inspection: inspectFile(path: path).inspection,
+            dataset: inspectFile(path: path).dataset,
+            template: "curve",
+            options: .init(
+                size: "single_panel",
+                stylePreset: "journal_calm",
+                palettePreset: "aqua_graphite",
+                visualThemeID: "paper"
+            ),
+            promptText: """
+            Write one Python script for the SciPlot God Code Console.
+            Use: from src.code_console_runtime import console
+            """,
+            starterCode: """
+            from src.code_console_runtime import console
+
+            fig, ax = console.new_figure()
+            console.save_figure(fig, "sample")
+            """,
+            sourceKind: "plot",
+            sourceLabel: "Current Plot session"
+        )
+    }
+
+    static func codeConsoleRun() -> CodeConsoleRunResponse {
+        CodeConsoleRunResponse(
+            status: "succeeded",
+            exitCode: 0,
+            durationSeconds: 0.42,
+            stdout: "Generated outputs",
+            stderr: "",
+            runDir: "/tmp/code_console/run-1",
+            outputDir: "/tmp/code_console/run-1/outputs",
+            scriptPath: "/tmp/code_console/run-1/user_code.py",
+            promptPath: "/tmp/code_console/run-1/external_ai_prompt.txt",
+            contextPath: "/tmp/code_console/run-1/context.json",
+            stdoutPath: "/tmp/code_console/run-1/stdout.txt",
+            stderrPath: "/tmp/code_console/run-1/stderr.txt",
+            generatedFiles: [
+                .init(
+                    path: "/tmp/code_console/run-1/outputs/sample.pdf",
+                    name: "sample.pdf",
+                    fileType: "pdf",
+                    sizeBytes: 1024
+                ),
+                .init(
+                    path: "/tmp/code_console/run-1/outputs/fit_table.csv",
+                    name: "fit_table.csv",
+                    fileType: "csv",
+                    sizeBytes: 256
+                ),
+            ]
+        )
+    }
+
     static func multiSeriesInspectFile(path: String = "/tmp/sample.csv") -> InspectFileResponse {
         InspectFileResponse(
             inputPath: path,
@@ -470,12 +530,14 @@ enum TestPayloads {
         TensileWorkbookSummaryResponse(
             workbookPath: path,
             label: label,
+            preferredSheet: "Representative_Curve",
             sheetNames: ["Representative_Curve", "Strength_Box"],
             sampleCount: 4,
             representativeFilename: "sample_b.csv",
             metrics: [
                 .init(label: "Modulus", unit: "MPa", mean: 2.1, std: 0.1),
-            ]
+            ],
+            warnings: ["Workbook summary loaded from prepared workbook."]
         )
     }
 
@@ -484,7 +546,23 @@ enum TestPayloads {
             bundleDir: "/tmp/cleanup_bundle",
             comparisonWorkbookPath: "/tmp/cleanup_bundle/comparison.xlsx",
             labels: ["Primary Group", "Second Group"],
-            outputs: ["/tmp/cleanup_bundle/strength_box.pdf", "/tmp/cleanup_bundle/modulus_bar.pdf"]
+            outputs: ["/tmp/cleanup_bundle/strength_box.pdf", "/tmp/cleanup_bundle/modulus_bar.pdf"],
+            figureOutputs: [
+                .init(
+                    path: "/tmp/cleanup_bundle/strength_box.pdf",
+                    category: "metric",
+                    kind: "box_compare",
+                    metric: "Strength",
+                    label: "Strength Box Compare"
+                ),
+                .init(
+                    path: "/tmp/cleanup_bundle/modulus_bar.pdf",
+                    category: "metric",
+                    kind: "bar_compare",
+                    metric: "Modulus",
+                    label: "Modulus Bar Compare"
+                ),
+            ]
         )
     }
 
