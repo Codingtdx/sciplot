@@ -4,28 +4,20 @@ struct DataCleanupWorkbenchView: View {
     let session: DataCleanupSession
 
     var body: some View {
-        HSplitView {
-            CleanupImportView(session: session)
-                .frame(minWidth: 290, idealWidth: 320, maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
+        VStack(alignment: .leading, spacing: 14) {
+            topSourceBar
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let errorMessage = session.errorMessage {
-                        ErrorStateCard(
-                            title: "Data Cleanup issue",
-                            message: errorMessage,
-                            retryTitle: nil,
-                            retryAction: nil
-                        )
-                    }
-
-                    CleanupReviewView(session: session)
-                    CleanupCompareView(session: session)
-                    CleanupExportView(session: session)
-                }
-                .padding(20)
+            if let errorMessage = session.errorMessage {
+                compactIssueLabel(message: errorMessage)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            HSplitView {
+                CleanupImportView(session: session)
+                    .frame(minWidth: 230, idealWidth: 260, maxWidth: 300, maxHeight: .infinity, alignment: .topLeading)
+
+                CleanupPreviewSurface(session: session)
+                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -67,11 +59,53 @@ struct DataCleanupWorkbenchView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Choose whether to preprocess raw tensile CSV files or load an existing prepared workbook into the compare queue.")
+            Text("Choose raw tensile CSV files or prepared workbooks for the current cleanup session.")
         }
         .sheet(isPresented: bindingForGuide) {
             DataCleanupGuideSheet(session: session)
         }
+    }
+
+    private var topSourceBar: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.selectedSourceFilename ?? "No workbook selected")
+                    .font(.title2.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer(minLength: 16)
+
+            if let focusedWorkbook = session.focusedWorkbook {
+                HStack(spacing: 8) {
+                    Text("Sheet")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(focusedWorkbook.preferredSheet.displayName)
+                        .font(.footnote.weight(.medium))
+                }
+            }
+
+            Label(session.liveStatusLabel, systemImage: session.liveStatusSymbol)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func compactIssueLabel(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .lineLimit(2)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var bindingForImportMenu: Binding<Bool> {
@@ -103,6 +137,92 @@ struct DataCleanupWorkbenchView: View {
     }
 }
 
+private struct CleanupPreviewSurface: View {
+    let session: DataCleanupSession
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            previewContent
+
+            if session.currentActivity == .refreshingReview || session.focusedWorkbook?.isReviewLoading == true {
+                Label("Updating preview", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.footnote.weight(.semibold))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(.thinMaterial, in: Capsule())
+                    .foregroundStyle(.secondary)
+                    .padding(16)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        if let workbook = session.focusedWorkbook {
+            if workbook.isReviewLoading {
+                BusyStateCard(
+                    title: "Refreshing preview",
+                    message: "Data Cleanup is rendering the representative curve for the focused workbook."
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage = workbook.reviewErrorMessage {
+                ErrorStateCard(
+                    title: "Preview issue",
+                    message: errorMessage,
+                    retryTitle: "Retry Preview",
+                    retryAction: {
+                        Task { await session.refreshFocusedReview() }
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let preview = workbook.reviewPreview {
+                Base64PDFPreviewView(base64PDF: preview.pdfBase64)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+                    )
+            } else {
+                emptySurface(
+                    title: "No preview yet",
+                    systemImage: "waveform.path.ecg.rectangle",
+                    description: "Focus a prepared workbook to review its representative curve."
+                )
+            }
+        } else if session.currentActivity == .preprocessing || session.currentActivity == .importingWorkbooks {
+            BusyStateCard(
+                title: "Preparing workbook",
+                message: "Data Cleanup is building the first focused workbook preview."
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            emptySurface(
+                title: "No prepared workbook yet",
+                systemImage: "tablecells.badge.ellipsis",
+                description: "Import raw CSV or open a prepared workbook from the toolbar to start review."
+            )
+        }
+    }
+
+    private func emptySurface(title: String, systemImage: String, description: String) -> some View {
+        ContentUnavailableView(
+            title,
+            systemImage: systemImage,
+            description: Text(description)
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+    }
+}
+
 private struct DataCleanupGuideSheet: View {
     let session: DataCleanupSession
     @Environment(\.dismiss) private var dismiss
@@ -110,27 +230,27 @@ private struct DataCleanupGuideSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 16) {
                     guideSection(
                         title: "Import",
-                        text: "Bring raw tensile CSV files in for preprocessing, or open prepared workbooks directly into the review and compare queue."
+                        text: "Use the toolbar to preprocess raw tensile CSV files or open prepared workbooks into the current cleanup session."
                     )
                     guideSection(
-                        title: "Review & Clean",
-                        text: "Data Cleanup keeps the current workbook summary, warnings, and representative curve preview together so you can verify the prepared result without opening Plot first."
+                        title: "Focus",
+                        text: "The main canvas always previews the focused workbook. The left rail controls focus and queue order."
                     )
                     guideSection(
-                        title: "Compare",
-                        text: "The compare queue is runtime-only. Reorder the prepared workbooks, choose the primary handoff workbook, and export the QC bundle when at least two groups are loaded."
+                        title: "Primary",
+                        text: "Primary controls Plot handoff. It does not replace the focused workbook preview."
                     )
                     guideSection(
-                        title: "Export / Open in Plot",
-                        text: "Comparison export writes the workbook and figure bundle together. Open in Plot always hands off the current primary workbook with its preferred sheet."
+                        title: "Compare / Output",
+                        text: "Export writes the comparison workbook plus figure bundle together. Output browsing stays in the inspector."
                     )
                 }
                 .padding(24)
             }
-            .navigationTitle("Data Cleanup Guide")
+            .navigationTitle("Data Cleanup Help")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {

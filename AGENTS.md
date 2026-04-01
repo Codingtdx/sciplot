@@ -80,7 +80,9 @@
 - Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
 - `Data Cleanup / 数据整理` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
 - `Data Cleanup` 工作台支持 intake raw tensile CSV、补录任意组数的已整理 workbook、做 QC compare，并导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在运行时 store，不写进项目文件 schema。
-- `Data Cleanup` 原生工作台应保持统一 workbench 形态：左侧 intake / prepared workbook 列表，中间 `Review & Clean + Compare + Export / Open in Plot` 主面，右侧 inspector；不要再把这几个步骤恢复成独立 stage 页面主切换。
+- `Data Cleanup` 原生工作台应与 Plot 对齐成同级壳层：顶部 source bar、左侧 intake / prepared queue rail、中间单一 focused workbook preview surface、右侧 compact inspector；不要再把 review / compare / export 堆成中央长滚动主面。
+- `Data Cleanup` 的左 rail 只承载 intake filter、workbook/queue selection、轻量状态标记与重排；不要在 rail 里塞解释性文案或重复动作区。
+- `Data Cleanup` 的 focused workbook 控制中央预览；primary workbook 只控制 Plot handoff 与 UI 标记，不要让 compare/export output 抢占主 preview surface。
 - `inspect-tensile-workbook` 响应现在必须带 `preferred_sheet` 与 `warnings`；`export-tensile-comparison` 除兼容 `outputs` 外还必须带结构化 `figure_outputs`，供原生工作台稳定展示 preview / label / metric 语义，前端不要再靠文件名猜。
 - 如果要做面向用户的 mock，Data Cleanup 的 user-visible workflow 默认优先压缩为 `Import -> Review & Clean -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
 - Data Cleanup preprocess 成功后默认停留在 `Data Cleanup` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。

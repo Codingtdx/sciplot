@@ -5,29 +5,29 @@ struct CleanupInspectorView: View {
 
     var body: some View {
         Form {
-            contextSummarySection
-            primaryActionsSection
-            outputHandoffSection
+            contextSection
+            reviewSection
+            compareExportSection
+            handoffOutputSection
         }
         .formStyle(.grouped)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    @ViewBuilder
-    private var contextSummarySection: some View {
-        Section("Context Summary") {
+    private var contextSection: some View {
+        Section("Context") {
             LabeledContent("Stage", value: session.stage.title)
             LabeledContent("Raw inputs", value: "\(session.rawInputURLs.count)")
-            LabeledContent("Prepared workbooks", value: "\(session.preparedWorkbooks.count)")
+            LabeledContent("Prepared", value: "\(session.preparedWorkbooks.count)")
 
-            if let workbook = session.primaryWorkbook {
-                LabeledContent("Primary workbook", value: workbook.url.lastPathComponent)
-                LabeledContent("Preferred sheet", value: workbook.preferredSheet.displayName)
-                if let focusedWorkbook = session.focusedWorkbook {
-                    LabeledContent("Focused workbook", value: focusedWorkbook.url.lastPathComponent)
-                }
-            } else {
-                Text("Import raw CSVs or prepared workbooks to start Data Cleanup.")
-                    .foregroundStyle(.secondary)
+            if let focusedWorkbook = session.focusedWorkbook {
+                LabeledContent("Focused", value: focusedWorkbook.url.lastPathComponent)
+                LabeledContent("Sheet", value: focusedWorkbook.preferredSheet.displayName)
+                LabeledContent("Warnings", value: "\(focusedWorkbook.warnings.count)")
+            }
+
+            if let primaryWorkbook = session.primaryWorkbook {
+                LabeledContent("Primary", value: primaryWorkbook.url.lastPathComponent)
             }
 
             if let errorMessage = session.errorMessage {
@@ -39,70 +39,85 @@ struct CleanupInspectorView: View {
         }
     }
 
-    @ViewBuilder
-    private var primaryActionsSection: some View {
-        Section("Primary Actions") {
-            Button("Choose Import Source") {
-                session.showImportMenu()
+    private var reviewSection: some View {
+        Section("Review") {
+            Button("Refresh Preview") {
+                Task { await session.refreshFocusedReview() }
             }
-            .buttonStyle(.bordered)
+            .disabled(!session.canRefreshFocusedReview)
 
+            Button("Set as Primary") {
+                session.setFocusedWorkbookAsPrimary()
+            }
+            .disabled(!session.canSetFocusedAsPrimary)
+
+            Button("Remove Workbook", role: .destructive) {
+                session.removeFocusedWorkbook()
+            }
+            .disabled(!session.canRemoveFocusedWorkbook)
+        }
+    }
+
+    private var compareExportSection: some View {
+        Section("Compare / Export") {
             Button("Export Comparison Bundle") {
                 Task { await session.exportComparisonBundle() }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(session.preparedWorkbooks.count < 2 || session.isBusy)
+            .disabled(!session.canExportComparison)
 
-            Button("Refresh Workbook Preview") {
-                Task { await session.refreshFocusedReview() }
-            }
-            .buttonStyle(.bordered)
-            .disabled(session.focusedWorkbook == nil)
+            if let comparisonExportResponse = session.comparisonExportResponse {
+                LabeledContent("Outputs", value: "\(comparisonExportResponse.figureOutputs.count)")
+                LabeledContent("Format", value: session.selectedComparisonFigureFormatLabel)
 
-            if !session.preparedWorkbooks.isEmpty {
-                Button("Open in Plot") {
-                    session.openPrimaryWorkbookInPlot()
+                if !session.comparisonFigureItems.isEmpty {
+                    Picker("Figure", selection: selectedFigureBinding) {
+                        ForEach(session.comparisonFigureItems) { item in
+                            Text(item.label).tag(item.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
-                .buttonStyle(.bordered)
-            }
-
-            if session.comparisonExportDestinationURL != nil {
-                Button("Reveal In Finder") {
-                    session.revealLatestExport()
-                }
-                .buttonStyle(.bordered)
             }
         }
     }
 
-    @ViewBuilder
-    private var outputHandoffSection: some View {
-        Section("Output & Handoff") {
+    private var handoffOutputSection: some View {
+        Section("Handoff / Output") {
+            Button("Open in Plot") {
+                session.openPrimaryWorkbookInPlot()
+            }
+            .disabled(!session.canOpenInPlot)
+
+            Button("Open Selected Figure") {
+                session.openSelectedComparisonFigure()
+            }
+            .disabled(!session.canOpenSelectedComparisonFigure)
+
+            Button("Reveal Bundle") {
+                session.revealLatestExport()
+            }
+            .disabled(!session.canRevealLatestExport)
+
             if let comparisonExportResponse = session.comparisonExportResponse {
                 LabeledContent(
-                    "Destination",
+                    "Bundle",
                     value: session.comparisonExportDestinationURL?.path ?? comparisonExportResponse.bundleDir
                 )
                 LabeledContent(
-                    "Comparison workbook",
+                    "Workbook",
                     value: URL(fileURLWithPath: comparisonExportResponse.comparisonWorkbookPath).lastPathComponent
                 )
-                LabeledContent("Outputs", value: "\(comparisonExportResponse.figureOutputs.count)")
-                if let selectedFigure = session.selectedComparisonFigureItem {
-                    LabeledContent(
-                        "Figure format",
-                        value: selectedFigure.url.pathExtension.uppercased()
-                    )
-                    LabeledContent("Selected preview", value: selectedFigure.label)
-                }
             } else if let primaryWorkbookURL = session.primaryWorkbookURL {
-                LabeledContent("Prepared workbook", value: primaryWorkbookURL.lastPathComponent)
-                Text("Export the comparison bundle to generate the handoff workbook plus editable PDF or 300 dpi TIFF figures.")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("No cleanup export output yet.")
-                    .foregroundStyle(.secondary)
+                LabeledContent("Workbook", value: primaryWorkbookURL.lastPathComponent)
             }
         }
+    }
+
+    private var selectedFigureBinding: Binding<String> {
+        Binding(
+            get: { session.selectedComparisonFigureItem?.id ?? "" },
+            set: { session.selectComparisonFigure(id: $0) }
+        )
     }
 }

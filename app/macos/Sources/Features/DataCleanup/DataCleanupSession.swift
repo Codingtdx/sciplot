@@ -39,6 +39,14 @@ enum DataCleanupImportKind: String, Identifiable {
     }
 }
 
+enum DataCleanupActivity: Equatable {
+    case idle
+    case preprocessing
+    case importingWorkbooks
+    case refreshingReview
+    case exportingComparison
+}
+
 struct PreparedWorkbookItem: Identifiable, Equatable {
     let id: String
     var url: URL
@@ -100,6 +108,7 @@ final class DataCleanupSession {
     var groupName = ""
     var errorMessage: String?
     var isBusy = false
+    var currentActivity: DataCleanupActivity = .idle
     var openInPlotHandler: ((URL, SheetValue) -> Void)?
 
     init(
@@ -159,6 +168,79 @@ final class DataCleanupSession {
 
     var primaryPreferredSheet: SheetValue? {
         primaryWorkbook?.preferredSheet
+    }
+
+    var selectedSourceFilename: String? {
+        focusedWorkbook?.url.lastPathComponent ?? primaryWorkbook?.url.lastPathComponent
+    }
+
+    var liveStatusLabel: String {
+        if errorMessage != nil {
+            return "Attention needed"
+        }
+        switch currentActivity {
+        case .idle:
+            if let focusedWorkbook, focusedWorkbook.reviewPreview != nil {
+                return "Preview ready"
+            }
+            if comparisonExportResponse != nil {
+                return "Comparison ready"
+            }
+            return selectedSourceFilename == nil ? "Awaiting import" : "Ready"
+        case .preprocessing:
+            return "Preprocessing raw CSV"
+        case .importingWorkbooks:
+            return "Loading workbooks"
+        case .refreshingReview:
+            return "Refreshing preview"
+        case .exportingComparison:
+            return "Exporting comparison"
+        }
+    }
+
+    var liveStatusSymbol: String {
+        if errorMessage != nil {
+            return "exclamationmark.triangle.fill"
+        }
+        if currentActivity != .idle {
+            return "arrow.triangle.2.circlepath"
+        }
+        if focusedWorkbook?.reviewPreview != nil || comparisonExportResponse != nil {
+            return "checkmark.circle.fill"
+        }
+        return "circle.dashed"
+    }
+
+    var canExportComparison: Bool {
+        preparedWorkbooks.count >= 2 && !isBusy
+    }
+
+    var canRefreshFocusedReview: Bool {
+        focusedWorkbook != nil && !isBusy && currentActivity != .refreshingReview
+    }
+
+    var canSetFocusedAsPrimary: Bool {
+        focusedWorkbook?.id != nil && focusedWorkbook?.id != primaryWorkbook?.id && !isBusy
+    }
+
+    var canRemoveFocusedWorkbook: Bool {
+        focusedWorkbook != nil && !isBusy
+    }
+
+    var canOpenInPlot: Bool {
+        primaryWorkbookURL != nil
+    }
+
+    var canRevealLatestExport: Bool {
+        comparisonExportDestinationURL != nil || primaryWorkbookURL != nil
+    }
+
+    var canOpenSelectedComparisonFigure: Bool {
+        selectedComparisonFigureItem != nil && !isBusy
+    }
+
+    var selectedComparisonFigureFormatLabel: String {
+        selectedComparisonFigureItem?.url.pathExtension.uppercased() ?? "PDF"
     }
 
     var selectedComparisonFigureItem: CleanupExportFigureItem? {
@@ -227,6 +309,20 @@ final class DataCleanupSession {
         }
     }
 
+    func setFocusedWorkbookAsPrimary() {
+        guard let workbookID = focusedWorkbook?.id else {
+            return
+        }
+        setPrimaryWorkbook(id: workbookID)
+    }
+
+    func removeFocusedWorkbook() {
+        guard let workbookID = focusedWorkbook?.id else {
+            return
+        }
+        removeWorkbook(id: workbookID)
+    }
+
     func removeWorkbook(id: String) {
         preparedWorkbooks.removeAll { $0.id == id }
         comparisonWorkbookOrder.removeAll { $0 == id }
@@ -269,9 +365,13 @@ final class DataCleanupSession {
         }
 
         isBusy = true
+        currentActivity = .preprocessing
         clearExportSelection()
         errorMessage = nil
-        defer { isBusy = false }
+        defer {
+            isBusy = false
+            currentActivity = .idle
+        }
 
         do {
             let response = try await client.preprocessTensileReplicates(
@@ -314,9 +414,13 @@ final class DataCleanupSession {
         }
 
         isBusy = true
+        currentActivity = .importingWorkbooks
         clearExportSelection()
         errorMessage = nil
-        defer { isBusy = false }
+        defer {
+            isBusy = false
+            currentActivity = .idle
+        }
 
         do {
             var lastImportedID: String?
@@ -383,8 +487,12 @@ final class DataCleanupSession {
         }
 
         isBusy = true
+        currentActivity = .exportingComparison
         errorMessage = nil
-        defer { isBusy = false }
+        defer {
+            isBusy = false
+            currentActivity = .idle
+        }
 
         do {
             let response = try await client.exportTensileComparison(
@@ -425,6 +533,13 @@ final class DataCleanupSession {
         openInPlotHandler?(primary, preferredSheet)
     }
 
+    func openSelectedComparisonFigure() {
+        guard let selectedFigure = selectedComparisonFigureItem else {
+            return
+        }
+        WorkspaceBridge.open(selectedFigure.url)
+    }
+
     func moveComparisonWorkbooks(from source: IndexSet, to destination: Int) {
         comparisonWorkbookOrder = orderedPreparedWorkbooks.map(\.id)
         comparisonWorkbookOrder.move(fromOffsets: source, toOffset: destination)
@@ -446,9 +561,13 @@ final class DataCleanupSession {
             return
         }
 
+        currentActivity = .refreshingReview
         mutateWorkbook(id: workbookID) {
             $0.isReviewLoading = true
             $0.reviewErrorMessage = nil
+        }
+        defer {
+            currentActivity = .idle
         }
 
         do {

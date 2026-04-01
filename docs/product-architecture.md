@@ -82,6 +82,9 @@ Normalization rules:
 - user-facing name is `Data Cleanup / 数据整理`
 - internal tensile-specific backend seams may remain
 - the workbench should grow from tensile-only preparation toward broader cleanup framing without breaking current preprocessing flows
+- the native shell should mirror Plot-level density: top source bar, left selection rail, one central focused preview surface, and a compact right inspector
+- focused workbook controls the main preview; primary workbook controls Plot handoff and stays a separate visible state
+- compare/export outputs should remain in compact inspector surfaces or native open/reveal actions rather than taking over the main canvas
 
 Default user-visible UI flow:
 

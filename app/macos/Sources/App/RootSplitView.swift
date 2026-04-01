@@ -129,11 +129,7 @@ struct RootSplitView: View {
                 Task { await model.exportActiveWorkbench() }
             }
 
-            Button("Reveal", systemImage: "folder") {
-                model.revealActiveOutput()
-            }
-
-            Button("Guide", systemImage: "questionmark.circle") {
+            Button("Help", systemImage: "questionmark.circle") {
                 model.showDataCleanupGuide()
             }
 
@@ -143,10 +139,6 @@ struct RootSplitView: View {
             ) {
                 model.toggleInspector()
             }
-        }
-
-        ToolbarItem(placement: .status) {
-            runtimeStatusView
         }
     }
 

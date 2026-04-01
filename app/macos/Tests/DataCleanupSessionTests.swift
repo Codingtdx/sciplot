@@ -44,9 +44,25 @@ final class DataCleanupSessionTests: XCTestCase {
         XCTAssertEqual(client.workbookRequests.first?.workbookPath, "/tmp/second.xlsx")
         XCTAssertEqual(session.focusedWorkbook?.url.path, "/tmp/second.xlsx")
         XCTAssertEqual(session.primaryWorkbook?.url, outputWorkbookURL)
+        XCTAssertEqual(session.selectedSourceFilename, "second.xlsx")
+        XCTAssertTrue(session.canSetFocusedAsPrimary)
+        XCTAssertTrue(session.canExportComparison)
+
+        var openedWorkbook: URL?
+        var openedSheet: SheetValue?
+        session.openInPlotHandler = { url, sheet in
+            openedWorkbook = url
+            openedSheet = sheet
+        }
+
+        session.openPrimaryWorkbookInPlot()
+
+        XCTAssertEqual(openedWorkbook, outputWorkbookURL)
+        XCTAssertEqual(openedSheet, .name("Representative_Curve"))
 
         session.setPrimaryWorkbook(id: "/tmp/second.xlsx")
         XCTAssertEqual(session.primaryWorkbook?.url.path, "/tmp/second.xlsx")
+        XCTAssertFalse(session.canSetFocusedAsPrimary)
 
         session.removeWorkbook(id: "/tmp/second.xlsx")
         XCTAssertEqual(session.preparedWorkbooks.count, 1)
@@ -61,6 +77,8 @@ final class DataCleanupSessionTests: XCTestCase {
         await session.exportComparisonBundle()
 
         XCTAssertEqual(session.stage, .export)
+        XCTAssertEqual(session.focusedWorkbook?.url.path, "/tmp/second.xlsx")
+        XCTAssertEqual(session.primaryWorkbook?.url.path, "/tmp/second.xlsx")
         XCTAssertEqual(client.comparisonRequests.first?.workbookPaths.count, 2)
         XCTAssertEqual(session.comparisonExportResponse?.bundleDir, "/tmp/cleanup_bundle")
         XCTAssertEqual(session.comparisonExportDestinationURL, exportDirectoryURL)
@@ -71,17 +89,17 @@ final class DataCleanupSessionTests: XCTestCase {
         )
         XCTAssertEqual(session.comparisonFigureItems.first?.label, "Strength Box Compare")
         XCTAssertEqual(session.selectedComparisonFigureItem?.url.lastPathComponent, "strength_box.tiff")
-
-        var openedWorkbook: URL?
-        var openedSheet: SheetValue?
-        session.openInPlotHandler = { url, sheet in
-            openedWorkbook = url
-            openedSheet = sheet
-        }
+        XCTAssertTrue(session.canOpenSelectedComparisonFigure)
 
         session.openPrimaryWorkbookInPlot()
 
         XCTAssertEqual(openedWorkbook?.path, "/tmp/second.xlsx")
         XCTAssertEqual(openedSheet, .name("Representative_Curve"))
+
+        session.moveComparisonWorkbooks(from: IndexSet(integer: 1), to: 0)
+        XCTAssertNil(session.comparisonExportResponse)
+        XCTAssertNil(session.selectedComparisonFigureItem)
+        XCTAssertEqual(session.focusedWorkbook?.url.path, "/tmp/second.xlsx")
+        XCTAssertEqual(session.primaryWorkbook?.url.path, "/tmp/second.xlsx")
     }
 }
