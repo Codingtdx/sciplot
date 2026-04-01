@@ -118,6 +118,7 @@ final class ComposerSession {
     var selectedRegionID: String?
     var selectedCells: Set<ComposerGridCell> = []
     var pendingImportKind: ComposerImportKind = .graph
+    var isImportMenuPresented = false
     var isImportPresented = false
     var isGuidePresented = false
     var isPreviewing = false
@@ -295,7 +296,12 @@ final class ComposerSession {
         self.undoManager = undoManager
     }
 
+    func showImportMenu() {
+        isImportMenuPresented = true
+    }
+
     func beginImport(kind: ComposerImportKind) {
+        isImportMenuPresented = false
         pendingImportKind = kind
         isImportPresented = true
     }

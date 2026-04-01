@@ -6,13 +6,13 @@ import Observation
 final class AppModel {
     enum PendingPlotReplacementAction {
         case importFromFilesystem
-        case seedFromCleanup(URL, SheetValue)
+        case seedFromDataStudio(URL, SheetValue)
     }
 
     let runtime: SidecarRuntime
     let client: any SidecarClienting
     let plotSession: PlotSession
-    let dataCleanupSession: DataCleanupSession
+    let dataStudioSession: DataStudioSession
     let composerSession: ComposerSession
     let codeConsoleSession: CodeConsoleSession
 
@@ -29,16 +29,16 @@ final class AppModel {
         let resolvedClient = client ?? SidecarClient(runtime: runtime)
         self.client = resolvedClient
         self.plotSession = PlotSession()
-        self.dataCleanupSession = DataCleanupSession()
+        self.dataStudioSession = DataStudioSession()
         self.composerSession = ComposerSession()
         self.codeConsoleSession = CodeConsoleSession()
 
         plotSession.configure(client: resolvedClient)
-        dataCleanupSession.configure(client: resolvedClient)
+        dataStudioSession.configure(client: resolvedClient)
         composerSession.configure(client: resolvedClient)
         codeConsoleSession.configure(client: resolvedClient)
 
-        dataCleanupSession.openInPlotHandler = { [weak self] url, sheet in
+        dataStudioSession.openInPlotHandler = { [weak self] url, sheet in
             self?.openInPlot(workbookURL: url, preferredSheet: sheet)
         }
     }
@@ -57,6 +57,7 @@ final class AppModel {
             let meta = try await client.fetchMeta()
             let contract = try await client.fetchPlotContract()
             plotSession.apply(meta: meta, contract: contract)
+            dataStudioSession.apply(meta: meta)
             codeConsoleSession.apply(meta: meta)
             refreshCodeConsoleContext()
             hasBootstrapped = true
@@ -75,29 +76,38 @@ final class AppModel {
         switch selectedWorkbench {
         case .plot:
             requestPlotImport()
-        case .dataCleanup:
-            dataCleanupSession.showImportMenu()
+        case .dataStudio:
+            dataStudioSession.showImportMenu()
         case .composer:
-            beginComposerImport(kind: .graph)
+            composerSession.showImportMenu()
         case .codeConsole:
             codeConsoleSession.isImporterPresented = true
         }
-    }
-
-    func beginComposerImport(kind: ComposerImportKind) {
-        composerSession.beginImport(kind: kind)
     }
 
     func exportActiveWorkbench() async {
         switch selectedWorkbench {
         case .plot:
             await plotSession.exportCurrentSelection()
-        case .dataCleanup:
-            await dataCleanupSession.exportComparisonBundle()
+        case .dataStudio:
+            await dataStudioSession.exportComparisonBundle()
         case .composer:
             await composerSession.exportComposition()
         case .codeConsole:
-            break
+            codeConsoleSession.exportCurrentOutputs()
+        }
+    }
+
+    func showHelpForActiveWorkbench() {
+        switch selectedWorkbench {
+        case .plot:
+            plotSession.showGuide()
+        case .dataStudio:
+            dataStudioSession.showGuide()
+        case .composer:
+            composerSession.showGuide()
+        case .codeConsole:
+            codeConsoleSession.showGuide()
         }
     }
 
@@ -105,8 +115,8 @@ final class AppModel {
         switch selectedWorkbench {
         case .plot:
             plotSession.revealLatestExport()
-        case .dataCleanup:
-            dataCleanupSession.revealLatestExport()
+        case .dataStudio:
+            dataStudioSession.revealLatestExport()
         case .composer:
             composerSession.revealLatestExport()
         case .codeConsole:
@@ -118,27 +128,19 @@ final class AppModel {
         inspectorPresented.toggle()
     }
 
-    func showComposerGuide() {
-        composerSession.showGuide()
-    }
-
-    func showDataCleanupGuide() {
-        dataCleanupSession.showGuide()
-    }
-
     func openInPlot(workbookURL: URL, preferredSheet: SheetValue) {
         selectedWorkbench = .plot
         if plotSession.hasSessionContent {
-            pendingPlotReplacementAction = .seedFromCleanup(workbookURL, preferredSheet)
+            pendingPlotReplacementAction = .seedFromDataStudio(workbookURL, preferredSheet)
             isPlotReplacementConfirmationPresented = true
         } else {
-            plotSession.seedFromCleanup(workbookURL: workbookURL, preferredSheet: preferredSheet)
+            plotSession.seedFromDataStudio(workbookURL: workbookURL, preferredSheet: preferredSheet)
             refreshCodeConsoleContext()
         }
     }
 
     func refreshCodeConsoleContext() {
-        codeConsoleSession.refreshContext(plot: plotSession, dataCleanup: dataCleanupSession)
+        codeConsoleSession.refreshContext(plot: plotSession, dataStudio: dataStudioSession)
     }
 
     func confirmPendingPlotReplacement() {
@@ -152,8 +154,8 @@ final class AppModel {
         switch pendingPlotReplacementAction {
         case .importFromFilesystem:
             plotSession.isImporterPresented = true
-        case let .seedFromCleanup(url, sheet):
-            plotSession.seedFromCleanup(workbookURL: url, preferredSheet: sheet)
+        case let .seedFromDataStudio(url, sheet):
+            plotSession.seedFromDataStudio(workbookURL: url, preferredSheet: sheet)
             refreshCodeConsoleContext()
         }
     }

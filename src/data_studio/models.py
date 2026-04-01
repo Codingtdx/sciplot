@@ -1,0 +1,238 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field, is_dataclass
+from pathlib import Path
+from typing import Any, Literal
+
+
+def serialize_model(value: Any) -> Any:
+    if is_dataclass(value) and not isinstance(value, type):
+        return {key: serialize_model(item) for key, item in asdict(value).items()}
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: serialize_model(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [serialize_model(item) for item in value]
+    return value
+
+
+@dataclass(frozen=True)
+class DataStudioRange:
+    sheet_name: str
+    start_row: int
+    end_row: int
+    start_col: int
+    end_col: int
+
+
+@dataclass(frozen=True)
+class SheetBlock:
+    id: str
+    sheet_name: str
+    label: str
+    row_count: int
+    col_count: int
+    range: DataStudioRange
+    header_row_index: int | None = None
+    unit_row_index: int | None = None
+    data_start_row_index: int | None = None
+    sample_rows: tuple[tuple[Any, ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class FieldCandidate:
+    id: str
+    kind: str
+    label: str
+    confidence: float
+    rationale: str
+    sheet_name: str
+    block_id: str | None = None
+    range: DataStudioRange | None = None
+    sample_values: tuple[str, ...] = ()
+    unit_hint: str | None = None
+
+
+@dataclass(frozen=True)
+class RawSheetPreview:
+    sheet_name: str
+    row_count: int
+    col_count: int
+    sample_rows: tuple[tuple[Any, ...], ...]
+    blocks: tuple[SheetBlock, ...]
+
+
+@dataclass(frozen=True)
+class RawFilePreview:
+    source_path: Path
+    file_type: str
+    encoding: str | None
+    delimiter: str | None
+    sheet_names: tuple[str, ...]
+    sheets: tuple[RawSheetPreview, ...]
+    field_candidates: tuple[FieldCandidate, ...]
+    recommended_template_ids: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+
+TemplateFieldRole = Literal["curve_x", "curve_y", "metadata", "metric", "summary_metric", "header", "unit"]
+
+
+@dataclass(frozen=True)
+class TemplateFieldBinding:
+    id: str
+    role: TemplateFieldRole
+    label: str
+    sheet_name: str | None = None
+    block_id: str | None = None
+    column_name: str | None = None
+    column_index: int | None = None
+    row_label_contains: str | None = None
+    cell_value_contains: tuple[str, ...] = ()
+    unit_hint: str | None = None
+    optional: bool = False
+
+
+@dataclass(frozen=True)
+class TemplateMatchCondition:
+    sheet_name_contains: tuple[str, ...] = ()
+    text_contains: tuple[str, ...] = ()
+    field_kinds: tuple[str, ...] = ()
+    minimum_score: float = 0.0
+
+
+@dataclass(frozen=True)
+class TemplateDefinition:
+    version: int
+    id: str
+    label: str
+    family: str
+    builtin: bool
+    description: str
+    file_types: tuple[str, ...]
+    parse_strategy: str
+    match_conditions: tuple[TemplateMatchCondition, ...] = ()
+    field_bindings: tuple[TemplateFieldBinding, ...] = ()
+    workbook_metric_ids: tuple[str, ...] = ()
+    default_group_name_strategy: str = "common_prefix"
+    preferred_sheet_name: str = "Representative_Curve"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TemplateMatch:
+    template_id: str
+    label: str
+    family: str
+    confidence: float
+    reasons: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+    matched_sheet_names: tuple[str, ...] = ()
+    auto_selected: bool = False
+
+
+@dataclass(frozen=True)
+class WorkbookMetricSummary:
+    id: str
+    label: str
+    unit: str
+    mean: float | None
+    std: float | None
+
+
+@dataclass(frozen=True)
+class WorkbookSample:
+    id: str
+    source_path: Path
+    filename: str
+    parsed: bool
+    warnings: tuple[str, ...] = ()
+    exclusions: tuple[str, ...] = ()
+    metrics: dict[str, float | None] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DataStudioWorkbook:
+    workbook_id: str
+    workbook_path: Path
+    label: str
+    template_match: TemplateMatch
+    source_files: tuple[Path, ...]
+    sheet_names: tuple[str, ...]
+    preferred_sheet: str
+    parsed_sample_count: int
+    failed_sample_count: int
+    representative_filename: str
+    metrics: tuple[WorkbookMetricSummary, ...]
+    warnings: tuple[str, ...] = ()
+    exclusions: tuple[str, ...] = ()
+    samples: tuple[WorkbookSample, ...] = ()
+
+
+@dataclass(frozen=True)
+class ComparisonRecipe:
+    id: str
+    label: str
+    category: str
+    template_id: str
+    sheet_name: str
+    metric_id: str | None = None
+    enabled_by_default: bool = True
+    supported: bool = True
+    support_reason: str = ""
+
+
+@dataclass(frozen=True)
+class DataStudioFigureOutput:
+    path: Path
+    label: str
+    category: str
+    template_id: str
+    sheet_name: str
+    metric_id: str | None = None
+    recipe_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ComparisonSet:
+    id: str
+    label: str
+    workbook_paths: tuple[Path, ...]
+    workbook_labels: tuple[str, ...]
+    comparison_workbook_path: Path
+    recipes: tuple[ComparisonRecipe, ...]
+
+
+@dataclass(frozen=True)
+class DataStudioSessionPayload:
+    version: int
+    selected_template_id: str | None
+    selected_workbook_id: str | None
+    primary_workbook_id: str | None
+    selected_recipe_id: str | None
+    workbook_paths: tuple[str, ...]
+    comparison_recipe_ids: tuple[str, ...]
+    imported_paths: tuple[str, ...] = ()
+    template_draft_path: str | None = None
+
+
+__all__ = [
+    "ComparisonRecipe",
+    "ComparisonSet",
+    "DataStudioFigureOutput",
+    "DataStudioRange",
+    "DataStudioSessionPayload",
+    "DataStudioWorkbook",
+    "FieldCandidate",
+    "RawFilePreview",
+    "RawSheetPreview",
+    "SheetBlock",
+    "TemplateDefinition",
+    "TemplateFieldBinding",
+    "TemplateMatch",
+    "TemplateMatchCondition",
+    "WorkbookMetricSummary",
+    "WorkbookSample",
+    "serialize_model",
+]

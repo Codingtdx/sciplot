@@ -15,15 +15,15 @@ final class AppModelTests: XCTestCase {
     func testWorkbenchCommandsRouteToCurrentSession() {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
-        model.switchWorkbench(.dataCleanup)
+        model.switchWorkbench(.dataStudio)
         model.beginImportForActiveWorkbench()
-        XCTAssertEqual(model.selectedWorkbench, .dataCleanup)
-        XCTAssertTrue(model.dataCleanupSession.isImportMenuPresented)
+        XCTAssertEqual(model.selectedWorkbench, .dataStudio)
+        XCTAssertTrue(model.dataStudioSession.isImportMenuPresented)
 
         model.switchWorkbench(.composer)
         model.beginImportForActiveWorkbench()
-        XCTAssertTrue(model.composerSession.isImportPresented)
-        XCTAssertEqual(model.composerSession.pendingImportKind, .graph)
+        XCTAssertTrue(model.composerSession.isImportMenuPresented)
+        XCTAssertFalse(model.composerSession.isImportPresented)
     }
 
     func testOpenInPlotSeedsPlotSessionAndContext() {
@@ -108,6 +108,9 @@ final class AppModelTests: XCTestCase {
               "paths": {
                 "/meta": { "get": {} },
                 "/plot-contract": { "get": {} },
+                "/data-studio/templates": { "get": {} },
+                "/data-studio/source-preview": { "post": {} },
+                "/data-studio/build-workbook": { "post": {} },
                 "/inspect-file": { "post": {} },
                 "/code-console/context": { "post": {} },
                 "/code-console/run": { "post": {} },

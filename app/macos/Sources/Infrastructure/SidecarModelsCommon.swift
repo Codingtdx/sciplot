@@ -5,6 +5,10 @@ struct HealthResponse: Codable, Equatable, Sendable {
     let version: String
 }
 
+struct StatusResponse: Codable, Equatable, Sendable {
+    let status: String
+}
+
 struct PathResponse: Codable, Equatable, Sendable {
     let outputPath: String
 }

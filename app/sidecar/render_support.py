@@ -61,6 +61,16 @@ def contextual_error_message(context: str, exc: Exception) -> str:
         "tensile_preprocess": "Could not build the tensile workbook.",
         "tensile_workbook": "Could not inspect this tensile workbook.",
         "tensile_compare": "Could not export the tensile comparison bundle.",
+        "data_studio_templates": "Could not load Data Studio templates.",
+        "data_studio_source_preview": "Could not inspect this Data Studio source file.",
+        "data_studio_template_create": "Could not create the Data Studio template.",
+        "data_studio_template_update": "Could not update the Data Studio template.",
+        "data_studio_template_delete": "Could not delete the Data Studio template.",
+        "data_studio_build_workbook": "Could not build the Data Studio workbook.",
+        "data_studio_import_workbook": "Could not load this Data Studio workbook.",
+        "data_studio_comparison_preview": "Could not render the Data Studio comparison preview.",
+        "data_studio_comparison_export": "Could not export the Data Studio comparison bundle.",
+        "data_studio_session_normalize": "Could not normalize the Data Studio session payload.",
     }
     prefix = prefixes.get(context)
     if prefix is None:

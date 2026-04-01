@@ -5,7 +5,7 @@ SciPlot God is a desktop publication workflow tool for scientific figures.
 The product is organized around four retained primary workbenches:
 
 1. Plot
-2. Data Cleanup
+2. Data Studio
 3. Composer
 4. Code Console
 
@@ -21,7 +21,7 @@ These are the only workbenches that should shape app-level information architect
 Default user-visible flow examples for future mock work:
 
 - `Plot`: `Import -> Template -> Refine & Export`
-- `Data Cleanup`: `Import -> Review & Clean -> Compare -> Export / Open in Plot`
+- `Data Studio`: `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
 - `Composer`: `Library -> Compose & Inspect -> Export`
 - `Code Console`: `Context -> Code -> Run -> Outputs`
 
@@ -39,17 +39,17 @@ Notes:
 - Preview belongs inside `Refine`.
 - Readiness and preflight belong inside `Refine`, not as separate app-level destinations.
 
-### Data Cleanup
+### Data Studio
 
 Canonical workflow:
 
-`Intake -> Detect -> Clean -> Replicates -> QC Compare -> Export / Open in Plot`
+`Choose Template -> Preview Source or Create Template -> Build Workbook -> Review -> Compare -> Export / Open in Plot`
 
 Notes:
 
-- User-facing language is `Data Cleanup / 数据整理`.
-- Current v1 backend may still be powered by tensile-oriented routes and terminology.
-- Future UI and docs should present this as a broader cleanup and preparation workbench, not a tensile-only product area.
+- User-facing language is `Data Studio`.
+- The workbench is template-first: users either choose an existing template for direct processing or import one real sample file, confirm recommended regions, and save a reusable template.
+- Tensile remains the default built-in template family, but the product surface should treat it as one supported template family inside Data Studio rather than as the workbench itself.
 
 ### Composer
 
@@ -82,7 +82,7 @@ Notes:
 - Code Console is a first-class workbench, not a secondary utility.
 - It should preserve contract-bound context and controlled runner semantics.
 - It is the scripting and AI-control surface for advanced work, not a side panel bolted onto Plot.
-- The current native implementation supports direct data import or Plot/Data Cleanup context binding, prompt copy for external AI, and repo-native Python runs with managed output review.
+- The current native implementation supports direct data import or Plot/Data Studio context binding, prompt copy for external AI, and repo-native Python runs with managed output review.
 
 ## App-Level IA Principles
 
@@ -137,7 +137,7 @@ Any future mock redesign should:
 - keep Plot local steps inside Plot
 - distinguish canonical internal workflow from simplified user-visible workflow
 - merge hidden/system stages into broader decision-oriented work surfaces when the user does not need to act on them
-- present Data Cleanup with product-facing naming, even if tensile-specific backend seams remain underneath
+- present Data Studio as the structured import, workbook, comparison, and figure-generation workbench, even if tensile-specific backend seams remain underneath
 - keep utilities subordinate rather than promoting them into sidebar peers
 
 ## More Detail

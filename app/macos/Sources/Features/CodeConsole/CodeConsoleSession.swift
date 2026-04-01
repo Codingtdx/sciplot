@@ -11,15 +11,15 @@ struct CodeConsoleContextItem: Identifiable, Equatable, Sendable {
 
 enum CodeConsoleSourceKind: String, Sendable {
     case plot
-    case dataCleanup
+    case dataStudio
     case importedFile
 
     var title: String {
         switch self {
         case .plot:
             return "Plot"
-        case .dataCleanup:
-            return "Data Cleanup"
+        case .dataStudio:
+            return "Data Studio"
         case .importedFile:
             return "Imported File"
         }
@@ -58,6 +58,7 @@ final class CodeConsoleSession {
     var selectedGeneratedFilePath: String?
     var errorMessage: String?
     var isImporterPresented = false
+    var isGuidePresented = false
     var isRefreshingContext = false
     var isRunning = false
 
@@ -153,7 +154,7 @@ final class CodeConsoleSession {
         defaultRenderOptions.visualThemeID = meta.visualThemes.first?.id
     }
 
-    func refreshContext(plot: PlotSession, dataCleanup: DataCleanupSession) {
+    func refreshContext(plot: PlotSession, dataStudio: DataStudioSession) {
         let previousSelection = selectedBindingID
         var bindings: [CodeConsoleBindingOption] = []
 
@@ -172,16 +173,16 @@ final class CodeConsoleSession {
             )
         }
 
-        if let workbookURL = dataCleanup.primaryWorkbookURL {
+        if let workbookURL = dataStudio.primaryWorkbookURL {
             bindings.append(
                 .init(
-                    id: bindingID(kind: .dataCleanup, url: workbookURL),
-                    sourceKind: .dataCleanup,
+                    id: bindingID(kind: .dataStudio, url: workbookURL),
+                    sourceKind: .dataStudio,
                     sourceURL: workbookURL,
-                    sheet: dataCleanup.primaryPreferredSheet ?? .name("Representative_Curve"),
-                    title: "Prepared workbook",
-                    subtitle: dataCleanup.primaryWorkbook?.representativeFilename ?? workbookURL.lastPathComponent,
-                    templateID: dataCleanup.primaryWorkbook?.reviewTemplateID,
+                    sheet: dataStudio.primaryPreferredSheet ?? .name("Representative_Curve"),
+                    title: "Data Studio workbook",
+                    subtitle: dataStudio.primaryWorkbook?.response.representativeFilename ?? workbookURL.lastPathComponent,
+                    templateID: dataStudio.primaryWorkbook?.reviewTemplateID,
                     renderOptions: defaultRenderOptions
                 )
             )
@@ -262,6 +263,14 @@ final class CodeConsoleSession {
         scheduleContextRefresh()
     }
 
+    func showGuide() {
+        isGuidePresented = true
+    }
+
+    func dismissGuide() {
+        isGuidePresented = false
+    }
+
     func refreshCurrentContext() async {
         contextRevision += 1
         let revision = contextRevision
@@ -333,6 +342,10 @@ final class CodeConsoleSession {
         } else if let selectedFileURL {
             WorkspaceBridge.reveal([selectedFileURL])
         }
+    }
+
+    func exportCurrentOutputs() {
+        revealLatestOutput()
     }
 
     func openCurrentSource() {

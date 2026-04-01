@@ -6,7 +6,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 
 ## Global Rules
 
-- App-level primary navigation exposes only four workbenches: `Plot`, `Data Cleanup`, `Composer`, and `Code Console`.
+- App-level primary navigation exposes only four workbenches: `Plot`, `Data Studio`, `Composer`, and `Code Console`.
 - `Start`, `Home`, `Project`, and `Settings` are not primary destinations in the long-term IA.
 - Utilities such as recents, open/save, managed files, and appearance/runtime controls stay secondary.
 - Each workbench should present one dominant workspace rather than a dashboard mosaic.
@@ -22,7 +22,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 - Titlebar with traffic lights at top left.
 - Fixed left sidebar with primary destinations:
 - Plot
-- Data Cleanup
+- Data Studio
 - Composer
 - Code Console
 - Main workspace to the right.
@@ -33,7 +33,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 
 - Sidebar selection changes the active workbench.
 - Plot local steps stay inside Plot.
-- Data Cleanup local steps stay inside Data Cleanup.
+- Data Studio local steps stay inside Data Studio.
 - Composer and Code Console may expose local panes or tabs, but these remain workbench-local.
 - The shell must not treat the protected Plot mock flow as the whole-app IA.
 
@@ -69,33 +69,33 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 - Export stays attached to the Plot workflow.
 - Do not restore a product shell whose primary navigation is only `Start / Plot Import / Plot Template / Plot Refine`.
 
-## Data Cleanup
+## Data Studio
 
 ### Purpose
 
-- Prepare experimental data into clean, compare-ready, and plot-ready structured outputs.
+- Turn raw experimental data into structured workbooks, comparison sets, and exportable figures.
 
 ### Canonical Workflow
 
-- Intake
-- Detect
-- Clean
-- Replicates
-- QC Compare
+- Choose Template
+- Preview Source or Create Template
+- Build Workbook
+- Review
+- Compare
 - Export / Open in Plot
 
 ### Layout
 
-- Main workspace is data-preparation-centric.
-- Intake should foreground raw-file selection, detected structure, and cleanup readiness.
-- Cleaning and replicate steps should surface structured transformations rather than raw implementation jargon.
-- QC Compare should make comparison outputs, warnings, and bundle actions easy to review.
+- Main workspace is workbook-and-comparison-centric.
+- The first decision should be template selection: choose an existing template for direct processing, or start template creation from one real sample file.
+- Source preview should foreground detected structure, recommended regions, and candidate fields rather than blank schema forms.
+- Compare should make figure previews, warnings, recipe selection, and bundle actions easy to review.
 
 ### Rules
 
-- Use `Data Cleanup / 数据整理` in product-facing copy.
+- Use `Data Studio` in product-facing copy.
 - Internal tensile-specific routes or schemas may remain underneath.
-- Successful cleanup should stay in this workbench until the user explicitly chooses `Open in Plot`.
+- Successful workbook build and comparison work should stay in this workbench until the user explicitly chooses `Open in Plot`.
 - Do not frame this workbench as a tensile-only niche tool in user-facing IA.
 
 ## Composer
@@ -181,7 +181,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 
 - Borrow the calm sheet layout, readable preview/table treatment, and stable inspector rhythm.
 
-### Data Cleanup
+### Data Studio
 
 - Borrow structured intake panels, comparison clarity, and desktop utility-panel calmness.
 
@@ -200,14 +200,14 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 ### Canonical Internal Flows
 
 - Plot: `Import -> Inspect -> Template -> Refine -> Preflight -> Export`
-- Data Cleanup: `Intake -> Detect -> Clean -> Replicates -> QC Compare -> Export / Open in Plot`
+- Data Studio: `Choose Template -> Preview Source or Create Template -> Build Workbook -> Review -> Compare -> Export / Open in Plot`
 - Composer: `Assets -> Layout -> Compose -> Inspect/Arrange -> Review -> Export`
 - Code Console: `Bind Context -> Inspect Inputs -> Prompt/Code -> Run -> Outputs -> Handoff`
 
 ### User-Visible Mock Flows
 
 - Plot: `Import -> Template -> Refine & Export`
-- Data Cleanup: `Import -> Review & Clean -> Compare -> Export / Open in Plot`
+- Data Studio: `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
 - Composer: `Assets -> Compose -> Review -> Export`
 - Code Console: `Context -> Code -> Run -> Outputs`
 

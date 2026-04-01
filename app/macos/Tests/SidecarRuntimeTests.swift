@@ -104,6 +104,9 @@ final class SidecarRuntimeTests: XCTestCase {
                       "paths": {
                         "/meta": { "get": {} },
                         "/plot-contract": { "get": {} },
+                        "/data-studio/templates": { "get": {} },
+                        "/data-studio/source-preview": { "post": {} },
+                        "/data-studio/build-workbook": { "post": {} },
                         "/inspect-file": { "post": {} },
                         "/code-console/context": { "post": {} },
                         "/code-console/run": { "post": {} },

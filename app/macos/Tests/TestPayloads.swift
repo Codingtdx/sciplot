@@ -511,6 +511,300 @@ enum TestPayloads {
         )
     }
 
+    static func dataStudioTemplate(
+        id: String = "builtin/tensile",
+        label: String = "Tensile"
+    ) -> DataStudioTemplateResponse {
+        DataStudioTemplateResponse(
+            version: 1,
+            id: id,
+            label: label,
+            family: "tensile",
+            builtin: id == "builtin/tensile",
+            description: "Built-in tensile import template.",
+            fileTypes: ["csv", "txt", "tsv", "xls", "xlsx", "xlsm"],
+            parseStrategy: "builtin:tensile",
+            matchConditions: [
+                .init(
+                    sheetNameContains: ["Representative"],
+                    textContains: ["strain", "stress"],
+                    fieldKinds: ["curve_x", "curve_y", "metric"],
+                    minimumScore: 0.8
+                ),
+            ],
+            fieldBindings: [
+                .init(
+                    id: "strain",
+                    role: "curve_x",
+                    label: "Strain",
+                    sheetName: nil,
+                    blockID: nil,
+                    columnName: "Strain",
+                    columnIndex: 0,
+                    rowLabelContains: nil,
+                    cellValueContains: [],
+                    unitHint: "%",
+                    optional: false
+                ),
+                .init(
+                    id: "stress",
+                    role: "curve_y",
+                    label: "Stress",
+                    sheetName: nil,
+                    blockID: nil,
+                    columnName: "Stress",
+                    columnIndex: 1,
+                    rowLabelContains: nil,
+                    cellValueContains: [],
+                    unitHint: "MPa",
+                    optional: false
+                ),
+            ],
+            workbookMetricIDs: ["Strength", "Modulus", "Elongation"],
+            defaultGroupNameStrategy: "common_prefix",
+            preferredSheetName: "Representative_Curve",
+            metadata: ["builtin_family": .string("tensile")]
+        )
+    }
+
+    static func dataStudioTemplateList() -> DataStudioTemplateListResponse {
+        DataStudioTemplateListResponse(
+            templates: [
+                dataStudioTemplate(),
+                dataStudioTemplate(id: "user/custom_curve", label: "Custom Curve Template"),
+            ]
+        )
+    }
+
+    static func dataStudioSourcePreview(path: String = "/tmp/raw_a.csv") -> DataStudioSourcePreviewResponse {
+        DataStudioSourcePreviewResponse(
+            preview: .init(
+                sourcePath: path,
+                fileType: "csv",
+                encoding: "utf-8",
+                delimiter: ",",
+                sheetNames: ["Sheet1"],
+                sheets: [
+                    .init(
+                        sheetName: "Sheet1",
+                        rowCount: 8,
+                        colCount: 4,
+                        sampleRows: [
+                            [.string("Strain"), .string("Stress"), .string("Strength"), .string("Modulus")],
+                            [.string("%"), .string("MPa"), .string("MPa"), .string("MPa")],
+                        ],
+                        blocks: [
+                            .init(
+                                id: "sheet1:block0",
+                                sheetName: "Sheet1",
+                                label: "Primary Data Block",
+                                rowCount: 6,
+                                colCount: 4,
+                                range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 1, endCol: 4),
+                                headerRowIndex: 0,
+                                unitRowIndex: 1,
+                                dataStartRowIndex: 2,
+                                sampleRows: [
+                                    [.string("Strain"), .string("Stress"), .string("Strength"), .string("Modulus")],
+                                    [.string("%"), .string("MPa"), .string("MPa"), .string("MPa")],
+                                    [.number(0), .number(0), .number(12.4), .number(2.1)],
+                                ]
+                            ),
+                        ]
+                    ),
+                ],
+                fieldCandidates: [
+                    .init(
+                        id: "candidate:strain",
+                        kind: "curve_x",
+                        label: "Strain",
+                        confidence: 0.98,
+                        rationale: "Detected percentage strain values with tensile-style headers.",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 1, endCol: 1),
+                        sampleValues: ["0", "0.1", "0.2"],
+                        unitHint: "%"
+                    ),
+                    .init(
+                        id: "candidate:stress",
+                        kind: "curve_y",
+                        label: "Stress",
+                        confidence: 0.97,
+                        rationale: "Detected stress column adjacent to strain with MPa units.",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 2, endCol: 2),
+                        sampleValues: ["0", "5.1", "12.4"],
+                        unitHint: "MPa"
+                    ),
+                    .init(
+                        id: "candidate:strength",
+                        kind: "metric",
+                        label: "Strength",
+                        confidence: 0.92,
+                        rationale: "Summary metric column detected in the same block.",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 3, endCol: 3),
+                        sampleValues: ["12.4", "12.7"],
+                        unitHint: "MPa"
+                    ),
+                ],
+                recommendedTemplateIDs: ["builtin/tensile"],
+                warnings: []
+            ),
+            matches: [
+                .init(
+                    templateID: "builtin/tensile",
+                    label: "Tensile",
+                    family: "tensile",
+                    confidence: 0.99,
+                    reasons: ["Tensile headers and metrics matched the built-in template family."],
+                    warnings: [],
+                    matchedSheetNames: ["Sheet1"],
+                    autoSelected: true
+                ),
+            ]
+        )
+    }
+
+    static func dataStudioWorkbook(
+        id: String = "workbook-1",
+        path: String = "/tmp/prepared.xlsx",
+        label: String = "Primary Group"
+    ) -> DataStudioWorkbookResponse {
+        DataStudioWorkbookResponse(
+            workbookID: id,
+            workbookPath: path,
+            label: label,
+            templateMatch: .init(
+                templateID: "builtin/tensile",
+                label: "Tensile",
+                family: "tensile",
+                confidence: 0.98,
+                reasons: ["Built with the selected Data Studio template."],
+                warnings: [],
+                matchedSheetNames: ["Representative_Curve"],
+                autoSelected: true
+            ),
+            sourceFiles: ["/tmp/raw_a.csv", "/tmp/raw_b.csv"],
+            sheetNames: ["Representative_Curve", "Strength_Replicates", "Modulus_Replicates", "Elongation_Replicates"],
+            preferredSheet: "Representative_Curve",
+            parsedSampleCount: 2,
+            failedSampleCount: 0,
+            representativeFilename: "raw_a.csv",
+            metrics: [
+                .init(id: "strength", label: "Strength", unit: "MPa", mean: 12.4, std: 0.4),
+                .init(id: "modulus", label: "Modulus", unit: "MPa", mean: 2.1, std: 0.1),
+            ],
+            warnings: [],
+            exclusions: [],
+            samples: [
+                .init(
+                    id: "sample-a",
+                    sourcePath: "/tmp/raw_a.csv",
+                    filename: "raw_a.csv",
+                    parsed: true,
+                    warnings: [],
+                    exclusions: [],
+                    metrics: ["Strength": 12.4, "Modulus": 2.0]
+                ),
+                .init(
+                    id: "sample-b",
+                    sourcePath: "/tmp/raw_b.csv",
+                    filename: "raw_b.csv",
+                    parsed: true,
+                    warnings: [],
+                    exclusions: [],
+                    metrics: ["Strength": 12.8, "Modulus": 2.2]
+                ),
+            ]
+        )
+    }
+
+    static func dataStudioComparisonSet() -> DataStudioComparisonSetResponse {
+        DataStudioComparisonSetResponse(
+            id: "primary-vs-second",
+            label: "Primary Group vs Second Group",
+            workbookPaths: ["/tmp/prepared.xlsx", "/tmp/second.xlsx"],
+            workbookLabels: ["Primary Group", "Second Group"],
+            comparisonWorkbookPath: "/tmp/data_studio_exports/primary-vs-second/primary-vs-second.xlsx",
+            recipes: [
+                .init(
+                    id: "representative_curve",
+                    label: "Representative Curve Compare",
+                    category: "curve",
+                    templateID: "curve",
+                    sheetName: "Representative_Curve",
+                    metricID: nil,
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+                .init(
+                    id: "strength_box",
+                    label: "Strength Box Compare",
+                    category: "metric",
+                    templateID: "box",
+                    sheetName: "Strength_Replicates",
+                    metricID: "Strength",
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+            ]
+        )
+    }
+
+    static func dataStudioComparisonPreview() -> DataStudioComparisonPreviewResponse {
+        DataStudioComparisonPreviewResponse(
+            comparisonSet: dataStudioComparisonSet(),
+            recipe: dataStudioComparisonSet().recipes[0],
+            preview: .init(filename: "representative_curve.pdf", pdfBase64: pdfBase64, qa: nil)
+        )
+    }
+
+    static func dataStudioComparisonExport() -> DataStudioComparisonExportResponse {
+        DataStudioComparisonExportResponse(
+            comparisonSet: dataStudioComparisonSet(),
+            figureOutputs: [
+                .init(
+                    path: "/tmp/data_studio_exports/primary-vs-second/representative_curve.pdf",
+                    label: "Representative Curve Compare",
+                    category: "curve",
+                    templateID: "curve",
+                    sheetName: "Representative_Curve",
+                    metricID: nil,
+                    recipeID: "representative_curve"
+                ),
+                .init(
+                    path: "/tmp/data_studio_exports/primary-vs-second/strength_box.pdf",
+                    label: "Strength Box Compare",
+                    category: "metric",
+                    templateID: "box",
+                    sheetName: "Strength_Replicates",
+                    metricID: "Strength",
+                    recipeID: "strength_box"
+                ),
+            ]
+        )
+    }
+
+    static func dataStudioSession() -> DataStudioSessionResponse {
+        DataStudioSessionResponse(
+            version: 1,
+            selectedTemplateID: "builtin/tensile",
+            selectedWorkbookID: "workbook-1",
+            primaryWorkbookID: "workbook-1",
+            selectedRecipeID: "representative_curve",
+            workbookPaths: ["/tmp/prepared.xlsx"],
+            comparisonRecipeIDs: ["representative_curve", "strength_box"],
+            importedPaths: ["/tmp/raw_a.csv"],
+            templateDraftPath: "/tmp/raw_a.csv"
+        )
+    }
+
     static func tensilePreprocess() -> TensileReplicateResponseModel {
         TensileReplicateResponseModel(
             outputPath: "/tmp/prepared.xlsx",

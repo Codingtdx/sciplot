@@ -141,6 +141,84 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.figureOutputs.first?.label, "Strength Box Compare")
     }
 
+    func testDecodeDataStudioWorkbookAndComparisonPayloads() throws {
+        let workbookPayload = """
+        {
+          "workbook_id": "workbook-1",
+          "workbook_path": "/tmp/prepared.xlsx",
+          "label": "Primary Group",
+          "template_match": {
+            "template_id": "builtin/tensile",
+            "label": "Tensile",
+            "family": "tensile",
+            "confidence": 0.98,
+            "reasons": ["Built with the selected Data Studio template."],
+            "warnings": [],
+            "matched_sheet_names": ["Representative_Curve"],
+            "auto_selected": true
+          },
+          "source_files": ["/tmp/raw_a.csv"],
+          "sheet_names": ["Representative_Curve"],
+          "preferred_sheet": "Representative_Curve",
+          "parsed_sample_count": 2,
+          "failed_sample_count": 1,
+          "representative_filename": "raw_a.csv",
+          "metrics": [{"id": "strength", "label": "Strength", "unit": "MPa", "mean": 12.4, "std": 0.4}],
+          "warnings": [],
+          "exclusions": [],
+          "samples": []
+        }
+        """
+
+        let comparisonPayload = """
+        {
+          "comparison_set": {
+            "id": "primary-vs-second",
+            "label": "Primary Group vs Second Group",
+            "workbook_paths": ["/tmp/prepared.xlsx", "/tmp/second.xlsx"],
+            "workbook_labels": ["Primary Group", "Second Group"],
+            "comparison_workbook_path": "/tmp/exports/comparison.xlsx",
+            "recipes": [
+              {
+                "id": "representative_curve",
+                "label": "Representative Curve Compare",
+                "category": "curve",
+                "template_id": "curve",
+                "sheet_name": "Representative_Curve",
+                "metric_id": null,
+                "enabled_by_default": true,
+                "supported": true,
+                "support_reason": ""
+              }
+            ]
+          },
+          "recipe": {
+            "id": "representative_curve",
+            "label": "Representative Curve Compare",
+            "category": "curve",
+            "template_id": "curve",
+            "sheet_name": "Representative_Curve",
+            "metric_id": null,
+            "enabled_by_default": true,
+            "supported": true,
+            "support_reason": ""
+          },
+          "preview": {
+            "filename": "representative_curve.pdf",
+            "pdf_base64": "\(TestPayloads.pdfBase64)"
+          }
+        }
+        """
+
+        let workbook = try decoder.decode(DataStudioWorkbookResponse.self, from: Data(workbookPayload.utf8))
+        let comparison = try decoder.decode(DataStudioComparisonPreviewResponse.self, from: Data(comparisonPayload.utf8))
+
+        XCTAssertEqual(workbook.templateMatch.templateID, "builtin/tensile")
+        XCTAssertEqual(workbook.metrics.first?.label, "Strength")
+        XCTAssertEqual(comparison.recipe.id, "representative_curve")
+        XCTAssertEqual(comparison.comparisonSet.workbookLabels.count, 2)
+    }
+
     func testDecodePlotContractSizePresetsWithoutIDField() throws {
         let payload = """
         {

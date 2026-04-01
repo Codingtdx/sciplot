@@ -85,6 +85,7 @@ TENSILE_WORKBOOK_SHEETS = {
     "Strength_Replicates",
     "Modulus_Replicates",
     "Elongation_Replicates",
+    "DataStudio_Metadata",
 }
 
 

@@ -81,8 +81,8 @@ enum NativePanels {
 
     static func chooseWorkbookSaveLocation(suggestedName: String) -> URL? {
         chooseSaveLocation(
-            title: "Save Prepared Workbook",
-            message: "Choose where the prepared workbook should be written.",
+            title: "Save Data Studio Workbook",
+            message: "Choose where the Data Studio workbook should be written.",
             suggestedName: suggestedName,
             allowedContentTypes: FileTypeCatalog.workbookExport,
             prompt: "Save"

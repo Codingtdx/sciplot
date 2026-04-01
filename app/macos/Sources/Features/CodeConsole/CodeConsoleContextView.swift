@@ -24,7 +24,7 @@ struct CodeConsoleContextView: View {
                 LabeledContent("Origin", value: binding.sourceKind.title)
                 LabeledContent("Sheet", value: session.selectedSheet.displayName)
             } else {
-                Text("No Plot, Data Cleanup, or direct import source is currently bound.")
+                Text("No Plot, Data Studio, or direct import source is currently bound.")
                     .foregroundStyle(.secondary)
             }
 

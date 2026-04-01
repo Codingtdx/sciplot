@@ -2,7 +2,7 @@ import SwiftUI
 
 enum Workbench: String, CaseIterable, Hashable, Identifiable {
     case plot
-    case dataCleanup
+    case dataStudio
     case composer
     case codeConsole
 
@@ -12,8 +12,8 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .plot:
             return "Plot"
-        case .dataCleanup:
-            return "Data Cleanup"
+        case .dataStudio:
+            return "Data Studio"
         case .composer:
             return "Composer"
         case .codeConsole:
@@ -25,8 +25,8 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .plot:
             return "Publication-ready figure workflow"
-        case .dataCleanup:
-            return "Workbook cleanup and compare"
+        case .dataStudio:
+            return "Template-driven workbook analysis"
         case .composer:
             return "Canvas-first panel composition"
         case .codeConsole:
@@ -38,7 +38,7 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .plot:
             return "chart.xyaxis.line"
-        case .dataCleanup:
+        case .dataStudio:
             return "tablecells"
         case .composer:
             return "square.on.square.squareshape.controlhandles"
@@ -51,7 +51,7 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .plot:
             return "1"
-        case .dataCleanup:
+        case .dataStudio:
             return "2"
         case .composer:
             return "3"

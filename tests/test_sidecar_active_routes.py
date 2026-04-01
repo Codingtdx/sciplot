@@ -34,6 +34,13 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/export-render") in signatures
     assert ("POST", "/compose-preview") in signatures
     assert ("POST", "/compose-export") in signatures
+    assert ("GET", "/data-studio/templates") in signatures
+    assert ("POST", "/data-studio/source-preview") in signatures
+    assert ("POST", "/data-studio/build-workbook") in signatures
+    assert ("POST", "/data-studio/import-workbook") in signatures
+    assert ("POST", "/data-studio/comparison-preview") in signatures
+    assert ("POST", "/data-studio/comparison-export") in signatures
+    assert ("POST", "/data-studio/session/normalize") in signatures
     assert ("POST", "/preprocess-tensile-replicates") in signatures
     assert ("POST", "/inspect-tensile-workbook") in signatures
     assert ("POST", "/export-tensile-comparison") in signatures

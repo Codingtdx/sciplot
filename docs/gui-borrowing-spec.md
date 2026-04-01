@@ -93,7 +93,7 @@ Reference basis:
 ### App Shell
 
 - Borrow the floating macOS-style window, titlebar, traffic lights, soft radius, shadow, and fixed left sidebar.
-- Replace OS app categories with SciPlot navigation only: `Plot`, `Data Cleanup`, `Composer`, `Code Console`.
+- Replace OS app categories with SciPlot navigation only: `Plot`, `Data Studio`, `Composer`, `Code Console`.
 - Keep the main workspace broad and calm, with optional right-side contextual inspector only when the current workbench needs one.
 - Keep utilities secondary rather than restoring `Start`, `Project`, or `Settings` as primary destinations.
 
@@ -103,10 +103,10 @@ Reference basis:
 - Use local Plot navigation for `Import -> Inspect -> Template -> Refine -> Preflight -> Export`.
 - Keep preview and export tied to the Plot workflow itself rather than separate app destinations.
 
-### Data Cleanup
+### Data Studio
 
 - Borrow structured intake sheets, compare-table calmness, and utility-panel hierarchy.
-- Center the workbench on cleanup and quality control, not on raw backend terminology.
+- Center the workbench on template-first import, workbook review, and comparison generation, not on raw backend terminology.
 - Keep `Open in Plot` as an explicit handoff action rather than an automatic redirect.
 
 ### Composer

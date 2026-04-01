@@ -155,11 +155,11 @@ This document defines the first-pass local design rules for the retained four-wo
 - Template should emphasize ranked compatible recommendations.
 - Refine should give preview the most area and keep export nearby.
 
-### Data Cleanup
+### Data Studio
 
-- Use structured intake panels, readable compare tables, and explicit transformation stages.
-- Present detection and cleanup guidance as workflow support, not as walls of diagnostics.
-- Keep `Open in Plot` visible, but subordinate to the cleanup workflow itself.
+- Use structured template selection, readable workbook review, and clear comparison previews.
+- Present detected structure and recommended regions as workflow support, not as walls of diagnostics.
+- Keep `Open in Plot` visible, but subordinate to the Data Studio workflow itself.
 
 ### Composer
 

@@ -5,10 +5,12 @@ seaborn
 scienceplots
 numpy
 pandas
+charset-normalizer
 scipy
 statsmodels
 jupyterlab
 openpyxl
+xlrd
 fastapi
 uvicorn
 pypdf

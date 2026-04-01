@@ -11,7 +11,7 @@ SciPlot God is a desktop workflow system for turning scientific data into public
 The retained app model contains four primary workbenches:
 
 1. Plot
-2. Data Cleanup
+2. Data Studio
 3. Composer
 4. Code Console
 
@@ -29,7 +29,7 @@ Canonical workflow and user-visible UI workflow are different layers.
 Default user-visible workflow compression for future mock work:
 
 - `Plot`: `Import -> Template -> Refine & Export`
-- `Data Cleanup`: `Import -> Review & Clean -> Compare -> Export / Open in Plot`
+- `Data Studio`: `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
 - `Composer`: `Assets -> Compose -> Review -> Export`
 - `Code Console`: `Context -> Code -> Run -> Outputs`
 
@@ -62,33 +62,33 @@ Default user-visible UI flow:
 
 - `Import -> Template -> Refine & Export`
 
-### Data Cleanup
+### Data Studio
 
 Purpose:
 
-- prepare incoming experimental data into plot-ready and compare-ready structured outputs
+- turn raw experimental files into structured workbooks, comparison sets, and exportable figures inside one workbench
 
 Canonical workflow:
 
-- Intake
-- Detect
-- Clean
-- Replicates
-- QC Compare
+- Choose Template
+- Preview Source or Create Template
+- Build Workbook
+- Review
+- Compare
 - Export / Open in Plot
 
 Normalization rules:
 
-- user-facing name is `Data Cleanup / 数据整理`
-- internal tensile-specific backend seams may remain
-- the workbench should grow from tensile-only preparation toward broader cleanup framing without breaking current preprocessing flows
+- user-facing name is `Data Studio`
+- the workbench is template-first: `Use Existing Template` is the fast daily path, while `Create Template` should start from one real sample file plus recommended regions
+- internal tensile-specific seams may remain as one built-in template family, but they must not define the product semantics
 - the native shell should mirror Plot-level density: top source bar, left selection rail, one central focused preview surface, and a compact right inspector
 - focused workbook controls the main preview; primary workbook controls Plot handoff and stays a separate visible state
 - compare/export outputs should remain in compact inspector surfaces or native open/reveal actions rather than taking over the main canvas
 
 Default user-visible UI flow:
 
-- `Import -> Review & Clean -> Compare -> Export / Open in Plot`
+- `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
 
 ### Composer
 
@@ -169,20 +169,24 @@ Do not assume without new evidence:
 - user-facing figure-component ordering controls
 - a separate preflight page outside the refine/export surface
 
-### Data Cleanup
+### Data Studio
 
 Confirmed in current repo/docs/tests:
 
-- preprocess raw tensile CSV into a prepared workbook through `/preprocess-tensile-replicates`
-- inspect a prepared workbook through `/inspect-tensile-workbook`
-- review representative curves and compare-ready workbook outputs
-- export the tensile comparison bundle through `/export-tensile-comparison`
-- explicitly hand cleaned outputs into Plot through `Open in Plot`
+- list, create, update, and delete reusable templates through `/data-studio/templates`
+- preview raw source structure and recommended fields through `/data-studio/source-preview`
+- build a workbook from raw files through `/data-studio/build-workbook`
+- import an existing workbook through `/data-studio/import-workbook`
+- preview comparison figures through `/data-studio/comparison-preview`
+- export comparison figures through `/data-studio/comparison-export`
+- normalize saved session payloads through `/data-studio/session/normalize`
+- explicitly hand workbook outputs into Plot through `Open in Plot`
 
 Strongly implied by recent integrated history:
 
-- mixed intake of raw CSV and already-prepared workbooks in one workbench
-- QC compare review before export or Plot handoff
+- mixed intake of raw `csv/txt/tsv/xls/xlsx/xlsm` files and already-built workbooks in one workbench
+- tensile remains the default built-in template family and should still auto-match existing tensile raw fixtures
+- template creation should start from recommended regions rather than blank schema entry
 
 Do not assume without new evidence:
 
@@ -244,7 +248,7 @@ Do not assume without new evidence:
 
 - App
 - Plot
-- Data Cleanup
+- Data Studio
 - Composer
 - Code Console
 - Utilities
@@ -266,7 +270,7 @@ Do not assume without new evidence:
 
 ## Naming Rules
 
-- Use `Data Cleanup / 数据整理` for product-facing references.
+- Use `Data Studio` for product-facing references.
 - Use `tensile` only where an implementation, route, schema, fixture, or scientific domain concept is specifically tensile-related.
 - Avoid product copy that implies the whole app is a plot wizard or a plot-only tool.
 
@@ -275,7 +279,7 @@ Do not assume without new evidence:
 ### Primary
 
 - Plot
-- Data Cleanup
+- Data Studio
 - Composer
 - Code Console
 
@@ -306,7 +310,7 @@ The following foundations must be preserved for future implementation work:
 
 - contract-first metadata from `/meta` and `/plot-contract`
 - Plot export bundles and submission report artifacts
-- Data Cleanup handoff into Plot
+- Data Studio handoff into Plot
 - Composer v2 geometry and export invariants
 - controlled Code Console semantics when restored or expanded
 - native macOS hosting in `app/macos`
@@ -324,7 +328,7 @@ A future mock redesign should:
 - keep Plot steps inside Plot
 - keep user-visible workflow simpler than canonical internal workflow
 - merge hidden processing stages unless the user must meaningfully act there
-- express Data Cleanup in product-facing language even if internal tensile seams remain
+- express Data Studio as the template-first workbook and comparison workbench even if internal tensile seams remain
 
 ## Current Protected Mock Status
 

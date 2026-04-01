@@ -11,18 +11,15 @@ final class CodeConsoleSessionTests: XCTestCase {
         plot.selectedTemplateID = "curve"
         plot.renderOptions.size = "single_panel"
 
-        let cleanup = DataCleanupSession()
-        cleanup.preparedWorkbooks = [
+        let dataStudio = DataStudioSession()
+        dataStudio.workbooks = [
             .init(
-                id: "/tmp/prepared.xlsx",
-                url: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
-                label: "Prepared",
-                preferredSheet: .name("Representative_Curve"),
-                sampleCount: 3,
-                representativeFilename: "sample.csv",
-                metrics: [],
-                sheetNames: ["Representative_Curve"],
-                warnings: [],
+                id: "workbook-1",
+                response: TestPayloads.dataStudioWorkbook(
+                    id: "workbook-1",
+                    path: "/tmp/prepared.xlsx",
+                    label: "Prepared"
+                ),
                 reviewTemplateID: nil,
                 reviewInspection: nil,
                 reviewDataset: nil,
@@ -31,13 +28,16 @@ final class CodeConsoleSessionTests: XCTestCase {
                 reviewErrorMessage: nil
             ),
         ]
+        dataStudio.workbookOrder = ["workbook-1"]
+        dataStudio.primaryWorkbookID = "workbook-1"
+        dataStudio.focusedWorkbookID = "workbook-1"
 
         let client = MockSidecarClient()
         let session = CodeConsoleSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta())
 
-        session.refreshContext(plot: plot, dataCleanup: cleanup)
+        session.refreshContext(plot: plot, dataStudio: dataStudio)
         await session.refreshCurrentContext()
 
         XCTAssertEqual(session.availableBindings.count, 2)

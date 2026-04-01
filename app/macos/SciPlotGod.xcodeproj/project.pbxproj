@@ -23,13 +23,6 @@
 		C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */; };
 		C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */; };
 		C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */; };
-		C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */; };
-		C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */; };
-		C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */; };
-		C00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */; };
-		C00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */; };
-		C00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */; };
-		C00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */; };
 		C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */; };
 		C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */; };
 		C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */; };
@@ -59,13 +52,17 @@
 		C00000000000000000000031 /* Tests/AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000031 /* Tests/AppModelTests.swift */; };
 		C00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */; };
 		C00000000000000000000033 /* Tests/ComposerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* Tests/ComposerSessionTests.swift */; };
-		C00000000000000000000034 /* Tests/DataCleanupSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */; };
 		C00000000000000000000035 /* Tests/MockSidecarClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000035 /* Tests/MockSidecarClient.swift */; };
 		C00000000000000000000036 /* Tests/MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000036 /* Tests/MockURLProtocol.swift */; };
 		C00000000000000000000037 /* Tests/PlotSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000037 /* Tests/PlotSessionTests.swift */; };
 		C00000000000000000000038 /* Tests/SchemaDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000038 /* Tests/SchemaDecodingTests.swift */; };
 		C00000000000000000000039 /* Tests/SidecarRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000039 /* Tests/SidecarRuntimeTests.swift */; };
 		C0000000000000000000003A /* Tests/TestPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003A /* Tests/TestPayloads.swift */; };
+		C0000000000000000000003D /* Sources/Infrastructure/SidecarModelsDataStudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003D /* Sources/Infrastructure/SidecarModelsDataStudio.swift */; };
+		C0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */; };
+		C0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift */; };
+		C00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift */; };
+		C00000000000000000000041 /* Tests/DataStudioSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000041 /* Tests/DataStudioSessionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -95,13 +92,6 @@
 		B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSession.swift; sourceTree = "<group>"; };
 		B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerWorkbenchView.swift; sourceTree = "<group>"; };
 		B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerPanelThumbnailView.swift; sourceTree = "<group>"; };
-		B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupCompareView.swift; sourceTree = "<group>"; };
-		B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupExportView.swift; sourceTree = "<group>"; };
-		B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupImportView.swift; sourceTree = "<group>"; };
-		B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupInspectorView.swift; sourceTree = "<group>"; };
-		B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/CleanupReviewView.swift; sourceTree = "<group>"; };
-		B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/DataCleanupSession.swift; sourceTree = "<group>"; };
-		B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift; sourceTree = "<group>"; };
 		B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotImportView.swift; sourceTree = "<group>"; };
 		B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotRefineView.swift; sourceTree = "<group>"; };
@@ -131,13 +121,17 @@
 		B00000000000000000000031 /* Tests/AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/AppModelTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/CodeConsoleSessionTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000033 /* Tests/ComposerSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ComposerSessionTests.swift; sourceTree = "<group>"; };
-		B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/DataCleanupSessionTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000035 /* Tests/MockSidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/MockSidecarClient.swift; sourceTree = "<group>"; };
 		B00000000000000000000036 /* Tests/MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/MockURLProtocol.swift; sourceTree = "<group>"; };
 		B00000000000000000000037 /* Tests/PlotSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/PlotSessionTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000038 /* Tests/SchemaDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/SchemaDecodingTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000039 /* Tests/SidecarRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/SidecarRuntimeTests.swift; sourceTree = "<group>"; };
 		B0000000000000000000003A /* Tests/TestPayloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/TestPayloads.swift; sourceTree = "<group>"; };
+		B0000000000000000000003D /* Sources/Infrastructure/SidecarModelsDataStudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Infrastructure/SidecarModelsDataStudio.swift; sourceTree = "<group>"; };
+		B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSession.swift; sourceTree = "<group>"; };
+		B0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioWorkbenchView.swift; sourceTree = "<group>"; };
+		B00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioInspectorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000041 /* Tests/DataStudioSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/DataStudioSessionTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000008 /* SciPlot God.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot God.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000009 /* SciPlotGodMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotGodMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -188,13 +182,9 @@
 				B00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift */,
 				B0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift */,
 				B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */,
-				B00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift */,
-				B00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift */,
-				B00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift */,
-				B00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift */,
-				B00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift */,
-				B00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift */,
-				B00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift */,
+				B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */,
+				B0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift */,
+				B00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift */,
 				B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */,
 				B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */,
 				B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */,
@@ -206,6 +196,7 @@
 				B0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift */,
 				B00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift */,
 				B00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift */,
+				B0000000000000000000003D /* Sources/Infrastructure/SidecarModelsDataStudio.swift */,
 				B00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift */,
 				B00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift */,
 				B00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift */,
@@ -231,7 +222,7 @@
 				B00000000000000000000031 /* Tests/AppModelTests.swift */,
 				B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */,
 				B00000000000000000000033 /* Tests/ComposerSessionTests.swift */,
-				B00000000000000000000034 /* Tests/DataCleanupSessionTests.swift */,
+				B00000000000000000000041 /* Tests/DataStudioSessionTests.swift */,
 				B00000000000000000000035 /* Tests/MockSidecarClient.swift */,
 				B00000000000000000000036 /* Tests/MockURLProtocol.swift */,
 				B00000000000000000000037 /* Tests/PlotSessionTests.swift */,
@@ -357,13 +348,9 @@
 				C0000000000000000000000E /* Sources/Features/Composer/ComposerSession.swift in Sources */,
 				C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */,
 				C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */,
-				C00000000000000000000010 /* Sources/Features/DataCleanup/CleanupCompareView.swift in Sources */,
-				C00000000000000000000011 /* Sources/Features/DataCleanup/CleanupExportView.swift in Sources */,
-				C00000000000000000000012 /* Sources/Features/DataCleanup/CleanupImportView.swift in Sources */,
-				C00000000000000000000013 /* Sources/Features/DataCleanup/CleanupInspectorView.swift in Sources */,
-				C00000000000000000000014 /* Sources/Features/DataCleanup/CleanupReviewView.swift in Sources */,
-				C00000000000000000000015 /* Sources/Features/DataCleanup/DataCleanupSession.swift in Sources */,
-				C00000000000000000000016 /* Sources/Features/DataCleanup/DataCleanupWorkbenchView.swift in Sources */,
+				C0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift in Sources */,
+				C0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift in Sources */,
+				C00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift in Sources */,
 				C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */,
 				C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */,
 				C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */,
@@ -375,6 +362,7 @@
 				C0000000000000000000001F /* Sources/Infrastructure/SidecarError.swift in Sources */,
 				C00000000000000000000020 /* Sources/Infrastructure/SidecarModelsCommon.swift in Sources */,
 				C00000000000000000000021 /* Sources/Infrastructure/SidecarModelsComposer.swift in Sources */,
+				C0000000000000000000003D /* Sources/Infrastructure/SidecarModelsDataStudio.swift in Sources */,
 				C00000000000000000000022 /* Sources/Infrastructure/SidecarModelsRender.swift in Sources */,
 				C00000000000000000000023 /* Sources/Infrastructure/SidecarModelsTensile.swift in Sources */,
 				C00000000000000000000024 /* Sources/Infrastructure/SidecarRuntime.swift in Sources */,
@@ -400,7 +388,7 @@
 				C00000000000000000000031 /* Tests/AppModelTests.swift in Sources */,
 				C00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift in Sources */,
 				C00000000000000000000033 /* Tests/ComposerSessionTests.swift in Sources */,
-				C00000000000000000000034 /* Tests/DataCleanupSessionTests.swift in Sources */,
+				C00000000000000000000041 /* Tests/DataStudioSessionTests.swift in Sources */,
 				C00000000000000000000035 /* Tests/MockSidecarClient.swift in Sources */,
 				C00000000000000000000036 /* Tests/MockURLProtocol.swift in Sources */,
 				C00000000000000000000037 /* Tests/PlotSessionTests.swift in Sources */,

@@ -32,6 +32,21 @@ struct ComposerWorkbenchView: View {
                 session.errorMessage = error.localizedDescription
             }
         }
+        .confirmationDialog(
+            "Import Composer Source",
+            isPresented: bindingForImportMenu,
+            titleVisibility: .visible
+        ) {
+            Button("Graph PDF") {
+                session.beginImport(kind: .graph)
+            }
+            Button("Asset File") {
+                session.beginImport(kind: .asset)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose Graph PDF or Asset File for this Composer session.")
+        }
         .sheet(isPresented: bindingForGuide) {
             ComposerGuideSheet(session: session)
         }
@@ -50,6 +65,13 @@ struct ComposerWorkbenchView: View {
         Binding(
             get: { session.isImportPresented },
             set: { session.isImportPresented = $0 }
+        )
+    }
+
+    private var bindingForImportMenu: Binding<Bool> {
+        Binding(
+            get: { session.isImportMenuPresented },
+            set: { session.isImportMenuPresented = $0 }
         )
     }
 

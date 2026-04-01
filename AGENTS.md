@@ -2,7 +2,7 @@
 
 这个仓库已经把绘图规范和 GUI 运行时约束收成同一套事实源。以后不管是人还是 AI 来改，先看这里，再决定动哪一层。
 
-> **Desktop GUI status (2026-03-28):** 当前受支持桌面前端已经切到原生 macOS `app/macos`。app-level product model 仍以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个保留 workbench 为准；`app/desktop/src/mock/**` 里的当前 mock 仍是受保护的 Plot-only 参考，不代表 whole-app IA，也不要在非 mock-design pass 里改它。
+> **Desktop GUI status (2026-04-01):** 当前受支持桌面前端已经切到原生 macOS `app/macos`。app-level product model 仍以 `Plot / Data Studio / Composer / Code Console` 这 4 个保留 workbench 为准；`app/desktop/src/mock/**` 里的当前 mock 仍是受保护的 Plot-only 参考，不代表 whole-app IA，也不要在非 mock-design pass 里改它。
 
 ## 项目结构
 
@@ -16,17 +16,20 @@
 - `src/plotting_stats.py`: 统计图族实现，承接 `box / bar / violin` 及其共享坐标规则；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/plotting_heatmap.py`: 热图实现，承接 heatmap 主图区与 colorbar 布局；外部兼容调用仍通过 `src/plotting.py` 暴露。
 - `src/composer.py`: Composer v2 后端公开入口与真相源门面；外部调用继续统一从这里 import。类型与常量在 `src/composer_types.py`，布局/导入/校验在 `src/composer_ops.py`，预览/导出在 `src/composer_render.py`。
+- `src/data_studio/`: Data Studio 后端真相源；负责多格式原始文件 intake、模板推荐与持久化、workbook 构建、comparison recipe 生成、session normalize 与 tensile 内置模板族。
 - `src/code_console_service.py`: Code Console 后端真相源；负责绑定输入上下文、生成外部 AI prompt/starter code，并运行受控 repo-native Python runner。
 - `src/code_console_runtime.py`: Code Console 脚本 helper；runner 内脚本统一从这里读取上下文、加载数据、申请受控输出路径并复用 SciPlot God 风格底座。
 - `src/infrastructure/persistence/code_console_runs.py`: Code Console managed run/output 目录与 retention 规则；不要在 sidecar route 里散落手写目录策略。
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
+- `app/sidecar/routes_data_studio.py` + `app/sidecar/schemas_data_studio.py`: Data Studio 的 canonical backend surface；模板列表/创建/重命名/删除、source preview、workbook build/import、comparison preview/export、session normalize 全走 `/data-studio/*`。
 - `app/sidecar/routes_code_console.py` + `app/sidecar/schemas_code_console.py`: Code Console 的 prompt/context 与 controlled runner surface；当前原生前端统一通过 `/code-console/context`、`/code-console/run` 走这一层。
 - `app/macos/`: 当前受支持的原生 macOS 前端；手工 Xcode 工程、SwiftUI app shell、sidecar runtime 与 4 个 workbench 的实现都在这里。
 - `app/macos/Sources/App`: SwiftUI `App` root、`NavigationSplitView` shell、toolbar、commands 与 app-level session/runtime 装配。
 - `app/macos/Sources/Infrastructure`: `Process + Pipe` sidecar runtime、`URLSession + Codable` client、repo root 定位与 sidecar schema mirror。
-- `app/macos/Sources/Features`: `Plot / Data Cleanup / Composer / Code Console` 各工作台与本地 session state。
+- `app/macos/Sources/Features`: `Plot / Data Studio / Composer / Code Console` 各工作台与本地 session state。
+- `data_studio_templates/`: Data Studio 模板存储根目录；`builtin/` 放内置模板族，`user/` 放用户保存的结构模板，前后端启动时都要自动加载。
 - `app/macos/Tests`: 原生 macOS 测试目标；覆盖 sidecar bootstrap/probe、schema decoding 与工作台状态流。
 - `app/desktop/src/`: 旧的 Tauri foundation 代码保留作历史/参考层，不再是受支持的桌面主链路。
 - `app/desktop/src/mock/`: 当前受保护的 Plot-only mock 参考；它保留 runnable mount 供后续 mock-design pass 使用，但不代表 app-level IA，也不要在本类 foundation pass 里修改。
@@ -70,7 +73,7 @@
 - 原生 macOS runtime 对 sidecar 的策略是“app-managed ownership”：不要再依赖“复用端口上已有 sidecar”来凑兼容。`/meta` 与 `/plot-contract` payload 不可解码或模板集合为空时，必须判定为不兼容并替换为 repo `.venv` 启动的 sidecar。
 - `Launch_Plotter.command` 现在代表原生 macOS 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 原生桌面文件对话框优先走 `fileImporter`、`NSOpenPanel`、`NSSavePanel` 这类一方 API；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
-- 桌面端当前的 app-level product model 以 `Plot / Data Cleanup / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
+- 桌面端当前的 app-level product model 以 `Plot / Data Studio / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
 - 设计或 mock 规划时要明确区分 canonical internal workflow 和 user-visible UI workflow：detect / normalize / map / validate / handoff / automation 这类系统步骤可以隐藏或并入更大的 work surface，只有用户需要定位、决策、复核、调整、确认、导出或交接时才应暴露成可见步骤。
 - 当前受保护 mock 仍展示 `Start -> Plot Import -> Plot Template -> Plot Refine` 这一条 Plot-only 参考流；它服务于后续 mock-design pass，但不是 whole-app IA 真相源，也不要在非 mock pass 里改 `app/desktop/src/mock/**` 与 `app/desktop/src/main.tsx`。
 - 桌面端 workspace 默认只保留一个纵向滚动根：`app-main`。除非是明确设计的局部画布/代码横向预览，不要再给页面内部叠第二层默认纵向滚动容器。
@@ -78,14 +81,15 @@
 - Plot 的 canonical local workflow 是 `Import -> Inspect -> Template -> Refine -> Preflight -> Export`；不要再把旧的 staged 子路由恢复成 app-level 主入口，也不要把 Plot 子步骤重新堆回一级导航。
 - `inspect` 仍在导入和切 sheet 后立即执行，但它属于 Plot 的 `Import` 本地阶段；preview、readiness check 与 export 都收敛在 `Refine` 内联完成，不要再改回跨多个 app-level 屏幕的心智模型。
 - Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
-- `Data Cleanup / 数据整理` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
-- `Data Cleanup` 工作台支持 intake raw tensile CSV、补录任意组数的已整理 workbook、做 QC compare，并导出代表曲线 + Strength/Modulus/Elongation 的箱线图与柱状图；compare 清单只保存在运行时 store，不写进项目文件 schema。
-- `Data Cleanup` 原生工作台应与 Plot 对齐成同级壳层：顶部 source bar、左侧 intake / prepared queue rail、中间单一 focused workbook preview surface、右侧 compact inspector；不要再把 review / compare / export 堆成中央长滚动主面。
-- `Data Cleanup` 的左 rail 只承载 intake filter、workbook/queue selection、轻量状态标记与重排；不要在 rail 里塞解释性文案或重复动作区。
-- `Data Cleanup` 的 focused workbook 控制中央预览；primary workbook 只控制 Plot handoff 与 UI 标记，不要让 compare/export output 抢占主 preview surface。
-- `inspect-tensile-workbook` 响应现在必须带 `preferred_sheet` 与 `warnings`；`export-tensile-comparison` 除兼容 `outputs` 外还必须带结构化 `figure_outputs`，供原生工作台稳定展示 preview / label / metric 语义，前端不要再靠文件名猜。
-- 如果要做面向用户的 mock，Data Cleanup 的 user-visible workflow 默认优先压缩为 `Import -> Review & Clean -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
-- Data Cleanup preprocess 成功后默认停留在 `Data Cleanup` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
+- `Data Studio` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
+- `Data Studio` 工作台是 template-first 的一体化工作台：先选现有模板或新建模板，再 intake raw `csv/txt/tsv/xls/xlsx/xlsm` 文件，自动构建 workbook，做 compare，并直接出 comparison figures；compare 清单只保存在运行时 store，不写进项目文件 schema。
+- `Data Studio` 原生工作台应与 Plot 对齐成同级壳层：顶部 source bar、左侧 intake / prepared queue rail、中间单一 focused workbook preview surface、右侧 compact inspector；不要再把 review / compare / export 堆成中央长滚动主面。
+- `Data Studio` 的左 rail 只承载 intake filter、workbook/queue selection、轻量状态标记与重排；不要在 rail 里塞解释性文案或重复动作区。
+- `Data Studio` 的 focused workbook 控制中央预览；primary workbook 只控制 Plot handoff 与 UI 标记，不要让 compare/export output 抢占主 preview surface。
+- Tensile 现有模板必须继续作为内置模板族工作；默认优先支持并自动匹配现有 tensile raw fixtures，不允许因为 Data Studio 重构而失效。
+- Data Studio 的 canonical route surface 是 `/data-studio/templates`、`/data-studio/source-preview`、`/data-studio/build-workbook`、`/data-studio/import-workbook`、`/data-studio/comparison-preview`、`/data-studio/comparison-export` 与 `/data-studio/session/normalize`；旧 tensile-specific route 只可作为兼容 seam，不能再主导新前端。
+- 如果要做面向用户的 mock，Data Studio 的 user-visible workflow 默认优先压缩为 `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
+- Data Studio workbook build 或 comparison preview 成功后默认停留在 `Data Studio` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
 - 最近记录、open/save、managed files 与 runtime cleanup 都属于 utility affordance；不要再把 `Start` 或 `projects/recents` 还原成一级 workspace。
 - Plot 导入阶段如需 sidecar materialize `example template folder / blank template folder`，这些 workbook 仍要写到 app-managed stable 目录并按需覆盖刷新；它们只是输入模板与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
 - `Code Console` 是一级主工作台，不是 utility；前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
@@ -210,7 +214,7 @@
 - `scripts/smoke_check.py` 中的 tensile preprocess 段
 - `tests/test_sidecar_active_routes.py`
 - `xcodebuild ... test` 中覆盖当前 native shell 的用例（如果本轮改了桌面文案、入口或导航假设）
-- 确认生成的 workbook 能在 `Data Cleanup` 工作台显示整理结果，并且点击“在绘图中打开”后可继续 Plot 的 `inspect / preflight / render`
+- 确认 tensile built-in template 仍能自动生成 workbook，并且该 workbook 能在 `Data Studio` 工作台显示结果、进入 compare、点击“在绘图中打开”后继续 Plot 的 `inspect / preflight / render`
 
 改 GUI 选项或状态流时，至少回归：
 
@@ -240,11 +244,11 @@
 - 不要再按“浏览器宿主也要能跑”的约束设计桌面前端；当前 GUI 的唯一受支持目标宿主是原生 macOS `app/macos`。
 - 不要让文件对话框、拖放等桌面能力失败后直接吞掉异常；必须在界面上给出明确错误。
 - 不要重新引入 `Launch_Plotter_Legacy.command`、`plot_wizard_gui.py`、`interactive_plot.py` 这类旧入口；当前桌面主链路只保留原生 macOS app。
-- 不要让当前受保护 mock 或 Plot-only 参考流反向定义 whole-app IA；app-level retained model 始终是 `Plot / Data Cleanup / Composer / Code Console`。
+- 不要让当前受保护 mock 或 Plot-only 参考流反向定义 whole-app IA；app-level retained model 始终是 `Plot / Data Studio / Composer / Code Console`。
 - 不要重新把 `Start / Home / Project / Settings` 恢复成一级产品区；这些概念最多只能作为 utility surface 或历史兼容层存在。
 - 不要把 Plot 的本地步骤塞回一级导航，也不要把所有 Plot 控件重新堆成一个无层次的大表单；Plot 的 canonical local flow 仍应保持 `Import -> Inspect -> Template -> Refine -> Preflight -> Export`。
 - 不要把 detect / normalize / map / preflight / handoff 之类内部系统步骤逐个翻译成 mock 页面；除非用户必须实际操作，否则应并入更大的 decision-oriented work surface。
-- 不要把 Data Cleanup compare 清单做成“必须先保存项目才能继续”的流；它应该是 `Data Cleanup / 数据整理` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 Plot 主输入。
+- 不要把 Data Studio compare 清单做成“必须先保存项目才能继续”的流；它应该是 `Data Studio` 工作台内的运行时工作流增强，并且补录已有 workbook 时不能抢走当前 Plot 主输入。
 - 不要把不兼容模板重新放回 `Plot Template` 默认主列表，更不要让 disabled 模板还能被点击。
 - 不要让 rheology bundle 的 `curve` 再退回普通 `curve_table` 解析；温度扫描、频率扫描、应力松弛都必须和 `point_line` 走同一套 bundle 预检与渲染入口。
 - 不要只靠模板名或人工经验拍脑袋推荐 `log/linear`；要同时看轴标签/单位和实际数据跨度。
@@ -255,7 +259,7 @@
 - 不要在导出里把所有 PDF 先栅格化；graph 和 PDF asset 应尽量保持矢量。
 - 改对齐规则时，要同时想到 `single_panel`、`wide_nmr`、`heatmap` 三类约束。
 - 改 loader、inspect、preflight 或 render 时，要同时想到 `src/rendering/cache.py` 的缓存失效，不要让旧解析结果穿透到新请求。
-- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 `Data Cleanup` 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 Plot render 能不能继续。
+- 改拉伸预处理时，不只是看 `.xlsx` 有没有生成，还要看 `Data Studio` 工作台是否正确展示 `preferred_sheet`，以及点击“在绘图中打开”后后续 Plot render 能不能继续。
 - `docs/plot_contract.md` 是生成产物；真正要改的是契约 JSON 和生成脚本依赖的数据。
 - `scripts/debug_refresh.py` 的真实数据入口只认 `CODEGOD_DEBUG_REFRESH_TENSILE_RAW_DATA`、`CODEGOD_DEBUG_REFRESH_FREQ_SWEEP`、`CODEGOD_DEBUG_REFRESH_TEMP_SWEEP`、`CODEGOD_DEBUG_REFRESH_STRESS_RELAXATION`；不要把个人绝对路径或私有目录结构写回仓库。
 - `scripts/clean_repo.py` 默认不应删除当前激活的 `.venv`；如果要清 `app/desktop/node_modules/` 这类旧桌面依赖，必须显式传 `--include-node-modules`，不要把“重装成本高”的依赖目录做成隐式默认删除项。

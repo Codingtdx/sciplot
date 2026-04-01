@@ -181,9 +181,14 @@ final class PlotSession {
         await waitUntilInspectionFinishes(for: url)
     }
 
-    func seedFromCleanup(workbookURL: URL, preferredSheet: SheetValue) {
+    func seedFromDataStudio(workbookURL: URL, preferredSheet: SheetValue) {
         prepareSource(url: workbookURL, sheet: preferredSheet, resetTemplate: true)
         scheduleInspection()
+    }
+
+    /// Backward-compatible shim for callers still using the old workbench name.
+    func seedFromCleanup(workbookURL: URL, preferredSheet: SheetValue) {
+        seedFromDataStudio(workbookURL: workbookURL, preferredSheet: preferredSheet)
     }
 
     func setSelectedSheet(_ sheet: SheetValue) {
