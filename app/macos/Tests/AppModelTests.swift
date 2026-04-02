@@ -18,7 +18,7 @@ final class AppModelTests: XCTestCase {
         model.switchWorkbench(.dataStudio)
         model.beginImportForActiveWorkbench()
         XCTAssertEqual(model.selectedWorkbench, .dataStudio)
-        XCTAssertTrue(model.dataStudioSession.isImportMenuPresented)
+        XCTAssertTrue(model.dataStudioSession.isImportFlowPresented)
 
         model.switchWorkbench(.composer)
         model.beginImportForActiveWorkbench()
@@ -26,11 +26,17 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.composerSession.isImportPresented)
     }
 
-    func testOpenInPlotSeedsPlotSessionAndContext() {
+    func testOpenInPlotSeedsPlotSessionAndContext() async {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
         let workbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
 
-        model.openInPlot(workbookURL: workbookURL, preferredSheet: .name("Representative_Curve"))
+        model.openInPlot(
+            inputURL: workbookURL,
+            sheet: .name("Representative_Curve"),
+            templateID: "curve",
+            options: RenderOptionsPayload(size: "single_panel")
+        )
+        try? await Task.sleep(nanoseconds: 20_000_000)
 
         XCTAssertEqual(model.selectedWorkbench, .plot)
         XCTAssertEqual(model.plotSession.selectedFileURL, workbookURL)
@@ -38,19 +44,22 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.codeConsoleSession.boundContext.first?.value, "prepared.xlsx")
     }
 
-    func testOpenInPlotRequestsReplacementWhenPlotAlreadyHasContent() {
+    func testOpenInPlotRequestsReplacementWhenPlotAlreadyHasContent() async {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
         model.plotSession.handleImportedFile(URL(fileURLWithPath: "/tmp/existing.csv"))
 
         model.openInPlot(
-            workbookURL: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
-            preferredSheet: .name("Representative_Curve")
+            inputURL: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
+            sheet: .name("Representative_Curve"),
+            templateID: "curve",
+            options: RenderOptionsPayload()
         )
 
         XCTAssertTrue(model.isPlotReplacementConfirmationPresented)
         XCTAssertEqual(model.plotSession.selectedFileURL?.path, "/tmp/existing.csv")
 
         model.confirmPendingPlotReplacement()
+        try? await Task.sleep(nanoseconds: 20_000_000)
 
         XCTAssertFalse(model.isPlotReplacementConfirmationPresented)
         XCTAssertEqual(model.plotSession.selectedFileURL?.path, "/tmp/prepared.xlsx")

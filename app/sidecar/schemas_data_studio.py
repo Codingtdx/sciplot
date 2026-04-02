@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from app.sidecar.schemas_common import PreviewItemResponse, StrictModel, serialize_dataclass
+from app.sidecar.schemas_render import RenderOptionsPayload
 
 
 class DataStudioRangeResponse(StrictModel):
@@ -143,6 +144,13 @@ class DataStudioWorkbookResponse(StrictModel):
     samples: list[DataStudioWorkbookSampleResponse] = Field(default_factory=list)
 
 
+class DataStudioGroupStateResponse(StrictModel):
+    workbook_path: str
+    display_name: str
+    include_in_compare: bool = True
+    sort_order: int = 0
+
+
 class DataStudioComparisonRecipeResponse(StrictModel):
     id: str
     label: str
@@ -174,6 +182,12 @@ class DataStudioComparisonSetResponse(StrictModel):
     recipes: list[DataStudioComparisonRecipeResponse] = Field(default_factory=list)
 
 
+class DataStudioFigurePreferenceResponse(StrictModel):
+    family_id: str
+    selected_template_id: str | None = None
+    options_by_template: dict[str, dict[str, object]] = Field(default_factory=dict)
+
+
 class DataStudioSessionResponse(StrictModel):
     version: int
     selected_template_id: str | None = None
@@ -182,6 +196,10 @@ class DataStudioSessionResponse(StrictModel):
     selected_recipe_id: str | None = None
     workbook_paths: list[str] = Field(default_factory=list)
     comparison_recipe_ids: list[str] = Field(default_factory=list)
+    selected_figure_family_id: str | None = None
+    selected_figure_template_id: str | None = None
+    group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
+    figure_preferences: list[DataStudioFigurePreferenceResponse] = Field(default_factory=list)
     imported_paths: list[str] = Field(default_factory=list)
     template_draft_path: str | None = None
 
@@ -216,17 +234,21 @@ class DataStudioImportWorkbookRequest(StrictModel):
 
 class DataStudioComparisonRequest(StrictModel):
     workbook_paths: list[str]
+    group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
 
 
 class DataStudioPreviewComparisonRequest(StrictModel):
     workbook_paths: list[str]
     recipe_id: str
+    group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
 
 
 class DataStudioExportComparisonRequest(StrictModel):
     workbook_paths: list[str]
     output_dir: str
+    group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
     selected_recipe_ids: list[str] = Field(default_factory=list)
+    figure_options_by_recipe_id: dict[str, RenderOptionsPayload] = Field(default_factory=dict)
 
 
 class DataStudioSessionNormalizeRequest(StrictModel):
@@ -263,7 +285,9 @@ __all__ = [
     "DataStudioCreateTemplateRequest",
     "DataStudioExportComparisonRequest",
     "DataStudioFieldCandidateResponse",
+    "DataStudioFigurePreferenceResponse",
     "DataStudioFigureOutputResponse",
+    "DataStudioGroupStateResponse",
     "DataStudioImportWorkbookRequest",
     "DataStudioMetricSummaryResponse",
     "DataStudioPreviewComparisonRequest",

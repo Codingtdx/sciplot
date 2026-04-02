@@ -7,7 +7,9 @@ from src.data_studio import template_store
 from src.data_studio.models import (
     ComparisonRecipe,
     ComparisonSet,
+    DataStudioFigurePreference,
     DataStudioFigureOutput,
+    DataStudioGroupState,
     DataStudioSessionPayload,
     DataStudioWorkbook,
     FieldCandidate,
@@ -44,7 +46,9 @@ _LAZY_EXPORTS = {
 __all__ = [
     "ComparisonRecipe",
     "ComparisonSet",
+    "DataStudioFigurePreference",
     "DataStudioFigureOutput",
+    "DataStudioGroupState",
     "DataStudioSessionPayload",
     "DataStudioWorkbook",
     "FieldCandidate",

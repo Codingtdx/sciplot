@@ -4,129 +4,144 @@ import XCTest
 
 @MainActor
 final class DataStudioSessionTests: XCTestCase {
-    func testBeginImportUsesSingleImporterStateAcrossDataStudioModes() {
+    func testImportFlowStartsAtKindForEmptySessionAndScopeForNonEmptySession() {
         let session = DataStudioSession()
 
-        session.showImportMenu()
-        session.beginImport(kind: .sourceFiles)
+        session.beginImportFlow()
+        XCTAssertTrue(session.isImportFlowPresented)
+        XCTAssertEqual(session.importFlowStep, .kind)
 
-        XCTAssertFalse(session.isImportMenuPresented)
-        XCTAssertTrue(session.isImportPresented)
-        XCTAssertEqual(session.pendingImportKind, .sourceFiles)
+        session.dismissImportFlow()
+        session.workbooks = [
+            .init(
+                id: "workbook-1",
+                response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: "/tmp/prepared.xlsx", label: "Prepared")
+            ),
+        ]
+        session.groupStates = [
+            .init(workbookPath: "/tmp/prepared.xlsx", displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
 
-        session.isImportPresented = false
-        session.showImportMenu()
-        session.beginImport(kind: .workbook)
-
-        XCTAssertFalse(session.isImportMenuPresented)
-        XCTAssertTrue(session.isImportPresented)
-        XCTAssertEqual(session.pendingImportKind, .workbook)
+        session.beginImportFlow()
+        XCTAssertTrue(session.isImportFlowPresented)
+        XCTAssertEqual(session.importFlowStep, .scope)
     }
 
-    func testNewTemplateFlowUsesRecommendedCandidatesAndSavesTemplate() async {
+    func testExistingWorkbookImportImmediatelyBuildsSingleGroupPreviewContext() async {
         let client = MockSidecarClient()
         let session = DataStudioSession()
         session.configure(client: client)
-        session.selectTemplateMode(.createNewTemplate)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.handleImportedTemplateSample([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
 
-        XCTAssertEqual(client.dataStudioSourcePreviewRequests.count, 1)
-        XCTAssertNotNil(session.sourcePreview)
-        XCTAssertFalse(session.selectedCandidateIDs.isEmpty)
-        XCTAssertEqual(session.templateDraftLabel, "raw_a")
-
-        await session.createTemplateFromDraft()
-
-        XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
-        XCTAssertEqual(client.dataStudioCreateTemplateRequests.last?.label, "raw_a")
-        XCTAssertEqual(
-            Set(client.dataStudioCreateTemplateRequests.last?.acceptedCandidateIDs ?? []),
-            Set(session.selectedCandidateIDs)
-        )
-        XCTAssertEqual(session.templateMode, .existingTemplate)
-        XCTAssertEqual(session.selectedTemplateID, client.dataStudioTemplateResponse.id)
+        XCTAssertEqual(session.orderedGroups.count, 1)
+        XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, "/tmp/prepared.xlsx")
+        XCTAssertEqual(session.includedGroups.count, 1)
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.count, 1)
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "Primary Group")
+        XCTAssertEqual(session.plotSession.selectedFileURL?.path, "/tmp/data_studio_exports/primary-vs-second/primary-vs-second.xlsx")
     }
 
-    func testDataStudioBuildImportCompareExportAndPlotHandoff() async {
+    func testRawImportAutoMatchesBuiltinTemplateAndRespectsGroupStateInPreview() async {
         let outputWorkbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
-        let exportDirectoryURL = URL(fileURLWithPath: "/tmp/data_studio_exports", isDirectory: true)
         let client = MockSidecarClient()
-        client.dataStudioWorkbookResponse = TestPayloads.dataStudioWorkbook(
-            id: "workbook-1",
-            path: outputWorkbookURL.path,
-            label: "Primary Group"
-        )
-        client.dataStudioImportWorkbookHandler = { request in
-            if request.workbookPath == "/tmp/second.xlsx" {
-                return TestPayloads.dataStudioWorkbook(
-                    id: "workbook-2",
-                    path: request.workbookPath,
-                    label: "Second Group"
-                )
-            }
-            return TestPayloads.dataStudioWorkbook(path: request.workbookPath, label: "Imported Group")
-        }
-
-        var chosenFormat: ExportGraphicFormat?
         let session = DataStudioSession(
-            chooseDirectory: { _, _ in exportDirectoryURL },
-            chooseWorkbookSaveLocation: { _ in outputWorkbookURL },
-            chooseComparisonFigureFormat: { _, _ in
-                chosenFormat = .tiff
-                return .tiff
-            },
-            materializeComparisonOutputs: { sourceURLs, format in
-                chosenFormat = format
-                return sourceURLs.map { $0.deletingPathExtension().appendingPathExtension("tiff") }
-            }
+            chooseWorkbookSaveLocation: { _ in outputWorkbookURL }
         )
         session.configure(client: client)
-        session.apply(meta: TestPayloads.meta())
-        session.selectedTemplateID = "builtin/tensile"
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.handleImportedSourceFiles([
+        await session.handleImportedRawFiles([
             URL(fileURLWithPath: "/tmp/raw_a.csv"),
             URL(fileURLWithPath: "/tmp/raw_b.csv"),
         ])
 
+        XCTAssertEqual(client.dataStudioSourcePreviewRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "builtin/tensile")
-        XCTAssertEqual(session.primaryWorkbook?.workbookURL, outputWorkbookURL)
-        XCTAssertEqual(session.focusedWorkbook?.workbookURL, outputWorkbookURL)
-        XCTAssertEqual(client.inspectRequests.first?.inputPath, outputWorkbookURL.path)
-        XCTAssertEqual(client.renderRequests.first?.inputPath, outputWorkbookURL.path)
+        XCTAssertEqual(session.orderedGroups.count, 1)
 
-        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/second.xlsx")])
+        session.updateDisplayName(for: "/tmp/prepared.xlsx", to: "Renamed Group")
+        try? await Task.sleep(nanoseconds: 250_000_000)
 
-        XCTAssertEqual(session.orderedWorkbooks.count, 2)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.workbookPaths.count, 2)
-        XCTAssertEqual(session.comparisonSet?.recipes.count, 2)
-        XCTAssertTrue(session.canExportComparison)
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "Renamed Group")
+    }
 
-        var openedWorkbook: URL?
-        var openedSheet: SheetValue?
-        session.openInPlotHandler = { url, sheet in
-            openedWorkbook = url
-            openedSheet = sheet
+    func testNewSessionClearsContentStateButPreservesFigurePreferences() {
+        let session = DataStudioSession()
+        session.workbooks = [
+            .init(id: "workbook-1", response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: "/tmp/prepared.xlsx", label: "Prepared")),
+        ]
+        session.groupStates = [
+            .init(workbookPath: "/tmp/prepared.xlsx", displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+        session.focusedWorkbookPath = "/tmp/prepared.xlsx"
+        session.selectedFigureFamilyID = "strength"
+        session.selectedFigureTemplateID = "box"
+        session.figurePreferences = [
+            .init(
+                familyID: "strength",
+                selectedTemplateID: "box",
+                optionsByTemplate: ["box": RenderOptionsPayload(stylePreset: "journal_calm", palettePreset: "aqua_graphite")]
+            ),
+        ]
+
+        session.newSession()
+
+        XCTAssertTrue(session.orderedGroups.isEmpty)
+        XCTAssertNil(session.focusedWorkbook)
+        XCTAssertEqual(session.selectedFigureFamilyID, "strength")
+        XCTAssertEqual(session.figurePreferences.first?.selectedTemplateID, "box")
+    }
+
+    func testExportAndOpenCurrentFigureInPlotUseCurrentFigureContext() async {
+        let exportDirectoryURL = URL(fileURLWithPath: "/tmp/data_studio_exports", isDirectory: true)
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            if request.workbookPath == "/tmp/second.xlsx" {
+                return TestPayloads.dataStudioWorkbook(id: "workbook-2", path: request.workbookPath, label: "Second Group")
+            }
+            return TestPayloads.dataStudioWorkbook(id: "workbook-1", path: request.workbookPath, label: "Primary Group")
         }
 
-        session.setPrimaryWorkbook(id: "workbook-2")
-        session.openPrimaryWorkbookInPlot()
+        var openedURL: URL?
+        var openedSheet: SheetValue?
+        var openedTemplateID: String?
+        var openedOptions: RenderOptionsPayload?
 
-        XCTAssertEqual(openedWorkbook?.path, "/tmp/second.xlsx")
-        XCTAssertEqual(openedSheet, .name("Representative_Curve"))
+        let session = DataStudioSession(
+            chooseDirectory: { _, _ in exportDirectoryURL },
+            chooseComparisonFigureFormat: { _, _ in .pdf },
+            materializeComparisonOutputs: { sourceURLs, _ in sourceURLs }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.openInPlotHandler = { url, sheet, templateID, options in
+            openedURL = url
+            openedSheet = sheet
+            openedTemplateID = templateID
+            openedOptions = options
+        }
 
+        await session.handleImportedWorkbooks([
+            URL(fileURLWithPath: "/tmp/prepared.xlsx"),
+            URL(fileURLWithPath: "/tmp/second.xlsx"),
+        ])
+
+        session.selectFigureFamily(id: "strength")
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(session.currentRecipe?.id, "strength_box")
+        session.openCurrentFigureInPlot()
         await session.exportComparisonBundle()
 
+        XCTAssertEqual(openedURL?.lastPathComponent, "primary-vs-second.xlsx")
+        XCTAssertEqual(openedSheet, .name("Strength_Replicates"))
+        XCTAssertEqual(openedTemplateID, "box")
+        XCTAssertEqual(openedOptions?.stylePreset, session.plotSession.renderOptions.stylePreset)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.count, 1)
-        XCTAssertEqual(session.comparisonExportDestinationURL, exportDirectoryURL)
-        XCTAssertEqual(chosenFormat, .tiff)
-        XCTAssertEqual(
-            session.comparisonFigureItems.map(\.url.lastPathComponent),
-            ["representative_curve.tiff", "strength_box.tiff"]
-        )
-        XCTAssertEqual(session.selectedComparisonFigure?.response.label, "Representative Curve Compare")
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.selectedRecipeIDs, ["representative_curve", "strength_box"])
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.stylePreset, session.plotSession.renderOptions.stylePreset)
     }
 
     func testNormalizeAndRestoreSessionStateRoundTripsThroughValidatedSchema() async {
@@ -144,7 +159,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         let session = DataStudioSession()
         session.configure(client: client)
-        session.apply(meta: TestPayloads.meta())
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
         let normalized = await session.normalizeSessionPayload()
         XCTAssertNotNil(normalized)
@@ -157,6 +172,19 @@ final class DataStudioSessionTests: XCTestCase {
             selectedRecipeID: "strength_box",
             workbookPaths: ["/tmp/prepared.xlsx", "/tmp/second.xlsx"],
             comparisonRecipeIDs: ["representative_curve", "strength_box"],
+            selectedFigureFamilyID: "strength",
+            selectedFigureTemplateID: "box",
+            groupStates: [
+                .init(workbookPath: "/tmp/prepared.xlsx", displayName: "A", includeInCompare: true, sortOrder: 1),
+                .init(workbookPath: "/tmp/second.xlsx", displayName: "B", includeInCompare: true, sortOrder: 0),
+            ],
+            figurePreferences: [
+                .init(
+                    familyID: "strength",
+                    selectedTemplateID: "box",
+                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "journal_calm", palettePreset: "aqua_graphite")]
+                ),
+            ],
             importedPaths: ["/tmp/raw_a.csv"],
             templateDraftPath: "/tmp/raw_a.csv"
         )
@@ -164,10 +192,11 @@ final class DataStudioSessionTests: XCTestCase {
         await session.restoreSession(from: payload)
 
         XCTAssertEqual(session.selectedTemplateID, "builtin/tensile")
-        XCTAssertEqual(session.primaryWorkbookID, "workbook-1")
-        XCTAssertEqual(session.focusedWorkbookID, "workbook-2")
-        XCTAssertEqual(session.selectedRecipeID, "strength_box")
+        XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, "/tmp/second.xlsx")
+        XCTAssertEqual(session.selectedFigureFamilyID, "strength")
+        XCTAssertEqual(session.currentFigureTemplateID, "box")
+        XCTAssertEqual(session.orderedGroups.map { $0.state.displayName }, ["B", "A"])
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
-        XCTAssertEqual(client.dataStudioSourcePreviewRequests.count, 1)
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.count, 1)
     }
 }

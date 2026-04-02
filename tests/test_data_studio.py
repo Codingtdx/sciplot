@@ -6,6 +6,7 @@ import pytest
 
 from src.data_studio import template_store
 from src.data_studio.ingest import preview_and_recommend
+from src.data_studio.models import DataStudioGroupState
 from src.data_studio.service import (
     build_data_studio_workbook,
     create_data_studio_template,
@@ -110,10 +111,32 @@ def test_preview_and_export_data_studio_comparison_uses_plot_render_pipeline(tmp
     exported_set, figure_outputs = export_data_studio_comparison(
         workbook_paths,
         tmp_path / "exports",
+        group_states=[
+            DataStudioGroupState(
+                workbook_path=workbook_paths[1],
+                display_name="B Group",
+                include_in_compare=True,
+                sort_order=0,
+            ),
+            DataStudioGroupState(
+                workbook_path=workbook_paths[0],
+                display_name="A Group",
+                include_in_compare=True,
+                sort_order=1,
+            ),
+        ],
         selected_recipe_ids=["representative_curve", "strength_box"],
+        figure_options_by_recipe_id={
+            "representative_curve": {
+                "style_preset": "default",
+                "palette_preset": "colorblind_safe",
+                "size": "single_panel",
+            }
+        },
     )
 
     assert exported_set.comparison_workbook_path.exists()
+    assert exported_set.workbook_labels == ("B Group", "A Group")
     assert {output.recipe_id for output in figure_outputs} == {"representative_curve", "strength_box"}
     assert all(output.path.exists() for output in figure_outputs)
 
@@ -127,12 +150,36 @@ def test_normalize_session_payload_expands_paths() -> None:
             "selected_recipe_id": "representative_curve",
             "workbook_paths": ["~/tmp/prepared.xlsx"],
             "comparison_recipe_ids": ["representative_curve", "strength_box"],
+            "selected_figure_family_id": "representative_curve",
+            "selected_figure_template_id": "curve",
+            "group_states": [
+                {
+                    "workbook_path": "~/tmp/prepared.xlsx",
+                    "display_name": "Prepared",
+                    "include_in_compare": True,
+                    "sort_order": 0,
+                }
+            ],
+            "figure_preferences": [
+                {
+                    "family_id": "representative_curve",
+                    "selected_template_id": "curve",
+                    "options_by_template": {
+                        "curve": {
+                            "style_preset": "default",
+                            "palette_preset": "colorblind_safe",
+                        }
+                    },
+                }
+            ],
             "imported_paths": ["~/tmp/raw_a.csv"],
             "template_draft_path": "~/tmp/raw_a.csv",
         }
     )
 
     assert payload.selected_template_id == "builtin/tensile"
+    assert payload.selected_figure_family_id == "representative_curve"
+    assert payload.group_states[0].display_name == "Prepared"
     assert payload.workbook_paths[0].startswith(str(Path.home()))
     assert payload.imported_paths[0].startswith(str(Path.home()))
     assert payload.template_draft_path and payload.template_draft_path.startswith(str(Path.home()))

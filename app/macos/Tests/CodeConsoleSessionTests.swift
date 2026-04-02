@@ -19,18 +19,18 @@ final class CodeConsoleSessionTests: XCTestCase {
                     id: "workbook-1",
                     path: "/tmp/prepared.xlsx",
                     label: "Prepared"
-                ),
-                reviewTemplateID: nil,
-                reviewInspection: nil,
-                reviewDataset: nil,
-                reviewPreview: nil,
-                reviewSubmissionReport: nil,
-                reviewErrorMessage: nil
+                )
             ),
         ]
-        dataStudio.workbookOrder = ["workbook-1"]
-        dataStudio.primaryWorkbookID = "workbook-1"
-        dataStudio.focusedWorkbookID = "workbook-1"
+        dataStudio.groupStates = [
+            .init(
+                workbookPath: "/tmp/prepared.xlsx",
+                displayName: "Prepared",
+                includeInCompare: true,
+                sortOrder: 0
+            ),
+        ]
+        dataStudio.focusedWorkbookPath = "/tmp/prepared.xlsx"
 
         let client = MockSidecarClient()
         let session = CodeConsoleSession()

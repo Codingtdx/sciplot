@@ -93,6 +93,20 @@ struct RootSplitView: View {
             ) {
                 model.toggleInspector()
             }
+
+            if model.selectedWorkbench == .dataStudio {
+                Menu {
+                    Button("New Data Studio Session") {
+                        model.newDataStudioSession()
+                    }
+
+                    Button("Clear Current Session", role: .destructive) {
+                        model.clearCurrentDataStudioSession()
+                    }
+                } label: {
+                    Label("Data Studio Menu", systemImage: "ellipsis.circle")
+                }
+            }
         }
     }
 }

@@ -800,6 +800,30 @@ enum TestPayloads {
             selectedRecipeID: "representative_curve",
             workbookPaths: ["/tmp/prepared.xlsx"],
             comparisonRecipeIDs: ["representative_curve", "strength_box"],
+            selectedFigureFamilyID: "representative_curve",
+            selectedFigureTemplateID: "curve",
+            groupStates: [
+                .init(
+                    workbookPath: "/tmp/prepared.xlsx",
+                    displayName: "Prepared Group",
+                    includeInCompare: true,
+                    sortOrder: 0
+                ),
+            ],
+            figurePreferences: [
+                .init(
+                    familyID: "representative_curve",
+                    selectedTemplateID: "curve",
+                    optionsByTemplate: [
+                        "curve": RenderOptionsPayload(
+                            size: "single_panel",
+                            stylePreset: "journal_calm",
+                            palettePreset: "aqua_graphite",
+                            visualThemeID: "paper"
+                        ),
+                    ]
+                ),
+            ],
             importedPaths: ["/tmp/raw_a.csv"],
             templateDraftPath: "/tmp/raw_a.csv"
         )

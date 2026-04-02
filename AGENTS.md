@@ -82,13 +82,14 @@
 - `inspect` 仍在导入和切 sheet 后立即执行，但它属于 Plot 的 `Import` 本地阶段；preview、readiness check 与 export 都收敛在 `Refine` 内联完成，不要再改回跨多个 app-level 屏幕的心智模型。
 - Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
 - `Data Studio` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
-- `Data Studio` 工作台是 template-first 的一体化工作台：先选现有模板或新建模板，再 intake raw `csv/txt/tsv/xls/xlsx/xlsm` 文件，自动构建 workbook，做 compare，并直接出 comparison figures；compare 清单只保存在运行时 store，不写进项目文件 schema。
-- `Data Studio` 原生工作台应与 Plot 对齐成同级壳层：顶部 source bar、左侧 intake / prepared queue rail、中间单一 focused workbook preview surface、右侧 compact inspector；不要再把 review / compare / export 堆成中央长滚动主面。
-- `Data Studio` 的左 rail 只承载 intake filter、workbook/queue selection、轻量状态标记与重排；不要在 rail 里塞解释性文案或重复动作区。
-- `Data Studio` 的 focused workbook 控制中央预览；primary workbook 只控制 Plot handoff 与 UI 标记，不要让 compare/export output 抢占主 preview surface。
+- `Data Studio` 工作台是 workbook group + compare plotting 工作台：主对象是每个样品组对应的 workbook；parse template 只属于 Import 流程，不是主界面主对象。raw import 时先自动匹配现有模板，只有匹配失败或不确定时才让用户选择或新建解析模板。
+- `Data Studio` 原生工作台应与 Plot 对齐成同级壳层：顶部只保留状态和 toolbar Import/Export，左侧是 workbook group rail，中间是 current figure preview，右侧是 Plot inspector 主导加少量 Studio-specific 控制；不要再把 template flow/library/status 做成主块，也不要把 review / compare / export 堆成中央长滚动主面。
+- `Data Studio` 的左 rail 只承载 workbook group list：display name、replicate 摘要、轻量 warning/ready 状态、include-in-compare 开关与拖拽重排；不要把 raw file list、template library 或解释性文案放回 rail。
+- `Data Studio` 的显示语义以 `display_name / include_in_compare / sort_order / focused workbook` 为真相源；display rename 只作用于图例、label 与默认导出命名，不得修改磁盘上的原始文件名、workbook 文件名或 source path。
+- `Data Studio` 必须提供正式的 `New Data Studio Session` 语义：清空当前 workbook group list、compare inclusion、display rename、排序与 preview context，但保留 figure type、plot style、canvas/theme/palette 等 figure preferences。`Clear Current Session` 只能作为次级危险动作存在。
 - Tensile 现有模板必须继续作为内置模板族工作；默认优先支持并自动匹配现有 tensile raw fixtures，不允许因为 Data Studio 重构而失效。
 - Data Studio 的 canonical route surface 是 `/data-studio/templates`、`/data-studio/source-preview`、`/data-studio/build-workbook`、`/data-studio/import-workbook`、`/data-studio/comparison-preview`、`/data-studio/comparison-export` 与 `/data-studio/session/normalize`；旧 tensile-specific route 只可作为兼容 seam，不能再主导新前端。
-- 如果要做面向用户的 mock，Data Studio 的 user-visible workflow 默认优先压缩为 `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`，不要把 detect / normalize / replicates 等内部处理直接拆成一级页面。
+- 如果要做面向用户的 mock，Data Studio 的 user-visible workflow 默认优先压缩为 `Import -> Group Review -> Compare Preview -> Export / Open in Plot`；parse template 的自动匹配、候选推荐和新建模板确认都应下沉在 Import sheet 内，不要回到主界面当一级页面。
 - Data Studio workbook build 或 comparison preview 成功后默认停留在 `Data Studio` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
 - 最近记录、open/save、managed files 与 runtime cleanup 都属于 utility affordance；不要再把 `Start` 或 `projects/recents` 还原成一级 workspace。
 - Plot 导入阶段如需 sidecar materialize `example template folder / blank template folder`，这些 workbook 仍要写到 app-managed stable 目录并按需覆盖刷新；它们只是输入模板与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。

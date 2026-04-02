@@ -49,6 +49,9 @@ final class PlotSession {
     @ObservationIgnored private var inspectionRevision = 0
     @ObservationIgnored private var previewRevision = 0
     @ObservationIgnored private var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
+    @ObservationIgnored private var stagedExternalPinnedSheet: SheetValue?
+    @ObservationIgnored private var stagedExternalPinnedTemplateID: String?
+    @ObservationIgnored var renderOptionsDidChange: ((RenderOptionsPayload) -> Void)?
 
     var isImporterPresented = false
     var isGuidePresented = false
@@ -229,9 +232,114 @@ final class PlotSession {
         mutate: (inout RenderOptionsPayload) -> Void
     ) {
         mutate(&renderOptions)
+        notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: policy)
+    }
+
+    func clearPreviewContext(preserveRenderOptions: Bool = true) {
+        cancelInspectionTask()
+        cancelPreviewTask()
+        selectedFileURL = nil
+        selectedSheet = .index(0)
+        inspectionResponse = nil
+        previewResponse = nil
+        preflightResponse = nil
+        exportResponse = nil
+        userExportURLs = []
+        errorMessage = nil
+        isInspecting = false
+        isPreviewing = false
+        isRunningPreflight = false
+        isExporting = false
+        selectedTemplateID = nil
+        inspectedInputPath = nil
+        inspectedSheet = nil
+        if !preserveRenderOptions {
+            renderOptions = RenderOptionsPayload(
+                stylePreset: metadata?.defaults.stylePreset ?? "journal_calm",
+                palettePreset: metadata?.defaults.palettePreset ?? "aqua_graphite",
+                visualThemeID: metadata?.visualThemes.first?.id
+            )
+            notifyRenderOptionsDidChange()
+        }
+    }
+
+    func loadExternalFigure(
+        inputURL: URL,
+        sheet: SheetValue,
+        preferredTemplateID: String? = nil,
+        preferredOptions: RenderOptionsPayload? = nil
+    ) async {
+        stageExternalFigure(
+            inputURL: inputURL,
+            sheet: sheet,
+            preferredTemplateID: preferredTemplateID,
+            preferredOptions: preferredOptions
+        )
+        await finishLoadingStagedExternalFigure(
+            preferredTemplateID: preferredTemplateID,
+            preferredOptions: preferredOptions
+        )
+    }
+
+    func stageExternalFigure(
+        inputURL: URL,
+        sheet: SheetValue,
+        preferredTemplateID: String? = nil,
+        preferredOptions: RenderOptionsPayload? = nil
+    ) {
+        prepareSource(url: inputURL, sheet: sheet, resetTemplate: true)
+        stagedExternalPinnedSheet = sheet
+        stagedExternalPinnedTemplateID = preferredTemplateID
+        if let preferredTemplateID {
+            selectedTemplateID = preferredTemplateID
+        }
+        if let preferredOptions {
+            renderOptions = preferredOptions
+            notifyRenderOptionsDidChange()
+        }
+    }
+
+    func finishLoadingStagedExternalFigure(
+        preferredTemplateID: String? = nil,
+        preferredOptions: RenderOptionsPayload? = nil,
+        expectedInputURL: URL? = nil,
+        expectedSheet: SheetValue? = nil
+    ) async {
+        guard let inputURL = expectedInputURL ?? selectedFileURL else {
+            return
+        }
+        defer {
+            stagedExternalPinnedSheet = nil
+            stagedExternalPinnedTemplateID = nil
+        }
+        let targetSheet = expectedSheet ?? selectedSheet
+        scheduleInspection()
+        await waitUntilInspectionFinishes(for: inputURL)
+        guard errorMessage == nil else {
+            return
+        }
+        guard selectedFileURL == inputURL, selectedSheet == targetSheet else {
+            return
+        }
+
+        if let preferredTemplateID,
+           selectedTemplateID != preferredTemplateID,
+           (compatibleTemplateIDs.contains(preferredTemplateID) || templateSummary(for: preferredTemplateID) != nil)
+        {
+            chooseTemplate(preferredTemplateID)
+        }
+        guard selectedFileURL == inputURL, selectedSheet == targetSheet else {
+            return
+        }
+
+        if let preferredOptions {
+            applyExternalRenderOptions(preferredOptions)
+        } else {
+            await waitUntilPreviewFinishes(for: inputURL)
+        }
     }
 
     func runPreflight() async {
@@ -509,6 +617,7 @@ final class PlotSession {
         }
         let cleaned = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         renderOptions.seriesOrder = cleaned.isEmpty ? nil : cleaned
+        notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: .immediate)
@@ -522,6 +631,7 @@ final class PlotSession {
 
     func resetSeriesOrder() {
         renderOptions.seriesOrder = nil
+        notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: .immediate)
@@ -598,6 +708,8 @@ final class PlotSession {
         if resetTemplate {
             selectedTemplateID = nil
         }
+        stagedExternalPinnedSheet = nil
+        stagedExternalPinnedTemplateID = nil
         invalidateSubmissionArtifacts()
         errorMessage = nil
     }
@@ -648,13 +760,14 @@ final class PlotSession {
 
     private func applyInspectionResponse(_ response: InspectFileResponse) {
         inspectionResponse = response
-        selectedSheet = response.sheet
+        let resolvedSheet = stagedExternalPinnedSheet ?? response.sheet
+        selectedSheet = resolvedSheet
         inspectedInputPath = response.inputPath
-        inspectedSheet = response.sheet
+        inspectedSheet = resolvedSheet
         invalidateSubmissionArtifacts()
         errorMessage = nil
 
-        if shouldAutoSelectTemplate(after: response) {
+        if shouldAutoSelectTemplate(after: response, preservingTemplateID: stagedExternalPinnedTemplateID) {
             let preferredTemplateID = response.inspection.primaryRecommendation.first?.templateID
                 ?? response.inspection.recommendation.template
             setTemplate(preferredTemplateID, shouldResetRenderOptions: true)
@@ -663,7 +776,13 @@ final class PlotSession {
         schedulePreviewRefresh(policy: .immediate)
     }
 
-    private func shouldAutoSelectTemplate(after _: InspectFileResponse) -> Bool {
+    private func shouldAutoSelectTemplate(
+        after _: InspectFileResponse,
+        preservingTemplateID: String? = nil
+    ) -> Bool {
+        if let preservingTemplateID, selectedTemplateID == preservingTemplateID {
+            return false
+        }
         guard let selectedTemplateID else {
             return true
         }
@@ -778,6 +897,30 @@ final class PlotSession {
             useSidecar: true,
             visualThemeID: metadata?.visualThemes.first?.id
         )
+        notifyRenderOptionsDidChange()
+    }
+
+    private func applyExternalRenderOptions(_ options: RenderOptionsPayload) {
+        guard let template = selectedTemplateSummary else {
+            renderOptions = options
+            notifyRenderOptionsDidChange()
+            schedulePreviewRefresh(policy: .immediate)
+            return
+        }
+
+        var resolved = options
+        resolved.size = template.allowedSizes.contains(options.size ?? "") ? options.size : template.defaultSize
+        if !template.availableStyles.contains(resolved.stylePreset) {
+            resolved.stylePreset = defaultStyle(for: template)
+        }
+        if !template.availablePalettes.contains(resolved.palettePreset) {
+            resolved.palettePreset = defaultPalette(for: template)
+        }
+        renderOptions = resolved
+        notifyRenderOptionsDidChange()
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+        schedulePreviewRefresh(policy: .immediate)
     }
 
     private func defaultStyle(for template: MetaTemplateSummary?) -> String {
@@ -898,6 +1041,10 @@ final class PlotSession {
         userExportURLs = []
     }
 
+    private func notifyRenderOptionsDidChange() {
+        renderOptionsDidChange?(renderOptions)
+    }
+
     private func cancelInspectionTask() {
         inspectionTask?.cancel()
         inspectionTask = nil
@@ -909,19 +1056,50 @@ final class PlotSession {
     }
 
     private func waitUntilInspectionFinishes(for expectedFileURL: URL?) async {
-        let deadline = Date().addingTimeInterval(5.0)
+        let task = inspectionTask
+        await task?.value
+
+        guard let expectedFileURL else {
+            return
+        }
+
+        if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
+            return
+        }
+
+        let deadline = Date().addingTimeInterval(1.0)
         while Date() < deadline {
-            if !isInspecting {
-                if let expectedFileURL {
-                    if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
-                        return
-                    }
-                } else if inspectionResponse != nil || errorMessage != nil {
-                    return
-                }
+            if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
+                return
             }
             await Task.yield()
-            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+    }
+
+    private func waitUntilPreviewFinishes(for expectedFileURL: URL?) async {
+        let task = previewTask
+        await task?.value
+
+        guard let expectedFileURL else {
+            return
+        }
+
+        if previewResponse != nil, selectedFileURL?.path == expectedFileURL.path {
+            return
+        }
+        if errorMessage != nil {
+            return
+        }
+
+        let deadline = Date().addingTimeInterval(1.0)
+        while Date() < deadline {
+            if previewResponse != nil, selectedFileURL?.path == expectedFileURL.path {
+                return
+            }
+            if errorMessage != nil {
+                return
+            }
+            await Task.yield()
         }
     }
 }

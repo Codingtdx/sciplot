@@ -171,6 +171,14 @@ class DataStudioWorkbook:
 
 
 @dataclass(frozen=True)
+class DataStudioGroupState:
+    workbook_path: str
+    display_name: str
+    include_in_compare: bool = True
+    sort_order: int = 0
+
+
+@dataclass(frozen=True)
 class ComparisonRecipe:
     id: str
     label: str
@@ -205,6 +213,13 @@ class ComparisonSet:
 
 
 @dataclass(frozen=True)
+class DataStudioFigurePreference:
+    family_id: str
+    selected_template_id: str | None
+    options_by_template: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class DataStudioSessionPayload:
     version: int
     selected_template_id: str | None
@@ -213,6 +228,10 @@ class DataStudioSessionPayload:
     selected_recipe_id: str | None
     workbook_paths: tuple[str, ...]
     comparison_recipe_ids: tuple[str, ...]
+    selected_figure_family_id: str | None = None
+    selected_figure_template_id: str | None = None
+    group_states: tuple[DataStudioGroupState, ...] = ()
+    figure_preferences: tuple[DataStudioFigurePreference, ...] = ()
     imported_paths: tuple[str, ...] = ()
     template_draft_path: str | None = None
 
@@ -220,7 +239,9 @@ class DataStudioSessionPayload:
 __all__ = [
     "ComparisonRecipe",
     "ComparisonSet",
+    "DataStudioFigurePreference",
     "DataStudioFigureOutput",
+    "DataStudioGroupState",
     "DataStudioRange",
     "DataStudioSessionPayload",
     "DataStudioWorkbook",

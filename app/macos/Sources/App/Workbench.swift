@@ -26,7 +26,7 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         case .plot:
             return "Publication-ready figure workflow"
         case .dataStudio:
-            return "Template-driven workbook analysis"
+            return "Workbook group compare plotting"
         case .composer:
             return "Canvas-first panel composition"
         case .codeConsole:

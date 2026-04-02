@@ -6,7 +6,7 @@ import Observation
 final class AppModel {
     enum PendingPlotReplacementAction {
         case importFromFilesystem
-        case seedFromDataStudio(URL, SheetValue)
+        case openExternalFigure(URL, SheetValue, String?, RenderOptionsPayload?)
     }
 
     let runtime: SidecarRuntime
@@ -38,8 +38,8 @@ final class AppModel {
         composerSession.configure(client: resolvedClient)
         codeConsoleSession.configure(client: resolvedClient)
 
-        dataStudioSession.openInPlotHandler = { [weak self] url, sheet in
-            self?.openInPlot(workbookURL: url, preferredSheet: sheet)
+        dataStudioSession.openInPlotHandler = { [weak self] url, sheet, templateID, options in
+            self?.openInPlot(inputURL: url, sheet: sheet, templateID: templateID, options: options)
         }
     }
 
@@ -57,7 +57,7 @@ final class AppModel {
             let meta = try await client.fetchMeta()
             let contract = try await client.fetchPlotContract()
             plotSession.apply(meta: meta, contract: contract)
-            dataStudioSession.apply(meta: meta)
+            dataStudioSession.apply(meta: meta, contract: contract)
             codeConsoleSession.apply(meta: meta)
             refreshCodeConsoleContext()
             hasBootstrapped = true
@@ -77,7 +77,7 @@ final class AppModel {
         case .plot:
             requestPlotImport()
         case .dataStudio:
-            dataStudioSession.showImportMenu()
+            dataStudioSession.beginImportFlow()
         case .composer:
             composerSession.showImportMenu()
         case .codeConsole:
@@ -128,14 +128,38 @@ final class AppModel {
         inspectorPresented.toggle()
     }
 
-    func openInPlot(workbookURL: URL, preferredSheet: SheetValue) {
+    func newDataStudioSession() {
+        dataStudioSession.newSession()
+        refreshCodeConsoleContext()
+    }
+
+    func clearCurrentDataStudioSession() {
+        dataStudioSession.clearCurrentSession()
+        refreshCodeConsoleContext()
+    }
+
+    func openInPlot(inputURL: URL, sheet: SheetValue, templateID: String?, options: RenderOptionsPayload?) {
         selectedWorkbench = .plot
         if plotSession.hasSessionContent {
-            pendingPlotReplacementAction = .seedFromDataStudio(workbookURL, preferredSheet)
+            pendingPlotReplacementAction = .openExternalFigure(inputURL, sheet, templateID, options)
             isPlotReplacementConfirmationPresented = true
         } else {
-            plotSession.seedFromDataStudio(workbookURL: workbookURL, preferredSheet: preferredSheet)
+            plotSession.stageExternalFigure(
+                inputURL: inputURL,
+                sheet: sheet,
+                preferredTemplateID: templateID,
+                preferredOptions: options
+            )
             refreshCodeConsoleContext()
+            Task {
+                await plotSession.finishLoadingStagedExternalFigure(
+                    preferredTemplateID: templateID,
+                    preferredOptions: options,
+                    expectedInputURL: inputURL,
+                    expectedSheet: sheet
+                )
+                refreshCodeConsoleContext()
+            }
         }
     }
 
@@ -154,9 +178,23 @@ final class AppModel {
         switch pendingPlotReplacementAction {
         case .importFromFilesystem:
             plotSession.isImporterPresented = true
-        case let .seedFromDataStudio(url, sheet):
-            plotSession.seedFromDataStudio(workbookURL: url, preferredSheet: sheet)
+        case let .openExternalFigure(url, sheet, templateID, options):
+            plotSession.stageExternalFigure(
+                inputURL: url,
+                sheet: sheet,
+                preferredTemplateID: templateID,
+                preferredOptions: options
+            )
             refreshCodeConsoleContext()
+            Task {
+                await plotSession.finishLoadingStagedExternalFigure(
+                    preferredTemplateID: templateID,
+                    preferredOptions: options,
+                    expectedInputURL: url,
+                    expectedSheet: sheet
+                )
+                refreshCodeConsoleContext()
+            }
         }
     }
 

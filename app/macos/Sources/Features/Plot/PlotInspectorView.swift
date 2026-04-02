@@ -1,25 +1,41 @@
 import SwiftUI
 
-struct PlotInspectorView: View {
+struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     @Bindable var session: PlotSession
+    private let styleSectionTitle: String
+    private let leadingSections: LeadingSections
+    private let trailingSections: TrailingSections
+
+    init(
+        session: PlotSession,
+        styleSectionTitle: String = "Plot Options",
+        @ViewBuilder leadingSections: () -> LeadingSections = { EmptyView() },
+        @ViewBuilder trailingSections: () -> TrailingSections = { EmptyView() }
+    ) {
+        self.session = session
+        self.styleSectionTitle = styleSectionTitle
+        self.leadingSections = leadingSections()
+        self.trailingSections = trailingSections()
+    }
 
     var body: some View {
         Form {
+            leadingSections
             plotOptionsSection
             if shouldShowAxesSection {
                 axesSection
             }
-
             if session.shouldShowSeriesLegendControls {
                 seriesSection
             }
+            trailingSections
         }
         .formStyle(.grouped)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var plotOptionsSection: some View {
-        Section("Plot Options") {
+        Section(styleSectionTitle) {
             if let template = session.selectedTemplateSummary {
                 if session.editableOptionIDs.contains("size") && session.allowedSizes.count > 1 {
                     LabeledContent("Canvas") {
@@ -117,7 +133,7 @@ struct PlotInspectorView: View {
     }
 
     private var axesSection: some View {
-        Section("Axes") {
+        Section("Axis") {
             if session.editableOptionIDs.contains("xscale") {
                 LabeledContent("X scale") {
                     Picker("", selection: stringBinding(
@@ -220,7 +236,7 @@ struct PlotInspectorView: View {
     }
 
     private var seriesSection: some View {
-        Section("Series / Legend") {
+        Section("Legend") {
             if session.seriesOrderLabels.isEmpty {
                 Text("No series labels are available for the current selection.")
                     .foregroundStyle(.secondary)
@@ -359,5 +375,16 @@ struct PlotInspectorView: View {
             "baseline",
         ]
         return !session.editableOptionIDs.isDisjoint(with: axisOptionIDs)
+    }
+}
+
+extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections == EmptyView {
+    init(session: PlotSession, styleSectionTitle: String = "Plot Options") {
+        self.init(
+            session: session,
+            styleSectionTitle: styleSectionTitle,
+            leadingSections: { EmptyView() },
+            trailingSections: { EmptyView() }
+        )
     }
 }

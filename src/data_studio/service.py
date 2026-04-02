@@ -73,21 +73,29 @@ def import_data_studio_workbook(path: str | Path):
     return import_workbook(path)
 
 
-def list_data_studio_recipes(workbook_paths: list[str | Path]):
-    return comparison_recipes_for_workbooks(workbook_paths)
+def list_data_studio_recipes(workbook_paths: list[str | Path], *, group_states=None):
+    return comparison_recipes_for_workbooks(workbook_paths, group_states=group_states)
 
 
-def preview_data_studio_comparison(workbook_paths: list[str | Path], recipe_id: str):
-    return preview_comparison_recipe(workbook_paths, recipe_id)
+def preview_data_studio_comparison(workbook_paths: list[str | Path], recipe_id: str, *, group_states=None):
+    return preview_comparison_recipe(workbook_paths, recipe_id, group_states=group_states)
 
 
 def export_data_studio_comparison(
     workbook_paths: list[str | Path],
     output_dir: str | Path,
     *,
+    group_states=None,
     selected_recipe_ids: list[str] | None = None,
+    figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
 ):
-    return export_comparison_bundle(workbook_paths, output_dir, selected_recipe_ids=selected_recipe_ids)
+    return export_comparison_bundle(
+        workbook_paths,
+        output_dir,
+        group_states=group_states,
+        selected_recipe_ids=selected_recipe_ids,
+        figure_options_by_recipe_id=figure_options_by_recipe_id,
+    )
 
 
 __all__ = [

@@ -14,6 +14,12 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
+            Button("New Data Studio Session") {
+                model.newDataStudioSession()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(model.selectedWorkbench != .dataStudio)
+
             Button("Import or Open") {
                 model.beginImportForActiveWorkbench()
             }
@@ -28,6 +34,11 @@ struct AppCommands: Commands {
                 model.revealActiveOutput()
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
+
+            Button("Clear Current Session", role: .destructive) {
+                model.clearCurrentDataStudioSession()
+            }
+            .disabled(model.selectedWorkbench != .dataStudio)
         }
 
         CommandGroup(after: .sidebar) {

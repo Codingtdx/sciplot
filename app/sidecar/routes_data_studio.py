@@ -119,6 +119,7 @@ def create_data_studio_router() -> APIRouter:
             comparison_set, recipe, pdf_base64 = preview_data_studio_comparison(
                 request.workbook_paths,
                 request.recipe_id,
+                group_states=request.group_states,
             )
             return DataStudioComparisonPreviewResponse.model_validate(
                 {
@@ -139,7 +140,12 @@ def create_data_studio_router() -> APIRouter:
             comparison_set, figure_outputs = export_data_studio_comparison(
                 request.workbook_paths,
                 request.output_dir,
+                group_states=request.group_states,
                 selected_recipe_ids=request.selected_recipe_ids,
+                figure_options_by_recipe_id={
+                    recipe_id: options.model_dump()
+                    for recipe_id, options in request.figure_options_by_recipe_id.items()
+                },
             )
             return DataStudioComparisonExportResponse.model_validate(
                 {

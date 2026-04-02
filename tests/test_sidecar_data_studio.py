@@ -76,6 +76,20 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
         json={
             "workbook_paths": [str(left), str(right)],
             "recipe_id": "representative_curve",
+            "group_states": [
+                {
+                    "workbook_path": str(right),
+                    "display_name": "Right",
+                    "include_in_compare": True,
+                    "sort_order": 0,
+                },
+                {
+                    "workbook_path": str(left),
+                    "display_name": "Left",
+                    "include_in_compare": True,
+                    "sort_order": 1,
+                },
+            ],
         },
     )
     assert preview.status_code == 200, preview.text
@@ -89,12 +103,34 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
         json={
             "workbook_paths": [str(left), str(right)],
             "output_dir": str(export_dir),
+            "group_states": [
+                {
+                    "workbook_path": str(right),
+                    "display_name": "Right",
+                    "include_in_compare": True,
+                    "sort_order": 0,
+                },
+                {
+                    "workbook_path": str(left),
+                    "display_name": "Left",
+                    "include_in_compare": True,
+                    "sort_order": 1,
+                },
+            ],
             "selected_recipe_ids": ["representative_curve", "strength_box"],
+            "figure_options_by_recipe_id": {
+                "representative_curve": {
+                    "style_preset": "default",
+                    "palette_preset": "colorblind_safe",
+                    "size": "single_panel",
+                }
+            },
         },
     )
     assert exported.status_code == 200, exported.text
     exported_payload = exported.json()
     assert exported_payload["comparison_set"]["comparison_workbook_path"]
+    assert exported_payload["comparison_set"]["workbook_labels"] == ["Right", "Left"]
     assert {item["recipe_id"] for item in exported_payload["figure_outputs"]} == {
         "representative_curve",
         "strength_box",

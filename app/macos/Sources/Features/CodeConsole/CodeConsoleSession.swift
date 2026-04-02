@@ -173,17 +173,17 @@ final class CodeConsoleSession {
             )
         }
 
-        if let workbookURL = dataStudio.primaryWorkbookURL {
+        if let sourceURL = dataStudio.currentFigureSourceURL {
             bindings.append(
                 .init(
-                    id: bindingID(kind: .dataStudio, url: workbookURL),
+                    id: bindingID(kind: .dataStudio, url: sourceURL),
                     sourceKind: .dataStudio,
-                    sourceURL: workbookURL,
-                    sheet: dataStudio.primaryPreferredSheet ?? .name("Representative_Curve"),
-                    title: "Data Studio workbook",
-                    subtitle: dataStudio.primaryWorkbook?.response.representativeFilename ?? workbookURL.lastPathComponent,
-                    templateID: dataStudio.primaryWorkbook?.reviewTemplateID,
-                    renderOptions: defaultRenderOptions
+                    sourceURL: sourceURL,
+                    sheet: dataStudio.currentFigureSheet,
+                    title: "Current Data Studio figure",
+                    subtitle: dataStudio.currentRecipeLabel,
+                    templateID: dataStudio.currentFigureTemplateID,
+                    renderOptions: dataStudio.currentFigureRenderOptions
                 )
             )
         }
