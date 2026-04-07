@@ -135,7 +135,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, "/tmp/prepared.xlsx")
         XCTAssertEqual(session.includedGroups.count, 1)
         XCTAssertEqual(client.dataStudioPreviewComparisonRequests.count, 1)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "Primary Group")
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "prepared")
         XCTAssertEqual(session.plotSession.selectedFileURL?.path, "/tmp/data_studio_exports/primary-vs-second/primary-vs-second.xlsx")
     }
 
@@ -189,6 +189,62 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 250_000_000)
 
         XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "Renamed Group")
+    }
+
+    func testRawBuildUsesChosenWorkbookFilenameAsInitialDisplayName() async {
+        let outputWorkbookURL = URL(fileURLWithPath: "/tmp/E3.xlsx")
+        let client = MockSidecarClient()
+        client.dataStudioBuildWorkbookHandler = { request in
+            XCTAssertEqual(request.groupName, "E3")
+            return TestPayloads.dataStudioWorkbook(
+                id: "workbook-1",
+                path: request.outputPath,
+                label: "Primary Group"
+            )
+        }
+        let session = DataStudioSession(
+            chooseWorkbookSaveLocation: { _ in outputWorkbookURL }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([
+            URL(fileURLWithPath: "/tmp/raw_a.csv"),
+            URL(fileURLWithPath: "/tmp/raw_b.csv"),
+        ])
+
+        XCTAssertEqual(session.orderedGroups.first?.state.displayName, "E3")
+        XCTAssertEqual(session.focusTitle, "E3")
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
+    }
+
+    func testExistingWorkbookImportUsesFilenameStemAsInitialDisplayName() async {
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            TestPayloads.dataStudioImportWorkbook(
+                workbooks: [
+                    TestPayloads.dataStudioWorkbook(
+                        id: "workbook-1",
+                        path: request.workbookPath,
+                        label: "Primary Group"
+                    ),
+                ]
+            )
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/E3.xlsx")])
+
+        XCTAssertEqual(session.orderedGroups.first?.state.displayName, "E3")
+        XCTAssertEqual(session.focusTitle, "E3")
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
+
+        session.updateDisplayName(for: "/tmp/E3.xlsx", to: "")
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
     }
 
     func testUnresolvedRawImportPresentsResolverWithoutOpeningTemplateEditor() async {

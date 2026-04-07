@@ -20,8 +20,12 @@ struct RootSplitView: View {
         }
         .inspector(isPresented: $model.inspectorPresented) {
             activeInspectorView
-                .frame(minWidth: 280)
         }
+        .inspectorColumnWidth(
+            min: InspectorColumnLayoutPolicy.minWidth,
+            ideal: InspectorColumnLayoutPolicy.idealWidth,
+            max: InspectorColumnLayoutPolicy.maxWidth
+        )
         .toolbar(removing: .sidebarToggle)
         .task {
             await model.bootstrapIfNeeded()

@@ -38,7 +38,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         Section(styleSectionTitle) {
             if let template = session.selectedTemplateSummary {
                 if session.editableOptionIDs.contains("size") && session.allowedSizes.count > 1 {
-                    LabeledContent("Canvas") {
+                    AdaptiveInspectorControlRow(title: "Canvas") {
                         Picker("", selection: sizeBinding(defaultSize: template.defaultSize)) {
                             ForEach(session.allowedSizes) { size in
                                 Text(size.label).tag(size.id)
@@ -48,12 +48,15 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                         .pickerStyle(.menu)
                     }
                 } else {
-                    LabeledContent("Canvas", value: sizeLabel(for: template.defaultSize))
+                    AdaptiveInspectorTextRow(
+                        title: "Canvas",
+                        value: sizeLabel(for: template.defaultSize)
+                    )
                 }
 
                 if !session.availableStyles.isEmpty {
                     if session.availableStyles.count > 1 {
-                        LabeledContent("Style") {
+                        AdaptiveInspectorControlRow(title: "Style") {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.stylePreset },
                                 set: { newValue in
@@ -68,13 +71,13 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                             .pickerStyle(.menu)
                         }
                     } else if let style = session.availableStyles.first {
-                        LabeledContent("Style", value: style.label)
+                        AdaptiveInspectorTextRow(title: "Style", value: style.label)
                     }
                 }
 
                 if !session.availablePalettes.isEmpty {
                     if session.availablePalettes.count > 1 {
-                        LabeledContent("Palette") {
+                        AdaptiveInspectorControlRow(title: "Palette") {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.palettePreset },
                                 set: { newValue in
@@ -89,13 +92,13 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                             .pickerStyle(.menu)
                         }
                     } else if let palette = session.availablePalettes.first {
-                        LabeledContent("Palette", value: palette.label)
+                        AdaptiveInspectorTextRow(title: "Palette", value: palette.label)
                     }
                 }
 
                 if let themes = session.metadata?.visualThemes, !themes.isEmpty {
                     if themes.count > 1 {
-                        LabeledContent("Theme") {
+                        AdaptiveInspectorControlRow(title: "Theme") {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
                                 set: { newValue in
@@ -110,12 +113,12 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                             .pickerStyle(.menu)
                         }
                     } else if let theme = themes.first {
-                        LabeledContent("Theme", value: theme.label)
+                        AdaptiveInspectorTextRow(title: "Theme", value: theme.label)
                     }
                 }
 
                 if session.editableOptionIDs.contains("show_colorbar") {
-                    LabeledContent("Colorbar") {
+                    AdaptiveInspectorControlRow(title: "Colorbar") {
                         Toggle("", isOn: boolBinding(
                             get: { session.renderOptions.showColorbar ?? false },
                             set: { newValue in
@@ -126,8 +129,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     }
                 }
             } else {
-                Text("Choose a compatible template to edit plot options.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Choose a template to edit figure controls.")
             }
         }
     }
@@ -135,7 +137,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     private var axesSection: some View {
         Section("Axis") {
             if session.editableOptionIDs.contains("xscale") {
-                LabeledContent("X scale") {
+                AdaptiveInspectorControlRow(title: "X scale") {
                     Picker("", selection: stringBinding(
                         get: { session.renderOptions.xscale ?? "linear" },
                         set: { newValue in
@@ -151,7 +153,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             }
 
             if session.editableOptionIDs.contains("yscale") {
-                LabeledContent("Y scale") {
+                AdaptiveInspectorControlRow(title: "Y scale") {
                     Picker("", selection: stringBinding(
                         get: { session.renderOptions.yscale ?? "linear" },
                         set: { newValue in
@@ -167,7 +169,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             }
 
             if session.editableOptionIDs.contains("reverse_x") {
-                LabeledContent("Reverse X") {
+                AdaptiveInspectorControlRow(title: "Reverse X") {
                     Toggle("", isOn: boolBinding(
                         get: { session.renderOptions.reverseX },
                         set: { newValue in
@@ -219,7 +221,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             }
 
             if session.editableOptionIDs.contains("baseline") {
-                LabeledContent("Baseline") {
+                AdaptiveInspectorControlRow(title: "Baseline") {
                     TextField(
                         "Baseline",
                         text: stringBinding(
@@ -238,12 +240,11 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     private var seriesSection: some View {
         Section("Legend") {
             if session.seriesOrderLabels.isEmpty {
-                Text("No series labels are available for the current selection.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "No legend entries are available for this figure.")
             } else {
                 SortableSeriesListView(
                     title: "Legend order",
-                    detail: "Drag or tap to reorder legend entries. Session-only.",
+                    detail: "Session-only reorder.",
                     items: Binding(
                         get: { session.seriesOrderLabels },
                         set: { session.setSeriesOrder($0) }

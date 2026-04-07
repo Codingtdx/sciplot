@@ -1191,11 +1191,13 @@ final class DataStudioSession {
             errorMessage = "Import raw files before building a workbook."
             return
         }
-        let groupName = inferGroupName(from: sourceURLs)
-        let suggestedName = "\(groupName).xlsx"
+        let inferredGroupName = inferGroupName(from: sourceURLs)
+        let suggestedName = "\(inferredGroupName).xlsx"
         guard let outputURL = chooseWorkbookSaveLocation(suggestedName) else {
             return
         }
+        let chosenGroupName = outputURL.deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let groupName = chosenGroupName.isEmpty ? inferredGroupName : chosenGroupName
         isBusy = true
         currentActivity = .buildingWorkbook
         errorMessage = nil
@@ -1339,7 +1341,7 @@ final class DataStudioSession {
             groupStates.append(
                 DataStudioGroupStatePayload(
                     workbookPath: response.workbookPath,
-                    displayName: response.label,
+                    displayName: seededDisplayName(for: response),
                     includeInCompare: true,
                     sortOrder: groupStates.count
                 )
@@ -1360,7 +1362,7 @@ final class DataStudioSession {
             merged.append(
                 DataStudioGroupStatePayload(
                     workbookPath: workbook.response.workbookPath,
-                    displayName: workbook.response.label,
+                    displayName: seededDisplayName(for: workbook),
                     includeInCompare: true,
                     sortOrder: merged.count
                 )
@@ -1412,11 +1414,7 @@ final class DataStudioSession {
         if !trimmed.isEmpty {
             return trimmed
         }
-        let responseLabel = workbook.response.label.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !responseLabel.isEmpty {
-            return responseLabel
-        }
-        return workbook.workbookURL.deletingPathExtension().lastPathComponent
+        return seededDisplayName(for: workbook)
     }
 
     private func reindexGroupStates() {
@@ -1424,13 +1422,38 @@ final class DataStudioSession {
         let stateByPath = Dictionary(uniqueKeysWithValues: groupStates.map { ($0.workbookPath, $0) })
         groupStates = orderedPaths.enumerated().map { index, path in
             let state = stateByPath[path]
+            let workbook = workbooks.first(where: { $0.response.workbookPath == path })
             return DataStudioGroupStatePayload(
                 workbookPath: path,
-                displayName: state?.displayName ?? workbooks.first(where: { $0.response.workbookPath == path })?.response.label ?? "",
+                displayName: workbook.map { normalizedDisplayName(for: $0, override: state?.displayName) }
+                    ?? seededDisplayName(workbookPath: path, responseLabel: state?.displayName ?? ""),
                 includeInCompare: state?.includeInCompare ?? true,
                 sortOrder: index
             )
         }
+    }
+
+    private func seededDisplayName(for workbook: DataStudioWorkbookItem) -> String {
+        seededDisplayName(workbookPath: workbook.response.workbookPath, responseLabel: workbook.response.label)
+    }
+
+    private func seededDisplayName(for response: DataStudioWorkbookResponse) -> String {
+        seededDisplayName(workbookPath: response.workbookPath, responseLabel: response.label)
+    }
+
+    private func seededDisplayName(workbookPath: String, responseLabel: String) -> String {
+        let workbookStem = URL(fileURLWithPath: workbookPath)
+            .deletingPathExtension()
+            .lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !workbookStem.isEmpty {
+            return workbookStem
+        }
+        let trimmedLabel = responseLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedLabel.isEmpty {
+            return trimmedLabel
+        }
+        return "Workbook"
     }
 
     private func syncFigureSelection(preferredRecipeID: String? = nil) {

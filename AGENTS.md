@@ -30,6 +30,7 @@
 - `app/macos/Sources/App`: SwiftUI `App` root、`NavigationSplitView` shell、toolbar、commands 与 app-level session/runtime 装配。
 - `app/macos/Sources/Infrastructure`: `Process + Pipe` sidecar runtime、`URLSession + Codable` client、repo root 定位与 sidecar schema mirror。
 - `app/macos/Sources/Features`: `Plot / Data Studio / Composer / Code Console` 各工作台与本地 session state。
+- `app/macos/Sources/Shared/UI/StateViews.swift`: 原生 macOS shared inspector primitives 与空态/错误态基础组件；右侧 inspector 的统一列宽、adaptive row、action stack 与 empty-state 应优先从这里复用，不要在各 workbench 里再散写一套 ad hoc `LabeledContent` 和说明文案布局。
 - `data_studio_templates/`: Data Studio 模板存储根目录；`builtin/` 放内置模板族，`user/` 放用户保存的结构模板，前后端启动时都要自动加载。
 - `app/macos/Tests`: 原生 macOS 测试目标；覆盖 sidecar bootstrap/probe、schema decoding 与工作台状态流。
 - `app/desktop/src/`: 旧的 Tauri foundation 代码保留作历史/参考层，不再是受支持的桌面主链路。
@@ -74,6 +75,7 @@
 - 原生 macOS runtime 对 sidecar 的策略是“app-managed ownership”：不要再依赖“复用端口上已有 sidecar”来凑兼容。`/meta` 与 `/plot-contract` payload 不可解码或模板集合为空时，必须判定为不兼容并替换为 repo `.venv` 启动的 sidecar。
 - `Launch_Plotter.command` 现在代表原生 macOS 主链路，也是唯一受支持的桌面入口；不要再引入 `plot_wizard_gui.py`、`interactive_plot.py` 一类旧 fallback。
 - 原生桌面文件对话框优先走 `fileImporter`、`NSOpenPanel`、`NSSavePanel` 这类一方 API；如果 dialog 打不开，必须把错误明确显示到界面上，不能静默失败。
+- 原生 macOS 右侧 inspector 现在使用统一的 native column policy：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`；四个 workbench 的 inspector 都应保持功能优先、短文案、adaptive row 与统一 action stack，不要再在某个模块里单独塞回超长解释文字或私有宽度策略。
 - 桌面端当前的 app-level product model 以 `Plot / Data Studio / Composer / Code Console` 这 4 个 retained workbench 为准；`Start / Home / Project / Settings` 只能作为 utility 或受保护 mock 参考，不能再当一级产品区。
 - 设计或 mock 规划时要明确区分 canonical internal workflow 和 user-visible UI workflow：detect / normalize / map / validate / handoff / automation 这类系统步骤可以隐藏或并入更大的 work surface，只有用户需要定位、决策、复核、调整、确认、导出或交接时才应暴露成可见步骤。
 - 当前受保护 mock 仍展示 `Start -> Plot Import -> Plot Template -> Plot Refine` 这一条 Plot-only 参考流；它服务于后续 mock-design pass，但不是 whole-app IA 真相源，也不要在非 mock pass 里改 `app/desktop/src/mock/**` 与 `app/desktop/src/main.tsx`。

@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum InspectorColumnLayoutPolicy {
+    static let minWidth: CGFloat = 360
+    static let idealWidth: CGFloat = 400
+    static let maxWidth: CGFloat = 460
+}
+
 struct InspectorSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -12,6 +18,19 @@ struct InspectorSurfaceModifier: ViewModifier {
 extension View {
     func inspectorSurface() -> some View {
         modifier(InspectorSurfaceModifier())
+    }
+
+    func inspectorActionButton() -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    func inspectorSelectable(_ selectable: Bool) -> some View {
+        if selectable {
+            textSelection(.enabled)
+        } else {
+            self
+        }
     }
 }
 
@@ -88,6 +107,117 @@ struct InspectorSection<Content: View>: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+struct InspectorEmptyState: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct AdaptiveInspectorTextRow: View {
+    let title: String
+    let value: String
+    var selectable: Bool = false
+    var secondaryValue: Bool = false
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            LabeledContent {
+                horizontalValue
+            } label: {
+                horizontalLabel
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                stackedLabel
+                stackedValue
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var horizontalLabel: some View {
+        Text(title)
+            .foregroundStyle(.secondary)
+    }
+
+    private var stackedLabel: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private var horizontalValue: some View {
+        Text(value)
+            .foregroundStyle(secondaryValue ? .secondary : .primary)
+            .fixedSize(horizontal: true, vertical: false)
+            .inspectorSelectable(selectable)
+    }
+
+    private var stackedValue: some View {
+        Text(value)
+            .foregroundStyle(secondaryValue ? .secondary : .primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .inspectorSelectable(selectable)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct AdaptiveInspectorControlRow<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            LabeledContent {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 12)
+                    content
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            } label: {
+                Text(title)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct InspectorActionStack<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

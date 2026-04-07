@@ -17,29 +17,35 @@ struct ComposerInspectorView: View {
     private var selectionSection: some View {
         Section("Selection") {
             if let region = session.selectedFreeRegion {
-                LabeledContent("Target", value: "Merged free region")
-                LabeledContent("Span", value: "\(region.colSpan)x\(region.rowSpan)")
-                LabeledContent("Coverage", value: session.regionSummary(region))
+                AdaptiveInspectorTextRow(title: "Target", value: "Merged free region")
+                AdaptiveInspectorTextRow(title: "Span", value: "\(region.colSpan)x\(region.rowSpan)")
+                AdaptiveInspectorTextRow(title: "Coverage", value: session.regionSummary(region))
             } else if let selection = session.selectedCellSelection {
-                LabeledContent("Target", value: selection.cellCount > 1 ? "Cell selection" : "Single cell")
-                LabeledContent("Cells", value: "\(selection.cellCount)")
-                LabeledContent("Span", value: "\(selection.colSpan)x\(selection.rowSpan)")
-                LabeledContent("Coverage", value: cellSelectionSummary(selection))
+                AdaptiveInspectorTextRow(
+                    title: "Target",
+                    value: selection.cellCount > 1 ? "Cell selection" : "Single cell"
+                )
+                AdaptiveInspectorTextRow(title: "Cells", value: "\(selection.cellCount)")
+                AdaptiveInspectorTextRow(title: "Span", value: "\(selection.colSpan)x\(selection.rowSpan)")
+                AdaptiveInspectorTextRow(title: "Coverage", value: cellSelectionSummary(selection))
             } else if session.selectedPanel == nil {
-                Text("Select cells, a merged region, or a placed panel to edit the composition.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Select cells or a panel to edit.")
             }
 
             if let panel = session.selectedPanel {
                 if session.selectedCellSelection != nil || session.selectedFreeRegion != nil {
                     Divider()
                 }
-                LabeledContent("Panel", value: panel.kind == "graph" ? "Graph" : "Asset")
-                LabeledContent("Placement", value: session.placementSummary(for: panel))
-                LabeledContent("File", value: URL(fileURLWithPath: panel.filePath).lastPathComponent)
+                AdaptiveInspectorTextRow(title: "Panel", value: panel.kind == "graph" ? "Graph" : "Asset")
+                AdaptiveInspectorTextRow(title: "Placement", value: session.placementSummary(for: panel))
+                AdaptiveInspectorTextRow(
+                    title: "File",
+                    value: URL(fileURLWithPath: panel.filePath).lastPathComponent,
+                    selectable: true
+                )
 
                 if panel.kind == "graph", !session.resolvedLabel(for: panel).isEmpty {
-                    LabeledContent("Label", value: session.resolvedLabel(for: panel))
+                    AdaptiveInspectorTextRow(title: "Label", value: session.resolvedLabel(for: panel))
                 }
             }
 
@@ -54,100 +60,106 @@ struct ComposerInspectorView: View {
 
     @ViewBuilder
     private var actionsSection: some View {
-        Section("Actions") {
+        Section("Edit") {
             if let selection = session.selectedCellSelection, selection.cellCount > 1 {
-                LabeledContent("Merge", value: "\(selection.colSpan)x\(selection.rowSpan)")
+                AdaptiveInspectorTextRow(title: "Merge", value: "\(selection.colSpan)x\(selection.rowSpan)")
 
-                Text(session.mergeGuidance)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Button("Merge Selected Cells") {
-                    session.mergeSelectedCells()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!session.canMergeSelectedCells)
-
-                Button("Clear Selection") {
-                    session.clearTransientEditingState()
-                }
-                .buttonStyle(.bordered)
-            } else if session.selectedFreeRegion != nil {
-                Button("Unmerge Region") {
-                    session.unmergeSelectedRegion()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!session.canUnmergeSelectedRegion)
-
-                if session.canPlaceFocusedPanelInSelectedTarget {
-                    Button(session.placementActionTitle) {
-                        session.placeFocusedPanelInSelectedTarget()
+                InspectorActionStack {
+                    Button("Merge Selected Cells") {
+                        session.mergeSelectedCells()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!session.canMergeSelectedCells)
+                    .inspectorActionButton()
                 }
+            } else if session.selectedFreeRegion != nil {
+                InspectorActionStack {
+                    Button("Unmerge Region") {
+                        session.unmergeSelectedRegion()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!session.canUnmergeSelectedRegion)
+                    .inspectorActionButton()
 
-                Button("Clear Selection") {
-                    session.clearTransientEditingState()
+                    if session.canPlaceFocusedPanelInSelectedTarget {
+                        Button(session.placementActionTitle) {
+                            session.placeFocusedPanelInSelectedTarget()
+                        }
+                        .buttonStyle(.bordered)
+                        .inspectorActionButton()
+                    }
                 }
-                .buttonStyle(.bordered)
             }
 
             if session.canPlaceFocusedPanelInSelectedTarget {
-                Button(session.placementActionTitle) {
-                    session.placeFocusedPanelInSelectedTarget()
+                InspectorActionStack {
+                    Button(session.placementActionTitle) {
+                        session.placeFocusedPanelInSelectedTarget()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .inspectorActionButton()
                 }
-                .buttonStyle(.borderedProminent)
             }
 
             if let panel = session.selectedPanel {
-                Toggle(
-                    "Locked",
-                    isOn: Binding(
-                        get: { panel.locked },
-                        set: { session.updateSelectedPanel(locked: $0) }
+                AdaptiveInspectorControlRow(title: "Locked") {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { panel.locked },
+                            set: { session.updateSelectedPanel(locked: $0) }
+                        )
                     )
-                )
+                    .labelsHidden()
+                }
 
                 if !panel.hidden {
-                    Button("Remove From Board") {
-                        session.removeSelectedPanelFromBoard()
+                    InspectorActionStack {
+                        Button("Remove From Board") {
+                            session.removeSelectedPanelFromBoard()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(panel.locked)
+                        .inspectorActionButton()
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(panel.locked)
                 }
 
                 if panel.kind == "graph" {
-                    Toggle(
-                        "Auto Figure Labels",
-                        isOn: Binding(
-                            get: { session.project.autoLabels },
-                            set: { session.setAutoLabels($0) }
+                    AdaptiveInspectorControlRow(title: "Auto Labels") {
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { session.project.autoLabels },
+                                set: { session.setAutoLabels($0) }
+                            )
                         )
-                    )
+                        .labelsHidden()
+                    }
 
-                    TextField(
-                        "Manual Label",
-                        text: Binding(
-                            get: { panel.label ?? "" },
-                            set: { session.updateSelectedPanel(label: $0) }
+                    AdaptiveInspectorControlRow(title: "Label") {
+                        TextField(
+                            "Manual Label",
+                            text: Binding(
+                                get: { panel.label ?? "" },
+                                set: { session.updateSelectedPanel(label: $0) }
+                            )
                         )
-                    )
-                    .disabled(session.project.autoLabels)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(session.project.autoLabels)
+                    }
                 }
             }
 
             if session.selectedCellSelection != nil || session.selectedFreeRegion != nil || session.selectedPanel != nil {
-                Text(session.placementGuidance)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Button("Clear Selection") {
-                    session.clearTransientEditingState()
+                InspectorActionStack {
+                    Button("Clear Selection") {
+                        session.clearTransientEditingState()
+                    }
+                    .buttonStyle(.bordered)
+                    .inspectorActionButton()
                 }
-                .buttonStyle(.bordered)
             } else {
-                Text("The current selection controls what actions appear here.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Select cells or a panel to reveal edit actions.")
             }
         }
     }
@@ -174,26 +186,31 @@ struct ComposerInspectorView: View {
                     .font(.footnote)
                 }
             } else {
-                Text("Preview updates automatically as you merge, place, label, and reorder panels.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Preview updates automatically.")
             }
 
             if session.isExporting {
                 Label("Exporting composition…", systemImage: "arrow.triangle.2.circlepath")
                     .foregroundStyle(.secondary)
             } else {
-                Text("Use Export to save the composition as PDF or TIFF with an explicit destination and file name.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Use Export to write PDF or TIFF output.")
             }
 
             if let exportURL = session.exportURL {
-                LabeledContent("Latest Export", value: exportURL.lastPathComponent)
-                LabeledContent("Folder", value: exportURL.deletingLastPathComponent().lastPathComponent)
+                AdaptiveInspectorTextRow(title: "Latest Export", value: exportURL.lastPathComponent)
+                AdaptiveInspectorTextRow(
+                    title: "Folder",
+                    value: exportURL.deletingLastPathComponent().path,
+                    selectable: true
+                )
 
-                Button("Reveal In Finder") {
-                    session.revealLatestExport()
+                InspectorActionStack {
+                    Button("Reveal In Finder") {
+                        session.revealLatestExport()
+                    }
+                    .buttonStyle(.bordered)
+                    .inspectorActionButton()
                 }
-                .buttonStyle(.bordered)
             }
         }
     }

@@ -261,7 +261,7 @@ private struct DataStudioGroupRowView: View {
     init(session: DataStudioSession, group: DataStudioGroupRowItem) {
         self.session = session
         self.group = group
-        _displayNameDraft = State(initialValue: group.state.displayName.isEmpty ? group.workbook.response.label : group.state.displayName)
+        _displayNameDraft = State(initialValue: Self.resolvedDisplayName(for: group))
     }
 
     var body: some View {
@@ -316,7 +316,9 @@ private struct DataStudioGroupRowView: View {
             }
         }
         .onChange(of: group.state.displayName) { _, newValue in
-            let resolved = newValue.isEmpty ? group.workbook.response.label : newValue
+            let resolved = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? Self.resolvedDisplayName(for: group)
+                : newValue
             if resolved != displayNameDraft {
                 displayNameDraft = resolved
             }
@@ -344,6 +346,21 @@ private struct DataStudioGroupRowView: View {
             .padding(.vertical, 3)
             .background(tint.opacity(0.14), in: Capsule())
             .foregroundStyle(tint)
+    }
+
+    private static func resolvedDisplayName(for group: DataStudioGroupRowItem) -> String {
+        let override = group.state.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !override.isEmpty {
+            return override
+        }
+        let stem = group.workbook.workbookURL
+            .deletingPathExtension()
+            .lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !stem.isEmpty {
+            return stem
+        }
+        return group.workbook.response.label
     }
 }
 

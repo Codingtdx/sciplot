@@ -5,8 +5,7 @@ struct CodeConsoleContextView: View {
 
     var body: some View {
         Form {
-            contextSummarySection
-            boundContextSection
+            bindingSection
             runnerSection
             outputHandoffSection
         }
@@ -15,70 +14,77 @@ struct CodeConsoleContextView: View {
     }
 
     @ViewBuilder
-    private var contextSummarySection: some View {
-        Section("Context Summary") {
+    private var bindingSection: some View {
+        Section("Binding") {
             Label(session.liveStatusLabel, systemImage: session.liveStatusSymbol)
                 .foregroundStyle(session.errorMessage == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
 
             if let binding = session.selectedBinding {
-                LabeledContent("Source", value: binding.sourceURL.lastPathComponent)
-                LabeledContent("Origin", value: binding.sourceKind.title)
-                LabeledContent("Sheet", value: session.selectedSheet.displayName)
+                AdaptiveInspectorTextRow(
+                    title: "Source",
+                    value: binding.sourceURL.lastPathComponent,
+                    selectable: true
+                )
+                AdaptiveInspectorTextRow(title: "Origin", value: binding.sourceKind.title)
+                AdaptiveInspectorTextRow(title: "Sheet", value: session.selectedSheet.displayName)
+
+                if !session.boundContext.isEmpty {
+                    Divider()
+                    ForEach(session.boundContext) { item in
+                        AdaptiveInspectorTextRow(title: item.label, value: item.value, selectable: true)
+                        if !item.detail.isEmpty, item.detail != item.value {
+                            Text(item.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
             } else {
-                Text("No Plot, Data Studio, or direct import source is currently bound.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Bind a dataset to enable context.")
             }
 
             if let errorMessage = session.errorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var boundContextSection: some View {
-        Section("Bound Context") {
-            if session.boundContext.isEmpty {
-                Text("Context metadata appears here after the current dataset has been inspected.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(session.boundContext) { item in
-                    LabeledContent(item.label, value: item.value)
-                    Text(item.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     @ViewBuilder
     private var runnerSection: some View {
-        Section("Prompt & Runner") {
-            LabeledContent("Prompt", value: session.promptText.isEmpty ? "Not ready" : "Ready")
-            LabeledContent("Editor", value: session.editorText.isEmpty ? "Empty" : "Loaded")
-            LabeledContent("Runner", value: session.isRunning ? "Running" : "Idle")
+        Section("Runner") {
+            AdaptiveInspectorTextRow(title: "Prompt", value: session.promptText.isEmpty ? "Not ready" : "Ready")
+            AdaptiveInspectorTextRow(title: "Editor", value: session.editorText.isEmpty ? "Empty" : "Loaded")
+            AdaptiveInspectorTextRow(title: "Runner", value: session.isRunning ? "Running" : "Idle")
             Text(session.promptStatusMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     @ViewBuilder
     private var outputHandoffSection: some View {
-        Section("Output & Handoff") {
-            Text(session.outputsSummary)
-                .foregroundStyle(.secondary)
-
+        Section("Outputs & Handoff") {
             if let run = session.latestRunResponse {
-                LabeledContent("Run status", value: run.status.capitalized)
-                LabeledContent("Generated files", value: "\(run.generatedFiles.count)")
-                LabeledContent("Output folder", value: run.outputDir)
-                    .textSelection(.enabled)
+                AdaptiveInspectorTextRow(title: "Run status", value: run.status.capitalized)
+                AdaptiveInspectorTextRow(title: "Generated files", value: "\(run.generatedFiles.count)")
+                AdaptiveInspectorTextRow(
+                    title: "Output folder",
+                    value: run.outputDir,
+                    selectable: true
+                )
+
+                if !session.outputsSummary.isEmpty {
+                    Text(session.outputsSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } else {
-                Text("No managed Code Console run has completed yet.")
-                    .foregroundStyle(.secondary)
+                InspectorEmptyState(message: "Run code to generate managed outputs.")
             }
         }
     }
