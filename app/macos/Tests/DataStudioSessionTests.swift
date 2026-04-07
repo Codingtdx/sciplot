@@ -134,9 +134,41 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.orderedGroups.count, 1)
         XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, "/tmp/prepared.xlsx")
         XCTAssertEqual(session.includedGroups.count, 1)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.count, 1)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "prepared")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "prepared")
         XCTAssertEqual(session.plotSession.selectedFileURL?.path, "/tmp/data_studio_exports/primary-vs-second/primary-vs-second.xlsx")
+    }
+
+    func testComparisonContextFailureKeepsLastSuccessfulPreviewAndMarksSessionStale() async {
+        let client = MockSidecarClient()
+        var shouldFailRefresh = false
+        client.dataStudioComparisonContextHandler = { request in
+            if shouldFailRefresh {
+                throw NSError(
+                    domain: "DataStudioTest",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "The request timed out."]
+                )
+            }
+            return TestPayloads.dataStudioComparisonContext()
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
+        let previousComparisonWorkbook = session.comparisonSet?.comparisonWorkbookPath
+        let previousPreviewSource = session.plotSession.selectedFileURL?.path
+
+        shouldFailRefresh = true
+        session.updateDisplayName(for: "/tmp/prepared.xlsx", to: "Renamed Group")
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertEqual(session.comparisonSet?.comparisonWorkbookPath, previousComparisonWorkbook)
+        XCTAssertEqual(session.plotSession.selectedFileURL?.path, previousPreviewSource)
+        XCTAssertTrue(session.isPreviewStale)
+        XCTAssertEqual(session.previewWarning, "Refresh failed, showing last successful preview.")
     }
 
     func testComparisonWorkbookImportExpandsIntoReferencedWorkbookGroups() async {
@@ -163,7 +195,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.orderedGroups.map(\.workbook.response.workbookPath), ["/tmp/prepared.xlsx", "/tmp/second.xlsx"])
         XCTAssertEqual(session.includedGroups.count, 2)
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 1)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.count, 2)
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.count, 2)
     }
 
     func testRawImportAutoMatchesBuiltinTemplateAndRespectsGroupStateInPreview() async {
@@ -188,7 +220,7 @@ final class DataStudioSessionTests: XCTestCase {
         session.updateDisplayName(for: "/tmp/prepared.xlsx", to: "Renamed Group")
         try? await Task.sleep(nanoseconds: 250_000_000)
 
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "Renamed Group")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "Renamed Group")
     }
 
     func testRawBuildUsesChosenWorkbookFilenameAsInitialDisplayName() async {
@@ -215,7 +247,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(session.orderedGroups.first?.state.displayName, "E3")
         XCTAssertEqual(session.focusTitle, "E3")
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "E3")
     }
 
     func testExistingWorkbookImportUsesFilenameStemAsInitialDisplayName() async {
@@ -239,12 +271,12 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(session.orderedGroups.first?.state.displayName, "E3")
         XCTAssertEqual(session.focusTitle, "E3")
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "E3")
 
         session.updateDisplayName(for: "/tmp/E3.xlsx", to: "")
         try? await Task.sleep(nanoseconds: 250_000_000)
 
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.last?.groupStates.first?.displayName, "E3")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "E3")
     }
 
     func testUnresolvedRawImportPresentsResolverWithoutOpeningTemplateEditor() async {
@@ -556,6 +588,55 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.stylePreset, session.plotSession.renderOptions.stylePreset)
     }
 
+    func testSpecimenSuggestionWorkflowAppliesSuggestedExclusionsToPreviewAndComparisonRequests() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            let excluded = Set(
+                request.specimenStates
+                    .filter { !$0.included }
+                    .map(\.specimenId)
+            )
+            return TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(
+                path: request.workbookPath,
+                label: "Prepared Group",
+                excludedSpecimenIDs: excluded
+            )
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 7)
+        XCTAssertEqual(Set(session.activeSuggestedExclusionIDs(for: workbookPath)), ["sample-1", "sample-7"])
+
+        session.applySuggestedExclusions(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 5)
+        XCTAssertEqual(
+            session.specimenStates(for: workbookPath)
+                .filter { !$0.included }
+                .map(\.specimenId)
+                .sorted(),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertEqual(
+            client.dataStudioComparisonContextRequests.last?
+                .specimenStates
+                .filter { !$0.included }
+                .map(\.specimenId)
+                .sorted(),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertTrue(session.isSpecimenFilterPresented)
+    }
+
     func testNormalizeAndRestoreSessionStateRoundTripsThroughValidatedSchema() async {
         let client = MockSidecarClient()
         client.dataStudioImportWorkbookHandler = { request in
@@ -615,6 +696,6 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.currentFigureTemplateID, "box")
         XCTAssertEqual(session.orderedGroups.map { $0.state.displayName }, ["B", "A"])
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
-        XCTAssertEqual(client.dataStudioPreviewComparisonRequests.count, 1)
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
     }
 }

@@ -180,6 +180,34 @@ class WorkbookSample:
 
 
 @dataclass(frozen=True)
+class DataStudioCurvePoint:
+    x: float
+    y: float
+
+
+@dataclass(frozen=True)
+class DataStudioSpecimenState:
+    workbook_path: str
+    specimen_id: str
+    included: bool = True
+
+
+@dataclass(frozen=True)
+class DataStudioSpecimenPreview:
+    specimen_id: str
+    label: str
+    filename: str
+    source_path: Path | None
+    included: bool
+    metrics: dict[str, float | None] = field(default_factory=dict)
+    warnings: tuple[str, ...] = ()
+    exclusions: tuple[str, ...] = ()
+    mini_curve_points: tuple[DataStudioCurvePoint, ...] = ()
+    triad_complete: bool = False
+    suggested_exclusion: bool = False
+
+
+@dataclass(frozen=True)
 class DataStudioWorkbook:
     workbook_id: str
     workbook_path: Path
@@ -195,6 +223,25 @@ class DataStudioWorkbook:
     warnings: tuple[str, ...] = ()
     exclusions: tuple[str, ...] = ()
     samples: tuple[WorkbookSample, ...] = ()
+
+
+@dataclass(frozen=True)
+class DataStudioWorkbookPreview:
+    workbook_path: Path
+    label: str
+    supported: bool
+    unsupported_reason: str = ""
+    total_specimen_count: int = 0
+    included_specimen_count: int = 0
+    excluded_specimen_count: int = 0
+    representative_specimen_id: str | None = None
+    representative_filename: str | None = None
+    metrics: tuple[WorkbookMetricSummary, ...] = ()
+    specimens: tuple[DataStudioSpecimenPreview, ...] = ()
+    warnings: tuple[str, ...] = ()
+    suggested_exclusion_ids: tuple[str, ...] = ()
+    suggestion_supported: bool = False
+    suggestion_support_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -258,6 +305,7 @@ class DataStudioSessionPayload:
     selected_figure_family_id: str | None = None
     selected_figure_template_id: str | None = None
     group_states: tuple[DataStudioGroupState, ...] = ()
+    specimen_states: tuple[DataStudioSpecimenState, ...] = ()
     figure_preferences: tuple[DataStudioFigurePreference, ...] = ()
     imported_paths: tuple[str, ...] = ()
     template_draft_path: str | None = None

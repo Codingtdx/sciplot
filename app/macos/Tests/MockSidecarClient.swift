@@ -15,6 +15,8 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioTemplateResponse = TestPayloads.dataStudioTemplate()
     var dataStudioWorkbookResponse = TestPayloads.dataStudioWorkbook()
     var dataStudioImportWorkbookResponse = TestPayloads.dataStudioImportWorkbook()
+    var dataStudioWorkbookPreviewResponse = TestPayloads.dataStudioWorkbookPreview()
+    var dataStudioComparisonContextResponse = TestPayloads.dataStudioComparisonContext()
     var dataStudioComparisonPreviewResponse = TestPayloads.dataStudioComparisonPreview()
     var dataStudioComparisonExportResponse = TestPayloads.dataStudioComparisonExport()
     var dataStudioSessionResponse = TestPayloads.dataStudioSession()
@@ -37,6 +39,8 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioUpdateTemplateHandler: ((String, DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioBuildWorkbookHandler: ((DataStudioBuildWorkbookRequest) async throws -> DataStudioWorkbookResponse)?
     var dataStudioImportWorkbookHandler: ((DataStudioImportWorkbookRequest) async throws -> DataStudioImportWorkbookResponse)?
+    var dataStudioWorkbookPreviewHandler: ((DataStudioWorkbookPreviewRequest) async throws -> DataStudioWorkbookPreviewResponse)?
+    var dataStudioComparisonContextHandler: ((DataStudioComparisonContextRequest) async throws -> DataStudioComparisonContextResponse)?
     var dataStudioPreviewComparisonHandler: ((DataStudioPreviewComparisonRequest) async throws -> DataStudioComparisonPreviewResponse)?
     var dataStudioExportComparisonHandler: ((DataStudioExportComparisonRequest) async throws -> DataStudioComparisonExportResponse)?
     var dataStudioNormalizeSessionHandler: ((DataStudioSessionNormalizeRequest) async throws -> DataStudioSessionResponse)?
@@ -54,6 +58,8 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var dataStudioDeleteTemplateIDs: [String] = []
     private(set) var dataStudioBuildWorkbookRequests: [DataStudioBuildWorkbookRequest] = []
     private(set) var dataStudioImportWorkbookRequests: [DataStudioImportWorkbookRequest] = []
+    private(set) var dataStudioWorkbookPreviewRequests: [DataStudioWorkbookPreviewRequest] = []
+    private(set) var dataStudioComparisonContextRequests: [DataStudioComparisonContextRequest] = []
     private(set) var dataStudioPreviewComparisonRequests: [DataStudioPreviewComparisonRequest] = []
     private(set) var dataStudioExportComparisonRequests: [DataStudioExportComparisonRequest] = []
     private(set) var dataStudioNormalizeSessionRequests: [DataStudioSessionNormalizeRequest] = []
@@ -134,6 +140,28 @@ final class MockSidecarClient: SidecarClienting {
             return try await dataStudioImportWorkbookHandler(request)
         }
         return dataStudioImportWorkbookResponse
+    }
+
+    func previewDataStudioWorkbook(_ request: DataStudioWorkbookPreviewRequest) async throws -> DataStudioWorkbookPreviewResponse {
+        dataStudioWorkbookPreviewRequests.append(request)
+        if let dataStudioWorkbookPreviewHandler {
+            return try await dataStudioWorkbookPreviewHandler(request)
+        }
+        if dataStudioWorkbookPreviewResponse.workbookPath != request.workbookPath {
+            return TestPayloads.dataStudioWorkbookPreview(
+                path: request.workbookPath,
+                label: URL(fileURLWithPath: request.workbookPath).deletingPathExtension().lastPathComponent
+            )
+        }
+        return dataStudioWorkbookPreviewResponse
+    }
+
+    func comparisonContextDataStudio(_ request: DataStudioComparisonContextRequest) async throws -> DataStudioComparisonContextResponse {
+        dataStudioComparisonContextRequests.append(request)
+        if let dataStudioComparisonContextHandler {
+            return try await dataStudioComparisonContextHandler(request)
+        }
+        return dataStudioComparisonContextResponse
     }
 
     func previewDataStudioComparison(_ request: DataStudioPreviewComparisonRequest) async throws -> DataStudioComparisonPreviewResponse {

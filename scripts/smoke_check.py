@@ -1659,11 +1659,11 @@ def _assert_editorial_policy_outputs(qa_by_output_key: dict[str, dict[str, objec
 
     bar_report = _report_for("bar/tensile_modulus_bar.pdf")
     bar_autofixes = {str(item) for item in bar_report.get("autofixes_applied", [])}
-    if "bar_raw_points_overlay" not in bar_autofixes:
-        raise AssertionError("Bar render should apply the editorial raw-point overlay.")
+    if "bar_raw_points_overlay" in bar_autofixes:
+        raise AssertionError("Plain bar render should remain summary-only and skip raw-point overlays.")
     bar_issue_ids = {str(item.get("id")) for item in bar_report.get("issues", []) if isinstance(item, dict)}
     if "raw_point_overlay" in bar_issue_ids:
-        raise AssertionError("Bar render should not report a missing raw-point overlay after autofix.")
+        raise AssertionError("Plain bar render should not expect a raw-point overlay under the new summary policy.")
 
     wide_nmr_report = _report_for("segmented_stacked_curve/wide_nmr_segmented_stacked_curve.pdf")
     wide_issue_ids = {str(item.get("id")) for item in wide_nmr_report.get("issues", []) if isinstance(item, dict)}

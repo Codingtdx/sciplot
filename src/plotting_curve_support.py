@@ -18,6 +18,7 @@ from src.layout_policy import (
     record_layout_decision,
 )
 from src.layout_scoring import bbox_overlaps_any, expanded_bbox, proximity_penalty
+from src.plot_contract import qa_profile
 from src.plotting_primitives import (
     _LINEAR_OUTER_PADDING_FRACTION,
     _STACKED_X_USE_STANDARD_ENDPOINT_POLICY,
@@ -82,6 +83,13 @@ class CurveTemplate:
     label_offset_pt: float = 5.0
     baseline_mode: str = "none"
     show_y_ticks: bool = True
+
+
+@dataclass(frozen=True)
+class LegendPlacementPolicy:
+    candidate_order: tuple[str, ...]
+    bias_step: float
+
 
 CURVE_TEMPLATES: dict[str, CurveTemplate] = {
     "frequency_sweep": CurveTemplate(
@@ -220,6 +228,98 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
         show_markers=False,
     ),
 }
+
+_STANDARD_LEGEND_DEFAULT_ORDER = ("upper_right", "lower_right", "upper_left", "lower_left")
+_TENSILE_STANDARD_LEGEND_DEFAULT_ORDER = ("lower_right", "upper_right", "lower_left", "upper_left")
+_COMPACT_LEGEND_DEFAULT_ORDER = ("upper_center", "upper_right", "lower_right", "upper_left", "lower_left", "lower_center")
+_TENSILE_COMPACT_LEGEND_DEFAULT_ORDER = (
+    "lower_right",
+    "upper_right",
+    "lower_left",
+    "upper_left",
+    "upper_center",
+    "lower_center",
+)
+
+
+def _legend_candidate_specs(*, inset_fraction: float) -> dict[str, tuple[tuple[float, float], dict[str, object]]]:
+    inset = inset_fraction
+    return {
+        "upper_left": ((inset, 1.0 - inset), {"loc": "upper left", "alignment": "left"}),
+        "lower_left": ((inset, inset), {"loc": "lower left", "alignment": "left"}),
+        "upper_right": ((1.0 - inset, 1.0 - inset), {"loc": "upper right", "alignment": "right"}),
+        "lower_right": ((1.0 - inset, inset), {"loc": "lower right", "alignment": "right"}),
+        "upper_center": ((0.5, 1.0 - inset), {"loc": "upper center", "alignment": "center"}),
+        "lower_center": ((0.5, inset), {"loc": "lower center", "alignment": "center"}),
+    }
+
+
+def _ordered_legend_candidates(
+    *,
+    candidate_order: tuple[str, ...],
+    bias_step: float,
+    inset_fraction: float,
+) -> list[LayoutCandidate]:
+    specs = _legend_candidate_specs(inset_fraction=inset_fraction)
+    candidates: list[LayoutCandidate] = []
+    for index, candidate_id in enumerate(candidate_order):
+        spec = specs.get(candidate_id)
+        if spec is None:
+            continue
+        anchor, payload = spec
+        candidates.append(
+            LayoutCandidate(
+                candidate_id=candidate_id,
+                anchor=anchor,
+                payload={**payload, "bias": float(index) * float(bias_step)},
+                notes="contract-ranked legend candidate",
+            )
+        )
+    return candidates
+
+
+def curve_legend_policy(
+    *,
+    preserve_stress_label: bool,
+    compact: bool,
+) -> LegendPlacementPolicy:
+    profile = qa_profile("curve")
+    if compact:
+        order_key = "tensile_compact_legend_candidate_order" if preserve_stress_label else "compact_legend_candidate_order"
+        default_order = (
+            _TENSILE_COMPACT_LEGEND_DEFAULT_ORDER if preserve_stress_label else _COMPACT_LEGEND_DEFAULT_ORDER
+        )
+        bias_key = "tensile_compact_legend_candidate_bias_step" if preserve_stress_label else "compact_legend_candidate_bias_step"
+        default_bias = 25.0 if preserve_stress_label else 0.75
+    else:
+        order_key = "tensile_legend_candidate_order" if preserve_stress_label else "legend_candidate_order"
+        default_order = (
+            _TENSILE_STANDARD_LEGEND_DEFAULT_ORDER if preserve_stress_label else _STANDARD_LEGEND_DEFAULT_ORDER
+        )
+        bias_key = "tensile_legend_candidate_bias_step" if preserve_stress_label else "legend_candidate_bias_step"
+        default_bias = 25.0 if preserve_stress_label else 0.75
+    raw_order = profile.get(order_key, default_order)
+    candidate_order = tuple(str(item) for item in raw_order) if isinstance(raw_order, (list, tuple)) else default_order
+    if not candidate_order:
+        candidate_order = default_order
+    return LegendPlacementPolicy(
+        candidate_order=candidate_order,
+        bias_step=float(profile.get(bias_key, default_bias)),
+    )
+
+
+def legend_layout_candidates(
+    *,
+    preserve_stress_label: bool,
+    compact: bool,
+    inset_fraction: float,
+) -> list[LayoutCandidate]:
+    policy = curve_legend_policy(preserve_stress_label=preserve_stress_label, compact=compact)
+    return _ordered_legend_candidates(
+        candidate_order=policy.candidate_order,
+        bias_step=policy.bias_step,
+        inset_fraction=inset_fraction,
+    )
 
 def _current_legend_inset(default: float | None = None) -> float:
     if default is not None:

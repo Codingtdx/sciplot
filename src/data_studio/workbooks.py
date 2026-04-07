@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 import pandas as pd
 
-from src.data_loader import load_curve_table, load_replicate_table
+from src.data_loader import CurveSeries, ReplicateGroup, load_curve_table, load_replicate_table, read_raw_table
 from src.data_studio.builtin import tensile as tensile_builtin
 from src.data_studio.ingest import preview_raw_file, read_preview_source
 from src.data_studio.io_utils import ensure_input_path, list_sheet_names
 from src.data_studio.models import (
+    DataStudioCurvePoint,
+    DataStudioSpecimenPreview,
+    DataStudioSpecimenState,
     DataStudioWorkbook,
+    DataStudioWorkbookPreview,
     FieldCandidate,
     TemplateDefinition,
     TemplateFieldBinding,
+    TemplateFieldRole,
     TemplateMatch,
     WorkbookMetricSummary,
     WorkbookSample,
@@ -24,6 +30,47 @@ from src.data_studio.template_store import load_template
 from src.infrastructure.persistence.data_studio_imports import prepare_managed_data_studio_import_dir
 
 GENERIC_TEMPLATE_PARSE_STRATEGY = "structured:curve_metrics_columns"
+
+
+@dataclass(frozen=True)
+class LoadedWorkbookSpecimen:
+    specimen_id: str
+    label: str
+    filename: str
+    source_path: Path | None
+    metrics: dict[str, float | None]
+    curve: CurveSeries | None
+    warnings: tuple[str, ...] = ()
+    exclusions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LoadedWorkbookSpecimenBundle:
+    workbook: DataStudioWorkbook
+    supported: bool
+    unsupported_reason: str
+    specimens: tuple[LoadedWorkbookSpecimen, ...] = ()
+
+
+@dataclass(frozen=True)
+class FilteredWorkbookContext:
+    workbook: DataStudioWorkbook
+    included_specimens: tuple[LoadedWorkbookSpecimen, ...]
+    metric_summaries: tuple[WorkbookMetricSummary, ...]
+    representative_specimen_id: str | None
+    representative_filename: str | None
+    representative_curve: CurveSeries | None
+    replicate_groups: dict[str, ReplicateGroup]
+
+
+class ParsedStructuredSample(TypedDict):
+    filename: str
+    curve: pd.DataFrame
+    metrics: dict[str, float | None]
+    x_label: str
+    y_label: str
+    x_unit: str | None
+    y_unit: str | None
 
 
 def create_template_from_candidates(
@@ -145,7 +192,7 @@ def build_workbook(
     if not paths:
         raise ValueError("Select at least one source file.")
 
-    parsed_samples: list[dict[str, object]] = []
+    parsed_samples: list[ParsedStructuredSample] = []
     workbook_samples: list[WorkbookSample] = []
     warnings: list[str] = []
     for path in paths:
@@ -158,7 +205,7 @@ def build_workbook(
                     source_path=path,
                     filename=path.name,
                     parsed=True,
-                    metrics={key: value for key, value in parsed["metrics"].items()},
+                    metrics=dict(parsed["metrics"]),
                 )
             )
         except Exception as exc:
@@ -316,7 +363,190 @@ def import_workbooks(path: str | Path) -> tuple[DataStudioWorkbook, ...]:
     return (import_workbook(workbook_path),)
 
 
-def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> dict[str, object]:
+def preview_workbook(
+    path: str | Path,
+    *,
+    specimen_states: Iterable[DataStudioSpecimenState] | None = None,
+) -> DataStudioWorkbookPreview:
+    bundle = load_workbook_specimen_bundle(path)
+    if not bundle.supported:
+        total_count = bundle.workbook.parsed_sample_count
+        return DataStudioWorkbookPreview(
+            workbook_path=bundle.workbook.workbook_path,
+            label=bundle.workbook.label,
+            supported=False,
+            unsupported_reason=bundle.unsupported_reason,
+            total_specimen_count=total_count,
+            included_specimen_count=total_count,
+            excluded_specimen_count=0,
+            representative_filename=bundle.workbook.representative_filename,
+            metrics=bundle.workbook.metrics,
+            warnings=bundle.workbook.warnings,
+        )
+
+    filtered = load_filtered_workbook_context(path, specimen_states=specimen_states, allow_empty=True)
+    suggested_ids, suggestion_reason = _suggested_exclusion_ids(filtered.included_specimens)
+    included_ids = {specimen.specimen_id for specimen in filtered.included_specimens}
+    specimen_previews = tuple(
+        DataStudioSpecimenPreview(
+            specimen_id=specimen.specimen_id,
+            label=specimen.label,
+            filename=specimen.filename,
+            source_path=specimen.source_path,
+            included=specimen.specimen_id in included_ids,
+            metrics={key: value for key, value in specimen.metrics.items()},
+            warnings=specimen.warnings,
+            exclusions=specimen.exclusions,
+            mini_curve_points=_downsample_curve_points(specimen.curve),
+            triad_complete=_has_complete_triad(specimen.metrics),
+            suggested_exclusion=specimen.specimen_id in suggested_ids,
+        )
+        for specimen in bundle.specimens
+    )
+    return DataStudioWorkbookPreview(
+        workbook_path=bundle.workbook.workbook_path,
+        label=bundle.workbook.label,
+        supported=True,
+        total_specimen_count=len(bundle.specimens),
+        included_specimen_count=len(filtered.included_specimens),
+        excluded_specimen_count=max(len(bundle.specimens) - len(filtered.included_specimens), 0),
+        representative_specimen_id=filtered.representative_specimen_id,
+        representative_filename=filtered.representative_filename,
+        metrics=filtered.metric_summaries,
+        specimens=specimen_previews,
+        warnings=bundle.workbook.warnings,
+        suggested_exclusion_ids=suggested_ids,
+        suggestion_supported=bool(suggested_ids),
+        suggestion_support_reason=suggestion_reason,
+    )
+
+
+def load_workbook_specimen_bundle(path: str | Path) -> LoadedWorkbookSpecimenBundle:
+    workbook = import_workbook(path)
+    workbook_path = workbook.workbook_path
+    sheet_names = set(workbook.sheet_names)
+    if tensile_builtin.ALL_SPECIMENS_SHEET not in sheet_names or tensile_builtin.ALL_CURVES_SHEET not in sheet_names:
+        return LoadedWorkbookSpecimenBundle(
+            workbook=workbook,
+            supported=False,
+            unsupported_reason=(
+                "Specimen editing needs workbook-level All_Specimens and All_Curves sheets. "
+                "This workbook can still be compared and exported."
+            ),
+        )
+
+    try:
+        summary_rows = _load_all_specimens_rows(workbook_path)
+        if not summary_rows:
+            raise ValueError("All_Specimens did not contain any specimen rows.")
+        curves = load_curve_table(workbook_path, sheet_name=tensile_builtin.ALL_CURVES_SHEET)
+        if not curves:
+            raise ValueError("All_Curves did not contain any specimen curves.")
+    except Exception as exc:
+        return LoadedWorkbookSpecimenBundle(
+            workbook=workbook,
+            supported=False,
+            unsupported_reason=f"Specimen editing could not read workbook details: {exc}",
+        )
+
+    source_path_by_name = {
+        Path(source_path).name: Path(source_path)
+        for source_path in workbook.source_files
+    }
+    curve_by_keys = _curve_lookup(curves)
+    specimens: list[LoadedWorkbookSpecimen] = []
+    for row in summary_rows:
+        filename = str(row.get("Filename", "")).strip()
+        if not filename:
+            continue
+        matched_curve = _match_curve_for_filename(filename, curve_by_keys)
+        source_path = source_path_by_name.get(filename)
+        metrics: dict[str, float | None] = {}
+        for key, value in row.items():
+            if key == "Filename":
+                continue
+            if value is None:
+                metrics[key] = None
+            elif isinstance(value, (int, float, np.floating)):
+                metrics[key] = float(value)
+            else:
+                metrics[key] = None
+        label = filename or (matched_curve.sample if matched_curve is not None else filename)
+        warnings: list[str] = []
+        if matched_curve is None:
+            warnings.append("Curve preview unavailable.")
+        specimens.append(
+            LoadedWorkbookSpecimen(
+                specimen_id=_specimen_id_for_filename(filename),
+                label=label,
+                filename=filename,
+                source_path=source_path,
+                metrics=metrics,
+                curve=matched_curve,
+                warnings=tuple(warnings),
+            )
+        )
+    if not specimens:
+        return LoadedWorkbookSpecimenBundle(
+            workbook=workbook,
+            supported=False,
+            unsupported_reason="Specimen editing could not recover any specimen rows from All_Specimens.",
+        )
+    return LoadedWorkbookSpecimenBundle(
+        workbook=workbook,
+        supported=True,
+        unsupported_reason="",
+        specimens=tuple(specimens),
+    )
+
+
+def load_filtered_workbook_context(
+    path: str | Path,
+    *,
+    specimen_states: Iterable[DataStudioSpecimenState] | None = None,
+    allow_empty: bool = False,
+) -> FilteredWorkbookContext:
+    bundle = load_workbook_specimen_bundle(path)
+    if not bundle.supported:
+        raise ValueError(
+            bundle.unsupported_reason
+            or f"{bundle.workbook.workbook_path.name} does not support specimen editing."
+        )
+
+    state_map = _specimen_state_map(bundle.workbook.workbook_path, specimen_states)
+    included_specimens = tuple(
+        specimen
+        for specimen in bundle.specimens
+        if state_map.get(specimen.specimen_id, True)
+    )
+    if not included_specimens and not allow_empty:
+        raise ValueError(f"{bundle.workbook.workbook_path.name} needs at least one included specimen.")
+
+    metric_summaries = _metric_summaries_for_specimens(bundle.workbook.metrics, included_specimens)
+    representative_specimen = _representative_specimen(
+        included_specimens,
+        metric_order=[metric.label for metric in bundle.workbook.metrics],
+        require_curve=False,
+    )
+    representative_curve_specimen = _representative_specimen(
+        included_specimens,
+        metric_order=[metric.label for metric in bundle.workbook.metrics],
+        require_curve=True,
+    )
+    representative_curve = representative_curve_specimen.curve if representative_curve_specimen is not None else None
+    replicate_groups = _replicate_groups_for_specimens(bundle.workbook, included_specimens)
+    return FilteredWorkbookContext(
+        workbook=bundle.workbook,
+        included_specimens=included_specimens,
+        metric_summaries=metric_summaries,
+        representative_specimen_id=representative_specimen.specimen_id if representative_specimen is not None else None,
+        representative_filename=representative_specimen.filename if representative_specimen is not None else None,
+        representative_curve=representative_curve,
+        replicate_groups=replicate_groups,
+    )
+
+
+def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> ParsedStructuredSample:
     source_path = Path(path).expanduser()
     sheets, _encoding, _delimiter = read_preview_source(source_path)
     sheet_name = str(template.metadata.get("sheet_name", "")) or sheets[0][0]
@@ -380,6 +610,240 @@ def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> d
     }
 
 
+def _load_all_specimens_rows(workbook_path: Path) -> list[dict[str, float | str | None]]:
+    raw = read_raw_table(workbook_path, sheet_name=tensile_builtin.ALL_SPECIMENS_SHEET).fillna("")
+    if raw.empty:
+        return []
+    headers = [_cell_text(value) for value in raw.iloc[0].tolist()]
+    rows: list[dict[str, float | str | None]] = []
+    for row_index in range(1, raw.shape[0]):
+        values = raw.iloc[row_index].tolist()
+        if all(_cell_text(value) == "" for value in values):
+            continue
+        row: dict[str, float | str | None] = {}
+        for header, value in zip(headers, values, strict=False):
+            if not header:
+                continue
+            if header == "Filename":
+                row[header] = _cell_text(value)
+                continue
+            label, _unit = _split_metric_header(header)
+            numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+            row[label] = float(numeric) if pd.notna(numeric) else None
+        rows.append(row)
+    return rows
+
+
+def _curve_lookup(curves: Iterable[CurveSeries]) -> dict[str, CurveSeries]:
+    lookup: dict[str, CurveSeries] = {}
+    for curve in curves:
+        for key in _specimen_match_keys(curve.sample):
+            lookup.setdefault(key, curve)
+    return lookup
+
+
+def _match_curve_for_filename(filename: str, curve_by_keys: dict[str, CurveSeries]) -> CurveSeries | None:
+    for key in _specimen_match_keys(filename):
+        if key in curve_by_keys:
+            return curve_by_keys[key]
+    return None
+
+
+def _specimen_id_for_filename(filename: str) -> str:
+    normalized = _normalize_specimen_token(filename)
+    return normalized or filename or "specimen"
+
+
+def _specimen_state_map(
+    workbook_path: Path,
+    specimen_states: Iterable[DataStudioSpecimenState] | None,
+) -> dict[str, bool]:
+    normalized_path = str(workbook_path.expanduser())
+    return {
+        state.specimen_id: state.included
+        for state in (specimen_states or ())
+        if str(Path(state.workbook_path).expanduser()) == normalized_path
+    }
+
+
+def _metric_summaries_for_specimens(
+    workbook_metrics: Iterable[WorkbookMetricSummary],
+    specimens: Iterable[LoadedWorkbookSpecimen],
+) -> tuple[WorkbookMetricSummary, ...]:
+    specimen_list = list(specimens)
+    summaries: list[WorkbookMetricSummary] = []
+    for metric in workbook_metrics:
+        values = [
+            float(value)
+            for specimen in specimen_list
+            if (value := specimen.metrics.get(metric.label)) is not None and pd.notna(value)
+        ]
+        series = pd.Series(values, dtype=float) if values else pd.Series(dtype=float)
+        summaries.append(
+            WorkbookMetricSummary(
+                id=metric.id,
+                label=metric.label,
+                unit=metric.unit,
+                mean=float(series.mean()) if not series.empty else None,
+                std=float(series.std(ddof=1)) if len(series.index) > 1 else None,
+            )
+        )
+    return tuple(summaries)
+
+
+def _replicate_groups_for_specimens(
+    workbook: DataStudioWorkbook,
+    specimens: Iterable[LoadedWorkbookSpecimen],
+) -> dict[str, ReplicateGroup]:
+    specimen_list = list(specimens)
+    groups: dict[str, ReplicateGroup] = {}
+    for metric in workbook.metrics:
+        values = [
+            float(value)
+            for specimen in specimen_list
+            if (value := specimen.metrics.get(metric.label)) is not None and pd.notna(value)
+        ]
+        groups[metric.label] = ReplicateGroup(
+            group=workbook.label,
+            value_label=metric.label,
+            value_unit=metric.unit,
+            data=pd.Series(values, dtype=float),
+        )
+    return groups
+
+
+def _representative_specimen(
+    specimens: Iterable[LoadedWorkbookSpecimen],
+    *,
+    metric_order: Iterable[str],
+    require_curve: bool,
+) -> LoadedWorkbookSpecimen | None:
+    specimen_list = [specimen for specimen in specimens if specimen.curve is not None or not require_curve]
+    if not specimen_list:
+        return None
+    summary_df = _specimen_metric_dataframe(specimen_list, metric_order=metric_order)
+    if summary_df.empty:
+        return specimen_list[0]
+    scores = _representative_scores(summary_df)
+    ordered_indices = sorted(
+        range(len(specimen_list)),
+        key=lambda index: (scores.iloc[index], index, specimen_list[index].filename.lower()),
+    )
+    return specimen_list[ordered_indices[0]] if ordered_indices else specimen_list[0]
+
+
+def _specimen_metric_dataframe(
+    specimens: Iterable[LoadedWorkbookSpecimen],
+    *,
+    metric_order: Iterable[str],
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for specimen in specimens:
+        row: dict[str, object] = {"Filename": specimen.filename}
+        for metric_label in metric_order:
+            row[metric_label] = specimen.metrics.get(metric_label)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def _representative_scores(summary_df: pd.DataFrame) -> pd.Series:
+    numeric_columns = [column for column in summary_df.columns if column != "Filename"]
+    if not numeric_columns:
+        return pd.Series(0.0, index=summary_df.index, dtype=float)
+    scores = pd.Series(0.0, index=summary_df.index, dtype=float)
+    contributions = pd.Series(0, index=summary_df.index, dtype=int)
+    for column in numeric_columns:
+        series = pd.to_numeric(summary_df[column], errors="coerce")
+        std_value = float(series.std(ddof=1)) if series.notna().sum() > 1 else 0.0
+        if std_value <= 0:
+            continue
+        z_squared = ((series - float(series.mean())) / std_value) ** 2
+        scores = scores.add(z_squared.fillna(0.0), fill_value=0.0)
+        contributions = contributions.add(series.notna().astype(int), fill_value=0).astype(int)
+    if not (contributions > 0).any():
+        return pd.Series(0.0, index=summary_df.index, dtype=float)
+    return scores.where(contributions > 0, other=np.inf)
+
+
+def _suggested_exclusion_ids(specimens: Iterable[LoadedWorkbookSpecimen]) -> tuple[tuple[str, ...], str]:
+    eligible = [specimen for specimen in specimens if _has_complete_triad(specimen.metrics)]
+    if len(eligible) < 7:
+        return (), "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
+    triad = ["Strength", "Modulus", "Elongation"]
+    summary_df = _specimen_metric_dataframe(eligible, metric_order=triad)
+    zscore_columns: list[pd.Series] = []
+    for metric in triad:
+        series = pd.to_numeric(summary_df[metric], errors="coerce")
+        std_value = float(series.std(ddof=1)) if series.notna().sum() > 1 else 0.0
+        if std_value <= 0:
+            continue
+        zscore_columns.append((series - float(series.mean())) / std_value)
+    if len(zscore_columns) != len(triad):
+        return (), "Suggest Exclusions needs varying Strength / Modulus / Elongation values across the included set."
+    composite = pd.concat(zscore_columns, axis=1).mean(axis=1)
+    if composite.empty:
+        return (), "Suggest Exclusions could not score the included specimens."
+    lowest_index = int(composite.idxmin())
+    highest_index = int(composite.idxmax())
+    if lowest_index == highest_index:
+        return (), "Suggest Exclusions needs at least two distinct composite scores."
+    return (
+        eligible[lowest_index].specimen_id,
+        eligible[highest_index].specimen_id,
+    ), ""
+
+
+def _has_complete_triad(metrics: dict[str, float | None]) -> bool:
+    triad = ("Strength", "Modulus", "Elongation")
+    return all(metrics.get(metric) is not None and pd.notna(metrics.get(metric)) for metric in triad)
+
+
+def _downsample_curve_points(curve: CurveSeries | None, *, max_points: int = 32) -> tuple[DataStudioCurvePoint, ...]:
+    if curve is None or curve.data.empty:
+        return ()
+    dataframe = curve.data.reset_index(drop=True)
+    if len(dataframe.index) <= max_points:
+        indices = list(range(len(dataframe.index)))
+    else:
+        indices = np.linspace(0, len(dataframe.index) - 1, num=max_points, dtype=int).tolist()
+    return tuple(
+        DataStudioCurvePoint(
+            x=float(dataframe.iloc[index]["x"]),
+            y=float(dataframe.iloc[index]["y"]),
+        )
+        for index in indices
+    )
+
+
+def _split_metric_header(header: str) -> tuple[str, str]:
+    if "(" not in header or ")" not in header:
+        return header.strip(), ""
+    label, unit = header.rsplit("(", 1)
+    return label.strip(), unit.rstrip(")").strip()
+
+
+def _specimen_match_keys(value: str) -> tuple[str, ...]:
+    text = value.strip()
+    if not text:
+        return ()
+    path = Path(text)
+    name = path.name.strip()
+    stem = path.stem.strip()
+    candidates = [text, name, stem]
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = _normalize_specimen_token(candidate)
+        if key and key not in seen:
+            normalized.append(key)
+            seen.add(key)
+    return tuple(normalized)
+
+
+def _normalize_specimen_token(value: str) -> str:
+    return "".join(ch.lower() for ch in value.strip() if ch.isalnum())
+
+
 def infer_group_name(file_paths: Iterable[str | Path]) -> str:
     return tensile_builtin.infer_group_name(file_paths)
 
@@ -406,7 +870,7 @@ def _best_candidate(candidates: list[FieldCandidate], kind: str) -> FieldCandida
     return matches[0]
 
 
-def _binding_from_candidate(candidate: FieldCandidate, *, role: str) -> TemplateFieldBinding:
+def _binding_from_candidate(candidate: FieldCandidate, *, role: TemplateFieldRole) -> TemplateFieldBinding:
     column_index = candidate.range.start_col if candidate.range is not None else None
     return TemplateFieldBinding(
         id=candidate.id,
@@ -438,13 +902,12 @@ def _resolve_column_index(header_row: list[str], binding: TemplateFieldBinding) 
     return None
 
 
-def _metrics_dataframe(parsed_samples: list[dict[str, object]]) -> pd.DataFrame:
+def _metrics_dataframe(parsed_samples: list[ParsedStructuredSample]) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     metric_units: dict[str, str] = {}
     for sample in parsed_samples:
         row: dict[str, object] = {"Filename": sample["filename"]}
-        metrics = sample["metrics"]
-        for label, value in metrics.items():
+        for label, value in sample["metrics"].items():
             unit = "%" if "elong" in label.lower() else "a.u."
             metric_units[label] = unit
             row[f"{label} ({unit})"] = value
@@ -453,16 +916,9 @@ def _metrics_dataframe(parsed_samples: list[dict[str, object]]) -> pd.DataFrame:
 
 
 def _representative_index(summary_df: pd.DataFrame) -> int:
-    numeric_columns = summary_df.select_dtypes(include=[np.number]).columns
-    if not numeric_columns.tolist():
+    if summary_df.empty:
         return 0
-    mean_values = summary_df.mean(numeric_only=True)
-    std_values = summary_df.std(numeric_only=True)
-    scores = pd.Series(0.0, index=summary_df.index, dtype=float)
-    for column in numeric_columns:
-        std_value = std_values[column]
-        if pd.notna(std_value) and float(std_value) > 0:
-            scores += ((summary_df[column] - mean_values[column]) / std_value) ** 2
+    scores = _representative_scores(summary_df)
     return int(scores.idxmin())
 
 

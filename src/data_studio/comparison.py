@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -14,11 +15,15 @@ from src.data_studio.io_utils import list_sheet_names
 from src.data_studio.models import (
     ComparisonRecipe,
     ComparisonSet,
-    DataStudioGroupState,
     DataStudioFigureOutput,
+    DataStudioGroupState,
+    DataStudioSpecimenState,
     WorkbookMetricSummary,
 )
-from src.data_studio.workbooks import import_workbook
+from src.data_studio.workbooks import import_workbook, load_filtered_workbook_context, load_workbook_specimen_bundle
+from src.infrastructure.persistence.data_studio_comparison_contexts import (
+    prepare_managed_data_studio_comparison_context_dir,
+)
 from src.plot_contract import template_contract
 from src.plot_style import DEFAULT_PALETTE_PRESET, DEFAULT_STYLE_PRESET, normalize_style_preset
 from src.rendering.render_service import build_rendered_plots, close_rendered_plots, export_rendered_plots
@@ -41,9 +46,38 @@ class ResolvedComparisonGroup:
     loaded: LoadedComparisonWorkbook
 
 
-def load_comparison_workbook(path: str | Path) -> LoadedComparisonWorkbook:
+@dataclass(frozen=True)
+class MaterializedComparisonContext:
+    comparison_set: ComparisonSet
+    cache_key: str
+    materialized_at: str
+
+
+def load_comparison_workbook(
+    path: str | Path,
+    *,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
+) -> LoadedComparisonWorkbook:
     workbook = import_workbook(path)
-    representative_curves = load_curve_table(workbook.workbook_path, sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET)
+    specimen_bundle = load_workbook_specimen_bundle(path)
+    if specimen_bundle.supported:
+        filtered = load_filtered_workbook_context(path, specimen_states=specimen_states)
+        if filtered.representative_curve is None:
+            raise ValueError(
+                f"{workbook.workbook_path.name} needs at least one included specimen with a representative curve."
+            )
+        return LoadedComparisonWorkbook(
+            workbook_path=workbook.workbook_path,
+            label=workbook.label,
+            representative_curve=filtered.representative_curve,
+            metric_summaries=filtered.metric_summaries,
+            replicate_groups=filtered.replicate_groups,
+        )
+
+    representative_curves = load_curve_table(
+        workbook.workbook_path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+    )
     if len(representative_curves) != 1:
         raise ValueError(
             f"{workbook.workbook_path.name} must contain exactly one representative curve in "
@@ -71,8 +105,13 @@ def comparison_recipes_for_workbooks(
     workbook_paths: list[str | Path],
     *,
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> tuple[ComparisonRecipe, ...]:
-    resolved_groups = _resolve_comparison_groups(workbook_paths, group_states=group_states)
+    resolved_groups = _resolve_comparison_groups(
+        workbook_paths,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
     loaded = [group.loaded for group in resolved_groups]
     if not loaded:
         raise ValueError("Data Studio needs at least one included workbook group.")
@@ -164,8 +203,13 @@ def build_comparison_set(
     output_dir: str | Path,
     *,
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> ComparisonSet:
-    resolved_groups = _resolve_comparison_groups(workbook_paths, group_states=group_states)
+    resolved_groups = _resolve_comparison_groups(
+        workbook_paths,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
     loaded = [group.loaded for group in resolved_groups]
     if len(loaded) < 1:
         raise ValueError("Data Studio comparison requires at least one included workbook group.")
@@ -255,6 +299,7 @@ def build_comparison_set(
             )
             for group in resolved_groups
         ],
+        specimen_states=specimen_states,
     )
     return ComparisonSet(
         id=bundle_dir.name,
@@ -271,9 +316,15 @@ def preview_comparison_recipe(
     recipe_id: str,
     *,
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> tuple[ComparisonSet, ComparisonRecipe, str]:
     temp_dir = Path(tempfile.mkdtemp(prefix="data_studio_preview_"))
-    comparison_set = build_comparison_set(workbook_paths, temp_dir, group_states=group_states)
+    comparison_set = build_comparison_set(
+        workbook_paths,
+        temp_dir,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
     recipe = _find_recipe(comparison_set.recipes, recipe_id)
     rendered = build_rendered_plots(
         recipe.template_id,
@@ -293,16 +344,52 @@ def preview_comparison_recipe(
     return comparison_set, recipe, pdf_base64
 
 
+def materialize_comparison_context(
+    workbook_paths: list[str | Path],
+    *,
+    group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
+) -> MaterializedComparisonContext:
+    cache_key, output_dir = prepare_managed_data_studio_comparison_context_dir(
+        workbook_paths,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+    comparison_set = build_comparison_set(
+        workbook_paths,
+        output_dir,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+    materialized_at = datetime.fromtimestamp(
+        comparison_set.comparison_workbook_path.stat().st_mtime,
+        tz=UTC,
+    ).isoformat()
+    return MaterializedComparisonContext(
+        comparison_set=comparison_set,
+        cache_key=cache_key,
+        materialized_at=materialized_at,
+    )
+
+
 def export_comparison_bundle(
     workbook_paths: list[str | Path],
     output_dir: str | Path,
     *,
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
     selected_recipe_ids: list[str] | None = None,
     figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
 ) -> tuple[ComparisonSet, tuple[DataStudioFigureOutput, ...]]:
-    comparison_set = build_comparison_set(workbook_paths, output_dir, group_states=group_states)
-    selected_ids = set(selected_recipe_ids or [recipe.id for recipe in comparison_set.recipes if recipe.enabled_by_default])
+    comparison_set = build_comparison_set(
+        workbook_paths,
+        output_dir,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+    selected_ids = set(
+        selected_recipe_ids or [recipe.id for recipe in comparison_set.recipes if recipe.enabled_by_default]
+    )
     figure_options_by_recipe_id = figure_options_by_recipe_id or {}
     figure_outputs: list[DataStudioFigureOutput] = []
     bundle_dir = comparison_set.comparison_workbook_path.parent
@@ -321,7 +408,7 @@ def export_comparison_bundle(
         )
         try:
             output_paths = export_rendered_plots(rendered, bundle_dir, close=False)
-            for output_path, rendered_plot in zip(output_paths, rendered, strict=True):
+            for output_path, _rendered_plot in zip(output_paths, rendered, strict=True):
                 figure_outputs.append(
                     DataStudioFigureOutput(
                         path=output_path,
@@ -351,6 +438,7 @@ def _resolve_comparison_groups(
     workbook_paths: list[str | Path],
     *,
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> list[ResolvedComparisonGroup]:
     expanded_paths = [Path(path).expanduser() for path in workbook_paths]
     if not expanded_paths:
@@ -372,7 +460,7 @@ def _resolve_comparison_groups(
         state = state_by_path.get(str(path))
         if state is not None and not state.include_in_compare:
             continue
-        loaded = load_comparison_workbook(path)
+        loaded = load_comparison_workbook(path, specimen_states=specimen_states)
         display_name = (
             state.display_name.strip()
             if state is not None and state.display_name.strip()

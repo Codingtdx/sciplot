@@ -5,6 +5,7 @@ from pathlib import Path
 from src.data_studio.comparison import (
     comparison_recipes_for_workbooks,
     export_comparison_bundle,
+    materialize_comparison_context,
     preview_comparison_recipe,
 )
 from src.data_studio.ingest import preview_and_recommend
@@ -16,7 +17,13 @@ from src.data_studio.template_store import (
     rename_template,
     save_template,
 )
-from src.data_studio.workbooks import build_workbook, create_template_from_candidates, import_workbook, import_workbooks
+from src.data_studio.workbooks import (
+    build_workbook,
+    create_template_from_candidates,
+    import_workbook,
+    import_workbooks,
+    preview_workbook,
+)
 
 
 def list_data_studio_templates():
@@ -77,12 +84,40 @@ def import_data_studio_workbooks(path: str | Path):
     return import_workbooks(path)
 
 
+def preview_data_studio_workbook(path: str | Path, *, specimen_states=None):
+    return preview_workbook(path, specimen_states=specimen_states)
+
+
 def list_data_studio_recipes(workbook_paths: list[str | Path], *, group_states=None):
     return comparison_recipes_for_workbooks(workbook_paths, group_states=group_states)
 
 
-def preview_data_studio_comparison(workbook_paths: list[str | Path], recipe_id: str, *, group_states=None):
-    return preview_comparison_recipe(workbook_paths, recipe_id, group_states=group_states)
+def preview_data_studio_comparison(
+    workbook_paths: list[str | Path],
+    recipe_id: str,
+    *,
+    group_states=None,
+    specimen_states=None,
+):
+    return preview_comparison_recipe(
+        workbook_paths,
+        recipe_id,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+
+
+def preview_data_studio_comparison_context(
+    workbook_paths: list[str | Path],
+    *,
+    group_states=None,
+    specimen_states=None,
+):
+    return materialize_comparison_context(
+        workbook_paths,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
 
 
 def export_data_studio_comparison(
@@ -90,6 +125,7 @@ def export_data_studio_comparison(
     output_dir: str | Path,
     *,
     group_states=None,
+    specimen_states=None,
     selected_recipe_ids: list[str] | None = None,
     figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
 ):
@@ -97,6 +133,7 @@ def export_data_studio_comparison(
         workbook_paths,
         output_dir,
         group_states=group_states,
+        specimen_states=specimen_states,
         selected_recipe_ids=selected_recipe_ids,
         figure_options_by_recipe_id=figure_options_by_recipe_id,
     )
@@ -113,7 +150,9 @@ __all__ = [
     "list_data_studio_templates",
     "load_template",
     "normalize_session_payload",
+    "preview_data_studio_workbook",
     "preview_data_studio_comparison",
+    "preview_data_studio_comparison_context",
     "preview_data_studio_source",
     "update_data_studio_template",
 ]

@@ -16,7 +16,7 @@ from src.layout_policy import (
 )
 from src.layout_scoring import score_points_against_bbox
 from src.plot_contract import qa_profile
-from src.plotting_curve_support import _place_series_edge_labels
+from src.plotting_curve_support import _place_series_edge_labels, legend_layout_candidates
 from src.rendering.models import RenderedPlot, RenderOptions
 from src.rendering.qa import CurveAutofix, recommend_curve_autofix
 
@@ -523,32 +523,12 @@ def _collect_axis_display_points(ax: plt.Axes, *, max_points: int = 3200) -> np.
         stacked = stacked[indices]
     return stacked
 
-def _compact_legend_candidates(inset: float) -> list[LayoutCandidate]:
-    return [
-        LayoutCandidate(
-            candidate_id="compact_upper_center",
-            anchor=(0.5, 1.0 - inset),
-            standoff_pt=inset * 72.0,
-            payload={"loc": "upper center", "alignment": "center", "bias": 0.0},
-            notes="primary compact legend candidate",
-        ),
-        LayoutCandidate(
-            candidate_id="compact_upper_left",
-            anchor=(inset, 1.0 - inset),
-            standoff_pt=inset * 72.0,
-            payload={"loc": "upper left", "alignment": "left", "bias": 2.4},
-            notes="compact legend fallback candidate",
-        ),
-        LayoutCandidate(
-            candidate_id="compact_upper_right",
-            anchor=(1.0 - inset, 1.0 - inset),
-            standoff_pt=inset * 72.0,
-            payload={"loc": "upper right", "alignment": "right", "bias": 2.8},
-            notes="compact legend fallback candidate",
-        ),
-    ]
-
-def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
+def _apply_compact_inside_legend(
+    ax: plt.Axes,
+    *,
+    series_count: int,
+    preserve_stress_label: bool = False,
+) -> bool:
     if series_count < 2:
         record_layout_decision(
             ax.figure,
@@ -567,7 +547,11 @@ def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
         return False
     profile = _compact_curve_editorial_profile()
     inset = plot_style.current_spacing().legend_inset_fraction
-    candidates = _compact_legend_candidates(inset)
+    candidates = legend_layout_candidates(
+        preserve_stress_label=preserve_stress_label,
+        compact=True,
+        inset_fraction=inset,
+    )
     data_points = _collect_axis_display_points(ax)
 
     def _score(candidate: LayoutCandidate) -> LayoutScore:
@@ -660,7 +644,7 @@ def _apply_compact_inside_legend(ax: plt.Axes, *, series_count: int) -> bool:
         labelspacing=0.25,
         borderpad=profile.legend_borderpad,
     )
-    if chosen.candidate_id != "compact_upper_center":
+    if chosen.candidate_id != "upper_center":
         decision = flag_margin_fallback(
             decision,
             action=f"compact_anchor:{chosen.candidate_id}",

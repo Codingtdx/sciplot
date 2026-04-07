@@ -124,7 +124,11 @@ def _render_curve_candidate(
                 side=direct_label_side,
             )
         elif compact_legend:
-            _apply_compact_inside_legend(ax, series_count=len(series_list))
+            _apply_compact_inside_legend(
+                ax,
+                series_count=len(series_list),
+                preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
+            )
         applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=False))
     else:
         marker_size = None
@@ -173,7 +177,11 @@ def _render_curve_candidate(
                 side=direct_label_side,
             )
         elif compact_legend:
-            _apply_compact_inside_legend(ax, series_count=len(series_list))
+            _apply_compact_inside_legend(
+                ax,
+                series_count=len(series_list),
+                preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
+            )
         applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=show_markers))
 
     rendered = _rendered_plot_with_qa(

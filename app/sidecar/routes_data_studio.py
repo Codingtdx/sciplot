@@ -4,8 +4,10 @@ from fastapi import APIRouter
 
 from app.sidecar.schemas import (
     DataStudioBuildWorkbookRequest,
+    DataStudioComparisonContextResponse,
     DataStudioComparisonExportResponse,
     DataStudioComparisonPreviewResponse,
+    DataStudioComparisonRequest,
     DataStudioCreateTemplateRequest,
     DataStudioExportComparisonRequest,
     DataStudioImportWorkbookRequest,
@@ -18,6 +20,8 @@ from app.sidecar.schemas import (
     DataStudioTemplateListResponse,
     DataStudioTemplateResponse,
     DataStudioUpdateTemplateRequest,
+    DataStudioWorkbookPreviewRequest,
+    DataStudioWorkbookPreviewResponse,
     DataStudioWorkbookResponse,
     PreviewItemResponse,
     serialize_dataclass,
@@ -32,7 +36,9 @@ from src.data_studio.service import (
     list_data_studio_templates,
     normalize_session_payload,
     preview_data_studio_comparison,
+    preview_data_studio_comparison_context,
     preview_data_studio_source,
+    preview_data_studio_workbook,
     update_data_studio_template,
 )
 
@@ -116,6 +122,35 @@ def create_data_studio_router() -> APIRouter:
         except Exception as exc:
             raise http_bad_request("data_studio_import_workbook", exc) from exc
 
+    @router.post("/data-studio/workbook-preview", response_model=DataStudioWorkbookPreviewResponse)
+    def workbook_preview(request: DataStudioWorkbookPreviewRequest) -> DataStudioWorkbookPreviewResponse:
+        try:
+            preview = preview_data_studio_workbook(
+                request.workbook_path,
+                specimen_states=request.specimen_states,
+            )
+            return DataStudioWorkbookPreviewResponse.model_validate(serialize_dataclass(preview))
+        except Exception as exc:
+            raise http_bad_request("data_studio_workbook_preview", exc) from exc
+
+    @router.post("/data-studio/comparison-context", response_model=DataStudioComparisonContextResponse)
+    def comparison_context(request: DataStudioComparisonRequest) -> DataStudioComparisonContextResponse:
+        try:
+            context = preview_data_studio_comparison_context(
+                request.workbook_paths,
+                group_states=request.group_states,
+                specimen_states=request.specimen_states,
+            )
+            return DataStudioComparisonContextResponse.model_validate(
+                {
+                    "comparison_set": serialize_dataclass(context.comparison_set),
+                    "cache_key": context.cache_key,
+                    "materialized_at": context.materialized_at,
+                }
+            )
+        except Exception as exc:
+            raise http_bad_request("data_studio_comparison_context", exc) from exc
+
     @router.post("/data-studio/comparison-preview", response_model=DataStudioComparisonPreviewResponse)
     def comparison_preview(request: DataStudioPreviewComparisonRequest) -> DataStudioComparisonPreviewResponse:
         try:
@@ -123,6 +158,7 @@ def create_data_studio_router() -> APIRouter:
                 request.workbook_paths,
                 request.recipe_id,
                 group_states=request.group_states,
+                specimen_states=request.specimen_states,
             )
             return DataStudioComparisonPreviewResponse.model_validate(
                 {
@@ -144,6 +180,7 @@ def create_data_studio_router() -> APIRouter:
                 request.workbook_paths,
                 request.output_dir,
                 group_states=request.group_states,
+                specimen_states=request.specimen_states,
                 selected_recipe_ids=request.selected_recipe_ids,
                 figure_options_by_recipe_id={
                     recipe_id: options.model_dump()

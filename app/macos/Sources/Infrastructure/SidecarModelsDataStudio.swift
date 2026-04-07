@@ -248,6 +248,35 @@ struct DataStudioWorkbookSampleResponse: Codable, Equatable, Sendable, Identifia
     let metrics: [String: Double?]
 }
 
+struct DataStudioCurvePointResponse: Codable, Equatable, Sendable {
+    let x: Double
+    let y: Double
+}
+
+struct DataStudioSpecimenStatePayload: Codable, Equatable, Sendable, Identifiable {
+    let workbookPath: String
+    let specimenId: String
+    let included: Bool
+
+    var id: String { "\(workbookPath)::\(specimenId)" }
+}
+
+struct DataStudioSpecimenPreviewResponse: Codable, Equatable, Sendable, Identifiable {
+    let specimenId: String
+    let label: String
+    let filename: String
+    let sourcePath: String?
+    let included: Bool
+    let metrics: [String: Double?]
+    let warnings: [String]
+    let exclusions: [String]
+    let miniCurvePoints: [DataStudioCurvePointResponse]
+    let triadComplete: Bool
+    let suggestedExclusion: Bool
+
+    var id: String { specimenId }
+}
+
 struct DataStudioWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
     let workbookID: String
     let workbookPath: String
@@ -282,6 +311,24 @@ struct DataStudioWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
         case exclusions
         case samples
     }
+}
+
+struct DataStudioWorkbookPreviewResponse: Codable, Equatable, Sendable {
+    let workbookPath: String
+    let label: String
+    let supported: Bool
+    let unsupportedReason: String
+    let totalSpecimenCount: Int
+    let includedSpecimenCount: Int
+    let excludedSpecimenCount: Int
+    let representativeSpecimenId: String?
+    let representativeFilename: String?
+    let metrics: [DataStudioMetricSummaryResponse]
+    let specimens: [DataStudioSpecimenPreviewResponse]
+    let warnings: [String]
+    let suggestedExclusionIds: [String]
+    let suggestionSupported: Bool
+    let suggestionSupportReason: String
 }
 
 struct DataStudioImportWorkbookResponse: Codable, Equatable, Sendable {
@@ -377,6 +424,12 @@ struct DataStudioComparisonPreviewResponse: Codable, Equatable, Sendable {
     let preview: PreviewItemResponse
 }
 
+struct DataStudioComparisonContextResponse: Codable, Equatable, Sendable {
+    let comparisonSet: DataStudioComparisonSetResponse
+    let cacheKey: String?
+    let materializedAt: String?
+}
+
 struct DataStudioComparisonExportResponse: Codable, Equatable, Sendable {
     let comparisonSet: DataStudioComparisonSetResponse
     let figureOutputs: [DataStudioFigureOutputResponse]
@@ -393,9 +446,42 @@ struct DataStudioSessionResponse: Codable, Equatable, Sendable {
     let selectedFigureFamilyID: String?
     let selectedFigureTemplateID: String?
     let groupStates: [DataStudioGroupStatePayload]
+    let specimenStates: [DataStudioSpecimenStatePayload]
     let figurePreferences: [DataStudioFigurePreferencePayload]
     let importedPaths: [String]
     let templateDraftPath: String?
+
+    init(
+        version: Int,
+        selectedTemplateID: String?,
+        selectedWorkbookID: String?,
+        primaryWorkbookID: String?,
+        selectedRecipeID: String?,
+        workbookPaths: [String],
+        comparisonRecipeIDs: [String],
+        selectedFigureFamilyID: String?,
+        selectedFigureTemplateID: String?,
+        groupStates: [DataStudioGroupStatePayload],
+        specimenStates: [DataStudioSpecimenStatePayload] = [],
+        figurePreferences: [DataStudioFigurePreferencePayload],
+        importedPaths: [String],
+        templateDraftPath: String?
+    ) {
+        self.version = version
+        self.selectedTemplateID = selectedTemplateID
+        self.selectedWorkbookID = selectedWorkbookID
+        self.primaryWorkbookID = primaryWorkbookID
+        self.selectedRecipeID = selectedRecipeID
+        self.workbookPaths = workbookPaths
+        self.comparisonRecipeIDs = comparisonRecipeIDs
+        self.selectedFigureFamilyID = selectedFigureFamilyID
+        self.selectedFigureTemplateID = selectedFigureTemplateID
+        self.groupStates = groupStates
+        self.specimenStates = specimenStates
+        self.figurePreferences = figurePreferences
+        self.importedPaths = importedPaths
+        self.templateDraftPath = templateDraftPath
+    }
 
     enum CodingKeys: String, CodingKey {
         case version
@@ -408,6 +494,7 @@ struct DataStudioSessionResponse: Codable, Equatable, Sendable {
         case selectedFigureFamilyID = "selectedFigureFamilyId"
         case selectedFigureTemplateID = "selectedFigureTemplateId"
         case groupStates
+        case specimenStates
         case figurePreferences
         case importedPaths
         case templateDraftPath
@@ -462,15 +549,55 @@ struct DataStudioImportWorkbookRequest: Codable, Equatable, Sendable {
     let workbookPath: String
 }
 
+struct DataStudioWorkbookPreviewRequest: Codable, Equatable, Sendable {
+    let workbookPath: String
+    let specimenStates: [DataStudioSpecimenStatePayload]
+
+    init(workbookPath: String, specimenStates: [DataStudioSpecimenStatePayload] = []) {
+        self.workbookPath = workbookPath
+        self.specimenStates = specimenStates
+    }
+}
+
+struct DataStudioComparisonContextRequest: Codable, Equatable, Sendable {
+    let workbookPaths: [String]
+    let groupStates: [DataStudioGroupStatePayload]
+    let specimenStates: [DataStudioSpecimenStatePayload]
+
+    init(
+        workbookPaths: [String],
+        groupStates: [DataStudioGroupStatePayload] = [],
+        specimenStates: [DataStudioSpecimenStatePayload] = []
+    ) {
+        self.workbookPaths = workbookPaths
+        self.groupStates = groupStates
+        self.specimenStates = specimenStates
+    }
+}
+
 struct DataStudioPreviewComparisonRequest: Codable, Equatable, Sendable {
     let workbookPaths: [String]
     let recipeID: String
     let groupStates: [DataStudioGroupStatePayload]
+    let specimenStates: [DataStudioSpecimenStatePayload]
+
+    init(
+        workbookPaths: [String],
+        recipeID: String,
+        groupStates: [DataStudioGroupStatePayload] = [],
+        specimenStates: [DataStudioSpecimenStatePayload] = []
+    ) {
+        self.workbookPaths = workbookPaths
+        self.recipeID = recipeID
+        self.groupStates = groupStates
+        self.specimenStates = specimenStates
+    }
 
     enum CodingKeys: String, CodingKey {
         case workbookPaths
         case recipeID = "recipeId"
         case groupStates
+        case specimenStates
     }
 }
 
@@ -478,13 +605,31 @@ struct DataStudioExportComparisonRequest: Codable, Equatable, Sendable {
     let workbookPaths: [String]
     let outputDir: String
     let groupStates: [DataStudioGroupStatePayload]
+    let specimenStates: [DataStudioSpecimenStatePayload]
     let selectedRecipeIDs: [String]
     let figureOptionsByRecipeID: [String: RenderOptionsPayload]
+
+    init(
+        workbookPaths: [String],
+        outputDir: String,
+        groupStates: [DataStudioGroupStatePayload] = [],
+        specimenStates: [DataStudioSpecimenStatePayload] = [],
+        selectedRecipeIDs: [String] = [],
+        figureOptionsByRecipeID: [String: RenderOptionsPayload] = [:]
+    ) {
+        self.workbookPaths = workbookPaths
+        self.outputDir = outputDir
+        self.groupStates = groupStates
+        self.specimenStates = specimenStates
+        self.selectedRecipeIDs = selectedRecipeIDs
+        self.figureOptionsByRecipeID = figureOptionsByRecipeID
+    }
 
     enum CodingKeys: String, CodingKey {
         case workbookPaths
         case outputDir
         case groupStates
+        case specimenStates
         case selectedRecipeIDs = "selectedRecipeIds"
         case figureOptionsByRecipeID = "figureOptionsByRecipeId"
     }

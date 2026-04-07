@@ -33,10 +33,26 @@ def _manual_y_override(options: RenderOptions) -> tuple[float | None, float | No
     return y_override
 
 
+def _stats_raw_point_overlay_enabled(
+    *,
+    template: str,
+    density_safe: bool,
+    distribution_variant: str | None = None,
+) -> bool:
+    if template in {"point_error", "lollipop_error"}:
+        return density_safe
+    if template == "box_strip":
+        return True
+    if template == "distribution_compare":
+        return distribution_variant == "strip_box"
+    return False
+
+
 def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     groups = _ordered_groups(input_path, sheet, options)
     validate_manual_axis_overrides(options, template="bar")
     stats_profile = _stats_profile(groups)
+    show_raw_points = _stats_raw_point_overlay_enabled(template="bar", density_safe=stats_profile.show_raw_points)
     fig, _ = plot_bar(
         groups,
         width_mm=options.width_mm,
@@ -44,7 +60,7 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         bar_width=stats_profile.bar_width,
         spacing_scale=stats_profile.spacing_scale,
         capsize=stats_profile.capsize,
-        show_raw_points=stats_profile.show_raw_points,
+        show_raw_points=show_raw_points,
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
         ylim=_manual_y_override(options),
@@ -64,8 +80,7 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
             figure=fig,
             template="bar",
             options=options,
-            autofixes_applied=("stats_spacing_profile", "bar_capsize_profile")
-            + (("bar_raw_points_overlay",) if stats_profile.show_raw_points else ()),
+            autofixes_applied=("stats_spacing_profile", "bar_capsize_profile"),
         )
     ]
 
@@ -79,6 +94,8 @@ def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         height_mm=options.height_mm,
         box_width=stats_profile.box_width,
         spacing_scale=stats_profile.spacing_scale,
+        show_raw_points=False,
+        show_fliers=False,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -165,7 +182,10 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
         spacing_scale=max(1.0, stats_profile.spacing_scale),
         capsize=stats_profile.capsize,
         marker_size_pt=max(4.2, plot_style.current_stroke().marker_size_pt * 0.9),
-        show_raw_points=stats_profile.show_raw_points,
+        show_raw_points=_stats_raw_point_overlay_enabled(
+            template="point_error",
+            density_safe=stats_profile.show_raw_points,
+        ),
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
         ylim=_manual_y_override(options),
@@ -209,7 +229,10 @@ def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOp
         spacing_scale=max(1.0, stats_profile.spacing_scale),
         capsize=stats_profile.capsize,
         marker_size_pt=max(4.4, plot_style.current_stroke().marker_size_pt * 0.94),
-        show_raw_points=stats_profile.show_raw_points,
+        show_raw_points=_stats_raw_point_overlay_enabled(
+            template="lollipop_error",
+            density_safe=stats_profile.show_raw_points,
+        ),
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
         ylim=_manual_y_override(options),
@@ -277,7 +300,7 @@ def _render_grouped_bar_error_like(
         bar_width=max(0.2, stats_profile.bar_width * 0.9),
         spacing_scale=max(1.02, stats_profile.spacing_scale),
         capsize=stats_profile.capsize,
-        show_raw_points=True,
+        show_raw_points=False,
         raw_point_size=max(stats_profile.raw_point_size, 10.0),
         raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
         ylim=_manual_y_override(options),
@@ -300,7 +323,6 @@ def _render_grouped_bar_error_like(
             autofixes_applied=(
                 "stats_spacing_profile",
                 "bar_capsize_profile",
-                "bar_raw_points_overlay",
                 profile_autofix,
             ),
         )
@@ -317,6 +339,8 @@ def _emphasize_strip_point_overlay(
         if sizes.size:
             collection.set_sizes(np.maximum(sizes, min_size))
         collection.set_alpha(max(float(collection.get_alpha() or 0.0), min_alpha))
+        collection.set_edgecolor("none")
+        collection.set_linewidth(0.0)
 
 def _overlay_violin_box_summary(
     ax: plt.Axes,
@@ -371,12 +395,21 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             ylim=_manual_y_override(options),
         )
     else:
+        show_raw_points = _stats_raw_point_overlay_enabled(
+            template="distribution_compare",
+            density_safe=stats_profile.show_raw_points,
+            distribution_variant=variant,
+        )
         fig, ax = plot_box(
             groups,
             width_mm=options.width_mm,
             height_mm=options.height_mm,
             box_width=stats_profile.box_width,
             spacing_scale=stats_profile.spacing_scale,
+            show_raw_points=show_raw_points,
+            raw_point_size=stats_profile.raw_point_size,
+            raw_point_alpha=stats_profile.raw_point_alpha,
+            show_fliers=False,
             ylim=_manual_y_override(options),
         )
         if variant == "strip_box":
@@ -409,6 +442,10 @@ def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions
         height_mm=options.height_mm,
         box_width=stats_profile.box_width,
         spacing_scale=stats_profile.spacing_scale,
+        show_raw_points=True,
+        raw_point_size=stats_profile.raw_point_size,
+        raw_point_alpha=stats_profile.raw_point_alpha,
+        show_fliers=False,
         ylim=_manual_y_override(options),
     )
     _emphasize_strip_point_overlay(

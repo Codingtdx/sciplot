@@ -78,6 +78,20 @@
       "small_panel_width_mm": 60.0,
       "small_panel_height_mm": 55.0,
       "direct_label_max_series": 4,
+      "legend_candidate_order": [
+        "upper_right",
+        "lower_right",
+        "upper_left",
+        "lower_left"
+      ],
+      "legend_candidate_bias_step": 0.75,
+      "tensile_legend_candidate_order": [
+        "lower_right",
+        "upper_right",
+        "lower_left",
+        "upper_left"
+      ],
+      "tensile_legend_candidate_bias_step": 25.0,
       "compact_direct_label_inset_fraction": 0.04,
       "compact_direct_label_offset_pt": 4.0,
       "compact_direct_label_search_band_fraction": 0.12,
@@ -90,6 +104,24 @@
       "compact_legend_handletextpad": 0.35,
       "compact_legend_columnspacing": 0.8,
       "compact_legend_borderpad": 0.15,
+      "compact_legend_candidate_order": [
+        "upper_center",
+        "upper_right",
+        "lower_right",
+        "upper_left",
+        "lower_left",
+        "lower_center"
+      ],
+      "compact_legend_candidate_bias_step": 0.75,
+      "tensile_compact_legend_candidate_order": [
+        "lower_right",
+        "upper_right",
+        "lower_left",
+        "upper_left",
+        "upper_center",
+        "lower_center"
+      ],
+      "tensile_compact_legend_candidate_bias_step": 25.0,
       "legend_area_ratio_warn": 0.055,
       "legend_area_ratio_fail": 0.07,
       "dense_marker_point_threshold": 24,
@@ -728,7 +760,7 @@
     },
     "bar": {
       "label": "Bar",
-      "description": "Statistical bar chart.",
+      "description": "Statistical bar chart with summary bars and error bars only.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -766,7 +798,7 @@
     },
     "box": {
       "label": "Box",
-      "description": "Statistical box plot.",
+      "description": "Statistical box plot summary without raw-point overlays.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -920,7 +952,7 @@
     },
     "grouped_bar_compare": {
       "label": "Grouped bar compare",
-      "description": "Grouped bar comparison with deterministic spacing and raw-point overlays.",
+      "description": "Grouped bar comparison with deterministic spacing and summary error bars.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
@@ -959,7 +991,7 @@
     },
     "grouped_bar_error": {
       "label": "Grouped bar + error",
-      "description": "Grouped bar means with deterministic error bars and raw-point overlays.",
+      "description": "Grouped bar means with deterministic error bars and summary-only bars.",
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [

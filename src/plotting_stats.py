@@ -30,7 +30,7 @@ def _compute_distribution_axis_limits(
     headroom_factor: float | None,
     y_padding_top: float,
     y_padding_bottom: float,
-) -> AxisLimits:
+    ) -> AxisLimits:
     return compute_axis_limits(
         values,
         kind="box",
@@ -40,6 +40,37 @@ def _compute_distribution_axis_limits(
         y_padding_top=y_padding_top,
         y_padding_bottom=y_padding_bottom,
     )
+
+
+def _overlay_group_raw_points(
+    ax: plt.Axes,
+    *,
+    groups: Sequence[ReplicateGroup],
+    positions: np.ndarray,
+    palette,
+    span_width: float,
+    size: float,
+    alpha: float,
+    jitter_fraction: float,
+    zorder: float,
+) -> None:
+    for pos, group, color in zip(positions, groups, palette, strict=True):
+        jitter_half_span = min(max(span_width * jitter_fraction, 0.03), max(span_width * 0.22, 0.06))
+        jitter = (
+            np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
+            if len(group.data) > 1
+            else np.array([0.0])
+        )
+        ax.scatter(
+            np.full(len(group.data), pos, dtype=float) + jitter,
+            group.data,
+            color=color,
+            alpha=alpha,
+            s=size,
+            zorder=zorder,
+            edgecolors="none",
+            linewidths=0.0,
+        )
 
 
 def plot_box(
@@ -59,6 +90,11 @@ def plot_box(
     headroom_factor: float | None = None,
     y_padding_top: float = 0.12,
     y_padding_bottom: float = 0.06,
+    show_raw_points: bool = False,
+    raw_point_size: float = 10.0,
+    raw_point_alpha: float | None = None,
+    raw_point_jitter_fraction: float = 0.18,
+    show_fliers: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_group_input(groups, chart_name="box plot")
     stroke = plot_style.current_stroke()
@@ -94,6 +130,7 @@ def plot_box(
         positions=positions,
         patch_artist=True,
         widths=box_width,
+        showfliers=show_fliers,
         medianprops={"color": "black", "linewidth": stroke.line_width_pt},
         whiskerprops={"linewidth": 1.0},
         capprops={"linewidth": 1.0},
@@ -104,20 +141,17 @@ def plot_box(
         patch.set_alpha(min(stroke.fill_alpha, stroke.max_fill_alpha))
         patch.set_edgecolor(color)
 
-    for pos, group, color in zip(positions, groups, palette, strict=True):
-        jitter_half_span = min(0.06, box_width * 0.18)
-        jitter = (
-            np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
-            if len(group.data) > 1
-            else np.array([0.0])
-        )
-        ax.scatter(
-            np.full(len(group.data), pos, dtype=float) + jitter,
-            group.data,
-            color=color,
-            alpha=stroke.marker_alpha,
-            s=10,
-            zorder=3,
+    if show_raw_points:
+        _overlay_group_raw_points(
+            ax,
+            groups=groups,
+            positions=positions,
+            palette=palette,
+            span_width=box_width,
+            size=raw_point_size,
+            alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
+            jitter_fraction=raw_point_jitter_fraction,
+            zorder=3.0,
         )
 
     limits = _compute_distribution_axis_limits(
@@ -217,22 +251,17 @@ def plot_bar(
         bar.set_edgecolor(color)
 
     if show_raw_points:
-        for pos, group, color in zip(positions, groups, palette, strict=True):
-            jitter_half_span = min(0.075, max(bar_width * raw_point_jitter_fraction, 0.03))
-            jitter = (
-                np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
-                if len(group.data) > 1
-                else np.array([0.0])
-            )
-            ax.scatter(
-                np.full(len(group.data), pos, dtype=float) + jitter,
-                group.data,
-                color=color,
-                alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
-                s=raw_point_size,
-                zorder=3,
-                linewidths=0.0,
-            )
+        _overlay_group_raw_points(
+            ax,
+            groups=groups,
+            positions=positions,
+            palette=palette,
+            span_width=bar_width,
+            size=raw_point_size,
+            alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
+            jitter_fraction=raw_point_jitter_fraction,
+            zorder=3.0,
+        )
 
     values = [
         np.concatenate([group.data.to_numpy(), [mean + std]])
@@ -341,22 +370,17 @@ def plot_point_error(
         )
 
     if show_raw_points:
-        for pos, group, color in zip(positions, groups, palette, strict=True):
-            jitter_half_span = min(0.085, max(point_spacing_width * raw_point_jitter_fraction, 0.03))
-            jitter = (
-                np.linspace(-jitter_half_span, jitter_half_span, len(group.data))
-                if len(group.data) > 1
-                else np.array([0.0])
-            )
-            ax.scatter(
-                np.full(len(group.data), pos, dtype=float) + jitter,
-                group.data,
-                color=color,
-                alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
-                s=raw_point_size,
-                zorder=2.8,
-                linewidths=0.0,
-            )
+        _overlay_group_raw_points(
+            ax,
+            groups=groups,
+            positions=positions,
+            palette=palette,
+            span_width=point_spacing_width,
+            size=raw_point_size,
+            alpha=stroke.marker_alpha if raw_point_alpha is None else raw_point_alpha,
+            jitter_fraction=raw_point_jitter_fraction,
+            zorder=2.8,
+        )
 
     values = [
         np.concatenate([group.data.to_numpy(dtype=float), [mean + std, mean - std]])

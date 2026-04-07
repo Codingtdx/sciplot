@@ -53,6 +53,12 @@ enum DataStudioActivity: Equatable {
     case exportingComparison
 }
 
+enum DataStudioWorkbookPreviewRefreshState: Equatable {
+    case idle
+    case refreshing(workbookPath: String)
+    case failed(workbookPath: String, message: String)
+}
+
 struct DataStudioWorkbookItem: Identifiable, Equatable {
     let id: String
     var response: DataStudioWorkbookResponse
@@ -144,9 +150,16 @@ final class DataStudioSession {
     var importedSourceURLs: [URL] = []
     var workbooks: [DataStudioWorkbookItem] = []
     var groupStates: [DataStudioGroupStatePayload] = []
+    var specimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]] = [:]
+    var workbookPreviewByPath: [String: DataStudioWorkbookPreviewResponse] = [:]
     var focusedWorkbookPath: String?
+    var specimenFilterWorkbookPath: String?
+    var isSpecimenFilterPresented = false
+    var focusedWorkbookPreviewRefreshState: DataStudioWorkbookPreviewRefreshState = .idle
 
     var comparisonSet: DataStudioComparisonSetResponse?
+    var comparisonContextCacheKey: String?
+    var comparisonContextMaterializedAt: String?
     var selectedRecipeID: String?
     var selectedFigureFamilyID: String?
     var selectedFigureTemplateID: String?
@@ -156,6 +169,8 @@ final class DataStudioSession {
     var comparisonFigureItems: [DataStudioExportFigureItem] = []
     var selectedComparisonFigureID: String?
 
+    var previewWarning: String?
+    var isPreviewStale = false
     var errorMessage: String?
     var currentActivity: DataStudioActivity = .idle
     var isBusy = false
@@ -318,8 +333,34 @@ final class DataStudioSession {
         return orderedWorkbooks.first(where: { $0.response.workbookPath == focusedWorkbookPath }) ?? orderedWorkbooks.first
     }
 
+    var specimenFilterWorkbook: DataStudioWorkbookItem? {
+        guard let specimenFilterWorkbookPath else {
+            return nil
+        }
+        return orderedWorkbooks.first(where: { $0.response.workbookPath == specimenFilterWorkbookPath })
+    }
+
+    var focusedWorkbookPreview: DataStudioWorkbookPreviewResponse? {
+        guard let focusedWorkbook else {
+            return nil
+        }
+        return workbookPreview(for: focusedWorkbook.response.workbookPath)
+    }
+
     var includedGroups: [DataStudioGroupRowItem] {
         orderedGroups.filter(\.state.includeInCompare)
+    }
+
+    func workbookPreview(for workbookPath: String) -> DataStudioWorkbookPreviewResponse? {
+        workbookPreviewByPath[workbookPath]
+    }
+
+    func specimenStates(for workbookPath: String) -> [DataStudioSpecimenStatePayload] {
+        specimenStatesByWorkbookPath[workbookPath] ?? []
+    }
+
+    func activeSuggestedExclusionIDs(for workbookPath: String) -> [String] {
+        workbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []
     }
 
     var selectedComparisonFigure: DataStudioExportFigureItem? {
@@ -327,6 +368,31 @@ final class DataStudioSession {
             return comparisonFigureItems.first
         }
         return comparisonFigureItems.first(where: { $0.id == selectedComparisonFigureID }) ?? comparisonFigureItems.first
+    }
+
+    var specimenFilterPreview: DataStudioWorkbookPreviewResponse? {
+        guard let specimenFilterWorkbookPath else {
+            return nil
+        }
+        return workbookPreview(for: specimenFilterWorkbookPath)
+    }
+
+    func displayedMetrics(for workbook: DataStudioWorkbookItem) -> [DataStudioMetricSummaryResponse] {
+        workbookPreview(for: workbook.response.workbookPath)?.metrics ?? workbook.response.metrics
+    }
+
+    func displayedReplicateBadge(for workbook: DataStudioWorkbookItem) -> String {
+        if let preview = workbookPreview(for: workbook.response.workbookPath), preview.supported {
+            return "\(preview.includedSpecimenCount) / \(preview.totalSpecimenCount) included"
+        }
+        return "\(workbook.response.parsedSampleCount) reps"
+    }
+
+    func workbookHasWarnings(_ workbook: DataStudioWorkbookItem) -> Bool {
+        if let preview = workbookPreview(for: workbook.response.workbookPath), !preview.warnings.isEmpty {
+            return true
+        }
+        return workbook.response.failedSampleCount > 0 || !workbook.response.warnings.isEmpty
     }
 
     var createTemplateSuggestions: [DataStudioBindingSuggestionResponse] {
@@ -509,12 +575,36 @@ final class DataStudioSession {
 
     var comparisonStatusText: String {
         if let comparisonSet {
-            return "\(includedGroups.count) group(s) · \(currentRecipeLabel) · \(URL(fileURLWithPath: comparisonSet.comparisonWorkbookPath).lastPathComponent)"
+            let workbookName = URL(fileURLWithPath: comparisonSet.comparisonWorkbookPath).lastPathComponent
+            if isPreviewStale {
+                return "\(includedGroups.count) group(s) · \(currentRecipeLabel) · showing last successful preview from \(workbookName)"
+            }
+            return "\(includedGroups.count) group(s) · \(currentRecipeLabel) · \(workbookName)"
         }
         if !workbooks.isEmpty {
             return "\(includedGroups.count) group(s) in compare"
         }
         return "No workbook groups loaded"
+    }
+
+    var previewStatusLabel: String {
+        if currentActivity == .previewingComparison {
+            return "Refreshing"
+        }
+        if isPreviewStale {
+            return "Stale"
+        }
+        return "Ready"
+    }
+
+    var previewStatusSymbol: String {
+        if currentActivity == .previewingComparison {
+            return "arrow.triangle.2.circlepath"
+        }
+        if isPreviewStale {
+            return "exclamationmark.triangle.fill"
+        }
+        return "checkmark.circle"
     }
 
     var focusTitle: String {
@@ -867,7 +957,7 @@ final class DataStudioSession {
                 }
             }
             if refreshContext {
-                await rebuildComparisonContext()
+                await rebuildComparisonContext(refreshWorkbookPreviews: true)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -883,7 +973,15 @@ final class DataStudioSession {
     }
 
     func focusWorkbook(path: String?) {
-        focusedWorkbookPath = path ?? orderedWorkbooks.first?.response.workbookPath
+        let resolvedPath = path ?? orderedWorkbooks.first?.response.workbookPath
+        focusedWorkbookPath = resolvedPath
+        guard isSpecimenFilterPresented else {
+            return
+        }
+        specimenFilterWorkbookPath = resolvedPath
+        if let resolvedPath {
+            Task { await refreshWorkbookPreview(for: resolvedPath) }
+        }
     }
 
     func updateDisplayName(for workbookPath: String, to displayName: String) {
@@ -904,6 +1002,104 @@ final class DataStudioSession {
         scheduleComparisonContextRebuild()
     }
 
+    func openSpecimenFilter(for workbookPath: String) {
+        focusedWorkbookPath = workbookPath
+        specimenFilterWorkbookPath = workbookPath
+        isSpecimenFilterPresented = true
+        Task { await refreshWorkbookPreview(for: workbookPath) }
+    }
+
+    func closeSpecimenFilter() {
+        isSpecimenFilterPresented = false
+        specimenFilterWorkbookPath = nil
+        focusedWorkbookPreviewRefreshState = .idle
+    }
+
+    func retryPreviewRefresh() {
+        guard let workbookPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath else {
+            Task { await rebuildComparisonContext() }
+            return
+        }
+        Task {
+            await refreshWorkbookPreview(for: workbookPath)
+            await rebuildComparisonContext()
+        }
+    }
+
+    func applySuggestedExclusions(for workbookPath: String) {
+        let suggested = activeSuggestedExclusionIDs(for: workbookPath)
+        guard !suggested.isEmpty else {
+            return
+        }
+        setSpecimenInclusion(
+            for: workbookPath,
+            includedIDs: Set(specimenStates(for: workbookPath).map(\.specimenId)).subtracting(suggested),
+            explicitlyExcludedIDs: Set(suggested)
+        )
+        Task {
+            await refreshWorkbookPreview(for: workbookPath)
+            scheduleComparisonContextRebuild()
+        }
+    }
+
+    func restoreAllSpecimens(for workbookPath: String) {
+        guard let preview = workbookPreview(for: workbookPath) else {
+            return
+        }
+        setSpecimenInclusion(
+            for: workbookPath,
+            includedIDs: Set(preview.specimens.map(\.specimenId)),
+            explicitlyExcludedIDs: []
+        )
+        Task {
+            await refreshWorkbookPreview(for: workbookPath)
+            scheduleComparisonContextRebuild()
+        }
+    }
+
+    func includeAllSpecimens(for workbookPath: String) {
+        restoreAllSpecimens(for: workbookPath)
+    }
+
+    func excludeAllSpecimens(for workbookPath: String) {
+        guard let preview = workbookPreview(for: workbookPath) else {
+            return
+        }
+        setSpecimenInclusion(
+            for: workbookPath,
+            includedIDs: [],
+            explicitlyExcludedIDs: Set(preview.specimens.map(\.specimenId))
+        )
+        Task {
+            await refreshWorkbookPreview(for: workbookPath)
+            scheduleComparisonContextRebuild()
+        }
+    }
+
+    func updateSpecimenInclusion(for workbookPath: String, specimenId: String, included: Bool) {
+        var currentStates = specimenStates(for: workbookPath)
+        if let index = currentStates.firstIndex(where: { $0.specimenId == specimenId }) {
+            currentStates[index] = DataStudioSpecimenStatePayload(
+                workbookPath: workbookPath,
+                specimenId: specimenId,
+                included: included
+            )
+        } else {
+            currentStates.append(
+                DataStudioSpecimenStatePayload(
+                    workbookPath: workbookPath,
+                    specimenId: specimenId,
+                    included: included
+                )
+            )
+        }
+        specimenStatesByWorkbookPath[workbookPath] = currentStates.sorted { $0.specimenId < $1.specimenId }
+        Task {
+            await refreshWorkbookPreview(for: workbookPath)
+            scheduleComparisonContextRebuild()
+        }
+    }
+
     func moveGroups(from source: IndexSet, to destination: Int) {
         var ordered = orderedGroups.map(\.state)
         ordered.move(fromOffsets: source, toOffset: destination)
@@ -921,6 +1117,12 @@ final class DataStudioSession {
     func removeWorkbook(path: String) {
         workbooks.removeAll { $0.response.workbookPath == path }
         groupStates.removeAll { $0.workbookPath == path }
+        specimenStatesByWorkbookPath.removeValue(forKey: path)
+        workbookPreviewByPath.removeValue(forKey: path)
+        if specimenFilterWorkbookPath == path {
+            specimenFilterWorkbookPath = nil
+            isSpecimenFilterPresented = false
+        }
         selectedComparisonFigureID = nil
         reindexGroupStates()
         if focusedWorkbookPath == path {
@@ -934,7 +1136,7 @@ final class DataStudioSession {
         selectedFigureFamilyID = id
         syncFigureSelection()
         stageCurrentFigurePreview()
-        Task { await refreshDisplayedFigure() }
+        Task { await refreshDisplayedFigureHandlingFailure() }
     }
 
     func selectFigureTemplate(id: String) {
@@ -946,7 +1148,7 @@ final class DataStudioSession {
         selectedFigureTemplateID = id
         syncFigureSelection()
         stageCurrentFigurePreview()
-        Task { await refreshDisplayedFigure() }
+        Task { await refreshDisplayedFigureHandlingFailure() }
     }
 
     func openCurrentFigureInPlot() {
@@ -1030,6 +1232,7 @@ final class DataStudioSession {
                     workbookPaths: orderedWorkbooks.map { $0.response.workbookPath },
                     outputDir: directoryURL.path,
                     groupStates: requestGroupStates,
+                    specimenStates: requestSpecimenStates,
                     selectedRecipeIDs: recipeIDs,
                     figureOptionsByRecipeID: exportFigureOptionsByRecipeID()
                 )
@@ -1064,6 +1267,7 @@ final class DataStudioSession {
             "selected_figure_family_id": selectedFigureFamilyID.map(JSONValue.string) ?? .null,
             "selected_figure_template_id": selectedFigureTemplateID.map(JSONValue.string) ?? .null,
             "group_states": .array(requestGroupStates.map(jsonValue(for:))),
+            "specimen_states": .array(requestSpecimenStates.map(jsonValue(for:))),
             "figure_preferences": .array(
                 figurePreferences
                     .sorted { $0.familyID.localizedCaseInsensitiveCompare($1.familyID) == .orderedAscending }
@@ -1099,13 +1303,14 @@ final class DataStudioSession {
         } else {
             reindexGroupStates()
         }
+        applyRestoredSpecimenStates(payload.specimenStates)
 
         focusedWorkbookPath = resolveRestoredWorkbookPath(
             selectedWorkbookID: payload.selectedWorkbookID,
             primaryWorkbookID: payload.primaryWorkbookID
         )
 
-        await rebuildComparisonContext()
+        await rebuildComparisonContext(refreshWorkbookPreviews: true)
     }
 
     func renameSelectedTemplate(to newLabel: String) async {
@@ -1176,6 +1381,17 @@ final class DataStudioSession {
         }
     }
 
+    private var requestSpecimenStates: [DataStudioSpecimenStatePayload] {
+        specimenStatesByWorkbookPath
+            .keys
+            .sorted()
+            .flatMap { workbookPath in
+                (specimenStatesByWorkbookPath[workbookPath] ?? []).sorted { lhs, rhs in
+                    lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+                }
+            }
+    }
+
     private var selectedExportRecipeIDs: [String] {
         figureFamilies.compactMap { family in
             recipe(forFamilyID: family.id)?.id
@@ -1215,13 +1431,13 @@ final class DataStudioSession {
                 )
             )
             upsertWorkbook(workbook, shouldFocus: true)
-            await rebuildComparisonContext()
+            await rebuildComparisonContext(refreshWorkbookPreviews: true)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private func rebuildComparisonContext() async {
+    private func rebuildComparisonContext(refreshWorkbookPreviews: Bool = false) async {
         guard let client else {
             return
         }
@@ -1239,29 +1455,64 @@ final class DataStudioSession {
 
         currentActivity = .previewingComparison
         errorMessage = nil
+        previewWarning = nil
         defer { currentActivity = .idle }
         do {
-            let response = try await client.previewDataStudioComparison(
+            if refreshWorkbookPreviews {
+                await refreshFocusedWorkbookPreviewIfNeeded()
+            }
+            let previousComparisonSet = comparisonSet
+            let previousCacheKey = comparisonContextCacheKey
+            let previousMaterializedAt = comparisonContextMaterializedAt
+            let previousSelectedFigureFamilyID = selectedFigureFamilyID
+            let previousSelectedFigureTemplateID = selectedFigureTemplateID
+            let previousSelectedRecipeID = selectedRecipeID
+
+            let response = try await client.comparisonContextDataStudio(
                 .init(
                     workbookPaths: workbookPaths,
-                    recipeID: "representative_curve",
-                    groupStates: requestGroupStates
+                    groupStates: requestGroupStates,
+                    specimenStates: requestSpecimenStates
                 )
             )
             comparisonSet = response.comparisonSet
-            syncFigureSelection(preferredRecipeID: selectedRecipeID)
-            stageCurrentFigurePreview()
-            await refreshDisplayedFigure()
+            comparisonContextCacheKey = response.cacheKey
+            comparisonContextMaterializedAt = response.materializedAt
+            syncFigureSelection(preferredRecipeID: previousSelectedRecipeID)
+            do {
+                try await refreshDisplayedFigure()
+                previewWarning = nil
+                isPreviewStale = false
+            } catch {
+                comparisonSet = previousComparisonSet
+                comparisonContextCacheKey = previousCacheKey
+                comparisonContextMaterializedAt = previousMaterializedAt
+                selectedFigureFamilyID = previousSelectedFigureFamilyID
+                selectedFigureTemplateID = previousSelectedFigureTemplateID
+                selectedRecipeID = previousSelectedRecipeID
+                syncFigureSelection(preferredRecipeID: previousSelectedRecipeID)
+                if previousComparisonSet != nil {
+                    await restoreCommittedComparisonFigure()
+                    previewWarning = "Refresh failed, showing last successful preview."
+                    isPreviewStale = true
+                } else {
+                    clearComparisonContext()
+                    previewWarning = error.localizedDescription
+                    isPreviewStale = false
+                }
+            }
         } catch {
-            comparisonSet = nil
-            plotSession.clearPreviewContext(preserveRenderOptions: true)
-            errorMessage = error.localizedDescription
+            if comparisonSet != nil {
+                previewWarning = "Refresh failed, showing last successful preview."
+                isPreviewStale = true
+            } else {
+                previewWarning = error.localizedDescription
+            }
         }
     }
 
-    private func refreshDisplayedFigure() async {
+    private func refreshDisplayedFigure() async throws {
         guard let comparisonSet, let currentRecipe else {
-            plotSession.clearPreviewContext(preserveRenderOptions: true)
             return
         }
         let preferredOptions = preferredRenderOptions(forFamilyID: currentFigureFamily?.id, templateID: currentRecipe.templateID)
@@ -1283,7 +1534,28 @@ final class DataStudioSession {
             if shouldSuppressPlotError(plotError, comparisonWorkbookPath: comparisonSet.comparisonWorkbookPath) {
                 plotSession.errorMessage = nil
             } else {
-                errorMessage = plotError
+                throw NSError(
+                    domain: "DataStudioPreview",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: plotError]
+                )
+            }
+        }
+        plotSession.errorMessage = nil
+        errorMessage = nil
+    }
+
+    private func refreshDisplayedFigureHandlingFailure() async {
+        do {
+            try await refreshDisplayedFigure()
+            previewWarning = nil
+            isPreviewStale = false
+        } catch {
+            if comparisonSet != nil {
+                previewWarning = "Refresh failed, showing last successful preview."
+                isPreviewStale = true
+            } else {
+                previewWarning = error.localizedDescription
             }
         }
     }
@@ -1302,6 +1574,14 @@ final class DataStudioSession {
             preferredTemplateID: currentRecipe.templateID,
             preferredOptions: preferredOptions
         )
+    }
+
+    private func restoreCommittedComparisonFigure() async {
+        guard comparisonSet != nil else {
+            return
+        }
+        stageCurrentFigurePreview()
+        try? await refreshDisplayedFigure()
     }
 
     private func scheduleComparisonContextRebuild() {
@@ -1323,9 +1603,14 @@ final class DataStudioSession {
 
     private func clearComparisonContext() {
         comparisonSet = nil
+        comparisonContextCacheKey = nil
+        comparisonContextMaterializedAt = nil
         comparisonExportResponse = nil
         comparisonFigureItems = []
         selectedComparisonFigureID = nil
+        comparisonExportDestinationURL = nil
+        previewWarning = nil
+        isPreviewStale = false
         plotSession.clearPreviewContext(preserveRenderOptions: true)
     }
 
@@ -1351,6 +1636,9 @@ final class DataStudioSession {
         if shouldFocus || focusedWorkbookPath == nil {
             focusedWorkbookPath = response.workbookPath
         }
+        if specimenStatesByWorkbookPath[response.workbookPath] == nil {
+            specimenStatesByWorkbookPath[response.workbookPath] = []
+        }
     }
 
     private func applyRestoredGroupStates(_ restoredStates: [DataStudioGroupStatePayload]) {
@@ -1370,6 +1658,83 @@ final class DataStudioSession {
         }
         groupStates = merged
         reindexGroupStates()
+    }
+
+    private func applyRestoredSpecimenStates(_ restoredStates: [DataStudioSpecimenStatePayload]) {
+        let validPaths = Set(workbooks.map { $0.response.workbookPath })
+        let filtered = restoredStates.filter { validPaths.contains($0.workbookPath) }
+        specimenStatesByWorkbookPath = Dictionary(grouping: filtered, by: \.workbookPath)
+    }
+
+    private func refreshFocusedWorkbookPreviewIfNeeded() async {
+        if let workbookPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath {
+            await refreshWorkbookPreview(for: workbookPath)
+        }
+    }
+
+    private func tracksWorkbookPreviewRefreshState(for workbookPath: String) -> Bool {
+        let trackedPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath
+        return trackedPath == workbookPath
+    }
+
+    private func refreshWorkbookPreview(for workbookPath: String) async {
+        guard let client else {
+            return
+        }
+        if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+            focusedWorkbookPreviewRefreshState = .refreshing(workbookPath: workbookPath)
+        }
+        do {
+            let response = try await client.previewDataStudioWorkbook(
+                .init(
+                    workbookPath: workbookPath,
+                    specimenStates: specimenStates(for: workbookPath)
+                )
+            )
+            workbookPreviewByPath[workbookPath] = response
+            synchronizeSpecimenStates(with: response)
+            if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+                focusedWorkbookPreviewRefreshState = .idle
+            }
+        } catch {
+            if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+                focusedWorkbookPreviewRefreshState = .failed(
+                    workbookPath: workbookPath,
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func synchronizeSpecimenStates(with preview: DataStudioWorkbookPreviewResponse) {
+        guard preview.supported else {
+            return
+        }
+        specimenStatesByWorkbookPath[preview.workbookPath] = preview.specimens.map {
+            DataStudioSpecimenStatePayload(
+                workbookPath: preview.workbookPath,
+                specimenId: $0.specimenId,
+                included: $0.included
+            )
+        }
+    }
+
+    private func setSpecimenInclusion(
+        for workbookPath: String,
+        includedIDs: Set<String>,
+        explicitlyExcludedIDs: Set<String>
+    ) {
+        guard let preview = workbookPreview(for: workbookPath) else {
+            return
+        }
+        specimenStatesByWorkbookPath[workbookPath] = preview.specimens.map {
+            let included = explicitlyExcludedIDs.contains($0.specimenId) ? false : includedIDs.contains($0.specimenId)
+            return DataStudioSpecimenStatePayload(
+                workbookPath: workbookPath,
+                specimenId: $0.specimenId,
+                included: included
+            )
+        }
     }
 
     private func resolveRestoredWorkbookPath(selectedWorkbookID: String?, primaryWorkbookID: String?) -> String? {
@@ -1627,8 +1992,15 @@ final class DataStudioSession {
         comparisonRefreshTask?.cancel()
         workbooks = []
         groupStates = []
+        specimenStatesByWorkbookPath = [:]
+        workbookPreviewByPath = [:]
         focusedWorkbookPath = nil
+        specimenFilterWorkbookPath = nil
+        isSpecimenFilterPresented = false
+        focusedWorkbookPreviewRefreshState = .idle
         comparisonSet = nil
+        comparisonContextCacheKey = nil
+        comparisonContextMaterializedAt = nil
         comparisonExportResponse = nil
         comparisonExportDestinationURL = nil
         comparisonFigureItems = []
@@ -1652,6 +2024,8 @@ final class DataStudioSession {
         isImportResolverPresented = false
         isCreateTemplateEditorPresented = false
         plotSession.clearPreviewContext(preserveRenderOptions: true)
+        previewWarning = nil
+        isPreviewStale = false
         errorMessage = nil
         currentActivity = .idle
     }
@@ -2016,6 +2390,16 @@ final class DataStudioSession {
                 "display_name": .string(state.displayName),
                 "include_in_compare": .bool(state.includeInCompare),
                 "sort_order": .number(Double(state.sortOrder)),
+            ]
+        )
+    }
+
+    private func jsonValue(for state: DataStudioSpecimenStatePayload) -> JSONValue {
+        .object(
+            [
+                "workbook_path": .string(state.workbookPath),
+                "specimen_id": .string(state.specimenId),
+                "included": .bool(state.included),
             ]
         )
     }

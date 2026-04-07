@@ -24,7 +24,7 @@
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。
-- `app/sidecar/routes_data_studio.py` + `app/sidecar/schemas_data_studio.py`: Data Studio 的 canonical backend surface；模板列表/创建/重命名/删除、source preview、workbook build/import、comparison preview/export、session normalize 全走 `/data-studio/*`。
+- `app/sidecar/routes_data_studio.py` + `app/sidecar/schemas_data_studio.py`: Data Studio 的 canonical backend surface；模板列表/创建/重命名/删除、source preview、workbook build/import、workbook preview、comparison context/preview/export、session normalize 全走 `/data-studio/*`。
 - `app/sidecar/routes_code_console.py` + `app/sidecar/schemas_code_console.py`: Code Console 的 prompt/context 与 controlled runner surface；当前原生前端统一通过 `/code-console/context`、`/code-console/run` 走这一层。
 - `app/macos/`: 当前受支持的原生 macOS 前端；手工 Xcode 工程、SwiftUI app shell、sidecar runtime 与 4 个 workbench 的实现都在这里。
 - `app/macos/Sources/App`: SwiftUI `App` root、`NavigationSplitView` shell、toolbar、commands 与 app-level session/runtime 装配。
@@ -86,14 +86,18 @@
 - Plot 的 `Template` 阶段默认只显示当前输入模型兼容的推荐模板，并把其他模板明确标成 disabled 或 unavailable；不要让用户点进一个必报错的模板路径。
 - `Data Studio` 是 retained primary workbench；底层仍可保留 tensile 相关 route、schema、fixture 与科学语义，但产品文案、README、IA 和导航不要再把 `Tensile` 当一级产品名。
 - `Data Studio` 工作台是 workbook group + compare plotting 工作台：主对象是每个样品组对应的 workbook；parse template 只属于 Import 流程，不是主界面主对象。raw import 时先自动匹配现有模板，只有匹配失败或不确定时才让用户选择或新建解析模板。
-- `Data Studio` 原生工作台应与 Plot 对齐成同级壳层：顶部只保留状态和 toolbar Import/Export，左侧是 workbook group rail，中间是 current figure preview，右侧是 Plot inspector 主导加少量 Studio-specific 控制；不要再把 template flow/library/status 做成主块，也不要把 review / compare / export 堆成中央长滚动主面。
+- `Data Studio` 原生工作台应与 Plot 对齐成同级壳层：顶部只保留状态和 toolbar Import/Export，左侧是 workbook group rail，中间默认是 current figure preview；当用户打开 specimen filter 时，在 rail 和 preview 之间插入 inline side panel；最右仍是 Plot inspector 主导加少量 Studio-specific 控制。不要再把 template flow/library/status 做成主块，也不要把 review / compare / export 堆成中央长滚动主面。
 - `Data Studio` 的左 rail 只承载 workbook group list：display name、replicate 摘要、轻量 warning/ready 状态、include-in-compare 开关与拖拽重排；不要把 raw file list、template library 或解释性文案放回 rail。
 - `Data Studio` 的显示语义以 `display_name / include_in_compare / sort_order / focused workbook` 为真相源；display rename 只作用于图例、label 与默认导出命名，不得修改磁盘上的原始文件名、workbook 文件名或 source path。
+- `Data Studio` 的 specimen inclusion/exclusion 属于 workbook 级运行时状态，真相源是 session payload 与 sidecar request/response 里的 `specimen_states`；代表曲线、mean/std、replicate compare sheet 与 warning/suggestion 都必须由 `/data-studio/workbook-preview` 和 comparison context/export 链路基于当前 included specimens 回算，前端不得本地重算另一套统计或建议逻辑。
+- `Data Studio` 的 specimen filter UI 必须保持 inline side panel：建议结果在打开面板或 specimen 状态变化后自动展示，但绝不自动应用；主 figure preview 在筛选过程中必须保持可见，不要再退回 modal sheet。
+- `Data Studio` 的自动 exclusion 建议当前只服务 tensile triad（`Strength / Modulus / Elongation`）这类 specimen compare 清洗；规则不是“挑最接近平均的 5 个”，而是基于当前 included 且 triad-complete 的 specimen 计算三指标 composite z-score，建议排除 `max 1 + min 1` 两个极端样本，典型 7 个样本会留下 5 个用于后续平均值与误差棒。
 - `Data Studio` 必须提供正式的 `New Data Studio Session` 语义：清空当前 workbook group list、compare inclusion、display rename、排序与 preview context，但保留 figure type、plot style、canvas/theme/palette 等 figure preferences。`Clear Current Session` 只能作为次级危险动作存在。
 - Tensile 现有模板必须继续作为内置模板族工作；默认优先支持并自动匹配现有 tensile raw fixtures，不允许因为 Data Studio 重构而失效。
-- Data Studio 的 canonical route surface 是 `/data-studio/templates`、`/data-studio/source-preview`、`/data-studio/build-workbook`、`/data-studio/import-workbook`、`/data-studio/comparison-preview`、`/data-studio/comparison-export` 与 `/data-studio/session/normalize`；旧 tensile-specific route 只可作为兼容 seam，不能再主导新前端。
-- 如果要做面向用户的 mock，Data Studio 的 user-visible workflow 默认优先压缩为 `Import -> Group Review -> Compare Preview -> Export / Open in Plot`；parse template 的自动匹配、候选推荐和新建模板确认都应下沉在 Import sheet 内，不要回到主界面当一级页面。
-- Data Studio workbook build 或 comparison preview 成功后默认停留在 `Data Studio` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
+- Data Studio 的 canonical route surface 是 `/data-studio/templates`、`/data-studio/source-preview`、`/data-studio/build-workbook`、`/data-studio/import-workbook`、`/data-studio/workbook-preview`、`/data-studio/comparison-context`、`/data-studio/comparison-preview`、`/data-studio/comparison-export` 与 `/data-studio/session/normalize`；旧 tensile-specific route 只可作为兼容 seam，不能再主导新前端。
+- Data Studio 主 workbench 的 preview 刷新必须走 `/data-studio/comparison-context` + PlotSession 单次 inspect/render；`/data-studio/comparison-preview` 只保留给确实需要 sidecar 直接产出 PDF preview 的场景，不要再让主工作台先渲染一次 PDF 再让 PlotSession 渲染第二次。
+- 如果要做面向用户的 mock，Data Studio 的 user-visible workflow 默认优先压缩为 `Import -> Group Review -> Compare Preview -> Export / Open in Plot`；specimen review / 自动 exclusion 建议属于 `Group Review` 内的 inline side panel，不应再拆成新的一级页面；parse template 的自动匹配、候选推荐和新建模板确认都应下沉在 Import sheet 内，不要回到主界面当一级页面。
+- Data Studio workbook build 或 comparison context/preview 成功后默认停留在 `Data Studio` 页面；只有显式点击“在绘图中打开”时，才会把整理结果送进 Plot 继续 inspect / preflight / render。
 - 最近记录、open/save、managed files 与 runtime cleanup 都属于 utility affordance；不要再把 `Start` 或 `projects/recents` 还原成一级 workspace。
 - Plot 导入阶段如需 sidecar materialize `example template folder / blank template folder`，这些 workbook 仍要写到 app-managed stable 目录并按需覆盖刷新；它们只是输入模板与桥接层，不是新的绘图事实源，也不能替代契约、`/meta`、inspect/recommendation 或现有导入责任链。
 - `Code Console` 是一级主工作台，不是 utility；前端负责绑定当前 plot session 或直接加载数据文件、继承当前 plot 或 inspect 得出的 size/style/palette 上下文、按需展示 prompt、承接粘贴代码与运行结果，sidecar 负责生成最终 prompt、轻量上下文和受控 runner。
@@ -132,6 +136,8 @@
   - `display bounds` 负责实际绘图区留白
 - 标准线性轴默认使用 `1/2/5 * 10^n` 的 nice 包络，再做 `5%` 对称无标签 outer padding；x/y 两轴都要按同一套规则处理。
 - `bar` 是例外：`y` 轴必须从 `0` 起画，底部不留 display padding；`box / violin` 不强制从 `0` 起，但自动下界必须显示成可见主刻度。
+- `curve / point_line / scatter` 的 inside legend 只能在当前 axis frame 内择位，不能再为了避让图例去扩张 `x/y` display bounds；`tensile_curve` 这类保留应力语义的小面板多曲线默认优先尝试右下角 legend。
+- plain `bar` / plain `box` 是摘要模板：默认不叠 raw replicate points；需要显式样本点覆盖时走 `box_strip`、`point_error`、`lollipop_error` 或 `distribution_compare` 的 `strip_box` 变体。plain `box` 与 `violin_box` 的 box summary 默认禁用 flier glyph，raw-point overlay 不得带黑色描边。
 - `wide_nmr` 是特例：只要求左、右、底对齐；顶部保留结构式区域；总高度保持双高。
 - `heatmap` 也是特例：主热图区必须和标准单图同 frame；顶部水平 colorbar 不能挤压主图区，也不能出画布。
 - 输入识别先看表结构，再看轴标签/单位，最后才看数值跨度：

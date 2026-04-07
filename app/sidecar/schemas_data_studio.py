@@ -152,6 +152,37 @@ class DataStudioWorkbookSampleResponse(StrictModel):
     metrics: dict[str, float | None] = Field(default_factory=dict)
 
 
+class DataStudioCurvePointResponse(StrictModel):
+    x: float
+    y: float
+
+
+class DataStudioSpecimenStateRequest(StrictModel):
+    workbook_path: str
+    specimen_id: str
+    included: bool = True
+
+
+class DataStudioSpecimenStateResponse(StrictModel):
+    workbook_path: str
+    specimen_id: str
+    included: bool = True
+
+
+class DataStudioSpecimenPreviewResponse(StrictModel):
+    specimen_id: str
+    label: str
+    filename: str
+    source_path: str | None = None
+    included: bool
+    metrics: dict[str, float | None] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    exclusions: list[str] = Field(default_factory=list)
+    mini_curve_points: list[DataStudioCurvePointResponse] = Field(default_factory=list)
+    triad_complete: bool = False
+    suggested_exclusion: bool = False
+
+
 class DataStudioWorkbookResponse(StrictModel):
     workbook_id: str
     workbook_path: str
@@ -167,6 +198,24 @@ class DataStudioWorkbookResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     exclusions: list[str] = Field(default_factory=list)
     samples: list[DataStudioWorkbookSampleResponse] = Field(default_factory=list)
+
+
+class DataStudioWorkbookPreviewResponse(StrictModel):
+    workbook_path: str
+    label: str
+    supported: bool
+    unsupported_reason: str = ""
+    total_specimen_count: int = 0
+    included_specimen_count: int = 0
+    excluded_specimen_count: int = 0
+    representative_specimen_id: str | None = None
+    representative_filename: str | None = None
+    metrics: list[DataStudioMetricSummaryResponse] = Field(default_factory=list)
+    specimens: list[DataStudioSpecimenPreviewResponse] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    suggested_exclusion_ids: list[str] = Field(default_factory=list)
+    suggestion_supported: bool = False
+    suggestion_support_reason: str = ""
 
 
 class DataStudioImportWorkbookResponse(StrictModel):
@@ -228,6 +277,7 @@ class DataStudioSessionResponse(StrictModel):
     selected_figure_family_id: str | None = None
     selected_figure_template_id: str | None = None
     group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
+    specimen_states: list[DataStudioSpecimenStateResponse] = Field(default_factory=list)
     figure_preferences: list[DataStudioFigurePreferenceResponse] = Field(default_factory=list)
     imported_paths: list[str] = Field(default_factory=list)
     template_draft_path: str | None = None
@@ -261,21 +311,29 @@ class DataStudioImportWorkbookRequest(StrictModel):
     workbook_path: str
 
 
+class DataStudioWorkbookPreviewRequest(StrictModel):
+    workbook_path: str
+    specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
+
+
 class DataStudioComparisonRequest(StrictModel):
     workbook_paths: list[str]
     group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
+    specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
 
 
 class DataStudioPreviewComparisonRequest(StrictModel):
     workbook_paths: list[str]
     recipe_id: str
     group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
+    specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
 
 
 class DataStudioExportComparisonRequest(StrictModel):
     workbook_paths: list[str]
     output_dir: str
     group_states: list[DataStudioGroupStateResponse] = Field(default_factory=list)
+    specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
     selected_recipe_ids: list[str] = Field(default_factory=list)
     figure_options_by_recipe_id: dict[str, RenderOptionsPayload] = Field(default_factory=dict)
 
@@ -299,6 +357,12 @@ class DataStudioComparisonPreviewResponse(StrictModel):
     preview: PreviewItemResponse
 
 
+class DataStudioComparisonContextResponse(StrictModel):
+    comparison_set: DataStudioComparisonSetResponse
+    cache_key: str | None = None
+    materialized_at: str | None = None
+
+
 class DataStudioComparisonExportResponse(StrictModel):
     comparison_set: DataStudioComparisonSetResponse
     figure_outputs: list[DataStudioFigureOutputResponse] = Field(default_factory=list)
@@ -308,11 +372,13 @@ __all__ = [
     "DataStudioBuildWorkbookRequest",
     "DataStudioBindingSuggestionResponse",
     "DataStudioComparisonExportResponse",
+    "DataStudioComparisonContextResponse",
     "DataStudioComparisonRecipeResponse",
     "DataStudioComparisonRequest",
     "DataStudioComparisonPreviewResponse",
     "DataStudioComparisonSetResponse",
     "DataStudioCreateTemplateRequest",
+    "DataStudioCurvePointResponse",
     "DataStudioExportComparisonRequest",
     "DataStudioFieldCandidateResponse",
     "DataStudioFigurePreferenceResponse",
@@ -331,6 +397,9 @@ __all__ = [
     "DataStudioSheetBlockResponse",
     "DataStudioSourcePreviewRequest",
     "DataStudioSourcePreviewResponse",
+    "DataStudioSpecimenPreviewResponse",
+    "DataStudioSpecimenStateRequest",
+    "DataStudioSpecimenStateResponse",
     "DataStudioTemplateConditionResponse",
     "DataStudioTemplateFieldBindingResponse",
     "DataStudioTemplateListResponse",
@@ -338,6 +407,8 @@ __all__ = [
     "DataStudioTemplateResponse",
     "DataStudioUpdateTemplateRequest",
     "DataStudioWorkbookResponse",
+    "DataStudioWorkbookPreviewRequest",
+    "DataStudioWorkbookPreviewResponse",
     "DataStudioWorkbookSampleResponse",
     "serialize_dataclass",
 ]

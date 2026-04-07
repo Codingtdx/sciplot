@@ -76,6 +76,38 @@ def test_plot_tensile_curve_keeps_zero_as_a_labeled_tick_but_leaves_display_padd
         plt.close(fig)
 
 
+def test_plot_tensile_curve_keeps_fixed_bounds_and_prefers_lower_right_legend() -> None:
+    series = [
+        _curve_series("E0", [0, 4, 8, 12, 20, 30, 36, 40], [0, 45, 68, 71, 71, 70, 62, 25]),
+        _curve_series("E2", [0, 4, 8, 12, 20, 30, 40, 52], [0, 43, 63, 64, 65, 65, 58, 20]),
+        _curve_series("E3", [0, 4, 8, 12, 20, 30, 42, 53], [0, 44, 66, 67, 67, 67, 57, 25]),
+        _curve_series("E4", [0, 4, 8, 12, 20, 30, 42, 45], [0, 46, 75, 71, 70, 69, 61, 29]),
+    ]
+
+    fig_none, ax_none = plot_tensile_curve(series, legend_mode="none")
+    expected_xlim = tuple(float(value) for value in ax_none.get_xlim())
+    expected_ylim = tuple(float(value) for value in ax_none.get_ylim())
+    plt.close(fig_none)
+
+    fig, ax = plot_tensile_curve(series)
+    try:
+        assert tuple(float(value) for value in ax.get_xlim()) == pytest.approx(expected_xlim)
+        assert tuple(float(value) for value in ax.get_ylim()) == pytest.approx(expected_ylim)
+
+        y_low, _ = sorted(float(value) for value in ax.get_ylim())
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+        assert y_low < 0.0
+        assert float(y_ticks.min()) == pytest.approx(0.0, abs=1e-9)
+
+        layout_debug = getattr(fig, "_sciplot_layout_debug", [])
+        legend_records = [entry for entry in layout_debug if entry.get("object_kind") == "legend"]
+        assert legend_records
+        assert legend_records[0]["chosen_candidate_id"] == "lower_right"
+    finally:
+        plt.close(fig)
+
+
 def test_plot_curve_keeps_labeled_endpoints_visible_and_display_padding_unlabeled() -> None:
     series = [_curve_series("Sample A", [0.0, 50.0, 100.0], [0.0, 40.0, 100.0])]
 
@@ -187,6 +219,8 @@ def test_plot_box_shows_the_current_lower_labeled_bound_and_keeps_display_paddin
         assert not np.isclose(y_low, 0.0)
         assert float(y_ticks.min()) > y_low
         assert np.any(np.isclose(y_ticks, float(y_ticks.min())))
+        assert not ax.collections
+        assert all(line.get_marker() in {None, "", "None", " "} for line in ax.lines)
     finally:
         plt.close(fig)
 

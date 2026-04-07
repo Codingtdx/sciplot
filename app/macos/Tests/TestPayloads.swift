@@ -804,6 +804,165 @@ enum TestPayloads {
         DataStudioImportWorkbookResponse(workbooks: workbooks)
     }
 
+    static func dataStudioWorkbookPreview(
+        path: String = "/tmp/prepared.xlsx",
+        label: String = "Prepared Group"
+    ) -> DataStudioWorkbookPreviewResponse {
+        DataStudioWorkbookPreviewResponse(
+            workbookPath: path,
+            label: label,
+            supported: true,
+            unsupportedReason: "",
+            totalSpecimenCount: 2,
+            includedSpecimenCount: 2,
+            excludedSpecimenCount: 0,
+            representativeSpecimenId: "sample-a",
+            representativeFilename: "raw_a.csv",
+            metrics: [
+                .init(id: "strength", label: "Strength", unit: "MPa", mean: 12.4, std: 0.4),
+                .init(id: "modulus", label: "Modulus", unit: "MPa", mean: 2.1, std: 0.1),
+            ],
+            specimens: [
+                .init(
+                    specimenId: "sample-a",
+                    label: "raw_a.csv",
+                    filename: "raw_a.csv",
+                    sourcePath: "/tmp/raw_a.csv",
+                    included: true,
+                    metrics: ["Strength": 12.4, "Modulus": 2.0, "Elongation": 9.8],
+                    warnings: [],
+                    exclusions: [],
+                    miniCurvePoints: [
+                        .init(x: 0, y: 0),
+                        .init(x: 5, y: 6),
+                        .init(x: 10, y: 12),
+                    ],
+                    triadComplete: true,
+                    suggestedExclusion: false
+                ),
+                .init(
+                    specimenId: "sample-b",
+                    label: "raw_b.csv",
+                    filename: "raw_b.csv",
+                    sourcePath: "/tmp/raw_b.csv",
+                    included: true,
+                    metrics: ["Strength": 12.8, "Modulus": 2.2, "Elongation": 10.1],
+                    warnings: [],
+                    exclusions: [],
+                    miniCurvePoints: [
+                        .init(x: 0, y: 0),
+                        .init(x: 5, y: 5.5),
+                        .init(x: 10, y: 11),
+                    ],
+                    triadComplete: true,
+                    suggestedExclusion: false
+                ),
+            ],
+            warnings: [],
+            suggestedExclusionIds: [],
+            suggestionSupported: false,
+            suggestionSupportReason: "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
+        )
+    }
+
+    static func dataStudioWorkbookPreviewWithSuggestedExclusions(
+        path: String = "/tmp/prepared.xlsx",
+        label: String = "Prepared Group",
+        excludedSpecimenIDs: Set<String> = []
+    ) -> DataStudioWorkbookPreviewResponse {
+        let specimens: [(id: String, filename: String, strength: Double, modulus: Double, elongation: Double)] = [
+            ("sample-1", "sample_1.csv", 98, 1990, 9.8),
+            ("sample-2", "sample_2.csv", 99, 1995, 9.9),
+            ("sample-3", "sample_3.csv", 100, 2000, 10.0),
+            ("sample-4", "sample_4.csv", 101, 2005, 10.1),
+            ("sample-5", "sample_5.csv", 102, 2010, 10.2),
+            ("sample-6", "sample_6.csv", 103, 2015, 10.3),
+            ("sample-7", "sample_7.csv", 130, 2200, 12.0),
+        ]
+        let suggestionIDs = excludedSpecimenIDs.isEmpty ? ["sample-1", "sample-7"] : []
+        let includedSpecimens = specimens.filter { !excludedSpecimenIDs.contains($0.id) }
+        let representative = includedSpecimens.sorted { abs($0.strength - 100) < abs($1.strength - 100) }.first ?? specimens[3]
+
+        func mean(_ values: [Double]) -> Double {
+            guard !values.isEmpty else { return 0 }
+            return values.reduce(0, +) / Double(values.count)
+        }
+
+        func std(_ values: [Double]) -> Double {
+            guard values.count > 1 else { return 0 }
+            let average = mean(values)
+            let variance = values.reduce(0) { partial, value in
+                partial + pow(value - average, 2)
+            } / Double(values.count - 1)
+            return sqrt(variance)
+        }
+
+        return DataStudioWorkbookPreviewResponse(
+            workbookPath: path,
+            label: label,
+            supported: true,
+            unsupportedReason: "",
+            totalSpecimenCount: specimens.count,
+            includedSpecimenCount: includedSpecimens.count,
+            excludedSpecimenCount: excludedSpecimenIDs.count,
+            representativeSpecimenId: representative.id,
+            representativeFilename: representative.filename,
+            metrics: [
+                .init(
+                    id: "strength",
+                    label: "Strength",
+                    unit: "MPa",
+                    mean: mean(includedSpecimens.map(\.strength)),
+                    std: std(includedSpecimens.map(\.strength))
+                ),
+                .init(
+                    id: "modulus",
+                    label: "Modulus",
+                    unit: "MPa",
+                    mean: mean(includedSpecimens.map(\.modulus)),
+                    std: std(includedSpecimens.map(\.modulus))
+                ),
+                .init(
+                    id: "elongation",
+                    label: "Elongation",
+                    unit: "%",
+                    mean: mean(includedSpecimens.map(\.elongation)),
+                    std: std(includedSpecimens.map(\.elongation))
+                ),
+            ],
+            specimens: specimens.map { specimen in
+                let included = !excludedSpecimenIDs.contains(specimen.id)
+                return .init(
+                    specimenId: specimen.id,
+                    label: specimen.filename,
+                    filename: specimen.filename,
+                    sourcePath: "/tmp/\(specimen.filename)",
+                    included: included,
+                    metrics: [
+                        "Strength": specimen.strength,
+                        "Modulus": specimen.modulus,
+                        "Elongation": specimen.elongation,
+                    ],
+                    warnings: [],
+                    exclusions: included ? [] : ["Excluded from compare"],
+                    miniCurvePoints: [
+                        .init(x: 0, y: 0),
+                        .init(x: 5, y: specimen.strength / 10),
+                        .init(x: 10, y: specimen.strength / 5),
+                    ],
+                    triadComplete: true,
+                    suggestedExclusion: suggestionIDs.contains(specimen.id)
+                )
+            },
+            warnings: [],
+            suggestedExclusionIds: suggestionIDs,
+            suggestionSupported: includedSpecimens.count >= 7,
+            suggestionSupportReason: includedSpecimens.count >= 7
+                ? ""
+                : "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
+        )
+    }
+
     static func dataStudioComparisonSet() -> DataStudioComparisonSetResponse {
         DataStudioComparisonSetResponse(
             id: "primary-vs-second",
@@ -843,6 +1002,14 @@ enum TestPayloads {
             comparisonSet: dataStudioComparisonSet(),
             recipe: dataStudioComparisonSet().recipes[0],
             preview: .init(filename: "representative_curve.pdf", pdfBase64: pdfBase64, qa: nil)
+        )
+    }
+
+    static func dataStudioComparisonContext() -> DataStudioComparisonContextResponse {
+        DataStudioComparisonContextResponse(
+            comparisonSet: dataStudioComparisonSet(),
+            cacheKey: "preview-cache-key",
+            materializedAt: "2026-04-07T12:00:00Z"
         )
     }
 
@@ -890,6 +1057,10 @@ enum TestPayloads {
                     includeInCompare: true,
                     sortOrder: 0
                 ),
+            ],
+            specimenStates: [
+                .init(workbookPath: "/tmp/prepared.xlsx", specimenId: "sample-a", included: true),
+                .init(workbookPath: "/tmp/prepared.xlsx", specimenId: "sample-b", included: false),
             ],
             figurePreferences: [
                 .init(

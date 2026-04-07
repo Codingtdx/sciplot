@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib import rcParams
+from matplotlib.collections import PathCollection
 from matplotlib.colors import to_hex
 
 from src import plot_style
@@ -22,6 +23,14 @@ from src.rendering import themes as rendering_themes
 from src.rendering.render_curve_support import _apply_compact_inside_legend
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.themes import VisualThemeSpec, visual_theme_ids, visual_theme_soft_overrides
+
+
+def _path_collections(ax) -> list[PathCollection]:
+    return [collection for collection in ax.collections if isinstance(collection, PathCollection)]
+
+
+def _has_marker_lines(ax) -> bool:
+    return any(line.get_marker() not in {None, "", "None", " "} for line in ax.lines)
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -604,6 +613,8 @@ def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "grouped_bar_compare_profile" in rendered[0].qa_report.autofixes_applied
+        assert "bar_raw_points_overlay" not in rendered[0].qa_report.autofixes_applied
+        assert not _path_collections(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
 
@@ -621,6 +632,8 @@ def test_grouped_bar_error_preflight_matches_render_filename(tmp_path: Path) -> 
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
+        assert "bar_raw_points_overlay" not in rendered[0].qa_report.autofixes_applied
+        assert not _path_collections(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
 
@@ -673,6 +686,7 @@ def test_violin_box_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "violin_box_profile" in rendered[0].qa_report.autofixes_applied
+        assert not _has_marker_lines(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
 
@@ -691,6 +705,10 @@ def test_box_strip_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert rendered[0].qa_report is not None
         assert "box_strip_profile" in rendered[0].qa_report.autofixes_applied
         assert "strip_point_overlay_emphasis" in rendered[0].qa_report.autofixes_applied
+        collections = _path_collections(rendered[0].figure.axes[0])
+        assert collections
+        assert all(collection.get_edgecolors().size == 0 for collection in collections)
+        assert not _has_marker_lines(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
 
@@ -708,6 +726,10 @@ def test_distribution_compare_preflight_matches_render_filename(tmp_path: Path) 
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "distribution_variant_strip_box" in rendered[0].qa_report.autofixes_applied
+        collections = _path_collections(rendered[0].figure.axes[0])
+        assert collections
+        assert all(collection.get_edgecolors().size == 0 for collection in collections)
+        assert not _has_marker_lines(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
 
@@ -771,6 +793,23 @@ def test_distribution_compare_uses_box_variant_when_group_count_is_large(tmp_pat
         assert len(rendered) == 1
         assert rendered[0].qa_report is not None
         assert "distribution_variant_box" in rendered[0].qa_report.autofixes_applied
+        assert not _path_collections(rendered[0].figure.axes[0])
+        assert not _has_marker_lines(rendered[0].figure.axes[0])
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_box_render_is_summary_only_and_hides_fliers(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    rendered = build_rendered_plots("box", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        ax = plot.figure.axes[0]
+        assert not _path_collections(ax)
+        assert not _has_marker_lines(ax)
     finally:
         close_rendered_plots(rendered)
 
@@ -1072,7 +1111,7 @@ def test_small_point_line_quality_clears_compact_editorial_checks(tmp_path: Path
         close_rendered_plots(rendered)
 
 
-def test_bar_render_uses_editorial_spacing_and_raw_point_overlay(tmp_path: Path) -> None:
+def test_bar_render_keeps_editorial_spacing_without_raw_point_overlay(tmp_path: Path) -> None:
     input_path = _write_replicate_table(tmp_path / "replicates.csv")
 
     rendered = build_rendered_plots("bar", input_path)
@@ -1080,9 +1119,9 @@ def test_bar_render_uses_editorial_spacing_and_raw_point_overlay(tmp_path: Path)
         assert len(rendered) == 1
         plot = rendered[0]
         assert plot.qa_report is not None
-        assert "bar_raw_points_overlay" in plot.qa_report.autofixes_applied
         assert "stats_spacing_profile" in plot.qa_report.autofixes_applied
         ax = plot.figure.axes[0]
-        assert ax.collections
+        assert "bar_raw_points_overlay" not in plot.qa_report.autofixes_applied
+        assert not _path_collections(ax)
     finally:
         close_rendered_plots(rendered)
