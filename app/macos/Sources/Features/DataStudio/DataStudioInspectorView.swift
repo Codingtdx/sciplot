@@ -4,13 +4,45 @@ struct DataStudioInspectorView: View {
     @Bindable var session: DataStudioSession
 
     var body: some View {
-        PlotInspectorView(session: session.plotSession, styleSectionTitle: "Style") {
-            figureSection
-            dataSection
-        } trailingSections: {
-            studioSection
-            actionsSection
+        if session.showsCompactEmptyInspector {
+            compactEmptyInspector
+        } else {
+            PlotInspectorView(session: session.plotSession, styleSectionTitle: "Style") {
+                figureSection
+                dataSection
+            } trailingSections: {
+                studioSection
+                if session.showsInspectorActions {
+                    actionsSection
+                }
+            }
         }
+    }
+
+    private var compactEmptyInspector: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                compactSection(
+                    title: "Figure",
+                    message: "Import at least one group to activate the Data Studio figure selector."
+                )
+
+                compactSection(
+                    title: "Data",
+                    message: "No workbook groups are loaded."
+                )
+
+                compactSection(
+                    title: "Studio",
+                    message: "Representative, exclusion, and aggregation rules appear once workbook data is loaded."
+                )
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .inspectorSurface()
     }
 
     private var figureSection: some View {
@@ -111,12 +143,14 @@ struct DataStudioInspectorView: View {
             .buttonStyle(.bordered)
             .disabled(session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil)
 
-            Button("Validate Session Payload") {
-                Task {
-                    _ = await session.normalizeSessionPayload()
+            if session.hasSessionContent {
+                Button("Validate Session Payload") {
+                    Task {
+                        _ = await session.normalizeSessionPayload()
+                    }
                 }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
         }
     }
 
@@ -140,5 +174,17 @@ struct DataStudioInspectorView: View {
                 }
             }
         )
+    }
+
+    private func compactSection(title: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

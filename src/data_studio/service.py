@@ -16,7 +16,7 @@ from src.data_studio.template_store import (
     rename_template,
     save_template,
 )
-from src.data_studio.workbooks import build_workbook, create_template_from_candidates, import_workbook
+from src.data_studio.workbooks import build_workbook, create_template_from_candidates, import_workbook, import_workbooks
 
 
 def list_data_studio_templates():
@@ -73,6 +73,10 @@ def import_data_studio_workbook(path: str | Path):
     return import_workbook(path)
 
 
+def import_data_studio_workbooks(path: str | Path):
+    return import_workbooks(path)
+
+
 def list_data_studio_recipes(workbook_paths: list[str | Path], *, group_states=None):
     return comparison_recipes_for_workbooks(workbook_paths, group_states=group_states)
 
@@ -104,6 +108,7 @@ __all__ = [
     "delete_data_studio_template",
     "export_data_studio_comparison",
     "import_data_studio_workbook",
+    "import_data_studio_workbooks",
     "list_data_studio_recipes",
     "list_data_studio_templates",
     "load_template",

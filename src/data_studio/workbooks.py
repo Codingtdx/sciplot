@@ -21,7 +21,7 @@ from src.data_studio.models import (
     WorkbookSample,
 )
 from src.data_studio.template_store import load_template
-
+from src.infrastructure.persistence.data_studio_imports import prepare_managed_data_studio_import_dir
 
 GENERIC_TEMPLATE_PARSE_STRATEGY = "structured:curve_metrics_columns"
 
@@ -38,8 +38,7 @@ def create_template_from_candidates(
     accepted_ids = set(accepted_candidate_ids or ())
     all_candidates = list(preview.field_candidates)
     candidates = [candidate for candidate in all_candidates if not accepted_ids or candidate.id in accepted_ids]
-    x_candidate = _best_candidate(candidates, "curve_x") or _best_candidate(all_candidates, "curve_x")
-    y_candidate = _best_candidate(candidates, "curve_y") or _best_candidate(all_candidates, "curve_y")
+    x_candidate, y_candidate = _resolve_curve_pair(preview, accepted_ids, candidates, all_candidates)
     if x_candidate is None or y_candidate is None:
         raise ValueError("Template creation needs at least one recommended X field and one recommended Y field.")
     metric_candidates = [candidate for candidate in candidates if candidate.kind == "metric"]
@@ -73,6 +72,60 @@ def create_template_from_candidates(
         preferred_sheet_name="Representative_Curve",
         metadata=metadata,
     )
+
+
+def _resolve_curve_pair(
+    preview,
+    accepted_ids: set[str],
+    candidates: list[FieldCandidate],
+    all_candidates: list[FieldCandidate],
+) -> tuple[FieldCandidate | None, FieldCandidate | None]:
+    selected_curve_suggestions = [
+        suggestion
+        for suggestion in preview.binding_suggestions
+        if suggestion.kind == "curve_pair"
+        and suggestion.candidate_ids
+        and set(suggestion.candidate_ids).issubset(accepted_ids)
+    ]
+    if selected_curve_suggestions:
+        curve_candidate_ids = set(selected_curve_suggestions[0].candidate_ids)
+        x_candidate = next(
+            (
+                candidate
+                for candidate in all_candidates
+                if candidate.id in curve_candidate_ids and candidate.kind == "curve_x"
+            ),
+            None,
+        )
+        y_candidate = next(
+            (
+                candidate
+                for candidate in all_candidates
+                if candidate.id in curve_candidate_ids and candidate.kind == "curve_y"
+            ),
+            None,
+        )
+        if x_candidate is not None and y_candidate is not None:
+            return x_candidate, y_candidate
+
+    same_block_pairs: list[tuple[float, FieldCandidate, FieldCandidate]] = []
+    candidate_pool = candidates or all_candidates
+    x_candidates = [candidate for candidate in candidate_pool if candidate.kind == "curve_x"]
+    y_candidates = [candidate for candidate in candidate_pool if candidate.kind == "curve_y"]
+    for x_candidate in x_candidates:
+        for y_candidate in y_candidates:
+            if x_candidate.block_id and y_candidate.block_id and x_candidate.block_id != y_candidate.block_id:
+                continue
+            score = x_candidate.confidence + y_candidate.confidence
+            same_block_pairs.append((score, x_candidate, y_candidate))
+    if same_block_pairs:
+        same_block_pairs.sort(key=lambda item: (-item[0], item[1].label.lower(), item[2].label.lower()))
+        _, x_candidate, y_candidate = same_block_pairs[0]
+        return x_candidate, y_candidate
+
+    return _best_candidate(candidates, "curve_x") or _best_candidate(all_candidates, "curve_x"), _best_candidate(
+        candidates, "curve_y"
+    ) or _best_candidate(all_candidates, "curve_y")
 
 
 def build_workbook(
@@ -246,6 +299,23 @@ def import_workbook(path: str | Path) -> DataStudioWorkbook:
     )
 
 
+def import_workbooks(path: str | Path) -> tuple[DataStudioWorkbook, ...]:
+    workbook_path = ensure_input_path(str(Path(path).expanduser()))
+    metadata = tensile_builtin.load_metadata_sheet(workbook_path)
+    if _looks_like_comparison_bundle(workbook_path, metadata):
+        imported = _import_source_workbooks_from_metadata(workbook_path, metadata)
+        if imported:
+            return imported
+        materialized = _materialize_comparison_bundle_groups(workbook_path, metadata)
+        if materialized:
+            return materialized
+        raise ValueError(
+            f"{workbook_path.name} looks like a comparison workbook, but Data Studio could not recover any "
+            "single-group workbooks from it."
+        )
+    return (import_workbook(workbook_path),)
+
+
 def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> dict[str, object]:
     source_path = Path(path).expanduser()
     sheets, _encoding, _delimiter = read_preview_source(source_path)
@@ -264,7 +334,11 @@ def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> d
         else header_row_index + 1
     )
     header_row = [_cell_text(value) for value in frame.iloc[header_row_index].tolist()]
-    unit_row = [_cell_text(value) for value in frame.iloc[unit_row_index].tolist()] if unit_row_index is not None else []
+    unit_row = (
+        [_cell_text(value) for value in frame.iloc[unit_row_index].tolist()]
+        if unit_row_index is not None
+        else []
+    )
 
     x_binding = _binding_by_role(template.field_bindings, "curve_x")
     y_binding = _binding_by_role(template.field_bindings, "curve_y")
@@ -439,6 +513,164 @@ def _looks_like_legacy_tensile_workbook(path: Path) -> bool:
     return bool(sheet_names) and tensile_builtin.REQUIRED_TENSILE_WORKBOOK_SHEETS.issubset(sheet_names)
 
 
+def _looks_like_comparison_bundle(path: Path, metadata: dict[str, Any]) -> bool:
+    template_id = str(metadata.get("template_id", "")).strip()
+    if template_id == "data_studio/comparison":
+        return True
+    try:
+        representative_curves = load_curve_table(path, sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET)
+    except Exception:
+        representative_curves = []
+    if len(representative_curves) > 1:
+        return True
+
+    for sheet_name in list_sheet_names(path):
+        if not sheet_name.endswith("_Replicates"):
+            continue
+        try:
+            groups = load_replicate_table(path, sheet_name=sheet_name)
+        except Exception:
+            continue
+        if len(groups) > 1:
+            return True
+
+    source_files = tuple(Path(item) for item in metadata.get("source_files", ()) if str(item).strip())
+    return len(source_files) >= 2 and all(
+        source_file.suffix.lower() in {".xlsx", ".xlsm", ".xls"} for source_file in source_files
+    )
+
+
+def _import_source_workbooks_from_metadata(path: Path, metadata: dict[str, Any]) -> tuple[DataStudioWorkbook, ...]:
+    source_files = tuple(Path(item) for item in metadata.get("source_files", ()) if str(item).strip())
+    if not source_files:
+        return ()
+    imported: list[DataStudioWorkbook] = []
+    seen_paths: set[str] = set()
+    try:
+        for source_file in source_files:
+            resolved = ensure_input_path(str(source_file.expanduser()))
+            resolved_key = str(resolved)
+            if resolved_key == str(path) or resolved_key in seen_paths:
+                continue
+            seen_paths.add(resolved_key)
+            imported.append(import_workbook(resolved))
+    except Exception:
+        return ()
+    return tuple(imported)
+
+
+def _materialize_comparison_bundle_groups(path: Path, metadata: dict[str, Any]) -> tuple[DataStudioWorkbook, ...]:
+    representative_curves = load_curve_table(path, sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET)
+    if not representative_curves:
+        return ()
+
+    replicate_sheet_names = [sheet_name for sheet_name in list_sheet_names(path) if sheet_name.endswith("_Replicates")]
+    replicate_groups_by_sheet = {
+        sheet_name: load_replicate_table(path, sheet_name=sheet_name)
+        for sheet_name in replicate_sheet_names
+    }
+    source_files = tuple(Path(item) for item in metadata.get("source_files", ()) if str(item).strip())
+    import_dir = prepare_managed_data_studio_import_dir(path)
+    imported: list[DataStudioWorkbook] = []
+
+    for index, curve in enumerate(representative_curves):
+        label = curve.sample.strip() or f"Recovered Group {index + 1}"
+        workbook_path = import_dir / f"{slugify_template_label(label) or 'group'}_{index + 1}.xlsx"
+        selected_metric_groups: list[tuple[str, Any]] = []
+        sample_count = 0
+        for sheet_name, groups in replicate_groups_by_sheet.items():
+            group = _select_group_for_label(groups, label, index)
+            if group is None:
+                continue
+            selected_metric_groups.append((sheet_name, group))
+            sample_count = max(sample_count, len(group.data.index))
+        source_path = source_files[index] if index < len(source_files) else path
+        metadata_sheet = _comparison_group_metadata_sheet_dataframe(
+            label=label,
+            source_files=(source_path,),
+            representative_filename=curve.sample or label,
+            sample_count=sample_count or len(curve.data.index),
+            warnings=(f"Recovered from comparison workbook {path.name}.",),
+        )
+        with pd.ExcelWriter(workbook_path) as writer:
+            _single_curve_table_dataframe(label=label, curve=curve).to_excel(
+                writer,
+                sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+                header=False,
+                index=False,
+            )
+            for sheet_name, group in selected_metric_groups:
+                _single_replicate_table_dataframe(group).to_excel(
+                    writer,
+                    sheet_name=sheet_name,
+                    header=False,
+                    index=False,
+                )
+            metadata_sheet.to_excel(writer, sheet_name=tensile_builtin.METADATA_SHEET, header=False, index=False)
+        imported.append(import_workbook(workbook_path))
+    return tuple(imported)
+
+
+def _select_group_for_label(groups: list[Any], label: str, index: int):
+    if not groups:
+        return None
+    normalized_label = _normalize_group_key(label)
+    for group in groups:
+        if _normalize_group_key(group.group) == normalized_label:
+            return group
+    if index < len(groups):
+        return groups[index]
+    return None
+
+
+def _normalize_group_key(value: object) -> str:
+    return str(value).strip().casefold()
+
+
+def _single_curve_table_dataframe(*, label: str, curve) -> pd.DataFrame:
+    rows: list[list[object]] = [
+        [curve.x_label, curve.y_label],
+        [curve.x_unit, curve.y_unit],
+        [label, label],
+    ]
+    for row_index in range(len(curve.data.index)):
+        rows.append(
+            [
+                float(curve.data.iloc[row_index]["x"]),
+                float(curve.data.iloc[row_index]["y"]),
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
+def _single_replicate_table_dataframe(group) -> pd.DataFrame:
+    rows: list[list[object]] = [
+        [group.value_label],
+        [group.group],
+        [group.value_unit],
+    ]
+    rows.extend([[float(value)] for value in group.data.reset_index(drop=True).tolist()])
+    return pd.DataFrame(rows)
+
+
+def _comparison_group_metadata_sheet_dataframe(
+    *,
+    label: str,
+    source_files: Iterable[Path],
+    representative_filename: str,
+    sample_count: int,
+    warnings: Iterable[str],
+) -> pd.DataFrame:
+    rows = [
+        ["label", label],
+        ["source_files", " | ".join(str(path) for path in source_files)],
+        ["warnings", " | ".join(str(item) for item in warnings)],
+        ["representative_filename", representative_filename],
+        ["sample_count", sample_count],
+    ]
+    return pd.DataFrame(rows)
+
+
 def _unit_for_column(unit_row: list[str], column_index: int) -> str:
     if 0 <= column_index < len(unit_row):
         return unit_row[column_index]
@@ -521,5 +753,6 @@ __all__ = [
     "build_workbook",
     "create_template_from_candidates",
     "import_workbook",
+    "import_workbooks",
     "parse_structured_sample",
 ]

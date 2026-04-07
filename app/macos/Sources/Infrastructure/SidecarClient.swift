@@ -11,7 +11,7 @@ protocol SidecarClienting: AnyObject {
     func updateDataStudioTemplate(templateID: String, request: DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse
     func deleteDataStudioTemplate(templateID: String) async throws
     func buildDataStudioWorkbook(_ request: DataStudioBuildWorkbookRequest) async throws -> DataStudioWorkbookResponse
-    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioWorkbookResponse
+    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioImportWorkbookResponse
     func previewDataStudioComparison(_ request: DataStudioPreviewComparisonRequest) async throws -> DataStudioComparisonPreviewResponse
     func exportDataStudioComparison(_ request: DataStudioExportComparisonRequest) async throws -> DataStudioComparisonExportResponse
     func normalizeDataStudioSession(_ request: DataStudioSessionNormalizeRequest) async throws -> DataStudioSessionResponse
@@ -88,7 +88,7 @@ final class SidecarClient: SidecarClienting {
         try await post("data-studio/build-workbook", body: request)
     }
 
-    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioWorkbookResponse {
+    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioImportWorkbookResponse {
         try await post("data-studio/import-workbook", body: request)
     }
 

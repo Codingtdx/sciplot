@@ -1,5 +1,20 @@
 import SwiftUI
 
+struct InspectorSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+extension View {
+    func inspectorSurface() -> some View {
+        modifier(InspectorSurfaceModifier())
+    }
+}
+
 struct EmptyStateCard: View {
     let title: String
     let message: String

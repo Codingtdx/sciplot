@@ -31,7 +31,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             trailingSections
         }
         .formStyle(.grouped)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .inspectorSurface()
     }
 
     private var plotOptionsSection: some View {

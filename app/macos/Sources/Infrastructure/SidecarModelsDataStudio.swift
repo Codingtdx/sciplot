@@ -47,6 +47,58 @@ struct DataStudioFieldCandidateResponse: Codable, Equatable, Sendable, Identifia
     }
 }
 
+struct DataStudioPreviewRangeResponse: Codable, Equatable, Sendable, Identifiable {
+    let sheetName: String
+    let blockID: String?
+    let startRow: Int
+    let endRow: Int
+    let startCol: Int
+    let endCol: Int
+    let role: String
+
+    var id: String {
+        [sheetName, blockID ?? "-", "\(startRow)", "\(endRow)", "\(startCol)", "\(endCol)", role].joined(separator: ":")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case sheetName
+        case blockID = "blockId"
+        case startRow
+        case endRow
+        case startCol
+        case endCol
+        case role
+    }
+}
+
+struct DataStudioBindingSuggestionResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let title: String
+    let summary: String
+    let sheetName: String
+    let blockID: String?
+    let candidateIDs: [String]
+    let previewRanges: [DataStudioPreviewRangeResponse]
+    let defaultSelected: Bool
+    let rationale: String
+    let confidence: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case title
+        case summary
+        case sheetName
+        case blockID = "blockId"
+        case candidateIDs = "candidateIds"
+        case previewRanges
+        case defaultSelected
+        case rationale
+        case confidence
+    }
+}
+
 struct DataStudioRawSheetPreviewResponse: Codable, Equatable, Sendable {
     let sheetName: String
     let rowCount: Int
@@ -63,6 +115,7 @@ struct DataStudioRawFilePreviewResponse: Codable, Equatable, Sendable {
     let sheetNames: [String]
     let sheets: [DataStudioRawSheetPreviewResponse]
     let fieldCandidates: [DataStudioFieldCandidateResponse]
+    let bindingSuggestions: [DataStudioBindingSuggestionResponse]
     let recommendedTemplateIDs: [String]
     let warnings: [String]
 
@@ -74,6 +127,7 @@ struct DataStudioRawFilePreviewResponse: Codable, Equatable, Sendable {
         case sheetNames
         case sheets
         case fieldCandidates
+        case bindingSuggestions
         case recommendedTemplateIDs = "recommendedTemplateIds"
         case warnings
     }
@@ -228,6 +282,10 @@ struct DataStudioWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
         case exclusions
         case samples
     }
+}
+
+struct DataStudioImportWorkbookResponse: Codable, Equatable, Sendable {
+    let workbooks: [DataStudioWorkbookResponse]
 }
 
 struct DataStudioGroupStatePayload: Codable, Equatable, Sendable, Identifiable {

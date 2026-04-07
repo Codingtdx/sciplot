@@ -55,6 +55,32 @@ class FieldCandidate:
 
 
 @dataclass(frozen=True)
+class PreviewRange:
+    sheet_name: str
+    block_id: str | None
+    start_row: int
+    end_row: int
+    start_col: int
+    end_col: int
+    role: str
+
+
+@dataclass(frozen=True)
+class BindingSuggestion:
+    id: str
+    kind: str
+    title: str
+    summary: str
+    sheet_name: str
+    block_id: str | None
+    candidate_ids: tuple[str, ...]
+    preview_ranges: tuple[PreviewRange, ...] = ()
+    default_selected: bool = False
+    rationale: str = ""
+    confidence: float | None = None
+
+
+@dataclass(frozen=True)
 class RawSheetPreview:
     sheet_name: str
     row_count: int
@@ -72,6 +98,7 @@ class RawFilePreview:
     sheet_names: tuple[str, ...]
     sheets: tuple[RawSheetPreview, ...]
     field_candidates: tuple[FieldCandidate, ...]
+    binding_suggestions: tuple[BindingSuggestion, ...] = ()
     recommended_template_ids: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -245,7 +272,9 @@ __all__ = [
     "DataStudioRange",
     "DataStudioSessionPayload",
     "DataStudioWorkbook",
+    "BindingSuggestion",
     "FieldCandidate",
+    "PreviewRange",
     "RawFilePreview",
     "RawSheetPreview",
     "SheetBlock",

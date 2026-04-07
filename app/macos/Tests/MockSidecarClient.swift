@@ -14,6 +14,7 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioSourcePreviewResponse = TestPayloads.dataStudioSourcePreview()
     var dataStudioTemplateResponse = TestPayloads.dataStudioTemplate()
     var dataStudioWorkbookResponse = TestPayloads.dataStudioWorkbook()
+    var dataStudioImportWorkbookResponse = TestPayloads.dataStudioImportWorkbook()
     var dataStudioComparisonPreviewResponse = TestPayloads.dataStudioComparisonPreview()
     var dataStudioComparisonExportResponse = TestPayloads.dataStudioComparisonExport()
     var dataStudioSessionResponse = TestPayloads.dataStudioSession()
@@ -35,7 +36,7 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioCreateTemplateHandler: ((DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioUpdateTemplateHandler: ((String, DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioBuildWorkbookHandler: ((DataStudioBuildWorkbookRequest) async throws -> DataStudioWorkbookResponse)?
-    var dataStudioImportWorkbookHandler: ((DataStudioImportWorkbookRequest) async throws -> DataStudioWorkbookResponse)?
+    var dataStudioImportWorkbookHandler: ((DataStudioImportWorkbookRequest) async throws -> DataStudioImportWorkbookResponse)?
     var dataStudioPreviewComparisonHandler: ((DataStudioPreviewComparisonRequest) async throws -> DataStudioComparisonPreviewResponse)?
     var dataStudioExportComparisonHandler: ((DataStudioExportComparisonRequest) async throws -> DataStudioComparisonExportResponse)?
     var dataStudioNormalizeSessionHandler: ((DataStudioSessionNormalizeRequest) async throws -> DataStudioSessionResponse)?
@@ -127,12 +128,12 @@ final class MockSidecarClient: SidecarClienting {
         return dataStudioWorkbookResponse
     }
 
-    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioWorkbookResponse {
+    func importDataStudioWorkbook(_ request: DataStudioImportWorkbookRequest) async throws -> DataStudioImportWorkbookResponse {
         dataStudioImportWorkbookRequests.append(request)
         if let dataStudioImportWorkbookHandler {
             return try await dataStudioImportWorkbookHandler(request)
         }
-        return dataStudioWorkbookResponse
+        return dataStudioImportWorkbookResponse
     }
 
     func previewDataStudioComparison(_ request: DataStudioPreviewComparisonRequest) async throws -> DataStudioComparisonPreviewResponse {

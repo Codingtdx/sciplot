@@ -9,8 +9,10 @@ from typing import Any
 import pandas as pd
 
 from src.data_studio.models import (
+    BindingSuggestion,
     DataStudioRange,
     FieldCandidate,
+    PreviewRange,
     RawFilePreview,
     RawSheetPreview,
     SheetBlock,
@@ -58,6 +60,55 @@ UNIT_TOKENS = {
     "°c",
     "k",
 }
+CURVE_X_HINTS = (
+    "strain",
+    "应变",
+    "time",
+    "时间",
+    "temperature",
+    "温度",
+    "frequency",
+    "频率",
+    "wavenumber",
+    "波数",
+    "chemical shift",
+    "ppm",
+    "位移",
+)
+CURVE_Y_HINTS = (
+    "stress",
+    "应力",
+    "force",
+    "力",
+    "load",
+    "modulus",
+    "模量",
+    "intensity",
+    "signal",
+    "强度",
+)
+METRIC_HINTS = (
+    "strength",
+    "断裂强度",
+    "强度",
+    "modulus",
+    "模量",
+    "elongation",
+    "伸长",
+    "break",
+)
+METADATA_HINTS = (
+    "sample",
+    "样品",
+    "name",
+    "batch",
+    "group",
+    "组",
+    "specimen",
+    "试样",
+    "id",
+    "编号",
+)
 
 
 def _cell_text(value: object) -> str:
@@ -78,6 +129,11 @@ def _normalize_token(text: str) -> str:
 
 def _token_set(text: str) -> set[str]:
     return {token for token in _normalize_token(text).split() if token}
+
+
+def _contains_hint(text: str, hints: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(hint in lowered for hint in hints)
 
 
 def sniff_text_encoding(raw_bytes: bytes) -> str | None:
@@ -192,7 +248,7 @@ def detect_sheet_blocks(sheet_name: str, frame: pd.DataFrame) -> tuple[SheetBloc
             header_row_index = detect_header_row(block_frame)
             unit_row_index = detect_unit_row(block_frame, header_row_index)
             data_start = detect_data_start_row(block_frame, header_row_index, unit_row_index)
-            sample_rows = tuple(tuple(value for value in row) for row in block_frame.head(8).itertuples(index=False))
+            sample_rows = tuple(tuple(value for value in row) for row in block_frame.head(24).itertuples(index=False))
             blocks.append(
                 SheetBlock(
                     id=f"{sheet_name}::block{block_index}_{col_run_index}",
@@ -279,11 +335,80 @@ def _looks_numeric(value: str) -> bool:
     return True
 
 
-def infer_field_candidates(sheet_name: str, frame: pd.DataFrame, block: SheetBlock) -> list[FieldCandidate]:
-    block_frame = frame.iloc[
+def _coerce_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _block_frame(frame: pd.DataFrame, block: SheetBlock) -> pd.DataFrame:
+    return frame.iloc[
         block.range.start_row : block.range.end_row + 1,
         block.range.start_col : block.range.end_col + 1,
     ].reset_index(drop=True)
+
+
+def _data_texts_for_column(block_frame: pd.DataFrame, block: SheetBlock, local_index: int) -> list[str]:
+    start_row = block.data_start_row_index or 0
+    return [
+        text
+        for value in block_frame.iloc[start_row:, local_index].tolist()
+        if (text := _cell_text(value))
+    ]
+
+
+def _numeric_profile(values: list[str]) -> tuple[list[float], float, float, float]:
+    numeric_values = [parsed for value in values if (parsed := _coerce_float(value)) is not None]
+    numeric_ratio = len(numeric_values) / max(len(values), 1)
+    unique_ratio = len(set(values)) / max(len(values), 1)
+    monotonic_score = _monotonic_score(numeric_values)
+    return numeric_values, numeric_ratio, unique_ratio, monotonic_score
+
+
+def _monotonic_score(values: list[float]) -> float:
+    if len(values) < 3:
+        return 0.0
+    diffs = [right - left for left, right in zip(values, values[1:]) if right != left]
+    if not diffs:
+        return 0.0
+    non_negative = sum(1 for value in diffs if value >= 0) / len(diffs)
+    non_positive = sum(1 for value in diffs if value <= 0) / len(diffs)
+    return max(non_negative, non_positive)
+
+
+def _column_range(sheet_name: str, block: SheetBlock, local_index: int) -> DataStudioRange:
+    return DataStudioRange(
+        sheet_name=sheet_name,
+        start_row=block.range.start_row,
+        end_row=block.range.end_row,
+        start_col=block.range.start_col + local_index,
+        end_col=block.range.start_col + local_index,
+    )
+
+
+def _best_candidate_for_column(
+    candidates: Iterable[FieldCandidate],
+    *,
+    kind: str,
+    local_index: int,
+    block: SheetBlock,
+) -> FieldCandidate | None:
+    matching: list[FieldCandidate] = []
+    absolute_col = block.range.start_col + local_index
+    for candidate in candidates:
+        if candidate.kind != kind or candidate.range is None:
+            continue
+        if candidate.range.start_col == absolute_col and candidate.range.end_col == absolute_col:
+            matching.append(candidate)
+    if not matching:
+        return None
+    matching.sort(key=lambda item: (-item.confidence, item.label.lower(), item.id))
+    return matching[0]
+
+
+def infer_field_candidates(sheet_name: str, frame: pd.DataFrame, block: SheetBlock) -> list[FieldCandidate]:
+    block_frame = _block_frame(frame, block)
     header_row = (
         [_cell_text(value) for value in block_frame.iloc[block.header_row_index].tolist()]
         if block.header_row_index is not None
@@ -295,57 +420,139 @@ def infer_field_candidates(sheet_name: str, frame: pd.DataFrame, block: SheetBlo
         else []
     )
     candidates: list[FieldCandidate] = []
-    for local_index, header in enumerate(header_row):
-        tokens = _token_set(header)
+    emitted_ids: set[str] = set()
+
+    def append_candidate(
+        *,
+        kind: str,
+        local_index: int,
+        label: str,
+        confidence: float,
+        rationale: str,
+        unit_hint: str | None,
+        sample_values: tuple[str, ...],
+    ) -> None:
+        candidate_id = f"{block.id}::{kind}_{local_index}"
+        if candidate_id in emitted_ids:
+            return
+        emitted_ids.add(candidate_id)
+        candidates.append(
+            FieldCandidate(
+                id=candidate_id,
+                kind=kind,
+                label=label,
+                confidence=confidence,
+                rationale=rationale,
+                sheet_name=sheet_name,
+                block_id=block.id,
+                range=_column_range(sheet_name, block, local_index),
+                sample_values=sample_values,
+                unit_hint=unit_hint,
+            )
+        )
+
+    for local_index in range(block_frame.shape[1]):
+        header = header_row[local_index] if local_index < len(header_row) else ""
+        header_display = header or f"Column {local_index + 1}"
         unit_hint = unit_row[local_index] if local_index < len(unit_row) and unit_row[local_index] else None
-        range_payload = DataStudioRange(
-            sheet_name=sheet_name,
-            start_row=block.range.start_row,
-            end_row=block.range.end_row,
-            start_col=block.range.start_col + local_index,
-            end_col=block.range.start_col + local_index,
-        )
-        sample_values = tuple(
-            _cell_text(value)
-            for value in block_frame.iloc[(block.data_start_row_index or 0) : (block.data_start_row_index or 0) + 5, local_index]
-            .tolist()
-            if _cell_text(value)
-        )
-        for kind, keywords, confidence, rationale in (
-            ("curve_x", {"strain", "time", "temperature", "frequency", "wavenumber", "chemical", "shift"}, 0.88, "Header looks like an X-axis field."),
-            ("curve_y", {"stress", "force", "load", "modulus", "intensity", "signal"}, 0.88, "Header looks like a Y-axis field."),
-            ("metric", {"strength", "modulus", "elongation", "break"}, 0.84, "Header looks like a group metric."),
-            ("metadata", {"sample", "name", "batch", "group", "specimen", "id"}, 0.76, "Header looks like metadata."),
-        ):
-            if tokens & keywords:
-                candidates.append(
-                    FieldCandidate(
-                        id=f"{block.id}::{kind}_{local_index}",
-                        kind=kind,
-                        label=header or f"Column {local_index + 1}",
-                        confidence=confidence,
-                        rationale=rationale,
-                        sheet_name=sheet_name,
-                        block_id=block.id,
-                        range=range_payload,
-                        sample_values=sample_values,
-                        unit_hint=unit_hint,
-                    )
-                )
+        data_values = _data_texts_for_column(block_frame, block, local_index)
+        sample_values = tuple(data_values[:5])
+        _, numeric_ratio, unique_ratio, monotonic_score = _numeric_profile(data_values)
+        combined_hint_text = " ".join(part for part in [header, unit_hint or ""] if part)
+
+        if _contains_hint(combined_hint_text, CURVE_X_HINTS):
+            append_candidate(
+                kind="curve_x",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.9,
+                rationale="Column header and units look like an ordered X series.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+        elif numeric_ratio >= 0.8 and monotonic_score >= 0.82 and unique_ratio >= 0.55:
+            append_candidate(
+                kind="curve_x",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.68,
+                rationale="Column behaves like an ordered X series after the detected data start row.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+
+        if _contains_hint(combined_hint_text, CURVE_Y_HINTS):
+            append_candidate(
+                kind="curve_y",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.9,
+                rationale="Column header and units look like a response or Y field.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+        elif numeric_ratio >= 0.8 and sample_values:
+            append_candidate(
+                kind="curve_y",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.62,
+                rationale="Numeric column could act as the Y component of a curve pair.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+
+        if _contains_hint(combined_hint_text, METRIC_HINTS):
+            append_candidate(
+                kind="metric",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.84,
+                rationale="Column looks like a workbook metric.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+        elif numeric_ratio >= 0.8 and monotonic_score < 0.82 and sample_values:
+            append_candidate(
+                kind="metric",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.54,
+                rationale="Numeric column could be retained as a metric or summary field.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+
+        if _contains_hint(combined_hint_text, METADATA_HINTS):
+            append_candidate(
+                kind="metadata",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.76,
+                rationale="Column looks like metadata.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+        elif sample_values and numeric_ratio <= 0.25:
+            append_candidate(
+                kind="metadata",
+                local_index=local_index,
+                label=header_display,
+                confidence=0.56,
+                rationale="Mostly text-like column could be preserved as metadata.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
+            )
+
         if header:
-            candidates.append(
-                FieldCandidate(
-                    id=f"{block.id}::header_{local_index}",
-                    kind="header",
-                    label=header,
-                    confidence=0.55,
-                    rationale="Column is available for manual template binding.",
-                    sheet_name=sheet_name,
-                    block_id=block.id,
-                    range=range_payload,
-                    sample_values=sample_values,
-                    unit_hint=unit_hint,
-                )
+            append_candidate(
+                kind="header",
+                local_index=local_index,
+                label=header,
+                confidence=0.55,
+                rationale="Column is available for advanced template binding.",
+                unit_hint=unit_hint,
+                sample_values=sample_values,
             )
 
     if block.header_row_index is not None:
@@ -387,6 +594,235 @@ def infer_field_candidates(sheet_name: str, frame: pd.DataFrame, block: SheetBlo
             )
         )
     return candidates
+
+
+def _candidate_sort_key(candidate: FieldCandidate) -> tuple[float, str, str]:
+    return (-candidate.confidence, candidate.label.lower(), candidate.id)
+
+
+def _display_label(candidate: FieldCandidate) -> str:
+    if candidate.unit_hint:
+        return f"{candidate.label} ({candidate.unit_hint})"
+    return candidate.label
+
+
+def _column_profiles(block_frame: pd.DataFrame, block: SheetBlock) -> list[dict[str, object]]:
+    profiles: list[dict[str, object]] = []
+    for local_index in range(block_frame.shape[1]):
+        values = _data_texts_for_column(block_frame, block, local_index)
+        _, numeric_ratio, unique_ratio, monotonic_score = _numeric_profile(values)
+        profiles.append(
+            {
+                "local_index": local_index,
+                "values": values,
+                "numeric_ratio": numeric_ratio,
+                "unique_ratio": unique_ratio,
+                "monotonic_score": monotonic_score,
+            }
+        )
+    return profiles
+
+
+def _preview_range_for_candidate(candidate: FieldCandidate, *, role: str) -> PreviewRange | None:
+    if candidate.range is None:
+        return None
+    return PreviewRange(
+        sheet_name=candidate.sheet_name,
+        block_id=candidate.block_id,
+        start_row=candidate.range.start_row,
+        end_row=candidate.range.end_row,
+        start_col=candidate.range.start_col,
+        end_col=candidate.range.end_col,
+        role=role,
+    )
+
+
+def _build_structure_rows_suggestion(block: SheetBlock, candidates: list[FieldCandidate]) -> BindingSuggestion | None:
+    structure_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.kind in {"header_row", "unit_row"}
+    ]
+    if not structure_candidates:
+        return None
+    ordered = sorted(structure_candidates, key=_candidate_sort_key)
+    preview_ranges = tuple(
+        preview_range
+        for candidate in ordered
+        if (preview_range := _preview_range_for_candidate(
+            candidate,
+            role="header_row" if candidate.kind == "header_row" else "unit_row",
+        )) is not None
+    )
+    summary_parts: list[str] = []
+    if block.header_row_index is not None:
+        summary_parts.append(f"Header Row {block.header_row_index + 1}")
+    elif any(candidate.kind == "header_row" for candidate in ordered):
+        summary_parts.append("Header Row")
+    if block.unit_row_index is not None:
+        summary_parts.append(f"Unit Row {block.unit_row_index + 1}")
+    elif any(candidate.kind == "unit_row" for candidate in ordered):
+        summary_parts.append("Unit Row")
+    return BindingSuggestion(
+        id=f"{block.id}::structure_rows",
+        kind="structure_rows",
+        title="Detected Structure",
+        summary=" · ".join(summary_parts),
+        sheet_name=block.sheet_name,
+        block_id=block.id,
+        candidate_ids=tuple(candidate.id for candidate in ordered),
+        preview_ranges=preview_ranges,
+        default_selected=True,
+        rationale="Detected the table structure rows for this block.",
+        confidence=max((candidate.confidence for candidate in ordered), default=None),
+    )
+
+
+def _build_curve_pair_suggestion(
+    block: SheetBlock,
+    block_frame: pd.DataFrame,
+    candidates: list[FieldCandidate],
+) -> BindingSuggestion | None:
+    profiles = _column_profiles(block_frame, block)
+    if len(profiles) < 2:
+        return None
+    candidate_pairs: list[tuple[float, FieldCandidate, FieldCandidate]] = []
+    for left_profile in profiles:
+        left_index = int(left_profile["local_index"])
+        left_values = list(left_profile["values"])
+        left_numeric_ratio = float(left_profile["numeric_ratio"])
+        left_monotonic = float(left_profile["monotonic_score"])
+        if left_numeric_ratio < 0.8 or len(left_values) < 3:
+            continue
+        x_candidate = _best_candidate_for_column(candidates, kind="curve_x", local_index=left_index, block=block)
+        if x_candidate is None:
+            continue
+        for right_profile in profiles:
+            right_index = int(right_profile["local_index"])
+            if right_index <= left_index:
+                continue
+            right_values = list(right_profile["values"])
+            right_numeric_ratio = float(right_profile["numeric_ratio"])
+            if right_numeric_ratio < 0.8 or len(right_values) < 3:
+                continue
+            y_candidate = _best_candidate_for_column(candidates, kind="curve_y", local_index=right_index, block=block)
+            if y_candidate is None:
+                continue
+            distance = right_index - left_index
+            adjacency_bonus = 0.16 if distance == 1 else max(0.0, 0.1 - 0.03 * (distance - 1))
+            same_block_bonus = 0.2
+            structural_bonus = left_monotonic * 0.22
+            score = x_candidate.confidence + y_candidate.confidence + adjacency_bonus + same_block_bonus + structural_bonus
+            candidate_pairs.append((score, x_candidate, y_candidate))
+    if not candidate_pairs:
+        return None
+    candidate_pairs.sort(key=lambda item: (-item[0], item[1].label.lower(), item[2].label.lower()))
+    score, x_candidate, y_candidate = candidate_pairs[0]
+    preview_ranges = tuple(
+        preview_range
+        for preview_range in (
+            _preview_range_for_candidate(x_candidate, role="x"),
+            _preview_range_for_candidate(y_candidate, role="y"),
+        )
+        if preview_range is not None
+    )
+    return BindingSuggestion(
+        id=f"{block.id}::curve_pair::{x_candidate.id}::{y_candidate.id}",
+        kind="curve_pair",
+        title="Recommended Curve",
+        summary=f"X: {_display_label(x_candidate)} · Y: {_display_label(y_candidate)}",
+        sheet_name=block.sheet_name,
+        block_id=block.id,
+        candidate_ids=(x_candidate.id, y_candidate.id),
+        preview_ranges=preview_ranges,
+        default_selected=True,
+        rationale="Recommended X/Y pair comes from the same numeric block with adjacent columns preferred.",
+        confidence=min(0.99, score / 2.4),
+    )
+
+
+def _build_group_suggestion(
+    *,
+    block: SheetBlock,
+    candidates: list[FieldCandidate],
+    kind: str,
+    title: str,
+    role: str,
+    excluded_candidate_ids: set[str] | None = None,
+    default_selected: bool,
+) -> BindingSuggestion | None:
+    excluded_candidate_ids = excluded_candidate_ids or set()
+    grouped = [
+        candidate
+        for candidate in sorted(candidates, key=_candidate_sort_key)
+        if candidate.kind == kind and candidate.id not in excluded_candidate_ids
+    ]
+    if not grouped:
+        return None
+    selected = grouped[:3]
+    preview_ranges = tuple(
+        preview_range
+        for candidate in selected
+        if (preview_range := _preview_range_for_candidate(candidate, role=role)) is not None
+    )
+    return BindingSuggestion(
+        id=f"{block.id}::{kind}_group",
+        kind=f"{kind}_group",
+        title=title,
+        summary=", ".join(_display_label(candidate) for candidate in selected),
+        sheet_name=block.sheet_name,
+        block_id=block.id,
+        candidate_ids=tuple(candidate.id for candidate in selected),
+        preview_ranges=preview_ranges,
+        default_selected=default_selected,
+        rationale=f"Grouped {kind} columns from the same block.",
+        confidence=max((candidate.confidence for candidate in selected), default=None),
+    )
+
+
+def build_binding_suggestions(
+    sheet_name: str,
+    frame: pd.DataFrame,
+    block: SheetBlock,
+    candidates: list[FieldCandidate],
+) -> list[BindingSuggestion]:
+    block_frame = _block_frame(frame, block)
+    suggestions: list[BindingSuggestion] = []
+    if structure_suggestion := _build_structure_rows_suggestion(block, candidates):
+        suggestions.append(structure_suggestion)
+    curve_suggestion = _build_curve_pair_suggestion(block, block_frame, candidates)
+    if curve_suggestion is not None:
+        suggestions.append(curve_suggestion)
+    excluded_ids = set(curve_suggestion.candidate_ids if curve_suggestion is not None else ())
+    if metric_suggestion := _build_group_suggestion(
+        block=block,
+        candidates=candidates,
+        kind="metric",
+        title="Recommended Metrics",
+        role="metric",
+        excluded_candidate_ids=excluded_ids,
+        default_selected=True,
+    ):
+        suggestions.append(metric_suggestion)
+    if metadata_suggestion := _build_group_suggestion(
+        block=block,
+        candidates=candidates,
+        kind="metadata",
+        title="Recommended Metadata",
+        role="metadata",
+        excluded_candidate_ids=set(),
+        default_selected=True,
+    ):
+        suggestions.append(metadata_suggestion)
+    suggestions.sort(
+        key=lambda item: (
+            not item.default_selected,
+            {"curve_pair": 0, "structure_rows": 1, "metric_group": 2, "metadata_group": 3}.get(item.kind, 9),
+            -(item.confidence or 0.0),
+            item.title.lower(),
+        )
+    )
+    return suggestions
 
 
 def match_template(preview: RawFilePreview, template: TemplateDefinition) -> TemplateMatch | None:
@@ -457,19 +893,38 @@ def preview_raw_file(path: str | Path) -> RawFilePreview:
     sheets, encoding, delimiter = read_preview_source(source_path)
     sheet_previews: list[RawSheetPreview] = []
     field_candidates: list[FieldCandidate] = []
+    binding_suggestions: list[BindingSuggestion] = []
+    frames_by_sheet: dict[str, pd.DataFrame] = {}
     for sheet_name, frame in sheets:
+        frames_by_sheet[sheet_name] = frame
         blocks = detect_sheet_blocks(sheet_name, frame)
         sheet_previews.append(
             RawSheetPreview(
                 sheet_name=sheet_name,
                 row_count=frame.shape[0],
                 col_count=frame.shape[1],
-                sample_rows=tuple(tuple(value for value in row) for row in frame.head(12).itertuples(index=False)),
+                sample_rows=tuple(tuple(value for value in row) for row in frame.head(16).itertuples(index=False)),
                 blocks=blocks,
             )
         )
         for block in blocks:
             field_candidates.extend(infer_field_candidates(sheet_name, frame, block))
+    candidates_by_block: dict[str, list[FieldCandidate]] = {}
+    for candidate in field_candidates:
+        if candidate.block_id is None:
+            continue
+        candidates_by_block.setdefault(candidate.block_id, []).append(candidate)
+    for sheet in sheet_previews:
+        frame = frames_by_sheet[sheet.sheet_name]
+        for block in sheet.blocks:
+            binding_suggestions.extend(
+                build_binding_suggestions(
+                    sheet.sheet_name,
+                    frame,
+                    block,
+                    candidates_by_block.get(block.id, []),
+                )
+            )
     preview = RawFilePreview(
         source_path=source_path,
         file_type=source_path.suffix.lower().lstrip("."),
@@ -478,6 +933,7 @@ def preview_raw_file(path: str | Path) -> RawFilePreview:
         sheet_names=tuple(sheet.sheet_name for sheet in sheet_previews),
         sheets=tuple(sheet_previews),
         field_candidates=tuple(field_candidates),
+        binding_suggestions=tuple(binding_suggestions),
     )
     recommendations = recommend_templates_for_preview(preview)
     return replace(preview, recommended_template_ids=tuple(match.template_id for match in recommendations[:5]))

@@ -11,6 +11,7 @@ struct CodeConsoleContextView: View {
             outputHandoffSection
         }
         .formStyle(.grouped)
+        .inspectorSurface()
     }
 
     @ViewBuilder

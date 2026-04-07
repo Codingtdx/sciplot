@@ -40,6 +40,30 @@ class DataStudioFieldCandidateResponse(StrictModel):
     unit_hint: str | None = None
 
 
+class DataStudioPreviewRangeResponse(StrictModel):
+    sheet_name: str
+    block_id: str | None = None
+    start_row: int
+    end_row: int
+    start_col: int
+    end_col: int
+    role: str
+
+
+class DataStudioBindingSuggestionResponse(StrictModel):
+    id: str
+    kind: str
+    title: str
+    summary: str
+    sheet_name: str
+    block_id: str | None = None
+    candidate_ids: list[str] = Field(default_factory=list)
+    preview_ranges: list[DataStudioPreviewRangeResponse] = Field(default_factory=list)
+    default_selected: bool = False
+    rationale: str = ""
+    confidence: float | None = None
+
+
 class DataStudioRawSheetPreviewResponse(StrictModel):
     sheet_name: str
     row_count: int
@@ -56,6 +80,7 @@ class DataStudioRawFilePreviewResponse(StrictModel):
     sheet_names: list[str] = Field(default_factory=list)
     sheets: list[DataStudioRawSheetPreviewResponse] = Field(default_factory=list)
     field_candidates: list[DataStudioFieldCandidateResponse] = Field(default_factory=list)
+    binding_suggestions: list[DataStudioBindingSuggestionResponse] = Field(default_factory=list)
     recommended_template_ids: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -142,6 +167,10 @@ class DataStudioWorkbookResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     exclusions: list[str] = Field(default_factory=list)
     samples: list[DataStudioWorkbookSampleResponse] = Field(default_factory=list)
+
+
+class DataStudioImportWorkbookResponse(StrictModel):
+    workbooks: list[DataStudioWorkbookResponse] = Field(default_factory=list)
 
 
 class DataStudioGroupStateResponse(StrictModel):
@@ -277,6 +306,7 @@ class DataStudioComparisonExportResponse(StrictModel):
 
 __all__ = [
     "DataStudioBuildWorkbookRequest",
+    "DataStudioBindingSuggestionResponse",
     "DataStudioComparisonExportResponse",
     "DataStudioComparisonRecipeResponse",
     "DataStudioComparisonRequest",
@@ -288,9 +318,11 @@ __all__ = [
     "DataStudioFigurePreferenceResponse",
     "DataStudioFigureOutputResponse",
     "DataStudioGroupStateResponse",
+    "DataStudioImportWorkbookResponse",
     "DataStudioImportWorkbookRequest",
     "DataStudioMetricSummaryResponse",
     "DataStudioPreviewComparisonRequest",
+    "DataStudioPreviewRangeResponse",
     "DataStudioRawFilePreviewResponse",
     "DataStudioRawSheetPreviewResponse",
     "DataStudioRangeResponse",

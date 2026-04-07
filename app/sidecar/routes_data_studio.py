@@ -9,6 +9,7 @@ from app.sidecar.schemas import (
     DataStudioCreateTemplateRequest,
     DataStudioExportComparisonRequest,
     DataStudioImportWorkbookRequest,
+    DataStudioImportWorkbookResponse,
     DataStudioPreviewComparisonRequest,
     DataStudioSessionNormalizeRequest,
     DataStudioSessionResponse,
@@ -27,7 +28,7 @@ from src.data_studio.service import (
     create_data_studio_template,
     delete_data_studio_template,
     export_data_studio_comparison,
-    import_data_studio_workbook,
+    import_data_studio_workbooks,
     list_data_studio_templates,
     normalize_session_payload,
     preview_data_studio_comparison,
@@ -105,11 +106,13 @@ def create_data_studio_router() -> APIRouter:
         except Exception as exc:
             raise http_bad_request("data_studio_build_workbook", exc) from exc
 
-    @router.post("/data-studio/import-workbook", response_model=DataStudioWorkbookResponse)
-    def import_workbook(request: DataStudioImportWorkbookRequest) -> DataStudioWorkbookResponse:
+    @router.post("/data-studio/import-workbook", response_model=DataStudioImportWorkbookResponse)
+    def import_workbook(request: DataStudioImportWorkbookRequest) -> DataStudioImportWorkbookResponse:
         try:
-            workbook = import_data_studio_workbook(request.workbook_path)
-            return DataStudioWorkbookResponse.model_validate(serialize_dataclass(workbook))
+            workbooks = import_data_studio_workbooks(request.workbook_path)
+            return DataStudioImportWorkbookResponse.model_validate(
+                {"workbooks": [serialize_dataclass(workbook) for workbook in workbooks]}
+            )
         except Exception as exc:
             raise http_bad_request("data_studio_import_workbook", exc) from exc
 

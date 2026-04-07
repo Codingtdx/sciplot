@@ -10,6 +10,7 @@ struct ComposerInspectorView: View {
             previewAndExportSection
         }
         .formStyle(.grouped)
+        .inspectorSurface()
     }
 
     @ViewBuilder

@@ -20,6 +20,7 @@
 - `src/code_console_service.py`: Code Console 后端真相源；负责绑定输入上下文、生成外部 AI prompt/starter code，并运行受控 repo-native Python runner。
 - `src/code_console_runtime.py`: Code Console 脚本 helper；runner 内脚本统一从这里读取上下文、加载数据、申请受控输出路径并复用 SciPlot God 风格底座。
 - `src/infrastructure/persistence/code_console_runs.py`: Code Console managed run/output 目录与 retention 规则；不要在 sidecar route 里散落手写目录策略。
+- `src/infrastructure/persistence/data_studio_imports.py`: Data Studio compare workbook re-import 时的 managed 单组 workbook 恢复目录；comparison workbook 若缺少可用 `source_files`，应先在这里 materialize 可重导入的单组 workbook，再交给 `/data-studio/import-workbook`。
 - `make_plot.py`: CLI 兼容入口；现在只负责参数解析、错误出口和调用 `src/rendering/`，不再承载领域逻辑。
 - `app/sidecar/server.py`: GUI 唯一后端真相源。`/meta`、`/plot-contract`、预览、导出、拼图、拉伸预处理都从这里走。
 - `app/sidecar/schemas.py`: sidecar 请求/响应模型、项目文件 schema 校验与迁移入口；`/save-project`、`/open-project` 统一经过这里。

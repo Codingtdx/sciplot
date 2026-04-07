@@ -608,6 +608,8 @@ enum TestPayloads {
                                     [.string("Strain"), .string("Stress"), .string("Strength"), .string("Modulus")],
                                     [.string("%"), .string("MPa"), .string("MPa"), .string("MPa")],
                                     [.number(0), .number(0), .number(12.4), .number(2.1)],
+                                    [.number(0.1), .number(5.1), .number(12.7), .number(2.2)],
+                                    [.number(0.2), .number(12.4), .number(12.8), .number(2.3)],
                                 ]
                             ),
                         ]
@@ -649,6 +651,79 @@ enum TestPayloads {
                         range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 3, endCol: 3),
                         sampleValues: ["12.4", "12.7"],
                         unitHint: "MPa"
+                    ),
+                    .init(
+                        id: "candidate:header_row",
+                        kind: "header_row",
+                        label: "Sheet1 header row",
+                        confidence: 0.7,
+                        rationale: "Likely header row for this data block.",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 1, startCol: 1, endCol: 4),
+                        sampleValues: [],
+                        unitHint: nil
+                    ),
+                    .init(
+                        id: "candidate:unit_row",
+                        kind: "unit_row",
+                        label: "Sheet1 unit row",
+                        confidence: 0.64,
+                        rationale: "Likely unit row for this data block.",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        range: .init(sheetName: "Sheet1", startRow: 2, endRow: 2, startCol: 1, endCol: 4),
+                        sampleValues: [],
+                        unitHint: nil
+                    ),
+                ],
+                bindingSuggestions: [
+                    .init(
+                        id: "sheet1:block0::curve_pair",
+                        kind: "curve_pair",
+                        title: "Recommended Curve",
+                        summary: "X: Strain (%) · Y: Stress (MPa)",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        candidateIDs: ["candidate:strain", "candidate:stress"],
+                        previewRanges: [
+                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 1, endCol: 1, role: "x"),
+                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 2, endCol: 2, role: "y"),
+                        ],
+                        defaultSelected: true,
+                        rationale: "Recommended X/Y pair comes from the same numeric block.",
+                        confidence: 0.96
+                    ),
+                    .init(
+                        id: "sheet1:block0::metric_group",
+                        kind: "metric_group",
+                        title: "Recommended Metrics",
+                        summary: "Strength (MPa)",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        candidateIDs: ["candidate:strength"],
+                        previewRanges: [
+                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 3, endCol: 3, role: "metric"),
+                        ],
+                        defaultSelected: true,
+                        rationale: "Metric column detected in the same block.",
+                        confidence: 0.92
+                    ),
+                    .init(
+                        id: "sheet1:block0::structure_rows",
+                        kind: "structure_rows",
+                        title: "Detected Structure",
+                        summary: "Header Row 2 · Unit Row 3",
+                        sheetName: "Sheet1",
+                        blockID: "sheet1:block0",
+                        candidateIDs: ["candidate:header_row", "candidate:unit_row"],
+                        previewRanges: [
+                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 1, startCol: 1, endCol: 4, role: "header_row"),
+                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 2, endRow: 2, startCol: 1, endCol: 4, role: "unit_row"),
+                        ],
+                        defaultSelected: true,
+                        rationale: "Detected header and unit rows for this block.",
+                        confidence: 0.8
                     ),
                 ],
                 recommendedTemplateIDs: ["builtin/tensile"],
@@ -721,6 +796,12 @@ enum TestPayloads {
                 ),
             ]
         )
+    }
+
+    static func dataStudioImportWorkbook(
+        workbooks: [DataStudioWorkbookResponse] = [dataStudioWorkbook()]
+    ) -> DataStudioImportWorkbookResponse {
+        DataStudioImportWorkbookResponse(workbooks: workbooks)
     }
 
     static func dataStudioComparisonSet() -> DataStudioComparisonSetResponse {

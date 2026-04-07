@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from app.sidecar.server import app
@@ -32,6 +33,18 @@ def _build_workbook(tmp_path: Path, name: str) -> Path:
     return output_path
 
 
+def _rewrite_metadata_sheet(workbook_path: Path, rows: list[list[object]]) -> None:
+    with pd.ExcelFile(workbook_path) as workbook:
+        sheets = {
+            sheet_name: pd.read_excel(workbook_path, sheet_name=sheet_name, header=None)
+            for sheet_name in workbook.sheet_names
+        }
+    sheets["DataStudio_Metadata"] = pd.DataFrame(rows)
+    with pd.ExcelWriter(workbook_path) as writer:
+        for sheet_name, dataframe in sheets.items():
+            dataframe.to_excel(writer, sheet_name=sheet_name, header=False, index=False)
+
+
 def test_data_studio_template_routes_and_source_preview_stay_live(tmp_path: Path) -> None:
     templates = client.get("/data-studio/templates")
     assert templates.status_code == 200
@@ -46,6 +59,14 @@ def test_data_studio_template_routes_and_source_preview_stay_live(tmp_path: Path
     payload = source_preview.json()
     assert payload["preview"]["file_type"] == "csv"
     assert any(candidate["kind"] == "curve_x" for candidate in payload["preview"]["field_candidates"])
+    curve_suggestion = next(
+        suggestion
+        for suggestion in payload["preview"]["binding_suggestions"]
+        if suggestion["kind"] == "curve_pair"
+    )
+    assert curve_suggestion["title"] == "Recommended Curve"
+    assert "X:" in curve_suggestion["summary"]
+    assert "Y:" in curve_suggestion["summary"]
     assert payload["matches"][0]["template_id"] == "builtin/tensile"
 
     normalize = client.post(
@@ -69,7 +90,9 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
 
     imported = client.post("/data-studio/import-workbook", json={"workbook_path": str(left)})
     assert imported.status_code == 200, imported.text
-    assert imported.json()["label"] == "Left Group"
+    imported_payload = imported.json()
+    assert len(imported_payload["workbooks"]) == 1
+    assert imported_payload["workbooks"][0]["label"] == "Left Group"
 
     preview = client.post(
         "/data-studio/comparison-preview",
@@ -135,3 +158,36 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
         "representative_curve",
         "strength_box",
     }
+
+    reimported = client.post(
+        "/data-studio/import-workbook",
+        json={"workbook_path": exported_payload["comparison_set"]["comparison_workbook_path"]},
+    )
+    assert reimported.status_code == 200, reimported.text
+    reimported_payload = reimported.json()
+    assert [item["label"] for item in reimported_payload["workbooks"]] == ["Right Group", "Left Group"]
+
+
+def test_data_studio_import_workbook_route_recovers_groups_when_comparison_metadata_is_missing(tmp_path: Path) -> None:
+    left = _build_workbook(tmp_path, "Route Left")
+    right = _build_workbook(tmp_path, "Route Right")
+
+    preview = client.post(
+        "/data-studio/comparison-preview",
+        json={
+            "workbook_paths": [str(left), str(right)],
+            "recipe_id": "representative_curve",
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    comparison_workbook_path = Path(preview.json()["comparison_set"]["comparison_workbook_path"])
+    _rewrite_metadata_sheet(comparison_workbook_path, [["label", "Route Compare"]])
+
+    reimported = client.post(
+        "/data-studio/import-workbook",
+        json={"workbook_path": str(comparison_workbook_path)},
+    )
+
+    assert reimported.status_code == 200, reimported.text
+    payload = reimported.json()
+    assert [item["label"] for item in payload["workbooks"]] == ["Route Left", "Route Right"]

@@ -18,7 +18,7 @@ final class AppModelTests: XCTestCase {
         model.switchWorkbench(.dataStudio)
         model.beginImportForActiveWorkbench()
         XCTAssertEqual(model.selectedWorkbench, .dataStudio)
-        XCTAssertTrue(model.dataStudioSession.isImportFlowPresented)
+        XCTAssertTrue(model.dataStudioSession.isImportChooserPresented)
 
         model.switchWorkbench(.composer)
         model.beginImportForActiveWorkbench()
