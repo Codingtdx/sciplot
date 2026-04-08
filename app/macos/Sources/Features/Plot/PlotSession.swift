@@ -258,8 +258,8 @@ final class PlotSession {
         inspectedSheet = nil
         if !preserveRenderOptions {
             renderOptions = RenderOptionsPayload(
-                stylePreset: metadata?.defaults.stylePreset ?? "journal_calm",
-                palettePreset: metadata?.defaults.palettePreset ?? "aqua_graphite",
+                stylePreset: metadata?.defaults.stylePreset ?? "default",
+                palettePreset: metadata?.defaults.palettePreset ?? "colorblind_safe",
                 visualThemeID: metadata?.visualThemes.first?.id
             )
             notifyRenderOptionsDidChange()
@@ -870,6 +870,8 @@ final class PlotSession {
             return nil
         }
 
+        sanitizeRenderOptionsForCurrentTemplateIfNeeded()
+
         return .init(
             inputPath: selectedFileURL.path,
             sheet: selectedSheet,
@@ -932,7 +934,7 @@ final class PlotSession {
             return defaultStyle
         }
 
-        return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "journal_calm"
+        return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "default"
     }
 
     private func defaultPalette(for template: MetaTemplateSummary?) -> String {
@@ -944,7 +946,40 @@ final class PlotSession {
             return defaultPalette
         }
 
-        return template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "aqua_graphite"
+        return template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "colorblind_safe"
+    }
+
+    private func sanitizeRenderOptionsForCurrentTemplateIfNeeded() {
+        var resolved = renderOptions
+
+        if let template = selectedTemplateSummary {
+            if !template.availableStyles.contains(resolved.stylePreset) {
+                resolved.stylePreset = defaultStyle(for: template)
+            }
+            if !template.availablePalettes.contains(resolved.palettePreset) {
+                resolved.palettePreset = defaultPalette(for: template)
+            }
+        } else if let metadata {
+            let validStyles = Set(metadata.styles.map(\.id))
+            let validPalettes = Set(metadata.palettes.map(\.id))
+
+            if !validStyles.contains(resolved.stylePreset) {
+                resolved.stylePreset = validStyles.contains(metadata.defaults.stylePreset)
+                    ? metadata.defaults.stylePreset
+                    : (metadata.styles.first?.id ?? "default")
+            }
+            if !validPalettes.contains(resolved.palettePreset) {
+                resolved.palettePreset = validPalettes.contains(metadata.defaults.palettePreset)
+                    ? metadata.defaults.palettePreset
+                    : (metadata.palettes.first?.id ?? "colorblind_safe")
+            }
+        }
+
+        guard resolved != renderOptions else {
+            return
+        }
+        renderOptions = resolved
+        notifyRenderOptionsDidChange()
     }
 
     private func suggestedPlotExportFilename(templateID: String) -> String {

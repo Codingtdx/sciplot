@@ -33,10 +33,9 @@ from src.plotting_primitives import (
     AxisLimits,
     AxisMode,
     LegendMode,
-    _apply_explicit_major_ticks,
+    _apply_major_ticks_with_override,
     _format_axis_label,
     _merge_limits,
-    _override_complete,
     _resolved_panel_geometry,
     compute_axis_limits,
 )
@@ -362,12 +361,19 @@ def plot_curves(
 
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
-    elif not _override_complete(xlim) and limits.x_tick_policy is not None:
-        _apply_explicit_major_ticks(ax.xaxis, limits.x_tick_policy.major_ticks)
-    if show_y_ticks and not _override_complete(ylim) and limits.y_tick_policy is not None:
-        _apply_explicit_major_ticks(
+    else:
+        _apply_major_ticks_with_override(
+            ax.xaxis,
+            policy_ticks=limits.x_tick_policy.major_ticks if limits.x_tick_policy is not None else None,
+            override=xlim,
+            scale=xscale,
+        )
+    if show_y_ticks:
+        _apply_major_ticks_with_override(
             ax.yaxis,
-            limits.y_tick_policy.major_ticks,
+            policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
+            override=ylim,
+            scale=yscale,
             max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
         )
     return fig, ax
@@ -484,14 +490,20 @@ def plot_scatter(
 
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
-    elif not _override_complete(xlim) and limits.x_tick_policy is not None:
-        _apply_explicit_major_ticks(ax.xaxis, limits.x_tick_policy.major_ticks)
-    if not _override_complete(ylim) and limits.y_tick_policy is not None:
-        _apply_explicit_major_ticks(
-            ax.yaxis,
-            limits.y_tick_policy.major_ticks,
-            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+    else:
+        _apply_major_ticks_with_override(
+            ax.xaxis,
+            policy_ticks=limits.x_tick_policy.major_ticks if limits.x_tick_policy is not None else None,
+            override=xlim,
+            scale=xscale,
         )
+    _apply_major_ticks_with_override(
+        ax.yaxis,
+        policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
+        override=ylim,
+        scale=yscale,
+        max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+    )
     return fig, ax
 
 

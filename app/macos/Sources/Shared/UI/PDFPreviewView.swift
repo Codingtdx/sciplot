@@ -1,7 +1,68 @@
 import PDFKit
 import SwiftUI
 
+final class PlotPDFView: PDFView {
+    private var pendingFitReset = false
+
+    func configureForPlotPreview() {
+        autoScales = true
+        displayMode = .singlePage
+        displaysPageBreaks = false
+        backgroundColor = .clear
+    }
+
+    override func layout() {
+        super.layout()
+        applyPendingFitResetIfPossible()
+    }
+
+    func resetToFit() {
+        pendingFitReset = true
+        applyPendingFitResetIfPossible()
+        if pendingFitReset {
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+            applyPendingFitResetIfPossible()
+        }
+    }
+
+    private func applyPendingFitResetIfPossible() {
+        guard pendingFitReset else {
+            return
+        }
+        guard document != nil, bounds.width > 1, bounds.height > 1 else {
+            return
+        }
+
+        autoScales = true
+        goToFirstPage(nil)
+
+        let fitScale = scaleFactorForSizeToFit
+        let resolvedScale: CGFloat
+        if fitScale.isFinite, fitScale > 0 {
+            resolvedScale = fitScale
+        } else if scaleFactor.isFinite, scaleFactor > 0 {
+            resolvedScale = scaleFactor
+        } else {
+            resolvedScale = 1.0
+        }
+
+        minScaleFactor = min(0.1, resolvedScale)
+        maxScaleFactor = max(4.0, resolvedScale * 6.0)
+        if fitScale.isFinite, fitScale > 0 {
+            scaleFactor = fitScale
+        }
+        autoScales = true
+        pendingFitReset = false
+    }
+}
+
 struct PDFPreviewView: NSViewRepresentable {
+    final class Coordinator {
+        var lastURL: URL?
+        var lastDataFingerprint: Int?
+    }
+
     private let url: URL?
     private let data: Data?
 
@@ -15,26 +76,50 @@ struct PDFPreviewView: NSViewRepresentable {
         self.data = data
     }
 
-    func makeNSView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displaysPageBreaks = true
-        view.backgroundColor = .clear
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> PlotPDFView {
+        let view = PlotPDFView()
+        view.configureForPlotPreview()
         return view
     }
 
-    func updateNSView(_ pdfView: PDFView, context: Context) {
+    func updateNSView(_ pdfView: PlotPDFView, context: Context) {
         if let url {
-            if pdfView.document?.documentURL != url {
+            if context.coordinator.lastURL != url {
                 pdfView.document = PDFDocument(url: url)
+                context.coordinator.lastURL = url
+                context.coordinator.lastDataFingerprint = nil
+                pdfView.resetToFit()
             }
             return
         }
 
         if let data {
-            pdfView.document = PDFDocument(data: data)
+            let fingerprint = dataFingerprint(data)
+            if context.coordinator.lastDataFingerprint != fingerprint {
+                pdfView.document = PDFDocument(data: data)
+                context.coordinator.lastDataFingerprint = fingerprint
+                context.coordinator.lastURL = nil
+                pdfView.resetToFit()
+            }
         }
+    }
+
+    private func dataFingerprint(_ data: Data) -> Int {
+        var hasher = Hasher()
+        hasher.combine(data.count)
+        if let first = data.first {
+            hasher.combine(first)
+        }
+        if let last = data.last {
+            hasher.combine(last)
+        }
+        hasher.combine(data.prefix(32))
+        hasher.combine(data.suffix(32))
+        return hasher.finalize()
     }
 }
 

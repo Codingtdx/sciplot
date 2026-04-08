@@ -544,6 +544,53 @@ def _apply_explicit_major_ticks(axis, ticks: Sequence[float], *, max_major_ticks
         values = _cap_visible_major_ticks(values, scale="linear", max_major_ticks=max_major_ticks)
     axis.set_major_locator(FixedLocator(values.tolist()))
 
+def _resolved_major_ticks_with_override(
+    *,
+    policy_ticks: Sequence[float] | None,
+    override: tuple[float | None, float | None] | None,
+    scale: str,
+    max_major_ticks: int | None = None,
+) -> np.ndarray:
+    values = (
+        np.asarray(policy_ticks, dtype=float)
+        if policy_ticks is not None
+        else np.array([], dtype=float)
+    )
+    values = values[np.isfinite(values)]
+
+    if scale == "linear" and override is not None:
+        endpoint_candidates = np.asarray(
+            [bound for bound in override if bound is not None and np.isfinite(bound)],
+            dtype=float,
+        )
+        if endpoint_candidates.size:
+            values = np.concatenate((values, endpoint_candidates))
+
+    if values.size == 0:
+        return values
+    values = np.unique(np.round(values, decimals=12))
+    if max_major_ticks is not None:
+        values = _cap_visible_major_ticks(values, scale=scale, max_major_ticks=max_major_ticks)
+    return values
+
+def _apply_major_ticks_with_override(
+    axis,
+    *,
+    policy_ticks: Sequence[float] | None,
+    override: tuple[float | None, float | None] | None,
+    scale: str,
+    max_major_ticks: int | None = None,
+) -> None:
+    values = _resolved_major_ticks_with_override(
+        policy_ticks=policy_ticks,
+        override=override,
+        scale=scale,
+        max_major_ticks=max_major_ticks,
+    )
+    if values.size == 0:
+        return
+    axis.set_major_locator(FixedLocator(values.tolist()))
+
 def _uses_positive_zero_origin(
     *,
     axis_mode: AxisMode,

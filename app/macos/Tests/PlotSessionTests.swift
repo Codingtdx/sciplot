@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 import XCTest
 @testable import SciPlotGodMac
 
@@ -168,6 +169,83 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.last?.options.yLabelOverride, "Stress")
     }
 
+    func testRenderRequestAutoSanitizesLegacyStylePreset() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+
+        let baseMeta = TestPayloads.meta()
+        let strictMeta = SidecarMetaResponse(
+            version: baseMeta.version,
+            defaults: .init(stylePreset: "default", palettePreset: "colorblind_safe"),
+            sizes: baseMeta.sizes,
+            styles: [
+                .init(
+                    id: "default",
+                    label: "Default",
+                    public: true,
+                    description: "Default style.",
+                    hardConstraints: true,
+                    presetNote: "Default preset"
+                ),
+                .init(
+                    id: "nature",
+                    label: "Nature",
+                    public: true,
+                    description: "Nature style.",
+                    hardConstraints: true,
+                    presetNote: "Nature preset"
+                ),
+            ],
+            palettes: [
+                .init(
+                    id: "colorblind_safe",
+                    label: "Colorblind Safe",
+                    public: true,
+                    description: "Default palette.",
+                    swatches: ["#112233", "#445566"]
+                ),
+            ],
+            templates: baseMeta.templates.map {
+                .init(
+                    id: $0.id,
+                    label: $0.label,
+                    description: $0.description,
+                    category: $0.category,
+                    defaultSize: $0.defaultSize,
+                    allowedSizes: $0.allowedSizes,
+                    editableOptions: $0.editableOptions,
+                    defaultOptions: $0.defaultOptions,
+                    availableStyles: ["default", "nature"],
+                    availablePalettes: ["colorblind_safe"],
+                    canonicalID: $0.canonicalID,
+                    role: $0.role,
+                    lifecyclePolicy: $0.lifecyclePolicy,
+                    implementationID: $0.implementationID
+                )
+            },
+            templateIds: baseMeta.templateIds,
+            sizeIds: baseMeta.sizeIds,
+            palettePresetIds: ["colorblind_safe"],
+            visualThemes: baseMeta.visualThemes
+        )
+
+        session.apply(meta: strictMeta, contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.updateRenderOptions(policy: .immediate) {
+            $0.stylePreset = "journal_calm"
+        }
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
+
+        XCTAssertEqual(client.renderRequests.last?.options.stylePreset, "default")
+        XCTAssertEqual(session.renderOptions.stylePreset, "default")
+        XCTAssertNil(session.errorMessage)
+    }
+
     func testSeriesLegendControlsOnlyAppearForMultiSeriesTemplates() async throws {
         let client = MockSidecarClient()
         client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")
@@ -312,5 +390,68 @@ final class PlotSessionTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for PlotSession state")
+    }
+}
+
+@MainActor
+final class PDFPreviewViewTests: XCTestCase {
+    func testPlotPDFViewConfiguresSinglePageFitDefaults() {
+        let view = PlotPDFView()
+        view.configureForPlotPreview()
+
+        XCTAssertEqual(view.displayMode, .singlePage)
+        XCTAssertFalse(view.displaysPageBreaks)
+        XCTAssertTrue(view.autoScales)
+    }
+
+    func testPlotPDFViewResetToFitRestoresStableZoomRange() throws {
+        guard
+            let data = Data(base64Encoded: TestPayloads.pdfBase64),
+            let document = PDFDocument(data: data)
+        else {
+            XCTFail("Expected valid fixture PDF payload.")
+            return
+        }
+
+        let view = PlotPDFView()
+        view.configureForPlotPreview()
+        view.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        view.document = document
+        view.autoScales = false
+        view.scaleFactor = max(2.0, view.scaleFactorForSizeToFit * 2.0)
+
+        view.resetToFit()
+
+        XCTAssertTrue(view.autoScales)
+        XCTAssertGreaterThan(view.scaleFactor, 0.0)
+        XCTAssertGreaterThan(view.minScaleFactor, 0.0)
+        XCTAssertGreaterThan(view.maxScaleFactor, view.minScaleFactor)
+    }
+
+    func testPlotPDFViewResetToFitWaitsForUsableBounds() throws {
+        guard
+            let data = Data(base64Encoded: TestPayloads.pdfBase64),
+            let document = PDFDocument(data: data)
+        else {
+            XCTFail("Expected valid fixture PDF payload.")
+            return
+        }
+
+        let view = PlotPDFView()
+        view.configureForPlotPreview()
+        view.frame = NSRect(x: 0, y: 0, width: 1, height: 1)
+        view.document = document
+        view.autoScales = false
+        view.scaleFactor = 0.05
+
+        view.resetToFit()
+        let beforeResizeScale = view.scaleFactor
+
+        view.frame = NSRect(x: 0, y: 0, width: 900, height: 620)
+        view.layoutSubtreeIfNeeded()
+
+        XCTAssertTrue(view.autoScales)
+        XCTAssertGreaterThan(view.scaleFactor, beforeResizeScale)
+        XCTAssertGreaterThan(view.maxScaleFactor, view.minScaleFactor)
     }
 }

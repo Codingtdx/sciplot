@@ -76,6 +76,24 @@ def test_plot_tensile_curve_keeps_zero_as_a_labeled_tick_but_leaves_display_padd
         plt.close(fig)
 
 
+def test_plot_tensile_curve_partial_manual_ymax_keeps_manual_endpoint_tick_visible(tmp_path: Path) -> None:
+    input_path = _write_tensile_curve_table(tmp_path / "tensile_curve.csv")
+    series_list = load_curve_table(input_path)
+
+    fig, ax = plot_tensile_curve(series_list, ylim=(None, 100.0))
+    try:
+        y_low, y_high = sorted(float(value) for value in ax.get_ylim())
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+
+        assert y_high == pytest.approx(100.0, abs=1e-9)
+        assert y_low < 0.0
+        assert np.any(np.isclose(y_ticks, 0.0))
+        assert np.any(np.isclose(y_ticks, 100.0))
+    finally:
+        plt.close(fig)
+
+
 def test_plot_tensile_curve_keeps_fixed_bounds_and_prefers_lower_right_legend() -> None:
     series = [
         _curve_series("E0", [0, 4, 8, 12, 20, 30, 36, 40], [0, 45, 68, 71, 71, 70, 62, 25]),
@@ -104,6 +122,27 @@ def test_plot_tensile_curve_keeps_fixed_bounds_and_prefers_lower_right_legend() 
         legend_records = [entry for entry in layout_debug if entry.get("object_kind") == "legend"]
         assert legend_records
         assert legend_records[0]["chosen_candidate_id"] == "lower_right"
+    finally:
+        plt.close(fig)
+
+
+def test_plot_curve_partial_manual_bounds_keep_manual_endpoints_visible() -> None:
+    series = [_curve_series("Sample A", [0.0, 50.0, 92.0], [0.0, 42.0, 81.0])]
+
+    fig, ax = plot_curves(
+        series,
+        legend_mode="none",
+        xlim=(None, 100.0),
+        ylim=(None, 100.0),
+    )
+    try:
+        x_ticks = np.asarray(ax.get_xticks(), dtype=float)
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        x_ticks = x_ticks[np.isfinite(x_ticks)]
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+
+        assert np.any(np.isclose(x_ticks, 100.0))
+        assert np.any(np.isclose(y_ticks, 100.0))
     finally:
         plt.close(fig)
 
@@ -237,6 +276,32 @@ def test_plot_bar_keeps_zero_based_lower_bound_without_bottom_display_padding(tm
 
         assert y_low == pytest.approx(0.0, abs=1e-9)
         assert np.any(np.isclose(y_ticks, 0.0))
+    finally:
+        plt.close(fig)
+
+
+def test_plot_bar_partial_manual_ymax_keeps_manual_endpoint_tick_visible(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+    groups = load_replicate_table(input_path)
+
+    fig, ax = plot_bar(groups, ylim=(None, 100.0))
+    try:
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+        assert np.any(np.isclose(y_ticks, 100.0))
+    finally:
+        plt.close(fig)
+
+
+def test_plot_box_partial_manual_ymax_keeps_manual_endpoint_tick_visible(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+    groups = load_replicate_table(input_path)
+
+    fig, ax = plot_box(groups, ylim=(None, 100.0))
+    try:
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+        assert np.any(np.isclose(y_ticks, 100.0))
     finally:
         plt.close(fig)
 
