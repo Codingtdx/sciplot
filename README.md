@@ -16,6 +16,7 @@ These four are the only app-level primary destinations.
 - Desktop frontend: `app/macos` (SwiftUI)
 - Backend: `app/sidecar` (FastAPI)
 - Rendering/core: `src/rendering`, `src/data_studio`, `src/composer.py`
+- Session async orchestration: shared latest-write-wins coordinators in `app/macos/Sources/Shared/Utilities/WorkspaceBridge.swift`
 
 The historical `app/desktop` and Tauri/mock chain has been removed.
 

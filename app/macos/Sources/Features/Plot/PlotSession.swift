@@ -13,15 +13,8 @@ final class PlotSession {
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private let chooseExportDestination: PlotExportDestinationChooser
     @ObservationIgnored private let materializeExport: PlotExportMaterializer
-    @ObservationIgnored private var inspectedInputPath: String?
-    @ObservationIgnored private var inspectedSheet: SheetValue?
-    @ObservationIgnored private var inspectionTask: Task<Void, Never>?
-    @ObservationIgnored private var previewTask: Task<Void, Never>?
-    @ObservationIgnored private var inspectionRevision = 0
-    @ObservationIgnored private var previewRevision = 0
-    @ObservationIgnored private var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
-    @ObservationIgnored private var stagedExternalPinnedSheet: SheetValue?
-    @ObservationIgnored private var stagedExternalPinnedTemplateID: String?
+    @ObservationIgnored private var runtimeState = RuntimeState()
+    @ObservationIgnored private let asyncCoordination = AsyncCoordination()
     @ObservationIgnored var renderOptionsDidChange: ((RenderOptionsPayload) -> Void)?
 
     var isImporterPresented = false
@@ -65,42 +58,31 @@ final class PlotSession {
     }
 
     var needsInspection: Bool {
-        guard let selectedFileURL else {
-            return false
-        }
-        guard let inspectedInputPath, let inspectedSheet else {
-            return true
-        }
-        return inspectedInputPath != selectedFileURL.path || inspectedSheet != selectedSheet || inspectionResponse == nil
+        DerivedState.needsInspection(
+            selectedFileURL: selectedFileURL,
+            inspectedInputPath: runtimeState.inspectedInputPath,
+            inspectedSheet: runtimeState.inspectedSheet,
+            selectedSheet: selectedSheet,
+            inspectionResponse: inspectionResponse
+        )
     }
 
     var liveStatusLabel: String {
-        if selectedFileURL == nil {
-            return "Awaiting import"
-        }
-        if isInspecting {
-            return "Inspecting source"
-        }
-        if isPreviewing {
-            return previewResponse == nil ? "Rendering preview" : "Refreshing preview"
-        }
-        if previewResponse != nil {
-            return "Preview ready"
-        }
-        return "Ready"
+        DerivedState.liveStatusLabel(
+            selectedFileURL: selectedFileURL,
+            isInspecting: isInspecting,
+            isPreviewing: isPreviewing,
+            previewResponse: previewResponse
+        )
     }
 
     var liveStatusSymbol: String {
-        if errorMessage != nil {
-            return "exclamationmark.triangle.fill"
-        }
-        if isInspecting || isPreviewing {
-            return "arrow.triangle.2.circlepath"
-        }
-        if previewResponse != nil {
-            return "checkmark.circle.fill"
-        }
-        return "circle.dashed"
+        DerivedState.liveStatusSymbol(
+            hasError: errorMessage != nil,
+            isInspecting: isInspecting,
+            isPreviewing: isPreviewing,
+            previewResponse: previewResponse
+        )
     }
 
     var selectedSourceFilename: String? {
@@ -164,8 +146,7 @@ final class PlotSession {
             return
         }
         selectedSheet = sheet
-        previewRevision += 1
-        cancelPreviewTask()
+        _ = asyncCoordination.preview.beginNow()
         isPreviewing = false
         invalidateSubmissionArtifacts()
         errorMessage = nil
@@ -215,8 +196,8 @@ final class PlotSession {
         isRunningPreflight = false
         isExporting = false
         selectedTemplateID = nil
-        inspectedInputPath = nil
-        inspectedSheet = nil
+        runtimeState.inspectedInputPath = nil
+        runtimeState.inspectedSheet = nil
         if !preserveRenderOptions {
             renderOptions = RenderOptionsPayload(
                 stylePreset: metadata?.defaults.stylePreset ?? "default",
@@ -252,8 +233,8 @@ final class PlotSession {
         preferredOptions: RenderOptionsPayload? = nil
     ) {
         prepareSource(url: inputURL, sheet: sheet, resetTemplate: true)
-        stagedExternalPinnedSheet = sheet
-        stagedExternalPinnedTemplateID = preferredTemplateID
+        runtimeState.stagedExternalPinnedSheet = sheet
+        runtimeState.stagedExternalPinnedTemplateID = preferredTemplateID
         if let preferredTemplateID {
             selectedTemplateID = preferredTemplateID
         }
@@ -273,8 +254,8 @@ final class PlotSession {
             return
         }
         defer {
-            stagedExternalPinnedSheet = nil
-            stagedExternalPinnedTemplateID = nil
+            runtimeState.stagedExternalPinnedSheet = nil
+            runtimeState.stagedExternalPinnedTemplateID = nil
         }
         let targetSheet = expectedSheet ?? selectedSheet
         scheduleInspection()
@@ -647,30 +628,29 @@ final class PlotSession {
     }
 
     func thumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
-        if let cached = thumbnailKindCache[templateID] {
+        if let cached = runtimeState.thumbnailKindCache[templateID] {
             return cached
         }
 
         let resolved = resolveThumbnailKind(for: templateID)
-        thumbnailKindCache[templateID] = resolved
+        runtimeState.thumbnailKindCache[templateID] = resolved
         return resolved
     }
 
     private func prepareSource(url: URL, sheet: SheetValue, resetTemplate: Bool) {
         cancelInspectionTask()
-        previewRevision += 1
-        cancelPreviewTask()
+        _ = asyncCoordination.preview.beginNow()
         isPreviewing = false
         selectedFileURL = url
         selectedSheet = sheet
         inspectionResponse = nil
-        inspectedInputPath = nil
-        inspectedSheet = nil
+        runtimeState.inspectedInputPath = nil
+        runtimeState.inspectedSheet = nil
         if resetTemplate {
             selectedTemplateID = nil
         }
-        stagedExternalPinnedSheet = nil
-        stagedExternalPinnedTemplateID = nil
+        runtimeState.stagedExternalPinnedSheet = nil
+        runtimeState.stagedExternalPinnedTemplateID = nil
         invalidateSubmissionArtifacts()
         errorMessage = nil
     }
@@ -680,13 +660,10 @@ final class PlotSession {
             return
         }
 
-        inspectionRevision += 1
-        let revision = inspectionRevision
-        cancelInspectionTask()
         isInspecting = true
         errorMessage = nil
 
-        inspectionTask = Task { [weak self] in
+        asyncCoordination.inspection.schedule { [weak self] revision in
             guard let self else { return }
             await self.performInspection(request: request, revision: revision)
         }
@@ -694,41 +671,38 @@ final class PlotSession {
 
     private func performInspection(request: FileRequest, revision: Int) async {
         guard let client else {
-            if revision == inspectionRevision {
+            if asyncCoordination.inspection.isLatest(revision) {
                 isInspecting = false
-                inspectionTask = nil
             }
             return
         }
 
         do {
             let response = try await client.inspectFile(request)
-            guard revision == inspectionRevision else {
+            guard asyncCoordination.inspection.isLatest(revision), !Task.isCancelled else {
                 return
             }
             applyInspectionResponse(response)
             isInspecting = false
-            inspectionTask = nil
         } catch {
-            guard revision == inspectionRevision else {
+            guard asyncCoordination.inspection.isLatest(revision), !Task.isCancelled else {
                 return
             }
             errorMessage = error.localizedDescription
             isInspecting = false
-            inspectionTask = nil
         }
     }
 
     private func applyInspectionResponse(_ response: InspectFileResponse) {
         inspectionResponse = response
-        let resolvedSheet = stagedExternalPinnedSheet ?? response.sheet
+        let resolvedSheet = runtimeState.stagedExternalPinnedSheet ?? response.sheet
         selectedSheet = resolvedSheet
-        inspectedInputPath = response.inputPath
-        inspectedSheet = resolvedSheet
+        runtimeState.inspectedInputPath = response.inputPath
+        runtimeState.inspectedSheet = resolvedSheet
         invalidateSubmissionArtifacts()
         errorMessage = nil
 
-        if shouldAutoSelectTemplate(after: response, preservingTemplateID: stagedExternalPinnedTemplateID) {
+        if shouldAutoSelectTemplate(after: response, preservingTemplateID: runtimeState.stagedExternalPinnedTemplateID) {
             let preferredTemplateID = response.inspection.recommendations.first?.templateID
                 ?? response.inspection.primaryRecommendation.first?.templateID
                 ?? selectedTemplateID
@@ -767,54 +741,38 @@ final class PlotSession {
             return
         }
 
-        previewRevision += 1
-        let revision = previewRevision
-        cancelPreviewTask()
         isPreviewing = true
         errorMessage = nil
 
         let delay = policy == .debounced ? previewDebounceNanoseconds : 0
-        previewTask = Task { [weak self] in
+        asyncCoordination.preview.schedule(delayNanoseconds: delay) { [weak self] revision in
             guard let self else { return }
-            if delay > 0 {
-                do {
-                    try await Task.sleep(nanoseconds: delay)
-                } catch {
-                    return
-                }
-            }
-            guard !Task.isCancelled else {
-                return
-            }
             await self.performPreview(request: request, revision: revision)
         }
     }
 
     private func performPreview(request: RenderRequest, revision: Int) async {
         guard let client else {
-            if revision == previewRevision {
+            if asyncCoordination.preview.isLatest(revision) {
                 isPreviewing = false
-                previewTask = nil
             }
             return
         }
 
         do {
             let response = try await client.renderPreview(request)
-            guard revision == previewRevision else {
+            guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return
             }
             previewResponse = response
             isPreviewing = false
             errorMessage = nil
-            previewTask = nil
         } catch {
-            guard revision == previewRevision else {
+            guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return
             }
             errorMessage = error.localizedDescription
             isPreviewing = false
-            previewTask = nil
         }
     }
 
@@ -1053,20 +1011,91 @@ final class PlotSession {
     }
 
     private func cancelInspectionTask() {
-        inspectionTask?.cancel()
-        inspectionTask = nil
+        asyncCoordination.inspection.cancel()
     }
 
     private func cancelPreviewTask() {
-        previewTask?.cancel()
-        previewTask = nil
+        asyncCoordination.preview.cancel()
     }
 
     private func waitUntilInspectionFinishes(for _: URL?) async {
-        await inspectionTask?.value
+        await asyncCoordination.inspection.wait()
     }
 
     private func waitUntilPreviewFinishes(for _: URL?) async {
-        await previewTask?.value
+        await asyncCoordination.preview.wait()
+    }
+}
+
+private extension PlotSession {
+    struct RuntimeState {
+        var inspectedInputPath: String?
+        var inspectedSheet: SheetValue?
+        var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
+        var stagedExternalPinnedSheet: SheetValue?
+        var stagedExternalPinnedTemplateID: String?
+    }
+
+    @MainActor
+    final class AsyncCoordination {
+        let inspection = AsyncLatestTaskCoordinator()
+        let preview = AsyncLatestTaskCoordinator()
+    }
+
+    enum DerivedState {
+        static func needsInspection(
+            selectedFileURL: URL?,
+            inspectedInputPath: String?,
+            inspectedSheet: SheetValue?,
+            selectedSheet: SheetValue,
+            inspectionResponse: InspectFileResponse?
+        ) -> Bool {
+            guard let selectedFileURL else {
+                return false
+            }
+            guard let inspectedInputPath, let inspectedSheet else {
+                return true
+            }
+            return inspectedInputPath != selectedFileURL.path || inspectedSheet != selectedSheet || inspectionResponse == nil
+        }
+
+        static func liveStatusLabel(
+            selectedFileURL: URL?,
+            isInspecting: Bool,
+            isPreviewing: Bool,
+            previewResponse: RenderPreviewResponse?
+        ) -> String {
+            if selectedFileURL == nil {
+                return "Awaiting import"
+            }
+            if isInspecting {
+                return "Inspecting source"
+            }
+            if isPreviewing {
+                return previewResponse == nil ? "Rendering preview" : "Refreshing preview"
+            }
+            if previewResponse != nil {
+                return "Preview ready"
+            }
+            return "Ready"
+        }
+
+        static func liveStatusSymbol(
+            hasError: Bool,
+            isInspecting: Bool,
+            isPreviewing: Bool,
+            previewResponse: RenderPreviewResponse?
+        ) -> String {
+            if hasError {
+                return "exclamationmark.triangle.fill"
+            }
+            if isInspecting || isPreviewing {
+                return "arrow.triangle.2.circlepath"
+            }
+            if previewResponse != nil {
+                return "checkmark.circle.fill"
+            }
+            return "circle.dashed"
+        }
     }
 }

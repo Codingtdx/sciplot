@@ -43,10 +43,8 @@ final class CodeConsoleSession {
     private let contextRefreshDebounceNanoseconds: UInt64 = 120_000_000
 
     @ObservationIgnored private var client: (any SidecarClienting)?
-    @ObservationIgnored private var defaultRenderOptions = RenderOptionsPayload()
-    @ObservationIgnored private var manualBinding: CodeConsoleBindingOption?
-    @ObservationIgnored private var contextRevision = 0
-    @ObservationIgnored private var contextRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var runtimeState = RuntimeState()
+    @ObservationIgnored private let asyncCoordination = AsyncCoordination()
 
     var editorText = ""
     var promptText = ""
@@ -66,19 +64,11 @@ final class CodeConsoleSession {
     var isRunning = false
 
     var outputsSummary: String {
-        if let latestRunResponse {
-            let outputCount = latestRunResponse.generatedFiles.count
-            let duration = String(format: "%.2fs", latestRunResponse.durationSeconds)
-            let exitText = latestRunResponse.exitCode.map(String.init) ?? "n/a"
-            return "\(latestRunResponse.status.capitalized) · \(outputCount) files · \(duration) · exit \(exitText)"
-        }
-        if isRunning {
-            return "Running the pasted Python in the repo-native Code Console runner."
-        }
-        if contextResponse != nil {
-            return "Prompt ready. Paste the returned Python script here to run it."
-        }
-        return "Import or bind a dataset to generate the controlled prompt and runner context."
+        DerivedState.outputsSummary(
+            latestRunResponse: latestRunResponse,
+            isRunning: isRunning,
+            hasContextResponse: contextResponse != nil
+        )
     }
 
     var selectedBinding: CodeConsoleBindingOption? {
@@ -119,32 +109,21 @@ final class CodeConsoleSession {
     }
 
     var liveStatusLabel: String {
-        if selectedFileURL == nil {
-            return "Awaiting context"
-        }
-        if isRunning {
-            return "Running script"
-        }
-        if isRefreshingContext {
-            return "Refreshing prompt"
-        }
-        if contextResponse != nil {
-            return "Prompt ready"
-        }
-        return "Ready"
+        DerivedState.liveStatusLabel(
+            selectedFileURL: selectedFileURL,
+            isRunning: isRunning,
+            isRefreshingContext: isRefreshingContext,
+            hasContextResponse: contextResponse != nil
+        )
     }
 
     var liveStatusSymbol: String {
-        if errorMessage != nil {
-            return "exclamationmark.triangle.fill"
-        }
-        if isRunning || isRefreshingContext {
-            return "arrow.triangle.2.circlepath"
-        }
-        if contextResponse != nil {
-            return "checkmark.circle.fill"
-        }
-        return "circle.dashed"
+        DerivedState.liveStatusSymbol(
+            hasError: errorMessage != nil,
+            isRunning: isRunning,
+            isRefreshingContext: isRefreshingContext,
+            hasContextResponse: contextResponse != nil
+        )
     }
 
     func configure(client: any SidecarClienting) {
@@ -152,9 +131,9 @@ final class CodeConsoleSession {
     }
 
     func apply(meta: SidecarMetaResponse) {
-        defaultRenderOptions.stylePreset = meta.defaults.stylePreset
-        defaultRenderOptions.palettePreset = meta.defaults.palettePreset
-        defaultRenderOptions.visualThemeID = meta.visualThemes.first?.id
+        runtimeState.defaultRenderOptions.stylePreset = meta.defaults.stylePreset
+        runtimeState.defaultRenderOptions.palettePreset = meta.defaults.palettePreset
+        runtimeState.defaultRenderOptions.visualThemeID = meta.visualThemes.first?.id
     }
 
     func refreshContext(plot: PlotSession, dataStudio: DataStudioSession) {
@@ -191,7 +170,7 @@ final class CodeConsoleSession {
             )
         }
 
-        if let manualBinding {
+        if let manualBinding = runtimeState.manualBinding {
             bindings.append(manualBinding)
         }
 
@@ -208,6 +187,7 @@ final class CodeConsoleSession {
             refreshBoundContext()
             scheduleContextRefresh()
         } else {
+            asyncCoordination.context.cancel()
             selectedSheet = .index(0)
             contextResponse = nil
             promptText = ""
@@ -226,9 +206,9 @@ final class CodeConsoleSession {
             title: "Imported file",
             subtitle: "Direct Code Console input",
             templateID: nil,
-            renderOptions: defaultRenderOptions
+            renderOptions: runtimeState.defaultRenderOptions
         )
-        manualBinding = binding
+        runtimeState.manualBinding = binding
         if !availableBindings.contains(where: { $0.id == binding.id }) {
             availableBindings.append(binding)
         }
@@ -275,9 +255,7 @@ final class CodeConsoleSession {
     }
 
     func refreshCurrentContext() async {
-        contextRevision += 1
-        let revision = contextRevision
-        contextRefreshTask?.cancel()
+        let revision = asyncCoordination.context.beginNow()
         await loadContext(revision: revision)
     }
 
@@ -367,19 +345,8 @@ final class CodeConsoleSession {
     }
 
     private func scheduleContextRefresh() {
-        contextRevision += 1
-        let revision = contextRevision
-        contextRefreshTask?.cancel()
-        contextRefreshTask = Task { [weak self] in
+        asyncCoordination.context.schedule(delayNanoseconds: contextRefreshDebounceNanoseconds) { [weak self] revision in
             guard let self else {
-                return
-            }
-            do {
-                try await Task.sleep(nanoseconds: contextRefreshDebounceNanoseconds)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else {
                 return
             }
             await self.loadContext(revision: revision)
@@ -394,15 +361,14 @@ final class CodeConsoleSession {
         isRefreshingContext = true
         clearRunState()
         defer {
-            if revision == contextRevision {
+            if asyncCoordination.context.isLatest(revision) {
                 isRefreshingContext = false
-                contextRefreshTask = nil
             }
         }
 
         do {
             let response = try await client.codeConsoleContext(request)
-            guard revision == contextRevision else {
+            guard asyncCoordination.context.isLatest(revision), !Task.isCancelled else {
                 return
             }
             contextResponse = response
@@ -416,7 +382,7 @@ final class CodeConsoleSession {
             }
             refreshBoundContext()
         } catch {
-            guard revision == contextRevision else {
+            guard asyncCoordination.context.isLatest(revision), !Task.isCancelled else {
                 return
             }
             errorMessage = error.localizedDescription
@@ -504,5 +470,78 @@ final class CodeConsoleSession {
 
     private func bindingID(kind: CodeConsoleSourceKind, url: URL) -> String {
         "\(kind.rawValue)::\(url.standardizedFileURL.path)"
+    }
+}
+
+private extension CodeConsoleSession {
+    struct RuntimeState {
+        var defaultRenderOptions = RenderOptionsPayload()
+        var manualBinding: CodeConsoleBindingOption?
+    }
+
+    @MainActor
+    final class AsyncCoordination {
+        let context = AsyncLatestTaskCoordinator()
+    }
+
+    enum DerivedState {
+        static func outputsSummary(
+            latestRunResponse: CodeConsoleRunResponse?,
+            isRunning: Bool,
+            hasContextResponse: Bool
+        ) -> String {
+            if let latestRunResponse {
+                let outputCount = latestRunResponse.generatedFiles.count
+                let duration = String(format: "%.2fs", latestRunResponse.durationSeconds)
+                let exitText = latestRunResponse.exitCode.map(String.init) ?? "n/a"
+                return "\(latestRunResponse.status.capitalized) · \(outputCount) files · \(duration) · exit \(exitText)"
+            }
+            if isRunning {
+                return "Running the pasted Python in the repo-native Code Console runner."
+            }
+            if hasContextResponse {
+                return "Prompt ready. Paste the returned Python script here to run it."
+            }
+            return "Import or bind a dataset to generate the controlled prompt and runner context."
+        }
+
+        static func liveStatusLabel(
+            selectedFileURL: URL?,
+            isRunning: Bool,
+            isRefreshingContext: Bool,
+            hasContextResponse: Bool
+        ) -> String {
+            if selectedFileURL == nil {
+                return "Awaiting context"
+            }
+            if isRunning {
+                return "Running script"
+            }
+            if isRefreshingContext {
+                return "Refreshing prompt"
+            }
+            if hasContextResponse {
+                return "Prompt ready"
+            }
+            return "Ready"
+        }
+
+        static func liveStatusSymbol(
+            hasError: Bool,
+            isRunning: Bool,
+            isRefreshingContext: Bool,
+            hasContextResponse: Bool
+        ) -> String {
+            if hasError {
+                return "exclamationmark.triangle.fill"
+            }
+            if isRunning || isRefreshingContext {
+                return "arrow.triangle.2.circlepath"
+            }
+            if hasContextResponse {
+                return "checkmark.circle.fill"
+            }
+            return "circle.dashed"
+        }
     }
 }

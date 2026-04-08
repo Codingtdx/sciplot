@@ -98,6 +98,29 @@ Every development round must update this file.
   - If persistent runner manager is unstable, run path degrades to legacy subprocess path.
   - No contract semantic changes in `src/plot_contract.json`.
 
+### 2026-04-08: Shared async orchestration kernel + three-layer macOS session split
+
+- Change:
+  - Added shared async orchestration primitives in `app/macos/Sources/Shared/Utilities/WorkspaceBridge.swift`:
+    - `AsyncLatestTaskCoordinator`
+    - `KeyedAsyncLatestTaskCoordinator<Key>`
+  - Refactored `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` to explicit internal layering:
+    - state storage (`RuntimeState`)
+    - async coordination (`AsyncCoordination`)
+    - UI-derived logic (`DerivedState`)
+  - Unified debounce/cancellation/revision gate/latest-write-wins semantics through shared coordinators, replacing ad-hoc per-session task+revision bookkeeping.
+  - Added coordinator behavior tests in `app/macos/Tests/CodeConsoleSessionTests.swift`.
+- Why:
+  - First principles: stale async responses and duplicated orchestration logic are the highest recurring source of UI inconsistency/regression.
+  - A shared kernel plus explicit layering minimizes copy-paste divergence and simplifies future session maintenance.
+- Rejected alternatives:
+  - Keep per-session task/revision implementations: rejected due drift risk and repeated bug surface.
+  - Large immediate extraction into standalone state-store objects for all observable fields: rejected this round due migration risk and low short-term return.
+- Boundaries:
+  - No IA/workflow/shortcut/order changes.
+  - Session orchestration objects must remain `@MainActor` isolated.
+  - Path-scoped async work (for workbook previews) must use keyed latest-write-wins semantics.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -138,6 +161,14 @@ Every development round must update this file.
 - Fix pattern:
   - update `TestPayloads` and tests constructing `CodeConsoleContextResponse` to include `contextID`.
   - rerun `xcodebuild test` after test fixture updates.
+
+### Symptom: Swift compile error `main actor-isolated default value in a nonisolated context`
+
+- Typical cause:
+  - shared coordinator holder type creates `@MainActor`-isolated coordinator instances from a non-isolated type context.
+- Fix pattern:
+  - mark the holder type (`AsyncCoordination`) as `@MainActor` when it owns `AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`.
+  - keep coordinator lifecycle owned by `@MainActor` sessions only.
 
 ## 5) Round Change Log
 
@@ -237,6 +268,43 @@ Every development round must update this file.
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`76 tests`)
+
+### 2026-04-08 (Round D): macOS session-layer deep refactor completion
+
+- Scope:
+  - Completed macOS Session-layer deep refactor for all workbenches while keeping public workflows unchanged.
+  - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` now consistently use:
+    - `RuntimeState` for private mutable storage
+    - `AsyncCoordination` for async orchestration lanes
+    - `DerivedState` for UI-derived state logic
+  - Unified async orchestration semantics via shared coordinators in `WorkspaceBridge.swift`.
+  - Added protective coordinator behavior tests under `CodeConsoleSessionTests`.
+- User-visible impact:
+  - 无（行为等价）；主要收益是并发路径稳定性与后续维护可读性提升。
+- Risks:
+  - refactor touches multiple central session files; accidental stale-state regressions are possible if revision guards are bypassed later.
+  - Swift actor-isolation annotations are required for coordination holders.
+- Rollback points:
+  - Revert session internal layering changes in:
+    - `app/macos/Sources/Features/Plot/PlotSession.swift`
+    - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+    - `app/macos/Sources/Features/Composer/ComposerSession.swift`
+    - `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+  - Revert shared orchestrator primitives in:
+    - `app/macos/Sources/Shared/Utilities/WorkspaceBridge.swift`
+  - Revert protective tests in:
+    - `app/macos/Tests/CodeConsoleSessionTests.swift`
+- Added protective tests:
+  - `CodeConsoleSessionTests::testAsyncLatestTaskCoordinatorExecutesLatestOperationOnly`
+  - `CodeConsoleSessionTests::testKeyedAsyncLatestTaskCoordinatorMaintainsPerKeyLatestWriteWins`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`78 tests`)
 
 ## 6) Update Template (copy for next round)
 

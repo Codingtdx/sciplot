@@ -13,16 +13,12 @@ final class DataStudioSession {
     private let comparisonRefreshDelayNanoseconds: UInt64 = 150_000_000
 
     @ObservationIgnored private var client: (any SidecarClienting)?
-    @ObservationIgnored private var meta: SidecarMetaResponse?
-    @ObservationIgnored private var contract: PlotContractResponse?
+    @ObservationIgnored private var runtimeState = RuntimeState()
     @ObservationIgnored private let chooseDirectory: DirectoryChooser
     @ObservationIgnored private let chooseWorkbookSaveLocation: WorkbookSaveChooser
     @ObservationIgnored private let chooseComparisonFigureFormat: ComparisonFigureFormatChooser
     @ObservationIgnored private let materializeComparisonOutputs: ComparisonOutputMaterializer
-    @ObservationIgnored private var comparisonRefreshTask: Task<Void, Never>?
-    @ObservationIgnored private var comparisonRefreshRevision = 0
-    @ObservationIgnored private var workbookPreviewTasks: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private var workbookPreviewRevisions: [String: Int] = [:]
+    @ObservationIgnored private let asyncCoordination = AsyncCoordination()
 
     let plotSession: PlotSession
 
@@ -112,8 +108,8 @@ final class DataStudioSession {
     }
 
     func apply(meta: SidecarMetaResponse, contract: PlotContractResponse) {
-        self.meta = meta
-        self.contract = contract
+        runtimeState.meta = meta
+        runtimeState.contract = contract
         plotSession.apply(meta: meta, contract: contract)
     }
 
@@ -201,7 +197,7 @@ final class DataStudioSession {
     }
 
     var hasSessionContent: Bool {
-        !workbooks.isEmpty
+        DerivedState.hasSessionContent(workbooks: workbooks)
     }
 
     var orderedWorkbooks: [DataStudioWorkbookItem] {
@@ -995,9 +991,7 @@ final class DataStudioSession {
     }
 
     func removeWorkbook(path: String) {
-        workbookPreviewTasks[path]?.cancel()
-        workbookPreviewTasks.removeValue(forKey: path)
-        workbookPreviewRevisions.removeValue(forKey: path)
+        asyncCoordination.workbookPreview.cancel(for: path)
         workbooks.removeAll { $0.response.workbookPath == path }
         groupStates.removeAll { $0.workbookPath == path }
         specimenStatesByWorkbookPath.removeValue(forKey: path)
@@ -1320,12 +1314,18 @@ final class DataStudioSession {
         }
     }
 
-    private func rebuildComparisonContext(refreshWorkbookPreviews: Bool = false) async {
+    private func rebuildComparisonContext(
+        refreshWorkbookPreviews: Bool = false,
+        revision: Int? = nil
+    ) async {
         guard let client else {
             return
         }
+        let activeRevision = revision ?? asyncCoordination.comparisonRefresh.beginNow()
         cacheCurrentFigureOptions()
-        comparisonRefreshTask?.cancel()
+        guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+            return
+        }
         let workbookPaths = orderedWorkbooks.map { $0.response.workbookPath }
         guard !workbookPaths.isEmpty else {
             clearComparisonContext()
@@ -1343,6 +1343,9 @@ final class DataStudioSession {
         do {
             if refreshWorkbookPreviews {
                 await refreshFocusedWorkbookPreviewIfNeeded()
+                guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+                    return
+                }
             }
             let previousComparisonSet = comparisonSet
             let previousCacheKey = comparisonContextCacheKey
@@ -1358,15 +1361,24 @@ final class DataStudioSession {
                     specimenStates: requestSpecimenStates
                 )
             )
+            guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+                return
+            }
             comparisonSet = response.comparisonSet
             comparisonContextCacheKey = response.cacheKey
             comparisonContextMaterializedAt = response.materializedAt
             syncFigureSelection(preferredRecipeID: previousSelectedRecipeID)
             do {
                 try await refreshDisplayedFigure()
+                guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+                    return
+                }
                 previewWarning = nil
                 isPreviewStale = false
             } catch {
+                guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+                    return
+                }
                 comparisonSet = previousComparisonSet
                 comparisonContextCacheKey = previousCacheKey
                 comparisonContextMaterializedAt = previousMaterializedAt
@@ -1385,6 +1397,9 @@ final class DataStudioSession {
                 }
             }
         } catch {
+            guard asyncCoordination.comparisonRefresh.isLatest(activeRevision), !Task.isCancelled else {
+                return
+            }
             if comparisonSet != nil {
                 previewWarning = "Refresh failed, showing last successful preview."
                 isPreviewStale = true
@@ -1468,19 +1483,11 @@ final class DataStudioSession {
     }
 
     private func scheduleComparisonContextRebuild() {
-        comparisonRefreshRevision += 1
-        let revision = comparisonRefreshRevision
-        comparisonRefreshTask?.cancel()
-        comparisonRefreshTask = Task { [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: self?.comparisonRefreshDelayNanoseconds ?? 0)
-            } catch {
+        asyncCoordination.comparisonRefresh.schedule(delayNanoseconds: comparisonRefreshDelayNanoseconds) { [weak self] revision in
+            guard let self else {
                 return
             }
-            guard let self, revision == self.comparisonRefreshRevision, !Task.isCancelled else {
-                return
-            }
-            await self.rebuildComparisonContext()
+            await self.rebuildComparisonContext(revision: revision)
         }
     }
 
@@ -1556,13 +1563,12 @@ final class DataStudioSession {
     }
 
     private func scheduleWorkbookPreviewRefresh(for workbookPath: String, rebuildComparisonContext: Bool) {
-        workbookPreviewTasks[workbookPath]?.cancel()
-        workbookPreviewTasks[workbookPath] = Task { [weak self] in
+        asyncCoordination.workbookPreview.schedule(for: workbookPath) { [weak self] workbookPath, revision in
             guard let self else {
                 return
             }
-            await self.refreshWorkbookPreview(for: workbookPath)
-            guard !Task.isCancelled else {
+            await self.refreshWorkbookPreview(for: workbookPath, revision: revision)
+            guard self.asyncCoordination.workbookPreview.isLatest(for: workbookPath, revision: revision), !Task.isCancelled else {
                 return
             }
             if rebuildComparisonContext {
@@ -1576,12 +1582,11 @@ final class DataStudioSession {
         return trackedPath == workbookPath
     }
 
-    private func refreshWorkbookPreview(for workbookPath: String) async {
+    private func refreshWorkbookPreview(for workbookPath: String, revision: Int? = nil) async {
         guard let client else {
             return
         }
-        let nextRevision = (workbookPreviewRevisions[workbookPath] ?? 0) + 1
-        workbookPreviewRevisions[workbookPath] = nextRevision
+        let activeRevision = revision ?? asyncCoordination.workbookPreview.beginNow(for: workbookPath)
         if tracksWorkbookPreviewRefreshState(for: workbookPath) {
             focusedWorkbookPreviewRefreshState = .refreshing(workbookPath: workbookPath)
         }
@@ -1592,7 +1597,7 @@ final class DataStudioSession {
                     specimenStates: specimenStates(for: workbookPath)
                 )
             )
-            guard workbookPreviewRevisions[workbookPath] == nextRevision, !Task.isCancelled else {
+            guard asyncCoordination.workbookPreview.isLatest(for: workbookPath, revision: activeRevision), !Task.isCancelled else {
                 return
             }
             workbookPreviewByPath[workbookPath] = response
@@ -1601,7 +1606,7 @@ final class DataStudioSession {
                 focusedWorkbookPreviewRefreshState = .idle
             }
         } catch {
-            guard workbookPreviewRevisions[workbookPath] == nextRevision, !Task.isCancelled else {
+            guard asyncCoordination.workbookPreview.isLatest(for: workbookPath, revision: activeRevision), !Task.isCancelled else {
                 return
             }
             if tracksWorkbookPreviewRefreshState(for: workbookPath) {
@@ -1896,10 +1901,8 @@ final class DataStudioSession {
     }
 
     private func resetContentState() {
-        comparisonRefreshTask?.cancel()
-        workbookPreviewTasks.values.forEach { $0.cancel() }
-        workbookPreviewTasks = [:]
-        workbookPreviewRevisions = [:]
+        asyncCoordination.comparisonRefresh.cancel()
+        asyncCoordination.workbookPreview.cancelAll()
         workbooks = []
         groupStates = []
         specimenStatesByWorkbookPath = [:]
@@ -2350,5 +2353,24 @@ final class DataStudioSession {
                 "visual_theme_id": options.visualThemeID.map(JSONValue.string) ?? .null,
             ]
         )
+    }
+}
+
+private extension DataStudioSession {
+    struct RuntimeState {
+        var meta: SidecarMetaResponse?
+        var contract: PlotContractResponse?
+    }
+
+    @MainActor
+    final class AsyncCoordination {
+        let comparisonRefresh = AsyncLatestTaskCoordinator()
+        let workbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
+    }
+
+    enum DerivedState {
+        static func hasSessionContent(workbooks: [DataStudioWorkbookItem]) -> Bool {
+            !workbooks.isEmpty
+        }
     }
 }

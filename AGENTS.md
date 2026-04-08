@@ -69,6 +69,7 @@
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
+- `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
 
 ## 绘图与工作流不变量

@@ -96,4 +96,41 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(client.codeConsoleContextRequests.last?.sheet, .name("Representative_Curve"))
         XCTAssertEqual(session.contextResponse?.sheet, .name("Representative_Curve"))
     }
+
+    func testAsyncLatestTaskCoordinatorExecutesLatestOperationOnly() async {
+        let coordinator = AsyncLatestTaskCoordinator()
+        var executedRevisions: [Int] = []
+
+        coordinator.schedule(delayNanoseconds: 120_000_000) { revision in
+            executedRevisions.append(revision)
+        }
+        coordinator.schedule { revision in
+            executedRevisions.append(revision)
+        }
+
+        try? await Task.sleep(nanoseconds: 220_000_000)
+
+        XCTAssertEqual(executedRevisions, [2])
+    }
+
+    func testKeyedAsyncLatestTaskCoordinatorMaintainsPerKeyLatestWriteWins() async {
+        let coordinator = KeyedAsyncLatestTaskCoordinator<String>()
+        var events: [String] = []
+
+        coordinator.schedule(for: "alpha", delayNanoseconds: 120_000_000) { key, revision in
+            events.append("\(key)-\(revision)")
+        }
+        coordinator.schedule(for: "alpha") { key, revision in
+            events.append("\(key)-\(revision)")
+        }
+        coordinator.schedule(for: "beta") { key, revision in
+            events.append("\(key)-\(revision)")
+        }
+
+        try? await Task.sleep(nanoseconds: 220_000_000)
+
+        XCTAssertTrue(events.contains("alpha-2"))
+        XCTAssertTrue(events.contains("beta-1"))
+        XCTAssertFalse(events.contains("alpha-1"))
+    }
 }

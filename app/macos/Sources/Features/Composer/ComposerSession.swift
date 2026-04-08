@@ -12,8 +12,8 @@ final class ComposerSession {
 
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private weak var undoManager: UndoManager?
-    @ObservationIgnored private var previewTask: Task<Void, Never>?
-    @ObservationIgnored private var previewRevision = 0
+    @ObservationIgnored private var runtimeState = RuntimeState()
+    @ObservationIgnored private let asyncCoordination = AsyncCoordination()
     @ObservationIgnored private let previewDelayNanoseconds: UInt64
     @ObservationIgnored private let chooseExportDestination: ComposerExportDestinationChooser
     @ObservationIgnored private let materializeExport: ComposerExportMaterializer
@@ -32,8 +32,6 @@ final class ComposerSession {
     var isPreviewing = false
     var isExporting = false
     var activeDragPanelID: String?
-
-    @ObservationIgnored private var selectionAnchorCell: ComposerGridCell?
 
     init(
         previewDelayNanoseconds: UInt64 = 300_000_000,
@@ -155,37 +153,21 @@ final class ComposerSession {
     }
 
     var mergeGuidance: String {
-        guard !selectedCells.isEmpty else {
-            return "Select adjacent empty cells on the 3x3 grid to merge them into one region."
-        }
-        guard let selection = selectedCellSelection else {
-            return "Use a rectangular cell selection for merge."
-        }
-        guard selection.cellCount > 1 else {
-            return "A single cell is selected. Add adjacent cells if you want to merge."
-        }
-        guard canMergeSelectedCells else {
-            return "Merge requires an empty rectangular selection with no existing panel or merged-region coverage."
-        }
-        return "This \(selection.colSpan)x\(selection.rowSpan) selection can be merged into one free region."
+        DerivedState.mergeGuidance(
+            selectedCells: selectedCells,
+            selectedCellSelection: selectedCellSelection,
+            canMergeSelectedCells: canMergeSelectedCells
+        )
     }
 
     var placementGuidance: String {
-        guard let panel = selectedPanel else {
-            return "Select a panel from the Library or the board, then choose a target cell or merged region."
-        }
-        if panel.hidden {
-            return "This panel is off the board. Select a target and place it back into the composition."
-        }
-        if panel.locked {
-            return "Unlock this panel before moving it on the board."
-        }
-        guard let target = selectedPlacementTarget else {
-            return "Drag the panel directly, or select a destination cell / region to move it there."
-        }
-        return canPlace(panelID: panel.id, in: target)
-            ? "This destination is valid."
-            : "That destination is not valid for the selected panel."
+        DerivedState.placementGuidance(
+            selectedPanel: selectedPanel,
+            selectedPlacementTarget: selectedPlacementTarget,
+            canPlaceInTarget: { panelID, target in
+                canPlace(panelID: panelID, in: target)
+            }
+        )
     }
 
     var placementActionTitle: String {
@@ -346,7 +328,7 @@ final class ComposerSession {
     }
 
     func updateCellSelection(_ cell: ComposerGridCell, additive: Bool, extend: Bool) {
-        if extend, let selectionAnchorCell {
+        if extend, let selectionAnchorCell = runtimeState.selectionAnchorCell {
             selectedCells = Set(rectangularCells(from: selectionAnchorCell, to: cell))
         } else if additive {
             if selectedCells.contains(cell) {
@@ -354,22 +336,22 @@ final class ComposerSession {
             } else {
                 selectedCells.insert(cell)
             }
-            selectionAnchorCell = selectionAnchorCell ?? cell
+            runtimeState.selectionAnchorCell = runtimeState.selectionAnchorCell ?? cell
         } else {
             selectedCells = [cell]
-            selectionAnchorCell = cell
+            runtimeState.selectionAnchorCell = cell
         }
         selectedRegionID = nil
     }
 
     func beginCellDragSelection(at cell: ComposerGridCell) {
         selectedCells = [cell]
-        selectionAnchorCell = cell
+        runtimeState.selectionAnchorCell = cell
         selectedRegionID = nil
     }
 
     func updateCellDragSelection(to cell: ComposerGridCell) {
-        guard let selectionAnchorCell else {
+        guard let selectionAnchorCell = runtimeState.selectionAnchorCell else {
             beginCellDragSelection(at: cell)
             return
         }
@@ -392,13 +374,13 @@ final class ComposerSession {
     func selectRegion(_ regionID: String?) {
         selectedRegionID = regionID
         selectedCells.removeAll()
-        selectionAnchorCell = nil
+        runtimeState.selectionAnchorCell = nil
     }
 
     func clearTargetSelection() {
         selectedRegionID = nil
         selectedCells.removeAll()
-        selectionAnchorCell = nil
+        runtimeState.selectionAnchorCell = nil
     }
 
     func setAutoLabels(_ enabled: Bool) {
@@ -479,7 +461,7 @@ final class ComposerSession {
         commitProject(candidate, previousProject: previous, actionName: "Merge Cells")
         selectedRegionID = newRegionID
         selectedCells.removeAll()
-        selectionAnchorCell = nil
+        runtimeState.selectionAnchorCell = nil
     }
 
     func unmergeSelectedRegion() {
@@ -709,12 +691,8 @@ final class ComposerSession {
     }
 
     func schedulePreview() {
-        previewRevision += 1
-        let revision = previewRevision
-        previewTask?.cancel()
-        previewTask = Task { [weak self] in
+        asyncCoordination.preview.schedule(delayNanoseconds: previewDelayNanoseconds) { [weak self] revision in
             guard let self else { return }
-            try? await Task.sleep(nanoseconds: self.previewDelayNanoseconds)
             await self.requestPreview(revision: revision)
         }
     }
@@ -726,20 +704,20 @@ final class ComposerSession {
 
         isPreviewing = true
         defer {
-            if revision == previewRevision {
+            if asyncCoordination.preview.isLatest(revision) {
                 isPreviewing = false
             }
         }
 
         do {
             let response = try await client.composePreview(project)
-            guard revision == previewRevision, !Task.isCancelled else {
+            guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return
             }
             previewResponse = response
             errorMessage = nil
         } catch {
-            guard revision == previewRevision, !Task.isCancelled else {
+            guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return
             }
             errorMessage = error.localizedDescription
@@ -1380,5 +1358,60 @@ final class ComposerSession {
             break
         }
         return ComposerBoardOrderingKey(row: .max, col: .max, area: .max, panelID: panel.id)
+    }
+}
+
+private extension ComposerSession {
+    struct RuntimeState {
+        var selectionAnchorCell: ComposerGridCell?
+    }
+
+    @MainActor
+    final class AsyncCoordination {
+        let preview = AsyncLatestTaskCoordinator()
+    }
+
+    enum DerivedState {
+        static func mergeGuidance(
+            selectedCells: Set<ComposerGridCell>,
+            selectedCellSelection: ComposerCellSelection?,
+            canMergeSelectedCells: Bool
+        ) -> String {
+            guard !selectedCells.isEmpty else {
+                return "Select adjacent empty cells on the 3x3 grid to merge them into one region."
+            }
+            guard let selection = selectedCellSelection else {
+                return "Use a rectangular cell selection for merge."
+            }
+            guard selection.cellCount > 1 else {
+                return "A single cell is selected. Add adjacent cells if you want to merge."
+            }
+            guard canMergeSelectedCells else {
+                return "Merge requires an empty rectangular selection with no existing panel or merged-region coverage."
+            }
+            return "This \(selection.colSpan)x\(selection.rowSpan) selection can be merged into one free region."
+        }
+
+        static func placementGuidance(
+            selectedPanel: ComposerPanelPayload?,
+            selectedPlacementTarget: ComposerPlacementTarget?,
+            canPlaceInTarget: (_ panelID: String, _ target: ComposerPlacementTarget) -> Bool
+        ) -> String {
+            guard let panel = selectedPanel else {
+                return "Select a panel from the Library or the board, then choose a target cell or merged region."
+            }
+            if panel.hidden {
+                return "This panel is off the board. Select a target and place it back into the composition."
+            }
+            if panel.locked {
+                return "Unlock this panel before moving it on the board."
+            }
+            guard let target = selectedPlacementTarget else {
+                return "Drag the panel directly, or select a destination cell / region to move it there."
+            }
+            return canPlaceInTarget(panel.id, target)
+                ? "This destination is valid."
+                : "That destination is not valid for the selected panel."
+        }
     }
 }
