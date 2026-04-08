@@ -109,6 +109,7 @@ struct CodeConsoleContextRequest: Codable, Equatable, Sendable {
 }
 
 struct CodeConsoleContextResponse: Codable, Equatable, Sendable {
+    let contextID: String
     let inputPath: String
     let sheet: SheetValue
     let sheetNames: [String]
@@ -123,9 +124,22 @@ struct CodeConsoleContextResponse: Codable, Equatable, Sendable {
 }
 
 struct CodeConsoleRunRequest: Codable, Equatable, Sendable {
-    let context: CodeConsoleContextRequest
+    let contextID: String?
+    let context: CodeConsoleContextRequest?
     let code: String
     let timeoutSeconds: Int
+
+    init(
+        contextID: String? = nil,
+        context: CodeConsoleContextRequest? = nil,
+        code: String,
+        timeoutSeconds: Int
+    ) {
+        self.contextID = contextID
+        self.context = context
+        self.code = code
+        self.timeoutSeconds = timeoutSeconds
+    }
 }
 
 struct CodeConsoleGeneratedFileResponse: Codable, Equatable, Sendable, Identifiable {

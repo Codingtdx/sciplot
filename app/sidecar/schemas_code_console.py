@@ -22,6 +22,7 @@ class CodeConsoleContextRequest(StrictModel):
 
 
 class CodeConsoleContextResponse(StrictModel):
+    context_id: str
     input_path: str
     sheet: str | int
     sheet_names: list[str]
@@ -36,7 +37,8 @@ class CodeConsoleContextResponse(StrictModel):
 
 
 class CodeConsoleRunRequest(StrictModel):
-    context: CodeConsoleContextRequest
+    context_id: str | None = None
+    context: CodeConsoleContextRequest | None = None
     code: str
     timeout_seconds: int = Field(default=90, ge=1, le=600)
 

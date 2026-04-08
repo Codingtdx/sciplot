@@ -68,6 +68,36 @@ Every development round must update this file.
   - No API behavior changes.
   - Motion must remain short, low-amplitude, and non-blocking.
 
+### 2026-04-08: Context-ID fast path + persistent runner + comparison context reuse
+
+- Change:
+  - Added in-memory LRU runtime cache (`src/infrastructure/runtime_cache.py`) and wired it into:
+    - Plot preview route cache (`/render-preview`)
+    - Code Console context cache by `context_id`
+  - Code Console:
+    - `/code-console/context` now emits stable `context_id` (input path + mtime + resolved options signature).
+    - `/code-console/run` now accepts optional `context_id`; fast path reuses cached context.
+    - Added persistent runner manager (`src/code_console_runner.py`) and subprocess auto-fallback on manager failure.
+  - Data Studio comparison:
+    - cache key now includes workbook mtimes.
+    - comparison context directory reuse with manifest-based reuse.
+    - removed repeated workbook parse/list calls in one comparison build path.
+  - Sidecar schema hardening:
+    - `/meta` and `/plot-contract` switched to explicit response models.
+    - `DELETE /data-studio/templates/{id}` now returns typed `StatusResponse`.
+    - composer/code-console/data-studio route errors now use contextual error mapping.
+- Why:
+  - First principles: throughput is dominated by duplicate parse/rebuild/cold-start costs.
+  - Keep workflow/IA unchanged and reduce latency by reusing validated context and artifacts.
+- Rejected alternatives:
+  - Rebuild context and start a fresh subprocess for every Code Console run: rejected due repeated fixed costs.
+  - Keep route responses as free-form dicts: rejected due schema drift and compatibility risk.
+  - Rebuild Data Studio comparison workbook/context each preview call: rejected due avoidable repeated IO/parse.
+- Boundaries:
+  - `context_id` cache is process-local and invalidates on input mtime change.
+  - If persistent runner manager is unstable, run path degrades to legacy subprocess path.
+  - No contract semantic changes in `src/plot_contract.json`.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -100,6 +130,14 @@ Every development round must update this file.
   - verify revision guard + task cancellation for workbook preview refresh path.
 - Fix:
   - keep latest-write-wins guard and do not remove per-workbook revision tracking.
+
+### Symptom: `xcodebuild test` fails after API model field additions
+
+- Typical cause:
+  - test payload factories and session tests were not updated for new required fields (`context_id`).
+- Fix pattern:
+  - update `TestPayloads` and tests constructing `CodeConsoleContextResponse` to include `contextID`.
+  - rerun `xcodebuild test` after test fixture updates.
 
 ## 5) Round Change Log
 
@@ -139,6 +177,66 @@ Every development round must update this file.
   - macOS:
     - `xcodebuild build`: passed
     - `xcodebuild test`: 76 passed
+
+### 2026-04-08 (Round C): First-principles full-project optimization sweep
+
+- Scope:
+  - Plot/Data Studio/Code Console/Sidecar/macOS 同轮优化，保持 IA 与 canonical workflows 不变。
+  - Added plot preview cache, Data Studio context reuse and mtime invalidation, Code Console `context_id` fast path, persistent runner manager + subprocess fallback, explicit sidecar response models, and contextualized error surfaces.
+  - macOS wired `contextID` through Code Console models/session run request.
+- User-visible impact:
+  - Code Console repeated runs become near-instant when `context_id` is reused.
+  - Data Studio comparison context/preview and Plot preview avoid repeated rebuild in steady state.
+  - No workflow or navigation changes.
+- Risks:
+  - In-memory caches are process-local and can go stale if external mutation bypasses mtime changes.
+  - persistent runner regression risk on specific machines.
+  - sidecar response schema tightening can expose hidden client payload assumptions.
+- Rollback points:
+  - Code Console runner fallback path: disable persistent path by reverting `src/code_console_runner.py` integration in `src/code_console_service.py`.
+  - Context-id API rollback: route/schema changes in `app/sidecar/schemas_code_console.py` + `app/sidecar/routes_code_console.py`.
+  - Meta/contract response model rollback: `app/sidecar/routes_meta.py` + `app/sidecar/schemas_meta.py`.
+  - Data Studio comparison reuse rollback: `src/data_studio/comparison.py` + `src/infrastructure/persistence/data_studio_comparison_contexts.py`.
+- Performance tactile targets and conclusion:
+  - Target:
+    - `data_studio.context p95 <= 0.20s`
+    - `data_studio.preview p95 <= 0.50s`
+    - `plot.preview p95 <= 0.22s`
+    - `plot.export p95 <= 0.30s`
+    - `code_console.run p95 <= 0.55s`
+  - Benchmark command:
+    - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 20 --warmup 3 --output docs/performance/benchmark-2026-04-08.json`
+  - Baseline (provided):
+    - `plot.preview p95≈0.27s`
+    - `plot.export p95≈0.34s`
+    - `data_studio.context p95≈0.41s`
+    - `data_studio.preview p95≈0.71s`
+    - `code_console.run p95≈0.93s`
+  - This round measured p95:
+    - `plot.preview p95=0.0008s`
+    - `plot.export p95=0.2776s`
+    - `data_studio.context p95=0.0013s`
+    - `data_studio.preview p95=0.2924s`
+    - `code_console.run p95=0.0031s`
+  - Notes:
+    - benchmark runs in-process via `TestClient`; numbers are comparable only with same harness but validate target-direction and cache/runner gains.
+- Added protective tests:
+  - `tests/test_sidecar_code_console.py::test_code_console_run_prefers_context_id_fast_path`
+  - `tests/test_code_console_service.py::test_code_console_run_falls_back_to_subprocess_when_runner_fails`
+  - `tests/test_code_console_service.py::test_persistent_runner_recovers_after_timeout`
+  - `tests/test_sidecar_render.py::test_render_preview_uses_cache_and_invalidates_when_options_change`
+  - `tests/test_data_studio.py::test_preview_data_studio_comparison_context_invalidates_on_workbook_mtime`
+  - `tests/test_data_studio.py::test_preview_data_studio_comparison_context_avoids_duplicate_workbook_imports`
+  - `tests/test_sidecar_schema_contract.py::test_meta_and_plot_contract_responses_match_explicit_models`
+  - `tests/test_sidecar_schema_contract.py::test_delete_data_studio_template_returns_status_response`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`76 tests`)
 
 ## 6) Update Template (copy for next round)
 

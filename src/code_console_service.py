@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -11,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from src import plot_style
+from src.code_console_runner import DEFAULT_RUNNER_MANAGER
 from src.infrastructure.persistence.code_console_runs import prepare_managed_code_console_run_dir
+from src.infrastructure.runtime_cache import LRUCache
 from src.plot_contract import template_contract
 from src.rendering.cache import read_raw_table_cached
 from src.rendering.dataset_models import (
@@ -29,7 +32,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 @dataclass(frozen=True)
 class CodeConsoleResolvedContext:
+    context_id: str
     input_path: Path
+    input_mtime_ns: int
     sheet: str | int
     sheet_names: tuple[str, ...]
     inspection: dict[str, Any]
@@ -40,6 +45,10 @@ class CodeConsoleResolvedContext:
     starter_code: str
     source_kind: str | None = None
     source_label: str | None = None
+
+
+_CONTEXT_BY_ID_CACHE = LRUCache[str, CodeConsoleResolvedContext](maxsize=128)
+_CONTEXT_REQUEST_KEY_CACHE = LRUCache[str, str](maxsize=128)
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,91 @@ class CodeConsoleRunResult:
     stdout_path: Path
     stderr_path: Path
     generated_files: tuple[CodeConsoleGeneratedFile, ...]
+
+
+def _stable_json_hash(payload: object) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _context_request_cache_key(
+    *,
+    input_path: Path,
+    sheet: str | int,
+    template: str | None,
+    size: str | None,
+    style_preset: str | None,
+    palette_preset: str | None,
+    visual_theme_id: str | None,
+    source_kind: str | None,
+    source_label: str | None,
+) -> str:
+    return _stable_json_hash(
+        {
+            "input_path": str(input_path.resolve()),
+            "input_mtime_ns": input_path.stat().st_mtime_ns,
+            "sheet": str(sheet),
+            "template": template,
+            "size": size,
+            "style_preset": style_preset,
+            "palette_preset": palette_preset,
+            "visual_theme_id": visual_theme_id,
+            "source_kind": source_kind,
+            "source_label": source_label,
+        }
+    )
+
+
+def _context_id_for_payload(payload: dict[str, object]) -> str:
+    return f"ctx_{_stable_json_hash(payload)[:24]}"
+
+
+def _context_id_for_context(
+    *,
+    input_path: Path,
+    input_mtime_ns: int,
+    sheet: str | int,
+    template: str,
+    options: dict[str, Any],
+    source_kind: str | None,
+    source_label: str | None,
+) -> str:
+    return _context_id_for_payload(
+        {
+            "input_path": str(input_path.resolve()),
+            "input_mtime_ns": input_mtime_ns,
+            "sheet": str(sheet),
+            "template": template,
+            "options": options,
+            "source_kind": source_kind,
+            "source_label": source_label,
+        }
+    )
+
+
+def _context_is_fresh(context: CodeConsoleResolvedContext) -> bool:
+    try:
+        return (
+            context.input_path.exists()
+            and context.input_path.stat().st_mtime_ns == context.input_mtime_ns
+        )
+    except Exception:
+        return False
+
+
+def _cached_context_by_id(context_id: str) -> CodeConsoleResolvedContext | None:
+    cached = _CONTEXT_BY_ID_CACHE.get(context_id)
+    if cached is None:
+        return None
+    if not _context_is_fresh(cached):
+        return None
+    return cached
+
+
+def _cache_context(context: CodeConsoleResolvedContext, *, request_key: str | None = None) -> None:
+    _CONTEXT_BY_ID_CACHE.set(context.context_id, context)
+    if request_key:
+        _CONTEXT_REQUEST_KEY_CACHE.set(request_key, context.context_id)
 
 
 def _json_ready(value: Any) -> Any:
@@ -198,7 +292,7 @@ def _build_starter_code(*, context: CodeConsoleResolvedContext) -> str:
     ).strip()
 
 
-def build_code_console_context(
+def _build_code_console_context_uncached(
     *,
     input_path: Path,
     sheet: str | int,
@@ -210,10 +304,11 @@ def build_code_console_context(
     source_kind: str | None = None,
     source_label: str | None = None,
 ) -> CodeConsoleResolvedContext:
+    resolved_input_path = input_path.expanduser().resolve()
     resolved_sheet = coerce_sheet(str(sheet))
-    inspection = inspect_input_file(input_path, resolved_sheet)
-    normalized_dataset = build_normalized_dataset(input_path, resolved_sheet, model=inspection.model)
-    raw = read_raw_table_cached(input_path, resolved_sheet).dropna(axis=1, how="all")
+    inspection = inspect_input_file(resolved_input_path, resolved_sheet)
+    normalized_dataset = build_normalized_dataset(resolved_input_path, resolved_sheet, model=inspection.model)
+    raw = read_raw_table_cached(resolved_input_path, resolved_sheet).dropna(axis=1, how="all")
     dataset_payload = {
         **normalized_dataset_payload(normalized_dataset),
         "sample_rows": dataframe_sample_rows(raw),
@@ -234,26 +329,39 @@ def build_code_console_context(
         palette_preset=palette_preset or plot_style.DEFAULT_PALETTE_PRESET,
         visual_theme_id=visual_theme_id,
     )
-    context = CodeConsoleResolvedContext(
-        input_path=input_path.resolve(),
+    input_mtime_ns = resolved_input_path.stat().st_mtime_ns
+    options = {
+        "size": size
+        or (
+            str(recommended_size)
+            if recommended_size is not None
+            else template_contract(resolved_template).default_size
+        ),
+        "width_mm": resolved_render_options.width_mm,
+        "height_mm": resolved_render_options.height_mm,
+        "style_preset": resolved_render_options.style_preset,
+        "palette_preset": resolved_render_options.palette_preset,
+        "visual_theme_id": resolved_render_options.visual_theme_id,
+    }
+    context_id = _context_id_for_context(
+        input_path=resolved_input_path,
+        input_mtime_ns=input_mtime_ns,
         sheet=resolved_sheet,
-        sheet_names=tuple(list_sheet_names(input_path)),
+        template=resolved_template,
+        options=options,
+        source_kind=source_kind,
+        source_label=source_label,
+    )
+    context = CodeConsoleResolvedContext(
+        context_id=context_id,
+        input_path=resolved_input_path,
+        input_mtime_ns=input_mtime_ns,
+        sheet=resolved_sheet,
+        sheet_names=tuple(list_sheet_names(resolved_input_path)),
         inspection=_json_ready(inspection),
         dataset=_json_ready(dataset_payload),
         template=resolved_template,
-        options={
-            "size": size
-            or (
-                str(recommended_size)
-                if recommended_size is not None
-                else template_contract(resolved_template).default_size
-            ),
-            "width_mm": resolved_render_options.width_mm,
-            "height_mm": resolved_render_options.height_mm,
-            "style_preset": resolved_render_options.style_preset,
-            "palette_preset": resolved_render_options.palette_preset,
-            "visual_theme_id": resolved_render_options.visual_theme_id,
-        },
+        options=options,
         prompt_text="",
         starter_code="",
         source_kind=source_kind,
@@ -262,7 +370,9 @@ def build_code_console_context(
     prompt_text = _build_prompt(context=context)
     starter_code = _build_starter_code(context=context)
     return CodeConsoleResolvedContext(
+        context_id=context.context_id,
         input_path=context.input_path,
+        input_mtime_ns=context.input_mtime_ns,
         sheet=context.sheet,
         sheet_names=context.sheet_names,
         inspection=context.inspection,
@@ -276,9 +386,90 @@ def build_code_console_context(
     )
 
 
+def build_code_console_context(
+    *,
+    input_path: Path,
+    sheet: str | int,
+    template: str | None,
+    size: str | None,
+    style_preset: str | None,
+    palette_preset: str | None,
+    visual_theme_id: str | None,
+    source_kind: str | None = None,
+    source_label: str | None = None,
+) -> CodeConsoleResolvedContext:
+    resolved_input_path = input_path.expanduser().resolve()
+    resolved_sheet = coerce_sheet(str(sheet))
+    request_key = _context_request_cache_key(
+        input_path=resolved_input_path,
+        sheet=resolved_sheet,
+        template=template,
+        size=size,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
+        visual_theme_id=visual_theme_id,
+        source_kind=source_kind,
+        source_label=source_label,
+    )
+    cached_context_id = _CONTEXT_REQUEST_KEY_CACHE.get(request_key)
+    if cached_context_id is not None:
+        cached_context = _cached_context_by_id(cached_context_id)
+        if cached_context is not None:
+            return cached_context
+    context = _build_code_console_context_uncached(
+        input_path=resolved_input_path,
+        sheet=resolved_sheet,
+        template=template,
+        size=size,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
+        visual_theme_id=visual_theme_id,
+        source_kind=source_kind,
+        source_label=source_label,
+    )
+    _cache_context(context, request_key=request_key)
+    return context
+
+
+def resolve_code_console_context(
+    *,
+    context_id: str | None,
+    input_path: Path | None = None,
+    sheet: str | int | None = None,
+    template: str | None = None,
+    size: str | None = None,
+    style_preset: str | None = None,
+    palette_preset: str | None = None,
+    visual_theme_id: str | None = None,
+    source_kind: str | None = None,
+    source_label: str | None = None,
+) -> CodeConsoleResolvedContext:
+    if context_id:
+        cached_context = _cached_context_by_id(context_id)
+        if cached_context is not None:
+            return cached_context
+    if input_path is None or sheet is None:
+        raise ValueError(
+            "Code Console context_id is unavailable. Request /code-console/context again or provide context details."
+        )
+    return build_code_console_context(
+        input_path=input_path,
+        sheet=sheet,
+        template=template,
+        size=size,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
+        visual_theme_id=visual_theme_id,
+        source_kind=source_kind,
+        source_label=source_label,
+    )
+
+
 def _serialize_context(context: CodeConsoleResolvedContext) -> dict[str, Any]:
     return {
+        "context_id": context.context_id,
         "input_path": str(context.input_path),
+        "input_mtime_ns": context.input_mtime_ns,
         "sheet": context.sheet,
         "sheet_names": list(context.sheet_names),
         "inspection": context.inspection,
@@ -316,21 +507,64 @@ def _coerce_subprocess_text(value: bytes | str | None) -> str:
     return value
 
 
+def _subprocess_environment(*, output_dir: Path, context_json_path: Path) -> dict[str, str]:
+    environment = dict(os.environ)
+    existing_pythonpath = environment.get("PYTHONPATH", "").strip()
+    environment["PYTHONPATH"] = (
+        f"{REPO_ROOT}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(REPO_ROOT)
+    )
+    environment["PYTHONUNBUFFERED"] = "1"
+    environment["OUTPUT_DIR"] = str(output_dir)
+    environment["CODEGOD_CODE_CONSOLE_CONTEXT_JSON"] = str(context_json_path)
+    return environment
+
+
+def _run_script_subprocess(
+    *,
+    script_path: Path,
+    output_dir: Path,
+    context_path: Path,
+    timeout_seconds: int,
+) -> tuple[str, int | None, str, str]:
+    environment = _subprocess_environment(output_dir=output_dir, context_json_path=context_path)
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(script_path)],
+            cwd=str(REPO_ROOT),
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+        status = "succeeded" if completed.returncode == 0 else "failed"
+        return status, completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired as exc:
+        stderr = _coerce_subprocess_text(exc.stderr) + (
+            f"\nCode Console timed out after {timeout_seconds} seconds."
+            if timeout_seconds > 0
+            else "\nCode Console timed out."
+        )
+        return "timed_out", None, _coerce_subprocess_text(exc.stdout), stderr
+
+
 def run_code_console_script(
     *,
-    input_path: Path,
-    sheet: str | int,
-    template: str | None,
-    size: str | None,
-    style_preset: str | None,
-    palette_preset: str | None,
-    visual_theme_id: str | None,
     code: str,
     timeout_seconds: int,
+    context_id: str | None = None,
+    input_path: Path | None = None,
+    sheet: str | int | None = None,
+    template: str | None = None,
+    size: str | None = None,
+    style_preset: str | None = None,
+    palette_preset: str | None = None,
+    visual_theme_id: str | None = None,
     source_kind: str | None = None,
     source_label: str | None = None,
 ) -> CodeConsoleRunResult:
-    context = build_code_console_context(
+    context = resolve_code_console_context(
+        context_id=context_id,
         input_path=input_path,
         sheet=sheet,
         template=template,
@@ -341,7 +575,8 @@ def run_code_console_script(
         source_kind=source_kind,
         source_label=source_label,
     )
-    run_dir = prepare_managed_code_console_run_dir(input_path, sheet=context.sheet)
+    _cache_context(context)
+    run_dir = prepare_managed_code_console_run_dir(context.input_path, sheet=context.sheet)
     output_dir = run_dir / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = run_dir / "external_ai_prompt.txt"
@@ -357,41 +592,33 @@ def run_code_console_script(
     )
     script_path.write_text(code, encoding="utf-8")
 
-    environment = dict(os.environ)
-    existing_pythonpath = environment.get("PYTHONPATH", "").strip()
-    environment["PYTHONPATH"] = (
-        f"{REPO_ROOT}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(REPO_ROOT)
-    )
-    environment["PYTHONUNBUFFERED"] = "1"
-    environment["OUTPUT_DIR"] = str(output_dir)
-    environment["CODEGOD_CODE_CONSOLE_CONTEXT_JSON"] = str(context_path)
-
     started_at = time.perf_counter()
+    fallback_reason: str | None = None
     try:
-        completed = subprocess.run(
-            [sys.executable, str(script_path)],
-            cwd=str(REPO_ROOT),
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
+        execution = DEFAULT_RUNNER_MANAGER.run(
+            script_path=script_path,
+            repo_root=REPO_ROOT,
+            output_dir=output_dir,
+            context_json_path=context_path,
+            timeout_seconds=timeout_seconds,
         )
-        duration_seconds = time.perf_counter() - started_at
-        status = "succeeded" if completed.returncode == 0 else "failed"
-        stdout = completed.stdout
-        stderr = completed.stderr
-        exit_code = completed.returncode
-    except subprocess.TimeoutExpired as exc:
-        duration_seconds = time.perf_counter() - started_at
-        status = "timed_out"
-        stdout = _coerce_subprocess_text(exc.stdout)
-        stderr = _coerce_subprocess_text(exc.stderr) + (
-            f"\nCode Console timed out after {timeout_seconds} seconds."
-            if timeout_seconds > 0
-            else "\nCode Console timed out."
+        status = execution.status
+        exit_code = execution.exit_code
+        stdout = execution.stdout
+        stderr = execution.stderr
+    except Exception as exc:
+        fallback_reason = str(exc).strip() or "unknown persistent runner error"
+        status, exit_code, stdout, stderr = _run_script_subprocess(
+            script_path=script_path,
+            output_dir=output_dir,
+            context_path=context_path,
+            timeout_seconds=timeout_seconds,
         )
-        exit_code = None
+
+    duration_seconds = time.perf_counter() - started_at
+    if fallback_reason:
+        fallback_note = f"Persistent runner unavailable, fell back to subprocess: {fallback_reason}"
+        stderr = f"{stderr.rstrip()}\n{fallback_note}".strip()
 
     stdout_path.write_text(stdout, encoding="utf-8")
     stderr_path.write_text(stderr, encoding="utf-8")
@@ -413,10 +640,41 @@ def run_code_console_script(
     )
 
 
+def run_code_console_script_legacy(
+    *,
+    input_path: Path,
+    sheet: str | int,
+    template: str | None,
+    size: str | None,
+    style_preset: str | None,
+    palette_preset: str | None,
+    visual_theme_id: str | None,
+    code: str,
+    timeout_seconds: int,
+    source_kind: str | None = None,
+    source_label: str | None = None,
+) -> CodeConsoleRunResult:
+    return run_code_console_script(
+        code=code,
+        timeout_seconds=timeout_seconds,
+        input_path=input_path,
+        sheet=sheet,
+        template=template,
+        size=size,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
+        visual_theme_id=visual_theme_id,
+        source_kind=source_kind,
+        source_label=source_label,
+    )
+
+
 __all__ = [
     "CodeConsoleGeneratedFile",
     "CodeConsoleResolvedContext",
     "CodeConsoleRunResult",
     "build_code_console_context",
+    "resolve_code_console_context",
+    "run_code_console_script_legacy",
     "run_code_console_script",
 ]

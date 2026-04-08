@@ -4,7 +4,7 @@ from base64 import b64encode
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.sidecar.schemas import (
     ComposerImportRequest,
@@ -17,6 +17,7 @@ from app.sidecar.schemas import (
     composer_project_from_request,
     serialize_dataclass,
 )
+from app.sidecar.server_utils import http_bad_request, normalize_path
 from src.core.application.composer import (
     analyze_composer_project,
     build_composer_submission_report,
@@ -35,8 +36,6 @@ def create_composer_router() -> APIRouter:
 
     @router.post("/panel-thumbnail", response_model=PanelThumbnailResponse)
     def panel_thumbnail(request: ThumbnailRequest) -> PanelThumbnailResponse:
-        from app.sidecar.server_utils import normalize_path
-
         try:
             input_path = normalize_path(request.file_path)
             png_bytes = panel_thumbnail_png(
@@ -46,7 +45,7 @@ def create_composer_router() -> APIRouter:
             )
             return PanelThumbnailResponse(png_base64=b64encode(png_bytes).decode("ascii"))
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-panel-thumbnail", exc) from exc
 
     @router.post("/compose-preview", response_model=ComposerPreviewResponse)
     def compose_preview(request: ComposerRequest) -> ComposerPreviewResponse:
@@ -70,7 +69,7 @@ def create_composer_router() -> APIRouter:
                 suggested_project_patch=serialize_dataclass(suggested_patch),
             )
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-preview", exc) from exc
 
     @router.post("/compose-export", response_model=PathResponse)
     def compose_export(request: ComposerRequest) -> PathResponse:
@@ -84,7 +83,7 @@ def create_composer_router() -> APIRouter:
             exported = compose_export_pdf(project, output_path)
             return PathResponse(output_path=str(exported))
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-export", exc) from exc
 
     @router.post("/composer/three-up", response_model=ComposerProjectResponse)
     def composer_three_up(request: list[str]) -> ComposerProjectResponse:
@@ -92,7 +91,7 @@ def create_composer_router() -> APIRouter:
             project = three_up_panels_from_paths(request)
             return ComposerProjectResponse.model_validate(serialize_dataclass(project))
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-three-up", exc) from exc
 
     @router.post("/composer/two-up-editorial", response_model=ComposerProjectResponse)
     def composer_two_up_editorial(request: list[str]) -> ComposerProjectResponse:
@@ -100,7 +99,7 @@ def create_composer_router() -> APIRouter:
             project = two_up_editorial_panels_from_paths(request)
             return ComposerProjectResponse.model_validate(serialize_dataclass(project))
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-two-up-editorial", exc) from exc
 
     @router.post("/composer/import-panels", response_model=ComposerProjectResponse)
     def composer_import_panels(request: ComposerImportRequest) -> ComposerProjectResponse:
@@ -110,6 +109,6 @@ def create_composer_router() -> APIRouter:
             next_project = import_panels_from_paths(project, file_paths, kind=request.kind)
             return ComposerProjectResponse.model_validate(serialize_dataclass(next_project))
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise http_bad_request("composer-import-panels", exc) from exc
 
     return router

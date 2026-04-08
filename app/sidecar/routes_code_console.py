@@ -32,6 +32,7 @@ def create_code_console_router() -> APIRouter:
             )
             return CodeConsoleContextResponse.model_validate(
                 {
+                    "context_id": context.context_id,
                     "input_path": str(context.input_path),
                     "sheet": context.sheet,
                     "sheet_names": list(context.sheet_names),
@@ -56,19 +57,21 @@ def create_code_console_router() -> APIRouter:
     @router.post("/code-console/run", response_model=CodeConsoleRunResponse)
     def code_console_run(request: CodeConsoleRunRequest) -> CodeConsoleRunResponse:
         try:
-            input_path = normalize_path(request.context.input_path)
+            request_context = request.context
+            input_path = normalize_path(request_context.input_path) if request_context else None
             result = run_code_console_script(
+                context_id=request.context_id,
                 input_path=input_path,
-                sheet=request.context.sheet,
-                template=request.context.template,
-                size=request.context.options.size,
-                style_preset=request.context.options.style_preset,
-                palette_preset=request.context.options.palette_preset,
-                visual_theme_id=request.context.options.visual_theme_id,
+                sheet=request_context.sheet if request_context else None,
+                template=request_context.template if request_context else None,
+                size=request_context.options.size if request_context else None,
+                style_preset=request_context.options.style_preset if request_context else None,
+                palette_preset=request_context.options.palette_preset if request_context else None,
+                visual_theme_id=request_context.options.visual_theme_id if request_context else None,
                 code=request.code,
                 timeout_seconds=request.timeout_seconds,
-                source_kind=request.context.source_kind,
-                source_label=request.context.source_label,
+                source_kind=request_context.source_kind if request_context else None,
+                source_label=request_context.source_label if request_context else None,
             )
             return CodeConsoleRunResponse.model_validate(
                 {

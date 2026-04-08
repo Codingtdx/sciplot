@@ -49,6 +49,8 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
+- Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
+- Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
   - `recommendations`
   - `primary_recommendation`

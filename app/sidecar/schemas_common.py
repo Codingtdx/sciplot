@@ -63,6 +63,10 @@ class PathResponse(StrictModel):
     output_path: str
 
 
+class StatusResponse(StrictModel):
+    status: str
+
+
 def serialize_dataclass(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
         return {key: serialize_dataclass(item) for key, item in asdict(value).items()}
@@ -81,6 +85,7 @@ __all__ = [
     "PreviewItemResponse",
     "QAReportResponse",
     "QAIssueResponse",
+    "StatusResponse",
     "StrictModel",
     "SubmissionCheckResponse",
     "SubmissionReportResponse",

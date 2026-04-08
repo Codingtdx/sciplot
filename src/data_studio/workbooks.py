@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -296,8 +297,12 @@ def build_workbook(
     )
 
 
-def import_workbook(path: str | Path) -> DataStudioWorkbook:
+def _workbook_cache_key(path: str | Path) -> tuple[str, int]:
     workbook_path = ensure_input_path(str(Path(path).expanduser()))
+    return str(workbook_path.resolve()), workbook_path.stat().st_mtime_ns
+
+
+def _import_workbook_from_path(workbook_path: Path) -> DataStudioWorkbook:
     metadata = tensile_builtin.load_metadata_sheet(workbook_path)
     template_id = str(metadata.get("template_id", "")).strip()
     if template_id == tensile_builtin.TENSILE_TEMPLATE_ID:
@@ -344,6 +349,16 @@ def import_workbook(path: str | Path) -> DataStudioWorkbook:
         warnings=warnings,
         samples=(),
     )
+
+
+@lru_cache(maxsize=64)
+def _import_workbook_cached(resolved_path: str, mtime_ns: int) -> DataStudioWorkbook:
+    _ = mtime_ns
+    return _import_workbook_from_path(Path(resolved_path))
+
+
+def import_workbook(path: str | Path) -> DataStudioWorkbook:
+    return _import_workbook_cached(*_workbook_cache_key(path))
 
 
 def import_workbooks(path: str | Path) -> tuple[DataStudioWorkbook, ...]:
@@ -421,8 +436,7 @@ def preview_workbook(
     )
 
 
-def load_workbook_specimen_bundle(path: str | Path) -> LoadedWorkbookSpecimenBundle:
-    workbook = import_workbook(path)
+def _load_workbook_specimen_bundle_from_workbook(workbook: DataStudioWorkbook) -> LoadedWorkbookSpecimenBundle:
     workbook_path = workbook.workbook_path
     sheet_names = set(workbook.sheet_names)
     if tensile_builtin.ALL_SPECIMENS_SHEET not in sheet_names or tensile_builtin.ALL_CURVES_SHEET not in sheet_names:
@@ -500,13 +514,31 @@ def load_workbook_specimen_bundle(path: str | Path) -> LoadedWorkbookSpecimenBun
     )
 
 
+@lru_cache(maxsize=64)
+def _load_workbook_specimen_bundle_cached(resolved_path: str, mtime_ns: int) -> LoadedWorkbookSpecimenBundle:
+    _ = mtime_ns
+    workbook = _import_workbook_cached(resolved_path, mtime_ns)
+    return _load_workbook_specimen_bundle_from_workbook(workbook)
+
+
+def load_workbook_specimen_bundle(
+    path: str | Path,
+    *,
+    workbook: DataStudioWorkbook | None = None,
+) -> LoadedWorkbookSpecimenBundle:
+    if workbook is not None:
+        return _load_workbook_specimen_bundle_from_workbook(workbook)
+    return _load_workbook_specimen_bundle_cached(*_workbook_cache_key(path))
+
+
 def load_filtered_workbook_context(
     path: str | Path,
     *,
     specimen_states: Iterable[DataStudioSpecimenState] | None = None,
     allow_empty: bool = False,
+    bundle: LoadedWorkbookSpecimenBundle | None = None,
 ) -> FilteredWorkbookContext:
-    bundle = load_workbook_specimen_bundle(path)
+    bundle = bundle or load_workbook_specimen_bundle(path)
     if not bundle.supported:
         raise ValueError(
             bundle.unsupported_reason

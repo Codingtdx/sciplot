@@ -72,8 +72,13 @@ def comparison_context_cache_key(
     group_states: Iterable[DataStudioGroupState] | None = None,
     specimen_states: Iterable[DataStudioSpecimenState] | None = None,
 ) -> str:
+    resolved_workbook_paths = [Path(path).expanduser() for path in workbook_paths]
     payload = {
-        "workbook_paths": [str(Path(path).expanduser()) for path in workbook_paths],
+        "workbook_paths": [str(path) for path in resolved_workbook_paths],
+        "workbook_mtime_ns": {
+            str(path): path.stat().st_mtime_ns if path.exists() else None
+            for path in resolved_workbook_paths
+        },
         "group_states": [
             {
                 "workbook_path": str(Path(state.workbook_path).expanduser()),
@@ -122,7 +127,7 @@ def prepare_managed_data_studio_comparison_context_dir(
         specimen_states=specimen_states,
     )
     directory = root / cache_key
-    _clear_directory(directory)
+    directory.mkdir(parents=True, exist_ok=True)
     _prune_directory_children(root, keep=_DATA_STUDIO_COMPARISON_CONTEXT_RETENTION, skip={directory})
     return cache_key, directory
 

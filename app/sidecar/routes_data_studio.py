@@ -24,6 +24,7 @@ from app.sidecar.schemas import (
     DataStudioWorkbookPreviewResponse,
     DataStudioWorkbookResponse,
     PreviewItemResponse,
+    StatusResponse,
     serialize_dataclass,
 )
 from app.sidecar.server_utils import http_bad_request
@@ -91,11 +92,11 @@ def create_data_studio_router() -> APIRouter:
         except Exception as exc:
             raise http_bad_request("data_studio_template_update", exc) from exc
 
-    @router.delete("/data-studio/templates/{template_id:path}")
-    def delete_template(template_id: str) -> dict[str, str]:
+    @router.delete("/data-studio/templates/{template_id:path}", response_model=StatusResponse)
+    def delete_template(template_id: str) -> StatusResponse:
         try:
             delete_data_studio_template(template_id)
-            return {"status": "ok"}
+            return StatusResponse(status="ok")
         except Exception as exc:
             raise http_bad_request("data_studio_template_delete", exc) from exc
 

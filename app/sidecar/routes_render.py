@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -42,6 +44,32 @@ from src.core.application.render import (
     validate_template_name,
 )
 from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
+from src.infrastructure.runtime_cache import LRUCache
+
+_RENDER_PREVIEW_CACHE = LRUCache[str, RenderPreviewResponse](maxsize=64)
+
+
+def _stable_json_hash(payload: object) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _render_preview_cache_key(
+    *,
+    input_path: Path,
+    sheet: str | int,
+    template: str,
+    options_payload: object,
+) -> str:
+    return _stable_json_hash(
+        {
+            "input_path": str(input_path.resolve()),
+            "input_mtime_ns": input_path.stat().st_mtime_ns,
+            "sheet": str(sheet),
+            "template": template,
+            "options": options_payload,
+        }
+    )
 
 
 def create_render_router(*, dep_provider: Callable[[], object] | None = None) -> APIRouter:
@@ -109,6 +137,16 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
             payload_options = request.options
+            options_payload = payload_options.model_dump(mode="json")
+            cache_key = _render_preview_cache_key(
+                input_path=input_path,
+                sheet=sheet,
+                template=template,
+                options_payload=options_payload,
+            )
+            cached = _RENDER_PREVIEW_CACHE.get(cache_key)
+            if cached is not None:
+                return cached.model_copy(deep=True)
             resolved_options = options_from_payload(template, payload_options)
             rendered_plots = build_rendered_plots(
                 template,
@@ -143,7 +181,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 )
             finally:
                 close_rendered_plots(rendered_plots)
-            return RenderPreviewResponse(
+            response = RenderPreviewResponse(
                 template=template,
                 requested_template_id=identity.requested_template_id,
                 canonical_id=identity.canonical_id,
@@ -154,6 +192,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 previews=previews,
                 submission_report=serialize_dataclass(submission_report),
             )
+            _RENDER_PREVIEW_CACHE.set(cache_key, response)
+            return response
         except Exception as exc:
             raise http_bad_request("preview", exc) from exc
 

@@ -65,9 +65,18 @@ def contextual_error_message(context: str, exc: Exception) -> str:
         "data_studio_template_delete": "Could not delete the Data Studio template.",
         "data_studio_build_workbook": "Could not build the Data Studio workbook.",
         "data_studio_import_workbook": "Could not load this Data Studio workbook.",
+        "data_studio_comparison_context": "Could not materialize the Data Studio comparison context.",
         "data_studio_comparison_preview": "Could not render the Data Studio comparison preview.",
         "data_studio_comparison_export": "Could not export the Data Studio comparison bundle.",
         "data_studio_session_normalize": "Could not normalize the Data Studio session payload.",
+        "code-console-context": "Could not build the Code Console context.",
+        "code-console-run": "Could not execute the Code Console run.",
+        "composer-panel-thumbnail": "Could not generate the composer panel thumbnail.",
+        "composer-preview": "Could not render the composer preview.",
+        "composer-export": "Could not export the composer project.",
+        "composer-three-up": "Could not build the three-up composer preset.",
+        "composer-two-up-editorial": "Could not build the two-up editorial composer preset.",
+        "composer-import-panels": "Could not import panels into the composer project.",
     }
     prefix = prefixes.get(context)
     if prefix is None:

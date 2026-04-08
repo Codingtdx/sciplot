@@ -265,6 +265,7 @@ enum TestPayloads {
 
     static func codeConsoleContext(path: String = "/tmp/sample.csv") -> CodeConsoleContextResponse {
         CodeConsoleContextResponse(
+            contextID: "ctx_test_payload",
             inputPath: path,
             sheet: .name("Representative_Curve"),
             sheetNames: ["Representative_Curve", "Strength_Box"],

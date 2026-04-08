@@ -442,6 +442,7 @@ final class CodeConsoleSession {
             return nil
         }
         return .init(
+            contextID: contextResponse?.contextID,
             context: contextRequest,
             code: editorText,
             timeoutSeconds: 90

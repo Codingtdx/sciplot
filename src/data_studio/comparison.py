@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-import tempfile
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from io import BytesIO
@@ -19,6 +19,7 @@ from src.data_studio.models import (
     DataStudioGroupState,
     DataStudioSpecimenState,
     WorkbookMetricSummary,
+    serialize_model,
 )
 from src.data_studio.workbooks import import_workbook, load_filtered_workbook_context, load_workbook_specimen_bundle
 from src.infrastructure.persistence.data_studio_comparison_contexts import (
@@ -33,6 +34,7 @@ from src.rendering.render_service import build_rendered_plots, close_rendered_pl
 class LoadedComparisonWorkbook:
     workbook_path: Path
     label: str
+    sheet_names: tuple[str, ...]
     representative_curve: CurveSeries
     metric_summaries: tuple[WorkbookMetricSummary, ...]
     replicate_groups: dict[str, ReplicateGroup]
@@ -53,15 +55,102 @@ class MaterializedComparisonContext:
     materialized_at: str
 
 
+def _context_manifest_path(context_root: Path) -> Path:
+    return context_root / "context_manifest.json"
+
+
+def _comparison_set_from_payload(payload: dict[str, object]) -> ComparisonSet:
+    recipes_payload = payload.get("recipes", [])
+    recipes = tuple(
+        ComparisonRecipe(
+            id=str(item.get("id", "")),
+            label=str(item.get("label", "")),
+            category=str(item.get("category", "")),
+            template_id=str(item.get("template_id", "")),
+            sheet_name=str(item.get("sheet_name", "")),
+            metric_id=(str(item["metric_id"]) if item.get("metric_id") is not None else None),
+            enabled_by_default=bool(item.get("enabled_by_default", True)),
+            supported=bool(item.get("supported", True)),
+            support_reason=str(item.get("support_reason", "")),
+        )
+        for item in recipes_payload
+        if isinstance(item, dict)
+    )
+    workbook_paths = tuple(Path(str(item)).expanduser() for item in payload.get("workbook_paths", []))
+    workbook_labels = tuple(str(item) for item in payload.get("workbook_labels", []))
+    return ComparisonSet(
+        id=str(payload.get("id", "")),
+        label=str(payload.get("label", "")),
+        workbook_paths=workbook_paths,
+        workbook_labels=workbook_labels,
+        comparison_workbook_path=Path(str(payload.get("comparison_workbook_path", ""))).expanduser(),
+        recipes=recipes,
+    )
+
+
+def _load_materialized_context_from_manifest(
+    context_root: Path,
+    *,
+    cache_key: str,
+) -> MaterializedComparisonContext | None:
+    manifest_path = _context_manifest_path(context_root)
+    if not manifest_path.exists():
+        return None
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    manifest_cache_key = payload.get("cache_key")
+    if isinstance(manifest_cache_key, str) and manifest_cache_key and manifest_cache_key != cache_key:
+        return None
+    try:
+        comparison_set = _comparison_set_from_payload(dict(payload.get("comparison_set", {})))
+        materialized_at = str(payload.get("materialized_at", ""))
+    except Exception:
+        return None
+    if not comparison_set.comparison_workbook_path.exists():
+        return None
+    if not materialized_at:
+        materialized_at = datetime.fromtimestamp(
+            comparison_set.comparison_workbook_path.stat().st_mtime,
+            tz=UTC,
+        ).isoformat()
+    return MaterializedComparisonContext(
+        comparison_set=comparison_set,
+        cache_key=cache_key,
+        materialized_at=materialized_at,
+    )
+
+
+def _write_materialized_context_manifest(
+    *,
+    context_root: Path,
+    context: MaterializedComparisonContext,
+) -> None:
+    manifest_path = _context_manifest_path(context_root)
+    payload = {
+        "cache_key": context.cache_key,
+        "materialized_at": context.materialized_at,
+        "comparison_set": serialize_model(context.comparison_set),
+    }
+    manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def load_comparison_workbook(
     path: str | Path,
     *,
     specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> LoadedComparisonWorkbook:
     workbook = import_workbook(path)
-    specimen_bundle = load_workbook_specimen_bundle(path)
+    specimen_bundle = load_workbook_specimen_bundle(path, workbook=workbook)
     if specimen_bundle.supported:
-        filtered = load_filtered_workbook_context(path, specimen_states=specimen_states)
+        filtered = load_filtered_workbook_context(
+            path,
+            specimen_states=specimen_states,
+            bundle=specimen_bundle,
+        )
         if filtered.representative_curve is None:
             raise ValueError(
                 f"{workbook.workbook_path.name} needs at least one included specimen with a representative curve."
@@ -69,11 +158,13 @@ def load_comparison_workbook(
         return LoadedComparisonWorkbook(
             workbook_path=workbook.workbook_path,
             label=workbook.label,
+            sheet_names=workbook.sheet_names,
             representative_curve=filtered.representative_curve,
             metric_summaries=filtered.metric_summaries,
             replicate_groups=filtered.replicate_groups,
         )
 
+    workbook_sheet_names = tuple(list_sheet_names(workbook.workbook_path))
     representative_curves = load_curve_table(
         workbook.workbook_path,
         sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
@@ -84,7 +175,7 @@ def load_comparison_workbook(
             f"{tensile_builtin.REPRESENTATIVE_CURVE_SHEET}."
         )
     replicate_groups: dict[str, ReplicateGroup] = {}
-    for sheet_name in list_sheet_names(workbook.workbook_path):
+    for sheet_name in workbook_sheet_names:
         if not sheet_name.endswith("_Replicates"):
             continue
         groups = load_replicate_table(workbook.workbook_path, sheet_name=sheet_name)
@@ -95,6 +186,7 @@ def load_comparison_workbook(
     return LoadedComparisonWorkbook(
         workbook_path=workbook.workbook_path,
         label=workbook.label,
+        sheet_names=workbook_sheet_names,
         representative_curve=representative_curves[0],
         metric_summaries=workbook.metrics,
         replicate_groups=replicate_groups,
@@ -112,7 +204,12 @@ def comparison_recipes_for_workbooks(
         group_states=group_states,
         specimen_states=specimen_states,
     )
-    loaded = [group.loaded for group in resolved_groups]
+    return _comparison_recipes_for_loaded_workbooks([group.loaded for group in resolved_groups])
+
+
+def _comparison_recipes_for_loaded_workbooks(
+    loaded: list[LoadedComparisonWorkbook],
+) -> tuple[ComparisonRecipe, ...]:
     if not loaded:
         raise ValueError("Data Studio needs at least one included workbook group.")
     metric_ids = [metric.label for metric in loaded[0].metric_summaries]
@@ -224,7 +321,7 @@ def build_comparison_set(
                 tensile_builtin.LoadedTensileWorkbookData(
                     workbook_path=workbook.workbook_path,
                     base_label=workbook.label,
-                    sheet_names=tuple(list_sheet_names(workbook.workbook_path)),
+                    sheet_names=workbook.sheet_names,
                     sample_count=0,
                     representative_filename=workbook.representative_curve.sample,
                     representative_curve=workbook.representative_curve,
@@ -254,7 +351,7 @@ def build_comparison_set(
                     tensile_builtin.LoadedTensileWorkbookData(
                         workbook_path=workbook.workbook_path,
                         base_label=workbook.label,
-                        sheet_names=tuple(list_sheet_names(workbook.workbook_path)),
+                        sheet_names=workbook.sheet_names,
                         sample_count=0,
                         representative_filename=workbook.representative_curve.sample,
                         representative_curve=workbook.representative_curve,
@@ -288,19 +385,7 @@ def build_comparison_set(
                 ["source_files", " | ".join(str(group.workbook_path) for group in resolved_groups)],
             ]
         ).to_excel(writer, sheet_name=tensile_builtin.METADATA_SHEET, header=False, index=False)
-    recipes = comparison_recipes_for_workbooks(
-        [group.workbook_path for group in resolved_groups],
-        group_states=[
-            DataStudioGroupState(
-                workbook_path=str(group.workbook_path),
-                display_name=group.display_name,
-                include_in_compare=True,
-                sort_order=group.sort_order,
-            )
-            for group in resolved_groups
-        ],
-        specimen_states=specimen_states,
-    )
+    recipes = _comparison_recipes_for_loaded_workbooks(loaded)
     return ComparisonSet(
         id=bundle_dir.name,
         label=" vs ".join(labels),
@@ -318,13 +403,12 @@ def preview_comparison_recipe(
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
     specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> tuple[ComparisonSet, ComparisonRecipe, str]:
-    temp_dir = Path(tempfile.mkdtemp(prefix="data_studio_preview_"))
-    comparison_set = build_comparison_set(
+    materialized = materialize_comparison_context(
         workbook_paths,
-        temp_dir,
         group_states=group_states,
         specimen_states=specimen_states,
     )
+    comparison_set = materialized.comparison_set
     recipe = _find_recipe(comparison_set.recipes, recipe_id)
     rendered = build_rendered_plots(
         recipe.template_id,
@@ -350,14 +434,18 @@ def materialize_comparison_context(
     group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None = None,
     specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
 ) -> MaterializedComparisonContext:
-    cache_key, output_dir = prepare_managed_data_studio_comparison_context_dir(
+    cache_key, context_root = prepare_managed_data_studio_comparison_context_dir(
         workbook_paths,
         group_states=group_states,
         specimen_states=specimen_states,
     )
+    cached = _load_materialized_context_from_manifest(context_root, cache_key=cache_key)
+    if cached is not None:
+        return cached
+
     comparison_set = build_comparison_set(
         workbook_paths,
-        output_dir,
+        context_root,
         group_states=group_states,
         specimen_states=specimen_states,
     )
@@ -365,11 +453,13 @@ def materialize_comparison_context(
         comparison_set.comparison_workbook_path.stat().st_mtime,
         tz=UTC,
     ).isoformat()
-    return MaterializedComparisonContext(
+    materialized = MaterializedComparisonContext(
         comparison_set=comparison_set,
         cache_key=cache_key,
         materialized_at=materialized_at,
     )
+    _write_materialized_context_manifest(context_root=context_root, context=materialized)
+    return materialized
 
 
 def export_comparison_bundle(

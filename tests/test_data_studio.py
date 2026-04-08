@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -475,6 +476,45 @@ def test_preview_data_studio_comparison_context_uses_stable_cache_key_without_re
     assert first.comparison_set.comparison_workbook_path.exists()
     assert restored.cache_key != first.cache_key
     assert restored.comparison_set.comparison_workbook_path != first.comparison_set.comparison_workbook_path
+
+
+def test_preview_data_studio_comparison_context_invalidates_on_workbook_mtime(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "mtime_context.xlsx")
+
+    first = preview_data_studio_comparison_context([str(workbook_path)])
+    assert first.cache_key
+    time.sleep(0.01)
+    workbook_path.touch()
+
+    second = preview_data_studio_comparison_context([str(workbook_path)])
+    assert second.cache_key
+    assert second.cache_key != first.cache_key
+
+
+def test_preview_data_studio_comparison_context_avoids_duplicate_workbook_imports(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    left = _write_specimen_filter_workbook(tmp_path / "left_import_count.xlsx", label="Left")
+    right = _write_specimen_filter_workbook(tmp_path / "right_import_count.xlsx", label="Right")
+
+    from src.data_studio import comparison as comparison_module
+    from src.data_studio.workbooks import import_workbook as real_import_workbook
+
+    call_paths: list[str] = []
+
+    def tracked_import(path: str | Path):
+        call_paths.append(str(Path(path).expanduser()))
+        return real_import_workbook(path)
+
+    monkeypatch.setattr(comparison_module, "import_workbook", tracked_import)
+
+    preview_data_studio_comparison_context([str(left), str(right)])
+    assert len(call_paths) == 2
+    assert sorted(Path(path).name for path in call_paths) == [
+        left.name,
+        right.name,
+    ]
 
 
 def test_normalize_session_payload_expands_paths() -> None:

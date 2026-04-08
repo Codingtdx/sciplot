@@ -67,6 +67,7 @@ final class CodeConsoleSessionTests: XCTestCase {
             try await Task.sleep(nanoseconds: 60_000_000)
             let base = TestPayloads.codeConsoleContext(path: request.inputPath)
             return CodeConsoleContextResponse(
+                contextID: base.contextID,
                 inputPath: base.inputPath,
                 sheet: request.sheet,
                 sheetNames: base.sheetNames,

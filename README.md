@@ -31,6 +31,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
+- `POST /code-console/context` returns a stable `context_id` (input signature + mtime).
+- `POST /code-console/run` accepts `context_id` fast path and still supports legacy `context`.
+- `GET /meta`, `GET /plot-contract`, and `DELETE /data-studio/templates/{id}` use explicit response schemas.
 - Ranked recommendation fields are canonical:
   - `recommendations`
   - `primary_recommendation`

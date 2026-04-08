@@ -38,6 +38,7 @@ def test_code_console_context_returns_prompt_and_starter_code(tmp_path: Path) ->
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["context_id"].startswith("ctx_")
     assert payload["input_path"] == str(input_path)
     assert payload["template"] == "curve"
     assert payload["inspection"]["model"] == "curve_table"
@@ -82,3 +83,43 @@ print(f"rows={len(df)}")
     generated_names = {item["name"] for item in payload["generated_files"]}
     assert "console_plot.pdf" in generated_names
     assert "raw_snapshot.csv" in generated_names
+
+
+def test_code_console_run_prefers_context_id_fast_path(tmp_path: Path, monkeypatch) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    context_response = client.post(
+        "/code-console/context",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+        },
+    )
+    assert context_response.status_code == 200, context_response.text
+    context_id = context_response.json()["context_id"]
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("context_id run path should not rebuild context")
+
+    monkeypatch.setattr("src.code_console_service.build_code_console_context", fail_build)
+
+    run_response = client.post(
+        "/code-console/run",
+        json={
+            "context_id": context_id,
+            "code": """
+from src.code_console_runtime import console
+df = console.load_raw_dataframe()
+print(f"fast_path_rows={len(df)}")
+""",
+            "timeout_seconds": 20,
+        },
+    )
+
+    assert run_response.status_code == 200, run_response.text
+    payload = run_response.json()
+    assert payload["status"] == "succeeded"
+    assert payload["exit_code"] == 0
+    assert "fast_path_rows=" in payload["stdout"]
