@@ -1,5 +1,3 @@
-app/desktop/package-lock.json
-app/desktop/src-tauri/Cargo.lock
 .venv/
 .venv-*/
 __pycache__/
@@ -8,11 +6,6 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 figures/
-app/desktop/node_modules/
-app/desktop/dist/
-app/desktop/playwright-report/
-app/desktop/test-results/
-app/desktop/src-tauri/target/
 app/macos/.derivedData/
 app/macos/build/
 app/macos/*.xcresult

@@ -45,17 +45,11 @@ def test_clean_repo_removes_safe_targets_but_keeps_active_venv(tmp_path: Path) -
     assert (tmp_path / ".venv").exists()
 
 
-def test_clean_repo_keeps_node_modules_unless_requested(tmp_path: Path) -> None:
-    node_modules = tmp_path / "app" / "desktop" / "node_modules"
+def test_clean_repo_keeps_unlisted_node_modules(tmp_path: Path) -> None:
+    node_modules = tmp_path / "app" / "macos" / "node_modules"
     node_modules.mkdir(parents=True)
     (node_modules / "package.json").write_text("{}", encoding="utf-8")
 
-    default_result = run_clean(tmp_path)
-
-    assert default_result.returncode == 0
+    result = run_clean(tmp_path)
+    assert result.returncode == 0
     assert node_modules.exists()
-
-    deep_result = run_clean(tmp_path, "--include-node-modules")
-
-    assert deep_result.returncode == 0
-    assert not node_modules.exists()

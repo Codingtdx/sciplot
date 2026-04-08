@@ -228,32 +228,32 @@ def test_import_data_studio_workbooks_expands_comparison_bundle_sources(tmp_path
     assert [workbook.label for workbook in imported] == ["Left Group", "Right Group"]
 
 
-def test_import_data_studio_workbooks_expands_legacy_tensile_comparison_bundle(tmp_path: Path) -> None:
-    left_path = tmp_path / "legacy_left.xlsx"
-    right_path = tmp_path / "legacy_right.xlsx"
+def test_import_data_studio_workbooks_expands_tensile_comparison_bundle_exports(tmp_path: Path) -> None:
+    left_path = tmp_path / "bundle_left.xlsx"
+    right_path = tmp_path / "bundle_right.xlsx"
     build_data_studio_workbook(
         file_paths=_fixture_paths(),
         output_path=left_path,
         template_id="builtin/tensile",
-        group_name="Legacy Left",
+        group_name="Bundle Left",
     )
     build_data_studio_workbook(
         file_paths=_fixture_paths(),
         output_path=right_path,
         template_id="builtin/tensile",
-        group_name="Legacy Right",
+        group_name="Bundle Right",
     )
 
     bundle_dir, comparison_workbook_path, _, _ = tensile_builtin.export_tensile_comparison_bundle(
         [left_path, right_path],
-        tmp_path / "legacy_exports",
+        tmp_path / "bundle_exports",
     )
 
     imported = import_data_studio_workbooks(comparison_workbook_path)
 
     assert bundle_dir.exists()
     assert [workbook.workbook_path for workbook in imported] == [left_path, right_path]
-    assert [workbook.label for workbook in imported] == ["Legacy Left", "Legacy Right"]
+    assert [workbook.label for workbook in imported] == ["Bundle Left", "Bundle Right"]
 
 
 def test_import_data_studio_workbooks_recovers_groups_when_comparison_metadata_is_missing(tmp_path: Path) -> None:

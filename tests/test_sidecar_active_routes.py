@@ -41,9 +41,7 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/data-studio/comparison-preview") in signatures
     assert ("POST", "/data-studio/comparison-export") in signatures
     assert ("POST", "/data-studio/session/normalize") in signatures
-    assert ("POST", "/preprocess-tensile-replicates") in signatures
-    assert ("POST", "/inspect-tensile-workbook") in signatures
-    assert ("POST", "/export-tensile-comparison") in signatures
+    assert ("POST", "/recommend-render") not in signatures
 
 
 def test_meta_endpoints_stay_live_for_retained_foundation() -> None:

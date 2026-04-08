@@ -1087,6 +1087,37 @@ def _plain_table_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def curve_table_dataframe(series_pairs: Iterable[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+    return _curve_table_dataframe(series_pairs)
+
+
+def replicate_table_dataframe(
+    *,
+    group_name: str,
+    value_label: str,
+    value_unit: str,
+    values: Iterable[float],
+) -> pd.DataFrame:
+    return _replicate_table_dataframe(
+        group_name=group_name,
+        value_label=value_label,
+        value_unit=value_unit,
+        values=values,
+    )
+
+
+def summary_sheet_dataframe(
+    summary_df: pd.DataFrame,
+    representative_filename: str,
+    metrics: tuple[TensileMetricSummary, ...],
+) -> pd.DataFrame:
+    return _summary_sheet_dataframe(summary_df, representative_filename, metrics)
+
+
+def plain_table_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
+    return _plain_table_dataframe(dataframe)
+
+
 def _metadata_sheet_dataframe(
     *,
     label: str,
@@ -1140,6 +1171,7 @@ __all__ = [
     "TENSILE_TEMPLATE_ID",
     "TensileMetricSummary",
     "bundle_dir_name",
+    "curve_table_dataframe",
     "default_template_match",
     "export_comparison_figures",
     "export_tensile_comparison_bundle",
@@ -1148,5 +1180,8 @@ __all__ = [
     "load_metadata_sheet",
     "load_tensile_workbook",
     "parse_tensile_csv",
+    "plain_table_dataframe",
+    "replicate_table_dataframe",
+    "summary_sheet_dataframe",
     "tensile_comparison_recipes",
 ]

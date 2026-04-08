@@ -152,7 +152,7 @@ Confirmed in current repo/docs/tests:
 
 - import a data file and choose a sheet
 - inspect input structure through `/inspect-file`
-- use recommendation-backed template selection through `/recommend-render`
+- use ranked recommendation payload returned by `/inspect-file` for template selection
 - preview the active figure through `/render-preview`
 - run export validation through `/preflight-render`
 - export the figure bundle through `/export-render`
@@ -314,28 +314,15 @@ The following foundations must be preserved for future implementation work:
 - Composer v2 geometry and export invariants
 - controlled Code Console semantics when restored or expanded
 - native macOS hosting in `app/macos`
-- the protected current mock under `app/desktop/src/mock/**`
-- the protected current mock mount in `app/desktop/src/main.tsx`
 
-## Guidance For Future Mock Redesign
+## Guidance For Future UI Iteration
 
-A future mock redesign should:
+A future IA/UI iteration should:
 
 - use this document as the app-level IA truth
-- leave the current protected mock untouched until a deliberate replacement lands
-- design a true four-workbench shell rather than extrapolating from the protected plot-only mock
+- preserve the four-workbench shell
 - keep utilities subordinate
 - keep Plot steps inside Plot
 - keep user-visible workflow simpler than canonical internal workflow
 - merge hidden processing stages unless the user must meaningfully act there
 - express Data Studio as the template-first workbook and comparison workbench even if internal tensile seams remain
-
-## Current Protected Mock Status
-
-The current mock remains protected and runnable.
-
-Important caveat:
-
-- it demonstrates a Plot-only local flow
-- it is not the authoritative whole-app navigation model
-- it must not be used to justify reintroducing Start/Home, Project, or Settings as primary destinations

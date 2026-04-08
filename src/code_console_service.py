@@ -218,10 +218,18 @@ def build_code_console_context(
         **normalized_dataset_payload(normalized_dataset),
         "sample_rows": dataframe_sample_rows(raw),
     }
-    resolved_template = validate_template_name(template or inspection.recommendation.template)
+    top_recommendation = (
+        inspection.recommendations[0]
+        if inspection.recommendations
+        else (inspection.primary_recommendation[0] if inspection.primary_recommendation else None)
+    )
+    if top_recommendation is None:
+        raise ValueError("Inspection did not return any template recommendations.")
+    recommended_size = top_recommendation.preview_config_summary.get("size")
+    resolved_template = validate_template_name(template or top_recommendation.template_id)
     resolved_render_options = resolve_render_options(
         template=resolved_template,
-        size=size,
+        size=size or (str(recommended_size) if recommended_size is not None else None),
         style_preset=style_preset or plot_style.DEFAULT_STYLE_PRESET,
         palette_preset=palette_preset or plot_style.DEFAULT_PALETTE_PRESET,
         visual_theme_id=visual_theme_id,
@@ -234,7 +242,12 @@ def build_code_console_context(
         dataset=_json_ready(dataset_payload),
         template=resolved_template,
         options={
-            "size": size or template_contract(resolved_template).default_size,
+            "size": size
+            or (
+                str(recommended_size)
+                if recommended_size is not None
+                else template_contract(resolved_template).default_size
+            ),
             "width_mm": resolved_render_options.width_mm,
             "height_mm": resolved_render_options.height_mm,
             "style_preset": resolved_render_options.style_preset,

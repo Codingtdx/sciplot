@@ -168,20 +168,6 @@ struct ExportRenderRequest: Codable, Equatable, Sendable {
     let outputDir: String?
 }
 
-struct RecommendationResponse: Codable, Equatable, Sendable {
-    let template: String
-    let reason: String
-    let size: String?
-    let xscale: String?
-    let yscale: String?
-    let reverseX: Bool?
-    let baseline: String?
-    let showColorbar: Bool?
-    let stylePreset: String?
-    let palettePreset: String?
-    let useSidecar: Bool?
-}
-
 struct TemplateRecommendationResponse: Codable, Equatable, Sendable, Identifiable {
     let templateID: String
     let canonicalID: String
@@ -223,7 +209,6 @@ struct TemplateRecommendationResponse: Codable, Equatable, Sendable, Identifiabl
 struct InputInspectionResponse: Codable, Equatable, Sendable {
     let model: String
     let modelLabel: String
-    let recommendation: RecommendationResponse
     let recommendations: [TemplateRecommendationResponse]
     let primaryRecommendation: [TemplateRecommendationResponse]
     let alternativeRecommendations: [TemplateRecommendationResponse]

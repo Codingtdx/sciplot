@@ -168,19 +168,6 @@ enum TestPayloads {
             inspection: .init(
                 model: "tensile_curve",
                 modelLabel: "Tensile Curve",
-                recommendation: .init(
-                    template: "curve",
-                    reason: "Compatible with the tensile curve data model.",
-                    size: "single_panel",
-                    xscale: "linear",
-                    yscale: "linear",
-                    reverseX: false,
-                    baseline: nil,
-                    showColorbar: nil,
-                    stylePreset: "journal_calm",
-                    palettePreset: "aqua_graphite",
-                    useSidecar: true
-                ),
                 recommendations: [
                     .init(
                         templateID: "curve",
@@ -344,19 +331,6 @@ enum TestPayloads {
             inspection: .init(
                 model: "frequency_sweep",
                 modelLabel: "Frequency Sweep",
-                recommendation: .init(
-                    template: "curve",
-                    reason: "Compatible with the multi-series curve data model.",
-                    size: "single_panel",
-                    xscale: "linear",
-                    yscale: "linear",
-                    reverseX: false,
-                    baseline: nil,
-                    showColorbar: nil,
-                    stylePreset: "journal_calm",
-                    palettePreset: "aqua_graphite",
-                    useSidecar: true
-                ),
                 recommendations: [
                     .init(
                         templateID: "curve",
@@ -1078,61 +1052,6 @@ enum TestPayloads {
             ],
             importedPaths: ["/tmp/raw_a.csv"],
             templateDraftPath: "/tmp/raw_a.csv"
-        )
-    }
-
-    static func tensilePreprocess() -> TensileReplicateResponseModel {
-        TensileReplicateResponseModel(
-            outputPath: "/tmp/prepared.xlsx",
-            groupName: "Primary Group",
-            preferredSheet: "Representative_Curve",
-            sheetNames: ["Representative_Curve", "Strength_Box"],
-            sampleCount: 3,
-            representativeFilename: "sample_a.csv",
-            metrics: [
-                .init(label: "Strength", unit: "MPa", mean: 12.4, std: 0.4),
-            ],
-            warnings: []
-        )
-    }
-
-    static func tensileWorkbookSummary(path: String, label: String) -> TensileWorkbookSummaryResponse {
-        TensileWorkbookSummaryResponse(
-            workbookPath: path,
-            label: label,
-            preferredSheet: "Representative_Curve",
-            sheetNames: ["Representative_Curve", "Strength_Box"],
-            sampleCount: 4,
-            representativeFilename: "sample_b.csv",
-            metrics: [
-                .init(label: "Modulus", unit: "MPa", mean: 2.1, std: 0.1),
-            ],
-            warnings: ["Workbook summary loaded from prepared workbook."]
-        )
-    }
-
-    static func tensileComparison() -> TensileComparisonExportResponse {
-        TensileComparisonExportResponse(
-            bundleDir: "/tmp/cleanup_bundle",
-            comparisonWorkbookPath: "/tmp/cleanup_bundle/comparison.xlsx",
-            labels: ["Primary Group", "Second Group"],
-            outputs: ["/tmp/cleanup_bundle/strength_box.pdf", "/tmp/cleanup_bundle/modulus_bar.pdf"],
-            figureOutputs: [
-                .init(
-                    path: "/tmp/cleanup_bundle/strength_box.pdf",
-                    category: "metric",
-                    kind: "box_compare",
-                    metric: "Strength",
-                    label: "Strength Box Compare"
-                ),
-                .init(
-                    path: "/tmp/cleanup_bundle/modulus_bar.pdf",
-                    category: "metric",
-                    kind: "bar_compare",
-                    metric: "Modulus",
-                    label: "Modulus Bar Compare"
-                ),
-            ]
         )
     }
 

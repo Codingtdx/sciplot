@@ -6,6 +6,15 @@ enum InspectorColumnLayoutPolicy {
     static let maxWidth: CGFloat = 460
 }
 
+@MainActor
+enum MotionTokens {
+    static let workbenchSwitch: Animation = .smooth(duration: 0.2)
+    static let selection: Animation = .snappy(duration: 0.16, extraBounce: 0.0)
+    static let status: Animation = .snappy(duration: 0.14, extraBounce: 0.0)
+    static let list: Animation = .smooth(duration: 0.18)
+    static let stateTransition: AnyTransition = .opacity.combined(with: .move(edge: .bottom))
+}
+
 struct InspectorSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         content

@@ -75,10 +75,6 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         except Exception as exc:
             raise http_bad_request("inspect", exc) from exc
 
-    @router.post("/recommend-render", response_model=InspectFileResponse)
-    def recommend_render(request: FileRequest) -> InspectFileResponse:
-        return inspect_file(request)
-
     @router.post("/preflight-render", response_model=PreflightRenderResponse)
     def preflight_render(request: RenderRequest) -> PreflightRenderResponse:
         try:

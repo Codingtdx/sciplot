@@ -65,15 +65,18 @@ struct PDFPreviewView: NSViewRepresentable {
 
     private let url: URL?
     private let data: Data?
+    private let providedDataFingerprint: Int?
 
     init(url: URL) {
         self.url = url
         self.data = nil
+        self.providedDataFingerprint = nil
     }
 
-    init(data: Data) {
+    init(data: Data, fingerprint: Int? = nil) {
         self.url = nil
         self.data = data
+        self.providedDataFingerprint = fingerprint
     }
 
     func makeCoordinator() -> Coordinator {
@@ -98,7 +101,7 @@ struct PDFPreviewView: NSViewRepresentable {
         }
 
         if let data {
-            let fingerprint = dataFingerprint(data)
+            let fingerprint = providedDataFingerprint ?? dataFingerprint(data)
             if context.coordinator.lastDataFingerprint != fingerprint {
                 pdfView.document = PDFDocument(data: data)
                 context.coordinator.lastDataFingerprint = fingerprint
@@ -127,10 +130,11 @@ struct Base64PDFPreviewView: View {
     let base64PDF: String
 
     var body: some View {
-        if let data = Data(base64Encoded: base64PDF),
-           PDFDocument(data: data) != nil
+        let fingerprint = PreviewImageDecoder.fingerprint(forBase64: base64PDF)
+        if let data = PreviewImageDecoder.decodeBase64Data(base64PDF),
+           PreviewImageDecoder.looksLikePDFData(data)
         {
-            PDFPreviewView(data: data)
+            PDFPreviewView(data: data, fingerprint: fingerprint)
                 .background(.black.opacity(0.02), in: RoundedRectangle(cornerRadius: 18))
         } else {
             EmptyStateCard(

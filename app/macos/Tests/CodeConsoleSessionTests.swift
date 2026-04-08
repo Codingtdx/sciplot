@@ -6,7 +6,7 @@ import XCTest
 final class CodeConsoleSessionTests: XCTestCase {
     func testCodeConsoleContextRefreshesAndRunsWithBoundPlotState() async {
         let plot = PlotSession()
-        plot.handleImportedFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
         plot.selectedSheet = .name("Representative_Curve")
         plot.selectedTemplateID = "curve"
         plot.renderOptions.size = "single_panel"
@@ -54,5 +54,45 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(session.latestRunResponse?.status, "succeeded")
         XCTAssertEqual(session.selectedGeneratedFile?.name, "sample.pdf")
         XCTAssertTrue(session.outputsSummary.contains("files"))
+    }
+
+    func testContextRefreshDebouncesRapidBindingChangesToLatestRequest() async {
+        let plot = PlotSession()
+        plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        plot.selectedSheet = .index(0)
+        plot.selectedTemplateID = "curve"
+
+        let client = MockSidecarClient()
+        client.codeConsoleContextHandler = { request in
+            try await Task.sleep(nanoseconds: 60_000_000)
+            let base = TestPayloads.codeConsoleContext(path: request.inputPath)
+            return CodeConsoleContextResponse(
+                inputPath: base.inputPath,
+                sheet: request.sheet,
+                sheetNames: base.sheetNames,
+                inspection: base.inspection,
+                dataset: base.dataset,
+                template: base.template,
+                options: base.options,
+                promptText: base.promptText,
+                starterCode: base.starterCode,
+                sourceKind: base.sourceKind,
+                sourceLabel: base.sourceLabel
+            )
+        }
+
+        let session = CodeConsoleSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta())
+
+        session.refreshContext(plot: plot, dataStudio: DataStudioSession())
+        session.setSelectedSheet(.name("Strength_Box"))
+        session.setSelectedSheet(.name("Representative_Curve"))
+
+        try? await Task.sleep(nanoseconds: 500_000_000)
+
+        XCTAssertEqual(client.codeConsoleContextRequests.count, 1)
+        XCTAssertEqual(client.codeConsoleContextRequests.last?.sheet, .name("Representative_Curve"))
+        XCTAssertEqual(session.contextResponse?.sheet, .name("Representative_Curve"))
     }
 }

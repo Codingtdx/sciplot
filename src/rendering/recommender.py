@@ -10,7 +10,7 @@ from src.rendering.template_lifecycle import alias_recommendation_penalty, templ
 from src.text_normalization import canonicalize_token
 from src.wide_nmr import wide_nmr_sidecar_path
 
-_LEGACY_SCORE: Final[float] = 100.0
+_OVERRIDE_SCORE: Final[float] = 100.0
 _CURVE_MODELS: Final[set[str]] = {
     "curve_table",
     "tensile_curve",
@@ -63,7 +63,7 @@ class _ScoredCandidate:
     preview_config_summary: dict[str, Any]
 
 
-def legacy_recommendation_to_template_recommendation(
+def template_recommendation_from_override(
     *,
     template_id: str,
     reason: str,
@@ -80,7 +80,7 @@ def legacy_recommendation_to_template_recommendation(
     identity = template_identity(template_id)
     return TemplateRecommendation(
         template_id=template_id,
-        score=_LEGACY_SCORE,
+        score=_OVERRIDE_SCORE,
         rank=1,
         score_gap_to_top=0.0,
         reason=reason,
@@ -105,10 +105,6 @@ def legacy_recommendation_to_template_recommendation(
         lifecycle_policy=identity.lifecycle_policy,
         implementation_id=identity.implementation_id,
     )
-
-
-def legacy_recommendations(template_recommendation: TemplateRecommendation) -> tuple[TemplateRecommendation, ...]:
-    return (template_recommendation,)
 
 
 def _clean_token(value: str | None) -> str:
@@ -919,17 +915,11 @@ class RuleBasedDatasetRecommender:
         return _recommendations_for_dataset(dataset)[:limit]
 
 
-class LegacyDatasetRecommender(RuleBasedDatasetRecommender):
-    pass
-
-
 DEFAULT_RECOMMENDER: TemplateRecommender = RuleBasedDatasetRecommender()
 
 
 __all__ = [
     "DEFAULT_RECOMMENDER",
-    "LegacyDatasetRecommender",
     "RuleBasedDatasetRecommender",
-    "legacy_recommendation_to_template_recommendation",
-    "legacy_recommendations",
+    "template_recommendation_from_override",
 ]

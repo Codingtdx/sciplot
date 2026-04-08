@@ -1,145 +1,110 @@
 # SciPlot God
 
-SciPlot God is a desktop publication workflow tool for scientific figures.
+SciPlot God is a native macOS scientific figure workflow tool.
 
-The product is organized around four retained primary workbenches:
+The app has four primary workbenches:
 
 1. Plot
 2. Data Studio
 3. Composer
 4. Code Console
 
-These are the only workbenches that should shape app-level information architecture going forward.
+These four are the only app-level primary destinations.
 
-## Canonical Vs User-Visible Workflow
+## Supported Runtime
 
-- Canonical workflows describe the full product logic, including hidden processing, validation, normalization, mapping, and handoff stages.
-- User-visible UI workflows should expose only the surfaces where the user must orient, decide, review, adjust, confirm, export, or hand off work.
-- Internal system steps may stay hidden or be merged into a broader work surface.
-- The mock should not turn every backend step into a page or primary navigation item.
+- Desktop frontend: `app/macos` (SwiftUI)
+- Backend: `app/sidecar` (FastAPI)
+- Rendering/core: `src/rendering`, `src/data_studio`, `src/composer.py`
 
-Default user-visible flow examples for future mock work:
+The historical `app/desktop` and Tauri/mock chain has been removed.
 
-- `Plot`: `Import -> Template -> Refine & Export`
-- `Data Studio`: `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
-- `Composer`: `Library -> Compose & Inspect -> Export`
-- `Code Console`: `Context -> Code -> Run -> Outputs`
+## Canonical Workflows
 
-## Core Workbenches
+- Plot: `Import -> Inspect -> Template -> Refine -> Preflight -> Export`
+- Data Studio: `Import -> Group Review -> Compare Preview -> Export / Open in Plot`
+- Composer: `Assets -> Layout -> Compose -> Inspect -> Export`
+- Code Console: `Bind Context -> Inspect Inputs -> Prompt/Code -> Run -> Outputs -> Handoff`
 
-### Plot
+Canonical internal steps can be richer than user-visible UI; only user decision surfaces should stay visible.
 
-Canonical workflow:
+## Backend/API Boundaries
 
-`Import -> Inspect -> Template -> Refine -> Preflight -> Export -> optional handoff to Composer`
+- `POST /inspect-file` is the single inspection/recommendation entry.
+- Ranked recommendation fields are canonical:
+  - `recommendations`
+  - `primary_recommendation`
+  - `alternative_recommendations`
+  - `advanced_templates`
+  - `recommendation_confidence`
+  - `recommendation_summary`
+- Legacy fields/endpoints have been removed:
+  - `POST /recommend-render`
+  - `inspection.recommendation`
+  - `/preprocess-tensile-replicates`
+  - `/inspect-tensile-workbook`
+  - `/export-tensile-comparison`
 
-Notes:
+## Single Sources Of Truth
 
-- Sheet selection belongs inside `Import`.
-- Preview belongs inside `Refine`.
-- Readiness and preflight belong inside `Refine`, not as separate app-level destinations.
+- Plot contract: `src/plot_contract.json`
+- Contract loader: `src/plot_contract.py`
+- Sidecar schema/validation/migration:
+  - `app/sidecar/schemas.py`
+  - `app/sidecar/schemas_render.py`
+  - `app/sidecar/schemas_data_studio.py`
+  - `app/sidecar/schemas_code_console.py`
 
-### Data Studio
+When behavior is a contract change, update contract first, regenerate docs, then update Python/sidecar/macOS consumers.
 
-Canonical workflow:
+## Entrypoints
 
-`Choose Template -> Preview Source or Create Template -> Build Workbook -> Review -> Compare -> Export / Open in Plot`
+- CLI: `make_plot.py`
+- Sidecar app: `app/sidecar/server.py`
+- Native desktop launcher: `Launch_Plotter.command`
 
-Notes:
+## Validation
 
-- User-facing language is `Data Studio`.
-- The workbench is template-first: users either choose an existing template for direct processing or import one real sample file, confirm recommended regions, and save a reusable template.
-- Tensile remains the default built-in template family, but the product surface should treat it as one supported template family inside Data Studio rather than as the workbench itself.
+- Clean:
+  - `.venv/bin/python scripts/clean_repo.py`
+- Ruff:
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
+- Mypy:
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`
+- Pytest:
+  - `.venv/bin/python -m pytest tests`
+- Smoke:
+  - `.venv/bin/python scripts/smoke_check.py`
+- macOS build:
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+- macOS test:
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
 
-### Composer
+## More
 
-Canonical workflow:
+- Product architecture: `docs/product-architecture.md`
+- Plot contract doc (generated): `docs/plot_contract.md`
+- Contributor/agent rules: `AGENTS.md`
+- Engineering handoff + runbook: `docs/engineering-handoff.md`
 
-`Assets -> Layout -> Compose -> Inspect/Arrange -> Review -> Export`
+## Handoff / Onboarding
 
-Notes:
+If you are taking over development, use this order:
 
-- Composer is canvas-first.
-- Prefer one focused workbench surface over a stage-heavy local flow unless stages are truly necessary.
-- Keep layout, crop, overlap, and export invariants intact.
-- Project files may still exist as utility persistence, but `Project` is not a primary product area.
-
-## Desktop UI Conventions
-
-- Put import, export, help, and inspector controls in the top-right utility action area of a workbench.
-- Avoid permanent issue banners in normal workbench UI; surface runtime issues in lighter utility or inspector affordances when possible.
-- Prefer one focused workspace over stage-heavy flows unless the stages are truly required by product logic.
-- Composer is the first workbench using this refined pattern: left library, center workspace, right inspector, and top-right utility actions.
-
-### Code Console
-
-Canonical workflow:
-
-`Bind Context -> Inspect Inputs -> Prompt/Code -> Run -> Outputs -> Handoff`
-
-Notes:
-
-- Code Console is a first-class workbench, not a secondary utility.
-- It should preserve contract-bound context and controlled runner semantics.
-- It is the scripting and AI-control surface for advanced work, not a side panel bolted onto Plot.
-- The current native implementation supports direct data import or Plot/Data Studio context binding, prompt copy for external AI, and repo-native Python runs with managed output review.
-
-## App-Level IA Principles
-
-- Primary app navigation should expose only the four retained workbenches.
-- `Start`, `Home`, and other launchpad-style destinations are not part of the long-term primary IA.
-- `Project`, `Settings`, recents, managed files, appearance controls, open/save actions, and similar affordances are utilities, not primary workbenches.
-- Plot may still have its own local multi-step workflow, but those local steps are not top-level app destinations.
-- The supported desktop frontend is the native macOS app under `app/macos`.
-- The current protected mock under `app/desktop/src/mock/**` is a plot-flow-only reference and is not the authoritative whole-app IA.
-
-## Desktop Development
-
-- Use `Launch_Plotter.command` to build and open the supported native macOS frontend.
-- For direct validation, run:
-  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' build`
-  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' test`
-- Native macOS runtime now treats sidecar ownership as app-managed only:
-  - it does not trust/reuse arbitrary existing listeners on `127.0.0.1:8765`
-  - the legacy "reuse existing sidecar listener" path has been removed from runtime startup
-  - it validates `/meta` and `/plot-contract` payload compatibility before considering a process usable
-  - if an incompatible/legacy listener is detected, runtime will replace it and start the repo `.venv` sidecar (`python -m app.sidecar.server`)
-  - for Swift decoding mirrors, avoid `*IDs` acronym fields with `convertFromSnakeCase`; use `*Ids` plus schema decoding tests that assert real snake_case payloads (for example `template_ids`)
-- Treat `app/desktop` as a legacy/reference area for the protected mock and migration history, not as the supported desktop runtime.
-
-## Utilities, Not Primary Workbenches
-
-The following concepts may remain in the codebase as supporting utilities:
-
-- recent files and session recovery
-- open/save actions
-- managed export folders and managed run artifacts
-- appearance/runtime controls
-- project persistence where still useful for Composer or specialized flows
-
-These utilities must remain visually and structurally subordinate to the four primary workbenches.
-
-## Deprecated From Active Product Scope
-
-The following concepts should not return as first-class app areas:
-
-- Start/Home as a primary destination
-- Project as a primary destination
-- Settings as a primary destination
-- product framing that implies the whole app is only a staged Plot wizard
-
-## Guidance For Future Mock Redesign
-
-Any future mock redesign should:
-
-- preserve the protected current mock until deliberately replaced
-- treat the four-workbench model as the app-level IA truth
-- keep Plot local steps inside Plot
-- distinguish canonical internal workflow from simplified user-visible workflow
-- merge hidden/system stages into broader decision-oriented work surfaces when the user does not need to act on them
-- present Data Studio as the structured import, workbook, comparison, and figure-generation workbench, even if tensile-specific backend seams remain underneath
-- keep utilities subordinate rather than promoting them into sidebar peers
-
-## More Detail
-
-See [docs/product-architecture.md](docs/product-architecture.md) for the detailed product architecture, workflow normalization rules, repo-grounded workbench action inventory, IA tree, and deprecation guidance.
+1. Read `AGENTS.md` for boundaries, invariants, and forbidden legacy restores.
+2. Read `docs/engineering-handoff.md` for latest change history, risk points, and troubleshooting.
+3. Run the full validation matrix once in your machine:
+   - clean
+   - ruff
+   - mypy
+   - pytest
+   - smoke_check
+   - xcodebuild build/test
+4. Confirm you can execute one complete end-to-end flow in each workbench:
+   - Plot
+   - Data Studio
+   - Composer
+   - Code Console
+5. Before shipping any change, update both:
+   - `AGENTS.md` / `README.md` (if responsibilities/boundaries/workflow changed)
+   - `docs/engineering-handoff.md` (every round, required)

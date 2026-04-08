@@ -26,9 +26,6 @@ final class MockSidecarClient: SidecarClienting {
     var preflightResponse = TestPayloads.preflight()
     var previewResponse = TestPayloads.renderPreview()
     var exportResponse = TestPayloads.exportRender()
-    var preprocessResponse = TestPayloads.tensilePreprocess()
-    var workbookSummaryResponse = TestPayloads.tensileWorkbookSummary(path: "/tmp/second.xlsx", label: "Second Group")
-    var comparisonResponse = TestPayloads.tensileComparison()
     var thumbnailResponse = PanelThumbnailResponse(pngBase64: TestPayloads.pngBase64)
     var composePreviewResponse = TestPayloads.composerPreview()
     var composeExportResponse = PathResponse(outputPath: "/tmp/composer-export.pdf")
@@ -68,9 +65,6 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var preflightRequests: [RenderRequest] = []
     private(set) var renderRequests: [RenderRequest] = []
     private(set) var exportRequests: [ExportRenderRequest] = []
-    private(set) var preprocessRequests: [TensileReplicateRequest] = []
-    private(set) var workbookRequests: [TensileWorkbookRequest] = []
-    private(set) var comparisonRequests: [TensileComparisonExportRequest] = []
     private(set) var thumbnailRequests: [ThumbnailRequest] = []
     private(set) var composePreviewRequests: [ComposerRequestPayload] = []
     private(set) var composeExportRequests: [ComposerRequestPayload] = []
@@ -248,21 +242,6 @@ final class MockSidecarClient: SidecarClienting {
             return try await exportHandler(request)
         }
         return exportResponse
-    }
-
-    func preprocessTensileReplicates(_ request: TensileReplicateRequest) async throws -> TensileReplicateResponseModel {
-        preprocessRequests.append(request)
-        return preprocessResponse
-    }
-
-    func inspectTensileWorkbook(_ request: TensileWorkbookRequest) async throws -> TensileWorkbookSummaryResponse {
-        workbookRequests.append(request)
-        return workbookSummaryResponse
-    }
-
-    func exportTensileComparison(_ request: TensileComparisonExportRequest) async throws -> TensileComparisonExportResponse {
-        comparisonRequests.append(request)
-        return comparisonResponse
     }
 
     func panelThumbnail(_ request: ThumbnailRequest) async throws -> PanelThumbnailResponse {

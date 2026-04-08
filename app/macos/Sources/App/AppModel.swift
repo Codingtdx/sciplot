@@ -4,6 +4,10 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    private struct ConcurrentClientBox: @unchecked Sendable {
+        let base: any SidecarClienting
+    }
+
     enum PendingPlotReplacementAction {
         case importFromFilesystem
         case openExternalFigure(URL, SheetValue, String?, RenderOptionsPayload?)
@@ -54,8 +58,10 @@ final class AppModel {
 
         do {
             try await runtime.ensureRunning()
-            let meta = try await client.fetchMeta()
-            let contract = try await client.fetchPlotContract()
+            let clientBox = ConcurrentClientBox(base: client)
+            async let metaTask = clientBox.base.fetchMeta()
+            async let contractTask = clientBox.base.fetchPlotContract()
+            let (meta, contract) = try await (metaTask, contractTask)
             plotSession.apply(meta: meta, contract: contract)
             dataStudioSession.apply(meta: meta, contract: contract)
             codeConsoleSession.apply(meta: meta)

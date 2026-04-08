@@ -13,6 +13,9 @@ struct RootSplitView: View {
             .listStyle(.sidebar)
         } detail: {
             activeWorkbenchView
+                .id(model.selectedWorkbench)
+                .transition(MotionTokens.stateTransition)
+                .animation(MotionTokens.workbenchSwitch, value: model.selectedWorkbench)
                 .navigationTitle(model.selectedWorkbench.title)
                 .toolbar {
                     activeToolbarContent

@@ -110,8 +110,7 @@ final class SidecarRuntimeTests: XCTestCase {
                         "/inspect-file": { "post": {} },
                         "/code-console/context": { "post": {} },
                         "/code-console/run": { "post": {} },
-                        "/compose-preview": { "post": {} },
-                        "/preprocess-tensile-replicates": { "post": {} }
+                        "/compose-preview": { "post": {} }
                       }
                     }
                     """
@@ -175,6 +174,173 @@ final class SidecarRuntimeTests: XCTestCase {
                 return
             }
         }
+    }
+
+    @MainActor
+    func testEnsureRunningSkipsFullCompatibilityProbeWithinHealthCacheWindow() async throws {
+        let repoRoot = try makeRepositoryFixture(includePythonStub: true)
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
+        FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
+
+        let metaData = try encodeJSON(TestPayloads.meta())
+        let contractData = try encodeJSON(TestPayloads.contract())
+        var healthRequestCount = 0
+        var openAPIRequestCount = 0
+        let session = makeStubbedSession { request in
+            switch request.url?.path {
+            case "/health":
+                healthRequestCount += 1
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: #"{"status":"ok","version":"5.0.0"}"#
+                )
+            case "/openapi.json":
+                openAPIRequestCount += 1
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "paths": {
+                        "/meta": { "get": {} },
+                        "/plot-contract": { "get": {} },
+                        "/data-studio/templates": { "get": {} },
+                        "/data-studio/source-preview": { "post": {} },
+                        "/data-studio/build-workbook": { "post": {} },
+                        "/inspect-file": { "post": {} },
+                        "/code-console/context": { "post": {} },
+                        "/code-console/run": { "post": {} },
+                        "/compose-preview": { "post": {} }
+                      }
+                    }
+                    """
+                )
+            case "/meta":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
+            case "/plot-contract":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: contractData, as: UTF8.self))
+            default:
+                throw URLError(.badURL)
+            }
+        }
+
+        let runtime = SidecarRuntime(
+            locator: RepoLocator(fileManager: .default, bundle: bundle),
+            session: session,
+            startupTimeoutNanoseconds: 150_000_000,
+            probeIntervalNanoseconds: 10_000_000,
+            runningHealthProbeCacheNanoseconds: 5_000_000_000
+        )
+
+        try await runtime.ensureRunning()
+        let firstOpenAPIRequestCount = openAPIRequestCount
+        let firstHealthRequestCount = healthRequestCount
+
+        try await runtime.ensureRunning()
+
+        XCTAssertEqual(openAPIRequestCount, firstOpenAPIRequestCount)
+        XCTAssertEqual(healthRequestCount, firstHealthRequestCount)
+        XCTAssertEqual(runtime.status, .running)
+    }
+
+    @MainActor
+    func testEnsureRunningFallsBackToFullCompatibilityProbeWhenHealthProbeFails() async throws {
+        let repoRoot = try makeRepositoryFixture(includePythonStub: true)
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
+        FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
+
+        let metaData = try encodeJSON(TestPayloads.meta())
+        let contractData = try encodeJSON(TestPayloads.contract())
+        var healthFailuresRemaining = 0
+        var healthRequestCount = 0
+        var openAPIRequestCount = 0
+        let session = makeStubbedSession { request in
+            switch request.url?.path {
+            case "/health":
+                healthRequestCount += 1
+                if healthFailuresRemaining > 0 {
+                    healthFailuresRemaining -= 1
+                    return Self.jsonResponse(
+                        request: request,
+                        statusCode: 503,
+                        body: #"{"detail":"offline"}"#
+                    )
+                }
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: #"{"status":"ok","version":"5.0.0"}"#
+                )
+            case "/openapi.json":
+                openAPIRequestCount += 1
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "paths": {
+                        "/meta": { "get": {} },
+                        "/plot-contract": { "get": {} },
+                        "/data-studio/templates": { "get": {} },
+                        "/data-studio/source-preview": { "post": {} },
+                        "/data-studio/build-workbook": { "post": {} },
+                        "/inspect-file": { "post": {} },
+                        "/code-console/context": { "post": {} },
+                        "/code-console/run": { "post": {} },
+                        "/compose-preview": { "post": {} }
+                      }
+                    }
+                    """
+                )
+            case "/meta":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
+            case "/plot-contract":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: contractData, as: UTF8.self))
+            default:
+                throw URLError(.badURL)
+            }
+        }
+
+        let runtime = SidecarRuntime(
+            locator: RepoLocator(fileManager: .default, bundle: bundle),
+            session: session,
+            startupTimeoutNanoseconds: 150_000_000,
+            probeIntervalNanoseconds: 10_000_000,
+            runningHealthProbeCacheNanoseconds: 1
+        )
+
+        try await runtime.ensureRunning()
+        let startedLogCountBeforeSecondEnsure = runtime.logs.filter { $0.contains("Started sidecar process") }.count
+        let firstOpenAPIRequestCount = openAPIRequestCount
+        let firstHealthRequestCount = healthRequestCount
+
+        healthFailuresRemaining = 1
+        try await runtime.ensureRunning()
+
+        let startedLogCountAfterSecondEnsure = runtime.logs.filter { $0.contains("Started sidecar process") }.count
+        XCTAssertEqual(startedLogCountAfterSecondEnsure, startedLogCountBeforeSecondEnsure)
+        XCTAssertGreaterThan(openAPIRequestCount, firstOpenAPIRequestCount)
+        XCTAssertGreaterThan(healthRequestCount, firstHealthRequestCount)
+        XCTAssertEqual(runtime.status, .running)
     }
 
     private func makeRepositoryFixture(includePythonStub: Bool = false) throws -> URL {

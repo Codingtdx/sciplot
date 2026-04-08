@@ -40,10 +40,13 @@ struct CodeConsoleBindingOption: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 final class CodeConsoleSession {
+    private let contextRefreshDebounceNanoseconds: UInt64 = 120_000_000
+
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private var defaultRenderOptions = RenderOptionsPayload()
     @ObservationIgnored private var manualBinding: CodeConsoleBindingOption?
     @ObservationIgnored private var contextRevision = 0
+    @ObservationIgnored private var contextRefreshTask: Task<Void, Never>?
 
     var editorText = ""
     var promptText = ""
@@ -274,6 +277,7 @@ final class CodeConsoleSession {
     func refreshCurrentContext() async {
         contextRevision += 1
         let revision = contextRevision
+        contextRefreshTask?.cancel()
         await loadContext(revision: revision)
     }
 
@@ -365,7 +369,21 @@ final class CodeConsoleSession {
     private func scheduleContextRefresh() {
         contextRevision += 1
         let revision = contextRevision
-        Task { await self.loadContext(revision: revision) }
+        contextRefreshTask?.cancel()
+        contextRefreshTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            do {
+                try await Task.sleep(nanoseconds: contextRefreshDebounceNanoseconds)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            await self.loadContext(revision: revision)
+        }
     }
 
     private func loadContext(revision: Int) async {
@@ -378,6 +396,7 @@ final class CodeConsoleSession {
         defer {
             if revision == contextRevision {
                 isRefreshingContext = false
+                contextRefreshTask = nil
             }
         }
 

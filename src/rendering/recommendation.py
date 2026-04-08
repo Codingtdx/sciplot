@@ -26,7 +26,7 @@ from src.rendering.models import InputInspection, Recommendation, TemplateName
 from src.rendering.recommendation_policy import build_recommendation_presentation
 from src.rendering.recommender import (
     DEFAULT_RECOMMENDER,
-    legacy_recommendation_to_template_recommendation,
+    template_recommendation_from_override,
 )
 from src.rendering.recommender_models import TemplateRecommendation
 from src.wide_nmr import wide_nmr_sidecar_path
@@ -172,8 +172,7 @@ def _inspection(
     warnings: tuple[str, ...] = (),
     signals: tuple[str, ...] = (),
 ) -> InputInspection:
-    presentation = build_recommendation_presentation(recommendations or ())
-    template_recommendation = legacy_recommendation_to_template_recommendation(
+    template_recommendation = template_recommendation_from_override(
         template_id=recommendation_value.template,
         reason=recommendation_value.reason,
         size=recommendation_value.size,
@@ -186,7 +185,38 @@ def _inspection(
         palette_preset=recommendation_value.palette_preset,
         use_sidecar=recommendation_value.use_sidecar,
     )
-    ranked = recommendations or (template_recommendation,)
+    if recommendations:
+        matched = next(
+            (item for item in recommendations if item.template_id == template_recommendation.template_id),
+            None,
+        )
+        if matched is not None:
+            merged = TemplateRecommendation(
+                template_id=matched.template_id,
+                score=matched.score,
+                rank=matched.rank,
+                score_gap_to_top=matched.score_gap_to_top,
+                reason=template_recommendation.reason,
+                suitability_hint=matched.suitability_hint,
+                why_hard_match=matched.why_hard_match,
+                why_soft_prior=matched.why_soft_prior,
+                inferred_mapping=matched.inferred_mapping,
+                optional_enhancements=matched.optional_enhancements,
+                preview_config_summary={
+                    **matched.preview_config_summary,
+                    **template_recommendation.preview_config_summary,
+                },
+                canonical_id=matched.canonical_id,
+                role=matched.role,
+                lifecycle_policy=matched.lifecycle_policy,
+                implementation_id=matched.implementation_id,
+            )
+            ranked = (merged,) + tuple(item for item in recommendations if item.template_id != matched.template_id)
+        else:
+            ranked = (template_recommendation,) + recommendations
+    else:
+        ranked = (template_recommendation,)
+    presentation = build_recommendation_presentation(ranked)
     visible_recommendations = presentation.visible_recommendations or ranked
     recommendation_confidence, recommendation_summary = _inspection_confidence_and_summary(
         model=model,
@@ -196,7 +226,6 @@ def _inspection(
     return InputInspection(
         model=model,
         model_label=model_label(model),
-        recommendation=recommendation_value,
         recommendations=ranked,
         primary_recommendation=presentation.primary_recommendation,
         alternative_recommendations=presentation.alternative_recommendations,
@@ -214,6 +243,10 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         normalized_dataset,
         limit=INSPECTION_RECOMMENDATION_LIMIT,
     )
+    if not ranked_recommendations:
+        raise ValueError(
+            f"Could not produce template recommendations for normalized dataset model: {normalized_dataset.model}."
+        )
 
     if normalized_dataset.model == "frequency_sweep":
         return _inspection(
@@ -378,7 +411,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
                 ),
             )
         xscale, yscale, range_signals = recommend_curve_scales(series_list)
-        compatibility_template = ranked_recommendations[0].template_id if ranked_recommendations else "curve"
+        compatibility_template = ranked_recommendations[0].template_id
         compatibility_reason = (
             "Detected a standard paired curve table, so a basic curve plot is recommended by default."
         )

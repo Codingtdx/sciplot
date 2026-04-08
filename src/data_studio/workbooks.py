@@ -300,7 +300,7 @@ def import_workbook(path: str | Path) -> DataStudioWorkbook:
     workbook_path = ensure_input_path(str(Path(path).expanduser()))
     metadata = tensile_builtin.load_metadata_sheet(workbook_path)
     template_id = str(metadata.get("template_id", "")).strip()
-    if template_id == tensile_builtin.TENSILE_TEMPLATE_ID or _looks_like_legacy_tensile_workbook(workbook_path):
+    if template_id == tensile_builtin.TENSILE_TEMPLATE_ID:
         return tensile_builtin.inspect_tensile_workbook(workbook_path)
 
     sheet_names = tuple(list_sheet_names(workbook_path))
@@ -964,11 +964,6 @@ def _metric_summaries_from_workbook(workbook_path: Path) -> list[WorkbookMetricS
     return metrics
 
 
-def _looks_like_legacy_tensile_workbook(path: Path) -> bool:
-    sheet_names = set(list_sheet_names(path))
-    return bool(sheet_names) and tensile_builtin.REQUIRED_TENSILE_WORKBOOK_SHEETS.issubset(sheet_names)
-
-
 def _looks_like_comparison_bundle(path: Path, metadata: dict[str, Any]) -> bool:
     template_id = str(metadata.get("template_id", "")).strip()
     if template_id == "data_studio/comparison":
@@ -1157,7 +1152,7 @@ def _metadata_sheet_dataframe(
 
 
 def _curve_table_dataframe(series_pairs: Iterable[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
-    return tensile_builtin._curve_table_dataframe(series_pairs)  # noqa: SLF001
+    return tensile_builtin.curve_table_dataframe(series_pairs)
 
 
 def _replicate_table_dataframe(
@@ -1167,7 +1162,7 @@ def _replicate_table_dataframe(
     value_unit: str,
     values: Iterable[float],
 ) -> pd.DataFrame:
-    return tensile_builtin._replicate_table_dataframe(  # noqa: SLF001
+    return tensile_builtin.replicate_table_dataframe(
         group_name=group_name,
         value_label=value_label,
         value_unit=value_unit,
@@ -1189,11 +1184,11 @@ def _summary_sheet_dataframe(
         )
         for metric in metrics
     ]
-    return tensile_builtin._summary_sheet_dataframe(summary_df, representative_filename, tuple(converted))  # noqa: SLF001
+    return tensile_builtin.summary_sheet_dataframe(summary_df, representative_filename, tuple(converted))
 
 
 def _plain_table_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
-    return tensile_builtin._plain_table_dataframe(dataframe)  # noqa: SLF001
+    return tensile_builtin.plain_table_dataframe(dataframe)
 
 
 def _cell_text(value: object) -> str:

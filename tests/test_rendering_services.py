@@ -283,7 +283,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     input_path = _write_curve_table(tmp_path / "curve.csv")
 
     inspection = inspect_input_file(input_path)
-    assert inspection.recommendation.template == "curve"
+    assert inspection.recommendations[0].template_id == "curve"
     assert len(inspection.recommendations) == 10
     assert inspection.recommendations[0].template_id == "curve"
     assert inspection.recommendations[1].template_id == "point_line"
@@ -451,10 +451,10 @@ def test_tensile_curve_defaults_to_linear_but_allows_log_override(tmp_path: Path
 
     inspection = inspect_input_file(input_path)
     assert inspection.model == "tensile_curve"
-    assert inspection.recommendation.template == "curve"
-    assert inspection.recommendation.size == "60x55"
-    assert inspection.recommendation.xscale == "linear"
-    assert inspection.recommendation.yscale == "linear"
+    assert inspection.recommendations[0].template_id == "curve"
+    assert inspection.recommendations[0].preview_config_summary.get("size") == "60x55"
+    assert inspection.recommendations[0].preview_config_summary.get("xscale") == "linear"
+    assert inspection.recommendations[0].preview_config_summary.get("yscale") == "linear"
 
     linear_options = resolve_render_options(template="curve", xscale="linear", yscale="linear")
     linear_preflight = preflight_render_request("curve", input_path, 0, linear_options)
@@ -494,7 +494,7 @@ def test_frequency_bundle_preflight_matches_multi_output_render(tmp_path: Path) 
 
     inspection = inspect_input_file(input_path)
     assert inspection.model == "frequency_sweep"
-    assert inspection.recommendation.template == "point_line"
+    assert inspection.recommendations[0].template_id == "point_line"
 
     options = resolve_render_options(template="point_line", xscale="log", yscale="log")
     preflight = preflight_render_request("point_line", input_path, 0, options)
@@ -529,9 +529,9 @@ def test_stress_relaxation_defaults_to_log_linear_and_curve_also_renders(tmp_pat
 
     inspection = inspect_input_file(input_path)
     assert inspection.model == "stress_relaxation"
-    assert inspection.recommendation.template == "point_line"
-    assert inspection.recommendation.xscale == "log"
-    assert inspection.recommendation.yscale == "linear"
+    assert inspection.recommendations[0].template_id == "point_line"
+    assert inspection.recommendations[0].preview_config_summary.get("xscale") == "log"
+    assert inspection.recommendations[0].preview_config_summary.get("yscale") == "linear"
 
     point_options = resolve_render_options(template="point_line", xscale="log", yscale="linear")
     point_preflight = preflight_render_request("point_line", input_path, 0, point_options)
@@ -554,7 +554,7 @@ def test_temperature_bundle_curve_preflight_matches_multi_output_render(tmp_path
 
     inspection = inspect_input_file(input_path)
     assert inspection.model == "temperature_sweep"
-    assert inspection.recommendation.template == "point_line"
+    assert inspection.recommendations[0].template_id == "point_line"
 
     curve_options = resolve_render_options(template="curve", xscale="linear", yscale="log")
     curve_preflight = preflight_render_request("curve", input_path, 0, curve_options)
@@ -591,7 +591,7 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     inspection = inspect_input_file(input_path)
 
     assert inspection.model == "replicate_table"
-    assert inspection.recommendation.template == "box"
+    assert inspection.recommendations[0].template_id == "box"
     assert inspection.recommendations
     assert inspection.recommendations[0].template_id == "box"
     assert {"distribution_compare", "grouped_bar_error", "point_error", "box_strip"}.issubset(

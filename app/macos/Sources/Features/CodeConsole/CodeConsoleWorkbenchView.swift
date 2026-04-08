@@ -78,9 +78,19 @@ struct CodeConsoleWorkbenchView: View {
                 .frame(width: 220, alignment: .leading)
             }
 
-            Label(session.liveStatusLabel, systemImage: session.liveStatusSymbol)
+            HStack(spacing: 6) {
+                Image(systemName: session.liveStatusSymbol)
+                    .symbolEffect(
+                        .pulse.byLayer,
+                        options: .repeating,
+                        value: session.isRefreshingContext || session.isRunning
+                    )
+                Text(session.liveStatusLabel)
+                    .contentTransition(.opacity)
+            }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .animation(MotionTokens.status, value: session.liveStatusLabel)
         }
     }
 

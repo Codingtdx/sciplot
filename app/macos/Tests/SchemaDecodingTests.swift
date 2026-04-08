@@ -18,19 +18,6 @@ final class SchemaDecodingTests: XCTestCase {
           "inspection": {
             "model": "tensile_curve",
             "model_label": "Tensile Curve",
-            "recommendation": {
-              "template": "curve",
-              "reason": "Compatible",
-              "size": "single_panel",
-              "xscale": "linear",
-              "yscale": "linear",
-              "reverse_x": false,
-              "baseline": null,
-              "show_colorbar": null,
-              "style_preset": "journal_calm",
-              "palette_preset": "aqua_graphite",
-              "use_sidecar": true
-            },
             "recommendations": [],
             "primary_recommendation": [],
             "alternative_recommendations": [],
@@ -72,73 +59,6 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.sheet, .name("Representative_Curve"))
         XCTAssertEqual(response.inspection.model, "tensile_curve")
         XCTAssertEqual(response.dataset?.sampleRows.count, 2)
-    }
-
-    func testDecodeTensilePreprocessPayload() throws {
-        let payload = """
-        {
-          "output_path": "/tmp/prepared.xlsx",
-          "group_name": "Primary Group",
-          "preferred_sheet": "Representative_Curve",
-          "sheet_names": ["Representative_Curve"],
-          "sample_count": 3,
-          "representative_filename": "sample.csv",
-          "metrics": [{"label": "Strength", "unit": "MPa", "mean": 12.4, "std": 0.4}],
-          "warnings": []
-        }
-        """
-
-        let response = try decoder.decode(TensileReplicateResponseModel.self, from: Data(payload.utf8))
-
-        XCTAssertEqual(response.groupName, "Primary Group")
-        XCTAssertEqual(response.preferredSheet, "Representative_Curve")
-        XCTAssertEqual(response.metrics.first?.label, "Strength")
-    }
-
-    func testDecodeTensileWorkbookSummaryPayload() throws {
-        let payload = """
-        {
-          "workbook_path": "/tmp/prepared.xlsx",
-          "label": "Prepared Group",
-          "preferred_sheet": "Representative_Curve",
-          "sheet_names": ["Representative_Curve", "Strength_Replicates"],
-          "sample_count": 4,
-          "representative_filename": "sample.csv",
-          "metrics": [{"label": "Strength", "unit": "MPa", "mean": 12.4, "std": 0.4}],
-          "warnings": ["Workbook summary loaded from prepared workbook."]
-        }
-        """
-
-        let response = try decoder.decode(TensileWorkbookSummaryResponse.self, from: Data(payload.utf8))
-
-        XCTAssertEqual(response.preferredSheet, "Representative_Curve")
-        XCTAssertEqual(response.warnings.first, "Workbook summary loaded from prepared workbook.")
-    }
-
-    func testDecodeTensileComparisonPayloadWithStructuredFigureOutputs() throws {
-        let payload = """
-        {
-          "bundle_dir": "/tmp/cleanup_bundle",
-          "comparison_workbook_path": "/tmp/cleanup_bundle/comparison.xlsx",
-          "labels": ["Primary Group", "Second Group"],
-          "outputs": ["/tmp/cleanup_bundle/strength_box.pdf"],
-          "figure_outputs": [
-            {
-              "path": "/tmp/cleanup_bundle/strength_box.pdf",
-              "category": "metric",
-              "kind": "box_compare",
-              "metric": "Strength",
-              "label": "Strength Box Compare"
-            }
-          ]
-        }
-        """
-
-        let response = try decoder.decode(TensileComparisonExportResponse.self, from: Data(payload.utf8))
-
-        XCTAssertEqual(response.figureOutputs.first?.kind, "box_compare")
-        XCTAssertEqual(response.figureOutputs.first?.metric, "Strength")
-        XCTAssertEqual(response.figureOutputs.first?.label, "Strength Box Compare")
     }
 
     func testDecodeDataStudioWorkbookAndComparisonPayloads() throws {

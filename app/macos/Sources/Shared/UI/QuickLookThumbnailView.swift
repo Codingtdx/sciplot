@@ -27,7 +27,7 @@ final class QuickLookThumbnailModel {
             QLThumbnailGenerator.shared.saveBestRepresentation(for: request, to: temporaryURL, as: .png) { [weak self] error in
                 let loadedImage = NSImage(contentsOf: temporaryURL)
                 let message = error?.localizedDescription ?? "Could not load a thumbnail for this asset."
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if let loadedImage {
                         self?.image = loadedImage
                         self?.errorMessage = nil

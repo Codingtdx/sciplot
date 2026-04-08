@@ -49,20 +49,6 @@ class ExportRenderRequest(RenderRequest):
     output_dir: str | None = None
 
 
-class RecommendationResponse(StrictModel):
-    template: str
-    reason: str
-    size: str | None = None
-    xscale: str | None = None
-    yscale: str | None = None
-    reverse_x: bool | None = None
-    baseline: str | None = None
-    show_colorbar: bool | None = None
-    style_preset: str | None = None
-    palette_preset: str | None = None
-    use_sidecar: bool | None = None
-
-
 class TemplateRecommendationResponse(StrictModel):
     template_id: str
     canonical_id: str = ""
@@ -84,7 +70,6 @@ class TemplateRecommendationResponse(StrictModel):
 class InputInspectionResponse(StrictModel):
     model: str
     model_label: str
-    recommendation: RecommendationResponse
     recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
     primary_recommendation: list[TemplateRecommendationResponse] = Field(default_factory=list)
     alternative_recommendations: list[TemplateRecommendationResponse] = Field(default_factory=list)
@@ -229,7 +214,6 @@ __all__ = [
     "PlotDatasetPreviewResponse",
     "PreflightRenderResponse",
     "PreflightResultResponse",
-    "RecommendationResponse",
     "RenderOptionsPayload",
     "RenderPreviewResponse",
     "RenderRequest",

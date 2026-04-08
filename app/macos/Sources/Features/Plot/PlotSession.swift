@@ -2,35 +2,6 @@ import Foundation
 import Observation
 import CoreGraphics
 
-enum PlotPreviewRefreshPolicy {
-    case immediate
-    case debounced
-}
-
-struct PlotTemplateGalleryItem: Identifiable, Hashable {
-    let id: String
-    let title: String
-    let hint: String
-    let selectable: Bool
-}
-
-struct PlotSampleColumn: Identifiable, Hashable {
-    let id: Int
-    let title: String
-}
-
-struct PlotSampleRow: Identifiable, Hashable {
-    let id: Int
-    let values: [JSONValue]
-
-    func value(at index: Int) -> JSONValue {
-        guard values.indices.contains(index) else {
-            return .null
-        }
-        return values[index]
-    }
-}
-
 @MainActor
 @Observable
 final class PlotSession {
@@ -174,11 +145,6 @@ final class PlotSession {
         scheduleInspection()
     }
 
-    /// Backward-compatible shim for older tests and callers.
-    func handleImportedFile(_ url: URL) {
-        importFile(url)
-    }
-
     func importFileAndInspect(_ url: URL) async {
         importFile(url)
         await waitUntilInspectionFinishes(for: url)
@@ -187,11 +153,6 @@ final class PlotSession {
     func seedFromDataStudio(workbookURL: URL, preferredSheet: SheetValue) {
         prepareSource(url: workbookURL, sheet: preferredSheet, resetTemplate: true)
         scheduleInspection()
-    }
-
-    /// Backward-compatible shim for callers still using the old workbench name.
-    func seedFromCleanup(workbookURL: URL, preferredSheet: SheetValue) {
-        seedFromDataStudio(workbookURL: workbookURL, preferredSheet: preferredSheet)
     }
 
     func setSelectedSheet(_ sheet: SheetValue) {
@@ -517,7 +478,7 @@ final class PlotSession {
         if let label = selectedTemplateRecommendation?.inferredMapping["x"], !label.isEmpty {
             return label
         }
-        if let label = inspectionResponse?.inspection.primaryRecommendation.first?.inferredMapping["x"], !label.isEmpty {
+        if let label = inspectionResponse?.inspection.recommendations.first?.inferredMapping["x"], !label.isEmpty {
             return label
         }
         return nil
@@ -527,7 +488,7 @@ final class PlotSession {
         if let label = selectedTemplateRecommendation?.inferredMapping["y"], !label.isEmpty {
             return label
         }
-        if let label = inspectionResponse?.inspection.primaryRecommendation.first?.inferredMapping["y"], !label.isEmpty {
+        if let label = inspectionResponse?.inspection.recommendations.first?.inferredMapping["y"], !label.isEmpty {
             return label
         }
         return nil
@@ -768,9 +729,12 @@ final class PlotSession {
         errorMessage = nil
 
         if shouldAutoSelectTemplate(after: response, preservingTemplateID: stagedExternalPinnedTemplateID) {
-            let preferredTemplateID = response.inspection.primaryRecommendation.first?.templateID
-                ?? response.inspection.recommendation.template
-            setTemplate(preferredTemplateID, shouldResetRenderOptions: true)
+            let preferredTemplateID = response.inspection.recommendations.first?.templateID
+                ?? response.inspection.primaryRecommendation.first?.templateID
+                ?? selectedTemplateID
+            if let preferredTemplateID {
+                setTemplate(preferredTemplateID, shouldResetRenderOptions: true)
+            }
         }
 
         schedulePreviewRefresh(policy: .immediate)
@@ -882,24 +846,32 @@ final class PlotSession {
 
     private func resetRenderOptions(for templateID: String) {
         let template = metadata?.templates.first { $0.id == templateID }
-        let recommendation = inspectionResponse?.inspection.recommendation
+        let recommendationSummary = recommendedPreviewConfigSummary(for: templateID)
 
         renderOptions = RenderOptionsPayload(
-            size: template?.defaultSize,
-            xscale: recommendation?.xscale,
-            yscale: recommendation?.yscale,
-            reverseX: recommendation?.reverseX ?? false,
+            size: recommendationSummary["size"]?.stringValue ?? template?.defaultSize,
+            xscale: recommendationSummary["xscale"]?.stringValue,
+            yscale: recommendationSummary["yscale"]?.stringValue,
+            reverseX: recommendationSummary["reverse_x"]?.boolValue ?? false,
             seriesOrder: nil,
             xLabelOverride: nil,
             yLabelOverride: nil,
-            baseline: recommendation?.baseline,
-            showColorbar: recommendation?.showColorbar,
+            baseline: recommendationSummary["baseline"]?.stringValue,
+            showColorbar: recommendationSummary["show_colorbar"]?.boolValue,
             stylePreset: defaultStyle(for: template),
             palettePreset: defaultPalette(for: template),
-            useSidecar: true,
+            useSidecar: recommendationSummary["use_sidecar"]?.boolValue ?? true,
             visualThemeID: metadata?.visualThemes.first?.id
         )
         notifyRenderOptionsDidChange()
+    }
+
+    private func recommendedPreviewConfigSummary(for templateID: String) -> [String: JSONValue] {
+        let selected = inspectionResponse?.inspection.recommendations.first { $0.templateID == templateID }
+            ?? compatibleRecommendations.first { $0.templateID == templateID }
+            ?? inspectionResponse?.inspection.recommendations.first
+            ?? inspectionResponse?.inspection.primaryRecommendation.first
+        return selected?.previewConfigSummary ?? [:]
     }
 
     private func applyExternalRenderOptions(_ options: RenderOptionsPayload) {
@@ -1090,51 +1062,11 @@ final class PlotSession {
         previewTask = nil
     }
 
-    private func waitUntilInspectionFinishes(for expectedFileURL: URL?) async {
-        let task = inspectionTask
-        await task?.value
-
-        guard let expectedFileURL else {
-            return
-        }
-
-        if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
-            return
-        }
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while Date() < deadline {
-            if inspectionResponse?.inputPath == expectedFileURL.path || errorMessage != nil {
-                return
-            }
-            await Task.yield()
-        }
+    private func waitUntilInspectionFinishes(for _: URL?) async {
+        await inspectionTask?.value
     }
 
-    private func waitUntilPreviewFinishes(for expectedFileURL: URL?) async {
-        let task = previewTask
-        await task?.value
-
-        guard let expectedFileURL else {
-            return
-        }
-
-        if previewResponse != nil, selectedFileURL?.path == expectedFileURL.path {
-            return
-        }
-        if errorMessage != nil {
-            return
-        }
-
-        let deadline = Date().addingTimeInterval(1.0)
-        while Date() < deadline {
-            if previewResponse != nil, selectedFileURL?.path == expectedFileURL.path {
-                return
-            }
-            if errorMessage != nil {
-                return
-            }
-            await Task.yield()
-        }
+    private func waitUntilPreviewFinishes(for _: URL?) async {
+        await previewTask?.value
     }
 }

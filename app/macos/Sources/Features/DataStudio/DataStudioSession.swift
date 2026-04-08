@@ -1,105 +1,6 @@
 import Foundation
 import Observation
 
-enum DataStudioImportKind: String, Identifiable {
-    case rawFiles
-    case existingWorkbook
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .rawFiles:
-            return "Raw Files"
-        case .existingWorkbook:
-            return "Existing Workbook"
-        }
-    }
-
-    var summary: String {
-        switch self {
-        case .rawFiles:
-            return "Import source csv / txt / xls / xlsx files and let Data Studio match or create a parse template."
-        case .existingWorkbook:
-            return "Import a prepared workbook directly into the current group list and compare context."
-        }
-    }
-}
-
-enum DataStudioImportDisposition: String, Identifiable {
-    case addToCurrentSession
-    case startNewSession
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .addToCurrentSession:
-            return "Add to Current Session"
-        case .startNewSession:
-            return "Start New Session"
-        }
-    }
-}
-
-enum DataStudioActivity: Equatable {
-    case idle
-    case loadingTemplates
-    case previewingSource
-    case creatingTemplate
-    case buildingWorkbook
-    case importingWorkbooks
-    case previewingComparison
-    case exportingComparison
-}
-
-enum DataStudioWorkbookPreviewRefreshState: Equatable {
-    case idle
-    case refreshing(workbookPath: String)
-    case failed(workbookPath: String, message: String)
-}
-
-struct DataStudioWorkbookItem: Identifiable, Equatable {
-    let id: String
-    var response: DataStudioWorkbookResponse
-
-    var workbookURL: URL {
-        URL(fileURLWithPath: response.workbookPath)
-    }
-}
-
-struct DataStudioGroupRowItem: Identifiable, Equatable {
-    let workbook: DataStudioWorkbookItem
-    let state: DataStudioGroupStatePayload
-
-    var id: String { workbook.response.workbookPath }
-}
-
-struct DataStudioFigureFamilyItem: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let metricID: String?
-    let recipes: [DataStudioComparisonRecipeResponse]
-}
-
-struct DataStudioFigureTemplateItem: Identifiable, Equatable {
-    let id: String
-    let label: String
-    let recipeID: String
-}
-
-struct DataStudioExportFigureItem: Identifiable, Equatable {
-    let id: String
-    let response: DataStudioFigureOutputResponse
-    let url: URL
-}
-
-struct DataStudioTemplateSummaryItem: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let value: String
-}
-
 @MainActor
 @Observable
 final class DataStudioSession {
@@ -120,6 +21,8 @@ final class DataStudioSession {
     @ObservationIgnored private let materializeComparisonOutputs: ComparisonOutputMaterializer
     @ObservationIgnored private var comparisonRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var comparisonRefreshRevision = 0
+    @ObservationIgnored private var workbookPreviewTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var workbookPreviewRevisions: [String: Int] = [:]
 
     let plotSession: PlotSession
 
@@ -248,9 +151,7 @@ final class DataStudioSession {
         clearImportFlowError()
         pendingImportDisposition = disposition
         isImportScopePresented = false
-        DispatchQueue.main.async {
-            self.isImportChooserPresented = true
-        }
+        isImportChooserPresented = true
     }
 
     func chooseImportKind(_ kind: DataStudioImportKind) {
@@ -750,9 +651,7 @@ final class DataStudioSession {
         reconcileSuggestionSelection()
         syncPinnedPreviewRanges()
         showAdvancedCandidates = false
-        DispatchQueue.main.async {
-            self.isCreateTemplateEditorPresented = true
-        }
+        isCreateTemplateEditorPresented = true
     }
 
     func dismissCreateTemplateEditor() {
@@ -762,9 +661,7 @@ final class DataStudioSession {
 
     func returnToImportResolver() {
         isCreateTemplateEditorPresented = false
-        DispatchQueue.main.async {
-            self.isImportResolverPresented = true
-        }
+        isImportResolverPresented = true
     }
 
     func saveTemplateDraft() async {
@@ -773,9 +670,7 @@ final class DataStudioSession {
         }
         selectedTemplateID = template.id
         isCreateTemplateEditorPresented = false
-        DispatchQueue.main.async {
-            self.isImportResolverPresented = true
-        }
+        isImportResolverPresented = true
     }
 
     func saveTemplateAndContinueImport() async {
@@ -980,7 +875,7 @@ final class DataStudioSession {
         }
         specimenFilterWorkbookPath = resolvedPath
         if let resolvedPath {
-            Task { await refreshWorkbookPreview(for: resolvedPath) }
+            scheduleWorkbookPreviewRefresh(for: resolvedPath, rebuildComparisonContext: false)
         }
     }
 
@@ -1006,7 +901,7 @@ final class DataStudioSession {
         focusedWorkbookPath = workbookPath
         specimenFilterWorkbookPath = workbookPath
         isSpecimenFilterPresented = true
-        Task { await refreshWorkbookPreview(for: workbookPath) }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: false)
     }
 
     func closeSpecimenFilter() {
@@ -1020,10 +915,7 @@ final class DataStudioSession {
             Task { await rebuildComparisonContext() }
             return
         }
-        Task {
-            await refreshWorkbookPreview(for: workbookPath)
-            await rebuildComparisonContext()
-        }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
     }
 
     func applySuggestedExclusions(for workbookPath: String) {
@@ -1036,10 +928,7 @@ final class DataStudioSession {
             includedIDs: Set(specimenStates(for: workbookPath).map(\.specimenId)).subtracting(suggested),
             explicitlyExcludedIDs: Set(suggested)
         )
-        Task {
-            await refreshWorkbookPreview(for: workbookPath)
-            scheduleComparisonContextRebuild()
-        }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
     }
 
     func restoreAllSpecimens(for workbookPath: String) {
@@ -1051,10 +940,7 @@ final class DataStudioSession {
             includedIDs: Set(preview.specimens.map(\.specimenId)),
             explicitlyExcludedIDs: []
         )
-        Task {
-            await refreshWorkbookPreview(for: workbookPath)
-            scheduleComparisonContextRebuild()
-        }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
     }
 
     func includeAllSpecimens(for workbookPath: String) {
@@ -1070,10 +956,7 @@ final class DataStudioSession {
             includedIDs: [],
             explicitlyExcludedIDs: Set(preview.specimens.map(\.specimenId))
         )
-        Task {
-            await refreshWorkbookPreview(for: workbookPath)
-            scheduleComparisonContextRebuild()
-        }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
     }
 
     func updateSpecimenInclusion(for workbookPath: String, specimenId: String, included: Bool) {
@@ -1094,10 +977,7 @@ final class DataStudioSession {
             )
         }
         specimenStatesByWorkbookPath[workbookPath] = currentStates.sorted { $0.specimenId < $1.specimenId }
-        Task {
-            await refreshWorkbookPreview(for: workbookPath)
-            scheduleComparisonContextRebuild()
-        }
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
     }
 
     func moveGroups(from source: IndexSet, to destination: Int) {
@@ -1115,6 +995,9 @@ final class DataStudioSession {
     }
 
     func removeWorkbook(path: String) {
+        workbookPreviewTasks[path]?.cancel()
+        workbookPreviewTasks.removeValue(forKey: path)
+        workbookPreviewRevisions.removeValue(forKey: path)
         workbooks.removeAll { $0.response.workbookPath == path }
         groupStates.removeAll { $0.workbookPath == path }
         specimenStatesByWorkbookPath.removeValue(forKey: path)
@@ -1672,6 +1555,22 @@ final class DataStudioSession {
         }
     }
 
+    private func scheduleWorkbookPreviewRefresh(for workbookPath: String, rebuildComparisonContext: Bool) {
+        workbookPreviewTasks[workbookPath]?.cancel()
+        workbookPreviewTasks[workbookPath] = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.refreshWorkbookPreview(for: workbookPath)
+            guard !Task.isCancelled else {
+                return
+            }
+            if rebuildComparisonContext {
+                self.scheduleComparisonContextRebuild()
+            }
+        }
+    }
+
     private func tracksWorkbookPreviewRefreshState(for workbookPath: String) -> Bool {
         let trackedPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath
         return trackedPath == workbookPath
@@ -1681,6 +1580,8 @@ final class DataStudioSession {
         guard let client else {
             return
         }
+        let nextRevision = (workbookPreviewRevisions[workbookPath] ?? 0) + 1
+        workbookPreviewRevisions[workbookPath] = nextRevision
         if tracksWorkbookPreviewRefreshState(for: workbookPath) {
             focusedWorkbookPreviewRefreshState = .refreshing(workbookPath: workbookPath)
         }
@@ -1691,12 +1592,18 @@ final class DataStudioSession {
                     specimenStates: specimenStates(for: workbookPath)
                 )
             )
+            guard workbookPreviewRevisions[workbookPath] == nextRevision, !Task.isCancelled else {
+                return
+            }
             workbookPreviewByPath[workbookPath] = response
             synchronizeSpecimenStates(with: response)
             if tracksWorkbookPreviewRefreshState(for: workbookPath) {
                 focusedWorkbookPreviewRefreshState = .idle
             }
         } catch {
+            guard workbookPreviewRevisions[workbookPath] == nextRevision, !Task.isCancelled else {
+                return
+            }
             if tracksWorkbookPreviewRefreshState(for: workbookPath) {
                 focusedWorkbookPreviewRefreshState = .failed(
                     workbookPath: workbookPath,
@@ -1990,6 +1897,9 @@ final class DataStudioSession {
 
     private func resetContentState() {
         comparisonRefreshTask?.cancel()
+        workbookPreviewTasks.values.forEach { $0.cancel() }
+        workbookPreviewTasks = [:]
+        workbookPreviewRevisions = [:]
         workbooks = []
         groupStates = []
         specimenStatesByWorkbookPath = [:]

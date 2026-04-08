@@ -46,7 +46,7 @@ final class AppModelTests: XCTestCase {
 
     func testOpenInPlotRequestsReplacementWhenPlotAlreadyHasContent() async {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
-        model.plotSession.handleImportedFile(URL(fileURLWithPath: "/tmp/existing.csv"))
+        model.plotSession.importFile(URL(fileURLWithPath: "/tmp/existing.csv"))
 
         model.openInPlot(
             inputURL: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
@@ -123,8 +123,7 @@ final class AppModelTests: XCTestCase {
                 "/inspect-file": { "post": {} },
                 "/code-console/context": { "post": {} },
                 "/code-console/run": { "post": {} },
-                "/compose-preview": { "post": {} },
-                "/preprocess-tensile-replicates": { "post": {} }
+                "/compose-preview": { "post": {} }
               }
             }
             """.utf8

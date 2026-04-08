@@ -23,9 +23,6 @@ protocol SidecarClienting: AnyObject {
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse
     func renderPreview(_ request: RenderRequest) async throws -> RenderPreviewResponse
     func exportRender(_ request: ExportRenderRequest) async throws -> ExportRenderResponse
-    func preprocessTensileReplicates(_ request: TensileReplicateRequest) async throws -> TensileReplicateResponseModel
-    func inspectTensileWorkbook(_ request: TensileWorkbookRequest) async throws -> TensileWorkbookSummaryResponse
-    func exportTensileComparison(_ request: TensileComparisonExportRequest) async throws -> TensileComparisonExportResponse
     func panelThumbnail(_ request: ThumbnailRequest) async throws -> PanelThumbnailResponse
     func composePreview(_ request: ComposerRequestPayload) async throws -> ComposerPreviewResponse
     func composeExport(_ request: ComposerRequestPayload) async throws -> PathResponse
@@ -136,18 +133,6 @@ final class SidecarClient: SidecarClienting {
 
     func exportRender(_ request: ExportRenderRequest) async throws -> ExportRenderResponse {
         try await post("export-render", body: request)
-    }
-
-    func preprocessTensileReplicates(_ request: TensileReplicateRequest) async throws -> TensileReplicateResponseModel {
-        try await post("preprocess-tensile-replicates", body: request)
-    }
-
-    func inspectTensileWorkbook(_ request: TensileWorkbookRequest) async throws -> TensileWorkbookSummaryResponse {
-        try await post("inspect-tensile-workbook", body: request)
-    }
-
-    func exportTensileComparison(_ request: TensileComparisonExportRequest) async throws -> TensileComparisonExportResponse {
-        try await post("export-tensile-comparison", body: request)
     }
 
     func panelThumbnail(_ request: ThumbnailRequest) async throws -> PanelThumbnailResponse {

@@ -13,11 +13,6 @@ figures/
 .DS_Store
 plots/
 .plot_wizard_state.json
-app/desktop/node_modules/
-app/desktop/dist/
-app/desktop/playwright-report/
-app/desktop/test-results/
-app/desktop/src-tauri/target/
 app/macos/.derivedData/
 app/macos/build/
 app/macos/*.xcresult

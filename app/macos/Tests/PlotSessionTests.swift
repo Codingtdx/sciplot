@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import PDFKit
 import XCTest
@@ -278,7 +279,6 @@ final class PlotSessionTests: XCTestCase {
             inspection: .init(
                 model: "frequency_sweep",
                 modelLabel: client.inspectResponse.inspection.modelLabel,
-                recommendation: client.inspectResponse.inspection.recommendation,
                 recommendations: client.inspectResponse.inspection.recommendations,
                 primaryRecommendation: client.inspectResponse.inspection.primaryRecommendation,
                 alternativeRecommendations: client.inspectResponse.inspection.alternativeRecommendations,
@@ -453,5 +453,30 @@ final class PDFPreviewViewTests: XCTestCase {
         XCTAssertTrue(view.autoScales)
         XCTAssertGreaterThan(view.scaleFactor, beforeResizeScale)
         XCTAssertGreaterThan(view.maxScaleFactor, view.minScaleFactor)
+    }
+
+    func testPreviewImageDecoderCachesDecodedPNGImageInstances() {
+        guard
+            let firstImage = PreviewImageDecoder.decodeBase64PNG(TestPayloads.pngBase64),
+            let secondImage = PreviewImageDecoder.decodeBase64PNG(TestPayloads.pngBase64)
+        else {
+            XCTFail("Expected valid PNG preview payload")
+            return
+        }
+
+        XCTAssertTrue(firstImage === secondImage)
+    }
+
+    func testPreviewImageDecoderLooksLikePDFHeader() {
+        guard
+            let pdfData = PreviewImageDecoder.decodeBase64Data(TestPayloads.pdfBase64),
+            let pngData = PreviewImageDecoder.decodeBase64Data(TestPayloads.pngBase64)
+        else {
+            XCTFail("Expected decodable preview payloads")
+            return
+        }
+
+        XCTAssertTrue(PreviewImageDecoder.looksLikePDFData(pdfData))
+        XCTAssertFalse(PreviewImageDecoder.looksLikePDFData(pngData))
     }
 }

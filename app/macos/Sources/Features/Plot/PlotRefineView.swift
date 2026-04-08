@@ -47,9 +47,11 @@ struct PlotRefineView: View {
     private var updatingBadge: some View {
         Label("Updating preview", systemImage: "arrow.triangle.2.circlepath")
             .font(.footnote.weight(.semibold))
+            .symbolEffect(.rotate.byLayer, options: .repeating, value: session.isPreviewing)
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background(.thinMaterial, in: Capsule())
             .foregroundStyle(.secondary)
+            .transition(MotionTokens.stateTransition)
     }
 }

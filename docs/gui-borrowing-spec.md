@@ -123,7 +123,7 @@ Reference basis:
 
 ## Implementation Notes
 
-- Start implementation from shell and component primitives, not from the protected mock's current app-level navigation.
+- Start implementation from shell and component primitives, not from historical Plot-only flows.
 - Preserve the borrowed desktop language consistently across all four workbenches before adding feature-specific variations.
 - If a workbench needs a new component, style it as if it belongs to the borrowed macOS desktop family first, then adapt for SciPlot semantics.
-- The protected mock under `app/desktop/src/mock/**` remains a Plot-only reference, not the authoritative whole-app IA.
+- Keep `Plot / Data Studio / Composer / Code Console` as the only authoritative app-level IA.

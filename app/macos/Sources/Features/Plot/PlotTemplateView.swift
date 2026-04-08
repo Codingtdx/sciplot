@@ -56,6 +56,7 @@ struct PlotTemplateView: View {
                         }
                     }
                 }
+                .animation(MotionTokens.list, value: session.templateGalleryItems.map(\.id))
             }
         }
         .padding(12)
@@ -408,6 +409,8 @@ private struct PlotTemplateCard: View {
         )
         .shadow(color: Color.black.opacity(selected ? 0.08 : 0.03), radius: selected ? 4 : 2, y: 1)
         .opacity(enabled ? 1 : 0.78)
+        .animation(MotionTokens.selection, value: selected)
+        .animation(MotionTokens.selection, value: enabled)
     }
 
     private var cardBackground: some ShapeStyle {

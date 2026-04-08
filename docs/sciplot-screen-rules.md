@@ -2,8 +2,6 @@
 
 This document defines app-shell and workbench-level layout rules for the retained SciPlot desktop product model.
 
-It is not the source of truth for the protected mock under `app/desktop/src/mock/**`.
-
 ## Global Rules
 
 - App-level primary navigation exposes only four workbenches: `Plot`, `Data Studio`, `Composer`, and `Code Console`.
@@ -35,7 +33,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 - Plot local steps stay inside Plot.
 - Data Studio local steps stay inside Data Studio.
 - Composer and Code Console may expose local panes or tabs, but these remain workbench-local.
-- The shell must not treat the protected Plot mock flow as the whole-app IA.
+- The shell must not collapse into a Plot-only flow.
 
 ## Plot
 
@@ -213,8 +211,7 @@ It is not the source of truth for the protected mock under `app/desktop/src/mock
 
 ## Future Mock Guidance
 
-- The protected mock remains a Plot-only reference.
-- Future mock redesign should build a true four-workbench shell.
+- Future IA iteration should keep a true four-workbench shell.
 - Do not expose every internal system step as a separate screen or navigation item.
 - Merge hidden processing stages unless the user must meaningfully orient, decide, review, adjust, confirm, export, or hand off there.
-- Do not use the protected mock to justify restoring `Start`, `Project`, or `Settings` as primary destinations.
+- Do not restore `Start`, `Project`, or `Settings` as primary destinations.

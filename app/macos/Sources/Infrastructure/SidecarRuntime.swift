@@ -16,6 +16,7 @@ final class SidecarRuntime {
     let baseURL: URL
     let startupTimeoutNanoseconds: UInt64
     let probeIntervalNanoseconds: UInt64
+    let runningHealthProbeCacheNanoseconds: UInt64
 
     var status: Status = .idle
     var logs: [String] = []
@@ -23,6 +24,7 @@ final class SidecarRuntime {
 
     @ObservationIgnored private var childProcess: Process?
     @ObservationIgnored private var lastCompatibilityFailure: String?
+    @ObservationIgnored private var lastHealthProbeAt: ContinuousClock.Instant?
     @ObservationIgnored private let requiredRoutes: Set<SidecarRouteSignature> = [
         .init(method: "GET", path: "/meta"),
         .init(method: "GET", path: "/plot-contract"),
@@ -40,18 +42,29 @@ final class SidecarRuntime {
         session: URLSession = .shared,
         baseURL: URL = URL(string: "http://127.0.0.1:8765")!,
         startupTimeoutNanoseconds: UInt64 = 15_000_000_000,
-        probeIntervalNanoseconds: UInt64 = 250_000_000
+        probeIntervalNanoseconds: UInt64 = 250_000_000,
+        runningHealthProbeCacheNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.locator = locator
         self.session = session
         self.baseURL = baseURL
         self.startupTimeoutNanoseconds = startupTimeoutNanoseconds
         self.probeIntervalNanoseconds = probeIntervalNanoseconds
+        self.runningHealthProbeCacheNanoseconds = runningHealthProbeCacheNanoseconds
     }
 
     func ensureRunning() async throws {
-        if case .running = status, try await probeCompatibility() {
-            return
+        if case .running = status {
+            if hasFreshHealthProbeCache {
+                return
+            }
+            if await probeHealthOnly() {
+                return
+            }
+            if try await probeCompatibility() {
+                return
+            }
+            appendLog("[runtime] Active sidecar failed compatibility checks; restarting managed sidecar.")
         }
 
         status = .starting
@@ -62,17 +75,12 @@ final class SidecarRuntime {
         try startSidecarProcess(repoRoot: repoRoot)
         try await waitForCompatibility(timeoutNanoseconds: startupTimeoutNanoseconds)
         status = .running
+        markCompatibilitySuccess()
     }
 
     private func probeCompatibility() async throws -> Bool {
         do {
             _ = try await fetchHealth()
-            let (_, response) = try await session.data(from: baseURL.appendingPathComponent("openapi.json"))
-            guard let http = response as? HTTPURLResponse, 200 ..< 300 ~= http.statusCode else {
-                reportCompatibilityFailure("openapi.json returned a non-2xx status.")
-                return false
-            }
-
             let routes = try await fetchOpenAPIRoutes()
             let missing = requiredRoutes.subtracting(routes)
             guard missing.isEmpty else {
@@ -86,13 +94,39 @@ final class SidecarRuntime {
 
             let payloadCompatible = try await probePayloadCompatibility()
             if payloadCompatible {
-                lastCompatibilityFailure = nil
+                markCompatibilitySuccess()
             }
             return payloadCompatible
         } catch {
             reportCompatibilityFailure(error.localizedDescription)
             return false
         }
+    }
+
+    private func probeHealthOnly() async -> Bool {
+        do {
+            _ = try await fetchHealth()
+            lastHealthProbeAt = .now
+            lastCompatibilityFailure = nil
+            return true
+        } catch {
+            reportCompatibilityFailure(error.localizedDescription)
+            return false
+        }
+    }
+
+    private var hasFreshHealthProbeCache: Bool {
+        guard let lastHealthProbeAt else {
+            return false
+        }
+        let ttl = Duration.nanoseconds(Int(runningHealthProbeCacheNanoseconds))
+        return ContinuousClock.now < (lastHealthProbeAt + ttl)
+    }
+
+    private func markCompatibilitySuccess() {
+        let now = ContinuousClock.now
+        lastHealthProbeAt = now
+        lastCompatibilityFailure = nil
     }
 
     private func probePayloadCompatibility() async throws -> Bool {

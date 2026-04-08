@@ -637,6 +637,47 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertTrue(session.isSpecimenFilterPresented)
     }
 
+    func testWorkbookPreviewRefreshIgnoresLateStaleResponseAfterRapidSpecimenToggles() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+
+        client.dataStudioWorkbookPreviewHandler = { request in
+            let sampleAExcluded = request.specimenStates.contains {
+                $0.workbookPath == workbookPath && $0.specimenId == "sample-a" && !$0.included
+            }
+            let delayNanoseconds: UInt64 = sampleAExcluded ? 220_000_000 : 20_000_000
+            let deadline = ContinuousClock.now + .nanoseconds(Int(delayNanoseconds))
+            while ContinuousClock.now < deadline {
+                await Task.yield()
+            }
+            return Self.makeWorkbookPreviewResponse(from: request)
+        }
+
+        session.updateSpecimenInclusion(for: workbookPath, specimenId: "sample-a", included: false)
+        session.updateSpecimenInclusion(for: workbookPath, specimenId: "sample-a", included: true)
+        try? await Task.sleep(nanoseconds: 700_000_000)
+
+        let finalPreview = session.workbookPreview(for: workbookPath)
+        let sampleAIncluded = finalPreview?
+            .specimens
+            .first(where: { $0.specimenId == "sample-a" })?
+            .included
+        XCTAssertGreaterThanOrEqual(client.dataStudioWorkbookPreviewRequests.count, 2)
+        XCTAssertEqual(sampleAIncluded, true)
+        XCTAssertEqual(finalPreview?.includedSpecimenCount, 2)
+        XCTAssertEqual(
+            client.dataStudioComparisonContextRequests.last?
+                .specimenStates
+                .first(where: { $0.workbookPath == workbookPath && $0.specimenId == "sample-a" })?
+                .included,
+            true
+        )
+    }
+
     func testNormalizeAndRestoreSessionStateRoundTripsThroughValidatedSchema() async {
         let client = MockSidecarClient()
         client.dataStudioImportWorkbookHandler = { request in
@@ -697,5 +738,50 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.orderedGroups.map { $0.state.displayName }, ["B", "A"])
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
         XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
+    }
+
+    private static func makeWorkbookPreviewResponse(from request: DataStudioWorkbookPreviewRequest) -> DataStudioWorkbookPreviewResponse {
+        let base = TestPayloads.dataStudioWorkbookPreview(path: request.workbookPath, label: "Prepared Group")
+        let excludedIDs = Set(
+            request.specimenStates
+                .filter { !$0.included }
+                .map(\.specimenId)
+        )
+        let specimens = base.specimens.map { specimen in
+            let included = !excludedIDs.contains(specimen.specimenId)
+            return DataStudioSpecimenPreviewResponse(
+                specimenId: specimen.specimenId,
+                label: specimen.label,
+                filename: specimen.filename,
+                sourcePath: specimen.sourcePath,
+                included: included,
+                metrics: specimen.metrics,
+                warnings: specimen.warnings,
+                exclusions: included ? [] : ["Excluded from compare"],
+                miniCurvePoints: specimen.miniCurvePoints,
+                triadComplete: specimen.triadComplete,
+                suggestedExclusion: specimen.suggestedExclusion
+            )
+        }
+        let includedCount = specimens.filter(\.included).count
+        let representative = specimens.first(where: \.included)
+
+        return DataStudioWorkbookPreviewResponse(
+            workbookPath: request.workbookPath,
+            label: base.label,
+            supported: base.supported,
+            unsupportedReason: base.unsupportedReason,
+            totalSpecimenCount: specimens.count,
+            includedSpecimenCount: includedCount,
+            excludedSpecimenCount: specimens.count - includedCount,
+            representativeSpecimenId: representative?.specimenId,
+            representativeFilename: representative?.filename,
+            metrics: base.metrics,
+            specimens: specimens,
+            warnings: base.warnings,
+            suggestedExclusionIds: [],
+            suggestionSupported: base.suggestionSupported,
+            suggestionSupportReason: base.suggestionSupportReason
+        )
     }
 }

@@ -28,9 +28,9 @@ Major additions completed in this refactor:
   - `grouped_bar_compare`
   - `distribution_compare`
   - `histogram_density`
-- Compatibility preservation of the legacy single recommendation field:
-  - `inspection.recommendation` remains present and stable.
-  - Ranked recommendations are additive via `inspection.recommendations`.
+- Ranked recommendation surface is canonical:
+  - `inspection.recommendations` + primary/alternative/advanced groups
+  - top-level confidence/summary for UX hints
 
 ## 3. Final architecture overview
 ### Layer model
@@ -92,8 +92,6 @@ Desktop continuity seams:
   - native macOS app shell, commands, and runtime ownership for the supported desktop frontend.
 - `app/macos/Sources/Features/Plot/**`
   - Plot workbench flow that consumes the inspect/recommend/preflight/render/export sidecar chain.
-- `app/desktop/src/mock/**`
-  - protected Plot-only mock reference; useful for local Plot-flow continuity, but not for whole-app IA decisions.
 - `README.md`
   - maintainer-facing summary of the retained workbench model.
 - `docs/product-architecture.md`
@@ -123,8 +121,7 @@ These are wired end-to-end in inspect/recommend/preflight/render/export paths.
 
 ## 7. Compatibility guarantees
 Intentionally preserved:
-- Legacy single recommendation field (`inspection.recommendation`) remains compatibility default.
-- Endpoint semantics remain stable (inspect/preflight/preview/export shape and behavior model).
+- Endpoint semantics remain stable (inspect/preflight/preview/export shape and behavior model) on the supported chain.
 - Publication defaults remain controlled by contract/publication profiles unless explicitly changed.
 - Visual themes cannot override protected publication settings.
 

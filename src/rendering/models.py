@@ -110,7 +110,6 @@ class Recommendation:
 class InputInspection:
     model: str
     model_label: str
-    recommendation: Recommendation
     recommendations: tuple[TemplateRecommendation, ...] = ()
     primary_recommendation: tuple[TemplateRecommendation, ...] = ()
     alternative_recommendations: tuple[TemplateRecommendation, ...] = ()

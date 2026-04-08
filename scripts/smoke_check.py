@@ -6,9 +6,10 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Callable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -108,6 +109,64 @@ def _repo_relative_path(path: Path) -> str:
         return str(path.resolve().relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+@dataclass(frozen=True)
+class _RecommendationConfig:
+    template: str
+    size: str | None = None
+    xscale: str | None = None
+    yscale: str | None = None
+    reverse_x: bool | None = None
+    baseline: str | None = None
+    show_colorbar: bool | None = None
+    use_sidecar: bool | None = None
+
+
+def _coerce_str(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _coerce_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _top_recommendation_config(inspection: Any) -> _RecommendationConfig:
+    ranked_candidates = list(getattr(inspection, "recommendations", ()))
+    ordered_candidates = (
+        list(getattr(inspection, "primary_recommendation", ()))
+        + list(getattr(inspection, "alternative_recommendations", ()))
+        + list(getattr(inspection, "advanced_templates", ()))
+    )
+    candidates = ranked_candidates or ordered_candidates
+    if not candidates:
+        raise AssertionError("Inspection did not return ranked recommendations.")
+    top = candidates[0]
+    summary = getattr(top, "preview_config_summary", {}) or {}
+    if not isinstance(summary, dict):
+        summary = {}
+    return _RecommendationConfig(
+        template=str(top.template_id),
+        size=_coerce_str(summary.get("size")),
+        xscale=_coerce_str(summary.get("xscale")),
+        yscale=_coerce_str(summary.get("yscale")),
+        reverse_x=_coerce_bool(summary.get("reverse_x")),
+        baseline=_coerce_str(summary.get("baseline")),
+        show_colorbar=_coerce_bool(summary.get("show_colorbar")),
+        use_sidecar=_coerce_bool(summary.get("use_sidecar")),
+    )
 
 
 def _write_curve_table(path: Path, x_label: str, y_label: str, x_unit: str, y_unit: str) -> None:
@@ -667,20 +726,21 @@ def _assert_inspection_and_preflight(
         raise AssertionError("Excel sheet listing should expose the default Sheet1 sheet.")
 
     freq_inspection = inspect_input_file(freq_path)
+    freq_recommendation = _top_recommendation_config(freq_inspection)
     if freq_inspection.model != "frequency_sweep":
         raise AssertionError("Frequency export should be recognized as frequency_sweep.")
-    if freq_inspection.recommendation.template != "point_line":
+    if freq_recommendation.template != "point_line":
         raise AssertionError("Frequency export should recommend point_line.")
-    if (freq_inspection.recommendation.xscale, freq_inspection.recommendation.yscale) != ("log", "log"):
+    if (freq_recommendation.xscale, freq_recommendation.yscale) != ("log", "log"):
         raise AssertionError("Frequency export should recommend log/log point_line.")
     if len(freq_inspection.signals) < 2:
         raise AssertionError("Frequency export should expose recommendation signals for the wizard.")
     freq_options = _resolve_render_options(
-        template=freq_inspection.recommendation.template,
-        size=freq_inspection.recommendation.size,
-        xscale=freq_inspection.recommendation.xscale,
-        yscale=freq_inspection.recommendation.yscale,
-        reverse_x=bool(freq_inspection.recommendation.reverse_x),
+        template=freq_recommendation.template,
+        size=freq_recommendation.size,
+        xscale=freq_recommendation.xscale,
+        yscale=freq_recommendation.yscale,
+        reverse_x=bool(freq_recommendation.reverse_x),
     )
     freq_preflight = preflight_render_request("point_line", freq_path, 0, freq_options)
     if freq_preflight.errors:
@@ -689,52 +749,58 @@ def _assert_inspection_and_preflight(
         raise AssertionError("Frequency preflight should predict 4 PDF outputs.")
 
     temp_inspection = inspect_input_file(temp_path)
+    temp_recommendation = _top_recommendation_config(temp_inspection)
     if temp_inspection.model != "temperature_sweep":
         raise AssertionError("Temperature export should be recognized as temperature_sweep.")
-    if temp_inspection.recommendation.size != "120x55":
+    if temp_recommendation.size != "120x55":
         raise AssertionError("Temperature export should recommend the 120x55 preset.")
-    if (temp_inspection.recommendation.xscale, temp_inspection.recommendation.yscale) != ("linear", "log"):
+    if (temp_recommendation.xscale, temp_recommendation.yscale) != ("linear", "log"):
         raise AssertionError("Temperature export should recommend linear/log point_line.")
 
     relax_inspection = inspect_input_file(relax_path)
+    relax_recommendation = _top_recommendation_config(relax_inspection)
     if relax_inspection.model != "stress_relaxation":
         raise AssertionError("Relaxation export should be recognized as stress_relaxation.")
-    if (relax_inspection.recommendation.xscale, relax_inspection.recommendation.yscale) != ("log", "linear"):
+    if (relax_recommendation.xscale, relax_recommendation.yscale) != ("log", "linear"):
         raise AssertionError("Relaxation export should recommend log/linear point_line.")
 
     replicate_inspection = inspect_input_file(replicate_path)
+    replicate_recommendation = _top_recommendation_config(replicate_inspection)
     if replicate_inspection.model != "replicate_table":
         raise AssertionError("Replicate table should be recognized as replicate_table.")
-    if replicate_inspection.recommendation.template != "box":
+    if replicate_recommendation.template != "box":
         raise AssertionError("Replicate table should default to box.")
     if len(replicate_inspection.signals) < 2:
         raise AssertionError("Replicate table should expose recommendation signals for the wizard.")
 
     heatmap_inspection = inspect_input_file(heatmap_path)
+    heatmap_recommendation = _top_recommendation_config(heatmap_inspection)
     if heatmap_inspection.model != "heatmap_table":
         raise AssertionError("Heatmap long table should be recognized as heatmap_table.")
-    if heatmap_inspection.recommendation.template != "heatmap":
+    if heatmap_recommendation.template != "heatmap":
         raise AssertionError("Heatmap table should recommend heatmap.")
     if len(heatmap_inspection.signals) < 2:
         raise AssertionError("Heatmap inspection should expose recommendation signals for the wizard.")
 
     ftir_inspection = inspect_input_file(ftir_path)
-    if ftir_inspection.recommendation.template != "stacked_curve":
+    ftir_recommendation = _top_recommendation_config(ftir_inspection)
+    if ftir_recommendation.template != "stacked_curve":
         raise AssertionError("FTIR-like curve table should recommend stacked_curve.")
-    if not ftir_inspection.recommendation.reverse_x:
+    if not ftir_recommendation.reverse_x:
         raise AssertionError("FTIR-like curve table should recommend reverse_x.")
 
     wide_nmr_inspection = inspect_input_file(wide_nmr_path)
-    if wide_nmr_inspection.recommendation.template != "segmented_stacked_curve":
+    wide_nmr_recommendation = _top_recommendation_config(wide_nmr_inspection)
+    if wide_nmr_recommendation.template != "segmented_stacked_curve":
         raise AssertionError("wide_nmr sidecar should recommend segmented_stacked_curve.")
     if len(wide_nmr_inspection.signals) < 2:
         raise AssertionError("wide_nmr inspection should expose recommendation signals for the wizard.")
     segmented_options = _resolve_render_options(
         template="segmented_stacked_curve",
-        size=wide_nmr_inspection.recommendation.size,
-        reverse_x=bool(wide_nmr_inspection.recommendation.reverse_x),
-        baseline=wide_nmr_inspection.recommendation.baseline,
-        use_sidecar=wide_nmr_inspection.recommendation.use_sidecar,
+        size=wide_nmr_recommendation.size,
+        reverse_x=bool(wide_nmr_recommendation.reverse_x),
+        baseline=wide_nmr_recommendation.baseline,
+        use_sidecar=wide_nmr_recommendation.use_sidecar,
     )
     segmented_preflight = preflight_render_request(
         "segmented_stacked_curve",
@@ -1187,7 +1253,7 @@ def _assert_style_palette_presets(
         plt.close(mono_fig)
 
     heatmap_table = inspect_input_file(heatmap_path)
-    if heatmap_table.recommendation.template != "heatmap":
+    if _top_recommendation_config(heatmap_table).template != "heatmap":
         raise AssertionError("Heatmap inspection should still recommend heatmap during style regression.")
     from src.data_loader import load_heatmap_table  # local import to keep top import list compact
 
@@ -1352,24 +1418,25 @@ def _assert_tensile_preprocess_workflow(
                 raise AssertionError("Mixed tensile preprocess warnings should name the skipped invalid raw CSV.")
 
         inspection = inspect_input_file(result.output_path, result.preferred_sheet)
+        recommendation = _top_recommendation_config(inspection)
         if inspection.model != "tensile_curve":
             raise AssertionError(f"{case_id} workbook should load back into the wizard as a tensile curve.")
-        if inspection.recommendation.template != "curve":
+        if recommendation.template != "curve":
             raise AssertionError(f"{case_id} representative sheet should recommend the standard curve template.")
-        if inspection.recommendation.xscale != "linear" or inspection.recommendation.yscale != "linear":
+        if recommendation.xscale != "linear" or recommendation.yscale != "linear":
             raise AssertionError(f"{case_id} tensile workbook should recommend linear x/y scales.")
         options = _resolve_render_options(
-            template=inspection.recommendation.template,
-            size=inspection.recommendation.size,
-            xscale=inspection.recommendation.xscale,
-            yscale=inspection.recommendation.yscale,
-            reverse_x=bool(inspection.recommendation.reverse_x),
-            baseline=inspection.recommendation.baseline,
-            show_colorbar=inspection.recommendation.show_colorbar,
-            use_sidecar=inspection.recommendation.use_sidecar,
+            template=recommendation.template,
+            size=recommendation.size,
+            xscale=recommendation.xscale,
+            yscale=recommendation.yscale,
+            reverse_x=bool(recommendation.reverse_x),
+            baseline=recommendation.baseline,
+            show_colorbar=recommendation.show_colorbar,
+            use_sidecar=recommendation.use_sidecar,
         )
         preflight = preflight_render_request(
-            inspection.recommendation.template,
+            recommendation.template,
             result.output_path,
             result.preferred_sheet,
             options,
@@ -1378,24 +1445,24 @@ def _assert_tensile_preprocess_workflow(
             raise AssertionError(f"{case_id} workbook should pass preflight, got: {preflight.errors}")
 
         render_outputs = render_template(
-            inspection.recommendation.template,
+            recommendation.template,
             result.output_path,
             outputs_dir / f"tensile_preprocess_{case_id}",
             result.preferred_sheet,
-            size=inspection.recommendation.size,
-            xscale=inspection.recommendation.xscale,
-            yscale=inspection.recommendation.yscale,
-            reverse_x=bool(inspection.recommendation.reverse_x),
-            baseline=inspection.recommendation.baseline,
-            show_colorbar=inspection.recommendation.show_colorbar,
-            use_sidecar=inspection.recommendation.use_sidecar,
+            size=recommendation.size,
+            xscale=recommendation.xscale,
+            yscale=recommendation.yscale,
+            reverse_x=bool(recommendation.reverse_x),
+            baseline=recommendation.baseline,
+            show_colorbar=recommendation.show_colorbar,
+            use_sidecar=recommendation.use_sidecar,
         )
         if not render_outputs:
             raise AssertionError(f"{case_id} workbook should remain renderable after preprocess.")
         for output in render_outputs:
             if not output.exists() or output.stat().st_size <= 0:
                 raise AssertionError(f"{case_id} downstream render produced an empty PDF: {output.name}")
-            template_by_output[str(output)] = inspection.recommendation.template
+            template_by_output[str(output)] = recommendation.template
 
         reports.append(
             {
@@ -1412,7 +1479,7 @@ def _assert_tensile_preprocess_workflow(
                 "warnings": list(result.warnings),
                 "downstream": {
                     "inspection_model": inspection.model,
-                    "recommended_template": inspection.recommendation.template,
+                    "recommended_template": recommendation.template,
                     "preflight_warnings": list(preflight.warnings),
                     "render_outputs": [str(path) for path in render_outputs],
                 },

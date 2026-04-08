@@ -226,6 +226,8 @@ private struct ComposerCanvasCellView: View {
             .frame(width: rect.width, height: rect.height)
             .position(rect.center)
             .contentShape(RoundedRectangle(cornerRadius: 18))
+            .animation(MotionTokens.selection, value: isSelected)
+            .animation(MotionTokens.selection, value: isHoveredDropTarget)
     }
 
     private var fillColor: Color {
@@ -293,6 +295,8 @@ private struct ComposerFreeRegionView: View {
             .frame(width: rect.width, height: rect.height)
             .position(rect.center)
             .contentShape(RoundedRectangle(cornerRadius: 22))
+            .animation(MotionTokens.selection, value: isSelected)
+            .animation(MotionTokens.selection, value: isHoveredDropTarget)
     }
 }
 
@@ -358,6 +362,7 @@ private struct ComposerPlacedPanelView: View {
         .position(rect.center)
         .contentShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(isSelected ? 0.08 : 0.03), radius: 10, y: 6)
+        .animation(MotionTokens.selection, value: isSelected)
     }
 
     private var borderColor: Color {

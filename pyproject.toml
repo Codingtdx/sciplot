@@ -7,8 +7,6 @@ addopts = "-q"
 target-version = "py314"
 line-length = 120
 extend-exclude = [
-  "app/desktop",
-  "app/desktop/src-tauri/target",
   "figures",
 ]
 

@@ -15,18 +15,11 @@ TOP_LEVEL_PATH_TARGETS: tuple[tuple[str, str], ...] = (
     (".tmp", "temporary workspace"),
     ("app/macos/.derivedData", "native macOS derived data"),
     ("app/macos/build", "native macOS build output"),
-    ("app/desktop/dist", "legacy desktop build output"),
-    ("app/desktop/playwright-report", "legacy desktop Playwright report"),
-    ("app/desktop/test-results", "legacy desktop test results"),
-    ("app/desktop/src-tauri/target", "legacy Tauri build output"),
 )
 TOP_LEVEL_GLOB_TARGETS: tuple[tuple[str, str], ...] = (
     (".venv-*", "backup virtualenv"),
     (".tmp_*", "temporary workspace"),
     ("app/macos/*.xcresult", "native macOS test result bundle"),
-)
-DEEP_PATH_TARGETS: tuple[tuple[str, str], ...] = (
-    ("app/desktop/node_modules", "legacy desktop dependencies"),
 )
 RECURSIVE_DIR_NAMES = frozenset({"__pycache__", ".cache", ".vite", ".turbo"})
 RECURSIVE_FILE_NAMES = frozenset({".DS_Store"})
@@ -50,11 +43,6 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Show what would be removed without deleting anything.",
-    )
-    parser.add_argument(
-        "--include-node-modules",
-        action="store_true",
-        help="Also remove legacy app/desktop/node_modules.",
     )
     parser.add_argument(
         "--root",
@@ -123,19 +111,15 @@ def should_skip_descent(
     root: Path,
     current_dir: Path,
     child_name: str,
-    *,
-    include_node_modules: bool,
 ) -> bool:
     if child_name in PROTECTED_TOP_LEVEL_DIRS:
         return True
-    if child_name == "node_modules":
-        return not include_node_modules or current_dir == root / "app" / "desktop"
     if current_dir == root and (child_name.startswith(".venv-") or child_name.startswith(".tmp_")):
         return True
     return False
 
 
-def collect_top_level_targets(root: Path, *, include_node_modules: bool) -> list[CleanupTarget]:
+def collect_top_level_targets(root: Path) -> list[CleanupTarget]:
     targets: list[CleanupTarget] = []
     for relative_path, reason in TOP_LEVEL_PATH_TARGETS:
         candidate = root / relative_path
@@ -146,15 +130,10 @@ def collect_top_level_targets(root: Path, *, include_node_modules: bool) -> list
             if candidate.name == ACTIVE_VENV_NAME or not candidate.exists():
                 continue
             targets.append(CleanupTarget(candidate, reason))
-    if include_node_modules:
-        for relative_path, reason in DEEP_PATH_TARGETS:
-            candidate = root / relative_path
-            if candidate.exists():
-                targets.append(CleanupTarget(candidate, reason))
     return targets
 
 
-def collect_recursive_targets(root: Path, *, include_node_modules: bool) -> list[CleanupTarget]:
+def collect_recursive_targets(root: Path) -> list[CleanupTarget]:
     targets: list[CleanupTarget] = []
     for current_root, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
         current_dir = Path(current_root)
@@ -165,7 +144,7 @@ def collect_recursive_targets(root: Path, *, include_node_modules: bool) -> list
             name
             for name in dirnames
             if name not in RECURSIVE_DIR_NAMES
-            and not should_skip_descent(root, current_dir, name, include_node_modules=include_node_modules)
+            and not should_skip_descent(root, current_dir, name)
         ]
         for filename in filenames:
             if filename in RECURSIVE_FILE_NAMES:
@@ -176,9 +155,9 @@ def collect_recursive_targets(root: Path, *, include_node_modules: bool) -> list
     return targets
 
 
-def discover_targets(root: Path, *, include_node_modules: bool) -> list[CleanupTarget]:
-    targets = collect_top_level_targets(root, include_node_modules=include_node_modules)
-    targets.extend(collect_recursive_targets(root, include_node_modules=include_node_modules))
+def discover_targets(root: Path) -> list[CleanupTarget]:
+    targets = collect_top_level_targets(root)
+    targets.extend(collect_recursive_targets(root))
     return collapse_targets(targets)
 
 
@@ -193,7 +172,7 @@ def remove_target(path: Path) -> None:
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
-    targets = discover_targets(root, include_node_modules=args.include_node_modules)
+    targets = discover_targets(root)
     if not targets:
         print("No generated files matched the cleanup rules.")
         return 0
