@@ -736,6 +736,80 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`100 tests`)
 
+### 2026-04-09 (Round N): Tick-label regressions + categorical x-axis minor-tick fix + external figure preview reset hardening
+
+- Scope:
+  - Updated shared plotting primitives so `Hide Min / Hide Max / Hide Both` blank the first/last resolved major tick labels using the final visible major-tick sequence, rather than relying on formatter-time value comparisons.
+  - Changed categorical statistics x-axis cleanup to remove only x-axis minor ticks; major tick marks and group labels remain visible for bar/box/box-strip/violin-style categorical plots.
+  - Hardened macOS `PlotSession.finishLoadingStagedExternalFigure(...)` so inspect-triggered stale preview work is cancelled before applying preferred render options or resetting an unsaved external figure back to template defaults.
+  - Added regression coverage for:
+    - curve `x_tick_edge_labels="hide_min"` with manual `x_min`
+    - sidecar preview-cache invalidation when only `x_tick_edge_labels` changes
+    - Data Studio family switching between two metric families that reuse the same template (`box_strip`)
+  - Expanded macOS test fixtures to include `box_strip` in test meta/contract payloads and a shared-template Data Studio comparison-set fixture.
+- User-visible impact:
+  - `Hide Min` now actually suppresses the leftmost x-axis boundary label on representative/curve plots.
+  - Categorical statistics plots keep their x-axis major ticks, but no longer show the unwanted x-axis minor ticks.
+  - Data Studio external-figure switching is less likely to flash or retain stale axis ranges while the correct figure-specific reset/apply cycle completes.
+- Risks:
+  - The new fixed-label edge-hiding path assumes major tick locations are resolved before formatter replacement; future code that swaps major locators after `_apply_numeric_axis_tick_preferences(...)` would bypass the blanked edge labels.
+  - `PlotSession.finishLoadingStagedExternalFigure(...)` now explicitly cancels stale preview work for unsaved/preferred external loads; future async changes in that method must preserve latest-write-wins semantics or external figure previews can regress.
+- Rollback points:
+  - `src/plotting_primitives.py`
+  - `src/plotting_stats.py`
+  - `tests/test_plotting.py`
+  - `tests/test_sidecar_render.py`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/Tests/TestPayloads.swift`
+- Decision:
+  - Boundary label hiding is now defined against the final rendered major-tick list, not against raw numeric comparisons during formatter callbacks, because the rendered tick list is the only stable cross-axis truth once density and locator policies have been applied.
+  - External-figure preview recovery prefers cancelling stale inspect-triggered preview work and issuing one final correct preview request over letting intermediate previews race with a later reset/apply step.
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_plotting.py tests/test_rendering_services.py tests/test_sidecar_render.py`: passed (`72 passed`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`53 tests`)
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`160 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`101 tests`)
+
+### 2026-04-09 (Round O): Manual axis ranges now recompute a fresh major-tick grid
+
+- Scope:
+  - Reworked shared linear-axis override handling in `src/plotting_primitives.py` so manual `x_min/x_max/y_min/y_max` no longer append override endpoints onto an old major-tick sequence.
+  - Manual linear range edits now derive a fresh evenly spaced major-tick grid from the final visible axis bounds, using the larger of the existing policy step and the new range-driven nice step.
+  - Kept the change inside the shared plotting helper so curve / representative-curve and categorical stats plots both pick up the fix without adding any new Data Studio state or UI.
+  - Added regressions for:
+    - curve manual `x_min=-10` + `Hide Min` using the final recomputed major ticks
+    - curve manual `x_min=-5` not introducing an odd extra short interval
+    - box/box-strip style manual `y_min/y_max` ranges redistributing to a uniform major-tick sequence
+- User-visible impact:
+  - Editing axis min/max in Plot or Data Studio now causes the major ticks to be redistributed cleanly instead of showing a one-off `-5` / `-10` tick jammed into the old grid.
+  - Manual ranges like `20 -> 60` on stats plots now reallocate to an even sequence such as `20, 30, 40, 50, 60`.
+  - `Hide Min` continues to act on the first actually rendered major tick after the recomputed grid is in place.
+- Risks:
+  - The recomputed linear override grid is intentionally aligned to the shared “nice” grid inside the visible bounds, so manual display bounds are not guaranteed to also become labeled major ticks.
+  - Future code that bypasses `_apply_major_ticks_with_override(...)` for linear manual ranges can reintroduce the old “append endpoint to old grid” bug.
+- Rollback points:
+  - `src/plotting_primitives.py`
+  - `tests/test_plotting.py`
+- Decision:
+  - Manual axis range edits are now treated as display-bound overrides that trigger a fresh major-tick solve, instead of as instructions to force the overridden endpoints into the preexisting tick list, because the latter produced nonuniform spacing and stale grid reuse across both curve and stats families.
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_plotting.py tests/test_rendering_services.py tests/test_sidecar_render.py`: passed (`74 passed`)
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`162 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`101 tests`)
+
 ## 6) Update Template (copy for next round)
 
 Use this block for every new round:

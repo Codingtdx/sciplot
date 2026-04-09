@@ -109,8 +109,33 @@ enum TestPayloads {
                     lifecyclePolicy: "stable",
                     implementationID: "box"
                 ),
+                .init(
+                    id: "box_strip",
+                    label: "Box + Strip",
+                    description: "Box comparison template with strip overlay.",
+                    category: "stats",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel"],
+                    editableOptions: [
+                        "size",
+                        "y_min",
+                        "y_max",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "series_order",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [:],
+                    availableStyles: ["journal_calm"],
+                    availablePalettes: ["aqua_graphite"],
+                    canonicalID: "box_strip",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "box_strip"
+                ),
             ],
-            templateIds: ["curve", "bar", "box"],
+            templateIds: ["curve", "bar", "box", "box_strip"],
             sizeIds: ["single_panel", "double_panel"],
             palettePresetIds: ["aqua_graphite"],
             visualThemes: [
@@ -241,6 +266,28 @@ enum TestPayloads {
                         "y_max",
                         "y_tick_density",
                         "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [:],
+                    availableStyles: ["journal_calm"],
+                    availablePalettes: ["aqua_graphite"],
+                    hardRules: ["Keep the shared axis frame."],
+                    softRules: ["Preserve readable outlier spacing."]
+                ),
+                "box_strip": .init(
+                    label: "Box + Strip",
+                    description: "Box comparison template with strip overlay.",
+                    category: "stats",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel"],
+                    editableOptions: [
+                        "size",
+                        "y_min",
+                        "y_max",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "series_order",
                         "style_preset",
                         "palette_preset",
                     ],
@@ -1130,6 +1177,59 @@ enum TestPayloads {
             comparisonSet: dataStudioComparisonSet(),
             cacheKey: "preview-cache-key",
             materializedAt: "2026-04-07T12:00:00Z"
+        )
+    }
+
+    static func dataStudioComparisonSetSharedMetricTemplate() -> DataStudioComparisonSetResponse {
+        DataStudioComparisonSetResponse(
+            id: "primary-vs-second",
+            label: "Primary Group vs Second Group",
+            workbookPaths: ["/tmp/prepared.xlsx", "/tmp/second.xlsx"],
+            workbookLabels: ["Primary Group", "Second Group"],
+            comparisonWorkbookPath: "/tmp/data_studio_exports/primary-vs-second/primary-vs-second.xlsx",
+            recipes: [
+                .init(
+                    id: "representative_curve",
+                    label: "Representative Curve Compare",
+                    category: "curve",
+                    templateID: "curve",
+                    sheetName: "Representative_Curve",
+                    metricID: nil,
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+                .init(
+                    id: "strength_box_strip",
+                    label: "Strength Box + Strip Compare",
+                    category: "metric",
+                    templateID: "box_strip",
+                    sheetName: "Strength_Replicates",
+                    metricID: "Strength",
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+                .init(
+                    id: "elongation_box_strip",
+                    label: "Elongation Box + Strip Compare",
+                    category: "metric",
+                    templateID: "box_strip",
+                    sheetName: "Elongation_Replicates",
+                    metricID: "Elongation",
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+            ]
+        )
+    }
+
+    static func dataStudioComparisonContextSharedMetricTemplate() -> DataStudioComparisonContextResponse {
+        DataStudioComparisonContextResponse(
+            comparisonSet: dataStudioComparisonSetSharedMetricTemplate(),
+            cacheKey: "preview-cache-key-shared-template",
+            materializedAt: "2026-04-09T12:00:00Z"
         )
     }
 

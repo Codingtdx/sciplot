@@ -308,20 +308,28 @@ final class PlotSession {
             return
         }
 
+        var didResetRenderOptionsDuringTemplateSelection = false
         if let preferredTemplateID,
            selectedTemplateID != preferredTemplateID,
            (compatibleTemplateIDs.contains(preferredTemplateID) || templateSummary(for: preferredTemplateID) != nil)
         {
             chooseTemplate(preferredTemplateID)
+            didResetRenderOptionsDuringTemplateSelection = true
         }
         guard selectedFileURL == inputURL, selectedSheet == targetSheet else {
             return
         }
 
         if let preferredOptions {
+            cancelPreviewTask()
+            isPreviewing = false
             applyExternalRenderOptions(preferredOptions)
         } else if selectedTemplateID != nil {
-            resetCurrentTemplateRenderOptionsForExternalFigure()
+            if !didResetRenderOptionsDuringTemplateSelection {
+                cancelPreviewTask()
+                isPreviewing = false
+                resetCurrentTemplateRenderOptionsForExternalFigure()
+            }
             await waitUntilPreviewFinishes(for: inputURL)
         } else {
             await waitUntilPreviewFinishes(for: inputURL)

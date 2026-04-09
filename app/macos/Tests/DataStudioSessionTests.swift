@@ -791,6 +791,86 @@ final class DataStudioSessionTests: XCTestCase {
         )
     }
 
+    func testFigureFamilySwitchResetsUnsavedRangesWhenFamiliesReuseTheSameTemplate() async throws {
+        let client = MockSidecarClient()
+        client.dataStudioComparisonContextHandler = { _ in
+            TestPayloads.dataStudioComparisonContextSharedMetricTemplate()
+        }
+        client.inspectHandler = { request in
+            let base = TestPayloads.inspectFile(path: request.inputPath)
+            return InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["Representative_Curve", "Strength_Replicates", "Elongation_Replicates"],
+                inspection: base.inspection,
+                dataset: base.dataset
+            )
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
+        await waitUntil({ session.plotSession.previewResponse != nil }, timeout: 3.0)
+
+        session.selectFigureFamily(id: "strength")
+        await waitUntil(
+            {
+                session.currentFigureFamily?.id == "strength" &&
+                session.plotSession.selectedTemplateID == "box_strip" &&
+                client.renderRequests.last?.template == "box_strip" &&
+                client.renderRequests.last?.sheet == .name("Strength_Replicates")
+            },
+            timeout: 3.0
+        )
+
+        session.plotSession.updateRenderOptions(policy: .immediate) {
+            $0.yMin = 60.0
+            $0.yMax = 90.0
+        }
+        await waitUntil(
+            {
+                session.plotSession.renderOptions.yMin == 60.0 &&
+                session.plotSession.renderOptions.yMax == 90.0 &&
+                client.renderRequests.last?.options.yMin == 60.0 &&
+                client.renderRequests.last?.options.yMax == 90.0
+            },
+            timeout: 3.0
+        )
+
+        session.selectFigureFamily(id: "elongation")
+        await waitUntil(
+            {
+                session.currentFigureFamily?.id == "elongation" &&
+                session.plotSession.selectedTemplateID == "box_strip" &&
+                client.renderRequests.last?.template == "box_strip" &&
+                client.renderRequests.last?.sheet == .name("Elongation_Replicates")
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertNil(session.plotSession.renderOptions.yMin)
+        XCTAssertNil(session.plotSession.renderOptions.yMax)
+        XCTAssertNil(client.renderRequests.last?.options.yMin)
+        XCTAssertNil(client.renderRequests.last?.options.yMax)
+
+        session.selectFigureFamily(id: "strength")
+        await waitUntil(
+            {
+                session.currentFigureFamily?.id == "strength" &&
+                session.plotSession.selectedTemplateID == "box_strip" &&
+                session.plotSession.renderOptions.yMin == 60.0 &&
+                session.plotSession.renderOptions.yMax == 90.0 &&
+                client.renderRequests.last?.template == "box_strip" &&
+                client.renderRequests.last?.sheet == .name("Strength_Replicates") &&
+                client.renderRequests.last?.options.yMin == 60.0 &&
+                client.renderRequests.last?.options.yMax == 90.0
+            },
+            timeout: 3.0
+        )
+    }
+
     func testAutoKeepAllAppliesEligibleGroupsAndSupportsSingleUndo() async {
         let firstWorkbookPath = "/tmp/prepared.xlsx"
         let secondWorkbookPath = "/tmp/second.xlsx"

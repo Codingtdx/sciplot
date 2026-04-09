@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data_loader import CurveSeries, HeatmapTable, load_curve_table, load_replicate_table
+from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup, load_curve_table, load_replicate_table
 from src.plotting import plot_bar, plot_box, plot_curves, plot_heatmap, plot_tensile_curve, plot_wide_nmr
 from src.wide_nmr import WideNMRConfig, WideNMRHighlightRegion, WideNMRSegment
 
@@ -283,6 +283,48 @@ def test_plot_curve_edge_label_hiding_blanks_boundary_labels_without_changing_bo
         plt.close(fig_hidden)
 
 
+def test_plot_curve_hide_min_uses_final_major_ticks_when_manual_xmin_is_present() -> None:
+    series = [_curve_series("Sample A", [0.0, 50.0, 100.0], [0.0, 40.0, 100.0])]
+
+    fig, ax = plot_curves(
+        series,
+        legend_mode="none",
+        xlim=(-10.0, None),
+        x_tick_edge_labels="hide_min",
+    )
+    try:
+        fig.canvas.draw()
+        x_ticks = np.asarray(ax.get_xticks(), dtype=float)
+        x_ticks = x_ticks[np.isfinite(x_ticks)]
+        x_labels = [tick.get_text() for tick in ax.get_xticklabels()]
+
+        assert tuple(float(value) for value in x_ticks) == pytest.approx((0.0, 20.0, 40.0, 60.0, 80.0, 100.0))
+        assert x_labels[0] == ""
+        assert any(label != "" for label in x_labels[1:])
+        assert float(ax.get_xlim()[0]) == pytest.approx(-10.0)
+    finally:
+        plt.close(fig)
+
+
+def test_plot_curve_manual_xmin_recomputes_even_major_ticks_instead_of_inserting_endpoint() -> None:
+    series = [_curve_series("Sample A", [0.0, 50.0, 100.0], [0.0, 40.0, 100.0])]
+
+    fig, ax = plot_curves(
+        series,
+        legend_mode="none",
+        xlim=(-5.0, None),
+    )
+    try:
+        x_ticks = np.asarray(ax.get_xticks(), dtype=float)
+        x_ticks = x_ticks[np.isfinite(x_ticks)]
+
+        assert tuple(float(value) for value in x_ticks) == pytest.approx((0.0, 20.0, 40.0, 60.0, 80.0, 100.0))
+        assert np.allclose(np.diff(x_ticks), 20.0)
+        assert float(ax.get_xlim()[0]) == pytest.approx(-5.0)
+    finally:
+        plt.close(fig)
+
+
 def test_stacked_curve_uses_the_same_x_axis_endpoint_policy() -> None:
     series = [
         _curve_series("A", [0.0, 50.0, 100.0], [1.0, 4.0, 3.0], x_label="Wavenumber", x_unit="cm^-1"),
@@ -385,7 +427,27 @@ def test_plot_box_partial_manual_ymax_keeps_manual_endpoint_tick_visible(tmp_pat
         plt.close(fig)
 
 
-def test_categorical_stats_hide_x_axis_tick_marks_and_minor_ticks(tmp_path: Path) -> None:
+def test_plot_box_manual_y_range_recomputes_even_major_ticks() -> None:
+    groups = [
+        ReplicateGroup(group="E0", data=pd.Series([40.0, 41.0, 42.0]), value_label="Elongation", value_unit="%"),
+        ReplicateGroup(group="E2", data=pd.Series([47.0, 50.0, 51.0, 56.0]), value_label="Elongation", value_unit="%"),
+        ReplicateGroup(group="E3", data=pd.Series([49.0, 52.0, 53.0, 55.0]), value_label="Elongation", value_unit="%"),
+        ReplicateGroup(group="E4", data=pd.Series([37.0, 39.0, 40.0, 42.0]), value_label="Elongation", value_unit="%"),
+    ]
+
+    fig, ax = plot_box(groups, ylim=(20.0, 60.0))
+    try:
+        y_ticks = np.asarray(ax.get_yticks(), dtype=float)
+        y_ticks = y_ticks[np.isfinite(y_ticks)]
+
+        assert tuple(float(value) for value in y_ticks) == pytest.approx((20.0, 30.0, 40.0, 50.0, 60.0))
+        assert np.allclose(np.diff(y_ticks), 10.0)
+        assert tuple(float(value) for value in ax.get_ylim()) == pytest.approx((20.0, 60.0))
+    finally:
+        plt.close(fig)
+
+
+def test_categorical_stats_hide_only_x_axis_minor_ticks(tmp_path: Path) -> None:
     input_path = _write_replicate_table(tmp_path / "replicates.csv")
     groups = load_replicate_table(input_path)
 
@@ -394,8 +456,8 @@ def test_categorical_stats_hide_x_axis_tick_marks_and_minor_ticks(tmp_path: Path
     try:
         assert len(ax_box.xaxis.get_minorticklocs()) == 0
         assert len(ax_bar.xaxis.get_minorticklocs()) == 0
-        assert all(np.isclose(tick.tick1line.get_markersize(), 0.0) for tick in ax_box.xaxis.get_major_ticks())
-        assert all(np.isclose(tick.tick1line.get_markersize(), 0.0) for tick in ax_bar.xaxis.get_major_ticks())
+        assert all(tick.tick1line.get_markersize() > 0.0 for tick in ax_box.xaxis.get_major_ticks())
+        assert all(tick.tick1line.get_markersize() > 0.0 for tick in ax_bar.xaxis.get_major_ticks())
     finally:
         plt.close(fig_box)
         plt.close(fig_bar)

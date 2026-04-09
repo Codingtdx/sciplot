@@ -14,7 +14,7 @@ from src.plotting_primitives import (
     LegendMode,
     _apply_major_ticks_with_override,
     _apply_numeric_axis_tick_preferences,
-    _clear_categorical_x_tick_marks,
+    _clear_categorical_x_minor_ticks,
     _format_axis_label,
     _resolved_panel_geometry,
     _style_categorical_ticklabels,
@@ -171,7 +171,7 @@ def plot_box(
         side_padding = max(0.28, box_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _clear_categorical_x_tick_marks(ax)
+    _clear_categorical_x_minor_ticks(ax)
     _apply_major_ticks_with_override(
         ax.yaxis,
         policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
@@ -294,7 +294,7 @@ def plot_bar(
     ax.set_ylim(*(ylim or limits.ylim))
     ax.set_xticks(positions)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _clear_categorical_x_tick_marks(ax)
+    _clear_categorical_x_minor_ticks(ax)
     if len(positions):
         side_padding = max(0.28, bar_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
@@ -423,7 +423,7 @@ def plot_point_error(
     ax.set_ylim(*(ylim or limits.ylim))
     ax.set_xticks(positions)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _clear_categorical_x_tick_marks(ax)
+    _clear_categorical_x_minor_ticks(ax)
     if len(positions):
         side_padding = max(0.25, point_spacing_width * 0.95)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
@@ -526,7 +526,7 @@ def plot_violin(
         side_padding = max(0.28, violin_width * 0.9)
         ax.set_xlim(positions[0] - side_padding, positions[-1] + side_padding)
     _style_categorical_ticklabels(ax, [group.group for group in groups])
-    _clear_categorical_x_tick_marks(ax)
+    _clear_categorical_x_minor_ticks(ax)
     _apply_major_ticks_with_override(
         ax.yaxis,
         policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import transforms
-from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
+from matplotlib.ticker import FixedFormatter, FixedLocator, NullLocator
 
 from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import ReplicateGroup
@@ -546,27 +546,87 @@ def _apply_explicit_major_ticks(axis, ticks: Sequence[float], *, max_major_ticks
         values = _cap_visible_major_ticks(values, scale="linear", max_major_ticks=max_major_ticks)
     axis.set_major_locator(FixedLocator(values.tolist()))
 
+
+def _axis_view_bounds(axis) -> tuple[float, float] | None:
+    bounds = np.asarray(axis.get_view_interval(), dtype=float)
+    bounds = bounds[np.isfinite(bounds)]
+    if bounds.size != 2:
+        return None
+    low, high = sorted(float(value) for value in bounds)
+    return low, high
+
+
+def _major_tick_step(values: Sequence[float] | np.ndarray) -> float | None:
+    ticks = _normalized_tick_values(values)
+    if ticks.size < 2:
+        return None
+    deltas = np.diff(ticks)
+    deltas = deltas[np.isfinite(deltas) & (deltas > 1e-9)]
+    if deltas.size == 0:
+        return None
+    return float(np.min(deltas))
+
+
+def _recompute_linear_major_ticks_for_view_bounds(
+    *,
+    view_bounds: tuple[float, float] | None,
+    policy_ticks: Sequence[float] | None,
+    max_major_ticks: int | None = None,
+) -> np.ndarray:
+    if view_bounds is None:
+        return _normalized_tick_values(policy_ticks or ())
+
+    low, high = view_bounds
+    if not np.isfinite(low) or not np.isfinite(high):
+        return _normalized_tick_values(policy_ticks or ())
+    if np.isclose(low, high):
+        return np.asarray([float(low)], dtype=float)
+
+    target_count = max(2, max_major_ticks or MAX_VISIBLE_Y_MAJOR_TICKS)
+    target_step = _nice_step_ge((high - low) / max(target_count - 1, 1))
+    policy_step = _major_tick_step(policy_ticks or ())
+    step = max(policy_step or 0.0, target_step)
+    tolerance = max(abs(step) * 1e-9, 1e-9)
+
+    start = np.ceil((low - tolerance) / step) * step
+    stop = np.floor((high + tolerance) / step) * step
+    if start > stop + tolerance:
+        midpoint = low + ((high - low) / 2.0)
+        snapped_midpoint = round(midpoint / step) * step
+        if low - tolerance <= snapped_midpoint <= high + tolerance:
+            return np.asarray([float(snapped_midpoint)], dtype=float)
+        return np.asarray([float(midpoint)], dtype=float)
+
+    tick_count = int(np.floor(((stop - start) / step) + tolerance)) + 1
+    ticks = start + np.arange(max(tick_count, 1), dtype=float) * step
+    ticks = ticks[(ticks >= low - tolerance) & (ticks <= high + tolerance)]
+    ticks = _normalized_tick_values(ticks)
+    if max_major_ticks is not None and ticks.size > max_major_ticks:
+        ticks = _cap_visible_major_ticks(ticks, scale="linear", max_major_ticks=max_major_ticks)
+    return ticks
+
+
 def _resolved_major_ticks_with_override(
     *,
+    axis,
     policy_ticks: Sequence[float] | None,
     override: tuple[float | None, float | None] | None,
     scale: str,
     max_major_ticks: int | None = None,
 ) -> np.ndarray:
+    if scale == "linear" and override is not None:
+        return _recompute_linear_major_ticks_for_view_bounds(
+            view_bounds=_axis_view_bounds(axis),
+            policy_ticks=policy_ticks,
+            max_major_ticks=max_major_ticks,
+        )
+
     values = (
         np.asarray(policy_ticks, dtype=float)
         if policy_ticks is not None
         else np.array([], dtype=float)
     )
     values = values[np.isfinite(values)]
-
-    if scale == "linear" and override is not None:
-        endpoint_candidates = np.asarray(
-            [bound for bound in override if bound is not None and np.isfinite(bound)],
-            dtype=float,
-        )
-        if endpoint_candidates.size:
-            values = np.concatenate((values, endpoint_candidates))
 
     if values.size == 0:
         return values
@@ -584,6 +644,7 @@ def _apply_major_ticks_with_override(
     max_major_ticks: int | None = None,
 ) -> None:
     values = _resolved_major_ticks_with_override(
+        axis=axis,
         policy_ticks=policy_ticks,
         override=override,
         scale=scale,
@@ -746,22 +807,17 @@ def _apply_tick_edge_label_visibility(
     values = _normalized_tick_values(ticks)
     if values.size == 0:
         return
-    lower = float(values[0])
-    upper = float(values[-1])
-    tolerance = max(abs(lower), abs(upper), abs(upper - lower), 1.0) * 1e-9
     hide_lower = mode in {"hide_min", "hide_both"}
     hide_upper = mode in {"hide_max", "hide_both"}
     base_formatter = axis.get_major_formatter()
     if hasattr(base_formatter, "set_locs"):
         base_formatter.set_locs(values.tolist())
-    axis.set_major_formatter(
-        FuncFormatter(
-            lambda value, position: ""
-            if (hide_lower and abs(value - lower) <= tolerance)
-            or (hide_upper and abs(value - upper) <= tolerance)
-            else base_formatter(value, position)
-        )
-    )
+    labels = [str(base_formatter(value, position)) for position, value in enumerate(values)]
+    if hide_lower:
+        labels[0] = ""
+    if hide_upper:
+        labels[-1] = ""
+    axis.set_major_formatter(FixedFormatter(labels))
 
 
 def _apply_numeric_axis_tick_preferences(
@@ -788,10 +844,9 @@ def _apply_numeric_axis_tick_preferences(
     )
 
 
-def _clear_categorical_x_tick_marks(ax: plt.Axes) -> None:
+def _clear_categorical_x_minor_ticks(ax: plt.Axes) -> None:
     ax.xaxis.set_minor_locator(NullLocator())
     ax.tick_params(axis="x", which="minor", bottom=False, top=False, length=0)
-    ax.tick_params(axis="x", which="major", bottom=False, top=False, length=0)
 
 def _uses_positive_zero_origin(
     *,

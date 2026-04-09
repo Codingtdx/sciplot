@@ -54,7 +54,7 @@ def test_render_preview_uses_cache_and_invalidates_when_options_change(
         "/render-preview",
         json={
             **base_request,
-            "options": {"x_tick_density": "sparse"},
+            "options": {"x_tick_edge_labels": "hide_min"},
         },
     )
     assert invalidated.status_code == 400
