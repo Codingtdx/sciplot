@@ -142,6 +142,65 @@ Every development round must update this file.
   - No app-level navigation expansion.
   - Undo scope remains key in-memory edits only (not long-running import/export side effects).
 
+### 2026-04-09: Data Studio specimen filter popover + baseline/committed preview split
+
+- Change:
+  - Replaced the always-open Data Studio specimen filter pane with an anchored macOS popover.
+  - Added two preview lanes in macOS session state:
+    - baseline workbook preview without `specimen_states`
+    - committed workbook preview with applied `specimen_states`
+  - Added specimen score metadata to preview payloads:
+    - `composite_signed_score`
+    - `distance_from_mean_score`
+    - `score_side`
+    - `auto_rule_role`
+    - `eligible_for_auto_filter`
+  - Advanced manual filtering now uses local draft specimen state with explicit Apply/Revert semantics.
+- Why:
+  - First principles: the common user question is “is automatic convergence filtering on, and is the preview already using it?”, not “which exact specimen was removed?”
+  - The automatic recommendation must stay stable and understandable, so it is always computed from the full workbook baseline rather than the currently filtered subset.
+- Rejected alternatives:
+  - Keep the persistent split-pane specimen list: rejected for scan overload, truncation, and low signal for the common path.
+  - Recompute auto recommendation from the currently filtered subset: rejected because the rule becomes moving-target/opaque.
+  - Add a dedicated sidecar endpoint for specimen filtering: rejected because `/data-studio/workbook-preview` already covers both baseline analysis and committed refresh.
+- Boundaries:
+  - The statistical rule itself is unchanged: one low-side and one high-side specimen are removed using the existing Strength/Modulus/Elongation z-score composite.
+  - Compare/export continue to consume only committed `specimen_states`.
+  - Default popover content must not enumerate removed specimen names; specimen-level inspection remains Advanced-only.
+
+### 2026-04-09: Typed presentation-model derivation for specimen-filter UI
+
+- Change:
+  - Centralized Data Studio specimen-filter UI derivation into one typed presentation model (`DataStudioSpecimenFilterPresentation`) instead of scattering button labels, badges, summaries, help text, preview banners, and Advanced rows across many helpers.
+  - Added explicit first-principles engineering guidance to `AGENTS.md` and `README.md` so future work starts from minimum state, one source of truth, and same-round dead-code removal.
+- Why:
+  - First principles: the hardest UI bugs in this area came from duplicated derived state, not from missing business logic.
+  - A single presentation model keeps semantic state (`off / auto / manual / unavailable`) separate from view rendering and makes review easier because every displayed filter affordance comes from one derivation path.
+- Rejected alternatives:
+  - Keep many small UI helper methods near the session: rejected because the same counts/copy/branching drifted across call sites and made “是否已经应用” hard to reason about.
+  - Move filter wording directly into SwiftUI views: rejected because views would then own business-state branching and become harder to test.
+- Boundaries:
+  - This pattern is for derived UI state, not for moving backend scoring logic into the client.
+  - Necessary session semantics remain distinct: baseline preview, committed preview, and manual draft are still separate because they represent different truths, not accidental duplication.
+
+### 2026-04-09: Auto Keep 5 + single-entry ranked popover
+
+- Change:
+  - Changed the default Data Studio automatic specimen filter from “drop one low-side and one high-side specimen” to a fixed `Auto Keep 5` rule using the same triad z-score distance metric.
+  - Removed the duplicate left-rail filter trigger and kept one specimen-filter entrypoint in the `Focused Group` strip.
+  - Simplified the default popover to open directly on the ranked keep/out list and moved filenames/manual specimen selection fully into `Advanced`.
+- Why:
+  - First principles: users care about the convergence outcome and ordering, not duplicate entrypoints or low-signal metadata like representative filename/workbook subtitle.
+  - A fixed keep-count rule is easier to understand and easier to verify visually than a “drop both extremes” explanation.
+- Rejected alternatives:
+  - Keep both left-rail and focused-strip triggers: rejected because the same control appearing twice reads as duplication and increases scan cost.
+  - Keep the previous “remove low/high” rule: rejected because the resulting kept count changes with input size and is harder to explain.
+  - Keep the `Status / Rule / Effect` card stack: rejected because it repeats information and delays the ranked result the user actually wants to see.
+- Boundaries:
+  - Baseline preview is still the source of Auto Keep 5 ranking.
+  - Compare/export still consume only committed `specimen_states`.
+  - Default popover does not reveal filenames; specimen identity remains `Advanced`-only.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -201,6 +260,17 @@ Every development round must update this file.
 - Fix pattern:
   - centralize importer presentation into a small deferred scheduler (`Task { @MainActor ... }`) that runs after wizard dismissal on the next main-actor turn.
   - keep cancel behavior explicit: import panel cancel should reset import flow state and exit the flow.
+
+### Symptom: `xcodebuild build` or `xcodebuild test` fails with `build.db: database is locked`
+
+- Typical cause:
+  - two `xcodebuild` processes were launched concurrently against the same `-derivedDataPath` (`app/macos/.derivedData`), so Xcode's build database stayed locked.
+- Check:
+  - confirm there is no overlapping `xcodebuild build` still running when `xcodebuild test` starts.
+  - prefer one serial invocation at a time for the shared derived-data directory.
+- Fix pattern:
+  - rerun the failed command serially after the previous build fully exits.
+  - if parallel CI is ever needed, give each job an isolated `-derivedDataPath`.
 
 ## 5) Round Change Log
 
@@ -395,6 +465,114 @@ Every development round must update this file.
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`89 tests`)
+
+### 2026-04-09 (Round G): Data Studio specimen filter popover + score metadata remediation
+
+- Scope:
+  - Extended Data Studio workbook preview models/schemas with specimen score metadata and wired `src/data_studio/workbooks.py` to emit signed score, distance, side, auto-role, and eligibility fields without changing the exclusion rule.
+  - Reworked macOS Data Studio specimen filtering from a persistent pane into an anchored popover with default `Status / Rule / Effect / Actions` content and an Advanced disclosure for score-sorted manual overrides.
+  - Split macOS session filter state into baseline preview, committed preview, and draft specimen states; added `off / auto / manual / unavailable` mode inference, dirty-close confirmation, edited row badges, and explicit preview filter status messaging.
+  - Added regression coverage across Python, sidecar JSON payloads, and macOS session behavior for score fields, baseline-vs-committed previews, filter mode inference, manual draft semantics, and unsaved-close confirmation.
+  - Updated `README.md` and `AGENTS.md` so future work keeps the popover interaction and baseline-vs-committed preview contract intact.
+- User-visible impact:
+  - Data Studio filtering is now lighter and clearer: users get a small popover with one-click auto filter, a compact effect summary, and an explicit preview-applied status line instead of a cramped always-open specimen pane.
+  - Advanced users can inspect distance-from-mean ordering and manually override inclusion, but those edits stay draft-only until `Apply Manual Filter`.
+- Risks:
+  - Filter clarity now depends on baseline preview refresh succeeding; if that request fails, the popover cannot show a stable automatic recommendation.
+  - Draft manual edits are intentionally session-local and are not persisted through session normalization/restore.
+- Rollback points:
+  - Python/sidecar score metadata rollout: `src/data_studio/models.py`, `src/data_studio/workbooks.py`, `app/sidecar/schemas_data_studio.py`.
+  - macOS popover/session state: `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`, `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`, `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`, `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`.
+  - Regression fixtures/tests: `tests/test_data_studio.py`, `tests/test_sidecar_data_studio.py`, `app/macos/Tests/TestPayloads.swift`, `app/macos/Tests/DataStudioSessionTests.swift`.
+- Decision:
+  - Default specimen filtering is popover-based automatic convergence filtering.
+  - Specimen-level inspection/manual selection is Advanced-only.
+  - Baseline recommendation is computed from the full workbook preview without `specimen_states`, while compare/export continue consuming only committed `specimen_states`.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`93 tests`)
+
+### 2026-04-09 (Round H): Data Studio specimen filter implementation cleanup
+
+- Scope:
+  - Removed dead Data Studio specimen filter helpers that were no longer referenced after the popover migration.
+  - Collapsed duplicated specimen-state upsert logic in macOS session code into one helper.
+  - Added a small `DataStudioSpecimenFilterAnchor.retargeted(to:)` helper so workbook-focus changes no longer repeat anchor-switch branching.
+- User-visible impact:
+  - None. This round is internal cleanup only.
+- Risks:
+  - Low. The cleanup only touched duplicated/dead macOS session paths and kept filter semantics unchanged.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`33 tests`)
+
+### 2026-04-09 (Round I): Specimen filter first-principles cleanup and maintainability hardening
+
+- Scope:
+  - Replaced scattered specimen-filter UI helper branches in macOS session code with one `DataStudioSpecimenFilterPresentation` derivation path for mode, summary, help copy, row badges, preview banner text, busy state, and Advanced rows.
+  - Updated specimen-filter SwiftUI views and tests to consume the presentation model instead of reconstructing filter state at each call site.
+  - Fixed the unsupported-filter preview banner so unsupported workbooks explicitly say filtering is unavailable instead of falsely implying the preview already applied a filter.
+  - Added first-principles engineering guidance to `AGENTS.md` and `README.md`, and documented the `xcodebuild` derived-data lock failure mode in this runbook.
+- User-visible impact:
+  - No workflow change. The specimen-filter UI is the same feature, but copy/status messaging is now more consistent and unsupported workbooks explain themselves correctly.
+- Risks:
+  - The presentation model becomes the main filter UI derivation path; future edits that bypass it can reintroduce state drift.
+  - The new first-principles guidance only helps if future rounds actually delete dead code instead of layering around it.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `AGENTS.md`
+  - `README.md`
+- Decision:
+  - Derived filter UI state must flow through a typed presentation model rather than ad-hoc helper scattering.
+  - Keep semantic state separation only where it represents different truths (`baseline`, `committed`, `draft`); remove all accidental duplication around it.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`94 tests`)
+
+### 2026-04-09 (Round J): Data Studio Auto Keep 5 simplification and GUI de-duplication
+
+- Scope:
+  - Changed the Python specimen-filter recommendation rule to `Auto Keep 5`, keeping the five eligible specimens with the smallest `distance_from_mean_score`.
+  - Updated preview payload semantics so `auto_rule_role` now means final recommendation state (`keep / exclude / ineligible`) instead of low/high-edge labels.
+  - Removed the duplicate left-rail filter trigger on macOS, deleted the redundant preview filter banner, and redesigned the popover so the default view is just the ranked keep/out list with a visible cutoff.
+  - Kept filenames and manual specimen selection inside `Advanced`, updated macOS tests to lock the new titles/order/cutoff behavior, and synced `README.md` / `AGENTS.md` to the new interaction contract.
+- User-visible impact:
+  - Data Studio filtering is now simpler and more direct: one entrypoint, `Auto Keep 5`, no repeated status panels, and a default ranked list that immediately shows what stays in or drops out.
+- Risks:
+  - Auto-mode inference now depends on baseline `suggested_exclusion_ids` matching the full non-kept set; future backend changes must preserve that contract.
+  - Default UI intentionally hides specimen identity; any future request to expose names in the default view would need a deliberate IA decision instead of a quick patch.
+- Rollback points:
+  - Python auto-filter rule and preview semantics: `src/data_studio/workbooks.py`, `src/data_studio/models.py`, `app/sidecar/schemas_data_studio.py`
+  - macOS filter presentation and popover UI: `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`, `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`, `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`, `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - Regression fixtures/tests: `tests/test_data_studio.py`, `tests/test_sidecar_data_studio.py`, `app/macos/Tests/TestPayloads.swift`, `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Default specimen filtering is `Auto Keep 5`, not “drop one low + one high”.
+  - Default filter UI is single-entry, ranking-first, and anonymous; filenames/manual overrides are `Advanced`-only.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`153 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: first attempt failed with `build.db` lock when run concurrently against the same derived-data path; reran serially and passed (`95 tests`)
 
 ## 6) Update Template (copy for next round)
 

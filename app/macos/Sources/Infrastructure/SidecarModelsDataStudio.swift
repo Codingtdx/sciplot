@@ -273,6 +273,11 @@ struct DataStudioSpecimenPreviewResponse: Codable, Equatable, Sendable, Identifi
     let miniCurvePoints: [DataStudioCurvePointResponse]
     let triadComplete: Bool
     let suggestedExclusion: Bool
+    let compositeSignedScore: Double?
+    let distanceFromMeanScore: Double?
+    let scoreSide: String
+    let autoRuleRole: String
+    let eligibleForAutoFilter: Bool
 
     var id: String { specimenId }
 }

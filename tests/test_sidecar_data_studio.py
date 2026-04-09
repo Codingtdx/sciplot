@@ -286,6 +286,12 @@ def test_data_studio_workbook_preview_and_comparison_routes_apply_specimen_filte
             if specimen["filename"] in {"sample_1.csv", "sample_7.csv"}
         ]
     )
+    auto_roles = {specimen["filename"]: specimen["auto_rule_role"] for specimen in preview_payload["specimens"]}
+    assert auto_roles["sample_1.csv"] == "exclude"
+    assert auto_roles["sample_7.csv"] == "exclude"
+    assert auto_roles["sample_4.csv"] == "keep"
+    assert preview_payload["specimens"][0]["score_side"] in {"low", "high", "neutral", "ineligible"}
+    assert "distance_from_mean_score" in preview_payload["specimens"][0]
 
     specimen_states = [
         {

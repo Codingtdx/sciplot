@@ -205,6 +205,11 @@ class DataStudioSpecimenPreview:
     mini_curve_points: tuple[DataStudioCurvePoint, ...] = ()
     triad_complete: bool = False
     suggested_exclusion: bool = False
+    composite_signed_score: float | None = None
+    distance_from_mean_score: float | None = None
+    score_side: str = "ineligible"
+    auto_rule_role: str = "ineligible"
+    eligible_for_auto_filter: bool = False
 
 
 @dataclass(frozen=True)

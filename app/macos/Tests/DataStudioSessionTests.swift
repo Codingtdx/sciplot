@@ -697,16 +697,7 @@ final class DataStudioSessionTests: XCTestCase {
         let workbookPath = "/tmp/prepared.xlsx"
         let client = MockSidecarClient()
         client.dataStudioWorkbookPreviewHandler = { request in
-            let excluded = Set(
-                request.specimenStates
-                    .filter { !$0.included }
-                    .map(\.specimenId)
-            )
-            return TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(
-                path: request.workbookPath,
-                label: "Prepared Group",
-                excludedSpecimenIDs: excluded
-            )
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
         }
 
         let session = DataStudioSession()
@@ -718,7 +709,11 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 200_000_000)
 
         XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 7)
-        XCTAssertEqual(Set(session.activeSuggestedExclusionIDs(for: workbookPath)), ["sample-1", "sample-7"])
+        XCTAssertEqual(
+            Set(session.baselineWorkbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertEqual(session.specimenFilterPresentation(for: workbookPath).autoKeepCount, 5)
 
         session.applySuggestedExclusions(for: workbookPath)
         try? await Task.sleep(nanoseconds: 200_000_000)
@@ -740,6 +735,242 @@ final class DataStudioSessionTests: XCTestCase {
             ["sample-1", "sample-7"]
         )
         XCTAssertTrue(session.isSpecimenFilterPresented)
+    }
+
+    func testSpecimenFilterModeInferenceTracksOffAutoAndManualStates() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.specimenFilterMode(for: workbookPath), .off)
+        XCTAssertEqual(session.specimenFilterPresentation(for: workbookPath).title, "All Specimens")
+
+        session.applySuggestedExclusions(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.specimenFilterMode(for: workbookPath), .auto)
+        XCTAssertEqual(session.specimenFilterPresentation(for: workbookPath).title, "Auto Keep 5")
+
+        session.updateDraftSpecimenInclusion(for: workbookPath, specimenId: "sample-1", included: true)
+        XCTAssertTrue(session.hasPendingFilterChanges(for: workbookPath))
+        XCTAssertEqual(session.specimenFilterMode(for: workbookPath), .auto)
+
+        session.applyManualFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.specimenFilterMode(for: workbookPath), .manual)
+        XCTAssertEqual(session.specimenFilterPresentation(for: workbookPath).title, "Manual Keep 6")
+        XCTAssertEqual(
+            session.specimenStates(for: workbookPath)
+                .filter { !$0.included }
+                .map(\.specimenId)
+                .sorted(),
+            ["sample-7"]
+        )
+    }
+
+    func testSpecimenFilterPresentationRanksAutoKeepRowsAndMarksCutoff() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        let presentation = session.specimenFilterPresentation(for: workbookPath)
+        XCTAssertEqual(presentation.autoKeepCount, 5)
+        XCTAssertEqual(presentation.rankedRows.count, 7)
+        XCTAssertEqual(
+            Array(presentation.rankedRows.prefix(5).map(\.disposition)),
+            Array(repeating: .keep, count: 5)
+        )
+        XCTAssertTrue(presentation.rankedRows[4].showsCutoffAfter)
+        XCTAssertEqual(
+            Array(presentation.rankedRows.suffix(2).map(\.disposition)),
+            Array(repeating: .out, count: 2)
+        )
+        XCTAssertEqual(presentation.rankedRows[0].rank, 1)
+        XCTAssertLessThanOrEqual(
+            presentation.rankedRows[0].distanceFromMeanScore ?? .infinity,
+            presentation.rankedRows[1].distanceFromMeanScore ?? .infinity
+        )
+    }
+
+    func testSpecimenFilterPresentationDisablesAutoKeepWhenBaselineIsUnsupported() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            let base = TestPayloads.dataStudioWorkbookPreview(path: request.workbookPath, label: "Prepared Group")
+            return DataStudioWorkbookPreviewResponse(
+                workbookPath: base.workbookPath,
+                label: base.label,
+                supported: false,
+                unsupportedReason: "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation.",
+                totalSpecimenCount: base.totalSpecimenCount,
+                includedSpecimenCount: base.includedSpecimenCount,
+                excludedSpecimenCount: base.excludedSpecimenCount,
+                representativeSpecimenId: base.representativeSpecimenId,
+                representativeFilename: base.representativeFilename,
+                metrics: base.metrics,
+                specimens: base.specimens,
+                warnings: base.warnings,
+                suggestedExclusionIds: [],
+                suggestionSupported: false,
+                suggestionSupportReason: "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation."
+            )
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        let presentation = session.specimenFilterPresentation(for: workbookPath)
+        XCTAssertEqual(presentation.mode, .off)
+        XCTAssertEqual(presentation.title, "All Specimens")
+        XCTAssertFalse(presentation.autoFilterSupported)
+        XCTAssertFalse(presentation.canApplyAuto)
+        XCTAssertEqual(presentation.help, "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation.")
+        XCTAssertEqual(presentation.autoFilterReason, "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation.")
+    }
+
+    func testManualDraftDoesNotChangeCommittedComparisonUntilApply() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        session.applySuggestedExclusions(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        let comparisonRequestCountBeforeDraft = client.dataStudioComparisonContextRequests.count
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 5)
+
+        session.updateDraftSpecimenInclusion(for: workbookPath, specimenId: "sample-1", included: true)
+
+        XCTAssertTrue(session.hasPendingFilterChanges(for: workbookPath))
+        XCTAssertTrue(session.draftSpecimenIncluded(for: workbookPath, specimenId: "sample-1"))
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 5)
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.count, comparisonRequestCountBeforeDraft)
+        XCTAssertEqual(
+            session.specimenStates(for: workbookPath)
+                .filter { !$0.included }
+                .map(\.specimenId)
+                .sorted(),
+            ["sample-1", "sample-7"]
+        )
+
+        session.applyManualFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 6)
+        XCTAssertGreaterThan(client.dataStudioComparisonContextRequests.count, comparisonRequestCountBeforeDraft)
+        XCTAssertEqual(
+            client.dataStudioComparisonContextRequests.last?
+                .specimenStates
+                .filter { !$0.included }
+                .map(\.specimenId)
+                .sorted(),
+            ["sample-7"]
+        )
+    }
+
+    func testClosingSpecimenFilterWithPendingDraftPresentsConfirmationAndDiscardResetsDraft() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        session.updateDraftSpecimenInclusion(for: workbookPath, specimenId: "sample-1", included: false)
+        XCTAssertTrue(session.hasPendingFilterChanges(for: workbookPath))
+
+        session.closeSpecimenFilter()
+
+        XCTAssertTrue(session.isSpecimenFilterPresented)
+        XCTAssertTrue(session.isSpecimenFilterCloseConfirmationPresented)
+
+        session.confirmPendingSpecimenFilterClosure(applyChanges: false)
+
+        XCTAssertFalse(session.isSpecimenFilterPresented)
+        XCTAssertFalse(session.isSpecimenFilterCloseConfirmationPresented)
+        XCTAssertFalse(session.hasPendingFilterChanges(for: workbookPath))
+        XCTAssertEqual(session.specimenStates(for: workbookPath).filter { !$0.included }.count, 0)
+        XCTAssertNil(session.specimenFilterPresentation(for: workbookPath).rowBadge)
+    }
+
+    func testBaselinePreviewStaysDistinctFromCommittedPreviewAfterAutoApply() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.baselineWorkbookPreview(for: workbookPath)?.includedSpecimenCount, 7)
+        XCTAssertEqual(
+            Set(session.baselineWorkbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 7)
+
+        session.applySuggestedExclusions(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.baselineWorkbookPreview(for: workbookPath)?.includedSpecimenCount, 7)
+        XCTAssertEqual(
+            Set(session.baselineWorkbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.includedSpecimenCount, 5)
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.suggestedExclusionIds.count, 0)
+        XCTAssertTrue(client.dataStudioWorkbookPreviewRequests.contains(where: { $0.workbookPath == workbookPath && $0.specimenStates.isEmpty }))
+        XCTAssertTrue(client.dataStudioWorkbookPreviewRequests.contains(where: {
+            $0.workbookPath == workbookPath && Set($0.specimenStates.filter { !$0.included }.map(\.specimenId)) == ["sample-1", "sample-7"]
+        }))
     }
 
     func testWorkbookPreviewRefreshIgnoresLateStaleResponseAfterRapidSpecimenToggles() async {
@@ -865,7 +1096,12 @@ final class DataStudioSessionTests: XCTestCase {
                 exclusions: included ? [] : ["Excluded from compare"],
                 miniCurvePoints: specimen.miniCurvePoints,
                 triadComplete: specimen.triadComplete,
-                suggestedExclusion: specimen.suggestedExclusion
+                suggestedExclusion: specimen.suggestedExclusion,
+                compositeSignedScore: specimen.compositeSignedScore,
+                distanceFromMeanScore: specimen.distanceFromMeanScore,
+                scoreSide: specimen.scoreSide,
+                autoRuleRole: specimen.autoRuleRole,
+                eligibleForAutoFilter: specimen.eligibleForAutoFilter
             )
         }
         let includedCount = specimens.filter(\.included).count
@@ -887,6 +1123,19 @@ final class DataStudioSessionTests: XCTestCase {
             suggestedExclusionIds: [],
             suggestionSupported: base.suggestionSupported,
             suggestionSupportReason: base.suggestionSupportReason
+        )
+    }
+
+    private static func makeSuggestedWorkbookPreviewResponse(from request: DataStudioWorkbookPreviewRequest) -> DataStudioWorkbookPreviewResponse {
+        let excluded = Set(
+            request.specimenStates
+                .filter { !$0.included }
+                .map(\.specimenId)
+        )
+        return TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(
+            path: request.workbookPath,
+            label: "Prepared Group",
+            excludedSpecimenIDs: excluded
         )
     }
 }

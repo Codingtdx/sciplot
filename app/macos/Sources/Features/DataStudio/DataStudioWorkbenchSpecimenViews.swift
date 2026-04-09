@@ -1,385 +1,473 @@
 import SwiftUI
 
-struct DataStudioSpecimenFilterPanel: View {
+struct DataStudioSpecimenFilterPrimaryTrigger: View {
     @Bindable var session: DataStudioSession
     let workbook: DataStudioWorkbookItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Specimen Filter")
-                        .font(.headline)
-                    Text("Review exclusions for \(workbook.response.label) while keeping the comparison preview visible.")
-                        .font(.footnote)
+        let presentation = session.specimenFilterPresentation(for: workbook.response.workbookPath)
+        Button {
+            session.openSpecimenFilter(
+                for: workbook.response.workbookPath,
+                anchor: .focusedStrip(workbookPath: workbook.response.workbookPath)
+            )
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(presentation.title)
+                    .font(.subheadline.weight(.semibold))
+                if let summary = presentation.summary {
+                    Text(summary)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .monospacedDigit()
                 }
-
-                Spacer()
-
-                Button {
-                    session.closeSpecimenFilter()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
             }
+            .frame(minWidth: 108, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .help(presentation.help)
+        .popover(
+            isPresented: isPresentedBinding,
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) {
+            DataStudioSpecimenFilterPopover(session: session, workbook: workbook)
+        }
+    }
 
-            if let refreshMessage {
+    private var isPresentedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                session.specimenFilterAnchor == .focusedStrip(workbookPath: workbook.response.workbookPath)
+            },
+            set: { isPresented in
+                if isPresented {
+                    session.openSpecimenFilter(
+                        for: workbook.response.workbookPath,
+                        anchor: .focusedStrip(workbookPath: workbook.response.workbookPath)
+                    )
+                } else {
+                    session.closeSpecimenFilter()
+                }
+            }
+        )
+    }
+}
+
+struct DataStudioSpecimenFilterPopover: View {
+    @Bindable var session: DataStudioSession
+    let workbook: DataStudioWorkbookItem
+    @State private var isAdvancedExpanded = false
+
+    var body: some View {
+        let presentation = session.specimenFilterPresentation(for: workbook.response.workbookPath)
+        VStack(alignment: .leading, spacing: 16) {
+            header
+
+            if let refreshMessage = refreshMessage(presentation: presentation) {
                 Label(refreshMessage.message, systemImage: refreshMessage.symbol)
                     .font(.footnote)
                     .foregroundStyle(refreshMessage.tint)
             }
 
-            if let preview = currentPreview {
-                if preview.supported {
-                    supportedContent(preview: preview)
+            if let baselinePreview {
+                if baselinePreview.supported {
+                    supportedContent(presentation: presentation)
                 } else {
-                    unsupported(preview: preview)
+                    unavailable(reason: baselinePreview.unsupportedReason)
                 }
             } else {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading specimen preview…")
-                    Spacer()
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("Loading specimen ranking…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 180)
             }
         }
         .padding(16)
-        .background(.quinary.opacity(0.14), in: RoundedRectangle(cornerRadius: 20))
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: 430)
     }
 
-    private var currentPreview: DataStudioWorkbookPreviewResponse? {
-        guard let preview = session.specimenFilterPreview, preview.workbookPath == workbook.response.workbookPath else {
-            return nil
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("Specimen Filter")
+                .font(.headline)
+
+            Spacer()
+
+            Button {
+                session.closeSpecimenFilter()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
         }
-        return preview
     }
 
-    private var refreshMessage: (message: String, symbol: String, tint: Color)? {
+    private var baselinePreview: DataStudioWorkbookPreviewResponse? {
+        session.baselineWorkbookPreview(for: workbook.response.workbookPath)
+    }
+
+    private func refreshMessage(
+        presentation: DataStudioSpecimenFilterPresentation
+    ) -> (message: String, symbol: String, tint: Color)? {
+        let workbookPath = workbook.response.workbookPath
+        if presentation.isBusy {
+            return ("Refreshing specimen order…", "arrow.triangle.2.circlepath", .secondary)
+        }
         switch session.focusedWorkbookPreviewRefreshState {
-        case let .refreshing(workbookPath) where workbookPath == workbook.response.workbookPath:
-            return ("Refreshing specimen summary…", "arrow.triangle.2.circlepath", .secondary)
-        case let .failed(workbookPath, message) where workbookPath == workbook.response.workbookPath:
+        case let .failed(currentPath, message) where currentPath == workbookPath:
+            return (message, "exclamationmark.triangle.fill", .orange)
+        default:
+            break
+        }
+        switch session.baselineWorkbookPreviewRefreshState {
+        case let .failed(currentPath, message) where currentPath == workbookPath:
             return (message, "exclamationmark.triangle.fill", .orange)
         default:
             return nil
         }
     }
 
-    @ViewBuilder
-    private func supportedContent(preview: DataStudioWorkbookPreviewResponse) -> some View {
+    private func supportedContent(
+        presentation: DataStudioSpecimenFilterPresentation
+    ) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                DataStudioSpecimenSummaryGrid(preview: preview)
-
-                DataStudioRecommendationCard(
-                    session: session,
-                    workbookPath: preview.workbookPath,
-                    preview: preview
-                )
-
-                if !recommendedSpecimens(preview).isEmpty {
-                    DataStudioSpecimenSection(
-                        title: "Recommended",
-                        subtitle: "Suggested high/low exclusions based on the combined Strength / Modulus / Elongation z-score.",
-                        specimens: recommendedSpecimens(preview),
-                        workbookPath: preview.workbookPath,
-                        session: session
-                    )
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(presentation.title)
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    if let summary = presentation.summary {
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
 
-                DataStudioSpecimenSection(
-                    title: "All Specimens",
-                    subtitle: "Toggle included specimens for representative selection, mean/std, and error bars.",
-                    specimens: preview.specimens,
-                    workbookPath: preview.workbookPath,
-                    session: session
-                )
+                if let reason = presentation.autoFilterReason, !presentation.autoFilterSupported {
+                    Text(reason)
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-                Text(impactText(for: preview))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                DataStudioSpecimenFilterRankedList(rows: presentation.rankedRows)
+
+                if presentation.hasPendingChanges {
+                    Text("Manual edits stay in draft until you apply them in Advanced.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                actionSection(presentation: presentation)
+
+                DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
+                    DataStudioSpecimenFilterAdvancedSection(
+                        session: session,
+                        workbookPath: workbook.response.workbookPath
+                    )
+                    .padding(.top, 10)
+                }
+                .font(.subheadline.weight(.semibold))
             }
             .padding(.vertical, 2)
         }
     }
 
-    @ViewBuilder
-    private func unsupported(preview: DataStudioWorkbookPreviewResponse) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func unavailable(reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Specimen filter unavailable")
                 .font(.headline)
-            Text(preview.unsupportedReason)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private func recommendedSpecimens(_ preview: DataStudioWorkbookPreviewResponse) -> [DataStudioSpecimenPreviewResponse] {
-        preview.specimens.filter { preview.suggestedExclusionIds.contains($0.specimenId) }
-    }
-
-    private func impactText(for preview: DataStudioWorkbookPreviewResponse) -> String {
-        "Keeping \(preview.includedSpecimenCount) of \(preview.totalSpecimenCount) specimens for mean/std and error bars."
-    }
-}
-
-private struct DataStudioSpecimenSummaryGrid: View {
-    let preview: DataStudioWorkbookPreviewResponse
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 94), spacing: 10)], spacing: 10) {
-            summaryCard(title: "Included", value: "\(preview.includedSpecimenCount)")
-            summaryCard(title: "Excluded", value: "\(preview.excludedSpecimenCount)")
-            summaryCard(title: "Resulting Reps", value: "\(preview.includedSpecimenCount)")
-        }
-    }
-
-    private func summaryCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.title3.weight(.semibold))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-private struct DataStudioRecommendationCard: View {
-    @Bindable var session: DataStudioSession
-    let workbookPath: String
-    let preview: DataStudioWorkbookPreviewResponse
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Recommendation")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(recommendationTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(recommendationSpecimens.isEmpty ? Color.secondary : .orange)
-            }
-
-            Text(recommendationMessage)
+            Text(reason)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            HStack(spacing: 10) {
-                Button("Apply Recommendation") {
-                    session.applySuggestedExclusions(for: workbookPath)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(recommendationSpecimens.isEmpty)
-
-                Button("Restore All") {
-                    session.restoreAllSpecimens(for: workbookPath)
-                }
-                .buttonStyle(.bordered)
-
-                Button("Retry Preview") {
-                    session.retryPreviewRefresh()
-                }
-                .buttonStyle(.bordered)
-
-                Spacer()
+    private func actionSection(
+        presentation: DataStudioSpecimenFilterPresentation
+    ) -> some View {
+        HStack(spacing: 10) {
+            Button("Use Auto Keep 5") {
+                session.applySuggestedExclusions(for: workbook.response.workbookPath)
             }
-        }
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 16))
-    }
+            .buttonStyle(.borderedProminent)
+            .disabled(!presentation.canApplyAuto)
+            .help(presentation.autoFilterReason ?? "Keep the five specimens closest to the mean.")
 
-    private var recommendationSpecimens: [DataStudioSpecimenPreviewResponse] {
-        preview.specimens.filter { preview.suggestedExclusionIds.contains($0.specimenId) }
-    }
+            Button("Turn Off") {
+                session.restoreAllSpecimens(for: workbook.response.workbookPath)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!presentation.canTurnOff)
+            .help("Restore all specimens to the comparison preview.")
 
-    private var recommendationTitle: String {
-        recommendationSpecimens.isEmpty ? "No pending recommendation" : "Exclude \(recommendationSpecimens.count)"
-    }
-
-    private var recommendationMessage: String {
-        if !recommendationSpecimens.isEmpty {
-            let names = recommendationSpecimens.map(\.filename).joined(separator: ", ")
-            return "Suggested exclusions: \(names). This rule removes one high and one low outlier from the current included tensile set."
+            Spacer()
         }
-        if !preview.suggestionSupportReason.isEmpty {
-            return preview.suggestionSupportReason
-        }
-        return "No automatic exclusions are available for the current included set."
     }
 }
 
-private struct DataStudioSpecimenSection: View {
-    let title: String
-    let subtitle: String
-    let specimens: [DataStudioSpecimenPreviewResponse]
-    let workbookPath: String
-    @Bindable var session: DataStudioSession
+private struct DataStudioSpecimenFilterRankedList: View {
+    let rows: [DataStudioSpecimenFilterRankedRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(subtitle)
+            Text("Sorted by distance from mean")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if rows.isEmpty {
+                Text("No specimen ranking is available for this workbook.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(spacing: 10) {
-                ForEach(specimens) { specimen in
-                    DataStudioSpecimenListRow(
-                        session: session,
-                        workbookPath: workbookPath,
-                        specimen: specimen,
-                        suggested: specimen.suggestedExclusion
-                    )
+            } else {
+                let maxDistance = rows.compactMap(\.distanceFromMeanScore).max() ?? 1
+                VStack(spacing: 0) {
+                    ForEach(rows) { row in
+                        DataStudioSpecimenFilterRankedRowView(
+                            row: row,
+                            maxDistance: maxDistance
+                        )
+                        if row.showsCutoffAfter {
+                            HStack(spacing: 8) {
+                                Divider()
+                                Text("Auto cutoff")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Divider()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                        }
+                        if row.id != rows.last?.id {
+                            Divider()
+                        }
+                    }
                 }
+                .background(.background, in: RoundedRectangle(cornerRadius: 14))
             }
         }
     }
 }
 
-private struct DataStudioSpecimenListRow: View {
+private struct DataStudioSpecimenFilterRankedRowView: View {
+    let row: DataStudioSpecimenFilterRankedRow
+    let maxDistance: Double
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("#\(row.rank)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 32, alignment: .leading)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.quinary.opacity(0.55))
+                Capsule()
+                    .fill(tint.opacity(0.42))
+                    .frame(width: barWidth)
+            }
+            .frame(width: 144, height: 9)
+
+            Text(distanceLabel)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 48, alignment: .trailing)
+
+            Text(row.disposition.title)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(tint.opacity(0.14), in: Capsule())
+                .foregroundStyle(tint)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var barWidth: CGFloat {
+        guard let distance = row.distanceFromMeanScore, maxDistance > 0 else {
+            return 12
+        }
+        let normalized = max(min(distance / maxDistance, 1), 0.08)
+        return 144 * normalized
+    }
+
+    private var distanceLabel: String {
+        guard let distance = row.distanceFromMeanScore else {
+            return "n/a"
+        }
+        return distance.formatted(.number.precision(.fractionLength(2)))
+    }
+
+    private var tint: Color {
+        switch row.disposition {
+        case .keep:
+            return .green
+        case .out:
+            return .orange
+        case .ineligible:
+            return .secondary
+        }
+    }
+}
+
+private struct DataStudioSpecimenFilterAdvancedSection: View {
+    @Bindable var session: DataStudioSession
+    let workbookPath: String
+
+    var body: some View {
+        let presentation = session.specimenFilterPresentation(for: workbookPath)
+        VStack(alignment: .leading, spacing: 12) {
+            if presentation.hasPendingChanges {
+                Text("Preview keeps using the last applied filter until you apply or revert these manual edits.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Button("Apply Manual Filter") {
+                    session.applyManualFilter(for: workbookPath)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!presentation.hasPendingChanges || presentation.isBusy)
+
+                Button("Revert") {
+                    session.revertDraftSpecimenStates(for: workbookPath)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!presentation.hasPendingChanges)
+
+                Spacer()
+            }
+
+            VStack(spacing: 0) {
+                headerRow
+                Divider()
+                ForEach(presentation.advancedRows) { specimen in
+                    DataStudioSpecimenFilterAdvancedRow(
+                        session: session,
+                        workbookPath: workbookPath,
+                        specimen: specimen
+                    )
+                    Divider()
+                }
+            }
+            .background(.background, in: RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    private var headerRow: some View {
+        HStack(spacing: 10) {
+            Text("Include")
+                .frame(width: 54, alignment: .leading)
+            Text("Filename")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Distance")
+                .frame(width: 72, alignment: .trailing)
+            Text("Side")
+                .frame(width: 80, alignment: .leading)
+            Text("Strength")
+                .frame(width: 70, alignment: .trailing)
+            Text("Modulus")
+                .frame(width: 70, alignment: .trailing)
+            Text("Elong.")
+                .frame(width: 60, alignment: .trailing)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+}
+
+private struct DataStudioSpecimenFilterAdvancedRow: View {
     @Bindable var session: DataStudioSession
     let workbookPath: String
     let specimen: DataStudioSpecimenPreviewResponse
-    let suggested: Bool
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(spacing: 10) {
             Toggle(
                 "",
                 isOn: Binding(
-                    get: { specimen.included },
-                    set: { session.updateSpecimenInclusion(for: workbookPath, specimenId: specimen.specimenId, included: $0) }
+                    get: { session.draftSpecimenIncluded(for: workbookPath, specimenId: specimen.specimenId) },
+                    set: { session.updateDraftSpecimenInclusion(for: workbookPath, specimenId: specimen.specimenId, included: $0) }
                 )
             )
             .labelsHidden()
             .toggleStyle(.checkbox)
+            .frame(width: 54, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Text(specimen.filename)
-                        .font(.body.weight(.semibold))
-
-                    if suggested {
-                        statusTag("Recommended", tint: .yellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(specimen.filename)
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if specimen.autoRuleRole == "exclude" {
+                        tag("Auto Out", tint: .orange)
                     }
-                    if !specimen.included {
-                        statusTag("Excluded", tint: .secondary)
-                    }
-                    if !specimen.triadComplete {
-                        statusTag("Incomplete", tint: .orange)
-                    }
-                    if !specimen.warnings.isEmpty {
-                        statusTag("Warning", tint: .orange)
+                    if !specimen.eligibleForAutoFilter {
+                        tag("Ineligible", tint: .secondary)
                     }
                 }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 14) {
-                    metric("Strength", value: specimen.metrics["Strength"], unit: "MPa")
-                    metric("Modulus", value: specimen.metrics["Modulus"], unit: "MPa")
-                    metric("Elongation", value: specimen.metrics["Elongation"], unit: "%")
-                }
+            numeric(specimen.distanceFromMeanScore)
+                .frame(width: 72, alignment: .trailing)
+            Text(sideLabel)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 10)
-
-            if !specimen.miniCurvePoints.isEmpty {
-                DataStudioMiniCurvePreview(points: specimen.miniCurvePoints)
-                    .frame(width: 110, height: 44)
-            }
+                .frame(width: 80, alignment: .leading)
+            numeric(specimen.metrics["Strength"] ?? nil)
+                .frame(width: 70, alignment: .trailing)
+            numeric(specimen.metrics["Modulus"] ?? nil)
+                .frame(width: 70, alignment: .trailing)
+            numeric(specimen.metrics["Elongation"] ?? nil)
+                .frame(width: 60, alignment: .trailing)
         }
-        .padding(12)
-        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 16))
-        .animation(MotionTokens.selection, value: specimen.included)
-        .animation(MotionTokens.selection, value: suggested)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
-    private var backgroundColor: Color {
-        if suggested {
-            return Color.yellow.opacity(0.10)
+    private var sideLabel: String {
+        switch specimen.scoreSide {
+        case "low":
+            return "Low side"
+        case "high":
+            return "High side"
+        case "neutral":
+            return "Near mean"
+        default:
+            return "Ineligible"
         }
-        if specimen.included {
-            return Color(nsColor: .controlBackgroundColor)
-        }
-        return Color(nsColor: .quaternaryLabelColor).opacity(0.08)
     }
 
-    private func metric(_ title: String, value: Double??, unit: String) -> some View {
-        let resolved = value ?? nil
-        let text = resolved?.formatted(.number.precision(.fractionLength(2))) ?? "n/a"
-        return Text("\(title) \(text) \(unit)")
+    private func numeric(_ value: Double?) -> some View {
+        Text(value?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
+            .font(.footnote)
+            .monospacedDigit()
     }
 
-    private func statusTag(_ title: String, tint: Color) -> some View {
+    private func tag(_ title: String, tint: Color) -> some View {
         Text(title)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .padding(.vertical, 2)
             .background(tint.opacity(0.14), in: Capsule())
             .foregroundStyle(tint)
-    }
-}
-
-private struct DataStudioMiniCurvePreview: View {
-    let points: [DataStudioCurvePointResponse]
-
-    var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                guard let first = normalized.first else {
-                    return
-                }
-                path.move(to: point(from: first, in: geometry.size))
-                for value in normalized.dropFirst() {
-                    path.addLine(to: point(from: value, in: geometry.size))
-                }
-            }
-            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-            .padding(.vertical, 4)
-        }
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var normalized: [(x: Double, y: Double)] {
-        guard
-            let minX = points.map(\.x).min(),
-            let maxX = points.map(\.x).max(),
-            let minY = points.map(\.y).min(),
-            let maxY = points.map(\.y).max()
-        else {
-            return []
-        }
-        let xSpan = max(maxX - minX, 0.0001)
-        let ySpan = max(maxY - minY, 0.0001)
-        return points.map { point in
-            ((point.x - minX) / xSpan, (point.y - minY) / ySpan)
-        }
-    }
-
-    private func point(from value: (x: Double, y: Double), in size: CGSize) -> CGPoint {
-        CGPoint(
-            x: value.x * max(size.width - 8, 1) + 4,
-            y: (1 - value.y) * max(size.height - 8, 1) + 4
-        )
     }
 }

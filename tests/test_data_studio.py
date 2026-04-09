@@ -372,7 +372,7 @@ def test_preview_and_export_data_studio_comparison_uses_plot_render_pipeline(tmp
     assert all(output.path.exists() for output in figure_outputs)
 
 
-def test_preview_data_studio_workbook_suggests_high_low_exclusions_and_recomputes_summary(tmp_path: Path) -> None:
+def test_preview_data_studio_workbook_keeps_five_closest_specimens_and_recomputes_summary(tmp_path: Path) -> None:
     workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter.xlsx")
 
     preview = preview_data_studio_workbook(workbook_path)
@@ -388,6 +388,20 @@ def test_preview_data_studio_workbook_suggests_high_low_exclusions_and_recompute
         if specimen.suggested_exclusion
     )
     assert suggested_filenames == ["sample_1.csv", "sample_7.csv"]
+    score_by_filename = {specimen.filename: specimen for specimen in preview.specimens}
+    assert score_by_filename["sample_1.csv"].auto_rule_role == "exclude"
+    assert score_by_filename["sample_1.csv"].score_side == "low"
+    assert score_by_filename["sample_1.csv"].eligible_for_auto_filter is True
+    assert score_by_filename["sample_7.csv"].auto_rule_role == "exclude"
+    assert score_by_filename["sample_7.csv"].score_side == "high"
+    assert score_by_filename["sample_7.csv"].eligible_for_auto_filter is True
+    assert score_by_filename["sample_4.csv"].auto_rule_role == "keep"
+    assert score_by_filename["sample_1.csv"].distance_from_mean_score is not None
+    assert score_by_filename["sample_7.csv"].distance_from_mean_score is not None
+    assert (
+        score_by_filename["sample_7.csv"].distance_from_mean_score
+        > score_by_filename["sample_3.csv"].distance_from_mean_score
+    )
 
     specimen_states = [
         DataStudioSpecimenState(
@@ -409,7 +423,11 @@ def test_preview_data_studio_workbook_suggests_high_low_exclusions_and_recompute
     assert modulus_metric.mean == pytest.approx(50.0)
     assert elongation_metric.mean == pytest.approx(10.0)
     assert filtered.suggested_exclusion_ids == ()
-    assert "at least 7 included specimens" in filtered.suggestion_support_reason
+    assert filtered.suggestion_supported is True
+    assert filtered.suggestion_support_reason == ""
+    filtered_scores = {specimen.filename: specimen for specimen in filtered.specimens}
+    assert filtered_scores["sample_1.csv"].eligible_for_auto_filter is False
+    assert filtered_scores["sample_1.csv"].auto_rule_role == "ineligible"
 
 
 def test_export_data_studio_comparison_filters_specimens_before_replicate_bundle(tmp_path: Path) -> None:
@@ -439,6 +457,31 @@ def test_export_data_studio_comparison_filters_specimens_before_replicate_bundle
     )
     assert len(strength_groups) == 1
     assert strength_groups[0].data.tolist() == pytest.approx([98.0, 99.0, 100.0, 101.0, 102.0])
+
+
+def test_preview_data_studio_workbook_disables_auto_keep_when_fewer_than_five_eligible(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter_under_five.xlsx")
+    preview = preview_data_studio_workbook(workbook_path)
+    specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
+    specimen_states = [
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_id,
+            included=False,
+        )
+        for specimen_id in (
+            specimen_ids_by_filename["sample_1.csv"],
+            specimen_ids_by_filename["sample_6.csv"],
+            specimen_ids_by_filename["sample_7.csv"],
+        )
+    ]
+
+    filtered = preview_data_studio_workbook(workbook_path, specimen_states=specimen_states)
+
+    assert filtered.included_specimen_count == 4
+    assert filtered.suggestion_supported is False
+    assert filtered.suggested_exclusion_ids == ()
+    assert "Auto Keep 5 needs at least 5 included specimens" in filtered.suggestion_support_reason
 
 
 def test_preview_data_studio_comparison_context_uses_stable_cache_key_without_rendering(

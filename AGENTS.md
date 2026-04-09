@@ -58,6 +58,9 @@
   - `advanced_templates`
   - `recommendation_confidence`
   - `recommendation_summary`
+- Data Studio specimen filter 统一复用 `POST /data-studio/workbook-preview`：
+  - baseline preview 不带 `specimen_states`，只用于 Auto Keep 5 排序与 Advanced 评分表；
+  - committed preview 带当前 `specimen_states`，才是 compare/export 的已应用状态来源。
 - sidecar endpoint 必须返回显式 response model，禁止裸 dict。
 - 项目文件保存/打开必须经过 sidecar schema 校验迁移层（`/save-project`、`/open-project`）。
 
@@ -72,6 +75,10 @@
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
 - Data Studio import 必须维持单一分阶段 native sheet（wizard），禁止恢复多个串联弹窗。
+- Data Studio specimen filter 默认交互必须是 anchored popover，且只保留右侧 `Focused Group` 单一入口；不得恢复左侧重复入口或常驻 split pane。
+- Data Studio specimen filter 默认规则是 `Auto Keep 5`：按距离均值最近排序，只保留 5 个合格 specimen；少于 5 个时禁用自动筛选并解释原因。
+- 默认 popover 必须直接展示排序结果和 keep/out cutoff，不要再展示 representative、文件名、workbook 标签等低价值信息。
+- specimen 级别的文件名、距离表、手动 inclusion override 只能放在 `Advanced` 折叠区；不要把 specimen 细节塞回默认主界面。
 - 关键动作必须“禁用并解释”（`disabled + help`），禁止 silent no-op。
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
@@ -98,6 +105,29 @@
 - 基础网格与 frame 约束保持不变（60x55 基础格，180x165 布局 frame，180x170 画布）。
 - graph 允许尺寸仅 `60x55`、`120x55`、`60x110 mm`。
 - hidden 对象保留在项目中但预览/导出忽略；locked 对象禁止位置编辑但保留导出。
+
+## 代码设计原则（第一性原理）
+
+- 先收敛“最小必要状态集合”再写代码：
+  - 能从单一事实源派生出来的 UI 状态、文案、徽章、按钮禁用态，不要再落第二份状态。
+- 同一语义只允许一个事实源：
+  - 后端规则只在 Python/contract/schema 一处定义；
+  - 前端只做消费与派生展示，不得偷偷重算业务语义。
+- 抽象必须服务于“减少重复 + 澄清职责”：
+  - 只有当抽象能减少真实重复、缩短调用路径、明确 ownership 时才引入；
+  - 为了“将来可能通用”而预埋抽象，一律视为噪音。
+- 拒绝屎山增量：
+  - 每轮功能改动都要同轮删除死代码、过期 helper、重复分支、无调用旧路径；
+  - 不允许把“先放着以后再收拾”作为常态。
+- 优先小而清晰的类型化结构：
+  - 用明确命名的 payload / presentation model / snapshot 表达语义；
+  - 不要用并列 `Bool`、魔法字符串、散落 helper 拼一个隐式状态机。
+- 分类优先于堆叠：
+  - 当一个文件同时承载 state、async orchestration、presentation copy、view glue 时，要及时分层或提取；
+  - 新逻辑默认放回所属层，不要继续把例外堆进调用方。
+- 改动完成后必须做一次“瘦身审查”：
+  - 问自己：有没有重复状态、重复分支、重复文案派生、无主 helper、不可命名的特殊情况；
+  - 如果有，当前轮直接收掉，不把结构债滚到下一轮。
 
 ## 修改流程（第一性原则）
 
@@ -150,6 +180,8 @@
 ## 常见坑
 
 - 不要在前端重建评分/推荐逻辑；只消费 sidecar ranked recommendations。
+- 不要新增 Data Studio specimen filter 专用 endpoint，也不要在前端按已过滤子集重算 auto recommendation。
+- 不要恢复 Data Studio specimen filter 的双入口交互，也不要把默认态重新做回 `Status / Rule / Effect` 卡片堆叠。
 - 不要在 sidecar 增加“先兼容旧接口再说”的 fallback。
 - 不要把 contract 常量复制到第二份文件。
 - 不要绕开 schema 校验层直接读写项目 JSON。

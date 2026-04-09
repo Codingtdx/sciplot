@@ -813,7 +813,12 @@ enum TestPayloads {
                         .init(x: 10, y: 12),
                     ],
                     triadComplete: true,
-                    suggestedExclusion: false
+                    suggestedExclusion: false,
+                    compositeSignedScore: nil,
+                    distanceFromMeanScore: nil,
+                    scoreSide: "ineligible",
+                    autoRuleRole: "ineligible",
+                    eligibleForAutoFilter: false
                 ),
                 .init(
                     specimenId: "sample-b",
@@ -830,13 +835,18 @@ enum TestPayloads {
                         .init(x: 10, y: 11),
                     ],
                     triadComplete: true,
-                    suggestedExclusion: false
+                    suggestedExclusion: false,
+                    compositeSignedScore: nil,
+                    distanceFromMeanScore: nil,
+                    scoreSide: "ineligible",
+                    autoRuleRole: "ineligible",
+                    eligibleForAutoFilter: false
                 ),
             ],
             warnings: [],
             suggestedExclusionIds: [],
             suggestionSupported: false,
-            suggestionSupportReason: "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
+            suggestionSupportReason: "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation."
         )
     }
 
@@ -854,7 +864,6 @@ enum TestPayloads {
             ("sample-6", "sample_6.csv", 103, 2015, 10.3),
             ("sample-7", "sample_7.csv", 130, 2200, 12.0),
         ]
-        let suggestionIDs = excludedSpecimenIDs.isEmpty ? ["sample-1", "sample-7"] : []
         let includedSpecimens = specimens.filter { !excludedSpecimenIDs.contains($0.id) }
         let representative = includedSpecimens.sorted { abs($0.strength - 100) < abs($1.strength - 100) }.first ?? specimens[3]
 
@@ -871,6 +880,40 @@ enum TestPayloads {
             } / Double(values.count - 1)
             return sqrt(variance)
         }
+
+        let baselineStrengthMean = mean(specimens.map(\.strength))
+        let baselineModulusMean = mean(specimens.map(\.modulus))
+        let baselineElongationMean = mean(specimens.map(\.elongation))
+        let baselineStrengthStd = std(specimens.map(\.strength))
+        let baselineModulusStd = std(specimens.map(\.modulus))
+        let baselineElongationStd = std(specimens.map(\.elongation))
+        let baselineScores: [String: Double] = Dictionary(
+            uniqueKeysWithValues: specimens.map { specimen in
+                let signedScore = (
+                    (specimen.strength - baselineStrengthMean) / max(baselineStrengthStd, 0.0001) +
+                    (specimen.modulus - baselineModulusMean) / max(baselineModulusStd, 0.0001) +
+                    (specimen.elongation - baselineElongationMean) / max(baselineElongationStd, 0.0001)
+                ) / 3
+                return (specimen.id, signedScore)
+            }
+        )
+        let baselineKeepIDs = Set(
+            specimens
+                .sorted { lhs, rhs in
+                    let left = abs(baselineScores[lhs.id] ?? .infinity)
+                    let right = abs(baselineScores[rhs.id] ?? .infinity)
+                    if left != right {
+                        return left < right
+                    }
+                    return lhs.filename.localizedCaseInsensitiveCompare(rhs.filename) == .orderedAscending
+                }
+                .prefix(5)
+                .map(\.id)
+        )
+        let suggestionIDs = excludedSpecimenIDs.isEmpty
+            ? specimens.compactMap { baselineKeepIDs.contains($0.id) ? nil : $0.id }
+            : []
+        let canSuggest = includedSpecimens.count >= 5
 
         return DataStudioWorkbookPreviewResponse(
             workbookPath: path,
@@ -907,6 +950,7 @@ enum TestPayloads {
             ],
             specimens: specimens.map { specimen in
                 let included = !excludedSpecimenIDs.contains(specimen.id)
+                let signedScore = baselineScores[specimen.id] ?? 0
                 return .init(
                     specimenId: specimen.id,
                     label: specimen.filename,
@@ -926,15 +970,22 @@ enum TestPayloads {
                         .init(x: 10, y: specimen.strength / 5),
                     ],
                     triadComplete: true,
-                    suggestedExclusion: suggestionIDs.contains(specimen.id)
+                    suggestedExclusion: suggestionIDs.contains(specimen.id),
+                    compositeSignedScore: signedScore,
+                    distanceFromMeanScore: abs(signedScore),
+                    scoreSide: signedScore == 0 ? "neutral" : (signedScore < 0 ? "low" : "high"),
+                    autoRuleRole: canSuggest
+                        ? (baselineKeepIDs.contains(specimen.id) ? "keep" : "exclude")
+                        : "ineligible",
+                    eligibleForAutoFilter: true
                 )
             },
             warnings: [],
             suggestedExclusionIds: suggestionIDs,
-            suggestionSupported: includedSpecimens.count >= 7,
-            suggestionSupportReason: includedSpecimens.count >= 7
+            suggestionSupported: canSuggest,
+            suggestionSupportReason: canSuggest
                 ? ""
-                : "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
+                : "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation."
         )
     }
 

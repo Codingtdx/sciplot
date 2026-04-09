@@ -54,11 +54,14 @@ final class DataStudioSession {
     var workbooks: [DataStudioWorkbookItem] = []
     var groupStates: [DataStudioGroupStatePayload] = []
     var specimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]] = [:]
+    var draftSpecimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]] = [:]
     var workbookPreviewByPath: [String: DataStudioWorkbookPreviewResponse] = [:]
+    var baselineWorkbookPreviewByPath: [String: DataStudioWorkbookPreviewResponse] = [:]
     var focusedWorkbookPath: String?
-    var specimenFilterWorkbookPath: String?
-    var isSpecimenFilterPresented = false
+    var specimenFilterAnchor: DataStudioSpecimenFilterAnchor?
     var focusedWorkbookPreviewRefreshState: DataStudioWorkbookPreviewRefreshState = .idle
+    var baselineWorkbookPreviewRefreshState: DataStudioWorkbookPreviewRefreshState = .idle
+    var isSpecimenFilterCloseConfirmationPresented = false
 
     var comparisonSet: DataStudioComparisonSetResponse?
     var comparisonContextCacheKey: String?
@@ -314,11 +317,12 @@ final class DataStudioSession {
         return orderedWorkbooks.first(where: { $0.response.workbookPath == focusedWorkbookPath }) ?? orderedWorkbooks.first
     }
 
-    var specimenFilterWorkbook: DataStudioWorkbookItem? {
-        guard let specimenFilterWorkbookPath else {
-            return nil
-        }
-        return orderedWorkbooks.first(where: { $0.response.workbookPath == specimenFilterWorkbookPath })
+    var specimenFilterWorkbookPath: String? {
+        specimenFilterAnchor?.workbookPath
+    }
+
+    var isSpecimenFilterPresented: Bool {
+        specimenFilterAnchor != nil
     }
 
     var focusedWorkbookPreview: DataStudioWorkbookPreviewResponse? {
@@ -336,12 +340,25 @@ final class DataStudioSession {
         workbookPreviewByPath[workbookPath]
     }
 
+    func baselineWorkbookPreview(for workbookPath: String) -> DataStudioWorkbookPreviewResponse? {
+        baselineWorkbookPreviewByPath[workbookPath]
+    }
+
     func specimenStates(for workbookPath: String) -> [DataStudioSpecimenStatePayload] {
         specimenStatesByWorkbookPath[workbookPath] ?? []
     }
 
-    func activeSuggestedExclusionIDs(for workbookPath: String) -> [String] {
-        workbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []
+    func draftSpecimenStates(for workbookPath: String) -> [DataStudioSpecimenStatePayload] {
+        draftSpecimenStatesByWorkbookPath[workbookPath] ?? specimenStates(for: workbookPath)
+    }
+
+    func suggestedAutoIncludedSpecimenIDs(for workbookPath: String) -> Set<String> {
+        Set(
+            baselineWorkbookPreview(for: workbookPath)?
+                .specimens
+                .filter { $0.autoRuleRole == "keep" }
+                .map(\.specimenId) ?? []
+        )
     }
 
     var selectedComparisonFigure: DataStudioExportFigureItem? {
@@ -349,13 +366,6 @@ final class DataStudioSession {
             return comparisonFigureItems.first
         }
         return comparisonFigureItems.first(where: { $0.id == selectedComparisonFigureID }) ?? comparisonFigureItems.first
-    }
-
-    var specimenFilterPreview: DataStudioWorkbookPreviewResponse? {
-        guard let specimenFilterWorkbookPath else {
-            return nil
-        }
-        return workbookPreview(for: specimenFilterWorkbookPath)
     }
 
     func displayedMetrics(for workbook: DataStudioWorkbookItem) -> [DataStudioMetricSummaryResponse] {
@@ -374,6 +384,146 @@ final class DataStudioSession {
             return true
         }
         return workbook.response.failedSampleCount > 0 || !workbook.response.warnings.isEmpty
+    }
+
+    func hasPendingFilterChanges(for workbookPath: String) -> Bool {
+        normalizedSpecimenStates(draftSpecimenStates(for: workbookPath)) != normalizedSpecimenStates(specimenStates(for: workbookPath))
+    }
+
+    func specimenFilterMode(for workbookPath: String) -> DataStudioSpecimenFilterMode {
+        let excludedIDs = Set(
+            specimenStates(for: workbookPath)
+                .filter { !$0.included }
+                .map(\.specimenId)
+        )
+        if excludedIDs.isEmpty {
+            return .off
+        }
+        let baselineSuggested = Set(baselineWorkbookPreview(for: workbookPath)?.suggestedExclusionIds ?? [])
+        if !baselineSuggested.isEmpty, excludedIDs == baselineSuggested {
+            return .auto
+        }
+        return .manual
+    }
+
+    func specimenFilterPresentation(for workbookPath: String) -> DataStudioSpecimenFilterPresentation {
+        let mode = specimenFilterMode(for: workbookPath)
+        let hasPendingChanges = hasPendingFilterChanges(for: workbookPath)
+        let baselinePreview = baselineWorkbookPreview(for: workbookPath)
+        let appliedPreview = workbookPreview(for: workbookPath)
+        let appliedRefreshing: Bool
+        switch focusedWorkbookPreviewRefreshState {
+        case let .refreshing(currentPath):
+            appliedRefreshing = currentPath == workbookPath
+        default:
+            appliedRefreshing = false
+        }
+        let baselineRefreshing: Bool
+        switch baselineWorkbookPreviewRefreshState {
+        case let .refreshing(currentPath):
+            baselineRefreshing = currentPath == workbookPath
+        default:
+            baselineRefreshing = false
+        }
+        let isBusy = appliedRefreshing || baselineRefreshing || currentActivity == .previewingComparison
+        let totalSpecimenCount = appliedPreview?.totalSpecimenCount ?? baselinePreview?.totalSpecimenCount ?? 0
+        let appliedIncludedCount = appliedPreview?.includedSpecimenCount ?? totalSpecimenCount
+        let autoKeepCount = baselinePreview?.specimens.filter { $0.autoRuleRole == "keep" }.count ?? 0
+        let autoFilterSupported = baselinePreview?.supported == true && (baselinePreview?.suggestionSupported ?? false)
+        let autoFilterReason: String?
+        if baselinePreview?.supported == false {
+            autoFilterReason = baselinePreview?.unsupportedReason
+        } else if baselinePreview?.suggestionSupported == false {
+            autoFilterReason = baselinePreview?.suggestionSupportReason
+        } else {
+            autoFilterReason = nil
+        }
+        let title: String
+        switch mode {
+        case .off:
+            title = "All Specimens"
+        case .auto:
+            title = "Auto Keep 5"
+        case .manual:
+            title = "Manual Keep \(appliedIncludedCount)"
+        }
+        let help = hasPendingChanges ? "Advanced manual edits are still draft." : (autoFilterReason ?? mode.defaultHelp)
+
+        let summary: String?
+        if totalSpecimenCount > 0, appliedIncludedCount < totalSpecimenCount {
+            summary = "\(totalSpecimenCount) -> \(appliedIncludedCount)"
+        } else {
+            summary = nil
+        }
+
+        let sortedRows = (baselinePreview?.specimens ?? [])
+            .sorted { lhs, rhs in
+                let leftHasDistance = lhs.distanceFromMeanScore != nil
+                let rightHasDistance = rhs.distanceFromMeanScore != nil
+                if leftHasDistance != rightHasDistance {
+                    return leftHasDistance && !rightHasDistance
+                }
+                let left = lhs.distanceFromMeanScore ?? .infinity
+                let right = rhs.distanceFromMeanScore ?? .infinity
+                if left != right {
+                    return left < right
+                }
+                let filenameComparison = lhs.filename.localizedCaseInsensitiveCompare(rhs.filename)
+                if filenameComparison != .orderedSame {
+                    return filenameComparison == .orderedAscending
+                }
+                return lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+            }
+        let rankedRows = sortedRows.enumerated().map { index, specimen in
+            let disposition: DataStudioSpecimenFilterRankDisposition
+            switch specimen.autoRuleRole {
+            case "keep":
+                disposition = .keep
+            case "exclude":
+                disposition = .out
+            default:
+                disposition = .ineligible
+            }
+            let showsCutoffAfter = disposition == .keep
+                && sortedRows.dropFirst(index + 1).contains(where: { $0.autoRuleRole != "keep" })
+            return DataStudioSpecimenFilterRankedRow(
+                id: specimen.specimenId,
+                rank: index + 1,
+                distanceFromMeanScore: specimen.distanceFromMeanScore,
+                disposition: disposition,
+                showsCutoffAfter: showsCutoffAfter
+            )
+        }
+        let canApplyAuto = autoFilterSupported
+            && !isBusy
+            && autoKeepCount > 0
+            && (mode != .auto || hasPendingChanges)
+        let canTurnOff = !isBusy && (appliedIncludedCount < totalSpecimenCount || hasPendingChanges)
+
+        return DataStudioSpecimenFilterPresentation(
+            mode: mode,
+            title: title,
+            summary: summary,
+            help: help,
+            rowBadge: hasPendingChanges ? "Edited" : nil,
+            hasPendingChanges: hasPendingChanges,
+            isBusy: isBusy,
+            totalSpecimenCount: totalSpecimenCount,
+            appliedIncludedCount: appliedIncludedCount,
+            autoKeepCount: autoKeepCount,
+            autoFilterSupported: autoFilterSupported,
+            autoFilterReason: autoFilterReason,
+            canApplyAuto: canApplyAuto,
+            canTurnOff: canTurnOff,
+            rankedRows: rankedRows,
+            advancedRows: sortedRows
+        )
+    }
+
+    func draftSpecimenIncluded(for workbookPath: String, specimenId: String) -> Bool {
+        draftSpecimenStates(for: workbookPath)
+            .first(where: { $0.specimenId == specimenId })?
+            .included ?? true
     }
 
     var createTemplateSuggestions: [DataStudioBindingSuggestionResponse] {
@@ -958,13 +1108,16 @@ final class DataStudioSession {
     func focusWorkbook(path: String?) {
         let resolvedPath = path ?? orderedWorkbooks.first?.response.workbookPath
         focusedWorkbookPath = resolvedPath
-        guard isSpecimenFilterPresented else {
+        guard let specimenFilterAnchor else {
             return
         }
-        specimenFilterWorkbookPath = resolvedPath
-        if let resolvedPath {
-            scheduleWorkbookPreviewRefresh(for: resolvedPath, rebuildComparisonContext: false)
+        guard let resolvedPath else {
+            closeSpecimenFilter()
+            return
         }
+        self.specimenFilterAnchor = specimenFilterAnchor.retargeted(to: resolvedPath)
+        scheduleWorkbookPreviewRefresh(for: resolvedPath, rebuildComparisonContext: false)
+        scheduleBaselineWorkbookPreviewRefresh(for: resolvedPath)
     }
 
     func updateDisplayName(for workbookPath: String, to displayName: String) {
@@ -989,17 +1142,63 @@ final class DataStudioSession {
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Toggle Compare Inclusion")
     }
 
-    func openSpecimenFilter(for workbookPath: String) {
+    func openSpecimenFilter(for workbookPath: String, anchor: DataStudioSpecimenFilterAnchor) {
+        if let currentPath = specimenFilterWorkbookPath,
+           currentPath != workbookPath,
+           hasPendingFilterChanges(for: currentPath)
+        {
+            runtimeState.pendingSpecimenFilterAction = .open(anchor)
+            isSpecimenFilterCloseConfirmationPresented = true
+            return
+        }
         focusedWorkbookPath = workbookPath
-        specimenFilterWorkbookPath = workbookPath
-        isSpecimenFilterPresented = true
+        specimenFilterAnchor = anchor
+        primeDraftSpecimenStates(for: workbookPath)
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: false)
+        scheduleBaselineWorkbookPreviewRefresh(for: workbookPath)
+    }
+
+    func openSpecimenFilter(for workbookPath: String) {
+        openSpecimenFilter(for: workbookPath, anchor: .focusedStrip(workbookPath: workbookPath))
     }
 
     func closeSpecimenFilter() {
-        isSpecimenFilterPresented = false
-        specimenFilterWorkbookPath = nil
-        focusedWorkbookPreviewRefreshState = .idle
+        guard let workbookPath = specimenFilterWorkbookPath else {
+            dismissSpecimenFilter()
+            return
+        }
+        if hasPendingFilterChanges(for: workbookPath) {
+            runtimeState.pendingSpecimenFilterAction = .close
+            isSpecimenFilterCloseConfirmationPresented = true
+            return
+        }
+        dismissSpecimenFilter()
+    }
+
+    func confirmPendingSpecimenFilterClosure(applyChanges: Bool) {
+        guard let pendingAction = runtimeState.pendingSpecimenFilterAction else {
+            isSpecimenFilterCloseConfirmationPresented = false
+            return
+        }
+        isSpecimenFilterCloseConfirmationPresented = false
+        runtimeState.pendingSpecimenFilterAction = nil
+        guard let workbookPath = specimenFilterWorkbookPath else {
+            performPendingSpecimenFilterAction(pendingAction)
+            return
+        }
+        if applyChanges {
+            applyManualFilter(for: workbookPath) {
+                self.performPendingSpecimenFilterAction(pendingAction)
+            }
+        } else {
+            revertDraftSpecimenStates(for: workbookPath)
+            performPendingSpecimenFilterAction(pendingAction)
+        }
+    }
+
+    func cancelPendingSpecimenFilterClosure() {
+        isSpecimenFilterCloseConfirmationPresented = false
+        runtimeState.pendingSpecimenFilterAction = nil
     }
 
     func retryPreviewRefresh() {
@@ -1008,74 +1207,70 @@ final class DataStudioSession {
             return
         }
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        scheduleBaselineWorkbookPreviewRefresh(for: workbookPath)
     }
 
     func applySuggestedExclusions(for workbookPath: String) {
-        let suggested = activeSuggestedExclusionIDs(for: workbookPath)
-        guard !suggested.isEmpty else {
+        let includedIDs = suggestedAutoIncludedSpecimenIDs(for: workbookPath)
+        guard !includedIDs.isEmpty else {
             return
         }
-        let previousSnapshot = undoSnapshot()
-        setSpecimenInclusion(
+        let allSpecimenIDs = Set(allKnownSpecimenIDs(for: workbookPath))
+        applyCommittedSpecimenStates(
             for: workbookPath,
-            includedIDs: Set(specimenStates(for: workbookPath).map(\.specimenId)).subtracting(suggested),
-            explicitlyExcludedIDs: Set(suggested)
+            includedIDs: includedIDs,
+            explicitlyExcludedIDs: allSpecimenIDs.subtracting(includedIDs),
+            actionName: "Use Auto Keep 5"
         )
-        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
-        registerUndo(previousSnapshot: previousSnapshot, actionName: "Apply Suggested Exclusions")
     }
 
     func restoreAllSpecimens(for workbookPath: String) {
-        guard let preview = workbookPreview(for: workbookPath) else {
+        let specimenIDs = allKnownSpecimenIDs(for: workbookPath)
+        guard !specimenIDs.isEmpty else {
             return
         }
-        let previousSnapshot = undoSnapshot()
-        setSpecimenInclusion(
+        applyCommittedSpecimenStates(
             for: workbookPath,
-            includedIDs: Set(preview.specimens.map(\.specimenId)),
-            explicitlyExcludedIDs: []
+            includedIDs: Set(specimenIDs),
+            explicitlyExcludedIDs: [],
+            actionName: "Turn Off Filter"
         )
-        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
-        registerUndo(previousSnapshot: previousSnapshot, actionName: "Include All Specimens")
     }
 
-    func includeAllSpecimens(for workbookPath: String) {
-        restoreAllSpecimens(for: workbookPath)
+    func updateDraftSpecimenInclusion(for workbookPath: String, specimenId: String, included: Bool) {
+        primeDraftSpecimenStates(for: workbookPath)
+        let currentStates = upsertSpecimenState(
+            in: draftSpecimenStates(for: workbookPath),
+            workbookPath: workbookPath,
+            specimenId: specimenId,
+            included: included
+        )
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(currentStates)
     }
 
-    func excludeAllSpecimens(for workbookPath: String) {
-        guard let preview = workbookPreview(for: workbookPath) else {
-            return
-        }
+    func applyManualFilter(for workbookPath: String, completion: (() -> Void)? = nil) {
+        primeDraftSpecimenStates(for: workbookPath)
+        let draftStates = normalizedSpecimenStates(draftSpecimenStates(for: workbookPath))
         let previousSnapshot = undoSnapshot()
-        setSpecimenInclusion(
-            for: workbookPath,
-            includedIDs: [],
-            explicitlyExcludedIDs: Set(preview.specimens.map(\.specimenId))
-        )
+        specimenStatesByWorkbookPath[workbookPath] = draftStates
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
-        registerUndo(previousSnapshot: previousSnapshot, actionName: "Exclude All Specimens")
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Apply Manual Filter")
+        completion?()
+    }
+
+    func revertDraftSpecimenStates(for workbookPath: String) {
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(specimenStates(for: workbookPath))
     }
 
     func updateSpecimenInclusion(for workbookPath: String, specimenId: String, included: Bool) {
         let previousSnapshot = undoSnapshot()
-        var currentStates = specimenStates(for: workbookPath)
-        if let index = currentStates.firstIndex(where: { $0.specimenId == specimenId }) {
-            currentStates[index] = DataStudioSpecimenStatePayload(
-                workbookPath: workbookPath,
-                specimenId: specimenId,
-                included: included
-            )
-        } else {
-            currentStates.append(
-                DataStudioSpecimenStatePayload(
-                    workbookPath: workbookPath,
-                    specimenId: specimenId,
-                    included: included
-                )
-            )
-        }
-        specimenStatesByWorkbookPath[workbookPath] = currentStates.sorted { $0.specimenId < $1.specimenId }
+        let currentStates = upsertSpecimenState(
+            in: specimenStates(for: workbookPath),
+            workbookPath: workbookPath,
+            specimenId: specimenId,
+            included: included
+        )
+        specimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(currentStates)
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Toggle Specimen Inclusion")
     }
@@ -1098,13 +1293,15 @@ final class DataStudioSession {
 
     func removeWorkbook(path: String) {
         asyncCoordination.workbookPreview.cancel(for: path)
+        asyncCoordination.baselineWorkbookPreview.cancel(for: path)
         workbooks.removeAll { $0.response.workbookPath == path }
         groupStates.removeAll { $0.workbookPath == path }
         specimenStatesByWorkbookPath.removeValue(forKey: path)
+        draftSpecimenStatesByWorkbookPath.removeValue(forKey: path)
         workbookPreviewByPath.removeValue(forKey: path)
+        baselineWorkbookPreviewByPath.removeValue(forKey: path)
         if specimenFilterWorkbookPath == path {
-            specimenFilterWorkbookPath = nil
-            isSpecimenFilterPresented = false
+            dismissSpecimenFilter()
         }
         selectedComparisonFigureID = nil
         reindexGroupStates()
@@ -1669,11 +1866,15 @@ final class DataStudioSession {
         let validPaths = Set(workbooks.map { $0.response.workbookPath })
         let filtered = restoredStates.filter { validPaths.contains($0.workbookPath) }
         specimenStatesByWorkbookPath = Dictionary(grouping: filtered, by: \.workbookPath)
+            .mapValues(normalizedSpecimenStates)
     }
 
     private func refreshFocusedWorkbookPreviewIfNeeded() async {
         if let workbookPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath {
             await refreshWorkbookPreview(for: workbookPath)
+            if baselineWorkbookPreview(for: workbookPath) == nil {
+                await refreshBaselineWorkbookPreview(for: workbookPath)
+            }
         }
     }
 
@@ -1692,7 +1893,16 @@ final class DataStudioSession {
         }
     }
 
-    private func tracksWorkbookPreviewRefreshState(for workbookPath: String) -> Bool {
+    private func scheduleBaselineWorkbookPreviewRefresh(for workbookPath: String) {
+        asyncCoordination.baselineWorkbookPreview.schedule(for: workbookPath) { [weak self] workbookPath, revision in
+            guard let self else {
+                return
+            }
+            await self.refreshBaselineWorkbookPreview(for: workbookPath, revision: revision)
+        }
+    }
+
+    private func tracksAppliedWorkbookPreviewRefreshState(for workbookPath: String) -> Bool {
         let trackedPath = specimenFilterWorkbookPath ?? focusedWorkbook?.response.workbookPath
         return trackedPath == workbookPath
     }
@@ -1702,7 +1912,7 @@ final class DataStudioSession {
             return
         }
         let activeRevision = revision ?? asyncCoordination.workbookPreview.beginNow(for: workbookPath)
-        if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+        if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
             focusedWorkbookPreviewRefreshState = .refreshing(workbookPath: workbookPath)
         }
         do {
@@ -1717,15 +1927,59 @@ final class DataStudioSession {
             }
             workbookPreviewByPath[workbookPath] = response
             synchronizeSpecimenStates(with: response)
-            if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+            if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
                 focusedWorkbookPreviewRefreshState = .idle
             }
         } catch {
             guard asyncCoordination.workbookPreview.isLatest(for: workbookPath, revision: activeRevision), !Task.isCancelled else {
                 return
             }
-            if tracksWorkbookPreviewRefreshState(for: workbookPath) {
+            if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
                 focusedWorkbookPreviewRefreshState = .failed(
+                    workbookPath: workbookPath,
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func refreshBaselineWorkbookPreview(for workbookPath: String, revision: Int? = nil) async {
+        guard let client else {
+            return
+        }
+        let activeRevision = revision ?? asyncCoordination.baselineWorkbookPreview.beginNow(for: workbookPath)
+        if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
+            baselineWorkbookPreviewRefreshState = .refreshing(workbookPath: workbookPath)
+        }
+        do {
+            let response = try await client.previewDataStudioWorkbook(.init(workbookPath: workbookPath))
+            guard asyncCoordination.baselineWorkbookPreview.isLatest(for: workbookPath, revision: activeRevision), !Task.isCancelled else {
+                return
+            }
+            baselineWorkbookPreviewByPath[workbookPath] = response
+            if specimenStatesByWorkbookPath[workbookPath] == nil, response.supported {
+                specimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(
+                    response.specimens.map {
+                        DataStudioSpecimenStatePayload(
+                            workbookPath: workbookPath,
+                            specimenId: $0.specimenId,
+                            included: $0.included
+                        )
+                    }
+                )
+            }
+            if draftSpecimenStatesByWorkbookPath[workbookPath] == nil {
+                draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(specimenStates(for: workbookPath))
+            }
+            if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
+                baselineWorkbookPreviewRefreshState = .idle
+            }
+        } catch {
+            guard asyncCoordination.baselineWorkbookPreview.isLatest(for: workbookPath, revision: activeRevision), !Task.isCancelled else {
+                return
+            }
+            if tracksAppliedWorkbookPreviewRefreshState(for: workbookPath) {
+                baselineWorkbookPreviewRefreshState = .failed(
                     workbookPath: workbookPath,
                     message: error.localizedDescription
                 )
@@ -1737,12 +1991,15 @@ final class DataStudioSession {
         guard preview.supported else {
             return
         }
-        specimenStatesByWorkbookPath[preview.workbookPath] = preview.specimens.map {
+        specimenStatesByWorkbookPath[preview.workbookPath] = normalizedSpecimenStates(preview.specimens.map {
             DataStudioSpecimenStatePayload(
                 workbookPath: preview.workbookPath,
                 specimenId: $0.specimenId,
                 included: $0.included
             )
+        })
+        if !hasPendingFilterChanges(for: preview.workbookPath) {
+            draftSpecimenStatesByWorkbookPath[preview.workbookPath] = normalizedSpecimenStates(specimenStates(for: preview.workbookPath))
         }
     }
 
@@ -1751,16 +2008,98 @@ final class DataStudioSession {
         includedIDs: Set<String>,
         explicitlyExcludedIDs: Set<String>
     ) {
-        guard let preview = workbookPreview(for: workbookPath) else {
+        let specimenIDs = allKnownSpecimenIDs(for: workbookPath)
+        guard !specimenIDs.isEmpty else {
             return
         }
-        specimenStatesByWorkbookPath[workbookPath] = preview.specimens.map {
-            let included = explicitlyExcludedIDs.contains($0.specimenId) ? false : includedIDs.contains($0.specimenId)
+        specimenStatesByWorkbookPath[workbookPath] = specimenIDs.map { specimenId in
+            let included = explicitlyExcludedIDs.contains(specimenId) ? false : includedIDs.contains(specimenId)
             return DataStudioSpecimenStatePayload(
                 workbookPath: workbookPath,
-                specimenId: $0.specimenId,
+                specimenId: specimenId,
                 included: included
             )
+        }
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(specimenStates(for: workbookPath))
+    }
+
+    private func allKnownSpecimenIDs(for workbookPath: String) -> [String] {
+        let baselineIDs = baselineWorkbookPreview(for: workbookPath)?.specimens.map(\.specimenId) ?? []
+        if !baselineIDs.isEmpty {
+            return baselineIDs
+        }
+        let previewIDs = workbookPreview(for: workbookPath)?.specimens.map(\.specimenId) ?? []
+        if !previewIDs.isEmpty {
+            return previewIDs
+        }
+        let committedIDs = specimenStates(for: workbookPath).map(\.specimenId)
+        if !committedIDs.isEmpty {
+            return committedIDs
+        }
+        return draftSpecimenStates(for: workbookPath).map(\.specimenId)
+    }
+
+    private func primeDraftSpecimenStates(for workbookPath: String) {
+        if draftSpecimenStatesByWorkbookPath[workbookPath] != nil {
+            return
+        }
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(specimenStates(for: workbookPath))
+    }
+
+    private func applyCommittedSpecimenStates(
+        for workbookPath: String,
+        includedIDs: Set<String>,
+        explicitlyExcludedIDs: Set<String>,
+        actionName: String
+    ) {
+        let previousSnapshot = undoSnapshot()
+        setSpecimenInclusion(
+            for: workbookPath,
+            includedIDs: includedIDs,
+            explicitlyExcludedIDs: explicitlyExcludedIDs
+        )
+        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: actionName)
+    }
+
+    private func normalizedSpecimenStates(_ states: [DataStudioSpecimenStatePayload]) -> [DataStudioSpecimenStatePayload] {
+        states.sorted { lhs, rhs in
+            lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+        }
+    }
+
+    private func upsertSpecimenState(
+        in states: [DataStudioSpecimenStatePayload],
+        workbookPath: String,
+        specimenId: String,
+        included: Bool
+    ) -> [DataStudioSpecimenStatePayload] {
+        var updatedStates = states
+        let payload = DataStudioSpecimenStatePayload(
+            workbookPath: workbookPath,
+            specimenId: specimenId,
+            included: included
+        )
+        if let index = updatedStates.firstIndex(where: { $0.specimenId == specimenId }) {
+            updatedStates[index] = payload
+        } else {
+            updatedStates.append(payload)
+        }
+        return updatedStates
+    }
+
+    private func dismissSpecimenFilter() {
+        specimenFilterAnchor = nil
+        focusedWorkbookPreviewRefreshState = .idle
+        baselineWorkbookPreviewRefreshState = .idle
+    }
+
+    private func performPendingSpecimenFilterAction(_ action: PendingSpecimenFilterAction) {
+        switch action {
+        case .close:
+            dismissSpecimenFilter()
+        case let .open(anchor):
+            openSpecimenFilter(for: anchor.workbookPath, anchor: anchor)
         }
     }
 
@@ -2051,6 +2390,7 @@ final class DataStudioSession {
     private func restore(from snapshot: UndoSnapshot) {
         groupStates = snapshot.groupStates
         specimenStatesByWorkbookPath = snapshot.specimenStatesByWorkbookPath
+        draftSpecimenStatesByWorkbookPath = snapshot.specimenStatesByWorkbookPath
         selectedFigureFamilyID = snapshot.selectedFigureFamilyID
         selectedFigureTemplateID = snapshot.selectedFigureTemplateID
         selectedRecipeID = snapshot.selectedRecipeID
@@ -2063,14 +2403,19 @@ final class DataStudioSession {
     private func resetContentState() {
         asyncCoordination.comparisonRefresh.cancel()
         asyncCoordination.workbookPreview.cancelAll()
+        asyncCoordination.baselineWorkbookPreview.cancelAll()
         workbooks = []
         groupStates = []
         specimenStatesByWorkbookPath = [:]
+        draftSpecimenStatesByWorkbookPath = [:]
         workbookPreviewByPath = [:]
+        baselineWorkbookPreviewByPath = [:]
         focusedWorkbookPath = nil
-        specimenFilterWorkbookPath = nil
-        isSpecimenFilterPresented = false
+        specimenFilterAnchor = nil
         focusedWorkbookPreviewRefreshState = .idle
+        baselineWorkbookPreviewRefreshState = .idle
+        isSpecimenFilterCloseConfirmationPresented = false
+        runtimeState.pendingSpecimenFilterAction = nil
         comparisonSet = nil
         comparisonContextCacheKey = nil
         comparisonContextMaterializedAt = nil
@@ -2549,12 +2894,19 @@ private extension DataStudioSession {
         var meta: SidecarMetaResponse?
         var contract: PlotContractResponse?
         var isApplyingUndoRedo = false
+        var pendingSpecimenFilterAction: PendingSpecimenFilterAction?
     }
 
     @MainActor
     final class AsyncCoordination {
         let comparisonRefresh = AsyncLatestTaskCoordinator()
         let workbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
+        let baselineWorkbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
+    }
+
+    enum PendingSpecimenFilterAction {
+        case close
+        case open(DataStudioSpecimenFilterAnchor)
     }
 
     enum DerivedState {

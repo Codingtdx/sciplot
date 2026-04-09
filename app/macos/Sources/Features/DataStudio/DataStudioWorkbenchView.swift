@@ -17,11 +17,6 @@ struct DataStudioWorkbenchView: View {
                 DataStudioGroupRailView(session: session)
                     .frame(minWidth: 280, idealWidth: 320, maxWidth: 360, maxHeight: .infinity)
 
-                if session.isSpecimenFilterPresented, let workbook = session.specimenFilterWorkbook {
-                    DataStudioSpecimenFilterPanel(session: session, workbook: workbook)
-                        .frame(minWidth: 320, idealWidth: 360, maxWidth: 420, maxHeight: .infinity)
-                }
-
                 DataStudioPreviewWorkspaceView(session: session)
                     .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -49,6 +44,22 @@ struct DataStudioWorkbenchView: View {
         }
         .sheet(isPresented: guideBinding) {
             DataStudioGuideSheet(session: session)
+        }
+        .confirmationDialog(
+            "Apply manual filter changes before closing?",
+            isPresented: specimenFilterCloseConfirmationBinding
+        ) {
+            Button("Apply Filter") {
+                session.confirmPendingSpecimenFilterClosure(applyChanges: true)
+            }
+            Button("Discard Changes", role: .destructive) {
+                session.confirmPendingSpecimenFilterClosure(applyChanges: false)
+            }
+            Button("Cancel", role: .cancel) {
+                session.cancelPendingSpecimenFilterClosure()
+            }
+        } message: {
+            Text("Your Advanced specimen edits are not yet applied to the compare preview.")
         }
     }
 
@@ -163,6 +174,13 @@ struct DataStudioWorkbenchView: View {
         )
     }
 
+    private var specimenFilterCloseConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { session.isSpecimenFilterCloseConfirmationPresented },
+            set: { session.isSpecimenFilterCloseConfirmationPresented = $0 }
+        )
+    }
+
 }
 
 private struct DataStudioGroupRailView: View {
@@ -239,20 +257,7 @@ private struct DataStudioGroupRowView: View {
                     .labelsHidden()
                     .toggleStyle(.checkbox)
 
-                Button {
-                    session.openSpecimenFilter(for: group.workbook.response.workbookPath)
-                } label: {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Open specimen filter")
-
                 Menu {
-                    Button("Filter Specimens") {
-                        session.openSpecimenFilter(for: group.workbook.response.workbookPath)
-                    }
-                    Divider()
                     Button("Reveal Workbook") {
                         session.focusWorkbook(path: group.workbook.response.workbookPath)
                         session.revealFocusedWorkbook()
@@ -275,6 +280,10 @@ private struct DataStudioGroupRowView: View {
             HStack(spacing: 8) {
                 badge(title: session.displayedReplicateBadge(for: group.workbook), tint: .secondary)
 
+                if let editedBadge = session.specimenFilterPresentation(for: group.workbook.response.workbookPath).rowBadge {
+                    badge(title: editedBadge, tint: .orange)
+                }
+
                 if session.workbookHasWarnings(group.workbook) {
                     badge(title: "Warning", tint: .orange)
                 } else {
@@ -295,10 +304,6 @@ private struct DataStudioGroupRowView: View {
         }
         .padding(.vertical, 6)
         .contextMenu {
-            Button("Filter Specimens") {
-                session.openSpecimenFilter(for: group.workbook.response.workbookPath)
-            }
-            Divider()
             Button("Reveal Workbook") {
                 session.focusWorkbook(path: group.workbook.response.workbookPath)
                 session.revealFocusedWorkbook()
@@ -470,13 +475,10 @@ private struct DataStudioFocusedWorkbookStrip: View {
                 Text("Focused Group")
                     .font(.headline)
                 Spacer()
-                Button("Filter Specimens") {
-                    session.openSpecimenFilter(for: workbook.response.workbookPath)
-                }
-                .buttonStyle(.bordered)
                 Text(workbook.response.templateMatch.label)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
             }
 
             if !displayedMetrics.isEmpty {

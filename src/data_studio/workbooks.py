@@ -31,6 +31,8 @@ from src.data_studio.template_store import load_template
 from src.infrastructure.persistence.data_studio_imports import prepare_managed_data_studio_import_dir
 
 GENERIC_TEMPLATE_PARSE_STRATEGY = "structured:curve_metrics_columns"
+AUTO_FILTER_KEEP_COUNT = 5
+AUTO_FILTER_METRIC_TRIAD = ("Strength", "Modulus", "Elongation")
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,15 @@ class FilteredWorkbookContext:
     replicate_groups: dict[str, ReplicateGroup]
 
 
+@dataclass(frozen=True)
+class _SpecimenAutoFilterScore:
+    composite_signed_score: float | None
+    distance_from_mean_score: float | None
+    score_side: str
+    auto_rule_role: str
+    eligible_for_auto_filter: bool
+
+
 class ParsedStructuredSample(TypedDict):
     filename: str
     curve: pd.DataFrame
@@ -72,6 +83,19 @@ class ParsedStructuredSample(TypedDict):
     y_label: str
     x_unit: str | None
     y_unit: str | None
+
+
+def _auto_filter_minimum_reason() -> str:
+    metrics = " / ".join(AUTO_FILTER_METRIC_TRIAD)
+    return (
+        f"Auto Keep {AUTO_FILTER_KEEP_COUNT} needs at least "
+        f"{AUTO_FILTER_KEEP_COUNT} included specimens with {metrics}."
+    )
+
+
+def _auto_filter_variation_reason() -> str:
+    metrics = " / ".join(AUTO_FILTER_METRIC_TRIAD)
+    return f"Auto Keep {AUTO_FILTER_KEEP_COUNT} needs varying {metrics} values across the included set."
 
 
 def create_template_from_candidates(
@@ -400,24 +424,32 @@ def preview_workbook(
         )
 
     filtered = load_filtered_workbook_context(path, specimen_states=specimen_states, allow_empty=True)
-    suggested_ids, suggestion_reason = _suggested_exclusion_ids(filtered.included_specimens)
+    auto_filter_scores, suggested_ids, suggestion_reason = _analyze_auto_filter_specimens(filtered.included_specimens)
     included_ids = {specimen.specimen_id for specimen in filtered.included_specimens}
-    specimen_previews = tuple(
-        DataStudioSpecimenPreview(
-            specimen_id=specimen.specimen_id,
-            label=specimen.label,
-            filename=specimen.filename,
-            source_path=specimen.source_path,
-            included=specimen.specimen_id in included_ids,
-            metrics={key: value for key, value in specimen.metrics.items()},
-            warnings=specimen.warnings,
-            exclusions=specimen.exclusions,
-            mini_curve_points=_downsample_curve_points(specimen.curve),
-            triad_complete=_has_complete_triad(specimen.metrics),
-            suggested_exclusion=specimen.specimen_id in suggested_ids,
+    specimen_previews_list: list[DataStudioSpecimenPreview] = []
+    for specimen in bundle.specimens:
+        score_info = auto_filter_scores.get(specimen.specimen_id, _DEFAULT_AUTO_FILTER_SCORE)
+        specimen_previews_list.append(
+            DataStudioSpecimenPreview(
+                specimen_id=specimen.specimen_id,
+                label=specimen.label,
+                filename=specimen.filename,
+                source_path=specimen.source_path,
+                included=specimen.specimen_id in included_ids,
+                metrics={key: value for key, value in specimen.metrics.items()},
+                warnings=specimen.warnings,
+                exclusions=specimen.exclusions,
+                mini_curve_points=_downsample_curve_points(specimen.curve),
+                triad_complete=_has_complete_triad(specimen.metrics),
+                suggested_exclusion=specimen.specimen_id in suggested_ids,
+                composite_signed_score=score_info.composite_signed_score,
+                distance_from_mean_score=score_info.distance_from_mean_score,
+                score_side=score_info.score_side,
+                auto_rule_role=score_info.auto_rule_role,
+                eligible_for_auto_filter=score_info.eligible_for_auto_filter,
+            )
         )
-        for specimen in bundle.specimens
-    )
+    specimen_previews = tuple(specimen_previews_list)
     return DataStudioWorkbookPreview(
         workbook_path=bundle.workbook.workbook_path,
         label=bundle.workbook.label,
@@ -431,7 +463,7 @@ def preview_workbook(
         specimens=specimen_previews,
         warnings=bundle.workbook.warnings,
         suggested_exclusion_ids=suggested_ids,
-        suggestion_supported=bool(suggested_ids),
+        suggestion_supported=not suggestion_reason,
         suggestion_support_reason=suggestion_reason,
     )
 
@@ -796,38 +828,99 @@ def _representative_scores(summary_df: pd.DataFrame) -> pd.Series:
         return pd.Series(0.0, index=summary_df.index, dtype=float)
     return scores.where(contributions > 0, other=np.inf)
 
+_DEFAULT_AUTO_FILTER_SCORE = _SpecimenAutoFilterScore(
+    composite_signed_score=None,
+    distance_from_mean_score=None,
+    score_side="ineligible",
+    auto_rule_role="ineligible",
+    eligible_for_auto_filter=False,
+)
 
-def _suggested_exclusion_ids(specimens: Iterable[LoadedWorkbookSpecimen]) -> tuple[tuple[str, ...], str]:
-    eligible = [specimen for specimen in specimens if _has_complete_triad(specimen.metrics)]
-    if len(eligible) < 7:
-        return (), "Suggest Exclusions needs at least 7 included specimens with Strength / Modulus / Elongation."
-    triad = ["Strength", "Modulus", "Elongation"]
-    summary_df = _specimen_metric_dataframe(eligible, metric_order=triad)
+
+def _analyze_auto_filter_specimens(
+    specimens: Iterable[LoadedWorkbookSpecimen],
+) -> tuple[dict[str, _SpecimenAutoFilterScore], tuple[str, ...], str]:
+    specimen_list = list(specimens)
+    eligible = [specimen for specimen in specimen_list if _has_complete_triad(specimen.metrics)]
+    scores_by_specimen_id = {specimen.specimen_id: _DEFAULT_AUTO_FILTER_SCORE for specimen in specimen_list}
+    if not eligible:
+        return scores_by_specimen_id, (), _auto_filter_minimum_reason()
+
+    composite = _composite_signed_scores(eligible)
+    if composite is not None:
+        for index, specimen in enumerate(eligible):
+            signed_score = float(composite.iloc[index])
+            if abs(signed_score) < 1e-9:
+                score_side = "neutral"
+            elif signed_score < 0:
+                score_side = "low"
+            else:
+                score_side = "high"
+            scores_by_specimen_id[specimen.specimen_id] = _SpecimenAutoFilterScore(
+                composite_signed_score=signed_score,
+                distance_from_mean_score=abs(signed_score),
+                score_side=score_side,
+                auto_rule_role="ineligible",
+                eligible_for_auto_filter=True,
+            )
+
+    if len(eligible) < AUTO_FILTER_KEEP_COUNT:
+        return scores_by_specimen_id, (), _auto_filter_minimum_reason()
+    if composite is None:
+        for specimen in eligible:
+            scores_by_specimen_id[specimen.specimen_id] = _SpecimenAutoFilterScore(
+                composite_signed_score=None,
+                distance_from_mean_score=None,
+                score_side="ineligible",
+                auto_rule_role="ineligible",
+                eligible_for_auto_filter=True,
+            )
+        return scores_by_specimen_id, (), _auto_filter_variation_reason()
+    if composite.empty:
+        return scores_by_specimen_id, (), f"Auto Keep {AUTO_FILTER_KEEP_COUNT} could not score the included specimens."
+
+    ordered_eligible = sorted(
+        eligible,
+        key=lambda specimen: (
+            scores_by_specimen_id[specimen.specimen_id].distance_from_mean_score
+            if scores_by_specimen_id[specimen.specimen_id].distance_from_mean_score is not None
+            else np.inf,
+            specimen.filename.lower(),
+            specimen.specimen_id,
+        ),
+    )
+    kept_ids = {specimen.specimen_id for specimen in ordered_eligible[:AUTO_FILTER_KEEP_COUNT]}
+    suggested_ids = tuple(
+        specimen.specimen_id for specimen in specimen_list if specimen.specimen_id not in kept_ids
+    )
+    for specimen in eligible:
+        score = scores_by_specimen_id[specimen.specimen_id]
+        scores_by_specimen_id[specimen.specimen_id] = _SpecimenAutoFilterScore(
+            composite_signed_score=score.composite_signed_score,
+            distance_from_mean_score=score.distance_from_mean_score,
+            score_side=score.score_side,
+            auto_rule_role="keep" if specimen.specimen_id in kept_ids else "exclude",
+            eligible_for_auto_filter=True,
+        )
+    return scores_by_specimen_id, suggested_ids, ""
+
+
+def _composite_signed_scores(specimens: list[LoadedWorkbookSpecimen]) -> pd.Series | None:
+    summary_df = _specimen_metric_dataframe(specimens, metric_order=AUTO_FILTER_METRIC_TRIAD)
     zscore_columns: list[pd.Series] = []
-    for metric in triad:
+    for metric in AUTO_FILTER_METRIC_TRIAD:
         series = pd.to_numeric(summary_df[metric], errors="coerce")
         std_value = float(series.std(ddof=1)) if series.notna().sum() > 1 else 0.0
         if std_value <= 0:
-            continue
+            return None
         zscore_columns.append((series - float(series.mean())) / std_value)
-    if len(zscore_columns) != len(triad):
-        return (), "Suggest Exclusions needs varying Strength / Modulus / Elongation values across the included set."
-    composite = pd.concat(zscore_columns, axis=1).mean(axis=1)
-    if composite.empty:
-        return (), "Suggest Exclusions could not score the included specimens."
-    lowest_index = int(composite.idxmin())
-    highest_index = int(composite.idxmax())
-    if lowest_index == highest_index:
-        return (), "Suggest Exclusions needs at least two distinct composite scores."
-    return (
-        eligible[lowest_index].specimen_id,
-        eligible[highest_index].specimen_id,
-    ), ""
+    if not zscore_columns:
+        return None
+    return pd.concat(zscore_columns, axis=1).mean(axis=1)
 
 
 def _has_complete_triad(metrics: dict[str, float | None]) -> bool:
-    triad = ("Strength", "Modulus", "Elongation")
-    return all(metrics.get(metric) is not None and pd.notna(metrics.get(metric)) for metric in triad)
+    return all(metrics.get(metric) is not None and pd.notna(metrics.get(metric)) for metric in AUTO_FILTER_METRIC_TRIAD)
 
 
 def _downsample_curve_points(curve: CurveSeries | None, *, max_points: int = 32) -> tuple[DataStudioCurvePoint, ...]:

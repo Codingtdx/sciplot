@@ -32,6 +32,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## macOS Interaction Conventions
 
 - Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Data Studio specimen filter uses one anchored popover entrypoint in the `Focused Group` strip. Do not restore a second left-rail trigger for the same control.
+- Default specimen-filter content opens directly to the ranked Auto Keep 5 list: sort by distance from mean, highlight the five kept specimens, and avoid workbook labels, filenames, or representative-curve copy in the default view.
+- Specimen identity and manual inclusion overrides are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.
 - Critical actions follow `disabled + help` and must not silently no-op.
 - Workbench top bars prioritize document-state feedback: current source, current template/figure, latest output, latest failure.
 - Plot/Data Studio key edits support native Undo/Redo via `UndoManager`.
@@ -40,6 +43,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
+- `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
+- Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`.
 - `POST /code-console/context` returns a stable `context_id` (input signature + mtime).
 - `POST /code-console/run` accepts `context_id` fast path and still supports legacy `context`.
 - `GET /meta`, `GET /plot-contract`, and `DELETE /data-studio/templates/{id}` use explicit response schemas.
@@ -68,6 +73,14 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
   - `app/sidecar/schemas_code_console.py`
 
 When behavior is a contract change, update contract first, regenerate docs, then update Python/sidecar/macOS consumers.
+
+## Engineering Principles
+
+- Start from the minimum necessary state. If a UI string, badge, or button state can be derived from one source of truth, do not store it separately.
+- Keep one source of truth per semantic rule. Backend rules live in Python/contract/schema; the macOS frontend consumes and presents them instead of recomputing them.
+- Add abstractions only when they reduce real duplication and clarify ownership. Speculative “maybe reusable later” layers are treated as maintenance debt.
+- Remove dead helpers, stale branches, and duplicate state wiring in the same round as the feature change. Do not normalize “we’ll clean it later.”
+- Prefer small typed payloads and presentation models over scattered booleans, magic strings, and implicit state machines.
 
 ## Entrypoints
 
