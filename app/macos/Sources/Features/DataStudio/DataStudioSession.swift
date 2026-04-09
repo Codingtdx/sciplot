@@ -61,7 +61,6 @@ final class DataStudioSession {
     var specimenFilterAnchor: DataStudioSpecimenFilterAnchor?
     var focusedWorkbookPreviewRefreshState: DataStudioWorkbookPreviewRefreshState = .idle
     var baselineWorkbookPreviewRefreshState: DataStudioWorkbookPreviewRefreshState = .idle
-    var isSpecimenFilterCloseConfirmationPresented = false
 
     var comparisonSet: DataStudioComparisonSetResponse?
     var comparisonContextCacheKey: String?
@@ -1108,16 +1107,14 @@ final class DataStudioSession {
     func focusWorkbook(path: String?) {
         let resolvedPath = path ?? orderedWorkbooks.first?.response.workbookPath
         focusedWorkbookPath = resolvedPath
-        guard let specimenFilterAnchor else {
-            return
-        }
         guard let resolvedPath else {
             closeSpecimenFilter()
             return
         }
-        self.specimenFilterAnchor = specimenFilterAnchor.retargeted(to: resolvedPath)
-        scheduleWorkbookPreviewRefresh(for: resolvedPath, rebuildComparisonContext: false)
-        scheduleBaselineWorkbookPreviewRefresh(for: resolvedPath)
+        ensureSpecimenFilterDataPreloaded(for: resolvedPath)
+        if let specimenFilterAnchor {
+            self.specimenFilterAnchor = specimenFilterAnchor.retargeted(to: resolvedPath)
+        }
     }
 
     func updateDisplayName(for workbookPath: String, to displayName: String) {
@@ -1147,15 +1144,12 @@ final class DataStudioSession {
            currentPath != workbookPath,
            hasPendingFilterChanges(for: currentPath)
         {
-            runtimeState.pendingSpecimenFilterAction = .open(anchor)
-            isSpecimenFilterCloseConfirmationPresented = true
-            return
+            revertDraftSpecimenStates(for: currentPath)
         }
         focusedWorkbookPath = workbookPath
         specimenFilterAnchor = anchor
         primeDraftSpecimenStates(for: workbookPath)
-        scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: false)
-        scheduleBaselineWorkbookPreviewRefresh(for: workbookPath)
+        ensureSpecimenFilterDataPreloaded(for: workbookPath)
     }
 
     func openSpecimenFilter(for workbookPath: String) {
@@ -1168,37 +1162,9 @@ final class DataStudioSession {
             return
         }
         if hasPendingFilterChanges(for: workbookPath) {
-            runtimeState.pendingSpecimenFilterAction = .close
-            isSpecimenFilterCloseConfirmationPresented = true
-            return
+            revertDraftSpecimenStates(for: workbookPath)
         }
         dismissSpecimenFilter()
-    }
-
-    func confirmPendingSpecimenFilterClosure(applyChanges: Bool) {
-        guard let pendingAction = runtimeState.pendingSpecimenFilterAction else {
-            isSpecimenFilterCloseConfirmationPresented = false
-            return
-        }
-        isSpecimenFilterCloseConfirmationPresented = false
-        runtimeState.pendingSpecimenFilterAction = nil
-        guard let workbookPath = specimenFilterWorkbookPath else {
-            performPendingSpecimenFilterAction(pendingAction)
-            return
-        }
-        if applyChanges {
-            applyManualFilter(for: workbookPath) {
-                self.performPendingSpecimenFilterAction(pendingAction)
-            }
-        } else {
-            revertDraftSpecimenStates(for: workbookPath)
-            performPendingSpecimenFilterAction(pendingAction)
-        }
-    }
-
-    func cancelPendingSpecimenFilterClosure() {
-        isSpecimenFilterCloseConfirmationPresented = false
-        runtimeState.pendingSpecimenFilterAction = nil
     }
 
     func retryPreviewRefresh() {
@@ -1841,6 +1807,7 @@ final class DataStudioSession {
         if specimenStatesByWorkbookPath[response.workbookPath] == nil {
             specimenStatesByWorkbookPath[response.workbookPath] = []
         }
+        ensureSpecimenFilterDataPreloaded(for: response.workbookPath)
     }
 
     private func applyRestoredGroupStates(_ restoredStates: [DataStudioGroupStatePayload]) {
@@ -1899,6 +1866,15 @@ final class DataStudioSession {
                 return
             }
             await self.refreshBaselineWorkbookPreview(for: workbookPath, revision: revision)
+        }
+    }
+
+    private func ensureSpecimenFilterDataPreloaded(for workbookPath: String) {
+        if workbookPreview(for: workbookPath) == nil {
+            scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: false)
+        }
+        if baselineWorkbookPreview(for: workbookPath) == nil {
+            scheduleBaselineWorkbookPreviewRefresh(for: workbookPath)
         }
     }
 
@@ -2092,15 +2068,6 @@ final class DataStudioSession {
         specimenFilterAnchor = nil
         focusedWorkbookPreviewRefreshState = .idle
         baselineWorkbookPreviewRefreshState = .idle
-    }
-
-    private func performPendingSpecimenFilterAction(_ action: PendingSpecimenFilterAction) {
-        switch action {
-        case .close:
-            dismissSpecimenFilter()
-        case let .open(anchor):
-            openSpecimenFilter(for: anchor.workbookPath, anchor: anchor)
-        }
     }
 
     private func resolveRestoredWorkbookPath(selectedWorkbookID: String?, primaryWorkbookID: String?) -> String? {
@@ -2414,8 +2381,6 @@ final class DataStudioSession {
         specimenFilterAnchor = nil
         focusedWorkbookPreviewRefreshState = .idle
         baselineWorkbookPreviewRefreshState = .idle
-        isSpecimenFilterCloseConfirmationPresented = false
-        runtimeState.pendingSpecimenFilterAction = nil
         comparisonSet = nil
         comparisonContextCacheKey = nil
         comparisonContextMaterializedAt = nil
@@ -2894,7 +2859,6 @@ private extension DataStudioSession {
         var meta: SidecarMetaResponse?
         var contract: PlotContractResponse?
         var isApplyingUndoRedo = false
-        var pendingSpecimenFilterAction: PendingSpecimenFilterAction?
     }
 
     @MainActor
@@ -2902,11 +2866,6 @@ private extension DataStudioSession {
         let comparisonRefresh = AsyncLatestTaskCoordinator()
         let workbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
         let baselineWorkbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
-    }
-
-    enum PendingSpecimenFilterAction {
-        case close
-        case open(DataStudioSpecimenFilterAnchor)
     }
 
     enum DerivedState {

@@ -190,6 +190,51 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
     }
 
+    func testLoadingExternalFigureWithoutPreferredOptionsResetsManualAxisOverrides() async throws {
+        let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.updateRenderOptions(policy: .immediate) {
+            $0.xMin = -10
+            $0.yMin = -10
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.xMin == -10 &&
+                client.renderRequests.last?.options.yMin == -10
+            },
+            timeout: 3.0
+        )
+
+        await session.loadExternalFigure(
+            inputURL: URL(fileURLWithPath: "/tmp/external.xlsx"),
+            sheet: .name("Representative_Curve"),
+            preferredTemplateID: "curve",
+            preferredOptions: nil
+        )
+
+        XCTAssertEqual(session.selectedFileURL?.path, "/tmp/external.xlsx")
+        XCTAssertNil(session.renderOptions.xMin)
+        XCTAssertNil(session.renderOptions.xMax)
+        XCTAssertNil(session.renderOptions.yMin)
+        XCTAssertNil(session.renderOptions.yMax)
+        XCTAssertEqual(client.inspectRequests.last?.inputPath, "/tmp/external.xlsx")
+        XCTAssertEqual(client.renderRequests.last?.inputPath, "/tmp/external.xlsx")
+        XCTAssertNil(client.renderRequests.last?.options.xMin)
+        XCTAssertNil(client.renderRequests.last?.options.xMax)
+        XCTAssertNil(client.renderRequests.last?.options.yMin)
+        XCTAssertNil(client.renderRequests.last?.options.yMax)
+    }
+
     func testAxisLabelOverridesRefreshPreviewAndReachRenderRequests() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

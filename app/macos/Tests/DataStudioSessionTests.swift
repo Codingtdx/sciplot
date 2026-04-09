@@ -643,6 +643,9 @@ final class DataStudioSessionTests: XCTestCase {
     func testExportAndOpenCurrentFigureInPlotUseCurrentFigureContext() async {
         let exportDirectoryURL = URL(fileURLWithPath: "/tmp/data_studio_exports", isDirectory: true)
         let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
         client.dataStudioImportWorkbookHandler = { request in
             if request.workbookPath == "/tmp/second.xlsx" {
                 return TestPayloads.dataStudioImportWorkbook(
@@ -681,6 +684,18 @@ final class DataStudioSessionTests: XCTestCase {
         session.selectFigureFamily(id: "strength")
         try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(session.currentRecipe?.id, "strength_box")
+        session.plotSession.updateRenderOptions(policy: .immediate) {
+            $0.yMin = 35.0
+            $0.yMax = 80.0
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.template == "box" &&
+                client.renderRequests.last?.options.yMin == 35.0 &&
+                client.renderRequests.last?.options.yMax == 80.0
+            },
+            timeout: 3.0
+        )
         session.openCurrentFigureInPlot()
         await session.exportComparisonBundle()
 
@@ -688,9 +703,72 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(openedSheet, .name("Strength_Replicates"))
         XCTAssertEqual(openedTemplateID, "box")
         XCTAssertEqual(openedOptions?.stylePreset, session.plotSession.renderOptions.stylePreset)
+        XCTAssertEqual(openedOptions?.yMin, 35.0)
+        XCTAssertEqual(openedOptions?.yMax, 80.0)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.count, 1)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.selectedRecipeIDs, ["representative_curve", "strength_box"])
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.stylePreset, session.plotSession.renderOptions.stylePreset)
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yMin, 35.0)
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yMax, 80.0)
+    }
+
+    func testFigureFamilySwitchRestoresSavedAxisOverridesAndResetsUnsavedFamilies() async throws {
+        let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
+        await waitUntil({ session.plotSession.previewResponse != nil }, timeout: 3.0)
+
+        session.plotSession.updateRenderOptions(policy: .immediate) {
+            $0.xMin = -10.0
+            $0.yMin = -10.0
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.template == "curve" &&
+                client.renderRequests.last?.options.xMin == -10.0 &&
+                client.renderRequests.last?.options.yMin == -10.0
+            },
+            timeout: 3.0
+        )
+
+        session.selectFigureFamily(id: "strength")
+        await waitUntil(
+            {
+                session.currentFigureFamily?.id == "strength" &&
+                session.plotSession.selectedTemplateID == "box" &&
+                client.renderRequests.last?.template == "box"
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertNil(session.plotSession.renderOptions.xMin)
+        XCTAssertNil(session.plotSession.renderOptions.xMax)
+        XCTAssertNil(session.plotSession.renderOptions.yMin)
+        XCTAssertNil(session.plotSession.renderOptions.yMax)
+        XCTAssertNil(client.renderRequests.last?.options.xMin)
+        XCTAssertNil(client.renderRequests.last?.options.xMax)
+        XCTAssertNil(client.renderRequests.last?.options.yMin)
+        XCTAssertNil(client.renderRequests.last?.options.yMax)
+
+        session.selectFigureFamily(id: "representative_curve")
+        await waitUntil(
+            {
+                session.currentFigureFamily?.id == "representative_curve" &&
+                session.plotSession.selectedTemplateID == "curve" &&
+                session.plotSession.renderOptions.xMin == -10.0 &&
+                session.plotSession.renderOptions.yMin == -10.0 &&
+                client.renderRequests.last?.template == "curve" &&
+                client.renderRequests.last?.options.xMin == -10.0 &&
+                client.renderRequests.last?.options.yMin == -10.0
+            },
+            timeout: 3.0
+        )
     }
 
     func testSpecimenSuggestionWorkflowAppliesSuggestedExclusionsToPreviewAndComparisonRequests() async {
@@ -903,7 +981,7 @@ final class DataStudioSessionTests: XCTestCase {
         )
     }
 
-    func testClosingSpecimenFilterWithPendingDraftPresentsConfirmationAndDiscardResetsDraft() async {
+    func testClosingSpecimenFilterWithPendingDraftDiscardsWithoutConfirmation() async {
         let workbookPath = "/tmp/prepared.xlsx"
         let client = MockSidecarClient()
         client.dataStudioWorkbookPreviewHandler = { request in
@@ -923,16 +1001,30 @@ final class DataStudioSessionTests: XCTestCase {
 
         session.closeSpecimenFilter()
 
-        XCTAssertTrue(session.isSpecimenFilterPresented)
-        XCTAssertTrue(session.isSpecimenFilterCloseConfirmationPresented)
-
-        session.confirmPendingSpecimenFilterClosure(applyChanges: false)
-
         XCTAssertFalse(session.isSpecimenFilterPresented)
-        XCTAssertFalse(session.isSpecimenFilterCloseConfirmationPresented)
         XCTAssertFalse(session.hasPendingFilterChanges(for: workbookPath))
         XCTAssertEqual(session.specimenStates(for: workbookPath).filter { !$0.included }.count, 0)
         XCTAssertNil(session.specimenFilterPresentation(for: workbookPath).rowBadge)
+    }
+
+    func testImportPreloadsSpecimenFilterPreviewBeforePopoverOpens() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)], refreshContext: false)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertNotNil(session.workbookPreview(for: workbookPath))
+        XCTAssertNotNil(session.baselineWorkbookPreview(for: workbookPath))
+        XCTAssertGreaterThanOrEqual(client.dataStudioWorkbookPreviewRequests.count, 2)
+        XCTAssertFalse(session.isSpecimenFilterPresented)
     }
 
     func testBaselinePreviewStaysDistinctFromCommittedPreviewAfterAutoApply() async {
@@ -1074,6 +1166,21 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.orderedGroups.map { $0.state.displayName }, ["B", "A"])
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
         XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
+    }
+
+    private func waitUntil(
+        _ condition: @escaping () -> Bool,
+        timeout: TimeInterval
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return
+            }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for DataStudioSession state")
     }
 
     private static func makeWorkbookPreviewResponse(from request: DataStudioWorkbookPreviewRequest) -> DataStudioWorkbookPreviewResponse {

@@ -45,22 +45,6 @@ struct DataStudioWorkbenchView: View {
         .sheet(isPresented: guideBinding) {
             DataStudioGuideSheet(session: session)
         }
-        .confirmationDialog(
-            "Apply manual filter changes before closing?",
-            isPresented: specimenFilterCloseConfirmationBinding
-        ) {
-            Button("Apply Filter") {
-                session.confirmPendingSpecimenFilterClosure(applyChanges: true)
-            }
-            Button("Discard Changes", role: .destructive) {
-                session.confirmPendingSpecimenFilterClosure(applyChanges: false)
-            }
-            Button("Cancel", role: .cancel) {
-                session.cancelPendingSpecimenFilterClosure()
-            }
-        } message: {
-            Text("Your Advanced specimen edits are not yet applied to the compare preview.")
-        }
     }
 
     private var topBar: some View {
@@ -171,13 +155,6 @@ struct DataStudioWorkbenchView: View {
         Binding(
             get: { session.isGuidePresented },
             set: { session.isGuidePresented = $0 }
-        )
-    }
-
-    private var specimenFilterCloseConfirmationBinding: Binding<Bool> {
-        Binding(
-            get: { session.isSpecimenFilterCloseConfirmationPresented },
-            set: { session.isSpecimenFilterCloseConfirmationPresented = $0 }
         )
     }
 

@@ -320,6 +320,9 @@ final class PlotSession {
 
         if let preferredOptions {
             applyExternalRenderOptions(preferredOptions)
+        } else if selectedTemplateID != nil {
+            resetCurrentTemplateRenderOptionsForExternalFigure()
+            await waitUntilPreviewFinishes(for: inputURL)
         } else {
             await waitUntilPreviewFinishes(for: inputURL)
         }
@@ -846,6 +849,9 @@ final class PlotSession {
     private func resetRenderOptions(for templateID: String) {
         let template = metadata?.templates.first { $0.id == templateID }
         let recommendationSummary = recommendedPreviewConfigSummary(for: templateID)
+        let preservedThemeID = metadata?.visualThemes.contains(where: { $0.id == renderOptions.visualThemeID }) == true
+            ? renderOptions.visualThemeID
+            : metadata?.visualThemes.first?.id
 
         renderOptions = RenderOptionsPayload(
             size: recommendationSummary["size"]?.stringValue ?? template?.defaultSize,
@@ -860,9 +866,17 @@ final class PlotSession {
             stylePreset: defaultStyle(for: template),
             palettePreset: defaultPalette(for: template),
             useSidecar: recommendationSummary["use_sidecar"]?.boolValue ?? true,
-            visualThemeID: metadata?.visualThemes.first?.id
+            visualThemeID: preservedThemeID
         )
         notifyRenderOptionsDidChange()
+    }
+
+    private func resetCurrentTemplateRenderOptionsForExternalFigure() {
+        guard let selectedTemplateID else {
+            return
+        }
+        setTemplate(selectedTemplateID, shouldResetRenderOptions: true)
+        schedulePreviewRefresh(policy: .immediate)
     }
 
     private func recommendedPreviewConfigSummary(for templateID: String) -> [String: JSONValue] {

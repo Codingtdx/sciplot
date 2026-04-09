@@ -83,11 +83,11 @@ struct DataStudioSpecimenFilterPopover: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 180)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .padding(16)
-        .frame(width: 430)
+        .frame(width: 460, height: 620, alignment: .topLeading)
     }
 
     private var header: some View {

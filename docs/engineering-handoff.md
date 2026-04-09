@@ -201,6 +201,39 @@ Every development round must update this file.
   - Compare/export still consume only committed `specimen_states`.
   - Default popover does not reveal filenames; specimen identity remains `Advanced`-only.
 
+### 2026-04-09: Specimen filter prewarm + non-blocking popover close policy
+
+- Change:
+  - macOS Data Studio now preloads specimen filter baseline/committed previews during workbook upsert and focus switching, instead of waiting for first popover open.
+  - Specimen filter popover close behavior is now lightweight: closing (or switching workbook anchor) discards draft manual edits directly, without confirmation dialogs.
+  - Popover content now uses a fixed first-open size so loading-state and loaded-state remain immediately operable.
+- Why:
+  - First principles: this popover is a lightweight working affordance, so first interaction must be immediately usable and must not escalate into modal-style commit/discard friction.
+  - Preloading removes avoidable first-click latency; fixed initial geometry removes first-open layout thrash.
+- Rejected alternatives:
+  - Keep close confirmation for draft edits: rejected because it over-weights a temporary popover state and interrupts flow.
+  - Keep on-demand loading at first open: rejected because it makes the first click visually unstable and delays actionability.
+- Boundaries:
+  - Draft semantics are unchanged: only explicit Apply writes committed `specimen_states`; close/switch still reverts draft only.
+  - Prewarm is opportunistic cache fill for existing preview endpoints; no new sidecar endpoint or scoring logic is introduced.
+  - Failure condition: if preload requests fail, popover still opens and shows the existing loading/error affordance.
+
+### 2026-04-09: Data Studio figure switches must not inherit unsaved manual axis overrides
+
+- Change:
+  - macOS `PlotSession` now resets figure-scoped render options back to the target template defaults/recommendations when Data Studio opens an external figure without saved `preferredOptions`.
+  - Saved per-figure manual axis overrides continue to restore through Data Studio `figurePreferences`; unsaved figures now start from their own template defaults instead of inheriting the previously focused figure's `x/y min/max`, baseline, or legend order.
+- Why:
+  - First principles: manual axis bounds are figure-specific authoring state, not a global workspace preference.
+  - Reusing the previous figure's bounds silently changes the meaning of a newly focused figure and makes the shared `Advanced -> X range / Y range` inspector unreliable as a recovery path.
+- Rejected alternatives:
+  - Add a second Data Studio-only custom-axis UI: rejected because the shared inspector already exposes the right controls, and duplicating them would create a second state path.
+  - Keep inheriting the prior figure state until the user edits again: rejected because it couples unrelated figure families and hides the true template default behavior.
+- Boundaries:
+  - Cross-figure carry-over is still allowed for still-valid style, palette, and theme choices.
+  - This round does not change Python rendering contracts, sidecar schemas, or cache-key semantics.
+  - Failure condition: if a future template switch path bypasses `shouldResetRenderOptions`, unsaved figure switches can regress to state leakage again.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -241,6 +274,18 @@ Every development round must update this file.
 - Fix pattern:
   - update `TestPayloads` and tests constructing `CodeConsoleContextResponse` to include `contextID`.
   - rerun `xcodebuild test` after test fixture updates.
+
+### Symptom: Data Studio macOS tests time out after figure-family switch and no preview request arrives
+
+- Typical cause:
+  - `MockSidecarClient.inspectFile` fell back to `TestPayloads.inspectFile()` with its default hard-coded `inputPath`, so the returned inspection payload no longer matched the comparison workbook path under test.
+  - `PlotSession.needsInspection` then stayed true, which blocked preview rendering and made figure-switch/open-in-plot assertions wait forever.
+- Check:
+  - confirm `client.inspectRequests.last?.inputPath` matches the workbook path currently loaded into `PlotSession`.
+  - if tests use comparison workbooks or exported `.xlsx` paths, verify the mocked inspect response echoes `request.inputPath`.
+- Fix:
+  - in affected tests, set `client.inspectHandler = { request in TestPayloads.inspectFile(path: request.inputPath) }`.
+  - rerun the targeted `DataStudioSessionTests` / `PlotSessionTests` slice before the full macOS suite.
 
 ### Symptom: Swift compile error `main actor-isolated default value in a nonisolated context`
 
@@ -573,6 +618,71 @@ Every development round must update this file.
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: first attempt failed with `build.db` lock when run concurrently against the same derived-data path; reran serially and passed (`95 tests`)
+
+### 2026-04-09 (Round K): Specimen filter first-open UX stabilization
+
+- Scope:
+  - Removed Data Studio specimen-filter close confirmation flow in macOS session/view paths and switched to close/switch = draft revert.
+  - Added specimen-filter preview prewarm for workbook upsert/focus so first popover open does not block on cold fetch.
+  - Set fixed popover initial dimensions for loading and loaded states to avoid first-open undersized layout.
+  - Updated Data Studio macOS tests:
+    - replaced pending-draft close test to assert direct discard without confirmation
+    - added preload regression test that verifies preview/baseline are ready before popover opens
+- User-visible impact:
+  - First click on `Specimen Filter` is consistently operable (stable size + preloaded data path).
+  - Closing the popover no longer shows disruptive “Discard Changes” confirmation.
+- Risks:
+  - Draft manual edits are now intentionally easy to drop when the popover closes; this is desired UX but can surprise users who expected a confirmation wall.
+  - Prewarm introduces extra background preview requests; future throttling edits must preserve latest-write-wins semantics.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Specimen filter popover is treated as low-ceremony operational UI: no modal close confirmation, and first-open readiness is prioritized via prewarm + stable geometry.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`153 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`36 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`96 tests`)
+
+### 2026-04-09 (Round L): Data Studio manual axis isolation across figure switches
+
+- Scope:
+  - Updated macOS `PlotSession` external-figure loading so a figure without saved `preferredOptions` explicitly resets figure-scoped render options back to the target template defaults/recommendations instead of inheriting the previous figure's manual axis state.
+  - Kept Data Studio `figurePreferences` as the only persisted figure-level source of truth and added regressions covering:
+    - external figure loads without preferred options
+    - figure-family switching between saved and unsaved manual axis overrides
+    - `Open in Plot` / export bundle carrying the current figure's manual axis range
+  - Expanded macOS test fixtures so shared inspector `Advanced -> X range / Y range` controls are exposed for curve and box templates in tests.
+- User-visible impact:
+  - Data Studio manual axis edits are now isolated per figure family/template.
+  - Switching to a figure that has no saved custom range returns to that figure's default/recommended axis bounds instead of leaking the previous figure's bounds.
+  - The existing shared inspector custom-axis controls remain the only fallback entry, but they now behave reliably across figure switches.
+- Risks:
+  - Any future load path that stages an external figure without going through the template-reset branch can reintroduce cross-figure render-option leakage.
+  - Preserving theme while resetting figure-scoped options assumes the current theme remains compatible with the active metadata payload.
+- Rollback points:
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/Tests/TestPayloads.swift`
+- Decision:
+  - Data Studio figure switches must treat manual axis bounds as figure-specific state, restored only from saved `figurePreferences` and otherwise reset to the target template defaults/recommendations.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`153 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`50 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`98 tests`)
 
 ## 6) Update Template (copy for next round)
 
