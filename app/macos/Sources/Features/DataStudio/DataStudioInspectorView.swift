@@ -70,28 +70,48 @@ struct DataStudioInspectorView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!session.canOpenCurrentFigureInPlot)
+                .help(
+                    session.canOpenCurrentFigureInPlot
+                        ? "Open the current comparison figure in Plot."
+                        : "Choose a supported figure context before opening in Plot."
+                )
                 .inspectorActionButton()
 
                 Button("Export Bundle") {
                     Task { await session.exportComparisonBundle() }
                 }
                 .buttonStyle(.bordered)
-                .disabled(!session.canExportComparison)
+                .disabled(!session.exportAvailability.isEnabled)
+                .help(session.exportAvailability.reason ?? "Export the comparison workbook and figure outputs.")
                 .inspectorActionButton()
+            }
 
-                Button("Reveal Workbook") {
-                    session.revealFocusedWorkbook()
-                }
-                .buttonStyle(.bordered)
-                .disabled(session.focusedWorkbook == nil)
-                .inspectorActionButton()
+            DisclosureGroup("Advanced") {
+                InspectorActionStack {
+                    Button("Reveal Workbook") {
+                        session.revealFocusedWorkbook()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session.focusedWorkbook == nil)
+                    .help(
+                        session.focusedWorkbook == nil
+                            ? "Select a workbook group first."
+                            : "Reveal the focused workbook in Finder."
+                    )
+                    .inspectorActionButton()
 
-                Button("Reveal Output") {
-                    session.revealLatestExport()
+                    Button("Reveal Output") {
+                        session.revealLatestExport()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil)
+                    .help(
+                        session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil
+                            ? "Export or focus a workbook first."
+                            : "Reveal the latest output location in Finder."
+                    )
+                    .inspectorActionButton()
                 }
-                .buttonStyle(.bordered)
-                .disabled(session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil)
-                .inspectorActionButton()
             }
         }
     }

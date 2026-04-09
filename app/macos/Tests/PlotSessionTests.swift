@@ -6,6 +6,47 @@ import XCTest
 
 @MainActor
 final class PlotSessionTests: XCTestCase {
+    func testExportAvailabilityExplainsBlockingStates() async throws {
+        let session = PlotSession()
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("sidecar") ?? false)
+
+        let client = MockSidecarClient()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Import a source file") ?? false)
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertTrue(session.exportAvailability.isEnabled)
+        XCTAssertNil(session.exportAvailability.reason)
+    }
+
+    func testUndoRestoresTemplateAndRenderOptions() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        let undoManager = UndoManager()
+        session.attachUndoManager(undoManager)
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertEqual(session.selectedTemplateID, "curve")
+        session.chooseTemplate("bar")
+        XCTAssertEqual(session.selectedTemplateID, "bar")
+        undoManager.undo()
+        XCTAssertEqual(session.selectedTemplateID, "curve")
+
+        let originalXScale = session.renderOptions.xscale
+        session.updateRenderOptions(policy: .immediate) { $0.xscale = "log" }
+        XCTAssertEqual(session.renderOptions.xscale, "log")
+        undoManager.undo()
+        XCTAssertEqual(session.renderOptions.xscale, originalXScale)
+    }
+
     func testImportAutomaticallyInspectsSelectsTemplateAndRendersPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

@@ -71,6 +71,10 @@
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
+- Data Studio import 必须维持单一分阶段 native sheet（wizard），禁止恢复多个串联弹窗。
+- 关键动作必须“禁用并解释”（`disabled + help`），禁止 silent no-op。
+- 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
+- Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 
 ## 绘图与工作流不变量
 
@@ -149,6 +153,8 @@
 - 不要在 sidecar 增加“先兼容旧接口再说”的 fallback。
 - 不要把 contract 常量复制到第二份文件。
 - 不要绕开 schema 校验层直接读写项目 JSON。
+- 不要把 Data Studio import 重新拆回多 sheet 串联弹窗。
+- 不要做“按钮可点但 guard-return 无反馈”的 silent no-op 交互。
 - 不要把 Plot 子步骤或 Data Studio 子流程重新提升为 app-level 导航。
 - 不要引入“保底壳层/历史别名/legacy adapter”。
 - 不要在文档里保留已删除目录或接口描述，文档必须与代码同轮一致。

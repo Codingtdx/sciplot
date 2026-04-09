@@ -3,17 +3,18 @@ import SwiftUI
 struct PlotWorkbenchView: View {
     @Bindable var session: PlotSession
     let bootstrapErrorMessage: String?
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             topSourceBar
 
             if let bootstrapErrorMessage {
-                compactIssueLabel(message: bootstrapErrorMessage)
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: bootstrapErrorMessage))
             }
 
             if let errorMessage = session.errorMessage {
-                compactIssueLabel(message: errorMessage)
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
@@ -27,6 +28,9 @@ struct PlotWorkbenchView: View {
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            session.attachUndoManager(undoManager)
+        }
         .fileImporter(
             isPresented: bindingForImporter,
             allowedContentTypes: FileTypeCatalog.plotInputs,
@@ -56,6 +60,11 @@ struct PlotWorkbenchView: View {
                     .font(.title2.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+                Text(session.documentStatusSummary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
 
             Spacer(minLength: 16)
@@ -84,21 +93,6 @@ struct PlotWorkbenchView: View {
                 .foregroundStyle(.secondary)
                 .animation(MotionTokens.status, value: session.liveStatusLabel)
         }
-    }
-
-    private func compactIssueLabel(message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .lineLimit(2)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var bindingForImporter: Binding<Bool> {

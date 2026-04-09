@@ -89,6 +89,8 @@ struct RootSplitView: View {
             Button("Export", systemImage: "square.and.arrow.up") {
                 Task { await model.exportActiveWorkbench() }
             }
+            .disabled(!model.activeExportAvailability.isEnabled)
+            .help(model.activeExportAvailability.reason ?? "Export current result")
 
             Button("Help", systemImage: "questionmark.circle") {
                 model.showHelpForActiveWorkbench()

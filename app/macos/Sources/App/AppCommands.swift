@@ -29,6 +29,7 @@ struct AppCommands: Commands {
                 Task { await model.exportActiveWorkbench() }
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(!model.activeExportAvailability.isEnabled)
 
             Button("Reveal in Finder") {
                 model.revealActiveOutput()

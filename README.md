@@ -29,6 +29,14 @@ The historical `app/desktop` and Tauri/mock chain has been removed.
 
 Canonical internal steps can be richer than user-visible UI; only user decision surfaces should stay visible.
 
+## macOS Interaction Conventions
+
+- Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Critical actions follow `disabled + help` and must not silently no-op.
+- Workbench top bars prioritize document-state feedback: current source, current template/figure, latest output, latest failure.
+- Plot/Data Studio key edits support native Undo/Redo via `UndoManager`.
+- Inspector keeps high-frequency controls visible and moves low-frequency controls into `DisclosureGroup("Advanced")`.
+
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.

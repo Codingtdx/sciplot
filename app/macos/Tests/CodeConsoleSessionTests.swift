@@ -4,6 +4,16 @@ import XCTest
 
 @MainActor
 final class CodeConsoleSessionTests: XCTestCase {
+    func testExportAvailabilityExplainsBlockingStates() {
+        let session = CodeConsoleSession()
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Run code or bind a dataset") ?? false)
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        XCTAssertTrue(session.exportAvailability.isEnabled)
+        XCTAssertNil(session.exportAvailability.reason)
+    }
+
     func testCodeConsoleContextRefreshesAndRunsWithBoundPlotState() async {
         let plot = PlotSession()
         plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))

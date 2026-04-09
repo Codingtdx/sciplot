@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum InspectorColumnLayoutPolicy {
@@ -13,6 +14,43 @@ enum MotionTokens {
     static let status: Animation = .snappy(duration: 0.14, extraBounce: 0.0)
     static let list: Animation = .smooth(duration: 0.18)
     static let stateTransition: AnyTransition = .opacity.combined(with: .move(edge: .bottom))
+}
+
+struct ActionAvailability: Equatable, Sendable {
+    let isEnabled: Bool
+    let reason: String?
+
+    static func enabled() -> ActionAvailability {
+        ActionAvailability(isEnabled: true, reason: nil)
+    }
+
+    static func disabled(_ reason: String) -> ActionAvailability {
+        ActionAvailability(isEnabled: false, reason: reason)
+    }
+}
+
+struct DiagnosticMessage: Equatable, Sendable {
+    let summary: String
+    let detail: String
+
+    init(summary: String, detail: String) {
+        self.summary = summary
+        self.detail = detail
+    }
+
+    init(detail: String) {
+        let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstLine = trimmed.split(separator: "\n").first {
+            let summary = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !summary.isEmpty {
+                self.summary = String(summary)
+                self.detail = trimmed
+                return
+            }
+        }
+        self.summary = "Operation failed"
+        self.detail = trimmed
+    }
 }
 
 struct InspectorSurfaceModifier: ViewModifier {
@@ -82,6 +120,81 @@ struct ErrorStateCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(.quinary.opacity(0.35), in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+struct DiagnosticIssueCard: View {
+    let message: DiagnosticMessage
+    let retryTitle: String?
+    let retryAction: (() -> Void)?
+    @State private var isExpanded = false
+
+    init(
+        message: DiagnosticMessage,
+        retryTitle: String? = nil,
+        retryAction: (() -> Void)? = nil
+    ) {
+        self.message = message
+        self.retryTitle = retryTitle
+        self.retryAction = retryAction
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+
+                Text(message.summary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(isExpanded ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 8)
+
+                Button {
+                    withAnimation(MotionTokens.selection) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Hide details" : "Show details")
+            }
+
+            if isExpanded {
+                ScrollView {
+                    Text(message.detail)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 130)
+                .padding(10)
+                .background(.quinary.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
+
+                HStack(spacing: 10) {
+                    Button("Copy Details") {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString(message.detail, forType: .string)
+                    }
+                    .buttonStyle(.bordered)
+
+                    if let retryTitle, let retryAction {
+                        Button(retryTitle, action: retryAction)
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

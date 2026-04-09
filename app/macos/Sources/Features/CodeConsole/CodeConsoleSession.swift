@@ -63,6 +63,24 @@ final class CodeConsoleSession {
     var isRefreshingContext = false
     var isRunning = false
 
+    var exportAvailability: ActionAvailability {
+        if isRunning {
+            return .disabled("Wait for the current run to finish.")
+        }
+        if latestRunResponse != nil || selectedFileURL != nil {
+            return .enabled()
+        }
+        return .disabled("Run code or bind a dataset before revealing outputs.")
+    }
+
+    var documentStatusSummary: String {
+        let source = selectedSourceFilename ?? "No source"
+        let template = contextResponse?.template ?? selectedBinding?.templateID ?? "Auto recommendation"
+        let output = latestRunResponse?.outputDir ?? "No output folder"
+        let failure = errorMessage ?? "No failure"
+        return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
+    }
+
     var outputsSummary: String {
         DerivedState.outputsSummary(
             latestRunResponse: latestRunResponse,

@@ -33,6 +33,19 @@ final class ComposerSession {
     var isExporting = false
     var activeDragPanelID: String?
 
+    var exportAvailability: ActionAvailability {
+        if isExporting {
+            return .disabled("Export is already in progress.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard !project.panels.isEmpty else {
+            return .disabled("Import at least one panel before exporting.")
+        }
+        return .enabled()
+    }
+
     init(
         previewDelayNanoseconds: UInt64 = 300_000_000,
         chooseExportDestination: @escaping ComposerExportDestinationChooser = {

@@ -8,7 +8,7 @@ struct CodeConsoleWorkbenchView: View {
             topBar
 
             if let errorMessage = session.errorMessage {
-                compactIssueLabel(message: errorMessage)
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             if session.availableBindings.isEmpty {
@@ -60,7 +60,7 @@ struct CodeConsoleWorkbenchView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                Text(session.promptStatusMessage)
+                Text(session.documentStatusSummary)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -163,21 +163,6 @@ struct CodeConsoleWorkbenchView: View {
 
     private func cardBackground(isSelected: Bool) -> some ShapeStyle {
         isSelected ? AnyShapeStyle(.quinary.opacity(0.32)) : AnyShapeStyle(.quinary.opacity(0.15))
-    }
-
-    private func compactIssueLabel(message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .lineLimit(2)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var bindingForImporter: Binding<Bool> {

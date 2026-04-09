@@ -26,6 +26,24 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.composerSession.isImportPresented)
     }
 
+    func testDataStudioImportTransitionsFromWizardToFileImporter() async {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.dataStudio)
+        model.beginImportForActiveWorkbench()
+        XCTAssertTrue(model.dataStudioSession.isImportWizardPresented)
+        XCTAssertTrue(model.dataStudioSession.isImportChooserPresented)
+        XCTAssertFalse(model.dataStudioSession.isImportPresented)
+
+        model.dataStudioSession.chooseImportKind(.rawFiles)
+        XCTAssertFalse(model.dataStudioSession.isImportWizardPresented)
+        XCTAssertFalse(model.dataStudioSession.isImportPresented)
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(model.dataStudioSession.isImportPresented)
+        XCTAssertFalse(model.dataStudioSession.isImportWizardPresented)
+    }
+
     func testOpenInPlotSeedsPlotSessionAndContext() async {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
         let workbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
@@ -63,6 +81,26 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertFalse(model.isPlotReplacementConfirmationPresented)
         XCTAssertEqual(model.plotSession.selectedFileURL?.path, "/tmp/prepared.xlsx")
+    }
+
+    func testActiveExportAvailabilityTracksSelectedWorkbench() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.plot)
+        XCTAssertFalse(model.activeExportAvailability.isEnabled)
+        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Import a source file") ?? false)
+
+        model.switchWorkbench(.dataStudio)
+        XCTAssertFalse(model.activeExportAvailability.isEnabled)
+        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Import workbook groups") ?? false)
+
+        model.switchWorkbench(.composer)
+        XCTAssertFalse(model.activeExportAvailability.isEnabled)
+        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Import at least one panel") ?? false)
+
+        model.switchWorkbench(.codeConsole)
+        XCTAssertFalse(model.activeExportAvailability.isEnabled)
+        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Run code or bind a dataset") ?? false)
     }
 
     func testBootstrapAndPlotImportInspectTemplateFlowWithSidecarClient() async throws {

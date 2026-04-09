@@ -41,6 +41,13 @@ enum DataStudioImportDisposition: String, Identifiable {
     }
 }
 
+enum DataStudioImportWizardStep: String, Equatable {
+    case scope
+    case kind
+    case resolver
+    case createTemplate
+}
+
 enum DataStudioActivity: Equatable {
     case idle
     case loadingTemplates

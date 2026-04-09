@@ -96,36 +96,38 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     }
                 }
 
-                if let themes = session.metadata?.visualThemes, !themes.isEmpty {
-                    if themes.count > 1 {
-                        AdaptiveInspectorControlRow(title: "Theme") {
-                            Picker("", selection: stringBinding(
-                                get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
-                                set: { newValue in
-                                    session.updateRenderOptions(policy: .immediate) { $0.visualThemeID = newValue.isEmpty ? nil : newValue }
+                DisclosureGroup("Advanced") {
+                    if let themes = session.metadata?.visualThemes, !themes.isEmpty {
+                        if themes.count > 1 {
+                            AdaptiveInspectorControlRow(title: "Theme") {
+                                Picker("", selection: stringBinding(
+                                    get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
+                                    set: { newValue in
+                                        session.updateRenderOptions(policy: .immediate) { $0.visualThemeID = newValue.isEmpty ? nil : newValue }
+                                    }
+                                )) {
+                                    ForEach(themes) { theme in
+                                        Text(theme.label).tag(theme.id)
+                                    }
                                 }
-                            )) {
-                                ForEach(themes) { theme in
-                                    Text(theme.label).tag(theme.id)
-                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
+                        } else if let theme = themes.first {
+                            AdaptiveInspectorTextRow(title: "Theme", value: theme.label)
                         }
-                    } else if let theme = themes.first {
-                        AdaptiveInspectorTextRow(title: "Theme", value: theme.label)
                     }
-                }
 
-                if session.editableOptionIDs.contains("show_colorbar") {
-                    AdaptiveInspectorControlRow(title: "Colorbar") {
-                        Toggle("", isOn: boolBinding(
-                            get: { session.renderOptions.showColorbar ?? false },
-                            set: { newValue in
-                                session.updateRenderOptions(policy: .immediate) { $0.showColorbar = newValue }
-                            }
-                        ))
-                        .labelsHidden()
+                    if session.editableOptionIDs.contains("show_colorbar") {
+                        AdaptiveInspectorControlRow(title: "Colorbar") {
+                            Toggle("", isOn: boolBinding(
+                                get: { session.renderOptions.showColorbar ?? false },
+                                set: { newValue in
+                                    session.updateRenderOptions(policy: .immediate) { $0.showColorbar = newValue }
+                                }
+                            ))
+                            .labelsHidden()
+                        }
                     }
                 }
             } else {
@@ -168,70 +170,72 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                 }
             }
 
-            if session.editableOptionIDs.contains("reverse_x") {
-                AdaptiveInspectorControlRow(title: "Reverse X") {
-                    Toggle("", isOn: boolBinding(
-                        get: { session.renderOptions.reverseX },
-                        set: { newValue in
-                            session.updateRenderOptions(policy: .immediate) { $0.reverseX = newValue }
-                        }
-                    ))
-                    .labelsHidden()
-                }
-            }
-
-            if session.editableOptionIDs.contains("x_min") || session.editableOptionIDs.contains("x_max") {
-                axisRangeRow(
-                    title: "X range",
-                    lowerTitle: "Min",
-                    upperTitle: "Max",
-                    lowerBinding: numericTextBinding(
-                        get: { session.renderOptions.xMin },
-                        set: { newValue in
-                            session.updateRenderOptions(policy: .debounced) { $0.xMin = newValue }
-                        }
-                    ),
-                    upperBinding: numericTextBinding(
-                        get: { session.renderOptions.xMax },
-                        set: { newValue in
-                            session.updateRenderOptions(policy: .debounced) { $0.xMax = newValue }
-                        }
-                    )
-                )
-            }
-
-            if session.editableOptionIDs.contains("y_min") || session.editableOptionIDs.contains("y_max") {
-                axisRangeRow(
-                    title: "Y range",
-                    lowerTitle: "Min",
-                    upperTitle: "Max",
-                    lowerBinding: numericTextBinding(
-                        get: { session.renderOptions.yMin },
-                        set: { newValue in
-                            session.updateRenderOptions(policy: .debounced) { $0.yMin = newValue }
-                        }
-                    ),
-                    upperBinding: numericTextBinding(
-                        get: { session.renderOptions.yMax },
-                        set: { newValue in
-                            session.updateRenderOptions(policy: .debounced) { $0.yMax = newValue }
-                        }
-                    )
-                )
-            }
-
-            if session.editableOptionIDs.contains("baseline") {
-                AdaptiveInspectorControlRow(title: "Baseline") {
-                    TextField(
-                        "Baseline",
-                        text: stringBinding(
-                            get: { session.renderOptions.baseline ?? "" },
+            DisclosureGroup("Advanced") {
+                if session.editableOptionIDs.contains("reverse_x") {
+                    AdaptiveInspectorControlRow(title: "Reverse X") {
+                        Toggle("", isOn: boolBinding(
+                            get: { session.renderOptions.reverseX },
                             set: { newValue in
-                                session.updateRenderOptions(policy: .debounced) { $0.baseline = newValue.isEmpty ? nil : newValue }
+                                session.updateRenderOptions(policy: .immediate) { $0.reverseX = newValue }
+                            }
+                        ))
+                        .labelsHidden()
+                    }
+                }
+
+                if session.editableOptionIDs.contains("x_min") || session.editableOptionIDs.contains("x_max") {
+                    axisRangeRow(
+                        title: "X range",
+                        lowerTitle: "Min",
+                        upperTitle: "Max",
+                        lowerBinding: numericTextBinding(
+                            get: { session.renderOptions.xMin },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.xMin = newValue }
+                            }
+                        ),
+                        upperBinding: numericTextBinding(
+                            get: { session.renderOptions.xMax },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.xMax = newValue }
                             }
                         )
                     )
-                    .textFieldStyle(.roundedBorder)
+                }
+
+                if session.editableOptionIDs.contains("y_min") || session.editableOptionIDs.contains("y_max") {
+                    axisRangeRow(
+                        title: "Y range",
+                        lowerTitle: "Min",
+                        upperTitle: "Max",
+                        lowerBinding: numericTextBinding(
+                            get: { session.renderOptions.yMin },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.yMin = newValue }
+                            }
+                        ),
+                        upperBinding: numericTextBinding(
+                            get: { session.renderOptions.yMax },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .debounced) { $0.yMax = newValue }
+                            }
+                        )
+                    )
+                }
+
+                if session.editableOptionIDs.contains("baseline") {
+                    AdaptiveInspectorControlRow(title: "Baseline") {
+                        TextField(
+                            "Baseline",
+                            text: stringBinding(
+                                get: { session.renderOptions.baseline ?? "" },
+                                set: { newValue in
+                                    session.updateRenderOptions(policy: .debounced) { $0.baseline = newValue.isEmpty ? nil : newValue }
+                                }
+                            )
+                        )
+                        .textFieldStyle(.roundedBorder)
+                    }
                 }
             }
         }
@@ -242,20 +246,22 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             if session.seriesOrderLabels.isEmpty {
                 InspectorEmptyState(message: "No legend entries are available for this figure.")
             } else {
-                SortableSeriesListView(
-                    title: "Legend order",
-                    detail: "Session-only reorder.",
-                    items: Binding(
-                        get: { session.seriesOrderLabels },
-                        set: { session.setSeriesOrder($0) }
-                    ),
-                    canEdit: session.canEditSeriesOrder
-                )
+                DisclosureGroup("Advanced") {
+                    SortableSeriesListView(
+                        title: "Legend order",
+                        detail: "Session-only reorder.",
+                        items: Binding(
+                            get: { session.seriesOrderLabels },
+                            set: { session.setSeriesOrder($0) }
+                        ),
+                        canEdit: session.canEditSeriesOrder
+                    )
 
-                Button("Reset Series Order") {
-                    session.resetSeriesOrder()
+                    Button("Reset Series Order") {
+                        session.resetSeriesOrder()
+                    }
+                    .disabled(!session.canEditSeriesOrder || session.renderOptions.seriesOrder == nil)
                 }
-                .disabled(!session.canEditSeriesOrder || session.renderOptions.seriesOrder == nil)
             }
         }
     }

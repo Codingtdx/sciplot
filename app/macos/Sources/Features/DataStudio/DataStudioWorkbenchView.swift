@@ -3,13 +3,14 @@ import UniformTypeIdentifiers
 
 struct DataStudioWorkbenchView: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             topBar
 
             if let errorMessage = session.errorMessage {
-                compactIssueLabel(message: errorMessage)
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
@@ -28,6 +29,9 @@ struct DataStudioWorkbenchView: View {
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            session.attachUndoManager(undoManager)
+        }
         .task {
             if session.templates.isEmpty {
                 await session.refreshTemplates()
@@ -40,17 +44,8 @@ struct DataStudioWorkbenchView: View {
         ) { result in
             session.handleImportPanelResult(result)
         }
-        .sheet(isPresented: importScopeBinding) {
-            DataStudioImportScopeSheet(session: session)
-        }
-        .sheet(isPresented: importChooserBinding) {
-            DataStudioImportChooserSheet(session: session)
-        }
-        .sheet(isPresented: importResolverBinding) {
-            DataStudioImportResolverSheet(session: session)
-        }
-        .sheet(isPresented: createTemplateEditorBinding) {
-            DataStudioCreateTemplateEditorSheet(session: session)
+        .sheet(isPresented: importWizardBinding) {
+            DataStudioImportWizardSheet(session: session)
         }
         .sheet(isPresented: guideBinding) {
             DataStudioGuideSheet(session: session)
@@ -66,7 +61,7 @@ struct DataStudioWorkbenchView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                Text(session.comparisonStatusText)
+                Text(session.documentStatusSummary)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -148,53 +143,14 @@ struct DataStudioWorkbenchView: View {
         )
     }
 
-    private var importScopeBinding: Binding<Bool> {
+    private var importWizardBinding: Binding<Bool> {
         Binding(
-            get: { session.isImportScopePresented },
+            get: { session.isImportWizardPresented },
             set: { isPresented in
                 if isPresented {
-                    session.isImportScopePresented = true
+                    session.isImportWizardPresented = true
                 } else {
-                    session.dismissImportScope()
-                }
-            }
-        )
-    }
-
-    private var importChooserBinding: Binding<Bool> {
-        Binding(
-            get: { session.isImportChooserPresented },
-            set: { isPresented in
-                if isPresented {
-                    session.isImportChooserPresented = true
-                } else {
-                    session.dismissImportChooser()
-                }
-            }
-        )
-    }
-
-    private var importResolverBinding: Binding<Bool> {
-        Binding(
-            get: { session.isImportResolverPresented },
-            set: { isPresented in
-                if isPresented {
-                    session.isImportResolverPresented = true
-                } else {
-                    session.dismissImportResolver()
-                }
-            }
-        )
-    }
-
-    private var createTemplateEditorBinding: Binding<Bool> {
-        Binding(
-            get: { session.isCreateTemplateEditorPresented },
-            set: { isPresented in
-                if isPresented {
-                    session.isCreateTemplateEditorPresented = true
-                } else {
-                    session.dismissCreateTemplateEditor()
+                    session.dismissImportWizard()
                 }
             }
         )
@@ -205,21 +161,6 @@ struct DataStudioWorkbenchView: View {
             get: { session.isGuidePresented },
             set: { session.isGuidePresented = $0 }
         )
-    }
-
-    private func compactIssueLabel(message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .lineLimit(2)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 10))
     }
 
 }
@@ -612,6 +553,25 @@ private struct DataStudioInlinePreviewBanner: View {
     }
 }
 
+private struct DataStudioImportWizardSheet: View {
+    @Bindable var session: DataStudioSession
+
+    var body: some View {
+        Group {
+            switch session.importWizardStep {
+            case .scope:
+                DataStudioImportScopeSheet(session: session)
+            case .kind:
+                DataStudioImportChooserSheet(session: session)
+            case .resolver:
+                DataStudioImportResolverSheet(session: session)
+            case .createTemplate:
+                DataStudioCreateTemplateEditorSheet(session: session)
+            }
+        }
+    }
+}
+
 private struct DataStudioImportScopeSheet: View {
     @Bindable var session: DataStudioSession
 
@@ -647,7 +607,7 @@ private struct DataStudioImportScopeSheet: View {
 
             DataStudioSheetFooter {
                 Button("Cancel") {
-                    session.dismissImportScope()
+                    session.dismissImportWizard()
                 }
             }
         }
@@ -690,8 +650,16 @@ private struct DataStudioImportChooserSheet: View {
             Divider()
 
             DataStudioSheetFooter {
+                if session.canGoBackInImportWizard {
+                    Button("Back") {
+                        session.goBackInImportWizard()
+                    }
+                }
+
+                Spacer()
+
                 Button("Cancel") {
-                    session.dismissImportChooser()
+                    session.dismissImportWizard()
                 }
             }
         }
@@ -768,8 +736,12 @@ private struct DataStudioImportResolverSheet: View {
             Divider()
 
             DataStudioSheetFooter {
+                Button("Back") {
+                    session.goBackInImportWizard()
+                }
+
                 Button("Cancel") {
-                    session.dismissImportResolver()
+                    session.dismissImportWizard()
                 }
 
                 Spacer()
@@ -903,8 +875,12 @@ private struct DataStudioCreateTemplateEditorSheet: View {
             Divider()
 
             DataStudioSheetFooter {
-                Button("Cancel") {
-                    session.dismissCreateTemplateEditor()
+                Button("Back") {
+                    session.goBackInImportWizard()
+                }
+
+                Button("Cancel Import") {
+                    session.dismissImportWizard()
                 }
 
                 Spacer()

@@ -118,8 +118,29 @@ Every development round must update this file.
   - Large immediate extraction into standalone state-store objects for all observable fields: rejected this round due migration risk and low short-term return.
 - Boundaries:
   - No IA/workflow/shortcut/order changes.
-  - Session orchestration objects must remain `@MainActor` isolated.
-  - Path-scoped async work (for workbook previews) must use keyed latest-write-wins semantics.
+- Session orchestration objects must remain `@MainActor` isolated.
+- Path-scoped async work (for workbook previews) must use keyed latest-write-wins semantics.
+
+### 2026-04-08: macOS first-principles GUI hardening (single import wizard + explainable actions + progressive inspector + undo)
+
+- Change:
+  - Data Studio import merged into one staged wizard sheet (`scope -> kind -> resolver -> create template`) on macOS.
+  - Added shared `ActionAvailability` and wired export actions to `disabled + help` (toolbar + menu + key inspector actions).
+  - Upgraded workbench error chips to expandable diagnostic cards (summary/detail/copy; retry hook supported).
+  - Workbench top bars now prioritize document-state summaries (source/template-or-figure/latest output/latest failure).
+  - Plot/Data Studio integrated native `UndoManager` for key reversible edits.
+  - Plot/Data Studio inspector controls switched to progressive disclosure (`DisclosureGroup("Advanced")`).
+- Why:
+  - First principles: reduce cognitive load, remove dead-end/no-op interactions, and keep edits reversible.
+  - Apple-native semantics: one modal context per task, explicit disabled reasons, compact default inspector.
+- Rejected alternatives:
+  - Keep Data Studio multi-modal import chain: rejected for repeated context switching and modal churn.
+  - Keep guard-return no-op actions: rejected due hidden state and poor recoverability.
+  - Keep full inspector expanded by default: rejected due scan overload for common tasks.
+- Boundaries:
+  - No sidecar/Python route or schema changes.
+  - No app-level navigation expansion.
+  - Undo scope remains key in-memory edits only (not long-running import/export side effects).
 
 ## 4) Troubleshooting Playbook
 
@@ -169,6 +190,17 @@ Every development round must update this file.
 - Fix pattern:
   - mark the holder type (`AsyncCoordination`) as `@MainActor` when it owns `AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`.
   - keep coordinator lifecycle owned by `@MainActor` sessions only.
+
+### Symptom: Data Studio import kind is clickable but native file picker does not appear
+
+- Typical cause:
+  - `fileImporter` is requested while the staged Data Studio wizard sheet is still presented, creating modal presentation contention.
+- Check:
+  - verify `chooseImportKind` first dismisses wizard state (`isImportWizardPresented = false`) before any importer presentation flag is toggled.
+  - verify there is no state where `isImportWizardPresented == true` and `isImportPresented == true` at the same time.
+- Fix pattern:
+  - centralize importer presentation into a small deferred scheduler (`Task { @MainActor ... }`) that runs after wizard dismissal on the next main-actor turn.
+  - keep cancel behavior explicit: import panel cancel should reset import flow state and exit the flow.
 
 ## 5) Round Change Log
 
@@ -305,6 +337,64 @@ Every development round must update this file.
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`78 tests`)
+
+### 2026-04-08 (Round E): macOS GUI interaction hardening (Apple-native)
+
+- Scope:
+  - Data Studio import moved to a single staged wizard sheet.
+  - Export actions now expose explicit availability reasons via `ActionAvailability`.
+  - Plot/Data Studio inspector switched to progressive disclosure for low-frequency controls.
+  - Plot/Data Studio/Code Console top bars now report document-state summaries.
+  - Plot/Data Studio key edits integrated with native Undo/Redo.
+  - Added macOS tests for wizard state, export availability mapping, and undo restore coverage.
+- User-visible impact:
+  - Data Studio import stays in one continuous sheet context.
+  - Export buttons no longer silently no-op; disabled state explains why.
+  - Inspector defaults are less crowded with advanced controls available on demand.
+  - Error details are expandable/copyable in-place.
+  - Plot/Data Studio edits can be undone/redone with native shortcuts.
+- Risks:
+  - Import wizard step/legacy state sync can regress if future edits change one side only.
+  - Undo currently covers selected key edits, not every mutating path.
+  - Document-state summary strings are dense and may need future copy tuning.
+- Rollback points:
+  - Wizard/UI state: `app/macos/Sources/Features/DataStudio/DataStudioSession.swift` and `DataStudioWorkbenchView.swift`.
+  - Availability wiring: `app/macos/Sources/Shared/UI/StateViews.swift`, `AppModel.swift`, `RootSplitView.swift`, `AppCommands.swift`.
+  - Undo wiring: `app/macos/Sources/Features/Plot/PlotSession.swift` and `DataStudioSession.swift`.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`86 tests`)
+
+### 2026-04-09 (Round F): Data Studio native importer sequencing fix + full interface audit
+
+- Scope:
+  - Fixed Data Studio import modal sequencing in macOS session layer so import kind selection always dismisses wizard first, then presents native `fileImporter`.
+  - Added importer presentation scheduler path in `DataStudioSession` to avoid sheet/importer modal contention.
+  - Added regression tests for wizard -> importer transition and cancel-reset behavior.
+  - Performed static sidecar interface audit between macOS `SidecarClient` and `app/sidecar/routes_*.py` route surface.
+- User-visible impact:
+  - Data Studio `Raw Files` / `Existing Workbook` now reliably opens the native file picker.
+  - Canceling the file picker exits the import flow cleanly without stale wizard/import states.
+- Risks:
+  - Import presentation now depends on deferred main-actor scheduling; future direct toggles of `isImportPresented` from new paths can bypass this safeguard.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift` (`chooseImportKind` + deferred importer scheduler).
+  - `app/macos/Tests/DataStudioSessionTests.swift` and `app/macos/Tests/AppModelTests.swift` (new transition regression coverage).
+- Interface audit result:
+  - `SidecarClient` endpoint strings and sidecar route registrations are fully aligned (`client_paths=25`, `route_paths=25`, no missing paths after dynamic template-id normalization).
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`152 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`89 tests`)
 
 ## 6) Update Template (copy for next round)
 

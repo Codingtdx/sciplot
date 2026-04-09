@@ -15,6 +15,7 @@ final class PlotSession {
     @ObservationIgnored private let materializeExport: PlotExportMaterializer
     @ObservationIgnored private var runtimeState = RuntimeState()
     @ObservationIgnored private let asyncCoordination = AsyncCoordination()
+    @ObservationIgnored private weak var undoManager: UndoManager?
     @ObservationIgnored var renderOptionsDidChange: ((RenderOptionsPayload) -> Void)?
 
     var isImporterPresented = false
@@ -36,6 +37,33 @@ final class PlotSession {
     var isRunningPreflight = false
     var isExporting = false
     var userExportURLs: [URL] = []
+
+    var exportAvailability: ActionAvailability {
+        if isExporting {
+            return .disabled("Export is already in progress.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before exporting.")
+        }
+        guard selectedTemplateID != nil else {
+            return .disabled("Choose a template before exporting.")
+        }
+        guard !needsInspection else {
+            return .disabled("Wait for inspect to finish before exporting.")
+        }
+        return .enabled()
+    }
+
+    var documentStatusSummary: String {
+        let source = selectedSourceFilename ?? "No source"
+        let template = selectedTemplateSummary?.label ?? "No template"
+        let output = userExportURLs.first?.lastPathComponent ?? "No export"
+        let failure = errorMessage ?? "No failure"
+        return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
+    }
 
     init(
         chooseExportDestination: @escaping PlotExportDestinationChooser = {
@@ -97,6 +125,10 @@ final class PlotSession {
         self.client = client
     }
 
+    func attachUndoManager(_ undoManager: UndoManager?) {
+        self.undoManager = undoManager
+    }
+
     func apply(meta: SidecarMetaResponse, contract: PlotContractResponse) {
         metadata = meta
         self.contract = contract
@@ -145,12 +177,14 @@ final class PlotSession {
         guard selectedSheet != sheet || needsInspection else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         selectedSheet = sheet
         _ = asyncCoordination.preview.beginNow()
         isPreviewing = false
         invalidateSubmissionArtifacts()
         errorMessage = nil
         scheduleInspection()
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Sheet")
     }
 
     func selectSheetAndReinspect(_ sheet: SheetValue) async {
@@ -165,19 +199,26 @@ final class PlotSession {
         guard selectedTemplateID != templateID else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         setTemplate(templateID, shouldResetRenderOptions: true)
         schedulePreviewRefresh(policy: .immediate)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Template")
     }
 
     func updateRenderOptions(
         policy: PlotPreviewRefreshPolicy = .debounced,
         mutate: (inout RenderOptionsPayload) -> Void
     ) {
+        let previousSnapshot = undoSnapshot()
         mutate(&renderOptions)
+        guard previousSnapshot.renderOptions != renderOptions else {
+            return
+        }
         notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: policy)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Edit Plot Options")
     }
 
     func clearPreviewContext(preserveRenderOptions: Bool = true) {
@@ -1025,15 +1066,70 @@ final class PlotSession {
     private func waitUntilPreviewFinishes(for _: URL?) async {
         await asyncCoordination.preview.wait()
     }
+
+    private func undoSnapshot() -> UndoSnapshot {
+        UndoSnapshot(
+            selectedSheet: selectedSheet,
+            selectedTemplateID: selectedTemplateID,
+            renderOptions: renderOptions
+        )
+    }
+
+    private func registerUndo(previousSnapshot: UndoSnapshot, actionName: String) {
+        guard let undoManager else {
+            return
+        }
+        guard !runtimeState.isApplyingUndoRedo else {
+            return
+        }
+
+        let currentSnapshot = undoSnapshot()
+        guard currentSnapshot != previousSnapshot else {
+            return
+        }
+
+        undoManager.registerUndo(withTarget: self) { session in
+            session.runtimeState.isApplyingUndoRedo = true
+            session.restore(from: previousSnapshot)
+            session.runtimeState.isApplyingUndoRedo = false
+            session.registerUndo(previousSnapshot: currentSnapshot, actionName: actionName)
+        }
+        undoManager.setActionName(actionName)
+    }
+
+    private func restore(from snapshot: UndoSnapshot) {
+        selectedSheet = snapshot.selectedSheet
+        selectedTemplateID = snapshot.selectedTemplateID
+        renderOptions = snapshot.renderOptions
+        notifyRenderOptionsDidChange()
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+
+        guard selectedFileURL != nil else {
+            return
+        }
+        if needsInspection {
+            scheduleInspection()
+        } else {
+            schedulePreviewRefresh(policy: .immediate)
+        }
+    }
 }
 
 private extension PlotSession {
+    struct UndoSnapshot: Equatable {
+        let selectedSheet: SheetValue
+        let selectedTemplateID: String?
+        let renderOptions: RenderOptionsPayload
+    }
+
     struct RuntimeState {
         var inspectedInputPath: String?
         var inspectedSheet: SheetValue?
         var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
         var stagedExternalPinnedSheet: SheetValue?
         var stagedExternalPinnedTemplateID: String?
+        var isApplyingUndoRedo = false
     }
 
     @MainActor

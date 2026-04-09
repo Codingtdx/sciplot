@@ -4,6 +4,21 @@ import XCTest
 
 @MainActor
 final class ComposerSessionTests: XCTestCase {
+    func testExportAvailabilityExplainsBlockingStates() {
+        let session = ComposerSession()
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("sidecar") ?? false)
+
+        let client = MockSidecarClient()
+        session.configure(client: client)
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Import at least one panel") ?? false)
+
+        session.project.panels = [graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0)]
+        XCTAssertTrue(session.exportAvailability.isEnabled)
+        XCTAssertNil(session.exportAvailability.reason)
+    }
+
     func testBoardGeometryResolvesAllNineCellsFromBoardLocalPoints() {
         let geometry = ComposerBoardGeometry(
             project: ComposerRequestPayload(),

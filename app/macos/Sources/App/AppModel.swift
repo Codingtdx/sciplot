@@ -26,6 +26,19 @@ final class AppModel {
     var hasBootstrapped = false
     var isPlotReplacementConfirmationPresented = false
 
+    var activeExportAvailability: ActionAvailability {
+        switch selectedWorkbench {
+        case .plot:
+            return plotSession.exportAvailability
+        case .dataStudio:
+            return dataStudioSession.exportAvailability
+        case .composer:
+            return composerSession.exportAvailability
+        case .codeConsole:
+            return codeConsoleSession.exportAvailability
+        }
+    }
+
     @ObservationIgnored private var pendingPlotReplacementAction: PendingPlotReplacementAction?
 
     init(runtime: SidecarRuntime, client: (any SidecarClienting)? = nil) {

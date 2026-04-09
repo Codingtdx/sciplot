@@ -19,6 +19,8 @@ final class DataStudioSession {
     @ObservationIgnored private let chooseComparisonFigureFormat: ComparisonFigureFormatChooser
     @ObservationIgnored private let materializeComparisonOutputs: ComparisonOutputMaterializer
     @ObservationIgnored private let asyncCoordination = AsyncCoordination()
+    @ObservationIgnored private var importPanelPresentationRevision = 0
+    @ObservationIgnored private weak var undoManager: UndoManager?
 
     let plotSession: PlotSession
 
@@ -36,6 +38,8 @@ final class DataStudioSession {
 
     var isImportScopePresented = false
     var isImportChooserPresented = false
+    var isImportWizardPresented = false
+    var importWizardStep: DataStudioImportWizardStep = .kind
     var pendingImportDisposition: DataStudioImportDisposition = .addToCurrentSession
     var pendingImportKind: DataStudioImportKind = .rawFiles
     var isImportPresented = false
@@ -75,6 +79,30 @@ final class DataStudioSession {
     var isBusy = false
     var openInPlotHandler: OpenInPlotHandler?
 
+    var exportAvailability: ActionAvailability {
+        if currentActivity == .exportingComparison {
+            return .disabled("Export is already in progress.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard comparisonSet != nil else {
+            return .disabled("Import workbook groups before exporting.")
+        }
+        guard !selectedExportRecipeIDs.isEmpty else {
+            return .disabled("Choose at least one figure family before exporting.")
+        }
+        return .enabled()
+    }
+
+    var documentStatusSummary: String {
+        let source = focusedWorkbook?.workbookURL.lastPathComponent ?? "No workbook"
+        let figure = currentRecipeLabel
+        let output = comparisonExportDestinationURL?.lastPathComponent ?? "No export"
+        let failure = errorMessage ?? previewWarning ?? "No failure"
+        return "Source: \(source) · Figure: \(figure) · Latest output: \(output) · Last failure: \(failure)"
+    }
+
     init(
         plotSession: PlotSession = PlotSession(),
         chooseDirectory: @escaping DirectoryChooser = { title, message in
@@ -107,6 +135,11 @@ final class DataStudioSession {
         plotSession.configure(client: client)
     }
 
+    func attachUndoManager(_ undoManager: UndoManager?) {
+        self.undoManager = undoManager
+        plotSession.attachUndoManager(undoManager)
+    }
+
     func apply(meta: SidecarMetaResponse, contract: PlotContractResponse) {
         runtimeState.meta = meta
         runtimeState.contract = contract
@@ -134,11 +167,14 @@ final class DataStudioSession {
 
     func beginImportFlow() {
         clearImportFlowError()
+        isImportWizardPresented = true
         if hasSessionContent {
             pendingImportDisposition = .addToCurrentSession
+            importWizardStep = .scope
             isImportScopePresented = true
         } else {
             pendingImportDisposition = .addToCurrentSession
+            importWizardStep = .kind
             isImportChooserPresented = true
         }
     }
@@ -147,27 +183,75 @@ final class DataStudioSession {
         clearImportFlowError()
         pendingImportDisposition = disposition
         isImportScopePresented = false
+        importWizardStep = .kind
         isImportChooserPresented = true
     }
 
     func chooseImportKind(_ kind: DataStudioImportKind) {
         clearImportFlowError()
         pendingImportKind = kind
+        importWizardStep = .kind
+        isImportScopePresented = false
         isImportChooserPresented = false
-        isImportPresented = true
+        isImportResolverPresented = false
+        isCreateTemplateEditorPresented = false
+        isImportWizardPresented = false
+        scheduleImportPanelPresentation()
     }
 
     func dismissImportScope() {
         clearImportFlowError()
+        isImportWizardPresented = false
+        importWizardStep = .kind
         isImportScopePresented = false
         pendingImportDisposition = .addToCurrentSession
     }
 
     func dismissImportChooser() {
         clearImportFlowError()
+        isImportWizardPresented = false
+        importWizardStep = .kind
         isImportChooserPresented = false
         pendingImportDisposition = .addToCurrentSession
         pendingImportKind = .rawFiles
+    }
+
+    var canGoBackInImportWizard: Bool {
+        switch importWizardStep {
+        case .scope:
+            return false
+        case .kind:
+            return hasSessionContent
+        case .resolver, .createTemplate:
+            return true
+        }
+    }
+
+    func goBackInImportWizard() {
+        switch importWizardStep {
+        case .scope:
+            break
+        case .kind:
+            if hasSessionContent {
+                importWizardStep = .scope
+                isImportScopePresented = true
+                isImportChooserPresented = false
+            }
+        case .resolver:
+            importWizardStep = .kind
+            isImportResolverPresented = false
+            isCreateTemplateEditorPresented = false
+            isImportChooserPresented = true
+        case .createTemplate:
+            returnToImportResolver()
+        }
+    }
+
+    func dismissImportWizard() {
+        clearImportFlowError()
+        isImportWizardPresented = false
+        resetImportPresentationState()
+        discardPendingSourcePreview()
     }
 
     func handleImportPanelResult(_ result: Result<[URL], Error>) {
@@ -616,6 +700,7 @@ final class DataStudioSession {
                 await buildWorkbookFromPendingRawFiles(templateID: match.templateID)
             } else {
                 selectedTemplateID = response.matches.first?.templateID ?? templates.first?.id
+                importWizardStep = .resolver
                 isImportResolverPresented = true
             }
         } catch {
@@ -647,6 +732,7 @@ final class DataStudioSession {
         reconcileSuggestionSelection()
         syncPinnedPreviewRanges()
         showAdvancedCandidates = false
+        importWizardStep = .createTemplate
         isCreateTemplateEditorPresented = true
     }
 
@@ -657,6 +743,7 @@ final class DataStudioSession {
 
     func returnToImportResolver() {
         isCreateTemplateEditorPresented = false
+        importWizardStep = .resolver
         isImportResolverPresented = true
     }
 
@@ -666,6 +753,7 @@ final class DataStudioSession {
         }
         selectedTemplateID = template.id
         isCreateTemplateEditorPresented = false
+        importWizardStep = .resolver
         isImportResolverPresented = true
     }
 
@@ -717,6 +805,7 @@ final class DataStudioSession {
 
     func dismissImportResolver() {
         clearImportFlowError()
+        isImportWizardPresented = false
         isImportResolverPresented = false
         resetImportPresentationState()
         discardPendingSourcePreview()
@@ -850,6 +939,9 @@ final class DataStudioSession {
             if refreshContext {
                 await rebuildComparisonContext(refreshWorkbookPreviews: true)
             }
+            isImportWizardPresented = false
+            resetImportPresentationState()
+            discardPendingSourcePreview()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -876,21 +968,25 @@ final class DataStudioSession {
     }
 
     func updateDisplayName(for workbookPath: String, to displayName: String) {
+        let previousSnapshot = undoSnapshot()
         setGroupState(
             workbookPath: workbookPath,
             displayName: displayName,
             includeInCompare: groupState(for: workbookPath)?.includeInCompare ?? true
         )
         scheduleComparisonContextRebuild()
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Rename Group")
     }
 
     func updateCompareInclusion(for workbookPath: String, includeInCompare: Bool) {
+        let previousSnapshot = undoSnapshot()
         setGroupState(
             workbookPath: workbookPath,
             displayName: groupState(for: workbookPath)?.displayName ?? "",
             includeInCompare: includeInCompare
         )
         scheduleComparisonContextRebuild()
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Toggle Compare Inclusion")
     }
 
     func openSpecimenFilter(for workbookPath: String) {
@@ -919,24 +1015,28 @@ final class DataStudioSession {
         guard !suggested.isEmpty else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         setSpecimenInclusion(
             for: workbookPath,
             includedIDs: Set(specimenStates(for: workbookPath).map(\.specimenId)).subtracting(suggested),
             explicitlyExcludedIDs: Set(suggested)
         )
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Apply Suggested Exclusions")
     }
 
     func restoreAllSpecimens(for workbookPath: String) {
         guard let preview = workbookPreview(for: workbookPath) else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         setSpecimenInclusion(
             for: workbookPath,
             includedIDs: Set(preview.specimens.map(\.specimenId)),
             explicitlyExcludedIDs: []
         )
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Include All Specimens")
     }
 
     func includeAllSpecimens(for workbookPath: String) {
@@ -947,15 +1047,18 @@ final class DataStudioSession {
         guard let preview = workbookPreview(for: workbookPath) else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         setSpecimenInclusion(
             for: workbookPath,
             includedIDs: [],
             explicitlyExcludedIDs: Set(preview.specimens.map(\.specimenId))
         )
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Exclude All Specimens")
     }
 
     func updateSpecimenInclusion(for workbookPath: String, specimenId: String, included: Bool) {
+        let previousSnapshot = undoSnapshot()
         var currentStates = specimenStates(for: workbookPath)
         if let index = currentStates.firstIndex(where: { $0.specimenId == specimenId }) {
             currentStates[index] = DataStudioSpecimenStatePayload(
@@ -974,9 +1077,11 @@ final class DataStudioSession {
         }
         specimenStatesByWorkbookPath[workbookPath] = currentStates.sorted { $0.specimenId < $1.specimenId }
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Toggle Specimen Inclusion")
     }
 
     func moveGroups(from source: IndexSet, to destination: Int) {
+        let previousSnapshot = undoSnapshot()
         var ordered = orderedGroups.map(\.state)
         ordered.move(fromOffsets: source, toOffset: destination)
         groupStates = ordered.enumerated().map { index, state in
@@ -988,6 +1093,7 @@ final class DataStudioSession {
             )
         }
         scheduleComparisonContextRebuild()
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Reorder Groups")
     }
 
     func removeWorkbook(path: String) {
@@ -1009,23 +1115,27 @@ final class DataStudioSession {
     }
 
     func selectFigureFamily(id: String) {
+        let previousSnapshot = undoSnapshot()
         cacheCurrentFigureOptions()
         selectedFigureFamilyID = id
         syncFigureSelection()
         stageCurrentFigurePreview()
         Task { await refreshDisplayedFigureHandlingFailure() }
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Figure Family")
     }
 
     func selectFigureTemplate(id: String) {
         guard let family = currentFigureFamily else {
             return
         }
+        let previousSnapshot = undoSnapshot()
         cacheCurrentFigureOptions()
         setFigurePreference(familyID: family.id, selectedTemplateID: id)
         selectedFigureTemplateID = id
         syncFigureSelection()
         stageCurrentFigurePreview()
         Task { await refreshDisplayedFigureHandlingFailure() }
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Figure Template")
     }
 
     func openCurrentFigureInPlot() {
@@ -1309,6 +1419,11 @@ final class DataStudioSession {
             )
             upsertWorkbook(workbook, shouldFocus: true)
             await rebuildComparisonContext(refreshWorkbookPreviews: true)
+            isImportWizardPresented = false
+            isImportResolverPresented = false
+            isCreateTemplateEditorPresented = false
+            resetImportPresentationState()
+            discardPendingSourcePreview()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1900,6 +2015,51 @@ final class DataStudioSession {
         return result
     }
 
+    private func undoSnapshot() -> UndoSnapshot {
+        UndoSnapshot(
+            groupStates: groupStates,
+            specimenStatesByWorkbookPath: specimenStatesByWorkbookPath,
+            selectedFigureFamilyID: selectedFigureFamilyID,
+            selectedFigureTemplateID: selectedFigureTemplateID,
+            selectedRecipeID: selectedRecipeID,
+            figurePreferences: figurePreferences
+        )
+    }
+
+    private func registerUndo(previousSnapshot: UndoSnapshot, actionName: String) {
+        guard let undoManager else {
+            return
+        }
+        guard !runtimeState.isApplyingUndoRedo else {
+            return
+        }
+
+        let currentSnapshot = undoSnapshot()
+        guard currentSnapshot != previousSnapshot else {
+            return
+        }
+
+        undoManager.registerUndo(withTarget: self) { session in
+            session.runtimeState.isApplyingUndoRedo = true
+            session.restore(from: previousSnapshot)
+            session.runtimeState.isApplyingUndoRedo = false
+            session.registerUndo(previousSnapshot: currentSnapshot, actionName: actionName)
+        }
+        undoManager.setActionName(actionName)
+    }
+
+    private func restore(from snapshot: UndoSnapshot) {
+        groupStates = snapshot.groupStates
+        specimenStatesByWorkbookPath = snapshot.specimenStatesByWorkbookPath
+        selectedFigureFamilyID = snapshot.selectedFigureFamilyID
+        selectedFigureTemplateID = snapshot.selectedFigureTemplateID
+        selectedRecipeID = snapshot.selectedRecipeID
+        figurePreferences = snapshot.figurePreferences
+        previewWarning = nil
+        isPreviewStale = false
+        scheduleComparisonContextRebuild()
+    }
+
     private func resetContentState() {
         asyncCoordination.comparisonRefresh.cancel()
         asyncCoordination.workbookPreview.cancelAll()
@@ -1932,6 +2092,8 @@ final class DataStudioSession {
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil
         showAdvancedCandidates = false
+        isImportWizardPresented = false
+        importWizardStep = .kind
         isImportScopePresented = false
         isImportChooserPresented = false
         isImportResolverPresented = false
@@ -1951,14 +2113,31 @@ final class DataStudioSession {
             && lowered.contains("representative_curve")
     }
 
+    private func scheduleImportPanelPresentation() {
+        importPanelPresentationRevision += 1
+        let revision = importPanelPresentationRevision
+        isImportPresented = false
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, self.importPanelPresentationRevision == revision else {
+                return
+            }
+            self.isImportPresented = true
+        }
+    }
+
     private func clearImportFlowError() {
         errorMessage = nil
     }
 
     private func resetImportPresentationState() {
         isImportPresented = false
+        isImportWizardPresented = false
+        importWizardStep = .kind
         isImportScopePresented = false
         isImportChooserPresented = false
+        isImportResolverPresented = false
+        isCreateTemplateEditorPresented = false
         pendingImportDisposition = .addToCurrentSession
         pendingImportKind = .rawFiles
     }
@@ -2357,9 +2536,19 @@ final class DataStudioSession {
 }
 
 private extension DataStudioSession {
+    struct UndoSnapshot: Equatable {
+        let groupStates: [DataStudioGroupStatePayload]
+        let specimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]]
+        let selectedFigureFamilyID: String?
+        let selectedFigureTemplateID: String?
+        let selectedRecipeID: String?
+        let figurePreferences: [DataStudioFigurePreferencePayload]
+    }
+
     struct RuntimeState {
         var meta: SidecarMetaResponse?
         var contract: PlotContractResponse?
+        var isApplyingUndoRedo = false
     }
 
     @MainActor

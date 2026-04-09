@@ -4,6 +4,95 @@ import XCTest
 
 @MainActor
 final class DataStudioSessionTests: XCTestCase {
+    func testImportWizardUsesSinglePresentationStateAndStepTransitions() {
+        let session = DataStudioSession()
+
+        session.beginImportFlow()
+        XCTAssertTrue(session.isImportWizardPresented)
+        XCTAssertEqual(session.importWizardStep, .kind)
+
+        session.workbooks = [
+            .init(
+                id: "workbook-1",
+                response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: "/tmp/prepared.xlsx", label: "Prepared")
+            ),
+        ]
+        session.groupStates = [
+            .init(workbookPath: "/tmp/prepared.xlsx", displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+
+        session.beginImportFlow()
+        XCTAssertEqual(session.importWizardStep, .scope)
+
+        session.chooseImportDisposition(.addToCurrentSession)
+        XCTAssertEqual(session.importWizardStep, .kind)
+
+        session.importWizardStep = .resolver
+        session.goBackInImportWizard()
+        XCTAssertEqual(session.importWizardStep, .kind)
+    }
+
+    func testChooseImportKindDismissesWizardThenPresentsImporter() async {
+        let session = DataStudioSession()
+        session.beginImportFlow()
+
+        XCTAssertTrue(session.isImportWizardPresented)
+        XCTAssertTrue(session.isImportChooserPresented)
+        XCTAssertFalse(session.isImportPresented)
+
+        session.chooseImportKind(.rawFiles)
+
+        XCTAssertFalse(session.isImportWizardPresented)
+        XCTAssertFalse(session.isImportScopePresented)
+        XCTAssertFalse(session.isImportChooserPresented)
+        XCTAssertFalse(session.isImportResolverPresented)
+        XCTAssertFalse(session.isCreateTemplateEditorPresented)
+        XCTAssertFalse(session.isImportPresented)
+        XCTAssertFalse(session.isImportWizardPresented && session.isImportPresented)
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertTrue(session.isImportPresented)
+        XCTAssertFalse(session.isImportWizardPresented)
+        XCTAssertFalse(session.isImportWizardPresented && session.isImportPresented)
+    }
+
+    func testExportAvailabilityExplainsBlockingStates() {
+        let session = DataStudioSession()
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("sidecar") ?? false)
+
+        let client = MockSidecarClient()
+        session.configure(client: client)
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Import workbook groups") ?? false)
+
+        session.comparisonSet = TestPayloads.dataStudioComparisonSet()
+        XCTAssertTrue(session.exportAvailability.isEnabled)
+        XCTAssertNil(session.exportAvailability.reason)
+    }
+
+    func testUndoRestoresGroupCompareInclusion() {
+        let session = DataStudioSession()
+        let undoManager = UndoManager()
+        session.attachUndoManager(undoManager)
+        session.workbooks = [
+            .init(
+                id: "workbook-1",
+                response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: "/tmp/prepared.xlsx", label: "Prepared")
+            ),
+        ]
+        session.groupStates = [
+            .init(workbookPath: "/tmp/prepared.xlsx", displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+
+        session.updateCompareInclusion(for: "/tmp/prepared.xlsx", includeInCompare: false)
+        XCTAssertEqual(session.groupStates.first?.includeInCompare, false)
+
+        undoManager.undo()
+        XCTAssertEqual(session.groupStates.first?.includeInCompare, true)
+    }
+
     func testImportFlowStartsAtChooserForEmptySessionAndScopeForNonEmptySession() {
         let session = DataStudioSession()
 
@@ -38,6 +127,22 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertNil(session.errorMessage)
         XCTAssertFalse(session.isImportPresented)
+        XCTAssertEqual(session.pendingImportDisposition, .addToCurrentSession)
+        XCTAssertEqual(session.pendingImportKind, .rawFiles)
+    }
+
+    func testCancelledImportAfterKindSelectionEndsImportFlow() async {
+        let session = DataStudioSession()
+
+        session.beginImportFlow()
+        session.chooseImportKind(.existingWorkbook)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(session.isImportPresented)
+
+        session.handleImportPanelFailure(CancellationError())
+
+        XCTAssertFalse(session.isImportPresented)
+        XCTAssertFalse(session.isImportWizardPresented)
         XCTAssertEqual(session.pendingImportDisposition, .addToCurrentSession)
         XCTAssertEqual(session.pendingImportKind, .rawFiles)
     }
