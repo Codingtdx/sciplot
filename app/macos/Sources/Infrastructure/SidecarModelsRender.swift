@@ -9,6 +9,10 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var xMax: Double?
     var yMin: Double?
     var yMax: Double?
+    var xTickDensity: String?
+    var yTickDensity: String?
+    var xTickEdgeLabels: String?
+    var yTickEdgeLabels: String?
     var seriesOrder: [String]?
     var xLabelOverride: String?
     var yLabelOverride: String?
@@ -28,6 +32,10 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         xMax: Double? = nil,
         yMin: Double? = nil,
         yMax: Double? = nil,
+        xTickDensity: String? = nil,
+        yTickDensity: String? = nil,
+        xTickEdgeLabels: String? = nil,
+        yTickEdgeLabels: String? = nil,
         seriesOrder: [String]? = nil,
         xLabelOverride: String? = nil,
         yLabelOverride: String? = nil,
@@ -46,6 +54,10 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.xMax = xMax
         self.yMin = yMin
         self.yMax = yMax
+        self.xTickDensity = xTickDensity
+        self.yTickDensity = yTickDensity
+        self.xTickEdgeLabels = xTickEdgeLabels
+        self.yTickEdgeLabels = yTickEdgeLabels
         self.seriesOrder = seriesOrder
         self.xLabelOverride = xLabelOverride
         self.yLabelOverride = yLabelOverride
@@ -66,6 +78,10 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case xMax
         case yMin
         case yMax
+        case xTickDensity
+        case yTickDensity
+        case xTickEdgeLabels
+        case yTickEdgeLabels
         case seriesOrder
         case xLabelOverride
         case yLabelOverride

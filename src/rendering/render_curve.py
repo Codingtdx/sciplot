@@ -105,6 +105,10 @@ def _render_curve_candidate(
             marker_size=14.0
             * (combined_fix.collection_size_scale if combined_fix.collection_size_scale != 1.0 else 1.0),
             visible_xticks=base_kwargs.get("visible_xticks"),
+            x_tick_density=options.x_tick_density,
+            y_tick_density=options.y_tick_density,
+            x_tick_edge_labels=options.x_tick_edge_labels,
+            y_tick_edge_labels=options.y_tick_edge_labels,
             xlim=base_kwargs.get("xlim"),
             ylim=base_kwargs.get("ylim"),
             preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
@@ -159,6 +163,10 @@ def _render_curve_candidate(
             ),
             series_label_side=direct_label_side or str(base_kwargs.get("series_label_side", "auto")),
             visible_xticks=base_kwargs.get("visible_xticks"),
+            x_tick_density=options.x_tick_density,
+            y_tick_density=options.y_tick_density,
+            x_tick_edge_labels=options.x_tick_edge_labels,
+            y_tick_edge_labels=options.y_tick_edge_labels,
             xlim=base_kwargs.get("xlim"),
             ylim=base_kwargs.get("ylim"),
             y_padding_top=(

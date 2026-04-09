@@ -34,6 +34,7 @@ from src.plotting_primitives import (
     AxisMode,
     LegendMode,
     _apply_major_ticks_with_override,
+    _apply_numeric_axis_tick_preferences,
     _format_axis_label,
     _merge_limits,
     _resolved_panel_geometry,
@@ -207,6 +208,10 @@ def plot_curves(
     marker_size: float | None = None,
     marker_every: int | None = None,
     visible_xticks: Sequence[float] | None = None,
+    x_tick_density: str | None = None,
+    y_tick_density: str | None = None,
+    x_tick_edge_labels: str | None = None,
+    y_tick_edge_labels: str | None = None,
     reverse_x: bool = False,
     stack_mode: str = "none",
     stack_floor_fraction: float = 0.22,
@@ -368,12 +373,25 @@ def plot_curves(
             override=xlim,
             scale=xscale,
         )
+    _apply_numeric_axis_tick_preferences(
+        ax.xaxis,
+        scale=xscale,
+        tick_density=x_tick_density,
+        tick_edge_labels=x_tick_edge_labels,
+    )
     if show_y_ticks:
         _apply_major_ticks_with_override(
             ax.yaxis,
             policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
             override=ylim,
             scale=yscale,
+            max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+        )
+        _apply_numeric_axis_tick_preferences(
+            ax.yaxis,
+            scale=yscale,
+            tick_density=y_tick_density,
+            tick_edge_labels=y_tick_edge_labels,
             max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
         )
     return fig, ax
@@ -399,6 +417,10 @@ def plot_scatter(
     y_padding_bottom: float = 0.06,
     marker_size: float = 14.0,
     visible_xticks: Sequence[float] | None = None,
+    x_tick_density: str | None = None,
+    y_tick_density: str | None = None,
+    x_tick_edge_labels: str | None = None,
+    y_tick_edge_labels: str | None = None,
     reverse_x: bool = False,
     legend_expand_axes: str = "xy",
     legend_inset_fraction: float | None = None,
@@ -497,11 +519,24 @@ def plot_scatter(
             override=xlim,
             scale=xscale,
         )
+    _apply_numeric_axis_tick_preferences(
+        ax.xaxis,
+        scale=xscale,
+        tick_density=x_tick_density,
+        tick_edge_labels=x_tick_edge_labels,
+    )
     _apply_major_ticks_with_override(
         ax.yaxis,
         policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
         override=ylim,
         scale=yscale,
+        max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+    )
+    _apply_numeric_axis_tick_preferences(
+        ax.yaxis,
+        scale=yscale,
+        tick_density=y_tick_density,
+        tick_edge_labels=y_tick_edge_labels,
         max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
     )
     return fig, ax

@@ -164,11 +164,19 @@ private struct DataStudioGroupRailView: View {
     @Bindable var session: DataStudioSession
 
     var body: some View {
+        let autoKeepAvailability = session.autoKeepAllAvailability
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Workbook Groups")
                     .font(.headline)
                 Spacer()
+                Button("Auto Keep 5 All") {
+                    session.applySuggestedExclusionsToAllWorkbooks()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!autoKeepAvailability.isEnabled)
+                .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
                 Text("\(session.orderedGroups.count)")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)

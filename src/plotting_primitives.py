@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import transforms
-from matplotlib.ticker import FixedLocator
+from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
 
 from src import mpl_backend, plot_style  # noqa: F401
 from src.data_loader import ReplicateGroup
@@ -19,6 +19,8 @@ LegendMode = str
 AxisMode = str
 
 MAX_VISIBLE_Y_MAJOR_TICKS = 7
+_SPARSE_MAJOR_TICK_TARGET = 5
+_DENSE_MAJOR_TICK_TARGET = 11
 
 _PLOT_CONTRACT = load_plot_contract()
 
@@ -590,6 +592,206 @@ def _apply_major_ticks_with_override(
     if values.size == 0:
         return
     axis.set_major_locator(FixedLocator(values.tolist()))
+
+
+def _normalized_tick_density(value: str | None) -> str:
+    cleaned = str(value or "auto").strip().lower()
+    if cleaned not in {"auto", "sparse", "dense"}:
+        raise ValueError(f"Unsupported tick density: {value!r}")
+    return cleaned
+
+
+def _normalized_tick_edge_labels(value: str | None) -> str:
+    cleaned = str(value or "auto").strip().lower()
+    if cleaned not in {"auto", "hide_min", "hide_max", "hide_both"}:
+        raise ValueError(f"Unsupported tick edge label mode: {value!r}")
+    return cleaned
+
+
+def _normalized_tick_values(ticks: Sequence[float] | np.ndarray) -> np.ndarray:
+    values = np.asarray(ticks, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return values
+    return np.unique(np.round(values, decimals=12))
+
+
+def _sparsify_major_ticks(
+    ticks: np.ndarray,
+    *,
+    target_count: int,
+) -> np.ndarray:
+    values = _normalized_tick_values(ticks)
+    if values.size <= target_count:
+        return values
+
+    anchor_indices: set[int] = {0, values.size - 1}
+    zero_indices = np.flatnonzero(np.isclose(values, 0.0, atol=1e-9))
+    if zero_indices.size:
+        anchor_indices.add(int(zero_indices[0]))
+
+    keep_indices = set(anchor_indices)
+    while len(keep_indices) < target_count and len(keep_indices) < values.size:
+        best_index: int | None = None
+        best_distance = -1
+        for index in range(values.size):
+            if index in keep_indices:
+                continue
+            distance = min(abs(index - kept) for kept in keep_indices)
+            if distance > best_distance:
+                best_distance = distance
+                best_index = index
+        if best_index is None:
+            break
+        keep_indices.add(best_index)
+    return values[sorted(keep_indices)]
+
+
+def _densify_linear_major_ticks(
+    ticks: np.ndarray,
+    *,
+    target_count: int,
+) -> np.ndarray:
+    values = _normalized_tick_values(ticks)
+    if values.size < 2 or values.size >= target_count:
+        return values
+
+    dense_values = values.tolist()
+    candidate_midpoints = sorted(
+        (
+            (abs(float(high - low)), float((low + high) / 2.0))
+            for low, high in zip(values[:-1], values[1:], strict=True)
+            if not np.isclose(low, high)
+        ),
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    for _, midpoint in candidate_midpoints:
+        if len(dense_values) >= target_count:
+            break
+        if any(np.isclose(existing, midpoint, atol=1e-9) for existing in dense_values):
+            continue
+        dense_values.append(midpoint)
+    return _normalized_tick_values(dense_values)
+
+
+def _resolved_major_ticks_for_density(
+    ticks: Sequence[float] | np.ndarray,
+    *,
+    scale: str,
+    density: str | None,
+    max_major_ticks: int | None = None,
+) -> np.ndarray:
+    values = _normalized_tick_values(ticks)
+    density_mode = _normalized_tick_density(density)
+    if values.size == 0 or density_mode == "auto":
+        return values
+    if density_mode == "sparse":
+        target_count = max(2, min(values.size, min(max_major_ticks or _SPARSE_MAJOR_TICK_TARGET, _SPARSE_MAJOR_TICK_TARGET)))
+        return _sparsify_major_ticks(values, target_count=target_count)
+    if scale != "linear":
+        return values
+    return _densify_linear_major_ticks(
+        values,
+        target_count=max_major_ticks or _DENSE_MAJOR_TICK_TARGET,
+    )
+
+
+def _linear_minor_ticks_from_major_ticks(ticks: np.ndarray) -> np.ndarray:
+    values = _normalized_tick_values(ticks)
+    if values.size < 2:
+        return np.array([], dtype=float)
+    return _normalized_tick_values((values[:-1] + values[1:]) / 2.0)
+
+
+def _log_minor_ticks_from_major_ticks(ticks: np.ndarray) -> np.ndarray:
+    values = _normalized_tick_values(ticks)
+    if values.size < 2:
+        return np.array([], dtype=float)
+    minors: list[float] = []
+    for low, high in zip(values[:-1], values[1:], strict=True):
+        if low <= 0 or high <= 0:
+            continue
+        ratio = high / low
+        if np.isclose(ratio, 10.0, atol=1e-6, rtol=1e-6):
+            for factor in (2.0, 5.0):
+                candidate = low * factor
+                if candidate < high * (1 - 1e-9):
+                    minors.append(candidate)
+    return _normalized_tick_values(minors)
+
+
+def _apply_minor_tick_locator(axis, *, scale: str, major_ticks: np.ndarray) -> None:
+    values = _normalized_tick_values(major_ticks)
+    if values.size < 2:
+        axis.set_minor_locator(NullLocator())
+        return
+    if scale == "log":
+        minor_ticks = _log_minor_ticks_from_major_ticks(values)
+        axis.set_minor_locator(FixedLocator(minor_ticks.tolist()) if minor_ticks.size else NullLocator())
+        return
+    minor_ticks = _linear_minor_ticks_from_major_ticks(values)
+    axis.set_minor_locator(FixedLocator(minor_ticks.tolist()) if minor_ticks.size else NullLocator())
+
+
+def _apply_tick_edge_label_visibility(
+    axis,
+    *,
+    ticks: np.ndarray,
+    edge_labels: str | None,
+) -> None:
+    mode = _normalized_tick_edge_labels(edge_labels)
+    if mode == "auto":
+        return
+    values = _normalized_tick_values(ticks)
+    if values.size == 0:
+        return
+    lower = float(values[0])
+    upper = float(values[-1])
+    tolerance = max(abs(lower), abs(upper), abs(upper - lower), 1.0) * 1e-9
+    hide_lower = mode in {"hide_min", "hide_both"}
+    hide_upper = mode in {"hide_max", "hide_both"}
+    base_formatter = axis.get_major_formatter()
+    if hasattr(base_formatter, "set_locs"):
+        base_formatter.set_locs(values.tolist())
+    axis.set_major_formatter(
+        FuncFormatter(
+            lambda value, position: ""
+            if (hide_lower and abs(value - lower) <= tolerance)
+            or (hide_upper and abs(value - upper) <= tolerance)
+            else base_formatter(value, position)
+        )
+    )
+
+
+def _apply_numeric_axis_tick_preferences(
+    axis,
+    *,
+    scale: str,
+    tick_density: str | None = None,
+    tick_edge_labels: str | None = None,
+    max_major_ticks: int | None = None,
+) -> None:
+    major_ticks = _resolved_major_ticks_for_density(
+        axis.get_majorticklocs(),
+        scale=scale,
+        density=tick_density,
+        max_major_ticks=max_major_ticks,
+    )
+    if major_ticks.size:
+        axis.set_major_locator(FixedLocator(major_ticks.tolist()))
+    _apply_minor_tick_locator(axis, scale=scale, major_ticks=major_ticks)
+    _apply_tick_edge_label_visibility(
+        axis,
+        ticks=major_ticks,
+        edge_labels=tick_edge_labels,
+    )
+
+
+def _clear_categorical_x_tick_marks(ax: plt.Axes) -> None:
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.tick_params(axis="x", which="minor", bottom=False, top=False, length=0)
+    ax.tick_params(axis="x", which="major", bottom=False, top=False, length=0)
 
 def _uses_positive_zero_origin(
     *,

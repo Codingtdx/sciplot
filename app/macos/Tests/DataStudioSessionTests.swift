@@ -687,12 +687,16 @@ final class DataStudioSessionTests: XCTestCase {
         session.plotSession.updateRenderOptions(policy: .immediate) {
             $0.yMin = 35.0
             $0.yMax = 80.0
+            $0.yTickDensity = "sparse"
+            $0.yTickEdgeLabels = "hide_min"
         }
         await waitUntil(
             {
                 client.renderRequests.last?.template == "box" &&
                 client.renderRequests.last?.options.yMin == 35.0 &&
-                client.renderRequests.last?.options.yMax == 80.0
+                client.renderRequests.last?.options.yMax == 80.0 &&
+                client.renderRequests.last?.options.yTickDensity == "sparse" &&
+                client.renderRequests.last?.options.yTickEdgeLabels == "hide_min"
             },
             timeout: 3.0
         )
@@ -705,11 +709,15 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(openedOptions?.stylePreset, session.plotSession.renderOptions.stylePreset)
         XCTAssertEqual(openedOptions?.yMin, 35.0)
         XCTAssertEqual(openedOptions?.yMax, 80.0)
+        XCTAssertEqual(openedOptions?.yTickDensity, "sparse")
+        XCTAssertEqual(openedOptions?.yTickEdgeLabels, "hide_min")
         XCTAssertEqual(client.dataStudioExportComparisonRequests.count, 1)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.selectedRecipeIDs, ["representative_curve", "strength_box"])
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.stylePreset, session.plotSession.renderOptions.stylePreset)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yMin, 35.0)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yMax, 80.0)
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yTickDensity, "sparse")
+        XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yTickEdgeLabels, "hide_min")
     }
 
     func testFigureFamilySwitchRestoresSavedAxisOverridesAndResetsUnsavedFamilies() async throws {
@@ -727,12 +735,16 @@ final class DataStudioSessionTests: XCTestCase {
         session.plotSession.updateRenderOptions(policy: .immediate) {
             $0.xMin = -10.0
             $0.yMin = -10.0
+            $0.xTickDensity = "sparse"
+            $0.yTickEdgeLabels = "hide_both"
         }
         await waitUntil(
             {
                 client.renderRequests.last?.template == "curve" &&
                 client.renderRequests.last?.options.xMin == -10.0 &&
-                client.renderRequests.last?.options.yMin == -10.0
+                client.renderRequests.last?.options.yMin == -10.0 &&
+                client.renderRequests.last?.options.xTickDensity == "sparse" &&
+                client.renderRequests.last?.options.yTickEdgeLabels == "hide_both"
             },
             timeout: 3.0
         )
@@ -751,10 +763,14 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertNil(session.plotSession.renderOptions.xMax)
         XCTAssertNil(session.plotSession.renderOptions.yMin)
         XCTAssertNil(session.plotSession.renderOptions.yMax)
+        XCTAssertNil(session.plotSession.renderOptions.xTickDensity)
+        XCTAssertNil(session.plotSession.renderOptions.yTickEdgeLabels)
         XCTAssertNil(client.renderRequests.last?.options.xMin)
         XCTAssertNil(client.renderRequests.last?.options.xMax)
         XCTAssertNil(client.renderRequests.last?.options.yMin)
         XCTAssertNil(client.renderRequests.last?.options.yMax)
+        XCTAssertNil(client.renderRequests.last?.options.xTickDensity)
+        XCTAssertNil(client.renderRequests.last?.options.yTickEdgeLabels)
 
         session.selectFigureFamily(id: "representative_curve")
         await waitUntil(
@@ -763,12 +779,94 @@ final class DataStudioSessionTests: XCTestCase {
                 session.plotSession.selectedTemplateID == "curve" &&
                 session.plotSession.renderOptions.xMin == -10.0 &&
                 session.plotSession.renderOptions.yMin == -10.0 &&
+                session.plotSession.renderOptions.xTickDensity == "sparse" &&
+                session.plotSession.renderOptions.yTickEdgeLabels == "hide_both" &&
                 client.renderRequests.last?.template == "curve" &&
                 client.renderRequests.last?.options.xMin == -10.0 &&
-                client.renderRequests.last?.options.yMin == -10.0
+                client.renderRequests.last?.options.yMin == -10.0 &&
+                client.renderRequests.last?.options.xTickDensity == "sparse" &&
+                client.renderRequests.last?.options.yTickEdgeLabels == "hide_both"
             },
             timeout: 3.0
         )
+    }
+
+    func testAutoKeepAllAppliesEligibleGroupsAndSupportsSingleUndo() async {
+        let firstWorkbookPath = "/tmp/prepared.xlsx"
+        let secondWorkbookPath = "/tmp/second.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            let workbookID = request.workbookPath == secondWorkbookPath ? "workbook-2" : "workbook-1"
+            let label = request.workbookPath == secondWorkbookPath ? "Second Group" : "Prepared Group"
+            return TestPayloads.dataStudioImportWorkbook(
+                workbooks: [
+                    TestPayloads.dataStudioWorkbook(
+                        id: workbookID,
+                        path: request.workbookPath,
+                        label: label
+                    ),
+                ]
+            )
+        }
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        let undoManager = UndoManager()
+        session.attachUndoManager(undoManager)
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([
+            URL(fileURLWithPath: firstWorkbookPath),
+            URL(fileURLWithPath: secondWorkbookPath),
+        ])
+        await waitUntil(
+            {
+                session.autoKeepAllAvailability.isEnabled &&
+                session.specimenStates(for: firstWorkbookPath).count == 7 &&
+                session.specimenStates(for: secondWorkbookPath).count == 7
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertTrue(session.autoKeepAllAvailability.isEnabled)
+        XCTAssertTrue(session.autoKeepAllHelp.contains("2 groups"))
+
+        session.applySuggestedExclusionsToAllWorkbooks()
+        await waitUntil(
+            {
+                session.specimenStates(for: firstWorkbookPath).filter { !$0.included }.count == 2 &&
+                session.specimenStates(for: secondWorkbookPath).filter { !$0.included }.count == 2 &&
+                client.dataStudioComparisonContextRequests.last?
+                    .specimenStates
+                    .filter { !$0.included }
+                    .map(\.workbookPath)
+                    .sorted() == [firstWorkbookPath, firstWorkbookPath, secondWorkbookPath, secondWorkbookPath]
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertEqual(
+            session.specimenStates(for: firstWorkbookPath).filter { !$0.included }.map(\.specimenId).sorted(),
+            ["sample-1", "sample-7"]
+        )
+        XCTAssertEqual(
+            session.specimenStates(for: secondWorkbookPath).filter { !$0.included }.map(\.specimenId).sorted(),
+            ["sample-1", "sample-7"]
+        )
+        undoManager.undo()
+        await waitUntil(
+            {
+                session.specimenStates(for: firstWorkbookPath).filter { !$0.included }.isEmpty &&
+                session.specimenStates(for: secondWorkbookPath).filter { !$0.included }.isEmpty
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertEqual(session.specimenStates(for: firstWorkbookPath).filter { !$0.included }.count, 0)
+        XCTAssertEqual(session.specimenStates(for: secondWorkbookPath).filter { !$0.included }.count, 0)
     }
 
     func testSpecimenSuggestionWorkflowAppliesSuggestedExclusionsToPreviewAndComparisonRequests() async {

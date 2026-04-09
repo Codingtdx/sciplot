@@ -7,7 +7,7 @@ import numpy as np
 
 from src import plot_style
 from src.plotting_families.stats_family import plot_bar, plot_box, plot_point_error, plot_violin
-from src.plotting_primitives import _format_axis_label
+from src.plotting_primitives import _apply_numeric_axis_tick_preferences, _format_axis_label
 from src.rendering.cache import load_replicate_table_cached
 from src.rendering.common import (
     manual_axis_overrides,
@@ -63,6 +63,8 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         show_raw_points=show_raw_points,
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -96,6 +98,8 @@ def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         spacing_scale=stats_profile.spacing_scale,
         show_raw_points=False,
         show_fliers=False,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -127,6 +131,8 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
         height_mm=options.height_mm,
         violin_width=stats_profile.violin_width,
         spacing_scale=stats_profile.spacing_scale,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -188,6 +194,8 @@ def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptio
         ),
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -235,6 +243,8 @@ def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOp
         ),
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     palette = plot_style.get_categorical_palette(n_colors=len(groups))
@@ -303,6 +313,8 @@ def _render_grouped_bar_error_like(
         show_raw_points=False,
         raw_point_size=max(stats_profile.raw_point_size, 10.0),
         raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     if fig.axes:
@@ -392,6 +404,8 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             height_mm=options.height_mm,
             violin_width=stats_profile.violin_width,
             spacing_scale=stats_profile.spacing_scale,
+            y_tick_density=options.y_tick_density,
+            y_tick_edge_labels=options.y_tick_edge_labels,
             ylim=_manual_y_override(options),
         )
     else:
@@ -410,6 +424,8 @@ def _render_distribution_compare(input_path: Path, sheet: str | int, options: Re
             raw_point_size=stats_profile.raw_point_size,
             raw_point_alpha=stats_profile.raw_point_alpha,
             show_fliers=False,
+            y_tick_density=options.y_tick_density,
+            y_tick_edge_labels=options.y_tick_edge_labels,
             ylim=_manual_y_override(options),
         )
         if variant == "strip_box":
@@ -446,6 +462,8 @@ def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions
         raw_point_size=stats_profile.raw_point_size,
         raw_point_alpha=stats_profile.raw_point_alpha,
         show_fliers=False,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     _emphasize_strip_point_overlay(
@@ -479,6 +497,8 @@ def _render_violin_box(input_path: Path, sheet: str | int, options: RenderOption
         height_mm=options.height_mm,
         violin_width=stats_profile.violin_width,
         spacing_scale=stats_profile.spacing_scale,
+        y_tick_density=options.y_tick_density,
+        y_tick_edge_labels=options.y_tick_edge_labels,
         ylim=_manual_y_override(options),
     )
     positions = np.asarray(ax.get_xticks(), dtype=float)
@@ -602,6 +622,19 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
             y_override[0] if y_override[0] is not None else y_low,
             y_override[1] if y_override[1] is not None else y_high,
         )
+    _apply_numeric_axis_tick_preferences(
+        ax.xaxis,
+        scale="linear",
+        tick_density=options.x_tick_density,
+        tick_edge_labels=options.x_tick_edge_labels,
+    )
+    _apply_numeric_axis_tick_preferences(
+        ax.yaxis,
+        scale="linear",
+        tick_density=options.y_tick_density,
+        tick_edge_labels=options.y_tick_edge_labels,
+        max_major_ticks=7,
+    )
 
     autofixes = ["histogram_density_overlay"]
     if discrete_binning:

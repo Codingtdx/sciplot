@@ -97,6 +97,14 @@ final class DataStudioSession {
         return .enabled()
     }
 
+    var autoKeepAllAvailability: ActionAvailability {
+        bulkAutoKeepPresentation.availability
+    }
+
+    var autoKeepAllHelp: String {
+        bulkAutoKeepPresentation.help
+    }
+
     var documentStatusSummary: String {
         let source = focusedWorkbook?.workbookURL.lastPathComponent ?? "No workbook"
         let figure = currentRecipeLabel
@@ -1188,6 +1196,39 @@ final class DataStudioSession {
             explicitlyExcludedIDs: allSpecimenIDs.subtracting(includedIDs),
             actionName: "Use Auto Keep 5"
         )
+    }
+
+    func applySuggestedExclusionsToAllWorkbooks() {
+        let presentation = bulkAutoKeepPresentation
+        guard presentation.availability.isEnabled else {
+            return
+        }
+        let previousSnapshot = undoSnapshot()
+        var changedWorkbookPaths: [String] = []
+        for workbookPath in presentation.eligibleWorkbookPaths {
+            let includedIDs = suggestedAutoIncludedSpecimenIDs(for: workbookPath)
+            guard !includedIDs.isEmpty else {
+                continue
+            }
+            let allSpecimenIDs = Set(allKnownSpecimenIDs(for: workbookPath))
+            let previousStates = normalizedSpecimenStates(specimenStates(for: workbookPath))
+            setSpecimenInclusion(
+                for: workbookPath,
+                includedIDs: includedIDs,
+                explicitlyExcludedIDs: allSpecimenIDs.subtracting(includedIDs)
+            )
+            if normalizedSpecimenStates(specimenStates(for: workbookPath)) != previousStates {
+                changedWorkbookPaths.append(workbookPath)
+            }
+        }
+        guard !changedWorkbookPaths.isEmpty else {
+            return
+        }
+        for workbookPath in changedWorkbookPaths {
+            scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: false)
+        }
+        scheduleComparisonContextRebuild()
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Use Auto Keep 5 for All Groups")
     }
 
     func restoreAllSpecimens(for workbookPath: String) {
@@ -2321,6 +2362,71 @@ final class DataStudioSession {
         return result
     }
 
+    private var bulkAutoKeepPresentation: BulkAutoKeepPresentation {
+        guard !orderedWorkbooks.isEmpty else {
+            return BulkAutoKeepPresentation(
+                eligibleWorkbookPaths: [],
+                availability: .disabled("Import workbook groups before applying Auto Keep 5."),
+                help: "Import workbook groups before applying Auto Keep 5."
+            )
+        }
+        guard currentActivity == .idle else {
+            return BulkAutoKeepPresentation(
+                eligibleWorkbookPaths: [],
+                availability: .disabled("Wait for the current refresh to finish before applying Auto Keep 5 to all groups."),
+                help: "Wait for previews to finish before applying Auto Keep 5 to all groups."
+            )
+        }
+
+        var eligibleWorkbookPaths: [String] = []
+        var skippedCount = 0
+        var loadingCount = 0
+
+        for workbook in orderedWorkbooks {
+            let workbookPath = workbook.response.workbookPath
+            guard baselineWorkbookPreview(for: workbookPath) != nil else {
+                loadingCount += 1
+                continue
+            }
+            if specimenFilterPresentation(for: workbookPath).canApplyAuto {
+                eligibleWorkbookPaths.append(workbookPath)
+            } else {
+                skippedCount += 1
+            }
+        }
+
+        if loadingCount > 0 {
+            let label = loadingCount == 1 ? "1 group" : "\(loadingCount) groups"
+            return BulkAutoKeepPresentation(
+                eligibleWorkbookPaths: [],
+                availability: .disabled("Auto Keep 5 suggestions are still loading for \(label)."),
+                help: "Auto Keep 5 suggestions are still loading for \(label)."
+            )
+        }
+
+        guard !eligibleWorkbookPaths.isEmpty else {
+            return BulkAutoKeepPresentation(
+                eligibleWorkbookPaths: [],
+                availability: .disabled("Auto Keep 5 is already current or unsupported for all workbook groups."),
+                help: "Auto Keep 5 is already current or unsupported for all workbook groups."
+            )
+        }
+
+        let applyLabel = eligibleWorkbookPaths.count == 1 ? "1 group" : "\(eligibleWorkbookPaths.count) groups"
+        let help: String
+        if skippedCount == 0 {
+            help = "Apply Auto Keep 5 to \(applyLabel)."
+        } else {
+            let skippedLabel = skippedCount == 1 ? "1 group" : "\(skippedCount) groups"
+            help = "Apply Auto Keep 5 to \(applyLabel) and skip \(skippedLabel) that are already current or unsupported."
+        }
+        return BulkAutoKeepPresentation(
+            eligibleWorkbookPaths: eligibleWorkbookPaths,
+            availability: .enabled(),
+            help: help
+        )
+    }
+
     private func undoSnapshot() -> UndoSnapshot {
         UndoSnapshot(
             groupStates: groupStates,
@@ -2831,6 +2937,10 @@ final class DataStudioSession {
                 "x_max": options.xMax.map(JSONValue.number) ?? .null,
                 "y_min": options.yMin.map(JSONValue.number) ?? .null,
                 "y_max": options.yMax.map(JSONValue.number) ?? .null,
+                "x_tick_density": options.xTickDensity.map(JSONValue.string) ?? .null,
+                "y_tick_density": options.yTickDensity.map(JSONValue.string) ?? .null,
+                "x_tick_edge_labels": options.xTickEdgeLabels.map(JSONValue.string) ?? .null,
+                "y_tick_edge_labels": options.yTickEdgeLabels.map(JSONValue.string) ?? .null,
                 "series_order": .array((options.seriesOrder ?? []).map(JSONValue.string)),
                 "x_label_override": options.xLabelOverride.map(JSONValue.string) ?? .null,
                 "y_label_override": options.yLabelOverride.map(JSONValue.string) ?? .null,
@@ -2859,6 +2969,12 @@ private extension DataStudioSession {
         var meta: SidecarMetaResponse?
         var contract: PlotContractResponse?
         var isApplyingUndoRedo = false
+    }
+
+    struct BulkAutoKeepPresentation {
+        let eligibleWorkbookPaths: [String]
+        let availability: ActionAvailability
+        let help: String
     }
 
     @MainActor

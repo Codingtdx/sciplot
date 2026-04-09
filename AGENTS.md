@@ -77,17 +77,21 @@
 - Data Studio import 必须维持单一分阶段 native sheet（wizard），禁止恢复多个串联弹窗。
 - Data Studio specimen filter 默认交互必须是 anchored popover，且只保留右侧 `Focused Group` 单一入口；不得恢复左侧重复入口或常驻 split pane。
 - Data Studio specimen filter 默认规则是 `Auto Keep 5`：按距离均值最近排序，只保留 5 个合格 specimen；少于 5 个时禁用自动筛选并解释原因。
+- `Workbook Groups` 标题栏允许一个全局批量动作 `Auto Keep 5 All`；它直接对当前 session 内所有 eligible workbook group 应用 committed auto-filter 结果，不要再新增第二个批量筛选入口。
 - 默认 popover 必须直接展示排序结果和 keep/out cutoff，不要再展示 representative、文件名、workbook 标签等低价值信息。
 - specimen 级别的文件名、距离表、手动 inclusion override 只能放在 `Advanced` 折叠区；不要把 specimen 细节塞回默认主界面。
 - 关键动作必须“禁用并解释”（`disabled + help`），禁止 silent no-op。
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
+- 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
 
 ## 绘图与工作流不变量
 
 - 标准模板 `curve / point_line / bar / box / violin / scatter / heatmap` 共用同一物理 axis frame。
 - `wide_nmr`、`heatmap` 维持既定特例对齐规则，不得破坏标准模板对齐。
 - `bar` 的 y 轴从 0 起，`box/violin` 不强制从 0 起但下界需可见主刻度。
+- categorical 统计图模板保留横轴组名文字，但默认不画 x 轴 tick marks，也不要恢复 x 轴 minor ticks。
+- 标准 numeric axis 的 minor ticks 默认保持克制稀疏；不要回到当前这种密集副刻度观感。
 - `curve/point_line/scatter` 的 inside legend 不能通过扩张 display bounds 规避。
 - `tensile_curve` 默认推荐 `linear` x/y，且 y 轴必须包含 0（保留下方 display padding）。
 - Plot canonical local workflow 固定：

@@ -225,6 +225,64 @@ def test_plot_curve_log_axis_keeps_decade_labels_but_can_extend_display_range() 
         plt.close(fig)
 
 
+def test_plot_curve_tick_density_controls_major_tick_count_without_changing_bounds() -> None:
+    series = [_curve_series("Sample A", [0.0, 20.0, 40.0, 60.0, 80.0, 100.0], [0.0, 18.0, 39.0, 57.0, 78.0, 100.0])]
+
+    fig_auto, ax_auto = plot_curves(series, legend_mode="none")
+    fig_sparse, ax_sparse = plot_curves(series, legend_mode="none", x_tick_density="sparse")
+    fig_dense, ax_dense = plot_curves(series, legend_mode="none", x_tick_density="dense")
+    try:
+        auto_ticks = np.asarray(ax_auto.get_xticks(), dtype=float)
+        sparse_ticks = np.asarray(ax_sparse.get_xticks(), dtype=float)
+        dense_ticks = np.asarray(ax_dense.get_xticks(), dtype=float)
+        auto_ticks = auto_ticks[np.isfinite(auto_ticks)]
+        sparse_ticks = sparse_ticks[np.isfinite(sparse_ticks)]
+        dense_ticks = dense_ticks[np.isfinite(dense_ticks)]
+
+        assert len(sparse_ticks) < len(auto_ticks)
+        assert len(dense_ticks) > len(sparse_ticks)
+        assert tuple(float(value) for value in ax_sparse.get_xlim()) == pytest.approx(
+            tuple(float(value) for value in ax_auto.get_xlim())
+        )
+        assert tuple(float(value) for value in ax_dense.get_xlim()) == pytest.approx(
+            tuple(float(value) for value in ax_auto.get_xlim())
+        )
+    finally:
+        plt.close(fig_auto)
+        plt.close(fig_sparse)
+        plt.close(fig_dense)
+
+
+def test_plot_curve_edge_label_hiding_blanks_boundary_labels_without_changing_bounds() -> None:
+    series = [_curve_series("Sample A", [0.0, 50.0, 100.0], [0.0, 40.0, 100.0])]
+
+    fig_default, ax_default = plot_curves(series, legend_mode="none")
+    fig_hidden, ax_hidden = plot_curves(
+        series,
+        legend_mode="none",
+        x_tick_edge_labels="hide_min",
+        y_tick_edge_labels="hide_both",
+    )
+    try:
+        fig_hidden.canvas.draw()
+        x_labels = [tick.get_text() for tick in ax_hidden.get_xticklabels()]
+        y_labels = [tick.get_text() for tick in ax_hidden.get_yticklabels()]
+
+        assert x_labels[0] == ""
+        assert any(label != "" for label in x_labels[1:])
+        assert y_labels[0] == ""
+        assert y_labels[-1] == ""
+        assert tuple(float(value) for value in ax_hidden.get_xlim()) == pytest.approx(
+            tuple(float(value) for value in ax_default.get_xlim())
+        )
+        assert tuple(float(value) for value in ax_hidden.get_ylim()) == pytest.approx(
+            tuple(float(value) for value in ax_default.get_ylim())
+        )
+    finally:
+        plt.close(fig_default)
+        plt.close(fig_hidden)
+
+
 def test_stacked_curve_uses_the_same_x_axis_endpoint_policy() -> None:
     series = [
         _curve_series("A", [0.0, 50.0, 100.0], [1.0, 4.0, 3.0], x_label="Wavenumber", x_unit="cm^-1"),
@@ -241,6 +299,27 @@ def test_stacked_curve_uses_the_same_x_axis_endpoint_policy() -> None:
         assert x_high == pytest.approx(105.0, abs=1e-9)
         assert np.any(np.isclose(x_ticks, 0.0))
         assert np.any(np.isclose(x_ticks, 100.0))
+    finally:
+        plt.close(fig)
+
+
+def test_linear_curve_minor_ticks_stay_sparse() -> None:
+    series = [_curve_series("Sample A", [0.0, 20.0, 40.0, 60.0, 80.0, 100.0], [0.0, 18.0, 39.0, 57.0, 78.0, 100.0])]
+
+    fig, ax = plot_curves(series, legend_mode="none")
+    try:
+        x_major = np.asarray(ax.get_xticks(), dtype=float)
+        y_major = np.asarray(ax.get_yticks(), dtype=float)
+        x_minor = np.asarray(ax.xaxis.get_minorticklocs(), dtype=float)
+        y_minor = np.asarray(ax.yaxis.get_minorticklocs(), dtype=float)
+
+        x_major = x_major[np.isfinite(x_major)]
+        y_major = y_major[np.isfinite(y_major)]
+        x_minor = x_minor[np.isfinite(x_minor)]
+        y_minor = y_minor[np.isfinite(y_minor)]
+
+        assert len(x_minor) <= max(len(x_major) - 1, 0)
+        assert len(y_minor) <= max(len(y_major) - 1, 0)
     finally:
         plt.close(fig)
 
@@ -304,6 +383,22 @@ def test_plot_box_partial_manual_ymax_keeps_manual_endpoint_tick_visible(tmp_pat
         assert np.any(np.isclose(y_ticks, 100.0))
     finally:
         plt.close(fig)
+
+
+def test_categorical_stats_hide_x_axis_tick_marks_and_minor_ticks(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+    groups = load_replicate_table(input_path)
+
+    fig_box, ax_box = plot_box(groups)
+    fig_bar, ax_bar = plot_bar(groups)
+    try:
+        assert len(ax_box.xaxis.get_minorticklocs()) == 0
+        assert len(ax_bar.xaxis.get_minorticklocs()) == 0
+        assert all(np.isclose(tick.tick1line.get_markersize(), 0.0) for tick in ax_box.xaxis.get_major_ticks())
+        assert all(np.isclose(tick.tick1line.get_markersize(), 0.0) for tick in ax_bar.xaxis.get_major_ticks())
+    finally:
+        plt.close(fig_box)
+        plt.close(fig_bar)
 
 
 def test_plot_curves_records_legend_layout_debug() -> None:

@@ -256,6 +256,35 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.last?.options.yLabelOverride, "Stress")
     }
 
+    func testTickLabelOptionsRefreshPreviewAndReachRenderRequests() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.updateRenderOptions(policy: .immediate) {
+            $0.xTickDensity = "sparse"
+            $0.xTickEdgeLabels = "hide_min"
+            $0.yTickDensity = "dense"
+            $0.yTickEdgeLabels = "hide_both"
+        }
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
+
+        XCTAssertEqual(session.renderOptions.xTickDensity, "sparse")
+        XCTAssertEqual(session.renderOptions.xTickEdgeLabels, "hide_min")
+        XCTAssertEqual(session.renderOptions.yTickDensity, "dense")
+        XCTAssertEqual(session.renderOptions.yTickEdgeLabels, "hide_both")
+        XCTAssertEqual(client.renderRequests.last?.options.xTickDensity, "sparse")
+        XCTAssertEqual(client.renderRequests.last?.options.xTickEdgeLabels, "hide_min")
+        XCTAssertEqual(client.renderRequests.last?.options.yTickDensity, "dense")
+        XCTAssertEqual(client.renderRequests.last?.options.yTickEdgeLabels, "hide_both")
+    }
+
     func testRenderRequestAutoSanitizesLegacyStylePreset() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

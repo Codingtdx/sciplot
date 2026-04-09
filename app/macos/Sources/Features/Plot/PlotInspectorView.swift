@@ -237,6 +237,22 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                         .textFieldStyle(.roundedBorder)
                     }
                 }
+
+                if showsTickLabelControls {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Tick Labels")
+                            .font(.subheadline.weight(.semibold))
+
+                        if supportsTickLabelControls(for: .x) {
+                            axisTickLabelControls(title: "X axis", axis: .x)
+                        }
+
+                        if supportsTickLabelControls(for: .y) {
+                            axisTickLabelControls(title: "Y axis", axis: .y)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
             }
         }
     }
@@ -366,8 +382,116 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         }
     }
 
+    private func axisTickLabelControls(title: String, axis: PlotAxisSelection) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if supportsTickDensity(for: axis) {
+                AdaptiveInspectorControlRow(title: "Density") {
+                    Picker("", selection: tickDensityBinding(for: axis)) {
+                        Text("Auto").tag("auto")
+                        Text("Sparse").tag("sparse")
+                        Text("Dense").tag("dense")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+                .disabled(isLogScale(axis))
+                .help(isLogScale(axis) ? "Density is available on linear axes only." : "")
+            }
+
+            if supportsTickEdgeLabels(for: axis) {
+                AdaptiveInspectorControlRow(title: "Edge labels") {
+                    Picker("", selection: tickEdgeLabelsBinding(for: axis)) {
+                        Text("Auto").tag("auto")
+                        Text("Hide Min").tag("hide_min")
+                        Text("Hide Max").tag("hide_max")
+                        Text("Hide Both").tag("hide_both")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+            }
+        }
+    }
+
     private func sizeLabel(for sizeID: String) -> String {
         session.allowedSizes.first(where: { $0.id == sizeID })?.label ?? sizeID
+    }
+
+    private var showsTickLabelControls: Bool {
+        supportsTickLabelControls(for: .x) || supportsTickLabelControls(for: .y)
+    }
+
+    private func supportsTickLabelControls(for axis: PlotAxisSelection) -> Bool {
+        supportsTickDensity(for: axis) || supportsTickEdgeLabels(for: axis)
+    }
+
+    private func supportsTickDensity(for axis: PlotAxisSelection) -> Bool {
+        session.editableOptionIDs.contains(axis == .x ? "x_tick_density" : "y_tick_density")
+    }
+
+    private func supportsTickEdgeLabels(for axis: PlotAxisSelection) -> Bool {
+        session.editableOptionIDs.contains(axis == .x ? "x_tick_edge_labels" : "y_tick_edge_labels")
+    }
+
+    private func isLogScale(_ axis: PlotAxisSelection) -> Bool {
+        switch axis {
+        case .x:
+            return (session.renderOptions.xscale ?? "linear") == "log"
+        case .y:
+            return (session.renderOptions.yscale ?? "linear") == "log"
+        }
+    }
+
+    private func tickDensityBinding(for axis: PlotAxisSelection) -> Binding<String> {
+        stringBinding(
+            get: {
+                switch axis {
+                case .x:
+                    return session.renderOptions.xTickDensity ?? "auto"
+                case .y:
+                    return session.renderOptions.yTickDensity ?? "auto"
+                }
+            },
+            set: { newValue in
+                session.updateRenderOptions(policy: .immediate) {
+                    let resolved = newValue == "auto" ? nil : newValue
+                    switch axis {
+                    case .x:
+                        $0.xTickDensity = resolved
+                    case .y:
+                        $0.yTickDensity = resolved
+                    }
+                }
+            }
+        )
+    }
+
+    private func tickEdgeLabelsBinding(for axis: PlotAxisSelection) -> Binding<String> {
+        stringBinding(
+            get: {
+                switch axis {
+                case .x:
+                    return session.renderOptions.xTickEdgeLabels ?? "auto"
+                case .y:
+                    return session.renderOptions.yTickEdgeLabels ?? "auto"
+                }
+            },
+            set: { newValue in
+                session.updateRenderOptions(policy: .immediate) {
+                    let resolved = newValue == "auto" ? nil : newValue
+                    switch axis {
+                    case .x:
+                        $0.xTickEdgeLabels = resolved
+                    case .y:
+                        $0.yTickEdgeLabels = resolved
+                    }
+                }
+            }
+        )
     }
 
     private var shouldShowAxesSection: Bool {
@@ -379,10 +503,19 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             "x_max",
             "y_min",
             "y_max",
+            "x_tick_density",
+            "x_tick_edge_labels",
+            "y_tick_density",
+            "y_tick_edge_labels",
             "baseline",
         ]
         return !session.editableOptionIDs.isDisjoint(with: axisOptionIDs)
     }
+}
+
+private enum PlotAxisSelection {
+    case x
+    case y
 }
 
 extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections == EmptyView {

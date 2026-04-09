@@ -12,6 +12,9 @@ from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HI
 from src.rendering.models import RenderOptions
 from src.rendering.themes import visual_theme_ids
 
+_VALID_TICK_DENSITIES = frozenset({"auto", "sparse", "dense"})
+_VALID_TICK_EDGE_LABELS = frozenset({"auto", "hide_min", "hide_max", "hide_both"})
+
 
 def validate_template_name(template: str) -> str:
     if template in LEGACY_TEMPLATE_HINTS:
@@ -76,6 +79,26 @@ def _normalize_label_override(value: str | None) -> str | None:
     return cleaned or None
 
 
+def _normalize_enumerated_option(
+    template: str,
+    option_id: str,
+    value: str | None,
+    *,
+    allowed: frozenset[str],
+) -> str | None:
+    if value is None:
+        return None
+    _ensure_template_option_supported(template, option_id)
+    cleaned = str(value).strip().lower()
+    if not cleaned or cleaned == "auto":
+        return None
+    if cleaned not in allowed:
+        raise ValueError(
+            f"`{option_id}` must be one of {', '.join(sorted(allowed))}."
+        )
+    return cleaned
+
+
 def resolve_render_options(
     *,
     template: str,
@@ -87,6 +110,10 @@ def resolve_render_options(
     x_max: float | None = None,
     y_min: float | None = None,
     y_max: float | None = None,
+    x_tick_density: str | None = None,
+    y_tick_density: str | None = None,
+    x_tick_edge_labels: str | None = None,
+    y_tick_edge_labels: str | None = None,
     series_order: list[str] | tuple[str, ...] | None = None,
     x_label_override: str | None = None,
     y_label_override: str | None = None,
@@ -131,6 +158,30 @@ def resolve_render_options(
         x_max=_normalize_manual_bound(template, "x_max", x_max),
         y_min=_normalize_manual_bound(template, "y_min", y_min),
         y_max=_normalize_manual_bound(template, "y_max", y_max),
+        x_tick_density=_normalize_enumerated_option(
+            template,
+            "x_tick_density",
+            x_tick_density,
+            allowed=_VALID_TICK_DENSITIES,
+        ),
+        y_tick_density=_normalize_enumerated_option(
+            template,
+            "y_tick_density",
+            y_tick_density,
+            allowed=_VALID_TICK_DENSITIES,
+        ),
+        x_tick_edge_labels=_normalize_enumerated_option(
+            template,
+            "x_tick_edge_labels",
+            x_tick_edge_labels,
+            allowed=_VALID_TICK_EDGE_LABELS,
+        ),
+        y_tick_edge_labels=_normalize_enumerated_option(
+            template,
+            "y_tick_edge_labels",
+            y_tick_edge_labels,
+            allowed=_VALID_TICK_EDGE_LABELS,
+        ),
         series_order=_normalize_series_order(template, series_order),
         x_label_override=_normalize_label_override(x_label_override),
         y_label_override=_normalize_label_override(y_label_override),

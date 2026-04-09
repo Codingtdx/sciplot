@@ -35,10 +35,13 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - Data Studio specimen filter uses one anchored popover entrypoint in the `Focused Group` strip. Do not restore a second left-rail trigger for the same control.
 - Default specimen-filter content opens directly to the ranked Auto Keep 5 list: sort by distance from mean, highlight the five kept specimens, and avoid workbook labels, filenames, or representative-curve copy in the default view.
 - Specimen identity and manual inclusion overrides are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.
+- `Workbook Groups` may expose one global `Auto Keep 5 All` action in the section header; it applies the committed auto-filter result to every eligible workbook group in the current session.
 - Critical actions follow `disabled + help` and must not silently no-op.
 - Workbench top bars prioritize document-state feedback: current source, current template/figure, latest output, latest failure.
 - Plot/Data Studio key edits support native Undo/Redo via `UndoManager`.
 - Inspector keeps high-frequency controls visible and moves low-frequency controls into `DisclosureGroup("Advanced")`.
+- Shared `Axis -> Advanced` inspector controls are the only home for smart tick-density and edge-label visibility settings; do not add a second Data Studio-only axis-label UI.
+- Categorical statistics templates keep category labels but suppress x-axis tick marks, and standard numeric axes should default to restrained minor-tick density.
 
 ## Backend/API Boundaries
 

@@ -47,6 +47,20 @@ class PlotContractTests(unittest.TestCase):
             set(contract.templates.keys()),
         )
 
+    def test_tick_label_controls_are_exposed_only_on_supported_axes(self) -> None:
+        contract = load_plot_contract()
+
+        curve_options = set(contract.templates["curve"].editable_options)
+        box_options = set(contract.templates["box"].editable_options)
+
+        self.assertTrue(
+            {"x_tick_density", "x_tick_edge_labels", "y_tick_density", "y_tick_edge_labels"}.issubset(curve_options)
+        )
+        self.assertIn("y_tick_density", box_options)
+        self.assertIn("y_tick_edge_labels", box_options)
+        self.assertNotIn("x_tick_density", box_options)
+        self.assertNotIn("x_tick_edge_labels", box_options)
+
 
 if __name__ == "__main__":
     unittest.main()

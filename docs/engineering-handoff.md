@@ -684,6 +684,58 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`98 tests`)
 
+### 2026-04-09 (Round M): Batch Auto Keep 5 + smart tick-label controls + axis tick cleanup
+
+- Scope:
+  - Added shared render-option contract fields for smart tick labeling:
+    - `x_tick_density`, `y_tick_density`
+    - `x_tick_edge_labels`, `y_tick_edge_labels`
+  - Wired those fields through Python render models, sidecar schemas/routes, macOS `RenderOptionsPayload`, Data Studio session normalization/export/open-in-plot payloads, and generated contract docs.
+  - Added shared macOS inspector controls under `Axis -> Advanced -> Tick Labels`:
+    - `Density`: `Auto / Sparse / Dense`
+    - `Edge labels`: `Auto / Hide Min / Hide Max / Hide Both`
+  - Added Data Studio `Workbook Groups` header action `Auto Keep 5 All`, with one committed batch apply path, `disabled + help`, single undo registration, and one debounced comparison-context rebuild after the batch update.
+  - Updated shared plotting primitives so numeric axes apply the new major-label density and edge-label hiding rules after bounds are resolved, while standard numeric minor ticks default to a sparser policy.
+  - Cleaned up categorical statistics x-axes so grouped labels remain visible but x-axis tick marks are suppressed and x-axis minor ticks stay off for categorical stats templates.
+  - Hardened `scripts/generate_plot_contract_docs.py` so the documented direct-script invocation works without manually setting `PYTHONPATH`.
+- User-visible impact:
+  - Data Studio now has a one-click `Auto Keep 5 All` action for every eligible workbook group in the current session.
+  - Plot and Data Studio inspectors now expose smarter axis-label controls without requiring raw numeric tick entry.
+  - Users can hide boundary labels like `-10` while keeping the actual axis range unchanged.
+  - Bar/box/violin-style categorical plots no longer show awkward x-axis tick marks, and minor ticks across standard numeric axes are less visually dense.
+- Risks:
+  - Any future template that forgets to advertise the new editable tick options in `src/plot_contract.json` will silently lose the shared inspector controls even though the render stack supports them.
+  - The `Dense` major-label policy intentionally stays conservative; if a future template also adds aggressive formatter overrides, label overlap protection may still collapse back toward `Auto`.
+  - Batch `Auto Keep 5 All` deliberately overwrites prior manual specimen filtering for eligible workbooks; if product semantics change toward mixed per-group preservation, `DataStudioSession.applySuggestedExclusionsToAllWorkbooks()` is the rollback point.
+- Rollback points:
+  - `src/plot_contract.json`
+  - `src/plotting_primitives.py`
+  - `src/plotting_curves.py`
+  - `src/plotting_stats.py`
+  - `src/rendering/models.py`
+  - `src/rendering/options.py`
+  - `src/rendering/render_curve.py`
+  - `src/rendering/render_stats.py`
+  - `app/sidecar/schemas_render.py`
+  - `app/sidecar/render_support.py`
+  - `app/sidecar/routes_render.py`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `scripts/generate_plot_contract_docs.py`
+- Decision:
+  - Smart axis labeling remains a shared inspector capability, not a Data Studio-only fallback, because density/edge-label visibility is render semantics rather than workbench-local UI state.
+  - Batch specimen filtering is implemented as a committed session-wide operation with one undo step so compare/export/open-in-plot all observe the same single source of truth.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`159 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`100 tests`)
+
 ## 6) Update Template (copy for next round)
 
 Use this block for every new round:

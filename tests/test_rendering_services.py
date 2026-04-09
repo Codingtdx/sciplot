@@ -440,6 +440,24 @@ def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
         resolve_render_options(template="curve", visual_theme_id="not-a-theme")
 
 
+def test_resolve_render_options_accepts_tick_label_preferences_for_supported_templates() -> None:
+    options = resolve_render_options(
+        template="curve",
+        x_tick_density="sparse",
+        y_tick_density="dense",
+        x_tick_edge_labels="hide_min",
+        y_tick_edge_labels="hide_both",
+    )
+
+    assert options.x_tick_density == "sparse"
+    assert options.y_tick_density == "dense"
+    assert options.x_tick_edge_labels == "hide_min"
+    assert options.y_tick_edge_labels == "hide_both"
+
+    with pytest.raises(ValueError, match="does not support option `x_tick_density`"):
+        resolve_render_options(template="box", x_tick_density="sparse")
+
+
 def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified() -> None:
     options = resolve_render_options(template="segmented_stacked_curve")
 
