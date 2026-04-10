@@ -1221,6 +1221,46 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
 
+### 2026-04-10 (Round Z): Data Studio reverts raw-source curve recovery and treats workbook data as authoritative
+
+- Scope:
+  - Removed the temporary tensile-specific import-time fallback in `src/data_studio/workbooks.py` that reparsed raw `source_files` to replace stale workbook curve sheets.
+  - Removed the matching regression test that asserted automatic curve recovery from raw source files.
+  - Updated `README.md` and `AGENTS.md` so the boundary is explicit: once a workbook is imported, preview / compare / export consume workbook data only.
+- User-visible impact:
+  - Data Studio no longer silently repairs workbook curve data from raw `source_files`.
+  - If a workbook stores an incorrect curve sheet, the UI will now reflect the workbook as-is instead of reaching back to the original CSV exports.
+- Risks:
+  - Legacy workbooks with stale `All_Curves` / `Representative_Curve` data remain stale until they are rebuilt or re-exported from a correct source.
+  - This is intentional: correctness now means “faithful to workbook,” not “best-effort recovery from provenance metadata.”
+- Rollback points:
+  - `src/data_studio/workbooks.py`
+  - `tests/test_data_studio.py`
+  - `README.md`
+  - `AGENTS.md`
+- Decision:
+  - Workbook contents are the only truth source after import. `source_files` are provenance metadata only and must not silently affect rendered curves or derived compare/export behavior.
+  - Rejected alternatives:
+    - keep best-effort raw-source repair for obviously broken workbooks: rejected because it violates the user's requirement that Data Studio read from workbook only
+    - rewrite workbook files in place to “fix” stale curves: rejected because destructive mutation is even less acceptable than a silent fallback
+  - Boundary:
+    - if a workbook is wrong, the fix is to regenerate or replace that workbook, not to reach outside it during preview/import
+- Troubleshooting note:
+  - Symptom:
+    - workbook summary metrics and workbook curve sheets appear inconsistent
+  - Current policy:
+    - Data Studio will still honor the workbook as imported
+  - Fix:
+    - regenerate the workbook from the correct raw inputs instead of expecting import-time healing from `source_files`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
+
 ## 6) Update Template (copy for next round)
 
 ### 2026-04-10 (Round W): Data Studio manual representative-curve selection inside specimen filter
@@ -1270,6 +1310,41 @@ Every development round must update this file.
   - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
   - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
   - `.venv/bin/python -m pytest tests`: passed (`173 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
+
+### 2026-04-10 (Round AA): Data Studio filtered workbook keeps workbook-only representative curves and exports curve sheets at four decimals
+
+- Scope:
+  - Split filtered-workbook numeric formatting in `src/data_studio/workbooks.py` so `Representative_Curve` and `All_Curves` export with four decimal places while specimen / summary / replicate tables remain at two decimal places.
+  - Updated Python and sidecar regression coverage to assert the new mixed-format export contract.
+  - Updated `README.md` and `AGENTS.md` to document the workbook-only representative-curve policy together with the new curve-sheet precision rule.
+- User-visible impact:
+  - Re-exported filtered workbooks now preserve more curve precision (`0.0000`, `2.0000`, etc.) without changing the two-decimal presentation of summary/specimen tables.
+  - Manual representative selection still works from committed `specimen_states`, but the rendered representative line remains whatever curve is stored in the workbook for that specimen.
+- Risks:
+  - Users may still expect the displayed elongation metric to equal the curve endpoint; if a workbook stores inconsistent `All_Specimens` vs `All_Curves` data, Data Studio will still honor the workbook and show that inconsistency.
+  - The mixed-format export contract is now intentional; widening four-decimal formatting to non-curve sheets later would be a user-visible change and should be treated as such.
+- Decision:
+  - Kept the workbook-only boundary intact: representative-curve rendering must follow the selected specimen's stored workbook curve, not the elongation metric cell and not the original raw source files.
+  - Rejected alternatives:
+    - “fix” the displayed line by stretching the curve to match the elongation metric: rejected because that would fabricate curve data not present in the workbook
+    - widen all filtered-workbook numeric tables to four decimals: rejected because the user's ask was specifically about curve precision, while two-decimal summary tables remain easier to read
+- Troubleshooting note:
+  - Symptom:
+    - a specimen row shows `Elongation` around `40%+`, but manually selecting it as representative still plots a curve that ends around `18%`
+  - Likely cause:
+    - the workbook stores inconsistent data: the specimen summary row and the matching `All_Curves` series disagree for that filename/specimen id
+  - Current behavior:
+    - Data Studio does select that specimen correctly, then renders the exact curve stored in the workbook for it
+  - Fix:
+    - regenerate or replace the workbook so `All_Specimens`, `All_Curves`, and `Representative_Curve` agree internally
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)

@@ -34,6 +34,7 @@ GENERIC_TEMPLATE_PARSE_STRATEGY = "structured:curve_metrics_columns"
 AUTO_FILTER_KEEP_COUNT = 5
 AUTO_FILTER_METRIC_TRIAD = ("Strength", "Modulus", "Elongation")
 FILTERED_WORKBOOK_DECIMAL_PLACES = 2
+FILTERED_WORKBOOK_CURVE_DECIMAL_PLACES = 4
 
 
 @dataclass(frozen=True)
@@ -500,11 +501,6 @@ def _load_workbook_specimen_bundle_from_workbook(workbook: DataStudioWorkbook) -
         Path(source_path).name: Path(source_path)
         for source_path in workbook.source_files
     }
-    source_samples_by_name = (
-        _tensile_source_samples_by_filename(workbook.source_files)
-        if workbook.template_match.template_id == tensile_builtin.TENSILE_TEMPLATE_ID
-        else {}
-    )
     curve_by_keys = _curve_lookup(curves)
     specimens: list[LoadedWorkbookSpecimen] = []
     for row in summary_rows:
@@ -524,14 +520,6 @@ def _load_workbook_specimen_bundle_from_workbook(workbook: DataStudioWorkbook) -
             else:
                 metrics[key] = None
         warnings: list[str] = []
-        source_sample = source_samples_by_name.get(filename)
-        if _should_prefer_tensile_source_curve(
-            workbook_curve=matched_curve,
-            source_sample=source_sample,
-            elongation=metrics.get("Elongation"),
-        ):
-            matched_curve = _curve_series_from_tensile_sample(source_sample=source_sample, filename=filename)
-            warnings.append("Recovered curve preview from source file metadata.")
         label = filename or (matched_curve.sample if matched_curve is not None else filename)
         if matched_curve is None:
             warnings.append("Curve preview unavailable.")
@@ -638,6 +626,7 @@ def export_filtered_workbook_from_context(
     label: str | None = None,
     source_workbook_path: str | Path | None = None,
     decimal_places: int = FILTERED_WORKBOOK_DECIMAL_PLACES,
+    curve_decimal_places: int = FILTERED_WORKBOOK_CURVE_DECIMAL_PLACES,
 ) -> DataStudioWorkbook:
     if not filtered.included_specimens:
         raise ValueError(f"{filtered.workbook.workbook_path.name} needs at least one included specimen.")
@@ -665,7 +654,7 @@ def export_filtered_workbook_from_context(
 
     representative_sheet = _formatted_export_dataframe(
         _curve_table_dataframe(((f"{resolved_label} representative", filtered.representative_curve.data),)),
-        decimal_places=decimal_places,
+        decimal_places=curve_decimal_places,
     )
     all_curves_sheet = _formatted_export_dataframe(
         _curve_table_dataframe(
@@ -673,7 +662,7 @@ def export_filtered_workbook_from_context(
             for specimen in filtered.included_specimens
             if specimen.curve is not None
         ),
-        decimal_places=decimal_places,
+        decimal_places=curve_decimal_places,
     )
     all_specimens_sheet = _formatted_export_dataframe(
         _plain_table_dataframe(summary_df),
@@ -837,76 +826,6 @@ def _match_curve_for_filename(filename: str, curve_by_keys: dict[str, CurveSerie
         if key in curve_by_keys:
             return curve_by_keys[key]
     return None
-
-
-@lru_cache(maxsize=256)
-def _load_tensile_source_sample_cached(resolved_path: str, mtime_ns: int):
-    _ = mtime_ns
-    return tensile_builtin.parse_tensile_csv(Path(resolved_path))
-
-
-def _load_tensile_source_sample(path: str | Path):
-    source_path = ensure_input_path(str(Path(path).expanduser()))
-    return _load_tensile_source_sample_cached(str(source_path.resolve()), source_path.stat().st_mtime_ns)
-
-
-def _tensile_source_samples_by_filename(source_files: Iterable[Path]) -> dict[str, Any]:
-    samples: dict[str, Any] = {}
-    for source_path in source_files:
-        try:
-            sample = _load_tensile_source_sample(source_path)
-        except Exception:
-            continue
-        samples[sample.filename] = sample
-    return samples
-
-
-def _curve_max_x_value(curve: CurveSeries | pd.DataFrame | None) -> float | None:
-    if curve is None:
-        return None
-    data = curve.data if isinstance(curve, CurveSeries) else curve
-    if data.empty or "x" not in data.columns:
-        return None
-    x_values = pd.to_numeric(data["x"], errors="coerce").dropna()
-    if x_values.empty:
-        return None
-    return float(x_values.max())
-
-
-def _should_prefer_tensile_source_curve(
-    *,
-    workbook_curve: CurveSeries | None,
-    source_sample: Any,
-    elongation: float | None,
-) -> bool:
-    if source_sample is None or source_sample.curve.empty:
-        return False
-    if workbook_curve is None or workbook_curve.data.empty:
-        return True
-
-    workbook_max_x = _curve_max_x_value(workbook_curve)
-    source_max_x = _curve_max_x_value(source_sample.curve)
-    if workbook_max_x is None or source_max_x is None:
-        return True
-    if source_max_x <= workbook_max_x:
-        return False
-    if elongation is None or pd.isna(elongation):
-        return source_max_x > workbook_max_x * 1.5
-
-    workbook_error = abs(workbook_max_x - float(elongation))
-    source_error = abs(source_max_x - float(elongation))
-    return source_max_x > workbook_max_x * 1.1 and source_error + 0.25 < workbook_error
-
-
-def _curve_series_from_tensile_sample(*, source_sample: Any, filename: str) -> CurveSeries:
-    return CurveSeries(
-        sample=Path(filename).stem or source_sample.filename,
-        x_label="Strain",
-        y_label="Stress",
-        x_unit="%",
-        y_unit="MPa",
-        data=source_sample.curve.copy(),
-    )
 
 
 def _specimen_id_for_filename(filename: str) -> str:
@@ -1658,6 +1577,7 @@ def _cell_text(value: object) -> str:
 __all__ = [
     "GENERIC_TEMPLATE_PARSE_STRATEGY",
     "FILTERED_WORKBOOK_DECIMAL_PLACES",
+    "FILTERED_WORKBOOK_CURVE_DECIMAL_PLACES",
     "build_workbook",
     "create_template_from_candidates",
     "export_filtered_workbook_from_context",

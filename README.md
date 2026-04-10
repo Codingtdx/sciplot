@@ -48,7 +48,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - `POST /inspect-file` is the single inspection/recommendation entry.
 - `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
 - Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`, including any manually selected representative curve override.
-- `POST /data-studio/comparison-export` returns one comparison workbook, one filtered standard workbook per included group, and the selected figure outputs from the same committed compare state. Filtered workbooks stay re-importable and currently normalize numeric cells to two decimal places.
+- After a workbook is imported, Data Studio preview/compare/export read curves and metrics from that workbook only. `source_files` remain provenance metadata and must not be used as a silent fallback data source.
+- `POST /data-studio/comparison-export` returns one comparison workbook, one filtered standard workbook per included group, and the selected figure outputs from the same committed compare state. Filtered workbooks stay re-importable; curve sheets keep four decimal places, while specimen / summary / replicate numeric tables stay at two decimal places.
 - `POST /code-console/context` returns a stable `context_id` (input signature + mtime).
 - `POST /code-console/run` accepts `context_id` fast path and still supports legacy `context`.
 - `GET /meta`, `GET /plot-contract`, and `DELETE /data-studio/templates/{id}` use explicit response schemas.

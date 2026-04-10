@@ -22,7 +22,6 @@ from src.data_studio.service import (
     preview_data_studio_comparison_context,
     preview_data_studio_workbook,
 )
-from src.data_studio.workbooks import load_workbook_specimen_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
@@ -36,23 +35,16 @@ def _fixture_paths() -> list[Path]:
     ]
 
 
-def _rewrite_workbook_sheets(workbook_path: Path, updates: dict[str, pd.DataFrame]) -> None:
+def _rewrite_metadata_sheet(workbook_path: Path, rows: list[list[object]]) -> None:
     with pd.ExcelFile(workbook_path) as workbook:
         sheets = {
             sheet_name: pd.read_excel(workbook_path, sheet_name=sheet_name, header=None)
             for sheet_name in workbook.sheet_names
         }
-    sheets.update(updates)
+    sheets[tensile_builtin.METADATA_SHEET] = pd.DataFrame(rows)
     with pd.ExcelWriter(workbook_path) as writer:
         for sheet_name, dataframe in sheets.items():
             dataframe.to_excel(writer, sheet_name=sheet_name, header=False, index=False)
-
-
-def _rewrite_metadata_sheet(workbook_path: Path, rows: list[list[object]]) -> None:
-    _rewrite_workbook_sheets(
-        workbook_path,
-        {tensile_builtin.METADATA_SHEET: pd.DataFrame(rows)},
-    )
 
 
 def _write_specimen_filter_workbook(path: Path, *, label: str = "Specimen Filter") -> Path:
@@ -211,65 +203,6 @@ def test_build_and_import_data_studio_workbook_keeps_tensile_behavior(tmp_path: 
     assert imported.template_match.family == "tensile"
     assert imported.label == "BlendSet"
     assert imported.parsed_sample_count == 2
-
-
-def test_preview_workbook_recovers_tensile_curves_from_source_files_when_workbook_curve_sheet_is_stale(
-    tmp_path: Path,
-) -> None:
-    output_path = tmp_path / "blendset.xlsx"
-    source_paths = [FIXTURE_DIR / "BlendSet_A.csv", FIXTURE_DIR / "BlendSet_B.csv"]
-    build_data_studio_workbook(
-        file_paths=source_paths,
-        output_path=output_path,
-        template_id="builtin/tensile",
-        group_name="BlendSet",
-    )
-
-    source_max_x_by_filename = {
-        path.name: float(tensile_builtin.parse_tensile_csv(path).curve["x"].max())
-        for path in source_paths
-    }
-    original_curves = load_curve_table(output_path, sheet_name=tensile_builtin.ALL_CURVES_SHEET)
-    original_representative_curve = load_curve_table(
-        output_path,
-        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
-    )[0]
-
-    _rewrite_workbook_sheets(
-        output_path,
-        {
-            tensile_builtin.ALL_CURVES_SHEET: tensile_builtin._curve_table_dataframe(
-                (
-                    curve.sample,
-                    curve.data.assign(x=pd.to_numeric(curve.data["x"], errors="coerce") / 2.0),
-                )
-                for curve in original_curves
-            ),
-            tensile_builtin.REPRESENTATIVE_CURVE_SHEET: tensile_builtin._curve_table_dataframe(
-                (
-                    (
-                        original_representative_curve.sample,
-                        original_representative_curve.data.assign(
-                            x=pd.to_numeric(original_representative_curve.data["x"], errors="coerce") / 2.0
-                        ),
-                    ),
-                )
-            ),
-        },
-    )
-
-    stored_curves = load_curve_table(output_path, sheet_name=tensile_builtin.ALL_CURVES_SHEET)
-    assert max(float(curve.data["x"].max()) for curve in stored_curves) < max(source_max_x_by_filename.values())
-
-    bundle = load_workbook_specimen_bundle(output_path)
-
-    assert bundle.supported is True
-    for specimen in bundle.specimens:
-        assert specimen.curve is not None
-        assert float(specimen.curve.data["x"].max()) == pytest.approx(
-            source_max_x_by_filename[specimen.filename],
-            rel=1e-6,
-        )
 
 
 def test_import_data_studio_workbooks_expands_comparison_bundle_sources(tmp_path: Path) -> None:
@@ -602,7 +535,7 @@ def test_export_data_studio_comparison_uses_manual_representative_curve_selectio
     assert representative_curves[0].data["y"].tolist() == pytest.approx([0.0, 2.0, 4.0, 5.2])
 
 
-def test_export_data_studio_comparison_writes_filtered_workbook_with_two_decimal_data(tmp_path: Path) -> None:
+def test_export_data_studio_comparison_writes_filtered_workbook_with_four_decimal_curves(tmp_path: Path) -> None:
     workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter_filtered_workbook.xlsx")
     preview = preview_data_studio_workbook(workbook_path)
     specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
@@ -678,8 +611,17 @@ def test_export_data_studio_comparison_writes_filtered_workbook_with_two_decimal
         header=None,
         dtype=str,
     ).fillna("")
-    assert representative_curve_sheet.iloc[3, 0] == "0.00"
-    assert representative_curve_sheet.iloc[4, 1] == "2.00"
+    assert representative_curve_sheet.iloc[3, 0] == "0.0000"
+    assert representative_curve_sheet.iloc[4, 1] == "2.0000"
+
+    all_curves_sheet = pd.read_excel(
+        filtered_workbook.path,
+        sheet_name=tensile_builtin.ALL_CURVES_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert all_curves_sheet.iloc[3, 0] == "0.0000"
+    assert all_curves_sheet.iloc[4, 1] == "2.0000"
 
     metadata = tensile_builtin.load_metadata_sheet(filtered_workbook.path)
     assert metadata["export_mode"] == "filtered"

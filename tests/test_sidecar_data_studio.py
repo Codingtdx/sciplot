@@ -246,7 +246,9 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
     assert [item["label"] for item in reimported_payload["workbooks"]] == ["Right Group", "Left Group"]
 
 
-def test_data_studio_comparison_export_route_returns_filtered_workbooks_with_two_decimal_data(tmp_path: Path) -> None:
+def test_data_studio_comparison_export_route_returns_filtered_workbooks_with_four_decimal_curves(
+    tmp_path: Path,
+) -> None:
     workbook_path = _write_specimen_filter_workbook(tmp_path / "sidecar_filtered_export.xlsx")
     preview = client.post(
         "/data-studio/workbook-preview",
@@ -314,6 +316,15 @@ def test_data_studio_comparison_export_route_returns_filtered_workbooks_with_two
     assert summary_sheet.iloc[1, 2] == "100.00"
     assert summary_sheet.iloc[1, 3] == "1.58"
     assert summary_sheet.iloc[1, 4] == "sample_2.csv"
+
+    representative_curve_sheet = pd.read_excel(
+        filtered_workbook_path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert representative_curve_sheet.iloc[3, 0] == "0.0000"
+    assert representative_curve_sheet.iloc[4, 1] == "2.0000"
 
 
 def test_data_studio_import_workbook_route_recovers_groups_when_comparison_metadata_is_missing(tmp_path: Path) -> None:
