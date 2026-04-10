@@ -209,7 +209,7 @@ private struct CodeConsoleGuideSheet: View {
                     )
                     guideSection(
                         title: "Outputs",
-                        text: "Use the Outputs panel and inspector to open generated artifacts and hand off results."
+                        text: "Use the Outputs panel to inspect managed run artifacts. Use the inspector Actions section or toolbar Export to export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
                     )
                 }
                 .padding(24)

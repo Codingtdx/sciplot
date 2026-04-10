@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class AppModelTests: XCTestCase {
-    private var originalWorkingDirectory: String = FileManager.default.currentDirectoryPath
+    private let originalWorkingDirectory: String = FileManager.default.currentDirectoryPath
 
     override func tearDown() {
         FileManager.default.changeCurrentDirectoryPath(originalWorkingDirectory)
@@ -100,7 +100,27 @@ final class AppModelTests: XCTestCase {
 
         model.switchWorkbench(.codeConsole)
         XCTAssertFalse(model.activeExportAvailability.isEnabled)
-        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Run code or bind a dataset") ?? false)
+        XCTAssertTrue(model.activeExportAvailability.reason?.contains("Run code to generate PDF figures") ?? false)
+    }
+
+    func testActiveExportCopyTracksSelectedWorkbench() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.plot)
+        XCTAssertEqual(model.activeExportCommandTitle, "Export Plot")
+        XCTAssertTrue(model.activeExportHelpText.contains("Import a source file"))
+
+        model.switchWorkbench(.dataStudio)
+        XCTAssertEqual(model.activeExportCommandTitle, "Export Bundle")
+        XCTAssertTrue(model.activeExportHelpText.contains("Import workbook groups"))
+
+        model.switchWorkbench(.composer)
+        XCTAssertEqual(model.activeExportCommandTitle, "Export Composition")
+        XCTAssertTrue(model.activeExportHelpText.contains("Import at least one panel"))
+
+        model.switchWorkbench(.codeConsole)
+        XCTAssertEqual(model.activeExportCommandTitle, "Export Figures")
+        XCTAssertTrue(model.activeExportHelpText.contains("Run code to generate PDF figures"))
     }
 
     func testBootstrapAndPlotImportInspectTemplateFlowWithSidecarClient() async throws {

@@ -5,12 +5,54 @@ struct CodeConsoleContextView: View {
 
     var body: some View {
         Form {
+            actionsSection
             bindingSection
             runnerSection
             outputHandoffSection
         }
         .formStyle(.grouped)
         .inspectorSurface()
+    }
+
+    @ViewBuilder
+    private var actionsSection: some View {
+        Section("Actions") {
+            InspectorActionStack {
+                Button("Export") {
+                    session.exportCurrentOutputs()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!session.exportAvailability.isEnabled)
+                .help(
+                    session.exportAvailability.reason
+                        ?? "Export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
+                )
+                .inspectorActionButton()
+            }
+
+            DisclosureGroup("Advanced") {
+                InspectorActionStack {
+                    Button("Reveal Output") {
+                        session.revealLatestOutput()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session.latestRunResponse == nil && session.latestExportItems.isEmpty)
+                    .help(
+                        session.latestRunResponse == nil && session.latestExportItems.isEmpty
+                            ? "Run code to generate managed outputs first."
+                            : "Reveal the latest export or managed output folder in Finder."
+                    )
+                    .inspectorActionButton()
+                }
+
+                LatestExportList(
+                    items: session.latestExportItems,
+                    openButtonTitle: { "Open \($0.label)" },
+                    openButtonHelp: { "Open the exported Code Console figure \($0.label)." },
+                    openAction: { session.openLatestExport(id: $0.id) }
+                )
+            }
+        }
     }
 
     @ViewBuilder

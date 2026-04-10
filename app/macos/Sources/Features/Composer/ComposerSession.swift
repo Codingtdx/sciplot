@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 @MainActor
 @Observable
 final class ComposerSession {
-    typealias ComposerExportDestinationChooser = @MainActor (_ suggestedName: String) -> URL?
+    typealias ComposerExportFormatChooser = @MainActor () -> ExportGraphicFormat?
+    typealias ComposerExportDestinationChooser = @MainActor (_ suggestedName: String, _ format: ExportGraphicFormat) -> URL?
     typealias ComposerExportMaterializer = @MainActor (_ intermediatePDFURL: URL, _ destinationURL: URL) throws -> Void
 
     @ObservationIgnored private var client: (any SidecarClienting)?
@@ -15,6 +16,7 @@ final class ComposerSession {
     @ObservationIgnored private var runtimeState = RuntimeState()
     @ObservationIgnored private let asyncCoordination = AsyncCoordination()
     @ObservationIgnored private let previewDelayNanoseconds: UInt64
+    @ObservationIgnored private let chooseExportFormat: ComposerExportFormatChooser
     @ObservationIgnored private let chooseExportDestination: ComposerExportDestinationChooser
     @ObservationIgnored private let materializeExport: ComposerExportMaterializer
 
@@ -46,10 +48,20 @@ final class ComposerSession {
         return .enabled()
     }
 
+    var latestExportItems: [ExportedFileItem] {
+        guard let exportURL else {
+            return []
+        }
+        return [ExportedFileItem(url: exportURL)]
+    }
+
     init(
         previewDelayNanoseconds: UInt64 = 300_000_000,
+        chooseExportFormat: @escaping ComposerExportFormatChooser = {
+            NativeExportCoordinator.chooseComposerExportFormat()
+        },
         chooseExportDestination: @escaping ComposerExportDestinationChooser = {
-            NativeExportCoordinator.chooseComposerExportLocation(suggestedName: $0)
+            NativeExportCoordinator.chooseComposerExportLocation(suggestedName: $0, format: $1)
         },
         materializeExport: @escaping ComposerExportMaterializer = {
             try NativeExportCoordinator.materializeComposerExport(
@@ -59,6 +71,7 @@ final class ComposerSession {
         }
     ) {
         self.previewDelayNanoseconds = previewDelayNanoseconds
+        self.chooseExportFormat = chooseExportFormat
         self.chooseExportDestination = chooseExportDestination
         self.materializeExport = materializeExport
     }
@@ -263,7 +276,13 @@ final class ComposerSession {
             return
         }
 
-        guard let destinationURL = chooseExportDestination(suggestedComposerExportFilename()) else {
+        guard let exportFormat = chooseExportFormat() else {
+            return
+        }
+        guard let destinationURL = chooseExportDestination(
+            suggestedComposerExportFilename(format: exportFormat),
+            exportFormat
+        ) else {
             return
         }
 
@@ -287,11 +306,24 @@ final class ComposerSession {
         }
     }
 
-    private func suggestedComposerExportFilename() -> String {
-        if let exportURL {
-            return exportURL.lastPathComponent
+    func openLatestExport(id: String) {
+        guard let item = latestExportItems.first(where: { $0.id == id }) else {
+            return
         }
-        return "composer-composition.pdf"
+        WorkspaceBridge.open(item.url)
+    }
+
+    private func suggestedComposerExportFilename(format: ExportGraphicFormat) -> String {
+        if let exportURL {
+            return NativeExportCoordinator.suggestedGraphicFilename(
+                from: exportURL.lastPathComponent,
+                format: format
+            )
+        }
+        return NativeExportCoordinator.suggestedGraphicFilename(
+            from: "composer-composition",
+            format: format
+        )
     }
 
     func focusPanel(_ panelID: String?) {

@@ -152,7 +152,7 @@ private struct PlotGuideSheet: View {
                     dataTemplatesSection
                     guideSection(
                         title: "Export",
-                        text: "Export is a toolbar utility. It writes the current state without turning Plot into a step-by-step workflow."
+                        text: "Export is available from both the toolbar and inspector Actions section. Choose PDF or 300 dpi TIFF first, then choose the destination for the current plot state."
                     )
                 }
                 .padding(24)

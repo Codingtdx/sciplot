@@ -32,6 +32,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## macOS Interaction Conventions
 
 - Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Export UX is unified around the Data Studio inspector pattern: toolbar `Export` remains the global entrypoint, while workbench inspectors expose `Section("Actions")` with a primary export action and an `Advanced` disclosure for `Reveal Output` plus `Latest Export`.
+- Plot / Composer / Code Console figure exports always choose `PDF` or `300 dpi TIFF` first, then choose the destination. Single-output exports keep an editable filename; multi-output exports choose one base filename and append deterministic suffixes per figure.
+- Code Console export only covers the latest run's generated PDF figure files. Managed run artifacts remain browsable in the Outputs panel, and revealing the managed output folder stays separate from user export destinations.
 - Data Studio specimen filter uses one anchored popover entrypoint in the `Focused Group` strip. Do not restore a second left-rail trigger for the same control.
 - Default specimen-filter content opens directly to the ranked Auto Keep 5 list: sort by distance from mean, highlight the five kept specimens, and avoid workbook labels, filenames, or representative-curve copy in the default view.
 - Specimen identity, manual inclusion overrides, and manual representative-curve selection are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.

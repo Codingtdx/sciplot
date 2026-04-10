@@ -5,12 +5,14 @@ import CoreGraphics
 @MainActor
 @Observable
 final class PlotSession {
-    typealias PlotExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool) -> URL?
+    typealias PlotExportFormatChooser = @MainActor (_ isMultiOutput: Bool) -> ExportGraphicFormat?
+    typealias PlotExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool, _ format: ExportGraphicFormat) -> URL?
     typealias PlotExportMaterializer = @MainActor (_ sourceURLs: [URL], _ destinationURL: URL) throws -> [URL]
 
     private let previewDebounceNanoseconds: UInt64 = 250_000_000
 
     @ObservationIgnored private var client: (any SidecarClienting)?
+    @ObservationIgnored private let chooseExportFormat: PlotExportFormatChooser
     @ObservationIgnored private let chooseExportDestination: PlotExportDestinationChooser
     @ObservationIgnored private let materializeExport: PlotExportMaterializer
     @ObservationIgnored private var runtimeState = RuntimeState()
@@ -60,19 +62,31 @@ final class PlotSession {
     var documentStatusSummary: String {
         let source = selectedSourceFilename ?? "No source"
         let template = selectedTemplateSummary?.label ?? "No template"
-        let output = userExportURLs.first?.lastPathComponent ?? "No export"
+        let output = latestExportItems.first?.label ?? "No export"
         let failure = errorMessage ?? "No failure"
         return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
     }
 
+    var latestExportItems: [ExportedFileItem] {
+        userExportURLs.map { ExportedFileItem(url: $0) }
+    }
+
     init(
+        chooseExportFormat: @escaping PlotExportFormatChooser = {
+            NativeExportCoordinator.choosePlotExportFormat(isMultiOutput: $0)
+        },
         chooseExportDestination: @escaping PlotExportDestinationChooser = {
-            NativeExportCoordinator.choosePlotExportLocation(suggestedName: $0, isMultiOutput: $1)
+            NativeExportCoordinator.choosePlotExportLocation(
+                suggestedName: $0,
+                isMultiOutput: $1,
+                format: $2
+            )
         },
         materializeExport: @escaping PlotExportMaterializer = {
             try NativeExportCoordinator.materializePlotOutputs(sourceURLs: $0, destinationURL: $1)
         }
     ) {
+        self.chooseExportFormat = chooseExportFormat
         self.chooseExportDestination = chooseExportDestination
         self.materializeExport = materializeExport
     }
@@ -363,9 +377,17 @@ final class PlotSession {
         }
 
         let isMultiOutput = isMultiOutputTemplate(templateID: selectedTemplateID)
+        guard let exportFormat = chooseExportFormat(isMultiOutput) else {
+            return
+        }
         guard let destinationURL = chooseExportDestination(
-            suggestedPlotExportFilename(templateID: selectedTemplateID),
-            isMultiOutput
+            suggestedPlotExportFilename(
+                templateID: selectedTemplateID,
+                format: exportFormat,
+                isMultiOutput: isMultiOutput
+            ),
+            isMultiOutput,
+            exportFormat
         ) else {
             return
         }
@@ -396,6 +418,13 @@ final class PlotSession {
         if !userExportURLs.isEmpty {
             WorkspaceBridge.reveal(userExportURLs)
         }
+    }
+
+    func openLatestExport(id: String) {
+        guard let item = latestExportItems.first(where: { $0.id == id }) else {
+            return
+        }
+        WorkspaceBridge.open(item.url)
     }
 
     func openCurrentSource() {
@@ -1000,16 +1029,33 @@ final class PlotSession {
         notifyRenderOptionsDidChange()
     }
 
-    private func suggestedPlotExportFilename(templateID: String) -> String {
-        if let exportResponse,
+    private func suggestedPlotExportFilename(
+        templateID: String,
+        format: ExportGraphicFormat,
+        isMultiOutput: Bool
+    ) -> String {
+        if !isMultiOutput,
+           let latest = userExportURLs.first
+        {
+            return NativeExportCoordinator.suggestedGraphicFilename(
+                from: latest.lastPathComponent,
+                format: format
+            )
+        }
+        if !isMultiOutput,
+           let exportResponse,
            let firstOutput = exportResponse.outputs.first
         {
-            return URL(fileURLWithPath: firstOutput).lastPathComponent
+            return NativeExportCoordinator.suggestedGraphicFilename(
+                from: URL(fileURLWithPath: firstOutput).lastPathComponent,
+                format: format
+            )
         }
         if let selectedFileURL {
-            return "\(selectedFileURL.deletingPathExtension().lastPathComponent)_\(templateID).pdf"
+            let stem = "\(selectedFileURL.deletingPathExtension().lastPathComponent)_\(templateID)"
+            return NativeExportCoordinator.suggestedGraphicFilename(from: stem, format: format)
         }
-        return "\(templateID).pdf"
+        return NativeExportCoordinator.suggestedGraphicFilename(from: templateID, format: format)
     }
 
     private func isMultiOutputTemplate(templateID: String) -> Bool {

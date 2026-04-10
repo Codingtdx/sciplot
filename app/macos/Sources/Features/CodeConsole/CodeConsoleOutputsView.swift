@@ -11,8 +11,8 @@ struct CodeConsoleOutputsView: View {
                     .font(.headline)
                 Spacer()
                 if session.latestRunResponse != nil {
-                    Button("Reveal Outputs") {
-                        session.revealLatestOutput()
+                    Button("Reveal Output Folder") {
+                        session.revealManagedOutputFolder()
                     }
                     .buttonStyle(.bordered)
                 }

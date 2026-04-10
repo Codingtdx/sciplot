@@ -69,7 +69,11 @@ struct RootSplitView: View {
     private var activeInspectorView: some View {
         switch model.selectedWorkbench {
         case .plot:
-            PlotInspectorView(session: model.plotSession)
+            PlotInspectorView(session: model.plotSession) {
+                EmptyView()
+            } trailingSections: {
+                PlotExportInspectorSection(session: model.plotSession)
+            }
         case .dataStudio:
             DataStudioInspectorView(session: model.dataStudioSession)
         case .composer:
@@ -90,7 +94,7 @@ struct RootSplitView: View {
                 Task { await model.exportActiveWorkbench() }
             }
             .disabled(!model.activeExportAvailability.isEnabled)
-            .help(model.activeExportAvailability.reason ?? "Export current result")
+            .help(model.activeExportHelpText)
 
             Button("Help", systemImage: "questionmark.circle") {
                 model.showHelpForActiveWorkbench()

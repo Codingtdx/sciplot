@@ -6,8 +6,9 @@ struct ComposerInspectorView: View {
     var body: some View {
         Form {
             selectionSection
-            actionsSection
-            previewAndExportSection
+            editSection
+            exportActionsSection
+            previewSection
         }
         .formStyle(.grouped)
         .inspectorSurface()
@@ -59,7 +60,7 @@ struct ComposerInspectorView: View {
     }
 
     @ViewBuilder
-    private var actionsSection: some View {
+    private var editSection: some View {
         Section("Edit") {
             if let selection = session.selectedCellSelection, selection.cellCount > 1 {
                 AdaptiveInspectorTextRow(title: "Merge", value: "\(selection.colSpan)x\(selection.rowSpan)")
@@ -165,8 +166,49 @@ struct ComposerInspectorView: View {
     }
 
     @ViewBuilder
-    private var previewAndExportSection: some View {
-        Section("Preview & Export") {
+    private var exportActionsSection: some View {
+        Section("Actions") {
+            InspectorActionStack {
+                Button("Export") {
+                    Task { await session.exportComposition() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!session.exportAvailability.isEnabled)
+                .help(
+                    session.exportAvailability.reason
+                        ?? "Export the current composition as PDF or 300 dpi TIFF."
+                )
+                .inspectorActionButton()
+            }
+
+            DisclosureGroup("Advanced") {
+                InspectorActionStack {
+                    Button("Reveal Output") {
+                        session.revealLatestExport()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session.latestExportItems.isEmpty)
+                    .help(
+                        session.latestExportItems.isEmpty
+                            ? "Export a composition first."
+                            : "Reveal the latest exported composition in Finder."
+                    )
+                    .inspectorActionButton()
+                }
+
+                LatestExportList(
+                    items: session.latestExportItems,
+                    openButtonTitle: { "Open \($0.label)" },
+                    openButtonHelp: { "Open the exported composition file \($0.label)." },
+                    openAction: { session.openLatestExport(id: $0.id) }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var previewSection: some View {
+        Section("Preview") {
             if session.isPreviewing {
                 BusyStateCard(
                     title: "Rendering preview",
@@ -192,25 +234,6 @@ struct ComposerInspectorView: View {
             if session.isExporting {
                 Label("Exporting composition…", systemImage: "arrow.triangle.2.circlepath")
                     .foregroundStyle(.secondary)
-            } else {
-                InspectorEmptyState(message: "Use Export to write PDF or TIFF output.")
-            }
-
-            if let exportURL = session.exportURL {
-                AdaptiveInspectorTextRow(title: "Latest Export", value: exportURL.lastPathComponent)
-                AdaptiveInspectorTextRow(
-                    title: "Folder",
-                    value: exportURL.deletingLastPathComponent().path,
-                    selectable: true
-                )
-
-                InspectorActionStack {
-                    Button("Reveal In Finder") {
-                        session.revealLatestExport()
-                    }
-                    .buttonStyle(.bordered)
-                    .inspectorActionButton()
-                }
             }
         }
     }

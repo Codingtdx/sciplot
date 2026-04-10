@@ -39,6 +39,36 @@ final class AppModel {
         }
     }
 
+    var activeExportCommandTitle: String {
+        switch selectedWorkbench {
+        case .plot:
+            return "Export Plot"
+        case .dataStudio:
+            return "Export Bundle"
+        case .composer:
+            return "Export Composition"
+        case .codeConsole:
+            return "Export Figures"
+        }
+    }
+
+    var activeExportHelpText: String {
+        if let reason = activeExportAvailability.reason {
+            return reason
+        }
+
+        switch selectedWorkbench {
+        case .plot:
+            return "Export the current plot as PDF or 300 dpi TIFF."
+        case .dataStudio:
+            return "Export the comparison workbook bundle, filtered workbooks, and figure outputs."
+        case .composer:
+            return "Export the current composition as PDF or 300 dpi TIFF."
+        case .codeConsole:
+            return "Export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
+        }
+    }
+
     @ObservationIgnored private var pendingPlotReplacementAction: PendingPlotReplacementAction?
 
     init(runtime: SidecarRuntime, client: (any SidecarClienting)? = nil) {

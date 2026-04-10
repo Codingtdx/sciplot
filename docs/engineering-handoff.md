@@ -1349,6 +1349,64 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
 
+### 2026-04-10 (Round AB): macOS export UX unified around the Data Studio pattern
+
+- Scope:
+  - Unified macOS export interaction across `Plot`, `Composer`, and `Code Console` around the Data Studio inspector pattern: toolbar `Export` stays global, while inspectors now expose `Section("Actions")` with `Advanced -> Reveal Output / Latest Export`.
+  - Added one shared macOS exported-file presentation model for flat latest-export lists and switched Plot / Composer / Code Console sessions to expose that state directly from their native session layer.
+  - Switched Plot / Composer figure export to explicit `format -> destination` flow and kept single-file rename vs multi-file base-stem semantics intact.
+  - Replaced `CodeConsoleSession.exportCurrentOutputs()` folder reveal behavior with real export of the latest run's generated PDF figure files only; managed output-folder reveal remains in the Outputs panel.
+  - Updated macOS guide/help copy plus app-level export command/help text to describe workbench-specific export behavior.
+- User-visible impact:
+  - Plot / Composer / Code Console now export from the toolbar and inspector with the same Data Studio-style flow.
+  - Plot / Composer / Code Console prompt for `PDF` or `300 dpi TIFF` before the destination chooser opens.
+  - Code Console can now export the latest run's generated figures instead of only revealing the output folder.
+  - Inspectors now show a flat `Latest Export` list for exported figure files and keep reveal actions inside `Advanced`.
+- Risks:
+  - Code Console export intentionally ignores non-PDF artifacts from the run output directory; if runtime-generated figure formats expand beyond PDF, macOS export logic must be updated in the same round.
+  - Multi-output export naming now depends on the shared deterministic-suffix helper; changing that helper will affect both Plot and Code Console exported filenames.
+  - The Outputs panel and inspector now intentionally distinguish managed outputs from user export destinations; future UI changes should not collapse those two concepts back together.
+- Rollback points:
+  - `app/macos/Sources/Shared/UI/StateViews.swift`
+  - `app/macos/Sources/Shared/Utilities/NativePanels.swift`
+  - `app/macos/Sources/App/AppModel.swift`
+  - `app/macos/Sources/App/AppCommands.swift`
+  - `app/macos/Sources/App/RootSplitView.swift`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSession.swift`
+  - `app/macos/Sources/Features/Composer/ComposerInspectorView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/ComposerSessionTests.swift`
+  - `app/macos/Tests/CodeConsoleSessionTests.swift`
+  - `app/macos/Tests/AppModelTests.swift`
+  - `README.md`
+  - `AGENTS.md`
+- Decision:
+  - Reused Data Studio's inspector/export structure as the macOS export authority instead of introducing a second shared “export shell” abstraction or leaving Plot / Composer / Code Console on their older ad-hoc flows.
+  - Rejected alternatives:
+    - keep Code Console toolbar export as folder reveal and add a second figure-export button elsewhere: rejected because it preserves ambiguous export semantics and diverges from the user's requested unified flow
+    - unify on a destination-first save panel for all workbenches: rejected because Data Studio already establishes format-first figure export semantics and the user explicitly asked to align around that model
+    - export every Code Console artifact type: rejected for this round because the managed runner truth source currently treats PDF figure files as the supported figure-export surface, while csv/json/log outputs remain handoff artifacts
+  - Boundary:
+    - Data Studio keeps bundle export semantics as-is
+    - Plot / Composer / Code Console share figure-export interaction only; no sidecar schema or backend contract changed
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/ComposerSessionTests -only-testing:SciPlotGodMacTests/CodeConsoleSessionTests -only-testing:SciPlotGodMacTests/AppModelTests`: passed (`51 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`109 tests`)
+
 Use this block for every new round:
 
 ```

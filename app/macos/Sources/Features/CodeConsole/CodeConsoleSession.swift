@@ -40,11 +40,18 @@ struct CodeConsoleBindingOption: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 final class CodeConsoleSession {
+    typealias CodeConsoleExportFormatChooser = @MainActor (_ isMultiOutput: Bool) -> ExportGraphicFormat?
+    typealias CodeConsoleExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool, _ format: ExportGraphicFormat) -> URL?
+    typealias CodeConsoleExportMaterializer = @MainActor (_ sourceURLs: [URL], _ destinationURL: URL) throws -> [URL]
+
     private let contextRefreshDebounceNanoseconds: UInt64 = 120_000_000
 
     @ObservationIgnored private var client: (any SidecarClienting)?
     @ObservationIgnored private var runtimeState = RuntimeState()
     @ObservationIgnored private let asyncCoordination = AsyncCoordination()
+    @ObservationIgnored private let chooseExportFormat: CodeConsoleExportFormatChooser
+    @ObservationIgnored private let chooseExportDestination: CodeConsoleExportDestinationChooser
+    @ObservationIgnored private let materializeExport: CodeConsoleExportMaterializer
 
     var editorText = ""
     var promptText = ""
@@ -62,21 +69,25 @@ final class CodeConsoleSession {
     var isGuidePresented = false
     var isRefreshingContext = false
     var isRunning = false
+    var userExportURLs: [URL] = []
 
     var exportAvailability: ActionAvailability {
         if isRunning {
             return .disabled("Wait for the current run to finish.")
         }
-        if latestRunResponse != nil || selectedFileURL != nil {
-            return .enabled()
+        guard latestRunResponse != nil else {
+            return .disabled("Run code to generate PDF figures before exporting.")
         }
-        return .disabled("Run code or bind a dataset before revealing outputs.")
+        guard !exportableGeneratedFigureURLs.isEmpty else {
+            return .disabled("The latest run did not generate any PDF figures to export.")
+        }
+        return .enabled()
     }
 
     var documentStatusSummary: String {
         let source = selectedSourceFilename ?? "No source"
         let template = contextResponse?.template ?? selectedBinding?.templateID ?? "Auto recommendation"
-        let output = latestRunResponse?.outputDir ?? "No output folder"
+        let output = latestExportItems.first?.label ?? latestRunResponse?.outputDir ?? "No export"
         let failure = errorMessage ?? "No failure"
         return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
     }
@@ -126,6 +137,10 @@ final class CodeConsoleSession {
         return URL(fileURLWithPath: path)
     }
 
+    var latestExportItems: [ExportedFileItem] {
+        userExportURLs.map { ExportedFileItem(url: $0) }
+    }
+
     var liveStatusLabel: String {
         DerivedState.liveStatusLabel(
             selectedFileURL: selectedFileURL,
@@ -142,6 +157,26 @@ final class CodeConsoleSession {
             isRefreshingContext: isRefreshingContext,
             hasContextResponse: contextResponse != nil
         )
+    }
+
+    init(
+        chooseExportFormat: @escaping CodeConsoleExportFormatChooser = {
+            NativeExportCoordinator.chooseCodeConsoleExportFormat(isMultiOutput: $0)
+        },
+        chooseExportDestination: @escaping CodeConsoleExportDestinationChooser = {
+            NativeExportCoordinator.chooseCodeConsoleExportLocation(
+                suggestedName: $0,
+                isMultiOutput: $1,
+                format: $2
+            )
+        },
+        materializeExport: @escaping CodeConsoleExportMaterializer = {
+            try NativeExportCoordinator.materializePlotOutputs(sourceURLs: $0, destinationURL: $1)
+        }
+    ) {
+        self.chooseExportFormat = chooseExportFormat
+        self.chooseExportDestination = chooseExportDestination
+        self.materializeExport = materializeExport
     }
 
     func configure(client: any SidecarClienting) {
@@ -307,6 +342,7 @@ final class CodeConsoleSession {
 
         isRunning = true
         errorMessage = nil
+        userExportURLs = []
         defer { isRunning = false }
 
         do {
@@ -337,6 +373,14 @@ final class CodeConsoleSession {
     }
 
     func revealLatestOutput() {
+        if !userExportURLs.isEmpty {
+            WorkspaceBridge.reveal(userExportURLs)
+            return
+        }
+        revealManagedOutputFolder()
+    }
+
+    func revealManagedOutputFolder() {
         if let outputDir = latestRunResponse?.outputDir {
             WorkspaceBridge.reveal([URL(fileURLWithPath: outputDir)])
         } else if let selectedFileURL {
@@ -345,7 +389,36 @@ final class CodeConsoleSession {
     }
 
     func exportCurrentOutputs() {
-        revealLatestOutput()
+        let sourceURLs = exportableGeneratedFigureURLs
+        guard !sourceURLs.isEmpty else {
+            return
+        }
+
+        let isMultiOutput = sourceURLs.count > 1
+        guard let exportFormat = chooseExportFormat(isMultiOutput) else {
+            return
+        }
+        guard let destinationURL = chooseExportDestination(
+            suggestedExportFilename(format: exportFormat, isMultiOutput: isMultiOutput),
+            isMultiOutput,
+            exportFormat
+        ) else {
+            return
+        }
+
+        do {
+            userExportURLs = try materializeExport(sourceURLs, destinationURL)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func openLatestExport(id: String) {
+        guard let item = latestExportItems.first(where: { $0.id == id }) else {
+            return
+        }
+        WorkspaceBridge.open(item.url)
     }
 
     func openCurrentSource() {
@@ -484,6 +557,48 @@ final class CodeConsoleSession {
     private func clearRunState() {
         latestRunResponse = nil
         selectedGeneratedFilePath = nil
+        userExportURLs = []
+    }
+
+    private var exportableGeneratedFigureURLs: [URL] {
+        guard let latestRunResponse else {
+            return []
+        }
+        return latestRunResponse.generatedFiles.compactMap { item in
+            guard item.fileType.lowercased() == "pdf" || URL(fileURLWithPath: item.path).pathExtension.lowercased() == "pdf" else {
+                return nil
+            }
+            return URL(fileURLWithPath: item.path)
+        }
+    }
+
+    private func suggestedExportFilename(
+        format: ExportGraphicFormat,
+        isMultiOutput: Bool
+    ) -> String {
+        if !isMultiOutput,
+           let latest = userExportURLs.first
+        {
+            return NativeExportCoordinator.suggestedGraphicFilename(
+                from: latest.lastPathComponent,
+                format: format
+            )
+        }
+
+        if !isMultiOutput,
+           let firstPDF = exportableGeneratedFigureURLs.first
+        {
+            return NativeExportCoordinator.suggestedGraphicFilename(
+                from: firstPDF.lastPathComponent,
+                format: format
+            )
+        }
+
+        let baseStem = selectedFileURL?.deletingPathExtension().lastPathComponent ?? "code_console"
+        return NativeExportCoordinator.suggestedGraphicFilename(
+            from: "\(baseStem)_code_console",
+            format: format
+        )
     }
 
     private func bindingID(kind: CodeConsoleSourceKind, url: URL) -> String {

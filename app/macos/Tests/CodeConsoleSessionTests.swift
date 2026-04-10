@@ -7,11 +7,44 @@ final class CodeConsoleSessionTests: XCTestCase {
     func testExportAvailabilityExplainsBlockingStates() {
         let session = CodeConsoleSession()
         XCTAssertFalse(session.exportAvailability.isEnabled)
-        XCTAssertTrue(session.exportAvailability.reason?.contains("Run code or bind a dataset") ?? false)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Run code to generate PDF figures") ?? false)
 
         session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("Run code to generate PDF figures") ?? false)
+
+        session.latestRunResponse = TestPayloads.codeConsoleRun()
         XCTAssertTrue(session.exportAvailability.isEnabled)
         XCTAssertNil(session.exportAvailability.reason)
+    }
+
+    func testExportAvailabilityExplainsLatestRunWithoutPDFFigures() {
+        let session = CodeConsoleSession()
+        session.latestRunResponse = CodeConsoleRunResponse(
+            status: "succeeded",
+            exitCode: 0,
+            durationSeconds: 0.2,
+            stdout: "",
+            stderr: "",
+            runDir: "/tmp/code_console/run-2",
+            outputDir: "/tmp/code_console/run-2/outputs",
+            scriptPath: "/tmp/code_console/run-2/user_code.py",
+            promptPath: "/tmp/code_console/run-2/external_ai_prompt.txt",
+            contextPath: "/tmp/code_console/run-2/context.json",
+            stdoutPath: "/tmp/code_console/run-2/stdout.txt",
+            stderrPath: "/tmp/code_console/run-2/stderr.txt",
+            generatedFiles: [
+                .init(
+                    path: "/tmp/code_console/run-2/outputs/fit_table.csv",
+                    name: "fit_table.csv",
+                    fileType: "csv",
+                    sizeBytes: 256
+                ),
+            ]
+        )
+
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("did not generate any PDF figures") ?? false)
     }
 
     func testCodeConsoleContextRefreshesAndRunsWithBoundPlotState() async {
@@ -64,6 +97,151 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(session.latestRunResponse?.status, "succeeded")
         XCTAssertEqual(session.selectedGeneratedFile?.name, "sample.pdf")
         XCTAssertTrue(session.outputsSummary.contains("files"))
+    }
+
+    func testCodeConsoleExportUsesOnlyLatestRunPDFFigures() async {
+        let client = MockSidecarClient()
+        var callOrder: [String] = []
+        var chooserSuggestedName: String?
+        var chooserIsMultiOutput: Bool?
+        var materializedSourceURLs: [URL] = []
+        let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/code-console-final.pdf")
+
+        let session = CodeConsoleSession(
+            chooseExportFormat: { isMultiOutput in
+                callOrder.append("format")
+                chooserIsMultiOutput = isMultiOutput
+                return .pdf
+            },
+            chooseExportDestination: { suggestedName, isMultiOutput, format in
+                callOrder.append("destination")
+                chooserSuggestedName = suggestedName
+                chooserIsMultiOutput = isMultiOutput
+                XCTAssertEqual(format, .pdf)
+                return destinationURL
+            },
+            materializeExport: { sourceURLs, destination in
+                materializedSourceURLs = sourceURLs
+                XCTAssertEqual(destination, destinationURL)
+                return [destination]
+            }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await session.refreshCurrentContext()
+        session.editorText = "print('hello code console')"
+        await session.runCurrentCode()
+
+        session.exportCurrentOutputs()
+
+        XCTAssertEqual(callOrder, ["format", "destination"])
+        XCTAssertEqual(chooserSuggestedName, "sample.pdf")
+        XCTAssertEqual(chooserIsMultiOutput, false)
+        XCTAssertEqual(materializedSourceURLs.map(\.lastPathComponent), ["sample.pdf"])
+        XCTAssertEqual(session.latestExportItems.map(\.label), ["code-console-final.pdf"])
+    }
+
+    func testCodeConsoleExportCanMaterializeTIFFOutput() {
+        var callOrder: [String] = []
+        var chooserSuggestedName: String?
+        var materializedDestination: URL?
+        let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/code-console-final.tiff")
+
+        let session = CodeConsoleSession(
+            chooseExportFormat: { isMultiOutput in
+                callOrder.append("format")
+                XCTAssertFalse(isMultiOutput)
+                return .tiff
+            },
+            chooseExportDestination: { suggestedName, _, format in
+                callOrder.append("destination")
+                chooserSuggestedName = suggestedName
+                XCTAssertEqual(format, .tiff)
+                return destinationURL
+            },
+            materializeExport: { _, destination in
+                materializedDestination = destination
+                return [destination]
+            }
+        )
+        session.latestRunResponse = TestPayloads.codeConsoleRun()
+
+        session.exportCurrentOutputs()
+
+        XCTAssertEqual(callOrder, ["format", "destination"])
+        XCTAssertEqual(chooserSuggestedName, "sample.tiff")
+        XCTAssertEqual(materializedDestination, destinationURL)
+        XCTAssertEqual(session.latestExportItems.map(\.label), ["code-console-final.tiff"])
+    }
+
+    func testCodeConsoleMultiFigureExportUsesBoundSourceStemAndStableLatestExportItems() {
+        var chooserSuggestedName: String?
+        var chooserIsMultiOutput: Bool?
+        var materializedSourceURLs: [URL] = []
+        let session = CodeConsoleSession(
+            chooseExportFormat: { isMultiOutput in
+                chooserIsMultiOutput = isMultiOutput
+                return .pdf
+            },
+            chooseExportDestination: { suggestedName, isMultiOutput, _ in
+                chooserSuggestedName = suggestedName
+                chooserIsMultiOutput = isMultiOutput
+                return URL(fileURLWithPath: "/tmp/user_exports/sample_code_console.pdf")
+            },
+            materializeExport: { sourceURLs, destination in
+                materializedSourceURLs = sourceURLs
+                return [
+                    destination.deletingLastPathComponent().appendingPathComponent("sample_code_console_storage.pdf"),
+                    destination.deletingLastPathComponent().appendingPathComponent("sample_code_console_loss.pdf"),
+                ]
+            }
+        )
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        session.latestRunResponse = CodeConsoleRunResponse(
+            status: "succeeded",
+            exitCode: 0,
+            durationSeconds: 0.3,
+            stdout: "",
+            stderr: "",
+            runDir: "/tmp/code_console/run-3",
+            outputDir: "/tmp/code_console/run-3/outputs",
+            scriptPath: "/tmp/code_console/run-3/user_code.py",
+            promptPath: "/tmp/code_console/run-3/external_ai_prompt.txt",
+            contextPath: "/tmp/code_console/run-3/context.json",
+            stdoutPath: "/tmp/code_console/run-3/stdout.txt",
+            stderrPath: "/tmp/code_console/run-3/stderr.txt",
+            generatedFiles: [
+                .init(
+                    path: "/tmp/code_console/run-3/outputs/storage.pdf",
+                    name: "storage.pdf",
+                    fileType: "pdf",
+                    sizeBytes: 1024
+                ),
+                .init(
+                    path: "/tmp/code_console/run-3/outputs/loss.pdf",
+                    name: "loss.pdf",
+                    fileType: "pdf",
+                    sizeBytes: 980
+                ),
+                .init(
+                    path: "/tmp/code_console/run-3/outputs/fit_table.csv",
+                    name: "fit_table.csv",
+                    fileType: "csv",
+                    sizeBytes: 256
+                ),
+            ]
+        )
+
+        session.exportCurrentOutputs()
+
+        XCTAssertEqual(chooserIsMultiOutput, true)
+        XCTAssertEqual(chooserSuggestedName, "sample_code_console.pdf")
+        XCTAssertEqual(materializedSourceURLs.map(\.lastPathComponent), ["storage.pdf", "loss.pdf"])
+        XCTAssertEqual(
+            session.latestExportItems.map(\.label),
+            ["sample_code_console_storage.pdf", "sample_code_console_loss.pdf"]
+        )
     }
 
     func testContextRefreshDebouncesRapidBindingChangesToLatestRequest() async {

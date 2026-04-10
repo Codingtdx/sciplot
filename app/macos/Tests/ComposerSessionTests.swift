@@ -120,12 +120,20 @@ final class ComposerSessionTests: XCTestCase {
     func testComposerHappyPathImportPreviewAndExport() async throws {
         let client = MockSidecarClient()
         let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/composer-final.pdf")
+        var callOrder: [String] = []
         var chooserSuggestedName: String?
+        var chooserFormat: ExportGraphicFormat?
         var materializeCall: (URL, URL)?
         let session = ComposerSession(
             previewDelayNanoseconds: 10_000_000,
-            chooseExportDestination: { suggestedName in
+            chooseExportFormat: {
+                callOrder.append("format")
+                return .pdf
+            },
+            chooseExportDestination: { suggestedName, format in
+                callOrder.append("destination")
                 chooserSuggestedName = suggestedName
+                chooserFormat = format
                 return destinationURL
             },
             materializeExport: { intermediatePDFURL, destination in
@@ -147,19 +155,33 @@ final class ComposerSessionTests: XCTestCase {
 
         await session.exportComposition()
 
+        XCTAssertEqual(callOrder, ["format", "destination"])
         XCTAssertEqual(client.composeExportRequests.first?.version, 2)
         XCTAssertEqual(chooserSuggestedName, "composer-composition.pdf")
+        XCTAssertEqual(chooserFormat, .pdf)
         XCTAssertEqual(materializeCall?.0.path, "/tmp/composer-export.pdf")
         XCTAssertEqual(materializeCall?.1, destinationURL)
         XCTAssertEqual(session.exportURL, destinationURL)
+        XCTAssertEqual(session.latestExportItems.map(\.label), ["composer-final.pdf"])
     }
 
     func testComposerExportPassesTiffDestinationToMaterializer() async {
         let client = MockSidecarClient()
         let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/composer-final.tiff")
+        var callOrder: [String] = []
+        var chooserSuggestedName: String?
         var materializeDestination: URL?
         let session = ComposerSession(
-            chooseExportDestination: { _ in destinationURL },
+            chooseExportFormat: {
+                callOrder.append("format")
+                return .tiff
+            },
+            chooseExportDestination: { suggestedName, format in
+                callOrder.append("destination")
+                chooserSuggestedName = suggestedName
+                XCTAssertEqual(format, .tiff)
+                return destinationURL
+            },
             materializeExport: { _, destination in
                 materializeDestination = destination
             }
@@ -168,8 +190,11 @@ final class ComposerSessionTests: XCTestCase {
 
         await session.exportComposition()
 
+        XCTAssertEqual(callOrder, ["format", "destination"])
+        XCTAssertEqual(chooserSuggestedName, "composer-composition.tiff")
         XCTAssertEqual(materializeDestination, destinationURL)
         XCTAssertEqual(session.exportURL, destinationURL)
+        XCTAssertEqual(session.latestExportItems.map(\.label), ["composer-final.tiff"])
     }
 
     func testShiftSelectionMergeCreatesFreeRegionWithoutChangingPanelOrder() {

@@ -109,7 +109,7 @@ private struct ComposerGuideSheet: View {
                     )
                     guideSection(
                         title: "Export",
-                        text: "Preview and export still use the authoritative sidecar flow. Export opens a native save dialog and writes either PDF or TIFF to your chosen destination."
+                        text: "Preview stays in the inspector Preview section, while export lives in the Actions section and toolbar. Choose PDF or 300 dpi TIFF first, then choose the destination."
                     )
                 }
                 .padding(24)

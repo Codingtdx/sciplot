@@ -84,6 +84,13 @@
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
+- macOS 导出交互统一以 Data Studio inspector 模式为准：
+  - toolbar `Export` 保留为全局主入口；
+  - Plot / Composer / Code Console inspector 必须提供 `Actions` 区，主按钮就是 `Export`；
+  - `Advanced` 内统一放 `Reveal Output` 和 `Latest Export`，不要再散落第二套导出按钮或状态卡；
+  - Plot / Composer / Code Console 的 figure export 必须先选格式（`PDF` / `300 dpi TIFF`），再选目标路径；
+  - 单文件导出保留可编辑文件名；多文件导出只选一个 base filename，再追加稳定 suffix；
+  - Code Console 的 toolbar/inspector `Export` 只导出 latest run 生成的 PDF figure files，不得退回成 reveal output folder。
 - Data Studio import 必须维持单一分阶段 native sheet（wizard），禁止恢复多个串联弹窗。
 - Data Studio specimen filter 默认交互必须是 anchored popover，且只保留右侧 `Focused Group` 单一入口；不得恢复左侧重复入口或常驻 split pane。
 - Data Studio specimen filter 默认规则是 `Auto Keep 5`：按距离均值最近排序，只保留 5 个合格 specimen；少于 5 个时禁用自动筛选并解释原因。

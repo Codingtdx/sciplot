@@ -29,6 +29,18 @@ struct ActionAvailability: Equatable, Sendable {
     }
 }
 
+struct ExportedFileItem: Identifiable, Equatable, Sendable {
+    let id: String
+    let label: String
+    let url: URL
+
+    init(url: URL, label: String? = nil) {
+        self.id = url.standardizedFileURL.path
+        self.label = label ?? url.lastPathComponent
+        self.url = url
+    }
+}
+
 struct DiagnosticMessage: Equatable, Sendable {
     let summary: String
     let detail: String
@@ -93,6 +105,37 @@ struct EmptyStateCard: View {
         }
         .frame(maxWidth: .infinity, minHeight: 220)
         .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+struct LatestExportList: View {
+    let items: [ExportedFileItem]
+    let openButtonTitle: (ExportedFileItem) -> String
+    let openButtonHelp: (ExportedFileItem) -> String
+    let openAction: (ExportedFileItem) -> Void
+
+    var body: some View {
+        guard !items.isEmpty else {
+            return AnyView(EmptyView())
+        }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Latest Export")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                ForEach(items) { item in
+                    Button(openButtonTitle(item)) {
+                        openAction(item)
+                    }
+                    .buttonStyle(.bordered)
+                    .help(openButtonHelp(item))
+                    .inspectorActionButton()
+                }
+            }
+            .padding(.top, 6)
+        )
     }
 }
 

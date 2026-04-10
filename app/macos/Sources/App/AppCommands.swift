@@ -25,7 +25,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command])
 
-            Button("Export Current Result") {
+            Button(model.activeExportCommandTitle) {
                 Task { await model.exportActiveWorkbench() }
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])

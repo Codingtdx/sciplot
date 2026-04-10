@@ -92,30 +92,87 @@ enum NativePanels {
 
 @MainActor
 enum NativeExportCoordinator {
-    static func chooseComposerExportLocation(suggestedName: String) -> URL? {
-        NativePanels.chooseSaveLocation(
-            title: "Export Composition",
-            message: "Choose a destination, file name, and output format for this composition export.",
-            suggestedName: suggestedName,
-            allowedContentTypes: FileTypeCatalog.composerExport,
-            prompt: "Export"
+    static func choosePlotExportFormat(isMultiOutput: Bool) -> ExportGraphicFormat? {
+        let message: String
+        if isMultiOutput {
+            message = "Export the current figure set as editable PDF or 300 dpi TIFF. Choose the format first, then choose one base file name and destination."
+        } else {
+            message = "Export the current plot as editable PDF or 300 dpi TIFF. Choose the format first, then choose the destination."
+        }
+        return NativePanels.chooseGraphicExportFormat(
+            title: "Choose Plot Export Format",
+            message: message
         )
     }
 
-    static func choosePlotExportLocation(suggestedName: String, isMultiOutput: Bool) -> URL? {
+    static func choosePlotExportLocation(
+        suggestedName: String,
+        isMultiOutput: Bool,
+        format: ExportGraphicFormat
+    ) -> URL? {
         let message: String
         if isMultiOutput {
-            message = "This template exports a file group. The name you choose is used as the base stem, and each output appends a deterministic suffix."
+            message = "This template exports a file group. The name you choose is used as the base stem, and each figure appends a deterministic suffix."
         } else {
-            message = "Choose a destination, file name, and output format for this plot export."
+            message = "Choose a destination and file name for this plot export."
         }
 
-        return NativePanels.chooseSaveLocation(
+        return chooseGraphicExportLocation(
             title: "Export Plot",
             message: message,
             suggestedName: suggestedName,
-            allowedContentTypes: FileTypeCatalog.composerExport,
-            prompt: "Export"
+            format: format
+        )
+    }
+
+    static func chooseComposerExportFormat() -> ExportGraphicFormat? {
+        NativePanels.chooseGraphicExportFormat(
+            title: "Choose Composition Export Format",
+            message: "Export the current composition as editable PDF or 300 dpi TIFF. Choose the format first, then choose the destination."
+        )
+    }
+
+    static func chooseComposerExportLocation(
+        suggestedName: String,
+        format: ExportGraphicFormat
+    ) -> URL? {
+        chooseGraphicExportLocation(
+            title: "Export Composition",
+            message: "Choose a destination and file name for this composition export.",
+            suggestedName: suggestedName,
+            format: format
+        )
+    }
+
+    static func chooseCodeConsoleExportFormat(isMultiOutput: Bool) -> ExportGraphicFormat? {
+        let message: String
+        if isMultiOutput {
+            message = "Export the latest run's generated PDF figure files as editable PDF or 300 dpi TIFF. Choose the format first, then choose one base file name and destination."
+        } else {
+            message = "Export the latest run's generated PDF figure file as editable PDF or 300 dpi TIFF. Choose the format first, then choose the destination."
+        }
+        return NativePanels.chooseGraphicExportFormat(
+            title: "Choose Code Console Export Format",
+            message: message
+        )
+    }
+
+    static func chooseCodeConsoleExportLocation(
+        suggestedName: String,
+        isMultiOutput: Bool,
+        format: ExportGraphicFormat
+    ) -> URL? {
+        let message: String
+        if isMultiOutput {
+            message = "The latest run contains multiple PDF figures. The name you choose is used as the base stem, and each figure appends a deterministic suffix."
+        } else {
+            message = "Choose a destination and file name for this Code Console export."
+        }
+        return chooseGraphicExportLocation(
+            title: "Export Code Console Figures",
+            message: message,
+            suggestedName: suggestedName,
+            format: format
         )
     }
 
@@ -226,6 +283,13 @@ enum NativeExportCoordinator {
         }
     }
 
+    static func suggestedGraphicFilename(
+        from suggestedName: String,
+        format: ExportGraphicFormat
+    ) -> String {
+        replaceExtension(of: suggestedName, with: format.fileExtension)
+    }
+
     private static func graphicExportFormat(for destinationURL: URL) -> ExportGraphicFormat {
         let ext = destinationURL.pathExtension.lowercased()
         if ext == "tif" || ext == "tiff" {
@@ -241,6 +305,37 @@ enum NativeExportCoordinator {
         case .tiff:
             return .tiff
         }
+    }
+
+    private static func chooseGraphicExportLocation(
+        title: String,
+        message: String,
+        suggestedName: String,
+        format: ExportGraphicFormat
+    ) -> URL? {
+        NativePanels.chooseSaveLocation(
+            title: title,
+            message: message,
+            suggestedName: suggestedGraphicFilename(from: suggestedName, format: format),
+            allowedContentTypes: [contentType(for: format)],
+            prompt: "Export"
+        )
+    }
+
+    private static func contentType(for format: ExportGraphicFormat) -> UTType {
+        switch format {
+        case .pdf:
+            return .pdf
+        case .tiff:
+            return .tiff
+        }
+    }
+
+    private static func replaceExtension(of filename: String, with newExtension: String) -> String {
+        let url = URL(fileURLWithPath: filename)
+        let stem = url.deletingPathExtension().lastPathComponent
+        let normalizedStem = stem.isEmpty ? "export" : stem
+        return "\(normalizedStem).\(newExtension)"
     }
 
     private static func materializeGraphicOutput(

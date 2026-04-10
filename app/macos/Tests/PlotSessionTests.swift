@@ -415,10 +415,21 @@ final class PlotSessionTests: XCTestCase {
             submissionReport: nil
         )
 
+        var callOrder: [String] = []
         var chooserIsMultiOutput: Bool?
+        var chooserSuggestedName: String?
+        var chooserFormat: ExportGraphicFormat?
         let session = PlotSession(
-            chooseExportDestination: { _, isMultiOutput in
+            chooseExportFormat: { isMultiOutput in
+                callOrder.append("format")
+                XCTAssertTrue(isMultiOutput)
+                return .pdf
+            },
+            chooseExportDestination: { suggestedName, isMultiOutput, format in
+                callOrder.append("destination")
+                chooserSuggestedName = suggestedName
                 chooserIsMultiOutput = isMultiOutput
+                chooserFormat = format
                 return URL(fileURLWithPath: "/tmp/user_exports/rheology_group.pdf")
             },
             materializeExport: { _, destination in
@@ -436,17 +447,37 @@ final class PlotSessionTests: XCTestCase {
         session.chooseTemplate("point_line")
         await session.exportCurrentSelection()
 
+        XCTAssertEqual(callOrder, ["format", "destination"])
         XCTAssertEqual(chooserIsMultiOutput, true)
+        XCTAssertEqual(chooserFormat, .pdf)
+        XCTAssertEqual(chooserSuggestedName, "sample_point_line.pdf")
         XCTAssertEqual(session.userExportURLs.count, 2)
+        XCTAssertEqual(
+            session.latestExportItems.map(\.label),
+            [
+                "rheology_group_storage_modulus_point_line.pdf",
+                "rheology_group_loss_modulus_point_line.pdf",
+            ]
+        )
     }
 
     func testPlotExportCanMaterializeTIFFOutput() async throws {
         let client = MockSidecarClient()
 
+        var callOrder: [String] = []
+        var chooserSuggestedName: String?
         var materializedDestination: URL?
         let session = PlotSession(
-            chooseExportDestination: { _, _ in
-                URL(fileURLWithPath: "/tmp/user_exports/sample_curve.tiff")
+            chooseExportFormat: { isMultiOutput in
+                callOrder.append("format")
+                XCTAssertFalse(isMultiOutput)
+                return .tiff
+            },
+            chooseExportDestination: { suggestedName, _, format in
+                callOrder.append("destination")
+                chooserSuggestedName = suggestedName
+                XCTAssertEqual(format, .tiff)
+                return URL(fileURLWithPath: "/tmp/user_exports/sample_curve.tiff")
             },
             materializeExport: { sourceURLs, destination in
                 XCTAssertEqual(sourceURLs.map(\.pathExtension), ["pdf"])
@@ -462,8 +493,11 @@ final class PlotSessionTests: XCTestCase {
         await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
         await session.exportCurrentSelection()
 
+        XCTAssertEqual(callOrder, ["format", "destination"])
+        XCTAssertEqual(chooserSuggestedName, "sample_curve.tiff")
         XCTAssertEqual(materializedDestination?.path, "/tmp/user_exports/sample_curve.tiff")
         XCTAssertEqual(session.userExportURLs.map { $0.pathExtension.lowercased() }, ["tiff"])
+        XCTAssertEqual(session.latestExportItems.map(\.label), ["sample_curve.tiff"])
     }
 
     func testNativeTIFFExportPreservesPDFVerticalOrientation() throws {
