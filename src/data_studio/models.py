@@ -190,6 +190,7 @@ class DataStudioSpecimenState:
     workbook_path: str
     specimen_id: str
     included: bool = True
+    selected_as_representative: bool = False
 
 
 @dataclass(frozen=True)
@@ -282,6 +283,14 @@ class DataStudioFigureOutput:
 
 
 @dataclass(frozen=True)
+class DataStudioFilteredWorkbookOutput:
+    path: Path
+    label: str
+    source_workbook_path: Path
+    representative_filename: str
+
+
+@dataclass(frozen=True)
 class ComparisonSet:
     id: str
     label: str
@@ -319,6 +328,7 @@ class DataStudioSessionPayload:
 __all__ = [
     "ComparisonRecipe",
     "ComparisonSet",
+    "DataStudioFilteredWorkbookOutput",
     "DataStudioFigurePreference",
     "DataStudioFigureOutput",
     "DataStudioGroupState",

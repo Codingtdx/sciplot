@@ -994,7 +994,8 @@ enum TestPayloads {
     static func dataStudioWorkbookPreviewWithSuggestedExclusions(
         path: String = "/tmp/prepared.xlsx",
         label: String = "Prepared Group",
-        excludedSpecimenIDs: Set<String> = []
+        excludedSpecimenIDs: Set<String> = [],
+        selectedRepresentativeSpecimenID: String? = nil
     ) -> DataStudioWorkbookPreviewResponse {
         let specimens: [(id: String, filename: String, strength: Double, modulus: Double, elongation: Double)] = [
             ("sample-1", "sample_1.csv", 98, 1990, 9.8),
@@ -1006,7 +1007,9 @@ enum TestPayloads {
             ("sample-7", "sample_7.csv", 130, 2200, 12.0),
         ]
         let includedSpecimens = specimens.filter { !excludedSpecimenIDs.contains($0.id) }
-        let representative = includedSpecimens.sorted { abs($0.strength - 100) < abs($1.strength - 100) }.first ?? specimens[3]
+        let representative = includedSpecimens.first(where: { $0.id == selectedRepresentativeSpecimenID })
+            ?? includedSpecimens.sorted { abs($0.strength - 100) < abs($1.strength - 100) }.first
+            ?? specimens[3]
 
         func mean(_ values: [Double]) -> Double {
             guard !values.isEmpty else { return 0 }
@@ -1255,6 +1258,20 @@ enum TestPayloads {
                     metricID: "Strength",
                     recipeID: "strength_box"
                 ),
+            ],
+            filteredWorkbooks: [
+                .init(
+                    path: "/tmp/data_studio_exports/primary-vs-second/filtered_workbooks/Primary.xlsx",
+                    label: "Primary",
+                    sourceWorkbookPath: "/tmp/prepared.xlsx",
+                    representativeFilename: "sample_2.csv"
+                ),
+                .init(
+                    path: "/tmp/data_studio_exports/primary-vs-second/filtered_workbooks/Second.xlsx",
+                    label: "Second",
+                    sourceWorkbookPath: "/tmp/second.xlsx",
+                    representativeFilename: "sample_3.csv"
+                ),
             ]
         )
     }
@@ -1279,7 +1296,12 @@ enum TestPayloads {
                 ),
             ],
             specimenStates: [
-                .init(workbookPath: "/tmp/prepared.xlsx", specimenId: "sample-a", included: true),
+                .init(
+                    workbookPath: "/tmp/prepared.xlsx",
+                    specimenId: "sample-a",
+                    included: true,
+                    selectedAsRepresentative: true
+                ),
                 .init(workbookPath: "/tmp/prepared.xlsx", specimenId: "sample-b", included: false),
             ],
             figurePreferences: [

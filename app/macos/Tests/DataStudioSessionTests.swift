@@ -718,6 +718,12 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yMax, 80.0)
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yTickDensity, "sparse")
         XCTAssertEqual(client.dataStudioExportComparisonRequests.last?.figureOptionsByRecipeID["strength_box"]?.yTickEdgeLabels, "hide_min")
+        XCTAssertEqual(session.latestComparisonWorkbookURL?.lastPathComponent, "primary-vs-second.xlsx")
+        XCTAssertEqual(session.comparisonFilteredWorkbookItems.map(\.response.label), ["Primary", "Second"])
+        XCTAssertEqual(
+            session.comparisonFilteredWorkbookItems.map(\.response.representativeFilename),
+            ["sample_2.csv", "sample_3.csv"]
+        )
     }
 
     func testFigureFamilySwitchRestoresSavedAxisOverridesAndResetsUnsavedFamilies() async throws {
@@ -1211,6 +1217,47 @@ final class DataStudioSessionTests: XCTestCase {
         )
     }
 
+    func testManualRepresentativeDraftDoesNotChangeCommittedComparisonUntilApply() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        let comparisonRequestCountBeforeDraft = client.dataStudioComparisonContextRequests.count
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.representativeSpecimenId, "sample-3")
+
+        session.updateDraftRepresentativeSelection(for: workbookPath, specimenId: "sample-2")
+
+        XCTAssertTrue(session.hasPendingFilterChanges(for: workbookPath))
+        XCTAssertEqual(session.draftRepresentativeSpecimenID(for: workbookPath), "sample-2")
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.representativeSpecimenId, "sample-3")
+        XCTAssertEqual(client.dataStudioComparisonContextRequests.count, comparisonRequestCountBeforeDraft)
+
+        session.applyManualFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(session.workbookPreview(for: workbookPath)?.representativeSpecimenId, "sample-2")
+        XCTAssertTrue(
+            client.dataStudioComparisonContextRequests.last?
+                .specimenStates
+                .contains(where: { $0.specimenId == "sample-2" && $0.selectedAsRepresentative }) == true
+        )
+        XCTAssertFalse(
+            client.dataStudioComparisonContextRequests.last?
+                .specimenStates
+                .contains(where: { $0.specimenId == "sample-3" && $0.selectedAsRepresentative }) == true
+        )
+    }
+
     func testClosingSpecimenFilterWithPendingDraftDiscardsWithoutConfirmation() async {
         let workbookPath = "/tmp/prepared.xlsx"
         let client = MockSidecarClient()
@@ -1376,6 +1423,14 @@ final class DataStudioSessionTests: XCTestCase {
                 .init(workbookPath: "/tmp/prepared.xlsx", displayName: "A", includeInCompare: true, sortOrder: 1),
                 .init(workbookPath: "/tmp/second.xlsx", displayName: "B", includeInCompare: true, sortOrder: 0),
             ],
+            specimenStates: [
+                .init(
+                    workbookPath: "/tmp/prepared.xlsx",
+                    specimenId: "sample-a",
+                    included: true,
+                    selectedAsRepresentative: true
+                ),
+            ],
             figurePreferences: [
                 .init(
                     familyID: "strength",
@@ -1394,6 +1449,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedFigureFamilyID, "strength")
         XCTAssertEqual(session.currentFigureTemplateID, "box")
         XCTAssertEqual(session.orderedGroups.map { $0.state.displayName }, ["B", "A"])
+        XCTAssertEqual(session.specimenStates(for: "/tmp/prepared.xlsx").first?.selectedAsRepresentative, true)
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
         XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
     }
@@ -1420,6 +1476,9 @@ final class DataStudioSessionTests: XCTestCase {
                 .filter { !$0.included }
                 .map(\.specimenId)
         )
+        let selectedRepresentativeSpecimenID = request.specimenStates.reversed().first(where: {
+            $0.included && $0.selectedAsRepresentative
+        })?.specimenId
         let specimens = base.specimens.map { specimen in
             let included = !excludedIDs.contains(specimen.specimenId)
             return DataStudioSpecimenPreviewResponse(
@@ -1442,7 +1501,8 @@ final class DataStudioSessionTests: XCTestCase {
             )
         }
         let includedCount = specimens.filter(\.included).count
-        let representative = specimens.first(where: \.included)
+        let representative = specimens.first(where: { $0.included && $0.specimenId == selectedRepresentativeSpecimenID })
+            ?? specimens.first(where: \.included)
 
         return DataStudioWorkbookPreviewResponse(
             workbookPath: request.workbookPath,
@@ -1469,10 +1529,14 @@ final class DataStudioSessionTests: XCTestCase {
                 .filter { !$0.included }
                 .map(\.specimenId)
         )
+        let selectedRepresentativeSpecimenID = request.specimenStates.reversed().first(where: {
+            $0.included && $0.selectedAsRepresentative
+        })?.specimenId
         return TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(
             path: request.workbookPath,
             label: "Prepared Group",
-            excludedSpecimenIDs: excluded
+            excludedSpecimenIDs: excluded,
+            selectedRepresentativeSpecimenID: selectedRepresentativeSpecimenID
         )
     }
 }

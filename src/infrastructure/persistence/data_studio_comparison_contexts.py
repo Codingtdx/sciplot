@@ -100,6 +100,7 @@ def comparison_context_cache_key(
                 "workbook_path": str(Path(state.workbook_path).expanduser()),
                 "specimen_id": state.specimen_id,
                 "included": state.included,
+                "selected_as_representative": state.selected_as_representative,
             }
             for state in sorted(
                 specimen_states or (),

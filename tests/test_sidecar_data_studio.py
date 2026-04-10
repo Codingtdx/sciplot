@@ -6,6 +6,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from app.sidecar.server import app
+from src.data_loader import load_curve_table
 from src.data_studio.builtin import tensile as tensile_builtin
 
 client = TestClient(app)
@@ -233,6 +234,8 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
         "representative_curve",
         "strength_box",
     }
+    assert [item["label"] for item in exported_payload["filtered_workbooks"]] == ["Right", "Left"]
+    assert all(Path(item["path"]).exists() for item in exported_payload["filtered_workbooks"])
 
     reimported = client.post(
         "/data-studio/import-workbook",
@@ -241,6 +244,76 @@ def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(t
     assert reimported.status_code == 200, reimported.text
     reimported_payload = reimported.json()
     assert [item["label"] for item in reimported_payload["workbooks"]] == ["Right Group", "Left Group"]
+
+
+def test_data_studio_comparison_export_route_returns_filtered_workbooks_with_two_decimal_data(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "sidecar_filtered_export.xlsx")
+    preview = client.post(
+        "/data-studio/workbook-preview",
+        json={"workbook_path": str(workbook_path)},
+    )
+    assert preview.status_code == 200, preview.text
+    preview_payload = preview.json()
+    specimen_ids_by_filename = {
+        specimen["filename"]: specimen["specimen_id"]
+        for specimen in preview_payload["specimens"]
+    }
+    specimen_states = [
+        {
+            "workbook_path": str(workbook_path),
+            "specimen_id": specimen_id,
+            "included": False,
+        }
+        for specimen_id in preview_payload["suggested_exclusion_ids"]
+    ]
+    specimen_states.append(
+        {
+            "workbook_path": str(workbook_path),
+            "specimen_id": specimen_ids_by_filename["sample_2.csv"],
+            "included": True,
+            "selected_as_representative": True,
+        }
+    )
+
+    exported = client.post(
+        "/data-studio/comparison-export",
+        json={
+            "workbook_paths": [str(workbook_path)],
+            "output_dir": str(tmp_path / "filtered_route_exports"),
+            "specimen_states": specimen_states,
+            "selected_recipe_ids": ["representative_curve"],
+        },
+    )
+    assert exported.status_code == 200, exported.text
+    exported_payload = exported.json()
+    assert len(exported_payload["filtered_workbooks"]) == 1
+
+    filtered_workbook_path = Path(exported_payload["filtered_workbooks"][0]["path"])
+    assert filtered_workbook_path.exists()
+    specimen_sheet = pd.read_excel(
+        filtered_workbook_path,
+        sheet_name=tensile_builtin.ALL_SPECIMENS_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert specimen_sheet.iloc[1:, 0].tolist() == [
+        "sample_2.csv",
+        "sample_3.csv",
+        "sample_4.csv",
+        "sample_5.csv",
+        "sample_6.csv",
+    ]
+    assert specimen_sheet.iloc[1, 1] == "98.00"
+
+    summary_sheet = pd.read_excel(
+        filtered_workbook_path,
+        sheet_name=tensile_builtin.SUMMARY_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert summary_sheet.iloc[1, 2] == "100.00"
+    assert summary_sheet.iloc[1, 3] == "1.58"
+    assert summary_sheet.iloc[1, 4] == "sample_2.csv"
 
 
 def test_data_studio_import_workbook_route_recovers_groups_when_comparison_metadata_is_missing(tmp_path: Path) -> None:
@@ -355,3 +428,63 @@ def test_data_studio_workbook_preview_and_comparison_routes_apply_specimen_filte
     assert workbook.sheet_names
     numeric_values = pd.to_numeric(strength.iloc[3:, 0], errors="coerce").dropna().tolist()
     assert numeric_values == [98.0, 99.0, 100.0, 101.0, 102.0]
+
+
+def test_data_studio_routes_apply_manual_representative_selection(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "route_manual_rep.xlsx")
+
+    preview = client.post(
+        "/data-studio/workbook-preview",
+        json={"workbook_path": str(workbook_path)},
+    )
+    assert preview.status_code == 200, preview.text
+    preview_payload = preview.json()
+    specimen_id_by_filename = {
+        specimen["filename"]: specimen["specimen_id"]
+        for specimen in preview_payload["specimens"]
+    }
+
+    specimen_states = [
+        {
+            "workbook_path": str(workbook_path),
+            "specimen_id": specimen_id,
+            "included": False,
+        }
+        for specimen_id in preview_payload["suggested_exclusion_ids"]
+    ]
+    specimen_states.append(
+        {
+            "workbook_path": str(workbook_path),
+            "specimen_id": specimen_id_by_filename["sample_2.csv"],
+            "included": True,
+            "selected_as_representative": True,
+        }
+    )
+
+    filtered_preview = client.post(
+        "/data-studio/workbook-preview",
+        json={
+            "workbook_path": str(workbook_path),
+            "specimen_states": specimen_states,
+        },
+    )
+    assert filtered_preview.status_code == 200, filtered_preview.text
+    filtered_payload = filtered_preview.json()
+    assert filtered_payload["representative_specimen_id"] == specimen_id_by_filename["sample_2.csv"]
+    assert filtered_payload["representative_filename"] == "sample_2.csv"
+
+    comparison_context = client.post(
+        "/data-studio/comparison-context",
+        json={
+            "workbook_paths": [str(workbook_path)],
+            "specimen_states": specimen_states,
+        },
+    )
+    assert comparison_context.status_code == 200, comparison_context.text
+    comparison_workbook_path = Path(comparison_context.json()["comparison_set"]["comparison_workbook_path"])
+    representative_curves = load_curve_table(
+        comparison_workbook_path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+    )
+    assert len(representative_curves) == 1
+    assert representative_curves[0].data["y"].tolist() == [0.0, 2.0, 4.0, 5.2]

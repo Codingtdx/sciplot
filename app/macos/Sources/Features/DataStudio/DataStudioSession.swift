@@ -72,6 +72,7 @@ final class DataStudioSession {
     var comparisonExportResponse: DataStudioComparisonExportResponse?
     var comparisonExportDestinationURL: URL?
     var comparisonFigureItems: [DataStudioExportFigureItem] = []
+    var comparisonFilteredWorkbookItems: [DataStudioExportFilteredWorkbookItem] = []
     var selectedComparisonFigureID: String?
 
     var previewWarning: String?
@@ -359,6 +360,17 @@ final class DataStudioSession {
         draftSpecimenStatesByWorkbookPath[workbookPath] ?? specimenStates(for: workbookPath)
     }
 
+    func draftRepresentativeSpecimenID(for workbookPath: String) -> String? {
+        selectedRepresentativeSpecimenID(in: draftSpecimenStates(for: workbookPath))
+    }
+
+    func draftRepresentativeFilename(for workbookPath: String) -> String? {
+        specimenFilename(
+            for: workbookPath,
+            specimenId: draftRepresentativeSpecimenID(for: workbookPath)
+        )
+    }
+
     func suggestedAutoIncludedSpecimenIDs(for workbookPath: String) -> Set<String> {
         Set(
             baselineWorkbookPreview(for: workbookPath)?
@@ -373,6 +385,13 @@ final class DataStudioSession {
             return comparisonFigureItems.first
         }
         return comparisonFigureItems.first(where: { $0.id == selectedComparisonFigureID }) ?? comparisonFigureItems.first
+    }
+
+    var latestComparisonWorkbookURL: URL? {
+        guard let path = comparisonExportResponse?.comparisonSet.comparisonWorkbookPath else {
+            return nil
+        }
+        return URL(fileURLWithPath: path)
     }
 
     func displayedMetrics(for workbook: DataStudioWorkbookItem) -> [DataStudioMetricSummaryResponse] {
@@ -445,6 +464,8 @@ final class DataStudioSession {
         } else {
             autoFilterReason = nil
         }
+        let appliedRepresentativeFilename = appliedPreview?.representativeFilename
+        let draftRepresentativeFilename = draftRepresentativeFilename(for: workbookPath)
         let title: String
         switch mode {
         case .off:
@@ -501,6 +522,8 @@ final class DataStudioSession {
             autoKeepCount: autoKeepCount,
             autoFilterSupported: autoFilterSupported,
             autoFilterReason: autoFilterReason,
+            appliedRepresentativeFilename: appliedRepresentativeFilename,
+            draftRepresentativeFilename: draftRepresentativeFilename,
             canApplyAuto: canApplyAuto,
             canTurnOff: canTurnOff,
             sortDescriptor: sortDescriptor,
@@ -517,6 +540,10 @@ final class DataStudioSession {
         draftSpecimenStates(for: workbookPath)
             .first(where: { $0.specimenId == specimenId })?
             .included ?? true
+    }
+
+    func draftSpecimenSelectedAsRepresentative(for workbookPath: String, specimenId: String) -> Bool {
+        draftRepresentativeSpecimenID(for: workbookPath) == specimenId
     }
 
     var createTemplateSuggestions: [DataStudioBindingSuggestionResponse] {
@@ -1241,13 +1268,33 @@ final class DataStudioSession {
         draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(currentStates)
     }
 
+    func updateDraftRepresentativeSelection(for workbookPath: String, specimenId: String) {
+        primeDraftSpecimenStates(for: workbookPath)
+        let currentStates = setRepresentativeSelection(
+            in: draftSpecimenStates(for: workbookPath),
+            workbookPath: workbookPath,
+            specimenId: specimenId
+        )
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(currentStates)
+    }
+
+    func restoreAutoRepresentativeSelection(for workbookPath: String) {
+        primeDraftSpecimenStates(for: workbookPath)
+        let currentStates = setRepresentativeSelection(
+            in: draftSpecimenStates(for: workbookPath),
+            workbookPath: workbookPath,
+            specimenId: nil
+        )
+        draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(currentStates)
+    }
+
     func applyManualFilter(for workbookPath: String, completion: (() -> Void)? = nil) {
         primeDraftSpecimenStates(for: workbookPath)
         let draftStates = normalizedSpecimenStates(draftSpecimenStates(for: workbookPath))
         let previousSnapshot = undoSnapshot()
         specimenStatesByWorkbookPath[workbookPath] = draftStates
         scheduleWorkbookPreviewRefresh(for: workbookPath, rebuildComparisonContext: true)
-        registerUndo(previousSnapshot: previousSnapshot, actionName: "Apply Manual Filter")
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Apply Specimen Filter Changes")
         completion?()
     }
 
@@ -1360,11 +1407,25 @@ final class DataStudioSession {
         }
     }
 
+    func openLatestComparisonWorkbook() {
+        guard let latestComparisonWorkbookURL else {
+            return
+        }
+        WorkspaceBridge.open(latestComparisonWorkbookURL)
+    }
+
     func openSelectedComparisonFigure() {
         guard let selectedComparisonFigure else {
             return
         }
         WorkspaceBridge.open(selectedComparisonFigure.url)
+    }
+
+    func openFilteredWorkbook(id: String) {
+        guard let item = comparisonFilteredWorkbookItems.first(where: { $0.id == id }) else {
+            return
+        }
+        WorkspaceBridge.open(item.url)
     }
 
     func selectComparisonFigure(id: String) {
@@ -1383,7 +1444,7 @@ final class DataStudioSession {
         }
         guard let directoryURL = chooseDirectory(
             "Export Data Studio Bundle",
-            "Choose a destination folder for the comparison workbook and figure outputs."
+            "Choose a destination folder for the comparison workbook, filtered workbooks, and figure outputs."
         ) else {
             return
         }
@@ -1416,6 +1477,13 @@ final class DataStudioSession {
             )
             comparisonExportResponse = response
             comparisonSet = response.comparisonSet
+            comparisonFilteredWorkbookItems = response.filteredWorkbooks.map { output in
+                DataStudioExportFilteredWorkbookItem(
+                    id: output.path,
+                    response: output,
+                    url: URL(fileURLWithPath: output.path)
+                )
+            }
             let sourceURLs = response.figureOutputs.map { URL(fileURLWithPath: $0.path) }
             let materialized = try materializeComparisonOutputs(sourceURLs, figureFormat)
             comparisonFigureItems = zip(response.figureOutputs, materialized).map { output, url in
@@ -1802,6 +1870,7 @@ final class DataStudioSession {
         comparisonContextMaterializedAt = nil
         comparisonExportResponse = nil
         comparisonFigureItems = []
+        comparisonFilteredWorkbookItems = []
         selectedComparisonFigureID = nil
         comparisonExportDestinationURL = nil
         previewWarning = nil
@@ -1966,7 +2035,8 @@ final class DataStudioSession {
                         DataStudioSpecimenStatePayload(
                             workbookPath: workbookPath,
                             specimenId: $0.specimenId,
-                            included: $0.included
+                            included: $0.included,
+                            selectedAsRepresentative: false
                         )
                     }
                 )
@@ -1994,11 +2064,15 @@ final class DataStudioSession {
         guard preview.supported else {
             return
         }
+        let preservedRepresentativeSpecimenID = selectedRepresentativeSpecimenID(
+            in: specimenStates(for: preview.workbookPath)
+        )
         specimenStatesByWorkbookPath[preview.workbookPath] = normalizedSpecimenStates(preview.specimens.map {
             DataStudioSpecimenStatePayload(
                 workbookPath: preview.workbookPath,
                 specimenId: $0.specimenId,
-                included: $0.included
+                included: $0.included,
+                selectedAsRepresentative: $0.included && $0.specimenId == preservedRepresentativeSpecimenID
             )
         })
         if !hasPendingFilterChanges(for: preview.workbookPath) {
@@ -2015,12 +2089,16 @@ final class DataStudioSession {
         guard !specimenIDs.isEmpty else {
             return
         }
+        let preservedRepresentativeSpecimenID = selectedRepresentativeSpecimenID(
+            in: specimenStates(for: workbookPath)
+        )
         specimenStatesByWorkbookPath[workbookPath] = specimenIDs.map { specimenId in
             let included = explicitlyExcludedIDs.contains(specimenId) ? false : includedIDs.contains(specimenId)
             return DataStudioSpecimenStatePayload(
                 workbookPath: workbookPath,
                 specimenId: specimenId,
-                included: included
+                included: included,
+                selectedAsRepresentative: included && specimenId == preservedRepresentativeSpecimenID
             )
         }
         draftSpecimenStatesByWorkbookPath[workbookPath] = normalizedSpecimenStates(specimenStates(for: workbookPath))
@@ -2066,9 +2144,25 @@ final class DataStudioSession {
     }
 
     private func normalizedSpecimenStates(_ states: [DataStudioSpecimenStatePayload]) -> [DataStudioSpecimenStatePayload] {
-        states.sorted { lhs, rhs in
-            lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+        var latestStatesBySpecimenID: [String: DataStudioSpecimenStatePayload] = [:]
+        for state in states {
+            latestStatesBySpecimenID[state.specimenId] = state
         }
+        let normalizedRepresentativeSpecimenID = selectedRepresentativeSpecimenID(
+            in: Array(latestStatesBySpecimenID.values)
+        )
+        return latestStatesBySpecimenID.values
+            .map { state in
+                DataStudioSpecimenStatePayload(
+                    workbookPath: state.workbookPath,
+                    specimenId: state.specimenId,
+                    included: state.included,
+                    selectedAsRepresentative: state.included && state.specimenId == normalizedRepresentativeSpecimenID
+                )
+            }
+            .sorted { lhs, rhs in
+                lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+            }
     }
 
     private func upsertSpecimenState(
@@ -2078,10 +2172,12 @@ final class DataStudioSession {
         included: Bool
     ) -> [DataStudioSpecimenStatePayload] {
         var updatedStates = states
+        let selectedRepresentativeSpecimenID = selectedRepresentativeSpecimenID(in: states)
         let payload = DataStudioSpecimenStatePayload(
             workbookPath: workbookPath,
             specimenId: specimenId,
-            included: included
+            included: included,
+            selectedAsRepresentative: included && selectedRepresentativeSpecimenID == specimenId
         )
         if let index = updatedStates.firstIndex(where: { $0.specimenId == specimenId }) {
             updatedStates[index] = payload
@@ -2089,6 +2185,51 @@ final class DataStudioSession {
             updatedStates.append(payload)
         }
         return updatedStates
+    }
+
+    private func setRepresentativeSelection(
+        in states: [DataStudioSpecimenStatePayload],
+        workbookPath: String,
+        specimenId: String?
+    ) -> [DataStudioSpecimenStatePayload] {
+        let selectedSpecimenID = specimenId.flatMap { candidate in
+            states.contains(where: { $0.specimenId == candidate && $0.included }) ? candidate : nil
+        }
+        return states.map { state in
+            DataStudioSpecimenStatePayload(
+                workbookPath: workbookPath,
+                specimenId: state.specimenId,
+                included: state.included,
+                selectedAsRepresentative: state.included && state.specimenId == selectedSpecimenID
+            )
+        }
+    }
+
+    private func selectedRepresentativeSpecimenID(
+        in states: [DataStudioSpecimenStatePayload]
+    ) -> String? {
+        states.reversed().first(where: { $0.included && $0.selectedAsRepresentative })?.specimenId
+    }
+
+    private func specimenFilename(for workbookPath: String, specimenId: String?) -> String? {
+        guard let specimenId else {
+            return nil
+        }
+        if let filename = baselineWorkbookPreview(for: workbookPath)?
+            .specimens
+            .first(where: { $0.specimenId == specimenId })?
+            .filename
+        {
+            return filename
+        }
+        if let filename = workbookPreview(for: workbookPath)?
+            .specimens
+            .first(where: { $0.specimenId == specimenId })?
+            .filename
+        {
+            return filename
+        }
+        return specimenId
     }
 
     private func dismissSpecimenFilter() {
@@ -2479,6 +2620,7 @@ final class DataStudioSession {
         comparisonExportResponse = nil
         comparisonExportDestinationURL = nil
         comparisonFigureItems = []
+        comparisonFilteredWorkbookItems = []
         selectedComparisonFigureID = nil
         selectedRecipeID = nil
         importedSourceURLs = []
@@ -3024,6 +3166,7 @@ final class DataStudioSession {
                 "workbook_path": .string(state.workbookPath),
                 "specimen_id": .string(state.specimenId),
                 "included": .bool(state.included),
+                "selected_as_representative": .bool(state.selectedAsRepresentative),
             ]
         )
     }

@@ -181,6 +181,8 @@ struct DataStudioSpecimenFilterPresentation {
     let autoKeepCount: Int
     let autoFilterSupported: Bool
     let autoFilterReason: String?
+    let appliedRepresentativeFilename: String?
+    let draftRepresentativeFilename: String?
     let canApplyAuto: Bool
     let canTurnOff: Bool
     let sortDescriptor: DataStudioSpecimenFilterSortDescriptor
@@ -204,6 +206,12 @@ struct DataStudioFigureTemplateItem: Identifiable, Equatable {
 struct DataStudioExportFigureItem: Identifiable, Equatable {
     let id: String
     let response: DataStudioFigureOutputResponse
+    let url: URL
+}
+
+struct DataStudioExportFilteredWorkbookItem: Identifiable, Equatable {
+    let id: String
+    let response: DataStudioFilteredWorkbookResponse
     let url: URL
 }
 

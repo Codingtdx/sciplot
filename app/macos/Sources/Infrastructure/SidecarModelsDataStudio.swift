@@ -257,8 +257,29 @@ struct DataStudioSpecimenStatePayload: Codable, Equatable, Sendable, Identifiabl
     let workbookPath: String
     let specimenId: String
     let included: Bool
+    let selectedAsRepresentative: Bool
+
+    init(
+        workbookPath: String,
+        specimenId: String,
+        included: Bool,
+        selectedAsRepresentative: Bool = false
+    ) {
+        self.workbookPath = workbookPath
+        self.specimenId = specimenId
+        self.included = included
+        self.selectedAsRepresentative = selectedAsRepresentative
+    }
 
     var id: String { "\(workbookPath)::\(specimenId)" }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workbookPath = try container.decode(String.self, forKey: .workbookPath)
+        specimenId = try container.decode(String.self, forKey: .specimenId)
+        included = try container.decode(Bool.self, forKey: .included)
+        selectedAsRepresentative = try container.decodeIfPresent(Bool.self, forKey: .selectedAsRepresentative) ?? false
+    }
 }
 
 struct DataStudioSpecimenPreviewResponse: Codable, Equatable, Sendable, Identifiable {
@@ -418,6 +439,15 @@ struct DataStudioFigureOutputResponse: Codable, Equatable, Sendable, Identifiabl
     }
 }
 
+struct DataStudioFilteredWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
+    let path: String
+    let label: String
+    let sourceWorkbookPath: String
+    let representativeFilename: String
+
+    var id: String { path }
+}
+
 struct DataStudioSourcePreviewResponse: Codable, Equatable, Sendable {
     let preview: DataStudioRawFilePreviewResponse
     let matches: [DataStudioTemplateMatchResponse]
@@ -438,6 +468,7 @@ struct DataStudioComparisonContextResponse: Codable, Equatable, Sendable {
 struct DataStudioComparisonExportResponse: Codable, Equatable, Sendable {
     let comparisonSet: DataStudioComparisonSetResponse
     let figureOutputs: [DataStudioFigureOutputResponse]
+    let filteredWorkbooks: [DataStudioFilteredWorkbookResponse]
 }
 
 struct DataStudioSessionResponse: Codable, Equatable, Sendable {

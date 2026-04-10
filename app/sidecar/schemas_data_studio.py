@@ -161,12 +161,14 @@ class DataStudioSpecimenStateRequest(StrictModel):
     workbook_path: str
     specimen_id: str
     included: bool = True
+    selected_as_representative: bool = False
 
 
 class DataStudioSpecimenStateResponse(StrictModel):
     workbook_path: str
     specimen_id: str
     included: bool = True
+    selected_as_representative: bool = False
 
 
 class DataStudioSpecimenPreviewResponse(StrictModel):
@@ -254,6 +256,13 @@ class DataStudioFigureOutputResponse(StrictModel):
     sheet_name: str
     metric_id: str | None = None
     recipe_id: str | None = None
+
+
+class DataStudioFilteredWorkbookResponse(StrictModel):
+    path: str
+    label: str
+    source_workbook_path: str
+    representative_filename: str
 
 
 class DataStudioComparisonSetResponse(StrictModel):
@@ -371,6 +380,7 @@ class DataStudioComparisonContextResponse(StrictModel):
 class DataStudioComparisonExportResponse(StrictModel):
     comparison_set: DataStudioComparisonSetResponse
     figure_outputs: list[DataStudioFigureOutputResponse] = Field(default_factory=list)
+    filtered_workbooks: list[DataStudioFilteredWorkbookResponse] = Field(default_factory=list)
 
 
 __all__ = [
@@ -385,6 +395,7 @@ __all__ = [
     "DataStudioCreateTemplateRequest",
     "DataStudioCurvePointResponse",
     "DataStudioExportComparisonRequest",
+    "DataStudioFilteredWorkbookResponse",
     "DataStudioFieldCandidateResponse",
     "DataStudioFigurePreferenceResponse",
     "DataStudioFigureOutputResponse",

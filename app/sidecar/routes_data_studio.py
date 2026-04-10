@@ -177,7 +177,7 @@ def create_data_studio_router() -> APIRouter:
     @router.post("/data-studio/comparison-export", response_model=DataStudioComparisonExportResponse)
     def comparison_export(request: DataStudioExportComparisonRequest) -> DataStudioComparisonExportResponse:
         try:
-            comparison_set, figure_outputs = export_data_studio_comparison(
+            comparison_set, figure_outputs, filtered_workbooks = export_data_studio_comparison(
                 request.workbook_paths,
                 request.output_dir,
                 group_states=request.group_states,
@@ -192,6 +192,7 @@ def create_data_studio_router() -> APIRouter:
                 {
                     "comparison_set": serialize_dataclass(comparison_set),
                     "figure_outputs": [serialize_dataclass(item) for item in figure_outputs],
+                    "filtered_workbooks": [serialize_dataclass(item) for item in filtered_workbooks],
                 }
             )
         except Exception as exc:

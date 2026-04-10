@@ -336,12 +336,35 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            VStack(alignment: .leading, spacing: 4) {
+                if let appliedRepresentativeFilename = presentation.appliedRepresentativeFilename {
+                    Text("Applied representative curve: \(appliedRepresentativeFilename)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if presentation.hasPendingChanges,
+                   presentation.draftRepresentativeFilename != presentation.appliedRepresentativeFilename
+                {
+                    Text("Draft representative curve: \(presentation.draftRepresentativeFilename ?? "Auto")")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             HStack(spacing: 10) {
-                Button("Apply Manual Filter") {
+                Button("Apply Changes") {
                     session.applyManualFilter(for: workbookPath)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!presentation.hasPendingChanges || presentation.isBusy)
+
+                Button("Use Auto Representative") {
+                    session.restoreAutoRepresentativeSelection(for: workbookPath)
+                }
+                .buttonStyle(.bordered)
+                .disabled(session.draftRepresentativeSpecimenID(for: workbookPath) == nil || presentation.isBusy)
 
                 Button("Revert") {
                     session.revertDraftSpecimenStates(for: workbookPath)
@@ -372,6 +395,8 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
         HStack(spacing: 10) {
             Text("Include")
                 .frame(width: 54, alignment: .leading)
+            Text("Rep.")
+                .frame(width: 40, alignment: .leading)
             Text("Elong.")
                 .frame(width: 64, alignment: .trailing)
             Text("Strength")
@@ -406,6 +431,17 @@ private struct DataStudioSpecimenFilterAdvancedRow: View {
             .toggleStyle(.checkbox)
             .frame(width: 54, alignment: .leading)
 
+            Button {
+                session.updateDraftRepresentativeSelection(for: workbookPath, specimenId: specimen.specimenId)
+            } label: {
+                Image(systemName: representativeSymbolName)
+                    .foregroundStyle(representativeTint)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSelectRepresentative)
+            .help(representativeHelp)
+            .frame(width: 40, alignment: .leading)
+
             numeric(specimen.metrics["Elongation"] ?? nil)
                 .frame(width: 64, alignment: .trailing)
             numeric(specimen.metrics["Strength"] ?? nil)
@@ -422,6 +458,9 @@ private struct DataStudioSpecimenFilterAdvancedRow: View {
                         tag("Auto Out", tint: .orange)
                     default:
                         EmptyView()
+                    }
+                    if session.draftSpecimenSelectedAsRepresentative(for: workbookPath, specimenId: specimen.specimenId) {
+                        tag("Representative", tint: .blue)
                     }
                     if !specimen.eligibleForAutoFilter {
                         tag("Ineligible", tint: .secondary)
@@ -442,6 +481,33 @@ private struct DataStudioSpecimenFilterAdvancedRow: View {
         Text(value?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
             .font(.footnote)
             .monospacedDigit()
+    }
+
+    private var canSelectRepresentative: Bool {
+        session.draftSpecimenIncluded(for: workbookPath, specimenId: specimen.specimenId) && !specimen.miniCurvePoints.isEmpty
+    }
+
+    private var representativeSymbolName: String {
+        session.draftSpecimenSelectedAsRepresentative(for: workbookPath, specimenId: specimen.specimenId)
+            ? "checkmark.circle.fill"
+            : "circle"
+    }
+
+    private var representativeTint: Color {
+        canSelectRepresentative ? .blue : .secondary
+    }
+
+    private var representativeHelp: String {
+        if !session.draftSpecimenIncluded(for: workbookPath, specimenId: specimen.specimenId) {
+            return "Include this specimen before selecting it as the representative curve."
+        }
+        if specimen.miniCurvePoints.isEmpty {
+            return "Curve preview unavailable for this specimen."
+        }
+        if session.draftSpecimenSelectedAsRepresentative(for: workbookPath, specimenId: specimen.specimenId) {
+            return "Representative curve is manually pinned to this specimen."
+        }
+        return "Use this specimen as the representative curve."
     }
 
     private func tag(_ title: String, tint: Color) -> some View {

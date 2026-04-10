@@ -97,6 +97,7 @@ def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPa
                 workbook_path=str(Path(str(item_map.get("workbook_path", ""))).expanduser()),
                 specimen_id=specimen_id,
                 included=bool(item_map.get("included", True)),
+                selected_as_representative=bool(item_map.get("selected_as_representative", False)),
             )
         )
     specimen_states = tuple(specimen_states_list)

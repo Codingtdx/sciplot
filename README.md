@@ -34,7 +34,7 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
 - Data Studio specimen filter uses one anchored popover entrypoint in the `Focused Group` strip. Do not restore a second left-rail trigger for the same control.
 - Default specimen-filter content opens directly to the ranked Auto Keep 5 list: sort by distance from mean, highlight the five kept specimens, and avoid workbook labels, filenames, or representative-curve copy in the default view.
-- Specimen identity and manual inclusion overrides are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.
+- Specimen identity, manual inclusion overrides, and manual representative-curve selection are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.
 - `Workbook Groups` may expose one global `Auto Keep 5 All` action in the section header; it applies the committed auto-filter result to every eligible workbook group in the current session.
 - Critical actions follow `disabled + help` and must not silently no-op.
 - Workbench top bars prioritize document-state feedback: current source, current template/figure, latest output, latest failure.
@@ -47,7 +47,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
 - `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
-- Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`.
+- Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`, including any manually selected representative curve override.
+- `POST /data-studio/comparison-export` returns one comparison workbook, one filtered standard workbook per included group, and the selected figure outputs from the same committed compare state. Filtered workbooks stay re-importable and currently normalize numeric cells to two decimal places.
 - `POST /code-console/context` returns a stable `context_id` (input signature + mtime).
 - `POST /code-console/run` accepts `context_id` fast path and still supports legacy `context`.
 - `GET /meta`, `GET /plot-contract`, and `DELETE /data-studio/templates/{id}` use explicit response schemas.

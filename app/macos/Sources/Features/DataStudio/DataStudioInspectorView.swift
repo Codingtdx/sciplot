@@ -72,7 +72,10 @@ struct DataStudioInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(!session.exportAvailability.isEnabled)
-                .help(session.exportAvailability.reason ?? "Export the comparison workbook and figure outputs.")
+                .help(
+                    session.exportAvailability.reason
+                        ?? "Export the comparison workbook, filtered workbooks, and figure outputs."
+                )
                 .inspectorActionButton()
             }
 
@@ -101,6 +104,46 @@ struct DataStudioInspectorView: View {
                             : "Reveal the latest output location in Finder."
                     )
                     .inspectorActionButton()
+                }
+
+                if session.comparisonExportResponse != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Latest Export")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Button("Open Comparison Workbook") {
+                            session.openLatestComparisonWorkbook()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(session.latestComparisonWorkbookURL == nil)
+                        .help(
+                            session.latestComparisonWorkbookURL == nil
+                                ? "Export a bundle first."
+                                : "Open the latest exported comparison workbook."
+                        )
+                        .inspectorActionButton()
+
+                        ForEach(session.comparisonFilteredWorkbookItems) { item in
+                            Button("Open \(item.response.label) Workbook") {
+                                session.openFilteredWorkbook(id: item.id)
+                            }
+                            .buttonStyle(.bordered)
+                            .help("Open the filtered workbook for \(item.response.label).")
+                            .inspectorActionButton()
+                        }
+
+                        ForEach(session.comparisonFigureItems) { item in
+                            Button("Open \(item.response.label)") {
+                                session.selectComparisonFigure(id: item.id)
+                                session.openSelectedComparisonFigure()
+                            }
+                            .buttonStyle(.bordered)
+                            .help("Open the exported figure file for \(item.response.label).")
+                            .inspectorActionButton()
+                        }
+                    }
+                    .padding(.top, 6)
                 }
             }
         }

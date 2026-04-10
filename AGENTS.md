@@ -64,7 +64,12 @@
   - `recommendation_summary`
 - Data Studio specimen filter 统一复用 `POST /data-studio/workbook-preview`：
   - baseline preview 不带 `specimen_states`，只用于 Auto Keep 5 排序与 Advanced 评分表；
-  - committed preview 带当前 `specimen_states`，才是 compare/export 的已应用状态来源。
+  - committed preview 带当前 `specimen_states`，才是 compare/export 的已应用状态来源；手动代表性曲线选择也必须走这同一条状态链，不得另开第二套状态或 endpoint。
+- Data Studio comparison export 必须复用同一份 committed compare state，一次返回：
+  - comparison workbook
+  - 每个 included workbook group 一个 filtered standard workbook
+  - selected figure outputs
+- filtered workbook 必须保持标准 Data Studio sheet 结构、支持再次 import / specimen filter，并且数值导出当前统一保留到小数点后两位；不要在 comparison workbook 上偷偷做第二套数值格式规则。
 - sidecar endpoint 必须返回显式 response model，禁止裸 dict。
 - 项目文件保存/打开必须经过 sidecar schema 校验迁移层（`/save-project`、`/open-project`）。
 
@@ -83,7 +88,7 @@
 - Data Studio specimen filter 默认规则是 `Auto Keep 5`：按距离均值最近排序，只保留 5 个合格 specimen；少于 5 个时禁用自动筛选并解释原因。
 - `Workbook Groups` 标题栏允许一个全局批量动作 `Auto Keep 5 All`；它直接对当前 session 内所有 eligible workbook group 应用 committed auto-filter 结果，不要再新增第二个批量筛选入口。
 - 默认 popover 必须直接展示排序结果和 keep/out cutoff，不要再展示 representative、文件名、workbook 标签等低价值信息。
-- specimen 级别的文件名、距离表、手动 inclusion override 只能放在 `Advanced` 折叠区；不要把 specimen 细节塞回默认主界面。
+- specimen 级别的文件名、距离表、手动 inclusion override、手动 representative curve 选择都只能放在 `Advanced` 折叠区；不要把 specimen 细节塞回默认主界面。
 - 关键动作必须“禁用并解释”（`disabled + help`），禁止 silent no-op。
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。

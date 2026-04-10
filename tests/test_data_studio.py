@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.data_loader import load_replicate_table
+from src.data_loader import load_curve_table, load_replicate_table
 from src.data_studio import template_store
 from src.data_studio.builtin import tensile as tensile_builtin
 from src.data_studio.ingest import preview_and_recommend
@@ -22,6 +22,7 @@ from src.data_studio.service import (
     preview_data_studio_comparison_context,
     preview_data_studio_workbook,
 )
+from src.data_studio.workbooks import load_workbook_specimen_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
@@ -35,16 +36,23 @@ def _fixture_paths() -> list[Path]:
     ]
 
 
-def _rewrite_metadata_sheet(workbook_path: Path, rows: list[list[object]]) -> None:
+def _rewrite_workbook_sheets(workbook_path: Path, updates: dict[str, pd.DataFrame]) -> None:
     with pd.ExcelFile(workbook_path) as workbook:
         sheets = {
             sheet_name: pd.read_excel(workbook_path, sheet_name=sheet_name, header=None)
             for sheet_name in workbook.sheet_names
         }
-    sheets[tensile_builtin.METADATA_SHEET] = pd.DataFrame(rows)
+    sheets.update(updates)
     with pd.ExcelWriter(workbook_path) as writer:
         for sheet_name, dataframe in sheets.items():
             dataframe.to_excel(writer, sheet_name=sheet_name, header=False, index=False)
+
+
+def _rewrite_metadata_sheet(workbook_path: Path, rows: list[list[object]]) -> None:
+    _rewrite_workbook_sheets(
+        workbook_path,
+        {tensile_builtin.METADATA_SHEET: pd.DataFrame(rows)},
+    )
 
 
 def _write_specimen_filter_workbook(path: Path, *, label: str = "Specimen Filter") -> Path:
@@ -205,6 +213,65 @@ def test_build_and_import_data_studio_workbook_keeps_tensile_behavior(tmp_path: 
     assert imported.parsed_sample_count == 2
 
 
+def test_preview_workbook_recovers_tensile_curves_from_source_files_when_workbook_curve_sheet_is_stale(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "blendset.xlsx"
+    source_paths = [FIXTURE_DIR / "BlendSet_A.csv", FIXTURE_DIR / "BlendSet_B.csv"]
+    build_data_studio_workbook(
+        file_paths=source_paths,
+        output_path=output_path,
+        template_id="builtin/tensile",
+        group_name="BlendSet",
+    )
+
+    source_max_x_by_filename = {
+        path.name: float(tensile_builtin.parse_tensile_csv(path).curve["x"].max())
+        for path in source_paths
+    }
+    original_curves = load_curve_table(output_path, sheet_name=tensile_builtin.ALL_CURVES_SHEET)
+    original_representative_curve = load_curve_table(
+        output_path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+    )[0]
+
+    _rewrite_workbook_sheets(
+        output_path,
+        {
+            tensile_builtin.ALL_CURVES_SHEET: tensile_builtin._curve_table_dataframe(
+                (
+                    curve.sample,
+                    curve.data.assign(x=pd.to_numeric(curve.data["x"], errors="coerce") / 2.0),
+                )
+                for curve in original_curves
+            ),
+            tensile_builtin.REPRESENTATIVE_CURVE_SHEET: tensile_builtin._curve_table_dataframe(
+                (
+                    (
+                        original_representative_curve.sample,
+                        original_representative_curve.data.assign(
+                            x=pd.to_numeric(original_representative_curve.data["x"], errors="coerce") / 2.0
+                        ),
+                    ),
+                )
+            ),
+        },
+    )
+
+    stored_curves = load_curve_table(output_path, sheet_name=tensile_builtin.ALL_CURVES_SHEET)
+    assert max(float(curve.data["x"].max()) for curve in stored_curves) < max(source_max_x_by_filename.values())
+
+    bundle = load_workbook_specimen_bundle(output_path)
+
+    assert bundle.supported is True
+    for specimen in bundle.specimens:
+        assert specimen.curve is not None
+        assert float(specimen.curve.data["x"].max()) == pytest.approx(
+            source_max_x_by_filename[specimen.filename],
+            rel=1e-6,
+        )
+
+
 def test_import_data_studio_workbooks_expands_comparison_bundle_sources(tmp_path: Path) -> None:
     left_path = tmp_path / "left.xlsx"
     right_path = tmp_path / "right.xlsx"
@@ -339,7 +406,7 @@ def test_preview_and_export_data_studio_comparison_uses_plot_render_pipeline(tmp
     assert pdf_base64
     assert comparison_set.comparison_workbook_path.exists()
 
-    exported_set, figure_outputs = export_data_studio_comparison(
+    exported_set, figure_outputs, filtered_workbooks = export_data_studio_comparison(
         workbook_paths,
         tmp_path / "exports",
         group_states=[
@@ -370,6 +437,8 @@ def test_preview_and_export_data_studio_comparison_uses_plot_render_pipeline(tmp
     assert exported_set.workbook_labels == ("B Group", "A Group")
     assert {output.recipe_id for output in figure_outputs} == {"representative_curve", "strength_box"}
     assert all(output.path.exists() for output in figure_outputs)
+    assert [item.label for item in filtered_workbooks] == ["B Group", "A Group"]
+    assert all(item.path.exists() for item in filtered_workbooks)
 
 
 def test_preview_data_studio_workbook_keeps_five_closest_specimens_and_recomputes_summary(tmp_path: Path) -> None:
@@ -442,7 +511,7 @@ def test_export_data_studio_comparison_filters_specimens_before_replicate_bundle
         for specimen_id in preview.suggested_exclusion_ids
     ]
 
-    comparison_set, figure_outputs = export_data_studio_comparison(
+    comparison_set, figure_outputs, filtered_workbooks = export_data_studio_comparison(
         [str(workbook_path)],
         tmp_path / "filtered_exports",
         specimen_states=specimen_states,
@@ -451,12 +520,185 @@ def test_export_data_studio_comparison_filters_specimens_before_replicate_bundle
 
     assert comparison_set.comparison_workbook_path.exists()
     assert {output.recipe_id for output in figure_outputs} == {"representative_curve", "strength_box"}
+    assert len(filtered_workbooks) == 1
+    assert filtered_workbooks[0].path.exists()
     strength_groups = load_replicate_table(
         comparison_set.comparison_workbook_path,
         sheet_name="Strength_Replicates",
     )
     assert len(strength_groups) == 1
     assert strength_groups[0].data.tolist() == pytest.approx([98.0, 99.0, 100.0, 101.0, 102.0])
+
+
+def test_preview_data_studio_workbook_respects_manual_representative_selection(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter_manual_rep.xlsx")
+    preview = preview_data_studio_workbook(workbook_path)
+    specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
+    specimen_states = [
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_id,
+            included=False,
+        )
+        for specimen_id in preview.suggested_exclusion_ids
+    ]
+    specimen_states.append(
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_ids_by_filename["sample_2.csv"],
+            included=True,
+            selected_as_representative=True,
+        )
+    )
+
+    filtered = preview_data_studio_workbook(workbook_path, specimen_states=specimen_states)
+
+    assert filtered.included_specimen_count == 5
+    assert filtered.representative_specimen_id == specimen_ids_by_filename["sample_2.csv"]
+    assert filtered.representative_filename == "sample_2.csv"
+
+
+def test_export_data_studio_comparison_uses_manual_representative_curve_selection(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter_manual_rep_export.xlsx")
+    preview = preview_data_studio_workbook(workbook_path)
+    specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
+    specimen_states = [
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_id,
+            included=False,
+        )
+        for specimen_id in preview.suggested_exclusion_ids
+    ]
+    specimen_states.append(
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_ids_by_filename["sample_2.csv"],
+            included=True,
+            selected_as_representative=True,
+        )
+    )
+
+    comparison_set, figure_outputs, filtered_workbooks = export_data_studio_comparison(
+        [str(workbook_path)],
+        tmp_path / "manual_rep_exports",
+        specimen_states=specimen_states,
+        selected_recipe_ids=["representative_curve"],
+    )
+
+    assert {output.recipe_id for output in figure_outputs} == {"representative_curve"}
+    assert len(filtered_workbooks) == 1
+    summary_sheet = pd.read_excel(
+        comparison_set.comparison_workbook_path,
+        sheet_name=tensile_builtin.SUMMARY_SHEET,
+        header=None,
+    )
+    assert summary_sheet.iloc[1, 2] == "sample_2"
+    representative_curves = load_curve_table(
+        comparison_set.comparison_workbook_path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+    )
+    assert len(representative_curves) == 1
+    assert representative_curves[0].data["y"].tolist() == pytest.approx([0.0, 2.0, 4.0, 5.2])
+
+
+def test_export_data_studio_comparison_writes_filtered_workbook_with_two_decimal_data(tmp_path: Path) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "specimen_filter_filtered_workbook.xlsx")
+    preview = preview_data_studio_workbook(workbook_path)
+    specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
+    specimen_states = [
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_id,
+            included=False,
+        )
+        for specimen_id in preview.suggested_exclusion_ids
+    ]
+    specimen_states.append(
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=specimen_ids_by_filename["sample_2.csv"],
+            included=True,
+            selected_as_representative=True,
+        )
+    )
+
+    _comparison_set, _figure_outputs, filtered_workbooks = export_data_studio_comparison(
+        [str(workbook_path)],
+        tmp_path / "filtered_bundle",
+        specimen_states=specimen_states,
+        selected_recipe_ids=["representative_curve"],
+    )
+
+    assert len(filtered_workbooks) == 1
+    filtered_workbook = filtered_workbooks[0]
+    assert filtered_workbook.label == "Specimen Filter"
+    assert filtered_workbook.source_workbook_path == workbook_path
+    assert filtered_workbook.representative_filename == "sample_2.csv"
+    assert filtered_workbook.path.exists()
+
+    reimported = import_data_studio_workbook(filtered_workbook.path)
+    assert reimported.label == "Specimen Filter"
+    assert reimported.representative_filename == "sample_2.csv"
+    assert reimported.parsed_sample_count == 5
+
+    filtered_preview = preview_data_studio_workbook(filtered_workbook.path)
+    assert filtered_preview.included_specimen_count == 5
+    assert filtered_preview.representative_filename == "sample_2.csv"
+
+    specimen_sheet = pd.read_excel(
+        filtered_workbook.path,
+        sheet_name=tensile_builtin.ALL_SPECIMENS_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert specimen_sheet.iloc[1:, 0].tolist() == [
+        "sample_2.csv",
+        "sample_3.csv",
+        "sample_4.csv",
+        "sample_5.csv",
+        "sample_6.csv",
+    ]
+    assert specimen_sheet.iloc[1, 1] == "98.00"
+    assert specimen_sheet.iloc[4, 3] == "10.10"
+
+    summary_sheet = pd.read_excel(
+        filtered_workbook.path,
+        sheet_name=tensile_builtin.SUMMARY_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert summary_sheet.iloc[1, 2] == "100.00"
+    assert summary_sheet.iloc[1, 3] == "1.58"
+    assert summary_sheet.iloc[1, 4] == "sample_2.csv"
+
+    representative_curve_sheet = pd.read_excel(
+        filtered_workbook.path,
+        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+        header=None,
+        dtype=str,
+    ).fillna("")
+    assert representative_curve_sheet.iloc[3, 0] == "0.00"
+    assert representative_curve_sheet.iloc[4, 1] == "2.00"
+
+    metadata = tensile_builtin.load_metadata_sheet(filtered_workbook.path)
+    assert metadata["export_mode"] == "filtered"
+    assert metadata["filtered_from_workbook_path"] == str(workbook_path)
+    assert metadata["representative_specimen_id"] == specimen_ids_by_filename["sample_2.csv"]
+    assert set(metadata["included_specimen_ids"].split(" | ")) == {
+        specimen_ids_by_filename["sample_2.csv"],
+        specimen_ids_by_filename["sample_3.csv"],
+        specimen_ids_by_filename["sample_4.csv"],
+        specimen_ids_by_filename["sample_5.csv"],
+        specimen_ids_by_filename["sample_6.csv"],
+    }
+    assert set(Path(item).name for item in metadata["source_files"]) == {
+        "sample_2.csv",
+        "sample_3.csv",
+        "sample_4.csv",
+        "sample_5.csv",
+        "sample_6.csv",
+    }
 
 
 def test_preview_data_studio_workbook_disables_auto_keep_when_fewer_than_five_eligible(tmp_path: Path) -> None:
@@ -626,6 +868,37 @@ def test_preview_data_studio_comparison_cache_invalidates_on_specimen_state_chan
     assert call_count == 1
 
 
+def test_preview_data_studio_comparison_context_cache_invalidates_on_manual_representative_change(
+    tmp_path: Path,
+) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "comparison_manual_rep_cache.xlsx")
+    preview = preview_data_studio_workbook(workbook_path)
+    specimen_ids_by_filename = {specimen.filename: specimen.specimen_id for specimen in preview.specimens}
+
+    first = preview_data_studio_comparison_context(
+        [str(workbook_path)],
+        specimen_states=[
+            DataStudioSpecimenState(
+                workbook_path=str(workbook_path),
+                specimen_id=specimen_ids_by_filename["sample_2.csv"],
+                selected_as_representative=True,
+            )
+        ],
+    )
+    second = preview_data_studio_comparison_context(
+        [str(workbook_path)],
+        specimen_states=[
+            DataStudioSpecimenState(
+                workbook_path=str(workbook_path),
+                specimen_id=specimen_ids_by_filename["sample_3.csv"],
+                selected_as_representative=True,
+            )
+        ],
+    )
+
+    assert first.cache_key != second.cache_key
+
+
 def test_normalize_session_payload_expands_paths() -> None:
     payload = normalize_session_payload(
         {
@@ -650,6 +923,7 @@ def test_normalize_session_payload_expands_paths() -> None:
                     "workbook_path": "~/tmp/prepared.xlsx",
                     "specimen_id": "sample_1csv",
                     "included": False,
+                    "selected_as_representative": True,
                 }
             ],
             "figure_preferences": [
@@ -674,6 +948,7 @@ def test_normalize_session_payload_expands_paths() -> None:
     assert payload.group_states[0].display_name == "Prepared"
     assert payload.specimen_states[0].specimen_id == "sample_1csv"
     assert payload.specimen_states[0].included is False
+    assert payload.specimen_states[0].selected_as_representative is True
     assert payload.workbook_paths[0].startswith(str(Path.home()))
     assert payload.imported_paths[0].startswith(str(Path.home()))
     assert payload.template_draft_path and payload.template_draft_path.startswith(str(Path.home()))

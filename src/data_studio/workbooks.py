@@ -33,6 +33,7 @@ from src.infrastructure.persistence.data_studio_imports import prepare_managed_d
 GENERIC_TEMPLATE_PARSE_STRATEGY = "structured:curve_metrics_columns"
 AUTO_FILTER_KEEP_COUNT = 5
 AUTO_FILTER_METRIC_TRIAD = ("Strength", "Modulus", "Elongation")
+FILTERED_WORKBOOK_DECIMAL_PLACES = 2
 
 
 @dataclass(frozen=True)
@@ -499,6 +500,11 @@ def _load_workbook_specimen_bundle_from_workbook(workbook: DataStudioWorkbook) -
         Path(source_path).name: Path(source_path)
         for source_path in workbook.source_files
     }
+    source_samples_by_name = (
+        _tensile_source_samples_by_filename(workbook.source_files)
+        if workbook.template_match.template_id == tensile_builtin.TENSILE_TEMPLATE_ID
+        else {}
+    )
     curve_by_keys = _curve_lookup(curves)
     specimens: list[LoadedWorkbookSpecimen] = []
     for row in summary_rows:
@@ -517,8 +523,16 @@ def _load_workbook_specimen_bundle_from_workbook(workbook: DataStudioWorkbook) -
                 metrics[key] = float(value)
             else:
                 metrics[key] = None
-        label = filename or (matched_curve.sample if matched_curve is not None else filename)
         warnings: list[str] = []
+        source_sample = source_samples_by_name.get(filename)
+        if _should_prefer_tensile_source_curve(
+            workbook_curve=matched_curve,
+            source_sample=source_sample,
+            elongation=metrics.get("Elongation"),
+        ):
+            matched_curve = _curve_series_from_tensile_sample(source_sample=source_sample, filename=filename)
+            warnings.append("Recovered curve preview from source file metadata.")
+        label = filename or (matched_curve.sample if matched_curve is not None else filename)
         if matched_curve is None:
             warnings.append("Curve preview unavailable.")
         specimens.append(
@@ -587,15 +601,22 @@ def load_filtered_workbook_context(
         raise ValueError(f"{bundle.workbook.workbook_path.name} needs at least one included specimen.")
 
     metric_summaries = _metric_summaries_for_specimens(bundle.workbook.metrics, included_specimens)
-    representative_specimen = _representative_specimen(
-        included_specimens,
-        metric_order=[metric.label for metric in bundle.workbook.metrics],
-        require_curve=False,
+    preferred_representative_specimen_id = _selected_representative_specimen_id(
+        bundle.workbook.workbook_path,
+        specimen_states,
     )
+    if preferred_representative_specimen_id is None:
+        preferred_representative_specimen_id = _metadata_representative_specimen_id(bundle.workbook.workbook_path)
     representative_curve_specimen = _representative_specimen(
         included_specimens,
         metric_order=[metric.label for metric in bundle.workbook.metrics],
         require_curve=True,
+        preferred_specimen_id=preferred_representative_specimen_id,
+    )
+    representative_specimen = representative_curve_specimen or _representative_specimen(
+        included_specimens,
+        metric_order=[metric.label for metric in bundle.workbook.metrics],
+        require_curve=False,
     )
     representative_curve = representative_curve_specimen.curve if representative_curve_specimen is not None else None
     replicate_groups = _replicate_groups_for_specimens(bundle.workbook, included_specimens)
@@ -608,6 +629,111 @@ def load_filtered_workbook_context(
         representative_curve=representative_curve,
         replicate_groups=replicate_groups,
     )
+
+
+def export_filtered_workbook_from_context(
+    filtered: FilteredWorkbookContext,
+    output_path: str | Path,
+    *,
+    label: str | None = None,
+    source_workbook_path: str | Path | None = None,
+    decimal_places: int = FILTERED_WORKBOOK_DECIMAL_PLACES,
+) -> DataStudioWorkbook:
+    if not filtered.included_specimens:
+        raise ValueError(f"{filtered.workbook.workbook_path.name} needs at least one included specimen.")
+    if filtered.representative_curve is None or filtered.representative_filename is None:
+        raise ValueError(
+            f"{filtered.workbook.workbook_path.name} needs at least one included specimen with a representative curve."
+        )
+
+    workbook_path = Path(output_path).expanduser()
+    if workbook_path.suffix.lower() != ".xlsx":
+        workbook_path = workbook_path.with_suffix(".xlsx")
+    workbook_path.parent.mkdir(parents=True, exist_ok=True)
+
+    resolved_label = (label or filtered.workbook.label).strip() or filtered.workbook.label or workbook_path.stem
+    summary_df = _summary_dataframe_for_specimens(filtered.workbook, filtered.included_specimens)
+    export_warnings = _filtered_workbook_export_warnings(filtered)
+    metadata_sheet = _filtered_metadata_sheet_dataframe(
+        filtered,
+        label=resolved_label,
+        source_workbook_path=Path(source_workbook_path).expanduser()
+        if source_workbook_path is not None
+        else filtered.workbook.workbook_path,
+        warnings=export_warnings,
+    )
+
+    representative_sheet = _formatted_export_dataframe(
+        _curve_table_dataframe(((f"{resolved_label} representative", filtered.representative_curve.data),)),
+        decimal_places=decimal_places,
+    )
+    all_curves_sheet = _formatted_export_dataframe(
+        _curve_table_dataframe(
+            (Path(specimen.filename).stem or specimen.label, specimen.curve.data)
+            for specimen in filtered.included_specimens
+            if specimen.curve is not None
+        ),
+        decimal_places=decimal_places,
+    )
+    all_specimens_sheet = _formatted_export_dataframe(
+        _plain_table_dataframe(summary_df),
+        decimal_places=decimal_places,
+    )
+    summary_sheet = _formatted_export_dataframe(
+        _summary_sheet_dataframe(
+            summary_df,
+            representative_filename=filtered.representative_filename,
+            metrics=list(filtered.metric_summaries),
+        ),
+        decimal_places=decimal_places,
+    )
+
+    with pd.ExcelWriter(workbook_path) as writer:
+        metadata_sheet.to_excel(writer, sheet_name=tensile_builtin.METADATA_SHEET, header=False, index=False)
+        representative_sheet.to_excel(
+            writer,
+            sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+            header=False,
+            index=False,
+        )
+        all_curves_sheet.to_excel(
+            writer,
+            sheet_name=tensile_builtin.ALL_CURVES_SHEET,
+            header=False,
+            index=False,
+        )
+        all_specimens_sheet.to_excel(
+            writer,
+            sheet_name=tensile_builtin.ALL_SPECIMENS_SHEET,
+            header=False,
+            index=False,
+        )
+        summary_sheet.to_excel(
+            writer,
+            sheet_name=tensile_builtin.SUMMARY_SHEET,
+            header=False,
+            index=False,
+        )
+        for metric in filtered.workbook.metrics:
+            group = filtered.replicate_groups.get(metric.label)
+            replicate_values = group.data.dropna().tolist() if group is not None else []
+            replicate_sheet = _formatted_export_dataframe(
+                _replicate_table_dataframe(
+                    group_name=resolved_label,
+                    value_label=metric.label,
+                    value_unit=metric.unit,
+                    values=replicate_values,
+                ),
+                decimal_places=decimal_places,
+            )
+            replicate_sheet.to_excel(
+                writer,
+                sheet_name=f"{metric.label}_Replicates",
+                header=False,
+                index=False,
+            )
+
+    return import_workbook(workbook_path)
 
 
 def parse_structured_sample(path: str | Path, template: TemplateDefinition) -> ParsedStructuredSample:
@@ -713,6 +839,76 @@ def _match_curve_for_filename(filename: str, curve_by_keys: dict[str, CurveSerie
     return None
 
 
+@lru_cache(maxsize=256)
+def _load_tensile_source_sample_cached(resolved_path: str, mtime_ns: int):
+    _ = mtime_ns
+    return tensile_builtin.parse_tensile_csv(Path(resolved_path))
+
+
+def _load_tensile_source_sample(path: str | Path):
+    source_path = ensure_input_path(str(Path(path).expanduser()))
+    return _load_tensile_source_sample_cached(str(source_path.resolve()), source_path.stat().st_mtime_ns)
+
+
+def _tensile_source_samples_by_filename(source_files: Iterable[Path]) -> dict[str, Any]:
+    samples: dict[str, Any] = {}
+    for source_path in source_files:
+        try:
+            sample = _load_tensile_source_sample(source_path)
+        except Exception:
+            continue
+        samples[sample.filename] = sample
+    return samples
+
+
+def _curve_max_x_value(curve: CurveSeries | pd.DataFrame | None) -> float | None:
+    if curve is None:
+        return None
+    data = curve.data if isinstance(curve, CurveSeries) else curve
+    if data.empty or "x" not in data.columns:
+        return None
+    x_values = pd.to_numeric(data["x"], errors="coerce").dropna()
+    if x_values.empty:
+        return None
+    return float(x_values.max())
+
+
+def _should_prefer_tensile_source_curve(
+    *,
+    workbook_curve: CurveSeries | None,
+    source_sample: Any,
+    elongation: float | None,
+) -> bool:
+    if source_sample is None or source_sample.curve.empty:
+        return False
+    if workbook_curve is None or workbook_curve.data.empty:
+        return True
+
+    workbook_max_x = _curve_max_x_value(workbook_curve)
+    source_max_x = _curve_max_x_value(source_sample.curve)
+    if workbook_max_x is None or source_max_x is None:
+        return True
+    if source_max_x <= workbook_max_x:
+        return False
+    if elongation is None or pd.isna(elongation):
+        return source_max_x > workbook_max_x * 1.5
+
+    workbook_error = abs(workbook_max_x - float(elongation))
+    source_error = abs(source_max_x - float(elongation))
+    return source_max_x > workbook_max_x * 1.1 and source_error + 0.25 < workbook_error
+
+
+def _curve_series_from_tensile_sample(*, source_sample: Any, filename: str) -> CurveSeries:
+    return CurveSeries(
+        sample=Path(filename).stem or source_sample.filename,
+        x_label="Strain",
+        y_label="Stress",
+        x_unit="%",
+        y_unit="MPa",
+        data=source_sample.curve.copy(),
+    )
+
+
 def _specimen_id_for_filename(filename: str) -> str:
     normalized = _normalize_specimen_token(filename)
     return normalized or filename or "specimen"
@@ -728,6 +924,26 @@ def _specimen_state_map(
         for state in (specimen_states or ())
         if str(Path(state.workbook_path).expanduser()) == normalized_path
     }
+
+
+def _selected_representative_specimen_id(
+    workbook_path: Path,
+    specimen_states: Iterable[DataStudioSpecimenState] | None,
+) -> str | None:
+    normalized_path = str(workbook_path.expanduser())
+    selected_specimen_id: str | None = None
+    for state in specimen_states or ():
+        if str(Path(state.workbook_path).expanduser()) != normalized_path:
+            continue
+        if state.selected_as_representative:
+            selected_specimen_id = state.specimen_id
+    return selected_specimen_id
+
+
+def _metadata_representative_specimen_id(workbook_path: Path) -> str | None:
+    metadata = tensile_builtin.load_metadata_sheet(workbook_path)
+    specimen_id = str(metadata.get("representative_specimen_id", "")).strip()
+    return specimen_id or None
 
 
 def _metric_summaries_for_specimens(
@@ -781,10 +997,18 @@ def _representative_specimen(
     *,
     metric_order: Iterable[str],
     require_curve: bool,
+    preferred_specimen_id: str | None = None,
 ) -> LoadedWorkbookSpecimen | None:
     specimen_list = [specimen for specimen in specimens if specimen.curve is not None or not require_curve]
     if not specimen_list:
         return None
+    if preferred_specimen_id:
+        preferred = next(
+            (specimen for specimen in specimen_list if specimen.specimen_id == preferred_specimen_id),
+            None,
+        )
+        if preferred is not None:
+            return preferred
     summary_df = _specimen_metric_dataframe(specimen_list, metric_order=metric_order)
     if summary_df.empty:
         return specimen_list[0]
@@ -1040,6 +1264,19 @@ def _metrics_dataframe(parsed_samples: list[ParsedStructuredSample]) -> pd.DataF
     return pd.DataFrame(rows)
 
 
+def _summary_dataframe_for_specimens(
+    workbook: DataStudioWorkbook,
+    specimens: Iterable[LoadedWorkbookSpecimen],
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for specimen in specimens:
+        row: dict[str, object] = {"Filename": specimen.filename}
+        for metric in workbook.metrics:
+            row[f"{metric.label} ({metric.unit})"] = specimen.metrics.get(metric.label)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def _representative_index(summary_df: pd.DataFrame) -> int:
     if summary_df.empty:
         return 0
@@ -1247,6 +1484,100 @@ def _comparison_group_metadata_sheet_dataframe(
     return pd.DataFrame(rows)
 
 
+def _filtered_workbook_export_warnings(filtered: FilteredWorkbookContext) -> tuple[str, ...]:
+    warnings = list(filtered.workbook.warnings)
+    missing_curve_filenames = sorted(
+        specimen.filename
+        for specimen in filtered.included_specimens
+        if specimen.curve is None
+    )
+    if missing_curve_filenames:
+        warnings.append(
+            "Skipped curve export for specimens without matched All_Curves data: "
+            + ", ".join(missing_curve_filenames)
+        )
+    return tuple(warnings)
+
+
+def _filtered_source_files(filtered: FilteredWorkbookContext) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    seen: set[str] = set()
+    for specimen in filtered.included_specimens:
+        if specimen.source_path is None:
+            continue
+        resolved = str(specimen.source_path)
+        if resolved in seen:
+            continue
+        paths.append(specimen.source_path)
+        seen.add(resolved)
+    if paths:
+        return tuple(paths)
+    fallback: list[Path] = []
+    for source_path in filtered.workbook.source_files:
+        resolved = str(source_path)
+        if resolved in seen:
+            continue
+        fallback.append(source_path)
+        seen.add(resolved)
+    return tuple(fallback)
+
+
+def _filtered_metadata_sheet_dataframe(
+    filtered: FilteredWorkbookContext,
+    *,
+    label: str,
+    source_workbook_path: Path,
+    warnings: Iterable[str],
+) -> pd.DataFrame:
+    base = _metadata_sheet_dataframe(
+        label=label,
+        template_id=filtered.workbook.template_match.template_id,
+        source_files=_filtered_source_files(filtered),
+        warnings=warnings,
+        representative_filename=filtered.representative_filename or "",
+        sample_count=len(filtered.included_specimens),
+        metric_ids=(metric.id for metric in filtered.metric_summaries),
+    )
+    extra = pd.DataFrame(
+        [
+            ["filtered_from_workbook_path", str(source_workbook_path)],
+            ["export_mode", "filtered"],
+            ["representative_specimen_id", filtered.representative_specimen_id or ""],
+            [
+                "included_specimen_ids",
+                " | ".join(specimen.specimen_id for specimen in filtered.included_specimens),
+            ],
+        ]
+    )
+    return pd.concat([base, extra], ignore_index=True)
+
+
+def _formatted_export_dataframe(dataframe: pd.DataFrame, *, decimal_places: int) -> pd.DataFrame:
+    rows: list[list[object]] = []
+    for row in dataframe.values.tolist():
+        rows.append(
+            [_format_numeric_export_cell(value, decimal_places=decimal_places) for value in row]
+        )
+    return pd.DataFrame(rows)
+
+
+def _format_numeric_export_cell(value: object, *, decimal_places: int) -> object:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (float, int, np.floating, np.integer)):
+        if pd.isna(value):
+            return ""
+        numeric = float(value)
+        if abs(numeric) < 0.5 * (10 ** (-decimal_places)):
+            numeric = 0.0
+        return f"{numeric:.{decimal_places}f}"
+    return value
+
+
 def _unit_for_column(unit_row: list[str], column_index: int) -> str:
     if 0 <= column_index < len(unit_row):
         return unit_row[column_index]
@@ -1326,9 +1657,12 @@ def _cell_text(value: object) -> str:
 
 __all__ = [
     "GENERIC_TEMPLATE_PARSE_STRATEGY",
+    "FILTERED_WORKBOOK_DECIMAL_PLACES",
     "build_workbook",
     "create_template_from_candidates",
+    "export_filtered_workbook_from_context",
     "import_workbook",
     "import_workbooks",
+    "load_filtered_workbook_context",
     "parse_structured_sample",
 ]

@@ -1125,7 +1125,154 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`103 tests`)
 
+### 2026-04-10 (Round X): Data Studio comparison export now includes per-group filtered workbooks
+
+- Scope:
+  - Extended Data Studio comparison export so one `Export` now produces:
+    - the existing comparison workbook
+    - one filtered standard workbook per included workbook group
+    - the selected figure outputs
+  - Added a dedicated filtered-workbook writer in `src/data_studio/workbooks.py` that emits standard Data Studio sheets:
+    - `DataStudio_Metadata`
+    - `Representative_Curve`
+    - `All_Curves`
+    - `All_Specimens`
+    - `Summary`
+    - per-metric `*_Replicates`
+  - Filtered workbooks now persist source metadata plus representative-specimen identity so re-import / workbook-preview keeps the committed manual representative selection instead of silently re-auto-picking.
+  - Extended sidecar/macOS comparison-export response handling so the export result UI lists the generated filtered workbooks alongside the comparison workbook and figure outputs.
+- User-visible impact:
+  - Data Studio export bundles now include one filtered standard workbook per included workbook group, not just the comparison workbook and figures.
+  - Those filtered workbooks can be imported back into Data Studio and keep the committed representative curve choice.
+  - Numeric cells in the new filtered workbooks are currently normalized to two decimal places for a consistent export surface.
+- Risks:
+  - The filtered-workbook writer currently assumes the source workbook can already materialize a standard `FilteredWorkbookContext`; future non-standard workbook families would need an explicit compatibility policy instead of silent schema drift.
+  - Filtered-workbook numeric formatting is intentionally separate from the existing comparison workbook formatting; future requests to unify them should be handled deliberately, not by widening this path implicitly.
+- Rollback points:
+  - `src/data_studio/models.py`
+  - `src/data_studio/__init__.py`
+  - `src/data_studio/workbooks.py`
+  - `src/data_studio/comparison.py`
+  - `app/sidecar/schemas_data_studio.py`
+  - `app/sidecar/schemas.py`
+  - `app/sidecar/routes_data_studio.py`
+  - `app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+  - `tests/test_data_studio.py`
+  - `tests/test_sidecar_data_studio.py`
+  - `app/macos/Tests/TestPayloads.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Reused the same committed `specimen_states` and `load_filtered_workbook_context(...)` path that already drives compare/export, instead of adding a second export-only state chain or a new endpoint.
+  - Rejected alternatives:
+    - exporting ad-hoc Excel sheets directly from the comparison workbook response: rejected because it would bypass the existing filtered workbook truth source and risk schema drift from normal Data Studio workbooks
+    - adding a separate filtered-workbook export toggle or endpoint: rejected because one export action should reflect one committed compare state and emit the full artifact bundle
+    - changing comparison workbook numeric formatting together with filtered-workbook formatting: rejected this round to keep scope tight and avoid changing an existing export contract unintentionally
+  - Boundary:
+    - only the new filtered-workbook artifacts normalize numeric cells to two decimal places
+    - comparison workbook export behavior otherwise stays unchanged
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
+
+### 2026-04-10 (Round Y): Legacy tensile workbooks now recover stale curve sheets from raw source files
+
+- Scope:
+  - Hardened `src/data_studio/workbooks.py` specimen-bundle loading for `builtin/tensile` workbooks with `source_files` metadata.
+  - When workbook `All_Curves` data is materially shorter than the original raw-source curve and also diverges from the specimen `Elongation` scalar, Data Studio now prefers the raw CSV curve recovered from `source_files`.
+  - Added regression coverage for the exact legacy failure mode: a workbook whose `All_Curves`/`Representative_Curve` x-values were written too short even though the referenced raw tensile CSVs still contain the correct strain axis.
+- User-visible impact:
+  - Old tensile workbooks that previously drew visibly too-short curves in Data Studio can now self-heal on import as long as their `source_files` still exist.
+  - Compare preview / representative-curve selection / export now use the repaired curves instead of the stale workbook curve sheet.
+- Risks:
+  - This repair path currently activates only for tensile workbooks with reachable `source_files`; if the raw files are missing, Data Studio still falls back to the workbook's stored curve sheets.
+  - The repair heuristic intentionally favors raw curves only when they are clearly closer to the specimen elongation metric than the stored workbook curve, to avoid overriding healthy workbooks.
+- Rollback points:
+  - `src/data_studio/workbooks.py`
+  - `tests/test_data_studio.py`
+- Decision:
+  - Repaired legacy curve-sheet drift at import time rather than mutating the workbook file on disk, because the app needs to render old workbooks correctly without destructive rewrite side effects.
+  - Rejected alternatives:
+    - treating the issue as a pure plotting bug: rejected because the renderer was faithfully plotting the stale curve data already stored in the workbook
+    - always ignoring workbook curve sheets and always reparsing raw sources: rejected because prepared workbooks should remain self-contained when their stored curve data is already healthy
+  - Boundary:
+    - the self-heal applies only to specimen-level curve recovery for supported tensile workbooks
+    - it does not silently rewrite the original workbook file contents
+- Troubleshooting note:
+  - Symptom:
+    - tensile workbook `Elongation` summary shows `40%+`, but representative or specimen curves stop around `15%~20%`
+  - Likely cause:
+    - the workbook was generated by an older import path that wrote the wrong strain column into `All_Curves` / `Representative_Curve`
+  - Fix:
+    - if metadata `source_files` still point to the raw CSV exports, current Data Studio will now recover the correct curves automatically on import
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
+
 ## 6) Update Template (copy for next round)
+
+### 2026-04-10 (Round W): Data Studio manual representative-curve selection inside specimen filter
+
+- Scope:
+  - Extended Data Studio specimen state payloads/models/schemas with `selected_as_representative` and kept the same single `specimen_states` chain for:
+    - `src/data_studio/workbooks.py` filtered preview recomputation
+    - `src/infrastructure/persistence/data_studio_comparison_contexts.py` context cache key invalidation
+    - sidecar workbook-preview / comparison-context / comparison-preview / comparison-export request models
+    - macOS session normalization / restore / compare-export request payloads
+  - Kept existing filtered-statistics behavior and added regressions proving that committed specimen filters still recompute mean/std and that manual representative selection changes the actual exported representative curve.
+  - Added macOS Data Studio filter-panel support in `Advanced` only:
+    - draft/apply/revert semantics now cover representative-curve selection too
+    - `Use Auto Representative` clears the manual pin and returns to automatic representative selection
+    - session synchronization preserves the committed representative pin across preview refreshes instead of losing it when sidecar preview responses hydrate local state
+- User-visible impact:
+  - Data Studio specimen filter `Advanced` now lets users manually pin the representative curve from an included specimen.
+  - Compare/export honor that manual representative curve after `Apply Changes`.
+  - Default specimen-filter popover remains the ranked `Auto Keep 5` list and does not expose representative-curve copy outside `Advanced`.
+- Risks:
+  - Manual representative selection is only valid for included specimens with a curve preview; excluding the pinned specimen or losing its curve falls back to automatic representative selection.
+  - Because the representative pin is now part of `specimen_states`, any future code that overwrites committed specimen state from preview payloads without preserving local flags can regress this behavior.
+- Rollback points:
+  - `src/data_studio/models.py`
+  - `src/data_studio/session.py`
+  - `src/data_studio/workbooks.py`
+  - `src/infrastructure/persistence/data_studio_comparison_contexts.py`
+  - `app/sidecar/schemas_data_studio.py`
+  - `app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `tests/test_data_studio.py`
+  - `tests/test_sidecar_data_studio.py`
+  - `app/macos/Tests/TestPayloads.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Reused committed `specimen_states` as the only persisted/requested source of truth for manual representative selection instead of introducing a second representative-only state list or a new endpoint.
+  - Rejected alternatives:
+    - a separate representative-selection endpoint: rejected because compare/export/cache invalidation would then need cross-endpoint state merging
+    - macOS-only local representative state: rejected because it would drift from sidecar compare/export semantics and break save/open round-trips
+  - Boundary:
+    - baseline preview still stays purely for Auto Keep 5 ranking and Advanced scoring context
+    - only committed `specimen_states` can affect compare/export/materialized context reuse
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`173 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`104 tests`)
 
 Use this block for every new round:
 

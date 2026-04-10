@@ -16,13 +16,19 @@ from src.data_studio.io_utils import list_sheet_names
 from src.data_studio.models import (
     ComparisonRecipe,
     ComparisonSet,
+    DataStudioFilteredWorkbookOutput,
     DataStudioFigureOutput,
     DataStudioGroupState,
     DataStudioSpecimenState,
     WorkbookMetricSummary,
     serialize_model,
 )
-from src.data_studio.workbooks import import_workbook, load_filtered_workbook_context, load_workbook_specimen_bundle
+from src.data_studio.workbooks import (
+    export_filtered_workbook_from_context,
+    import_workbook,
+    load_filtered_workbook_context,
+    load_workbook_specimen_bundle,
+)
 from src.infrastructure.persistence.data_studio_comparison_contexts import (
     prepare_managed_data_studio_comparison_context_dir,
 )
@@ -31,6 +37,7 @@ from src.plot_contract import template_contract
 from src.plot_style import DEFAULT_PALETTE_PRESET, DEFAULT_STYLE_PRESET, normalize_style_preset
 from src.rendering.render_service import build_rendered_plots, close_rendered_plots, export_rendered_plots
 from src.rendering.template_lifecycle import resolve_template_id
+from src.text_normalization import slugify_label
 
 
 _COMPARISON_PREVIEW_PDF_CACHE = LRUCache[str, str](maxsize=64)
@@ -486,7 +493,7 @@ def export_comparison_bundle(
     specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
     selected_recipe_ids: list[str] | None = None,
     figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
-) -> tuple[ComparisonSet, tuple[DataStudioFigureOutput, ...]]:
+) -> tuple[ComparisonSet, tuple[DataStudioFigureOutput, ...], tuple[DataStudioFilteredWorkbookOutput, ...]]:
     comparison_set = build_comparison_set(
         workbook_paths,
         output_dir,
@@ -528,7 +535,14 @@ def export_comparison_bundle(
                 )
         finally:
             close_rendered_plots(rendered)
-    return comparison_set, tuple(figure_outputs)
+    filtered_workbooks = _export_filtered_workbooks(
+        comparison_set=comparison_set,
+        workbook_paths=workbook_paths,
+        bundle_dir=bundle_dir,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+    return comparison_set, tuple(figure_outputs), filtered_workbooks
 
 
 def _find_recipe(recipes: tuple[ComparisonRecipe, ...], recipe_id: str) -> ComparisonRecipe:
@@ -538,6 +552,59 @@ def _find_recipe(recipes: tuple[ComparisonRecipe, ...], recipe_id: str) -> Compa
                 raise ValueError(recipe.support_reason or f"The recipe {recipe.label!r} is not available.")
             return recipe
     raise ValueError(f"Unknown comparison recipe: {recipe_id}")
+
+
+def _export_filtered_workbooks(
+    *,
+    comparison_set: ComparisonSet,
+    workbook_paths: list[str | Path],
+    bundle_dir: Path,
+    group_states: list[DataStudioGroupState] | tuple[DataStudioGroupState, ...] | None,
+    specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None,
+) -> tuple[DataStudioFilteredWorkbookOutput, ...]:
+    filtered_dir = bundle_dir / "filtered_workbooks"
+    filtered_dir.mkdir(parents=True, exist_ok=True)
+    resolved_groups = _resolve_comparison_groups(
+        workbook_paths,
+        group_states=group_states,
+        specimen_states=specimen_states,
+    )
+    labels = list(comparison_set.workbook_labels)
+    if len(labels) != len(resolved_groups):
+        labels = tensile_builtin.dedupe_labels(group.display_name for group in resolved_groups)
+    file_stems = _dedupe_export_file_stems(labels)
+    exported: list[DataStudioFilteredWorkbookOutput] = []
+    for group, label, file_stem in zip(resolved_groups, labels, file_stems, strict=True):
+        filtered = load_filtered_workbook_context(
+            group.workbook_path,
+            specimen_states=specimen_states,
+        )
+        workbook = export_filtered_workbook_from_context(
+            filtered,
+            filtered_dir / f"{file_stem}.xlsx",
+            label=label,
+            source_workbook_path=group.workbook_path,
+        )
+        exported.append(
+            DataStudioFilteredWorkbookOutput(
+                path=workbook.workbook_path,
+                label=workbook.label,
+                source_workbook_path=group.workbook_path,
+                representative_filename=workbook.representative_filename,
+            )
+        )
+    return tuple(exported)
+
+
+def _dedupe_export_file_stems(labels: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    stems: list[str] = []
+    for label in labels:
+        base = slugify_label(label).strip("_") or "filtered_workbook"
+        counts[base] = counts.get(base, 0) + 1
+        suffix = counts[base]
+        stems.append(f"{base}_{suffix}" if suffix > 1 else base)
+    return stems
 
 
 def _resolve_comparison_groups(
