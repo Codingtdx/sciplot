@@ -234,6 +234,65 @@ Every development round must update this file.
   - This round does not change Python rendering contracts, sidecar schemas, or cache-key semantics.
   - Failure condition: if a future template switch path bypasses `shouldResetRenderOptions`, unsaved figure switches can regress to state leakage again.
 
+### 2026-04-09: Single public style + explicit template semantics cleanup
+
+- Change:
+  - Plot contract public style surface now exposes only `nature`, with legacy style ids normalized immediately to `nature` at ingress.
+  - Public template/catalog/recommendation surfaces now expose only explicit template ids; legacy aliases remain input-compatible only through normalization/migration.
+  - `distribution_compare` is now compatibility-only and resolves to `box`, `box_strip`, or `violin` before validation, recommendation, preflight, render, export manifest generation, and session hydration.
+  - Data Studio tensile recipes/exports and macOS session migration now use canonical explicit ids and no longer round-trip removed public ids.
+- Why:
+  - First principles: one visible semantic should map to one real behavior. `default` and `nature` were effectively the same publication profile, while several template ids were either unreachable or misleading labels for more specific chart shapes.
+  - Keeping those ids public made `/meta`, `/plot-contract`, recommendations, exports, and saved session state look richer than the actual supported product surface.
+- Rejected alternatives:
+  - Keep `default` as a second public label for `nature`: rejected because it preserves semantic duplication and encourages a fake style picker.
+  - Keep alias/family template ids publicly visible but “documented as legacy”: rejected because recommend/export/gallery surfaces would still advertise names that are not the real rendered chart types.
+  - Keep `distribution_compare` as a user-visible family selector id: rejected because Plot and Data Studio were already resolving it to different concrete shapes, which made exports and UI labels inaccurate.
+- Boundaries:
+  - Visual themes remain supported and are still the only soft visual variation layer.
+  - Legacy ids are still accepted at ingress for compatibility, but they must normalize immediately and must never be emitted back out through public payloads or persisted state.
+  - If source inspection is unavailable during `distribution_compare` migration, `box` is the conservative fallback.
+
+### 2026-04-10: Data Studio comparison-preview PDF cache by materialized context key
+
+- Change:
+  - Added an in-memory LRU cache for Data Studio comparison preview PDFs in `src/data_studio/comparison.py`.
+  - Cache key now derives from `materialized_context.cache_key + recipe identity` (`recipe_id`, `template_id`, `sheet_name`), so unchanged compare context reuses the exact preview PDF bytes without re-rendering matplotlib figures.
+  - Added regression coverage for:
+    - cache hit on unchanged context
+    - cache invalidation when `specimen_states` changes (context key changes).
+- Why:
+  - First principles: repeated rendering of the same preview is pure recomputation and dominates latency despite stable workbook/context state.
+  - Existing context materialization already emits a stable invalidation key with workbook mtime + filter states, so preview cache can piggyback on that source of truth safely.
+- Rejected alternatives:
+  - Cache in macOS view/session layer only: rejected because duplicate preview requests can come from multiple clients and sidecar is the single source of recomputation.
+  - Cache raw `RenderedPlot`/`Figure` objects: rejected due heavyweight lifecycle/close semantics and memory risk.
+- Boundaries:
+  - Cache is process-local and non-persistent; restart clears it.
+  - Cache only applies to `/data-studio/comparison-preview` path; export still renders independently.
+  - Invalidation is bounded by `materialized_context.cache_key`; if future context key omits a semantic input, preview cache can become stale.
+
+### 2026-04-10: Rendering inspection + normalized-dataset cache de-dup
+
+- Change:
+  - Added process-local LRU caches in rendering hot paths:
+    - `build_normalized_dataset(...)` now reuses immutable normalized snapshots by `(resolved_path, mtime_ns, sheet, model)` in `src/rendering/dataset_models.py`.
+    - `inspect_input_file(...)` now reuses inspection/recommendation payloads by `(resolved_path, mtime_ns, sheet)` in `src/rendering/recommendation.py`.
+  - Added explicit cache clear hooks:
+    - `clear_normalized_dataset_cache()`
+    - `clear_inspection_cache()`
+  - Added regression tests to lock cache hit/invalidation behavior against file mtime updates.
+- Why:
+  - First principles: export/inspect/preflight paths were repeatedly recomputing deterministic model detection and recommendation payloads for unchanged inputs.
+  - Removing duplicate inference work in shared rendering services is safer and more reusable than adding one-off route-level short-circuits.
+- Rejected alternatives:
+  - Add ad-hoc cache only inside `/export-render`: rejected because `inspect-file`, preflight-linked flows, and future callers would still pay duplicate compute.
+  - Drop inspection artifact generation during export: rejected because it changes artifact contract and downstream diagnosability.
+- Boundaries:
+  - Caches are process-local and non-persistent.
+  - Invalidation depends on `(path, mtime, sheet[, model])`; external mutation that preserves mtime can still produce stale reuse.
+  - Cached values are immutable dataclasses only; no figure handles are cached in this layer.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -316,6 +375,24 @@ Every development round must update this file.
 - Fix pattern:
   - rerun the failed command serially after the previous build fully exits.
   - if parallel CI is ever needed, give each job an isolated `-derivedDataPath`.
+
+### Symptom: Data Studio representative tensile curve preview shows scattered per-series labels instead of a compact legend
+
+- Typical cause:
+  - small-panel curve candidate selection preferred direct edge labels for tensile-like curves when series count reached comparison-size groups.
+- Check:
+  - confirm rendered QA autofixes include `direct_series_labels` for `curve` previews where `preserve_stress_label` is true and group count is high.
+- Fix pattern:
+  - keep direct labels enabled for normal small-panel curves, but suppress direct-label candidates for tensile-preserved axis labeling when series count is 4+ so preview falls back to legend-based candidates.
+
+### Symptom: Preview card left edge/corner looks jagged after PDF preview appears
+
+- Typical cause:
+  - mixed rounded-shape styles and missing anti-aliased clipping around `NSViewRepresentable` PDF preview content.
+- Check:
+  - verify `PlotRefineView` and base64 preview wrappers all use the same `RoundedRectangle(cornerRadius: 18, style: .continuous)` shape and that clipping happens before overlay stroke.
+- Fix pattern:
+  - apply a single continuous rounded shape for clip + background + border, and keep border drawing anti-aliased (`strokeBorder(..., antialiased: true)`).
 
 ## 5) Round Change Log
 
@@ -805,10 +882,248 @@ Every development round must update this file.
   - `.venv/bin/python scripts/clean_repo.py`: passed
   - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
   - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`163 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`101 tests`)
+
+### 2026-04-09 (Round P): Single `nature` style + explicit template/public-surface cleanup
+
+- Scope:
+  - Reduced the public plot contract style surface to a single preset, `nature`, and added immediate normalization for legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, and `advanced_materials_spacious`.
+  - Removed `scatter_with_fit`, `replicate_curves_with_band`, `grouped_bar_compare`, and `distribution_compare` from the public contract/meta/template catalog/recommendation surfaces while keeping ingress compatibility through `src/rendering/template_lifecycle.py`.
+  - Moved explicit template resolution ahead of validation, option normalization, preflight, render dispatch, export manifest generation, Data Studio recipe/export paths, and Data Studio/macOS session hydration so canonical ids are what downstream consumers persist and emit.
+  - Removed dead alias renderer registrations and old public implementation helpers from the rendering layer, updated smoke assertions to expect normalized style behavior, and updated Python/macOS fixtures/tests to the single-style contract.
+  - Regenerated `docs/plot_contract.md` and updated `README.md`, `AGENTS.md`, `docs/data-to-template-v1-handoff.md`, and this handoff ledger to describe the new single-style + explicit-template rule.
+- User-visible impact:
+  - Plot and Data Studio now expose only one public publication style, `nature`.
+  - Template galleries, `/meta`, `/plot-contract`, and recommendation payloads no longer advertise misleading alias ids; users see the concrete chart types that actually render.
+  - Data Studio tensile export no longer labels a plain box-based figure as `distribution_compare`; explicit outputs such as `box_strip_compare.pdf` now line up with the rendered figure type.
+  - Opening legacy sessions/projects rewrites removed style/template ids to canonical ids instead of round-tripping them back into saved state.
+- Risks:
+  - Legacy `distribution_compare` entries that are migrated without inspectable source data fall back to `box`, which is conservative but may not match the exact historical auto-variant that would have been chosen with source access.
+  - Any future caller that assumes `requested_template_id` and emitted/exported `template` ids must always match can regress if it bypasses the canonicalization layer.
+  - Hidden reintroduction of alias ids in UI fixtures, Data Studio recipes, or recommendation copy would silently re-expand the public surface and needs contract/meta tests to stay in place.
+- Rollback points:
+  - `src/plot_contract.json`
+  - `src/rendering/template_lifecycle.py`
+  - `src/rendering/options.py`
+  - `src/rendering/preflight.py`
+  - `src/rendering/render_service.py`
+  - `src/rendering/recommender.py`
+  - `app/sidecar/routes_render.py`
+  - `app/sidecar/export_manifest.py`
+  - `src/data_studio/session.py`
+  - `src/data_studio/comparison.py`
+  - `src/data_studio/builtin/tensile.py`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+- Decision:
+  - Public style/template surfaces must describe the real supported product semantics, while compatibility for legacy ids belongs only at the boundary normalization layer.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
   - `.venv/bin/python -m pytest tests`: passed (`162 passed`)
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`101 tests`)
+
+### 2026-04-09 (Round Q): Native TIFF export orientation fix
+
+- Scope:
+  - Fixed the macOS native TIFF export rasterization path so PDF pages are drawn into the bitmap context without the extra translate + negative-Y scale that was vertically mirroring exported TIFF files.
+  - Added a focused macOS regression test that generates a known red-top / blue-bottom PDF probe, exports it through `NativeExportCoordinator`, and samples the resulting TIFF pixels to ensure the exported image preserves vertical orientation.
+  - Hardened the new test against AppKit bitmap coordinate confusion by sampling `NSBitmapImageRep` with its top-left origin and by using pure RGB probe colors instead of semantic system colors.
+- User-visible impact:
+  - TIFF exports from Plot now preserve the same top/bottom orientation as the PDF preview instead of appearing mirrored vertically in downstream viewers.
+- Risks:
+  - The native TIFF path still assumes single-page PDF export input; future multipage TIFF support would need explicit page-selection semantics rather than extending the current helper implicitly.
+  - Any later reintroduction of a manual Core Graphics Y-axis flip inside `writeSinglePageTIFF(...)` can silently regress export orientation unless the new regression test remains in the suite.
+- Rollback points:
+  - `app/macos/Sources/Shared/Utilities/NativePanels.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+- Decision:
+  - Native TIFF export should preserve the PDF page coordinate orientation directly and let the bitmap/image destination own TIFF row ordering, because duplicating an extra Core Graphics Y-axis flip was the source of the mirrored output.
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testNativeTIFFExportPreservesPDFVerticalOrientation`: passed
+  - Local AppKit bitmap sampling probe for `NSBitmapImageRep.colorAt(x:y:)` origin: confirmed `y=0` is top row
+  - Manual source inspection of `NativeExportCoordinator.writeSinglePageTIFF(...)`: confirmed the mirrored export came from the removed translate + negative-Y scale pair
+
+### 2026-04-09 (Round R): TIFF orientation metadata hardening + Data Studio inspector template recovery
+
+- Scope:
+  - Hardened native TIFF export by writing explicit top-left orientation metadata (`Orientation = 1`) alongside the already-correct rasterization transform, so downstream viewers do not have to infer TIFF row orientation.
+  - Added a PlotSession regression assertion that reads TIFF metadata back through `CGImageSource` and checks both the general image orientation and the TIFF-specific orientation tag.
+  - Added a PlotSession `effectiveTemplateID` fallback chain so inspector controls and preview refresh can recover the active template from staged external context or the latest preview/preflight/export payloads even if `selectedTemplateID` drifts to `nil`.
+  - Synced Data Studio figure selection into the embedded `PlotSession` during family/template reconciliation and added a regression test that simulates the lost-template state while ensuring representative-curve axis controls still render and send updates with template `curve`.
+- User-visible impact:
+  - TIFF exports now carry an explicit upright orientation tag in addition to the corrected image buffer, reducing the chance that Preview or other TIFF consumers display the figure mirrored.
+  - The Data Studio right inspector once again keeps the curve figure’s axis/style controls visible and editable instead of falling back to “Choose a template to edit figure controls.”
+- Risks:
+  - `effectiveTemplateID` is intentionally a recovery path, so future changes that leave stale preview/preflight payloads attached after a source swap could accidentally keep an old template visible longer than intended if preview context invalidation regresses.
+  - TIFF metadata now declares orientation explicitly; if a future exporter starts generating already-tagged TIFFs upstream, double-normalization rules would need to stay consistent.
+- Rollback points:
+  - `app/macos/Sources/Shared/Utilities/NativePanels.swift`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Recoverable UI/editor state should derive from the latest authoritative render context rather than a single fragile selection slot, and TIFF outputs should declare the intended upright orientation explicitly instead of relying on viewer inference.
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testNativeTIFFExportPreservesPDFVerticalOrientation -only-testing:SciPlotGodMacTests/DataStudioSessionTests/testRepresentativeCurveInspectorControlsRecoverFromPreviewTemplateWhenSelectionStateDrifts`: passed
+  - Local visual probe of a generated TIFF export: confirmed red top / blue bottom / upright text after conversion
+
+### 2026-04-10 (Round S): Data Studio specimen filter shows elongation-first ranking
+
+- Scope:
+  - Reworked the macOS Data Studio specimen filter presentation so the default ranked list resolves a primary inspection metric from the active figure family and otherwise falls back to `Elongation`, instead of always foregrounding distance-from-mean.
+  - Kept the Auto Keep 5 keep/out grouping intact, but changed the within-group order to sort by the resolved metric value so the default popover surfaces specimen values people actually compare against when deciding what to keep.
+  - Simplified the advanced table by removing `Distance` and `Side` as first-class columns, moving filename into de-emphasized status text, and putting elongation / strength / modulus values first while the advanced list itself is now directly sorted by the resolved inspection metric.
+  - Added a macOS regression assertion that the specimen filter now prefers elongation ordering on the tensile fixture and keeps the keep/out cutoff block stable.
+- User-visible impact:
+  - The specimen filter popover now shows tensile elongation values directly instead of making users infer them from filename, distance, and side fields.
+  - Auto Keep 5 suggestions still behave the same, but the popover is easier to use because the visible rows are ordered around the metric the figure is focused on, with elongation as the default tensile fallback.
+  - The Advanced section is less noisy: the triad values lead, while filename is still available as supporting context instead of dominating the row.
+- Risks:
+  - The current sort fallback assumes `Elongation` is the most useful default tensile inspection metric when no explicit figure metric is selected; if future workbook families need a different default, the fallback chain will need to become family-aware rather than tensile-biased.
+  - Keep/out grouping is still driven by the baseline auto-filter recommendation, so users looking for a single globally sorted numeric list may still need the advanced manual override flow for edge cases.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`162 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`103 tests`)
+
+### 2026-04-10 (Round T): Data Studio tensile legend de-scatter + inspector de-dup + preview edge smoothing
+
+- Scope:
+  - Updated curve candidate selection in `src/rendering/render_curve.py` so tensile-preserved small-panel curves with 4+ series do not prefer direct edge labels, preventing scattered label rendering in representative comparison previews.
+  - Added a rendering regression test that locks the new behavior for small tensile curve panels with four series.
+  - Removed the duplicate `Figure -> Type` control from `DataStudioInspectorView`, keeping figure-family switching only in the preview context bar chips.
+  - Unified preview card clipping/shape usage across `PlotRefineView`, `Base64PDFPreviewView`, and `Base64PreviewImageView` with continuous rounded corners and anti-aliased border drawing to avoid left-edge corner artifacts after preview loads.
+- User-visible impact:
+  - Data Studio representative tensile comparisons now keep legend information in a centralized legend layout instead of floating per-curve labels.
+  - The right inspector no longer repeats the top figure-family selector.
+  - Preview card edges render smoothly after preview updates, including the left corner/edge path.
+- Risks:
+  - Tensile direct-label suppression is intentionally scoped to 4+ series; future recipes that want direct labels for high-count tensile overlays would need an explicit override path.
+  - Inspector type removal assumes the top context-bar family chips remain visible and authoritative in all Data Studio preview states.
+- Rollback points:
+  - `src/rendering/render_curve.py`
+  - `app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+  - `app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - `app/macos/Sources/Shared/UI/PDFPreviewView.swift`
+  - `app/macos/Sources/Shared/UI/Base64PreviewImageView.swift`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`163 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`103 tests`)
+
+### 2026-04-10 (Round U): Data Studio comparison-preview hot-path caching + regression guard
+
+- Scope:
+  - Added Data Studio comparison preview PDF cache (`LRUCache`) keyed by materialized comparison context key + recipe identity in `src/data_studio/comparison.py`.
+  - Eliminated repeated re-rendering for unchanged compare previews by short-circuiting `preview_comparison_recipe(...)` to cached base64 PDF payload.
+  - Added two protective tests in `tests/test_data_studio.py`:
+    - `test_preview_data_studio_comparison_reuses_cached_pdf_for_same_context`
+    - `test_preview_data_studio_comparison_cache_invalidates_on_specimen_state_change`
+  - Produced benchmark before/after reports:
+    - `docs/performance/benchmark-2026-04-10-before.json`
+    - `docs/performance/benchmark-2026-04-10-after.json`
+- User-visible impact:
+  - Repeated Data Studio compare preview refreshes with unchanged group/specimen state become effectively instant.
+  - No workflow or payload schema changes.
+- Risks:
+  - Process-local cache means no cross-process reuse.
+  - If future context-key construction misses a semantic dependency, cache staleness risk appears.
+- Rollback points:
+  - `src/data_studio/comparison.py`
+  - `tests/test_data_studio.py`
+  - `docs/performance/benchmark-2026-04-10-before.json`
+  - `docs/performance/benchmark-2026-04-10-after.json`
+- Performance tactile target + conclusion:
+  - Target:
+    - `data_studio.preview p95 <= 0.01s` for unchanged repeated requests in the existing in-process benchmark harness.
+  - Benchmark command:
+    - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 30 --warmup 5 --output docs/performance/benchmark-2026-04-10-before.json`
+    - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 30 --warmup 5 --output docs/performance/benchmark-2026-04-10-after.json`
+  - Before:
+    - `data_studio.preview p95=0.2549s`
+  - After:
+    - `data_studio.preview p95=0.0012s`
+  - Conclusion:
+    - target achieved with >99% p95 reduction on repeated unchanged preview path.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`165 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`103 tests`)
+
+### 2026-04-10 (Round V): Rendering inspection/dataset cache de-dup + export-path micro-optimization
+
+- Scope:
+  - Added rendering-layer runtime caches:
+    - `src/rendering/dataset_models.py`: cached normalized dataset snapshots + `clear_normalized_dataset_cache`.
+    - `src/rendering/recommendation.py`: cached input inspection/recommendation payloads + `clear_inspection_cache`.
+    - `src/rendering/__init__.py`: exported the new cache-clear hooks.
+  - Added regression tests in `tests/test_rendering_cache.py` for:
+    - normalized-dataset cache hit on unchanged input
+    - normalized-dataset cache invalidation on mtime change
+    - inspect cache hit on unchanged input
+    - inspect cache invalidation on mtime change
+  - Captured benchmark reports:
+    - `docs/performance/benchmark-2026-04-10-round-v-before.json`
+    - `docs/performance/benchmark-2026-04-10-round-v-after.json`
+- User-visible impact:
+  - No workflow or payload schema change.
+  - Repeated inspect/export paths avoid duplicate deterministic inference work for unchanged files; `plot.export` p95 improved in the in-process benchmark harness.
+- Risks:
+  - Cache invalidation still depends on file mtime; out-of-band edits that keep mtime unchanged can yield stale reuse.
+  - Cache scope is process-local and is cleared on sidecar restart.
+- Rollback points:
+  - `src/rendering/dataset_models.py`
+  - `src/rendering/recommendation.py`
+  - `src/rendering/__init__.py`
+  - `tests/test_rendering_cache.py`
+  - `docs/performance/benchmark-2026-04-10-round-v-before.json`
+  - `docs/performance/benchmark-2026-04-10-round-v-after.json`
+- Performance tactile target + conclusion:
+  - Target:
+    - `plot.export p95 <= 0.245s` in the same in-process benchmark harness.
+  - Benchmark command:
+    - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 30 --warmup 5 --output docs/performance/benchmark-2026-04-10-round-v-before.json`
+    - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 30 --warmup 5 --output docs/performance/benchmark-2026-04-10-round-v-after.json`
+  - Before:
+    - `plot.export p95=0.2463s`
+  - After:
+    - `plot.export p95=0.2427s`
+  - Conclusion:
+    - target achieved with a small but stable p95 reduction while preserving behavior and test matrix.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`169 passed`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`103 tests`)
 
 ## 6) Update Template (copy for next round)
 

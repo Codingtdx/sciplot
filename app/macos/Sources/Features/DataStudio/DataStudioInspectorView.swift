@@ -32,16 +32,6 @@ struct DataStudioInspectorView: View {
             if session.figureFamilies.isEmpty {
                 InspectorEmptyState(message: "Import a workbook group to activate figure controls.")
             } else {
-                AdaptiveInspectorControlRow(title: "Type") {
-                    Picker("", selection: figureFamilyBinding) {
-                        ForEach(session.figureFamilies) { family in
-                            Text(family.title).tag(Optional(family.id))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
-
                 if !session.availableFigureTemplates.isEmpty {
                     AdaptiveInspectorControlRow(title: "Template") {
                         Picker("", selection: figureTemplateBinding) {
@@ -114,17 +104,6 @@ struct DataStudioInspectorView: View {
                 }
             }
         }
-    }
-
-    private var figureFamilyBinding: Binding<String?> {
-        Binding(
-            get: { session.currentFigureFamily?.id },
-            set: { newValue in
-                if let newValue {
-                    session.selectFigureFamily(id: newValue)
-                }
-            }
-        )
     }
 
     private var figureTemplateBinding: Binding<String?> {

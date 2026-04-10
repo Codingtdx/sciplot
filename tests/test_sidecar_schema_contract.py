@@ -17,14 +17,27 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     meta_response = client.get("/meta")
     assert meta_response.status_code == 200, meta_response.text
     meta = MetaResponse.model_validate(meta_response.json())
+    removed_template_ids = {
+        "scatter_with_fit",
+        "replicate_curves_with_band",
+        "grouped_bar_compare",
+        "distribution_compare",
+    }
     assert meta.template_ids
     assert meta.visual_themes
+    assert {item.id for item in meta.styles} == {"nature"}
+    assert removed_template_ids.isdisjoint(meta.template_ids)
+    assert removed_template_ids.isdisjoint({item.id for item in meta.templates})
+    assert {item.default_options.get("style_preset") for item in meta.templates} == {"nature"}
 
     contract_response = client.get("/plot-contract")
     assert contract_response.status_code == 200, contract_response.text
     contract = PlotContractResponse.model_validate(contract_response.json())
     assert contract.templates
     assert contract.size_presets
+    assert set(contract.styles.keys()) == {"nature"}
+    assert removed_template_ids.isdisjoint(contract.templates)
+    assert contract.aliases["style_presets"]["default"] == "nature"
 
 
 def test_delete_data_studio_template_returns_status_response() -> None:

@@ -156,7 +156,10 @@ struct DataStudioSpecimenFilterPopover: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                DataStudioSpecimenFilterRankedList(rows: presentation.rankedRows)
+                DataStudioSpecimenFilterRankedList(
+                    sortDescriptor: presentation.sortDescriptor,
+                    rows: presentation.rankedRows
+                )
 
                 if presentation.hasPendingChanges {
                     Text("Manual edits stay in draft until you apply them in Advanced.")
@@ -216,13 +219,20 @@ struct DataStudioSpecimenFilterPopover: View {
 }
 
 private struct DataStudioSpecimenFilterRankedList: View {
+    let sortDescriptor: DataStudioSpecimenFilterSortDescriptor
     let rows: [DataStudioSpecimenFilterRankedRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Sorted by distance from mean")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(sortDescriptor.label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(sortDescriptor.orderHint)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
 
             if rows.isEmpty {
                 Text("No specimen ranking is available for this workbook.")
@@ -230,12 +240,11 @@ private struct DataStudioSpecimenFilterRankedList: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                let maxDistance = rows.compactMap(\.distanceFromMeanScore).max() ?? 1
                 VStack(spacing: 0) {
                     ForEach(rows) { row in
                         DataStudioSpecimenFilterRankedRowView(
                             row: row,
-                            maxDistance: maxDistance
+                            unit: sortDescriptor.unit
                         )
                         if row.showsCutoffAfter {
                             HStack(spacing: 8) {
@@ -261,7 +270,7 @@ private struct DataStudioSpecimenFilterRankedList: View {
 
 private struct DataStudioSpecimenFilterRankedRowView: View {
     let row: DataStudioSpecimenFilterRankedRow
-    let maxDistance: Double
+    let unit: String?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -271,20 +280,17 @@ private struct DataStudioSpecimenFilterRankedRowView: View {
                 .monospacedDigit()
                 .frame(width: 32, alignment: .leading)
 
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(.quinary.opacity(0.55))
-                Capsule()
-                    .fill(tint.opacity(0.42))
-                    .frame(width: barWidth)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(valueLabel)
+                    .font(.body.weight(.semibold))
+                    .monospacedDigit()
+                if let unit, !unit.isEmpty {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .frame(width: 144, height: 9)
-
-            Text(distanceLabel)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .frame(width: 48, alignment: .trailing)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(row.disposition.title)
                 .font(.caption.weight(.semibold))
@@ -297,19 +303,11 @@ private struct DataStudioSpecimenFilterRankedRowView: View {
         .padding(.vertical, 10)
     }
 
-    private var barWidth: CGFloat {
-        guard let distance = row.distanceFromMeanScore, maxDistance > 0 else {
-            return 12
-        }
-        let normalized = max(min(distance / maxDistance, 1), 0.08)
-        return 144 * normalized
-    }
-
-    private var distanceLabel: String {
-        guard let distance = row.distanceFromMeanScore else {
+    private var valueLabel: String {
+        guard let value = row.sortValue else {
             return "n/a"
         }
-        return distance.formatted(.number.precision(.fractionLength(2)))
+        return value.formatted(.number.precision(.fractionLength(2)))
     }
 
     private var tint: Color {
@@ -374,18 +372,14 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
         HStack(spacing: 10) {
             Text("Include")
                 .frame(width: 54, alignment: .leading)
-            Text("Filename")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Distance")
-                .frame(width: 72, alignment: .trailing)
-            Text("Side")
-                .frame(width: 80, alignment: .leading)
+            Text("Elong.")
+                .frame(width: 64, alignment: .trailing)
             Text("Strength")
                 .frame(width: 70, alignment: .trailing)
             Text("Modulus")
                 .frame(width: 70, alignment: .trailing)
-            Text("Elong.")
-                .frame(width: 60, alignment: .trailing)
+            Text("Status")
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -412,48 +406,36 @@ private struct DataStudioSpecimenFilterAdvancedRow: View {
             .toggleStyle(.checkbox)
             .frame(width: 54, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(specimen.filename)
-                    .font(.footnote.weight(.semibold))
-                    .lineLimit(1)
+            numeric(specimen.metrics["Elongation"] ?? nil)
+                .frame(width: 64, alignment: .trailing)
+            numeric(specimen.metrics["Strength"] ?? nil)
+                .frame(width: 70, alignment: .trailing)
+            numeric(specimen.metrics["Modulus"] ?? nil)
+                .frame(width: 70, alignment: .trailing)
+
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    if specimen.autoRuleRole == "exclude" {
+                    switch specimen.autoRuleRole {
+                    case "keep":
+                        tag("Auto Keep", tint: .green)
+                    case "exclude":
                         tag("Auto Out", tint: .orange)
+                    default:
+                        EmptyView()
                     }
                     if !specimen.eligibleForAutoFilter {
                         tag("Ineligible", tint: .secondary)
                     }
                 }
+                Text(specimen.filename)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            numeric(specimen.distanceFromMeanScore)
-                .frame(width: 72, alignment: .trailing)
-            Text(sideLabel)
-                .font(.footnote)
-                .frame(width: 80, alignment: .leading)
-            numeric(specimen.metrics["Strength"] ?? nil)
-                .frame(width: 70, alignment: .trailing)
-            numeric(specimen.metrics["Modulus"] ?? nil)
-                .frame(width: 70, alignment: .trailing)
-            numeric(specimen.metrics["Elongation"] ?? nil)
-                .frame(width: 60, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-    }
-
-    private var sideLabel: String {
-        switch specimen.scoreSide {
-        case "low":
-            return "Low side"
-        case "high":
-            return "High side"
-        case "neutral":
-            return "Near mean"
-        default:
-            return "Ineligible"
-        }
     }
 
     private func numeric(_ value: Double?) -> some View {

@@ -560,6 +560,72 @@ def test_preview_data_studio_comparison_context_avoids_duplicate_workbook_import
     ]
 
 
+def test_preview_data_studio_comparison_reuses_cached_pdf_for_same_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "comparison_preview_cache.xlsx")
+    first_set, first_recipe, first_pdf = preview_data_studio_comparison(
+        [str(workbook_path)],
+        "representative_curve",
+    )
+
+    def fail_render(*args: object, **kwargs: object) -> None:
+        raise AssertionError("comparison-preview should reuse cached PDF for an unchanged context")
+
+    monkeypatch.setattr("src.data_studio.comparison.build_rendered_plots", fail_render)
+
+    second_set, second_recipe, second_pdf = preview_data_studio_comparison(
+        [str(workbook_path)],
+        "representative_curve",
+    )
+
+    assert first_recipe.id == second_recipe.id
+    assert first_set.comparison_workbook_path == second_set.comparison_workbook_path
+    assert second_pdf == first_pdf
+
+
+def test_preview_data_studio_comparison_cache_invalidates_on_specimen_state_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workbook_path = _write_specimen_filter_workbook(tmp_path / "comparison_preview_cache_invalidation.xlsx")
+    workbook_preview = preview_data_studio_workbook(workbook_path)
+    assert workbook_preview.suggested_exclusion_ids
+
+    preview_data_studio_comparison(
+        [str(workbook_path)],
+        "representative_curve",
+    )
+
+    from src.data_studio import comparison as comparison_module
+
+    call_count = 0
+    real_build_rendered_plots = comparison_module.build_rendered_plots
+
+    def tracked_build_rendered_plots(*args: object, **kwargs: object):
+        nonlocal call_count
+        call_count += 1
+        return real_build_rendered_plots(*args, **kwargs)
+
+    monkeypatch.setattr(comparison_module, "build_rendered_plots", tracked_build_rendered_plots)
+
+    specimen_states = [
+        DataStudioSpecimenState(
+            workbook_path=str(workbook_path),
+            specimen_id=workbook_preview.suggested_exclusion_ids[0],
+            included=False,
+        )
+    ]
+    preview_data_studio_comparison(
+        [str(workbook_path)],
+        "representative_curve",
+        specimen_states=specimen_states,
+    )
+
+    assert call_count == 1
+
+
 def test_normalize_session_payload_expands_paths() -> None:
     payload = normalize_session_payload(
         {

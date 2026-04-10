@@ -133,7 +133,7 @@ def test_curve_table_recommender_exposes_bubble_scatter_at_higher_limit(tmp_path
     assert any("bubble scatter" in reason.lower() for reason in bubble_candidate.why_soft_prior)
 
 
-def test_multi_curve_table_recommender_surfaces_mean_band_and_compat_replicate_band(tmp_path: Path) -> None:
+def test_multi_curve_table_recommender_surfaces_mean_band_without_legacy_aliases(tmp_path: Path) -> None:
     dataset = build_normalized_dataset(_write_multi_curve_table(tmp_path / "multi_curve.csv"))
 
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=5)
@@ -143,12 +143,11 @@ def test_multi_curve_table_recommender_surfaces_mean_band_and_compat_replicate_b
         "point_line",
         "mean_band",
         "stacked_curve",
-        "replicate_curves_with_band",
+        "scatter_fit",
     ]
     mean_band = next(item for item in recommendations if item.template_id == "mean_band")
-    assert any("canonical template id" in reason for reason in mean_band.why_soft_prior)
-    replicate_band = next(item for item in recommendations if item.template_id == "replicate_curves_with_band")
-    assert any("mean band" in reason for reason in replicate_band.why_soft_prior)
+    assert any("mean band" in reason.lower() for reason in mean_band.why_soft_prior)
+    assert "replicate_curves_with_band" not in [item.template_id for item in recommendations]
 
 
 def test_replicate_table_recommender_includes_e2_templates_with_deterministic_order(tmp_path: Path) -> None:
@@ -161,13 +160,10 @@ def test_replicate_table_recommender_includes_e2_templates_with_deterministic_or
     assert "box_strip" in template_ids
     assert "point_error" in template_ids
     assert "grouped_bar_error" in template_ids
-    assert "distribution_compare" in template_ids
+    assert "distribution_compare" not in template_ids
     assert recommendations[0].why_hard_match[0].startswith("Normalized dataset shape includes")
-    distribution_candidate = next(item for item in recommendations if item.template_id == "distribution_compare")
-    assert any(
-        "one structural family in v1" in reason.lower()
-        for reason in distribution_candidate.why_soft_prior
-    )
+    box_candidate = next(item for item in recommendations if item.template_id == "box")
+    assert any("box summaries" in reason.lower() for reason in box_candidate.why_soft_prior)
 
 
 def test_replicate_table_recommender_keeps_violin_box_available_with_higher_limit(tmp_path: Path) -> None:
@@ -196,7 +192,7 @@ def test_replicate_table_recommender_promotes_histogram_density_when_replicates_
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=7)
 
     template_ids = [item.template_id for item in recommendations]
-    assert template_ids[0] == "distribution_compare"
+    assert template_ids[0] == "violin"
     assert "box_strip" in template_ids[:3]
     assert template_ids.index("histogram_density") < template_ids.index("grouped_bar_error")
     histogram_candidate = next(item for item in recommendations if item.template_id == "histogram_density")
@@ -212,7 +208,7 @@ def test_replicate_table_recommender_downranks_histogram_for_highly_discrete_val
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=7)
 
     template_ids = [item.template_id for item in recommendations]
-    assert template_ids[0] == "distribution_compare"
+    assert template_ids[0] == "box"
     assert "box_strip" in template_ids
     assert "point_error" in template_ids
     assert "grouped_bar_error" in template_ids

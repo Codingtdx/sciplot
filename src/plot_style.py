@@ -33,6 +33,7 @@ TOP_MARGIN_MM = _CONTRACT.global_frame.top_margin_mm
 
 DEFAULT_STYLE_PRESET = _CONTRACT.defaults.style_preset
 DEFAULT_PALETTE_PRESET = _CONTRACT.defaults.palette_preset
+_PUBLICATION_BASE_STYLE_STACK = ("science", "nature", "no-latex")
 
 
 @dataclass(frozen=True)
@@ -288,7 +289,9 @@ def apply_style(
     _CURRENT_STYLE_PRESET = normalized_style
     _CURRENT_PALETTE_PRESET = palette_preset
 
-    plt.style.use(["science", "nature", "no-latex"])
+    # The contract now exposes a single publication profile (`nature`).
+    # Visual themes remain the only soft-variation layer on top of this base.
+    plt.style.use(list(_PUBLICATION_BASE_STYLE_STACK))
     sns.set_theme(
         context="paper",
         style="ticks",

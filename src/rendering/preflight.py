@@ -24,7 +24,7 @@ from src.rendering.common import (
 from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
 from src.rendering.series_order import unknown_series_order_labels
-from src.rendering.template_lifecycle import template_family_ids, template_identity
+from src.rendering.template_lifecycle import resolve_template_id, template_family_ids, template_identity
 from src.submission import build_render_submission_report
 
 _FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
@@ -39,12 +39,13 @@ def preflight_render_request(
     sheet: str | int,
     options: RenderOptions,
 ) -> PreflightResult:
-    identity = template_identity(template)
+    resolved_template = resolve_template_id(template, input_path=input_path, sheet=sheet)
+    identity = template_identity(template, resolved_template_id=resolved_template)
     warnings: list[str] = list(style_preflight_warnings(options))
     errors: list[str] = []
     normalized_dataset = (
         build_normalized_dataset(input_path, sheet)
-        if template
+        if resolved_template
         in {"point_line", "curve"}
         | _FIT_SCATTER_TEMPLATES
         | _BUBBLE_SCATTER_TEMPLATES
@@ -53,15 +54,15 @@ def preflight_render_request(
     )
 
     try:
-        if template in {"point_line", "curve"} | _MEAN_BAND_TEMPLATES:
+        if resolved_template in {"point_line", "curve"} | _MEAN_BAND_TEMPLATES:
             if normalized_dataset and normalized_dataset.model in {
                 "frequency_sweep",
                 "temperature_sweep",
                 "stress_relaxation",
             }:
-                if template in _MEAN_BAND_TEMPLATES:
-                    raise ValueError(f"{template} is not supported for rheology export bundles.")
-                validate_manual_axis_overrides(options, template=template)
+                if resolved_template in _MEAN_BAND_TEMPLATES:
+                    raise ValueError(f"{resolved_template} is not supported for rheology export bundles.")
+                validate_manual_axis_overrides(options, template=resolved_template)
                 metric_series = validate_rheology_bundle_scales(
                     normalized_dataset.model,
                     input_path,
@@ -82,7 +83,7 @@ def preflight_render_request(
                 validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
                 validate_manual_axis_overrides(
                     options,
-                    template=template,
+                    template=resolved_template,
                     is_tensile_curve=looks_like_tensile_curve(curve_series),
                 )
                 unknown_series = unknown_series_order_labels(
@@ -93,20 +94,20 @@ def preflight_render_request(
                     raise ValueError(
                         "series_order contains unknown series labels: " + ", ".join(unknown_series)
                     )
-                if template in _MEAN_BAND_TEMPLATES:
+                if resolved_template in _MEAN_BAND_TEMPLATES:
                     aligned_replicate_band(curve_series)
-        elif template == "stacked_curve":
+        elif resolved_template == "stacked_curve":
             curve_series = load_curve_table_cached(input_path, sheet)
-            validate_manual_axis_overrides(options, template=template)
+            validate_manual_axis_overrides(options, template=resolved_template)
             unknown_series = unknown_series_order_labels(
                 [series.sample for series in curve_series],
                 options.series_order,
             )
             if unknown_series:
                 raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
-        elif template == "segmented_stacked_curve":
+        elif resolved_template == "segmented_stacked_curve":
             curve_series = load_curve_table_cached(input_path, sheet)
-            validate_manual_axis_overrides(options, template=template)
+            validate_manual_axis_overrides(options, template=resolved_template)
             unknown_series = unknown_series_order_labels(
                 [series.sample for series in curve_series],
                 options.series_order,
@@ -118,12 +119,12 @@ def preflight_render_request(
                 curve_series,
                 use_sidecar=True if options.use_sidecar is None else options.use_sidecar,
             )
-        elif template in {"scatter"} | _BUBBLE_SCATTER_TEMPLATES:
+        elif resolved_template in {"scatter"} | _BUBBLE_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
             validate_manual_axis_overrides(
                 options,
-                template=template,
+                template=resolved_template,
                 is_tensile_curve=looks_like_tensile_curve(curve_series),
             )
             unknown_series = unknown_series_order_labels(
@@ -132,12 +133,12 @@ def preflight_render_request(
             )
             if unknown_series:
                 raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
-        elif template in _FIT_SCATTER_TEMPLATES:
+        elif resolved_template in _FIT_SCATTER_TEMPLATES:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
             validate_manual_axis_overrides(
                 options,
-                template=template,
+                template=resolved_template,
                 is_tensile_curve=looks_like_tensile_curve(curve_series),
             )
             unknown_series = unknown_series_order_labels(
@@ -158,23 +159,21 @@ def preflight_render_request(
                     raise ValueError(
                         f"Series {series.sample!r} has constant x values, so a linear fit cannot be computed."
                     )
-        elif template in {
+        elif resolved_template in {
             "bar",
             "box",
             "box_strip",
             "violin",
             "violin_box",
-            "grouped_bar_compare",
             "grouped_bar_error",
             "point_error",
             "lollipop_error",
-            "distribution_compare",
             "histogram_density",
         }:
             groups = load_replicate_table_cached(input_path, sheet)
             if not groups:
                 raise ValueError("No valid groups were found in the replicate table.")
-            validate_manual_axis_overrides(options, template=template)
+            validate_manual_axis_overrides(options, template=resolved_template)
             unknown_groups = unknown_series_order_labels(
                 [group.group for group in groups],
                 options.series_order,
@@ -182,13 +181,9 @@ def preflight_render_request(
             if unknown_groups:
                 raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))
             summary = summarize_replicate_distribution(groups)
-            if template in _GROUPED_BAR_ERROR_TEMPLATES | {"distribution_compare"} and len(groups) < 2:
-                raise ValueError(f"{template} requires at least two replicate groups.")
-            if template == "distribution_compare" and summary.min_group_points < 3:
-                warnings.append(
-                    "Some groups have very few replicates, so distribution_compare may fall back to a simpler variant."
-                )
-            if template == "histogram_density":
+            if resolved_template in _GROUPED_BAR_ERROR_TEMPLATES and len(groups) < 2:
+                raise ValueError(f"{resolved_template} requires at least two replicate groups.")
+            if resolved_template == "histogram_density":
                 if summary.total_points < 12 or summary.min_group_points < 4:
                     warnings.append(
                         "Histogram-density overlays are less stable with sparse replicates; "
@@ -200,9 +195,9 @@ def preflight_render_request(
                     )
             if len(groups) >= 6:
                 warnings.append(validation_rule("dense_group_label_warning").description)
-        elif template in {"heatmap", "annotated_heatmap"}:
+        elif resolved_template in {"heatmap", "annotated_heatmap"}:
             table = load_heatmap_table_cached(input_path, sheet)
-            if template == "annotated_heatmap":
+            if resolved_template == "annotated_heatmap":
                 x_count = int(table.data["x"].nunique(dropna=True))
                 y_count = int(table.data["y"].nunique(dropna=True))
                 matrix_cells = x_count * y_count
@@ -217,13 +212,13 @@ def preflight_render_request(
                         "consider plain heatmap for readability."
                     )
         else:
-            raise ValueError(f"Unsupported template in preflight: {template}")
+            raise ValueError(f"Unsupported template in preflight: {resolved_template}")
     except Exception as exc:
         errors.append(humanize_preflight_exception(exc))
 
     if not errors:
         preview_names = preview_output_filenames(
-            template,
+            resolved_template,
             input_path,
             sheet,
             normalized_dataset.model if normalized_dataset else None,
@@ -233,7 +228,7 @@ def preflight_render_request(
         preview_names = ()
 
     return PreflightResult(
-        template=template,
+        template=resolved_template,
         requested_template_id=identity.requested_template_id,
         canonical_id=identity.canonical_id,
         role=identity.role,
@@ -244,7 +239,7 @@ def preflight_render_request(
         output_filenames=preview_names,
         submission_report=build_render_submission_report(
             context="preflight",
-            template=template,
+            template=resolved_template,
             options=options,
             output_filenames=preview_names,
             blockers=errors,

@@ -8,15 +8,15 @@ enum TestPayloads {
     static func meta() -> SidecarMetaResponse {
         SidecarMetaResponse(
             version: 1,
-            defaults: .init(stylePreset: "journal_calm", palettePreset: "aqua_graphite"),
+            defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizes: [
                 .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
                 .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
             ],
             styles: [
                 .init(
-                    id: "journal_calm",
-                    label: "Journal Calm",
+                    id: "nature",
+                    label: "Nature",
                     public: true,
                     description: "Default publication style.",
                     hardConstraints: true,
@@ -25,8 +25,8 @@ enum TestPayloads {
             ],
             palettes: [
                 .init(
-                    id: "aqua_graphite",
-                    label: "Aqua Graphite",
+                    id: "colorblind_safe",
+                    label: "Colorblind Safe",
                     public: true,
                     description: "Default palette.",
                     swatches: ["#112233", "#445566"]
@@ -56,8 +56,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     canonicalID: "curve",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -78,8 +78,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     canonicalID: "bar",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -102,8 +102,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     canonicalID: "box",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -127,8 +127,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     canonicalID: "box_strip",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -137,7 +137,7 @@ enum TestPayloads {
             ],
             templateIds: ["curve", "bar", "box", "box_strip"],
             sizeIds: ["single_panel", "double_panel"],
-            palettePresetIds: ["aqua_graphite"],
+            palettePresetIds: ["colorblind_safe"],
             visualThemes: [
                 .init(id: "paper", label: "Paper", description: "Paper preview"),
             ]
@@ -147,15 +147,15 @@ enum TestPayloads {
     static func multiSeriesMeta() -> SidecarMetaResponse {
         SidecarMetaResponse(
             version: 1,
-            defaults: .init(stylePreset: "journal_calm", palettePreset: "aqua_graphite"),
+            defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizes: [
                 .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
                 .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
             ],
             styles: [
                 .init(
-                    id: "journal_calm",
-                    label: "Journal Calm",
+                    id: "nature",
+                    label: "Nature",
                     public: true,
                     description: "Default publication style.",
                     hardConstraints: true,
@@ -164,8 +164,8 @@ enum TestPayloads {
             ],
             palettes: [
                 .init(
-                    id: "aqua_graphite",
-                    label: "Aqua Graphite",
+                    id: "colorblind_safe",
+                    label: "Colorblind Safe",
                     public: true,
                     description: "Default palette.",
                     swatches: ["#112233", "#445566"]
@@ -196,8 +196,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     canonicalID: "curve",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -206,7 +206,7 @@ enum TestPayloads {
             ],
             templateIds: ["curve"],
             sizeIds: ["single_panel", "double_panel"],
-            palettePresetIds: ["aqua_graphite"],
+            palettePresetIds: ["colorblind_safe"],
             visualThemes: [
                 .init(id: "paper", label: "Paper", description: "Paper preview"),
             ]
@@ -216,15 +216,15 @@ enum TestPayloads {
     static func contract() -> PlotContractResponse {
         PlotContractResponse(
             version: 1,
-            defaults: .init(stylePreset: "journal_calm", palettePreset: "aqua_graphite"),
+            defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizePresets: [
                 "single_panel": .init(label: "Single Panel", widthMm: 60, heightMm: 55),
             ],
             styles: [
-                "journal_calm": .string("Journal Calm"),
+                "nature": .string("Nature"),
             ],
             palettes: [
-                "aqua_graphite": .string("Aqua Graphite"),
+                "colorblind_safe": .string("Colorblind Safe"),
             ],
             templates: [
                 "curve": .init(
@@ -249,8 +249,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     hardRules: ["Use the shared axis frame."],
                     softRules: ["Keep labels minimal."]
                 ),
@@ -270,8 +270,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
                 ),
@@ -292,8 +292,8 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [:],
-                    availableStyles: ["journal_calm"],
-                    availablePalettes: ["aqua_graphite"],
+                    availableStyles: ["nature"],
+                    availablePalettes: ["colorblind_safe"],
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
                 ),
@@ -415,8 +415,8 @@ enum TestPayloads {
             template: "curve",
             options: .init(
                 size: "single_panel",
-                stylePreset: "journal_calm",
-                palettePreset: "aqua_graphite",
+                stylePreset: "nature",
+                palettePreset: "colorblind_safe",
                 visualThemeID: "paper"
             ),
             promptText: """
@@ -1289,8 +1289,8 @@ enum TestPayloads {
                     optionsByTemplate: [
                         "curve": RenderOptionsPayload(
                             size: "single_panel",
-                            stylePreset: "journal_calm",
-                            palettePreset: "aqua_graphite",
+                            stylePreset: "nature",
+                            palettePreset: "colorblind_safe",
                             visualThemeID: "paper"
                         ),
                     ]
@@ -1356,8 +1356,8 @@ enum TestPayloads {
             readiness: "ready",
             summary: "Ready for export.",
             template: "curve",
-            stylePreset: "journal_calm",
-            palettePreset: "aqua_graphite",
+            stylePreset: "nature",
+            palettePreset: "colorblind_safe",
             outputCount: 1,
             outputFilenames: ["sample_curve.pdf"],
             blockers: [],

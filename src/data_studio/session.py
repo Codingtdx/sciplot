@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
+from src import plot_style
 from src.data_studio.models import (
     DataStudioFigurePreference,
     DataStudioGroupState,
     DataStudioSessionPayload,
     DataStudioSpecimenState,
 )
+from src.rendering.template_lifecycle import resolve_template_id
 
 
 def _iter_objects(value: object) -> tuple[object, ...]:
@@ -38,6 +40,27 @@ def _int_value(value: object, default: int) -> int:
         except ValueError:
             return default
     return default
+
+
+def _normalize_template_id(value: object) -> str | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    if not cleaned:
+        return None
+    return resolve_template_id(cleaned)
+
+
+def _normalize_style_value(value: object) -> str:
+    normalized = plot_style.normalize_style_preset(str(value) if value is not None else None)
+    return normalized if normalized in plot_style.list_style_presets() else plot_style.DEFAULT_STYLE_PRESET
+
+
+def _normalize_render_options(value: object) -> dict[str, object]:
+    option_map = _mapping(value) or {}
+    normalized = dict(option_map)
+    normalized["style_preset"] = _normalize_style_value(option_map.get("style_preset"))
+    return normalized
 
 
 def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPayload:
@@ -89,14 +112,14 @@ def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPa
         raw_options = _mapping(item_map.get("options_by_template")) or {}
         options_by_template: dict[str, dict[str, object]] = {}
         for template_id, options in raw_options.items():
-            option_map = _mapping(options)
-            options_by_template[str(template_id)] = dict(option_map or {})
+            normalized_template_id = _normalize_template_id(template_id)
+            if normalized_template_id is None:
+                continue
+            options_by_template[normalized_template_id] = _normalize_render_options(options)
         figure_preferences_list.append(
             DataStudioFigurePreference(
                 family_id=family_id,
-                selected_template_id=(
-                    str(item_map["selected_template_id"]) if item_map.get("selected_template_id") is not None else None
-                ),
+                selected_template_id=_normalize_template_id(item_map.get("selected_template_id")),
                 options_by_template=options_by_template,
             )
         )
@@ -125,9 +148,7 @@ def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPa
             else None
         ),
         selected_figure_template_id=(
-            str(payload["selected_figure_template_id"])
-            if payload.get("selected_figure_template_id") is not None
-            else None
+            _normalize_template_id(payload.get("selected_figure_template_id"))
         ),
         group_states=group_states,
         specimen_states=specimen_states,

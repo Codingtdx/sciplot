@@ -55,20 +55,16 @@ def test_replicate_policy_allows_co_primary_and_limits_visible_budget(tmp_path: 
 
     policy = build_recommendation_presentation(ranked)
 
-    assert _recommendation_ids(policy.primary_recommendation) == [
-        "box",
-        "distribution_compare",
-    ]
-    assert policy.score_gap_to_second_primary == 0.0
+    assert _recommendation_ids(policy.primary_recommendation) == ["box_strip"]
+    assert policy.score_gap_to_second_primary == 2.0
     assert _recommendation_ids(policy.alternative_recommendations) == [
-        "box_strip",
+        "box",
         "point_error",
         "violin",
     ]
     assert _recommendation_ids(policy.visible_recommendations) == [
-        "box",
-        "distribution_compare",
         "box_strip",
+        "box",
         "point_error",
         "violin",
     ]

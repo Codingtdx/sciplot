@@ -4,6 +4,7 @@ import hashlib
 import json
 from contextlib import suppress
 from dataclasses import dataclass, fields, is_dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -390,12 +391,27 @@ def _candidate_roles_for_rheology(series_map: dict[str, list[RheologySeries]]) -
     )
 
 
-def build_normalized_dataset(
+def _normalized_dataset_cache_key(
     input_path: Path,
-    sheet: str | int = 0,
-    *,
-    model: str | None = None,
+    sheet: str | int,
+    model: str | None,
+) -> tuple[str, int, str | int, str | None]:
+    return (
+        str(input_path.resolve()),
+        input_path.stat().st_mtime_ns,
+        sheet,
+        model,
+    )
+
+
+@lru_cache(maxsize=64)
+def _build_normalized_dataset_cached(
+    resolved_path: str,
+    _mtime_ns: int,
+    sheet: str | int,
+    model: str | None,
 ) -> NormalizedDataset:
+    input_path = Path(resolved_path)
     raw = read_raw_table_cached(input_path, sheet)
     working_raw = raw.dropna(axis=1, how="all")
     resolved_model = model or detect_input_model(input_path, sheet)
@@ -467,6 +483,24 @@ def build_normalized_dataset(
     )
 
 
+def build_normalized_dataset(
+    input_path: Path,
+    sheet: str | int = 0,
+    *,
+    model: str | None = None,
+) -> NormalizedDataset:
+    cache_key = _normalized_dataset_cache_key(
+        input_path=input_path,
+        sheet=sheet,
+        model=model,
+    )
+    return _build_normalized_dataset_cached(*cache_key)
+
+
+def clear_normalized_dataset_cache() -> None:
+    _build_normalized_dataset_cached.cache_clear()
+
+
 def normalized_dataset_payload(dataset: NormalizedDataset) -> dict[str, Any]:
     def _serialize(value: Any) -> Any:
         if is_dataclass(value) and not isinstance(value, type):
@@ -489,6 +523,7 @@ __all__ = [
     "NormalizedDataset",
     "RoleKey",
     "build_normalized_dataset",
+    "clear_normalized_dataset_cache",
     "detect_input_model",
     "detect_point_line_bundle",
     "looks_like_dsc_curve",

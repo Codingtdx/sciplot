@@ -114,9 +114,39 @@ enum DataStudioSpecimenFilterRankDisposition: Equatable {
     }
 }
 
+enum DataStudioSpecimenFilterSortKey: Equatable {
+    case metric(metricID: String)
+    case distanceFromMean
+}
+
+struct DataStudioSpecimenFilterSortDescriptor: Equatable {
+    let key: DataStudioSpecimenFilterSortKey
+    let label: String
+    let unit: String?
+
+    var orderHint: String {
+        switch key {
+        case .metric:
+            return "High to low"
+        case .distanceFromMean:
+            return "Closest first"
+        }
+    }
+
+    var sortsHighToLow: Bool {
+        switch key {
+        case .metric:
+            return true
+        case .distanceFromMean:
+            return false
+        }
+    }
+}
+
 struct DataStudioSpecimenFilterRankedRow: Identifiable, Equatable {
     let id: String
     let rank: Int
+    let sortValue: Double?
     let distanceFromMeanScore: Double?
     let disposition: DataStudioSpecimenFilterRankDisposition
     let showsCutoffAfter: Bool
@@ -153,6 +183,7 @@ struct DataStudioSpecimenFilterPresentation {
     let autoFilterReason: String?
     let canApplyAuto: Bool
     let canTurnOff: Bool
+    let sortDescriptor: DataStudioSpecimenFilterSortDescriptor
     let rankedRows: [DataStudioSpecimenFilterRankedRow]
     let advancedRows: [DataStudioSpecimenPreviewResponse]
 }

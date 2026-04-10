@@ -10,6 +10,7 @@ from src.rendering.models import RenderedPlot, TemplateName
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.render_registry import TEMPLATE_RENDERERS
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
+from src.rendering.template_lifecycle import resolve_template_id
 
 
 def close_rendered_plots(rendered_plots: list[RenderedPlot]) -> None:
@@ -57,9 +58,10 @@ def build_rendered_plots(
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
 ) -> list[RenderedPlot]:
-    validated_template = validate_template_name(template)
+    requested_template = validate_template_name(template)
+    resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
     options = resolve_render_options(
-        template=validated_template,
+        template=requested_template,
         size=size,
         xscale=xscale,
         yscale=yscale,
@@ -81,6 +83,7 @@ def build_rendered_plots(
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
         visual_theme_id=visual_theme_id,
+        resolved_template_id=resolved_template,
     )
     style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
     plot_style.apply_style(
@@ -88,7 +91,7 @@ def build_rendered_plots(
         options.palette_preset,
         soft_overrides=style_bundle.resolved_soft,
     )
-    renderer = TEMPLATE_RENDERERS[validated_template]
+    renderer = TEMPLATE_RENDERERS[resolved_template]
     return renderer.render(input_path, sheet, options)
 
 

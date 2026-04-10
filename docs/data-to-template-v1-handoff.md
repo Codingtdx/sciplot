@@ -6,6 +6,10 @@ Historical note (2026-03-28):
 - This document describes the Plot-side data-to-template refactor, not the canonical whole-app information architecture.
 - For current app-level product scope, workflows, and IA rules, use `README.md` and `docs/product-architecture.md`.
 - Older desktop-shell references in this handoff should be read as implementation history, not as the current app-shell truth.
+- Plot contract semantics have continued to evolve after this handoff:
+  - public style surface is now single-style `nature`
+  - old alias ids remain ingress-only compatibility shims
+  - `distribution_compare` is no longer a user-visible template id
 
 ## 1. Title + status
 - This document is the handoff for the **v1 data-to-template flow** refactor.
@@ -21,12 +25,12 @@ Major additions completed in this refactor:
 - `TemplateRecommender` with ranked, deterministic, explainable template recommendations.
 - `StyleComposer` for publication profile + visual theme composition.
 - Explicit layering of **publication profile (hard)** vs **visual theme (soft)**.
-- Six added structural templates:
-  - `scatter_with_fit`
+- Six added structural templates in the original v1 refactor:
+  - `scatter_fit` (shipped publicly after alias cleanup; historical alias: `scatter_with_fit`)
   - `annotated_heatmap`
-  - `replicate_curves_with_band`
-  - `grouped_bar_compare`
-  - `distribution_compare`
+  - `mean_band` (historical alias: `replicate_curves_with_band`)
+  - `grouped_bar_error` (historical alias: `grouped_bar_compare`)
+  - `distribution_compare` (historical family alias; now compatibility-only and resolved to `box` / `box_strip` / `violin`)
   - `histogram_density`
 - Ranked recommendation surface is canonical:
   - `inspection.recommendations` + primary/alternative/advanced groups
@@ -104,20 +108,20 @@ Desktop continuity seams:
 - Recommender is **Rules + Soft Priors**.
 - Ranking is **deterministic and explainable**.
 - **No adaptive/learned ranking in v1**.
-- `distribution_compare` is **one structural family in v1** with deterministic internal variant selection, not a family-selector UI.
+- `distribution_compare` started as one structural family in v1, but is now compatibility-only and must resolve to an explicit template before recommendation/preflight/render/export.
 - Endpoint names and compatibility fields were intentionally preserved.
 - This work is **Plotly-inspired in product flow/template breadth**, not donor-code porting.
 
 ## 6. Structural templates now available
-Newly added (and integrated through recommendation/preflight/render/export):
-- `scatter_with_fit`
+Newly added in the original v1 refactor (with current public ids shown here):
+- `scatter_fit`
 - `annotated_heatmap`
-- `replicate_curves_with_band`
-- `grouped_bar_compare`
-- `distribution_compare`
+- `mean_band`
+- `grouped_bar_error`
+- `distribution_compare` compatibility mapping to `box` / `box_strip` / `violin`
 - `histogram_density`
 
-These are wired end-to-end in inspect/recommend/preflight/render/export paths.
+Current public product surfaces should only emit the explicit ids above; legacy aliases remain ingress-only.
 
 ## 7. Compatibility guarantees
 Intentionally preserved:

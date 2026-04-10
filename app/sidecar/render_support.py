@@ -11,6 +11,7 @@ from src.core.application.render import (
     ensure_input_path,
     normalize_input_path_text,
     resolve_render_options,
+    resolve_template_id,
 )
 
 
@@ -18,10 +19,17 @@ def normalize_path(path_text: str) -> Path:
     return ensure_input_path(normalize_input_path_text(path_text))
 
 
-def options_from_payload(template: str, payload: RenderOptionsPayload):
+def options_from_payload(
+    template: str,
+    payload: RenderOptionsPayload,
+    *,
+    input_path: Path | None = None,
+    sheet: str | int = 0,
+):
+    resolved_template = resolve_template_id(template, input_path=input_path, sheet=sheet)
     return resolve_render_options(
         template=template,
-        size=payload.size or DEFAULT_SIZE_BY_TEMPLATE[template],
+        size=payload.size or DEFAULT_SIZE_BY_TEMPLATE.get(resolved_template),
         xscale=payload.xscale,
         yscale=payload.yscale,
         reverse_x=payload.reverse_x,
@@ -42,6 +50,7 @@ def options_from_payload(template: str, payload: RenderOptionsPayload):
         palette_preset=payload.palette_preset,
         use_sidecar=payload.use_sidecar,
         visual_theme_id=payload.visual_theme_id,
+        resolved_template_id=resolved_template,
     )
 
 

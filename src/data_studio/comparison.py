@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,9 +26,14 @@ from src.data_studio.workbooks import import_workbook, load_filtered_workbook_co
 from src.infrastructure.persistence.data_studio_comparison_contexts import (
     prepare_managed_data_studio_comparison_context_dir,
 )
+from src.infrastructure.runtime_cache import LRUCache
 from src.plot_contract import template_contract
 from src.plot_style import DEFAULT_PALETTE_PRESET, DEFAULT_STYLE_PRESET, normalize_style_preset
 from src.rendering.render_service import build_rendered_plots, close_rendered_plots, export_rendered_plots
+from src.rendering.template_lifecycle import resolve_template_id
+
+
+_COMPARISON_PREVIEW_PDF_CACHE = LRUCache[str, str](maxsize=64)
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,25 @@ class MaterializedComparisonContext:
     comparison_set: ComparisonSet
     cache_key: str
     materialized_at: str
+
+
+def _comparison_preview_pdf_cache_key(
+    *,
+    context_cache_key: str,
+    recipe: ComparisonRecipe,
+) -> str:
+    payload = json.dumps(
+        {
+            "context_cache_key": context_cache_key,
+            "recipe_id": recipe.id,
+            "template_id": recipe.template_id,
+            "sheet_name": recipe.sheet_name,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _context_manifest_path(context_root: Path) -> Path:
@@ -223,7 +248,6 @@ def _comparison_recipes_for_loaded_workbooks(
         )
     ]
     for metric_id in metric_ids:
-        min_points = min(len(workbook.replicate_groups[metric_id].data.index) for workbook in loaded)
         recipes.extend(
             [
                 ComparisonRecipe(
@@ -273,22 +297,6 @@ def _comparison_recipes_for_loaded_workbooks(
                     template_id="grouped_bar_error",
                     sheet_name=f"{metric_id}_Replicates",
                     metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_distribution",
-                    label=f"{metric_id} Distribution Compare",
-                    category="metric",
-                    template_id="distribution_compare",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                    supported=len(loaded) >= 2 and min_points >= 3,
-                    support_reason=(
-                        ""
-                        if len(loaded) >= 2 and min_points >= 3
-                        else (
-                            "Distribution compare needs at least two included groups and 3 replicates per workbook."
-                        )
-                    ),
                 ),
             ]
         )
@@ -410,6 +418,13 @@ def preview_comparison_recipe(
     )
     comparison_set = materialized.comparison_set
     recipe = _find_recipe(comparison_set.recipes, recipe_id)
+    preview_cache_key = _comparison_preview_pdf_cache_key(
+        context_cache_key=materialized.cache_key,
+        recipe=recipe,
+    )
+    cached_pdf_base64 = _COMPARISON_PREVIEW_PDF_CACHE.get(preview_cache_key)
+    if cached_pdf_base64 is not None:
+        return comparison_set, recipe, cached_pdf_base64
     rendered = build_rendered_plots(
         recipe.template_id,
         comparison_set.comparison_workbook_path,
@@ -423,6 +438,7 @@ def preview_comparison_recipe(
         buffer = BytesIO()
         rendered[0].figure.savefig(buffer, format="pdf", facecolor="white", bbox_inches=None)
         pdf_base64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+        _COMPARISON_PREVIEW_PDF_CACHE.set(preview_cache_key, pdf_base64)
     finally:
         close_rendered_plots(rendered)
     return comparison_set, recipe, pdf_base64
@@ -616,7 +632,8 @@ def _render_kwargs_from_payload(
     *,
     template_id: str,
 ) -> dict[str, object]:
-    template_spec = template_contract(template_id)
+    resolved_template_id = resolve_template_id(template_id)
+    template_spec = template_contract(resolved_template_id)
     size = payload.get("size") if payload else None
     if not isinstance(size, str) or size not in template_spec.allowed_sizes:
         size = template_spec.default_size

@@ -131,11 +131,13 @@ struct Base64PDFPreviewView: View {
 
     var body: some View {
         let fingerprint = PreviewImageDecoder.fingerprint(forBase64: base64PDF)
+        let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         if let data = PreviewImageDecoder.decodeBase64Data(base64PDF),
            PreviewImageDecoder.looksLikePDFData(data)
         {
             PDFPreviewView(data: data, fingerprint: fingerprint)
-                .background(.black.opacity(0.02), in: RoundedRectangle(cornerRadius: 18))
+                .clipShape(previewShape)
+                .background(.black.opacity(0.02), in: previewShape)
         } else {
             EmptyStateCard(
                 title: "Preview unavailable",

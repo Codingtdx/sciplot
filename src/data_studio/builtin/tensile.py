@@ -409,26 +409,16 @@ def tensile_comparison_recipes(workbooks: list[LoadedTensileWorkbookData]) -> tu
                     metric_id=metric_name,
                 ),
                 ComparisonRecipe(
-                    id=f"{metric_name.lower()}_distribution",
-                    label=f"{metric_name} Distribution Compare",
+                    id=f"{metric_name.lower()}_box_strip",
+                    label=f"{metric_name} Box + Strip Compare",
                     category="metric",
-                    template_id="distribution_compare",
+                    template_id="box_strip",
                     sheet_name=f"{metric_name}_Replicates",
                     metric_id=metric_name,
-                    supported=min_group_points(workbooks, metric_name) >= 3,
-                    support_reason=(
-                        ""
-                        if min_group_points(workbooks, metric_name) >= 3
-                        else "Distribution compare needs at least 3 points per workbook."
-                    ),
                 ),
             )
         )
     return tuple(recipes)
-
-
-def min_group_points(workbooks: list[LoadedTensileWorkbookData], metric_name: str) -> int:
-    return min(len(workbook.replicate_groups[metric_name].data.index) for workbook in workbooks)
 
 
 def export_tensile_comparison_bundle(
@@ -589,23 +579,29 @@ def export_comparison_figures(
                     recipe_id=f"{metric_name.lower()}_violin",
                 )
             )
-            distribution_recipe = recipe_map.get(f"{metric_name.lower()}_distribution")
-            if distribution_recipe is not None and distribution_recipe.supported:
-                box_distribution_figure, _ = plot_box(groups, width_mm=60.0, height_mm=55.0)
-                figures.append(box_distribution_figure)
-                distribution_path = save_pdf(
-                    box_distribution_figure,
-                    bundle_dir / f"{metric_slug}_distribution_compare.pdf",
+            box_strip_recipe = recipe_map.get(f"{metric_name.lower()}_box_strip")
+            if box_strip_recipe is not None and box_strip_recipe.supported:
+                box_strip_figure, _ = plot_box(
+                    groups,
+                    width_mm=60.0,
+                    height_mm=55.0,
+                    show_raw_points=True,
+                    show_fliers=False,
+                )
+                figures.append(box_strip_figure)
+                box_strip_path = save_pdf(
+                    box_strip_figure,
+                    bundle_dir / f"{metric_slug}_box_strip_compare.pdf",
                 )
                 outputs.append(
                     DataStudioFigureOutput(
-                        path=distribution_path,
-                        label=f"{metric_name} Distribution Compare",
+                        path=box_strip_path,
+                        label=f"{metric_name} Box + Strip Compare",
                         category="metric",
-                        template_id="distribution_compare",
+                        template_id="box_strip",
                         sheet_name=metric_sheet,
                         metric_id=metric_name,
-                        recipe_id=distribution_recipe.id,
+                        recipe_id=box_strip_recipe.id,
                     )
                 )
     finally:

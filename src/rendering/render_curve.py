@@ -247,6 +247,8 @@ def _render_curve_like_plot(
     base_kwargs: dict[str, object] | None = None,
 ) -> RenderedPlot:
     resolved_kwargs = _with_manual_axis_overrides(dict(base_kwargs or {}), options)
+    preserve_stress_label = bool(resolved_kwargs.get("preserve_stress_label", False))
+    supports_direct_labels = not (preserve_stress_label and len(series_list) >= 4)
     candidates = [
         _render_curve_candidate(
             filename=filename,
@@ -274,7 +276,7 @@ def _render_curve_like_plot(
                 base_kwargs=resolved_kwargs,
             )
         )
-    if _prefer_direct_labels(options, len(series_list)) and len(series_list) > 1:
+    if supports_direct_labels and _prefer_direct_labels(options, len(series_list)) and len(series_list) > 1:
         for side in ("left", "right"):
             candidates.append(
                 _render_curve_candidate(
@@ -624,15 +626,6 @@ def _render_scatter_fit_like(
     )
     return [rendered]
 
-def _render_scatter_with_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    return _render_scatter_fit_like(
-        input_path,
-        sheet,
-        options,
-        template="scatter_with_fit",
-        filename_suffix="scatter_with_fit",
-    )
-
 def _render_scatter_fit(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     return _render_scatter_fit_like(
         input_path,
@@ -708,19 +701,6 @@ def _render_replicate_band_like(
         + ("replicate_mean_band_overlay",),
     )
     return [rendered]
-
-def _render_replicate_curves_with_band(
-    input_path: Path,
-    sheet: str | int,
-    options: RenderOptions,
-) -> list[RenderedPlot]:
-    return _render_replicate_band_like(
-        input_path,
-        sheet,
-        options,
-        template="replicate_curves_with_band",
-        filename_suffix="replicate_curves_with_band",
-    )
 
 def _render_mean_band(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     return _render_replicate_band_like(

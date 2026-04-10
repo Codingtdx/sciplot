@@ -9,13 +9,24 @@ class PlotContractTests(unittest.TestCase):
     def test_meta_payload_matches_contract_defaults_and_templates(self) -> None:
         contract = load_plot_contract()
         meta = meta_payload()
+        removed_template_ids = {
+            "scatter_with_fit",
+            "replicate_curves_with_band",
+            "grouped_bar_compare",
+            "distribution_compare",
+        }
 
         self.assertEqual(meta["defaults"]["style_preset"], contract.defaults.style_preset)
         self.assertEqual(meta["defaults"]["palette_preset"], contract.defaults.palette_preset)
+        self.assertEqual(contract.defaults.style_preset, "nature")
+        self.assertEqual({item["id"] for item in meta["styles"]}, {"nature"})
+        self.assertEqual(set(contract.styles.keys()), {"nature"})
         self.assertEqual(
             {item["id"] for item in meta["templates"]},
             set(contract.templates.keys()),
         )
+        self.assertTrue(removed_template_ids.isdisjoint(contract.templates))
+        self.assertTrue(removed_template_ids.isdisjoint({item["id"] for item in meta["templates"]}))
         self.assertEqual(
             {item["id"] for item in meta["sizes"]},
             set(contract.size_presets.keys()),
@@ -28,6 +39,11 @@ class PlotContractTests(unittest.TestCase):
         for template in meta["templates"]:
             self.assertIn(template["id"], contract.templates)
             self.assertIn(template["default_size"], template["allowed_sizes"])
+            self.assertEqual(template["available_styles"], ["nature"])
+
+        for template in contract.templates.values():
+            self.assertEqual(template.available_styles, ("nature",))
+            self.assertEqual(template.default_options.get("style_preset"), "nature")
 
     def test_plot_contract_dict_exposes_validation_rules_from_loader(self) -> None:
         contract = load_plot_contract()
@@ -45,6 +61,17 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(
             set(contract_dict["templates"].keys()),
             set(contract.templates.keys()),
+        )
+        self.assertEqual(set(contract_dict["styles"].keys()), {"nature"})
+        self.assertEqual(
+            contract_dict["aliases"]["style_presets"],
+            {
+                "default": "nature",
+                "lab_default": "nature",
+                "science_editorial": "nature",
+                "jacs_analytical": "nature",
+                "advanced_materials_spacious": "nature",
+            },
         )
 
     def test_tick_label_controls_are_exposed_only_on_supported_axes(self) -> None:

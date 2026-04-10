@@ -6,6 +6,7 @@ struct Base64PreviewImageView: View {
 
     var body: some View {
         if let image = PreviewImageDecoder.decodeBase64PNG(base64PNG) {
+            let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
             GeometryReader { geometry in
                 Image(nsImage: image)
                     .resizable()
@@ -16,7 +17,8 @@ struct Base64PreviewImageView: View {
                         alignment: .center
                     )
             }
-            .background(.black.opacity(0.02), in: RoundedRectangle(cornerRadius: 18))
+            .clipShape(previewShape)
+            .background(.black.opacity(0.02), in: previewShape)
         } else {
             EmptyStateCard(
                 title: "Preview unavailable",

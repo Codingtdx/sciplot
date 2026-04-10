@@ -40,6 +40,7 @@ from src.core.application.render import (
     normalized_dataset_payload,
     preflight_render_request,
     read_raw_table_cached,
+    resolve_template_id,
     template_identity,
     validate_template_name,
 )
@@ -107,15 +108,21 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
     def preflight_render(request: RenderRequest) -> PreflightRenderResponse:
         try:
             input_path = normalize_path(request.input_path)
-            template = validate_template_name(request.template)
-            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
-            options = options_from_payload(template, request.options)
-            preflight = preflight_render_request(template, input_path, sheet, options)
+            requested_template = validate_template_name(request.template)
+            resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
+            identity = template_identity(requested_template, resolved_template_id=resolved_template)
+            options = options_from_payload(
+                requested_template,
+                request.options,
+                input_path=input_path,
+                sheet=sheet,
+            )
+            preflight = preflight_render_request(requested_template, input_path, sheet, options)
             return PreflightRenderResponse.model_validate(
                 {
                     "input_path": str(input_path),
-                    "template": template,
+                    "template": preflight.template,
                     "requested_template_id": identity.requested_template_id,
                     "canonical_id": identity.canonical_id,
                     "role": identity.role,
@@ -133,23 +140,29 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
     def render_preview(request: RenderRequest) -> RenderPreviewResponse:
         try:
             input_path = normalize_path(request.input_path)
-            template = validate_template_name(request.template)
-            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
+            requested_template = validate_template_name(request.template)
+            resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
+            identity = template_identity(requested_template, resolved_template_id=resolved_template)
             payload_options = request.options
             options_payload = payload_options.model_dump(mode="json")
             cache_key = _render_preview_cache_key(
                 input_path=input_path,
                 sheet=sheet,
-                template=template,
+                template=resolved_template,
                 options_payload=options_payload,
             )
             cached = _RENDER_PREVIEW_CACHE.get(cache_key)
             if cached is not None:
                 return cached.model_copy(deep=True)
-            resolved_options = options_from_payload(template, payload_options)
+            resolved_options = options_from_payload(
+                requested_template,
+                payload_options,
+                input_path=input_path,
+                sheet=sheet,
+            )
             rendered_plots = build_rendered_plots(
-                template,
+                requested_template,
                 input_path,
                 sheet,
                 size=payload_options.size,
@@ -178,7 +191,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 previews = rendered_plots_to_preview_payload(rendered_plots)
                 submission_report = build_render_submission_report(
                     context="preview",
-                    template=template,
+                    template=resolved_template,
                     options=resolved_options,
                     output_filenames=[rendered.filename for rendered in rendered_plots],
                     qa_reports=[rendered.qa_report for rendered in rendered_plots],
@@ -186,7 +199,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             finally:
                 close_rendered_plots(rendered_plots)
             response = RenderPreviewResponse(
-                template=template,
+                template=resolved_template,
                 requested_template_id=identity.requested_template_id,
                 canonical_id=identity.canonical_id,
                 role=identity.role,
@@ -205,9 +218,10 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
     def export_render(request: ExportRenderRequest) -> ExportRenderResponse:
         try:
             input_path = normalize_path(request.input_path)
-            template = validate_template_name(request.template)
-            identity = template_identity(template)
             sheet = coerce_sheet(str(request.sheet))
+            requested_template = validate_template_name(request.template)
+            resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
+            identity = template_identity(requested_template, resolved_template_id=resolved_template)
             payload_options = request.options
             managed_output_dir_fn = cast(
                 Callable[..., Path],
@@ -219,12 +233,17 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             output_dir = (
                 Path(request.output_dir).expanduser()
                 if request.output_dir
-                else managed_output_dir_fn(input_path, sheet=sheet, template=template)
+                else managed_output_dir_fn(input_path, sheet=sheet, template=resolved_template)
             )
             output_dir.mkdir(parents=True, exist_ok=True)
-            resolved_options = options_from_payload(template, payload_options)
+            resolved_options = options_from_payload(
+                requested_template,
+                payload_options,
+                input_path=input_path,
+                sheet=sheet,
+            )
             inspection = inspect_input_file(input_path, sheet)
-            preflight = preflight_render_request(template, input_path, sheet, resolved_options)
+            preflight = preflight_render_request(requested_template, input_path, sheet, resolved_options)
             if preflight.errors:
                 raise ValueError("\n".join(preflight.errors))
             created_paths: list[Path] = []
@@ -233,7 +252,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 for filename in preflight.output_filenames
             }
             rendered_plots = build_rendered_plots(
-                template,
+                requested_template,
                 input_path,
                 sheet,
                 size=payload_options.size,
@@ -280,7 +299,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
 
                 submission_report = build_render_submission_report(
                     context="export",
-                    template=template,
+                    template=resolved_template,
                     options=resolved_options,
                     output_filenames=[path.name for path in outputs],
                     qa_reports=[rendered.qa_report for rendered in rendered_plots],

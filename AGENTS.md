@@ -45,6 +45,10 @@
 - typed loader：`src/plot_contract.py`
 - sidecar `/meta`、`/plot-contract`、渲染/预检/smoke 一律消费同一份契约。
 - GUI 不得维护模板、尺寸、palette/style、本地默认值的第二套常量。
+- public `style_preset` 目前只允许一个值：`nature`。
+- 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
+- public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
+- `distribution_compare` 只能在兼容迁移层被解析为显式模板：优先按当前数据解析成 `violin` / `box_strip` / `box`，拿不到源数据时保守回退到 `box`。
 
 ## Sidecar 与前端边界
 
@@ -189,6 +193,7 @@
 - 不要在 sidecar 增加“先兼容旧接口再说”的 fallback。
 - 不要把 contract 常量复制到第二份文件。
 - 不要绕开 schema 校验层直接读写项目 JSON。
+- 不要把 legacy style/template alias 当成新的 public product 语义重新暴露出来。
 - 不要把 Data Studio import 重新拆回多 sheet 串联弹窗。
 - 不要做“按钮可点但 guard-return 无反馈”的 silent no-op 交互。
 - 不要把 Plot 子步骤或 Data Studio 子流程重新提升为 app-level 导航。

@@ -37,14 +37,11 @@ def _stats_raw_point_overlay_enabled(
     *,
     template: str,
     density_safe: bool,
-    distribution_variant: str | None = None,
 ) -> bool:
     if template in {"point_error", "lollipop_error"}:
         return density_safe
     if template == "box_strip":
         return True
-    if template == "distribution_compare":
-        return distribution_variant == "strip_box"
     return False
 
 
@@ -153,16 +150,6 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
             autofixes_applied=("stats_spacing_profile",),
         )
     ]
-
-def _render_grouped_bar_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    return _render_grouped_bar_error_like(
-        input_path,
-        sheet,
-        options,
-        template="grouped_bar_compare",
-        filename_suffix="grouped_bar_compare",
-        profile_autofix="grouped_bar_compare_profile",
-    )
 
 def _render_grouped_bar_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     return _render_grouped_bar_error_like(
@@ -377,74 +364,6 @@ def _overlay_violin_box_summary(
         patch.set_facecolor("none")
         patch.set_alpha(1.0)
         patch.set_edgecolor("black")
-
-def _distribution_compare_variant(groups) -> tuple[str, str]:
-    group_count = len(groups)
-    replicate_counts = [len(group.data) for group in groups]
-    min_replicates = min(replicate_counts) if replicate_counts else 0
-    if group_count >= 6:
-        return ("box", "Many groups default to box for cleaner side-by-side spread comparison.")
-    if group_count <= 4 and min_replicates >= 6:
-        return ("violin", "Higher replicate density with fewer groups defaults to violin for shape visibility.")
-    return ("strip_box", "Moderate group/replicate density defaults to strip+box for balanced spread and readability.")
-
-def _render_distribution_compare(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    groups = _ordered_groups(input_path, sheet, options)
-    validate_manual_axis_overrides(options, template="distribution_compare")
-    if len(groups) < 2:
-        raise ValueError("distribution_compare requires at least two replicate groups.")
-    stats_profile = _stats_profile(groups)
-    variant, _ = _distribution_compare_variant(groups)
-    autofixes = ["stats_spacing_profile", f"distribution_variant_{variant}"]
-
-    if variant == "violin":
-        fig, _ = plot_violin(
-            groups,
-            width_mm=options.width_mm,
-            height_mm=options.height_mm,
-            violin_width=stats_profile.violin_width,
-            spacing_scale=stats_profile.spacing_scale,
-            y_tick_density=options.y_tick_density,
-            y_tick_edge_labels=options.y_tick_edge_labels,
-            ylim=_manual_y_override(options),
-        )
-    else:
-        show_raw_points = _stats_raw_point_overlay_enabled(
-            template="distribution_compare",
-            density_safe=stats_profile.show_raw_points,
-            distribution_variant=variant,
-        )
-        fig, ax = plot_box(
-            groups,
-            width_mm=options.width_mm,
-            height_mm=options.height_mm,
-            box_width=stats_profile.box_width,
-            spacing_scale=stats_profile.spacing_scale,
-            show_raw_points=show_raw_points,
-            raw_point_size=stats_profile.raw_point_size,
-            raw_point_alpha=stats_profile.raw_point_alpha,
-            show_fliers=False,
-            y_tick_density=options.y_tick_density,
-            y_tick_edge_labels=options.y_tick_edge_labels,
-            ylim=_manual_y_override(options),
-        )
-        if variant == "strip_box":
-            _emphasize_strip_point_overlay(
-                ax,
-                min_size=stats_profile.raw_point_size,
-                min_alpha=max(stats_profile.raw_point_alpha, 0.8),
-            )
-            autofixes.append("strip_point_overlay_emphasis")
-
-    return [
-        _rendered_plot_with_qa(
-            filename=f"{predict_bar_box_slug(groups)}_distribution_compare.pdf",
-            figure=fig,
-            template="distribution_compare",
-            options=options,
-            autofixes_applied=tuple(autofixes),
-        )
-    ]
 
 def _render_box_strip(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     groups = _ordered_groups(input_path, sheet, options)

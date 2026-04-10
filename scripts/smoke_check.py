@@ -1231,8 +1231,9 @@ def _assert_style_palette_presets(
     for template, input_path, options in combos:
         rendered = build_rendered_plots(template, input_path, 0, **options)
         try:
-            if plot_style.current_style_preset() != options["style_preset"]:
-                raise AssertionError("Style preset should follow the explicit render option.")
+            expected_style_preset = plot_style.normalize_style_preset(options["style_preset"])
+            if plot_style.current_style_preset() != expected_style_preset:
+                raise AssertionError("Style preset should follow the normalized explicit render option.")
             if plot_style.current_palette_preset() != options["palette_preset"]:
                 raise AssertionError("Palette preset should follow the explicit render option.")
             if not rendered:

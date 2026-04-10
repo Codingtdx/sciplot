@@ -28,7 +28,7 @@ from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
-_BAR_ZERO_BASELINE_TEMPLATES = {"bar", "grouped_bar_compare", "grouped_bar_error"}
+_BAR_ZERO_BASELINE_TEMPLATES = {"bar", "grouped_bar_error"}
 
 
 @dataclass(frozen=True)
@@ -119,14 +119,14 @@ def humanize_preflight_exception(exc: Exception) -> str:
             "No valid groups were found in the replicate table. Confirm that "
             "row 2 contains group names and row 4 onward contains replicate values."
         )
-    if "replicate_curves_with_band requires at least two replicate curves." in message:
+    if "mean_band requires at least two replicate curves." in message:
         return (
-            "replicate_curves_with_band requires at least two usable replicate curves. "
+            "mean_band requires at least two usable replicate curves. "
             "Check that at least two series contain numeric X/Y data."
         )
-    if "At least two aligned x points are required for replicate_curves_with_band." in message:
+    if "At least two aligned x points are required for mean_band." in message:
         return (
-            "replicate_curves_with_band requires at least two shared x positions across replicates. "
+            "mean_band requires at least two shared x positions across replicates. "
             "Align the x values (or sampling grid) before rendering."
         )
     return message
@@ -268,11 +268,11 @@ def aligned_replicate_band(series_list: list[CurveSeries]) -> tuple[np.ndarray, 
     all_frames = [frame for frames in named.values() for frame in frames]
     source = replicated_groups[0] if replicated_groups else all_frames
     if len(source) < 2:
-        raise ValueError("replicate_curves_with_band requires at least two replicate curves.")
+        raise ValueError("mean_band requires at least two replicate curves.")
     x_reference = np.unique(np.concatenate([frame["x"].to_numpy(dtype=float) for frame in source]))
     x_reference = np.asarray(sorted(float(value) for value in x_reference), dtype=float)
     if x_reference.size < 2:
-        raise ValueError("At least two aligned x points are required for replicate_curves_with_band.")
+        raise ValueError("At least two aligned x points are required for mean_band.")
     aligned = []
     for frame in source:
         x = frame["x"].to_numpy(dtype=float)
@@ -281,7 +281,7 @@ def aligned_replicate_band(series_list: list[CurveSeries]) -> tuple[np.ndarray, 
             continue
         aligned.append(np.interp(x_reference, x, y))
     if len(aligned) < 2:
-        raise ValueError("replicate_curves_with_band requires at least two replicate curves.")
+        raise ValueError("mean_band requires at least two replicate curves.")
     stacked = np.vstack(aligned)
     mean = np.nanmean(stacked, axis=0)
     std = np.nanstd(stacked, axis=0, ddof=0)
@@ -392,12 +392,8 @@ def preview_output_filenames(
         return (f"{input_path.stem}_point_line.pdf",)
     if template == "curve":
         return (f"{input_path.stem}_curve.pdf",)
-    if template == "scatter_with_fit":
-        return (f"{input_path.stem}_scatter_with_fit.pdf",)
     if template == "scatter_fit":
         return (f"{input_path.stem}_scatter_fit.pdf",)
-    if template == "replicate_curves_with_band":
-        return (f"{input_path.stem}_replicate_curves_with_band.pdf",)
     if template == "mean_band":
         return (f"{input_path.stem}_mean_band.pdf",)
     if template == "stacked_curve":
@@ -417,11 +413,9 @@ def preview_output_filenames(
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)
     if template in {
-        "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
         "lollipop_error",
-        "distribution_compare",
         "histogram_density",
     }:
         groups = load_replicate_table_cached(input_path, sheet)

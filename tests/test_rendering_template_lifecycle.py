@@ -61,21 +61,32 @@ def test_template_lifecycle_inventory_marks_aliases_and_policies() -> None:
     assert scatter_alias_identity.role == "alias"
     assert scatter_alias_identity.lifecycle_policy == "deprecated_in_practice"
     assert scatter_alias_identity.implementation_id == "scatter_fit"
+    distribution_identity = template_identity("distribution_compare")
+    assert distribution_identity.requested_template_id == "distribution_compare"
+    assert distribution_identity.role == "family_alias"
+    assert distribution_identity.canonical_id == "box"
+    assert distribution_identity.implementation_id == "box"
 
 
-def test_template_catalog_uses_canonical_implementation_ids_for_aliases() -> None:
+def test_template_catalog_only_exposes_public_canonical_templates() -> None:
     assert DEFAULT_TEMPLATE_CATALOG.get("scatter_fit").implementation_id == "scatter_fit"
-    assert DEFAULT_TEMPLATE_CATALOG.get("scatter_with_fit").implementation_id == "scatter_fit"
-    assert DEFAULT_TEMPLATE_CATALOG.get("scatter_with_fit").canonical_id == "scatter_fit"
-    assert DEFAULT_TEMPLATE_CATALOG.get("scatter_with_fit").role == "alias"
-    assert DEFAULT_TEMPLATE_CATALOG.get("scatter_with_fit").lifecycle_policy == "deprecated_in_practice"
     assert DEFAULT_TEMPLATE_CATALOG.get("mean_band").implementation_id == "mean_band"
-    assert DEFAULT_TEMPLATE_CATALOG.get("replicate_curves_with_band").implementation_id == "mean_band"
-    assert DEFAULT_TEMPLATE_CATALOG.get("grouped_bar_compare").implementation_id == "grouped_bar_error"
     assert DEFAULT_TEMPLATE_CATALOG.get("bubble_scatter").canonical_id == "bubble_scatter"
     assert DEFAULT_TEMPLATE_CATALOG.get("bubble_scatter").role == "canonical"
     assert DEFAULT_TEMPLATE_CATALOG.get("lollipop_error").canonical_id == "lollipop_error"
     assert DEFAULT_TEMPLATE_CATALOG.get("lollipop_error").role == "canonical"
+    for legacy_id in (
+        "scatter_with_fit",
+        "replicate_curves_with_band",
+        "grouped_bar_compare",
+        "distribution_compare",
+    ):
+        try:
+            DEFAULT_TEMPLATE_CATALOG.get(legacy_id)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{legacy_id} should not remain in the public template catalog.")
 
 
 def test_recommender_prefers_canonical_templates_over_aliases_for_curve_data(tmp_path: Path) -> None:
@@ -83,8 +94,10 @@ def test_recommender_prefers_canonical_templates_over_aliases_for_curve_data(tmp
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=10)
     template_ids = [item.template_id for item in recommendations]
 
-    assert template_ids.index("scatter_fit") < template_ids.index("scatter_with_fit")
-    assert template_ids.index("mean_band") < template_ids.index("replicate_curves_with_band")
+    assert "scatter_with_fit" not in template_ids
+    assert "replicate_curves_with_band" not in template_ids
+    assert "scatter_fit" in template_ids
+    assert "mean_band" in template_ids
 
 
 def test_recommender_keeps_grouped_bar_compare_as_compatibility_only(tmp_path: Path) -> None:

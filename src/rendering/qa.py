@@ -29,7 +29,6 @@ _STATS_QA_TEMPLATES = {
     *template_family_ids("grouped_bar_error"),
     "point_error",
     "lollipop_error",
-    "distribution_compare",
     "histogram_density",
 }
 

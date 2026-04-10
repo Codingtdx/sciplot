@@ -1,7 +1,7 @@
 # SciPlot God Plot Contract
 
 - Version: `3`
-- Default style: `default`
+- Default style: `nature`
 - Default palette: `colorblind_safe`
 
 ## Global Frame
@@ -122,16 +122,6 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
-### `grouped_bar_compare` / Grouped bar compare
-
-- Category: `single_panel`
-- Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
-- Description: Grouped bar comparison with deterministic spacing and summary error bars.
-- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
-- Soft rules: `dense_group_label_warning`
-
 ### `grouped_bar_error` / Grouped bar + error
 
 - Category: `single_panel`
@@ -159,16 +149,6 @@
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Group means as lollipop stems with deterministic error bars and optional raw-point overlays.
-- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
-- Soft rules: `dense_group_label_warning`
-
-### `distribution_compare` / Distribution compare
-
-- Category: `single_panel`
-- Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
-- Description: Single structural family for group-wise distribution comparison with deterministic internal variant selection.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
@@ -202,16 +182,6 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
 
-### `scatter_with_fit` / Scatter with fit
-
-- Category: `single_panel`
-- Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
-- Description: Single-panel scatter plot with a deterministic linear fit overlay.
-- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
-- Soft rules: None
-
 ### `scatter_fit` / Scatter fit
 
 - Category: `single_panel`
@@ -219,16 +189,6 @@
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with a deterministic linear fit overlay.
-- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
-- Soft rules: None
-
-### `replicate_curves_with_band` / Replicate curves with band
-
-- Category: `single_panel`
-- Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
-- Description: Single-panel curve plot with a replicate mean band overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
 

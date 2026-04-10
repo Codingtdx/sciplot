@@ -41,7 +41,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         yLabelOverride: String? = nil,
         baseline: String? = nil,
         showColorbar: Bool? = nil,
-        stylePreset: String = "default",
+        stylePreset: String = "nature",
         palettePreset: String = "colorblind_safe",
         useSidecar: Bool? = nil,
         visualThemeID: String? = nil

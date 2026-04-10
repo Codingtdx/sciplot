@@ -628,7 +628,7 @@ final class DataStudioSessionTests: XCTestCase {
             .init(
                 familyID: "strength",
                 selectedTemplateID: "box",
-                optionsByTemplate: ["box": RenderOptionsPayload(stylePreset: "journal_calm", palettePreset: "aqua_graphite")]
+                optionsByTemplate: ["box": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")]
             ),
         ]
 
@@ -786,6 +786,49 @@ final class DataStudioSessionTests: XCTestCase {
                 client.renderRequests.last?.options.yMin == -10.0 &&
                 client.renderRequests.last?.options.xTickDensity == "sparse" &&
                 client.renderRequests.last?.options.yTickEdgeLabels == "hide_both"
+            },
+            timeout: 3.0
+        )
+    }
+
+    func testRepresentativeCurveInspectorControlsRecoverFromPreviewTemplateWhenSelectionStateDrifts() async throws {
+        let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
+        await waitUntil(
+            {
+                session.currentFigureTemplateID == "curve" &&
+                session.plotSession.previewResponse != nil &&
+                session.plotSession.selectedTemplateSummary?.id == "curve"
+            },
+            timeout: 3.0
+        )
+
+        session.plotSession.selectedTemplateID = nil
+
+        XCTAssertEqual(session.currentFigureTemplateID, "curve")
+        XCTAssertEqual(session.plotSession.effectiveTemplateID, "curve")
+        XCTAssertEqual(session.plotSession.selectedTemplateSummary?.id, "curve")
+        XCTAssertTrue(session.plotSession.editableOptionIDs.contains("x_min"))
+        XCTAssertTrue(session.plotSession.editableOptionIDs.contains("y_max"))
+
+        session.plotSession.updateRenderOptions(policy: .immediate) {
+            $0.xMin = -5.0
+            $0.yMax = 85.0
+        }
+
+        await waitUntil(
+            {
+                client.renderRequests.last?.template == "curve" &&
+                client.renderRequests.last?.options.xMin == -5.0 &&
+                client.renderRequests.last?.options.yMax == 85.0
             },
             timeout: 3.0
         )
@@ -1056,6 +1099,15 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(
             Array(presentation.rankedRows.prefix(5).map(\.disposition)),
             Array(repeating: .keep, count: 5)
+        )
+        XCTAssertEqual(presentation.sortDescriptor.label, "Elongation")
+        XCTAssertEqual(
+            presentation.rankedRows.map(\.id),
+            ["sample-6", "sample-5", "sample-4", "sample-3", "sample-2", "sample-7", "sample-1"]
+        )
+        XCTAssertEqual(
+            presentation.advancedRows.map(\.specimenId),
+            ["sample-7", "sample-6", "sample-5", "sample-4", "sample-3", "sample-2", "sample-1"]
         )
         XCTAssertTrue(presentation.rankedRows[4].showsCutoffAfter)
         XCTAssertEqual(
@@ -1328,7 +1380,7 @@ final class DataStudioSessionTests: XCTestCase {
                 .init(
                     familyID: "strength",
                     selectedTemplateID: "box",
-                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "journal_calm", palettePreset: "aqua_graphite")]
+                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe")]
                 ),
             ],
             importedPaths: ["/tmp/raw_a.csv"],

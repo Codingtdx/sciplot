@@ -201,6 +201,30 @@ def _write_heatmap_table(path: Path) -> Path:
     return path
 
 
+def _write_multi_tensile_curve_table(path: Path) -> Path:
+    x = np.linspace(0.0, 60.0, 90)
+    rows = [
+        ["Strain", "Stress", "Strain", "Stress", "Strain", "Stress", "Strain", "Stress"],
+        ["%", "MPa", "%", "MPa", "%", "MPa", "%", "MPa"],
+        ["Group A", "Group A", "Group B", "Group B", "Group C", "Group C", "Group D", "Group D"],
+    ]
+    for value in x:
+        rows.append(
+            [
+                value,
+                24.0 * (1.0 - np.exp(-value / 4.8)) - 0.015 * max(value - 48.0, 0.0) ** 2,
+                value,
+                26.0 * (1.0 - np.exp(-value / 5.6)) - 0.013 * max(value - 50.0, 0.0) ** 2,
+                value,
+                22.0 * (1.0 - np.exp(-value / 6.2)) - 0.011 * max(value - 52.0, 0.0) ** 2,
+                value,
+                25.5 * (1.0 - np.exp(-value / 5.1)) - 0.014 * max(value - 49.0, 0.0) ** 2,
+            ]
+        )
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_frequency_sweep_table(path: Path) -> Path:
     rows = [
         [
@@ -284,7 +308,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
 
     inspection = inspect_input_file(input_path)
     assert inspection.recommendations[0].template_id == "curve"
-    assert len(inspection.recommendations) == 10
+    assert len(inspection.recommendations) == 8
     assert inspection.recommendations[0].template_id == "curve"
     assert inspection.recommendations[1].template_id == "point_line"
     assert inspection.recommendations[0].rank == 1
@@ -314,7 +338,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     assert preflight.implementation_id == "curve"
     assert preflight.submission_report is not None
     assert preflight.submission_report.context == "preflight"
-    assert preflight.submission_report.style_preset == "default"
+    assert preflight.submission_report.style_preset == "nature"
 
     rendered = build_rendered_plots("curve", input_path)
     try:
@@ -370,7 +394,7 @@ def test_style_composer_uses_contract_backed_protected_keys() -> None:
     bundle = DEFAULT_STYLE_COMPOSER.compose("default", "soft_grid")
 
     assert default_bundle.resolved_soft == {}
-    assert bundle.publication_profile_id == "default"
+    assert bundle.publication_profile_id == "nature"
     assert bundle.protected_keys
     assert any(key.startswith("typography.") for key in bundle.protected_keys)
     assert "typography.font_size_pt" in bundle.protected_keys
@@ -402,7 +426,7 @@ def test_style_composer_filters_contract_protected_theme_overrides(monkeypatch: 
 def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> None:
     try:
         plot_style.apply_style(
-            "default",
+            "nature",
             "colorblind_safe",
             soft_overrides=visual_theme_soft_overrides("soft_grid"),
         )
@@ -414,8 +438,8 @@ def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> No
 
 
 def test_visual_themes_do_not_mutate_protected_publication_typography_defaults() -> None:
-    protected_font_size = DEFAULT_STYLE_COMPOSER.compose("default", None).resolved_hard["typography"]["font_size_pt"]
-    protected_legend_size = DEFAULT_STYLE_COMPOSER.compose("default", None).resolved_hard["typography"][
+    protected_font_size = DEFAULT_STYLE_COMPOSER.compose("nature", None).resolved_hard["typography"]["font_size_pt"]
+    protected_legend_size = DEFAULT_STYLE_COMPOSER.compose("nature", None).resolved_hard["typography"][
         "legend_font_size_pt"
     ]
 
@@ -424,7 +448,7 @@ def test_visual_themes_do_not_mutate_protected_publication_typography_defaults()
             overrides = visual_theme_soft_overrides(theme_id)
             assert "font.size" not in overrides
             assert "legend.fontsize" not in overrides
-            plot_style.apply_style("default", "colorblind_safe", soft_overrides=overrides)
+            plot_style.apply_style("nature", "colorblind_safe", soft_overrides=overrides)
             assert rcParams["font.size"] == protected_font_size
             assert rcParams["legend.fontsize"] == protected_legend_size
     finally:
@@ -612,9 +636,10 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     assert inspection.recommendations[0].template_id == "box"
     assert inspection.recommendations
     assert inspection.recommendations[0].template_id == "box"
-    assert {"distribution_compare", "grouped_bar_error", "point_error", "box_strip"}.issubset(
+    assert {"grouped_bar_error", "point_error", "box_strip"}.issubset(
         {item.template_id for item in inspection.recommendations}
     )
+    assert "distribution_compare" not in {item.template_id for item in inspection.recommendations}
     assert "lollipop_error" in {item.template_id for item in inspection.advanced_templates}
 
 
@@ -624,13 +649,15 @@ def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -
     options = resolve_render_options(template="grouped_bar_compare")
     preflight = preflight_render_request("grouped_bar_compare", input_path, 0, options)
     assert preflight.errors == ()
-    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_compare.pdf",)
+    assert preflight.requested_template_id == "grouped_bar_compare"
+    assert preflight.canonical_id == "grouped_bar_error"
+    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_error.pdf",)
 
     rendered = build_rendered_plots("grouped_bar_compare", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
-        assert "grouped_bar_compare_profile" in rendered[0].qa_report.autofixes_applied
+        assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
         assert "bar_raw_points_overlay" not in rendered[0].qa_report.autofixes_applied
         assert not _path_collections(rendered[0].figure.axes[0])
     finally:
@@ -737,13 +764,16 @@ def test_distribution_compare_preflight_matches_render_filename(tmp_path: Path) 
     options = resolve_render_options(template="distribution_compare")
     preflight = preflight_render_request("distribution_compare", input_path, 0, options)
     assert preflight.errors == ()
-    assert preflight.output_filenames == ("tensile_modulus_distribution_compare.pdf",)
+    assert preflight.requested_template_id == "distribution_compare"
+    assert preflight.canonical_id == "box_strip"
+    assert preflight.output_filenames == ("tensile_modulus_box_strip.pdf",)
 
     rendered = build_rendered_plots("distribution_compare", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
-        assert "distribution_variant_strip_box" in rendered[0].qa_report.autofixes_applied
+        assert "box_strip_profile" in rendered[0].qa_report.autofixes_applied
+        assert "strip_point_overlay_emphasis" in rendered[0].qa_report.autofixes_applied
         collections = _path_collections(rendered[0].figure.axes[0])
         assert collections
         assert all(collection.get_edgecolors().size == 0 for collection in collections)
@@ -798,7 +828,7 @@ def test_distribution_compare_uses_violin_variant_when_groups_are_few_and_dense(
     try:
         assert len(rendered) == 1
         assert rendered[0].qa_report is not None
-        assert "distribution_variant_violin" in rendered[0].qa_report.autofixes_applied
+        assert rendered[0].filename.endswith("_violin.pdf")
     finally:
         close_rendered_plots(rendered)
 
@@ -810,7 +840,7 @@ def test_distribution_compare_uses_box_variant_when_group_count_is_large(tmp_pat
     try:
         assert len(rendered) == 1
         assert rendered[0].qa_report is not None
-        assert "distribution_variant_box" in rendered[0].qa_report.autofixes_applied
+        assert rendered[0].filename.endswith("_box.pdf")
         assert not _path_collections(rendered[0].figure.axes[0])
         assert not _has_marker_lines(rendered[0].figure.axes[0])
     finally:
@@ -843,7 +873,7 @@ def test_scatter_with_fit_preflight_matches_render_filename(tmp_path: Path) -> N
     assert preflight.role == "alias"
     assert preflight.lifecycle_policy == "deprecated_in_practice"
     assert preflight.implementation_id == "scatter_fit"
-    assert preflight.output_filenames == ("curve_scatter_with_fit.pdf",)
+    assert preflight.output_filenames == ("curve_scatter_fit.pdf",)
 
     rendered = build_rendered_plots("scatter_with_fit", input_path)
     try:
@@ -994,7 +1024,8 @@ def test_replicate_curves_with_band_preflight_matches_render_filename(tmp_path: 
     options = resolve_render_options(template="replicate_curves_with_band")
     preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
     assert preflight.errors == ()
-    assert preflight.output_filenames == ("multi_curve_replicate_curves_with_band.pdf",)
+    assert preflight.canonical_id == "mean_band"
+    assert preflight.output_filenames == ("multi_curve_mean_band.pdf",)
 
     rendered = build_rendered_plots("replicate_curves_with_band", input_path)
     try:
@@ -1010,7 +1041,7 @@ def test_replicate_curves_with_band_rejects_rheology_bundle(tmp_path: Path) -> N
 
     options = resolve_render_options(template="replicate_curves_with_band")
     preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
-    assert preflight.errors == ("replicate_curves_with_band is not supported for rheology export bundles.",)
+    assert preflight.errors == ("mean_band is not supported for rheology export bundles.",)
 
     with pytest.raises(ValueError, match="not supported for rheology export bundles"):
         build_rendered_plots("replicate_curves_with_band", input_path)
@@ -1034,7 +1065,7 @@ def test_replicate_curves_with_band_preflight_rejects_poor_x_alignment(tmp_path:
     preflight = preflight_render_request("replicate_curves_with_band", input_path, 0, options)
 
     assert preflight.errors == (
-        "replicate_curves_with_band requires at least two shared x positions across replicates. "
+        "mean_band requires at least two shared x positions across replicates. "
         "Align the x values (or sampling grid) before rendering.",
     )
 
@@ -1066,6 +1097,21 @@ def test_large_curve_render_keeps_legend_when_direct_labels_are_not_preferred(tm
         ax = plot.figure.axes[0]
         assert ax.get_legend() is not None
         assert {text.get_text() for text in ax.texts} == set()
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_small_tensile_curve_with_four_series_keeps_legend(tmp_path: Path) -> None:
+    input_path = _write_multi_tensile_curve_table(tmp_path / "multi_tensile_curve.csv")
+
+    rendered = build_rendered_plots("curve", input_path)
+    try:
+        assert len(rendered) == 1
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "direct_series_labels" not in plot.qa_report.autofixes_applied
+        ax = plot.figure.axes[0]
+        assert ax.get_legend() is not None
     finally:
         close_rendered_plots(rendered)
 

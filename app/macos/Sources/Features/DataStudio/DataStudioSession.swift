@@ -463,39 +463,20 @@ final class DataStudioSession {
             summary = nil
         }
 
-        let sortedRows = (baselinePreview?.specimens ?? [])
-            .sorted { lhs, rhs in
-                let leftHasDistance = lhs.distanceFromMeanScore != nil
-                let rightHasDistance = rhs.distanceFromMeanScore != nil
-                if leftHasDistance != rightHasDistance {
-                    return leftHasDistance && !rightHasDistance
-                }
-                let left = lhs.distanceFromMeanScore ?? .infinity
-                let right = rhs.distanceFromMeanScore ?? .infinity
-                if left != right {
-                    return left < right
-                }
-                let filenameComparison = lhs.filename.localizedCaseInsensitiveCompare(rhs.filename)
-                if filenameComparison != .orderedSame {
-                    return filenameComparison == .orderedAscending
-                }
-                return lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
-            }
-        let rankedRows = sortedRows.enumerated().map { index, specimen in
-            let disposition: DataStudioSpecimenFilterRankDisposition
-            switch specimen.autoRuleRole {
-            case "keep":
-                disposition = .keep
-            case "exclude":
-                disposition = .out
-            default:
-                disposition = .ineligible
-            }
+        let sortDescriptor = specimenFilterSortDescriptor(for: baselinePreview)
+        let rankedSourceRows = sortedSpecimenRows(
+            baselinePreview?.specimens ?? [],
+            descriptor: sortDescriptor,
+            groupByDisposition: true
+        )
+        let rankedRows = rankedSourceRows.enumerated().map { index, specimen in
+            let disposition = specimenFilterDisposition(for: specimen)
             let showsCutoffAfter = disposition == .keep
-                && sortedRows.dropFirst(index + 1).contains(where: { $0.autoRuleRole != "keep" })
+                && rankedSourceRows.dropFirst(index + 1).contains(where: { specimenFilterDisposition(for: $0) != .keep })
             return DataStudioSpecimenFilterRankedRow(
                 id: specimen.specimenId,
                 rank: index + 1,
+                sortValue: specimenFilterSortValue(for: specimen, descriptor: sortDescriptor),
                 distanceFromMeanScore: specimen.distanceFromMeanScore,
                 disposition: disposition,
                 showsCutoffAfter: showsCutoffAfter
@@ -522,8 +503,13 @@ final class DataStudioSession {
             autoFilterReason: autoFilterReason,
             canApplyAuto: canApplyAuto,
             canTurnOff: canTurnOff,
+            sortDescriptor: sortDescriptor,
             rankedRows: rankedRows,
-            advancedRows: sortedRows
+            advancedRows: sortedSpecimenRows(
+                baselinePreview?.specimens ?? [],
+                descriptor: sortDescriptor,
+                groupByDisposition: false
+            )
         )
     }
 
@@ -2229,6 +2215,7 @@ final class DataStudioSession {
             selectedFigureTemplateID = nil
         }
         selectedRecipeID = currentRecipe?.id
+        plotSession.selectedTemplateID = currentRecipe?.templateID ?? selectedFigureTemplateID
     }
 
     private func familyFor(recipe: DataStudioComparisonRecipeResponse) -> DataStudioFigureFamilyItem? {
@@ -2260,7 +2247,6 @@ final class DataStudioSession {
             "box",
             "bar",
             "violin",
-            "distribution_compare",
         ]
         let supported = family.recipes.filter(\.supported)
         if let matched = preferredTemplateOrder.lazy.compactMap({ templateID in
@@ -2868,6 +2854,138 @@ final class DataStudioSession {
         return 9
     }
 
+    private func specimenFilterSortDescriptor(
+        for preview: DataStudioWorkbookPreviewResponse?
+    ) -> DataStudioSpecimenFilterSortDescriptor {
+        guard let preview else {
+            return DataStudioSpecimenFilterSortDescriptor(
+                key: .distanceFromMean,
+                label: "Distance from Mean",
+                unit: nil
+            )
+        }
+        var candidateMetricIDs: [String] = []
+        if let currentMetricID = currentFigureFamily?.metricID, !currentMetricID.isEmpty {
+            candidateMetricIDs.append(currentMetricID)
+        }
+        candidateMetricIDs.append("Elongation")
+        candidateMetricIDs.append(contentsOf: preview.metrics.map(\.label))
+
+        var seenMetricIDs: Set<String> = []
+        for metricID in candidateMetricIDs {
+            let normalizedMetricID = normalizeFigureFamilyID(metricID)
+            guard seenMetricIDs.insert(normalizedMetricID).inserted else {
+                continue
+            }
+            guard preview.specimens.contains(where: { specimenMetricValue(for: $0, metricID: metricID) != nil }) else {
+                continue
+            }
+            let summary = preview.metrics.first(where: {
+                metricIdentifierMatches($0.label, metricID) || metricIdentifierMatches($0.id, metricID)
+            })
+            return DataStudioSpecimenFilterSortDescriptor(
+                key: .metric(metricID: summary?.label ?? metricID),
+                label: summary?.label ?? metricID,
+                unit: summary?.unit
+            )
+        }
+
+        return DataStudioSpecimenFilterSortDescriptor(
+            key: .distanceFromMean,
+            label: "Distance from Mean",
+            unit: nil
+        )
+    }
+
+    private func specimenFilterSortValue(
+        for specimen: DataStudioSpecimenPreviewResponse,
+        descriptor: DataStudioSpecimenFilterSortDescriptor
+    ) -> Double? {
+        switch descriptor.key {
+        case let .metric(metricID):
+            return specimenMetricValue(for: specimen, metricID: metricID)
+        case .distanceFromMean:
+            return specimen.distanceFromMeanScore
+        }
+    }
+
+    private func sortedSpecimenRows(
+        _ specimens: [DataStudioSpecimenPreviewResponse],
+        descriptor: DataStudioSpecimenFilterSortDescriptor,
+        groupByDisposition: Bool
+    ) -> [DataStudioSpecimenPreviewResponse] {
+        specimens.sorted { lhs, rhs in
+            if groupByDisposition {
+                let leftDisposition = specimenFilterDisposition(for: lhs)
+                let rightDisposition = specimenFilterDisposition(for: rhs)
+                let leftPriority = specimenFilterDispositionPriority(leftDisposition)
+                let rightPriority = specimenFilterDispositionPriority(rightDisposition)
+                if leftPriority != rightPriority {
+                    return leftPriority < rightPriority
+                }
+            }
+            let leftValue = specimenFilterSortValue(for: lhs, descriptor: descriptor)
+            let rightValue = specimenFilterSortValue(for: rhs, descriptor: descriptor)
+            switch (leftValue, rightValue) {
+            case let (left?, right?) where left != right:
+                return descriptor.sortsHighToLow ? (left > right) : (left < right)
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            default:
+                break
+            }
+            let leftDistance = lhs.distanceFromMeanScore ?? .infinity
+            let rightDistance = rhs.distanceFromMeanScore ?? .infinity
+            if leftDistance != rightDistance {
+                return leftDistance < rightDistance
+            }
+            let filenameComparison = lhs.filename.localizedCaseInsensitiveCompare(rhs.filename)
+            if filenameComparison != .orderedSame {
+                return filenameComparison == .orderedAscending
+            }
+            return lhs.specimenId.localizedCaseInsensitiveCompare(rhs.specimenId) == .orderedAscending
+        }
+    }
+
+    private func specimenMetricValue(
+        for specimen: DataStudioSpecimenPreviewResponse,
+        metricID: String
+    ) -> Double? {
+        specimen.metrics.first { metricIdentifierMatches($0.key, metricID) }?.value ?? nil
+    }
+
+    private func metricIdentifierMatches(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+
+    private func specimenFilterDisposition(
+        for specimen: DataStudioSpecimenPreviewResponse
+    ) -> DataStudioSpecimenFilterRankDisposition {
+        switch specimen.autoRuleRole {
+        case "keep":
+            return .keep
+        case "exclude":
+            return .out
+        default:
+            return .ineligible
+        }
+    }
+
+    private func specimenFilterDispositionPriority(
+        _ disposition: DataStudioSpecimenFilterRankDisposition
+    ) -> Int {
+        switch disposition {
+        case .keep:
+            return 0
+        case .out:
+            return 1
+        case .ineligible:
+            return 2
+        }
+    }
+
     private func displayLabel(forTemplateID templateID: String) -> String {
         switch templateID {
         case "curve":
@@ -2880,8 +2998,6 @@ final class DataStudioSession {
             return "Box + Strip"
         case "violin":
             return "Violin"
-        case "distribution_compare":
-            return "Distribution"
         case "point_error":
             return "Point + Error"
         case "grouped_bar_error":

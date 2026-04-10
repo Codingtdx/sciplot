@@ -77,6 +77,14 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 
 When behavior is a contract change, update contract first, regenerate docs, then update Python/sidecar/macOS consumers.
 
+## Plot Contract Semantics
+
+- Public plotting style is now a single preset: `nature`.
+- Legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, and `advanced_materials_spacious` are ingress-only compatibility aliases and must normalize immediately to `nature`.
+- Public template/catalog/recommendation surfaces expose only explicit chart templates.
+- Legacy template ids such as `scatter_with_fit`, `replicate_curves_with_band`, and `grouped_bar_compare` are ingress-only aliases and must normalize immediately to `scatter_fit`, `mean_band`, and `grouped_bar_error`.
+- `distribution_compare` is compatibility-only and must never be emitted as a public template id; resolve it to `box`, `box_strip`, or `violin`, with `box` as the conservative fallback when source inspection is unavailable.
+
 ## Engineering Principles
 
 - Start from the minimum necessary state. If a UI string, badge, or button state can be derived from one source of truth, do not store it separately.

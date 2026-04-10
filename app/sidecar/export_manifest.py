@@ -84,11 +84,11 @@ def runtime_versions() -> dict[str, object]:
     }
 
 
-def template_layer(requested_template_id: str) -> dict[str, object]:
-    spec = template_contract(requested_template_id)
-    identity = template_identity(requested_template_id)
+def template_layer(requested_template_id: str, canonical_template_id: str) -> dict[str, object]:
+    spec = template_contract(canonical_template_id)
+    identity = template_identity(requested_template_id, resolved_template_id=canonical_template_id)
     return {
-        "id": requested_template_id,
+        "id": canonical_template_id,
         "requested_template_id": identity.requested_template_id,
         "canonical_id": identity.canonical_id,
         "role": identity.role,
@@ -123,7 +123,7 @@ def mapping_layer(
         recommendation_template = recommendation_payload.get("template")
     return {
         "detected_model": inspection_data.get("model"),
-        "selected_template": requested_template_id,
+        "selected_template": canonical_template_id,
         "requested_template_id": requested_template_id,
         "selected_implementation_id": canonical_template_id,
         "canonical_id": canonical_template_id,
@@ -135,7 +135,8 @@ def mapping_layer(
 
 def theme_layer(options: object) -> dict[str, object]:
     option_data = as_mapping(options)
-    style_preset = str(option_data.get("style_preset") or plot_style.DEFAULT_STYLE_PRESET)
+    style_raw = option_data.get("style_preset")
+    style_preset = plot_style.normalize_style_preset(str(style_raw) if style_raw is not None else None)
     palette_preset = str(option_data.get("palette_preset") or plot_style.DEFAULT_PALETTE_PRESET)
     visual_theme_raw = option_data.get("visual_theme_id")
     visual_theme_id = str(visual_theme_raw) if isinstance(visual_theme_raw, str) and visual_theme_raw.strip() else None
@@ -209,7 +210,7 @@ def bundle_manifest_payload(
         "generated_at": now_utc_iso(),
         "input_path": str(input_path),
         "sheet": sheet,
-        "template": requested_template_id,
+        "template": canonical_template_id,
         "requested_template_id": requested_template_id,
         "canonical_template_id": canonical_template_id,
         "output_dir": str(output_dir),
@@ -219,7 +220,7 @@ def bundle_manifest_payload(
         "normalized_options": options,
         "inspection": inspection,
         "submission_report": submission_report,
-        "template_layer": template_layer(requested_template_id),
+        "template_layer": template_layer(requested_template_id, canonical_template_id),
         "mapping_layer": mapping_layer(requested_template_id, canonical_template_id, inspection),
         "theme_layer": theme_layer(options),
         "contract_layer": contract_data,

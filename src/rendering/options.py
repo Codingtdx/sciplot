@@ -10,6 +10,7 @@ from src.plot_contract import (
 )
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HINTS, TEMPLATE_CHOICES
 from src.rendering.models import RenderOptions
+from src.rendering.template_lifecycle import is_supported_template_id, resolve_template_id
 from src.rendering.themes import visual_theme_ids
 
 _VALID_TICK_DENSITIES = frozenset({"auto", "sparse", "dense"})
@@ -19,14 +20,20 @@ _VALID_TICK_EDGE_LABELS = frozenset({"auto", "hide_min", "hide_max", "hide_both"
 def validate_template_name(template: str) -> str:
     if template in LEGACY_TEMPLATE_HINTS:
         raise ValueError(f"Legacy template name `{template}` is no longer supported. {LEGACY_TEMPLATE_HINTS[template]}")
-    if template not in TEMPLATE_CHOICES:
+    if not is_supported_template_id(template):
         raise ValueError(f"Unknown template: {template}. Supported templates: {', '.join(TEMPLATE_CHOICES)}")
     return template
 
 
-def resolve_size(size_text: str | None, template: str) -> tuple[float, float]:
-    spec = template_contract(template)
-    chosen = size_text or DEFAULT_SIZE_BY_TEMPLATE[template]
+def resolve_size(
+    size_text: str | None,
+    template: str,
+    *,
+    resolved_template_id: str | None = None,
+) -> tuple[float, float]:
+    effective_template = resolved_template_id or resolve_template_id(template)
+    spec = template_contract(effective_template)
+    chosen = size_text or DEFAULT_SIZE_BY_TEMPLATE[effective_template]
     if chosen not in spec.allowed_sizes:
         raise ValueError(
             f"Template `{template}` does not support size `{chosen}`. Supported sizes: {', '.join(spec.allowed_sizes)}"
@@ -35,8 +42,13 @@ def resolve_size(size_text: str | None, template: str) -> tuple[float, float]:
     return size_spec.width_mm, size_spec.height_mm
 
 
-def _ensure_template_option_supported(template: str, option_id: str) -> None:
-    spec = template_contract(template)
+def _ensure_template_option_supported(
+    template: str,
+    option_id: str,
+    *,
+    resolved_template_id: str | None = None,
+) -> None:
+    spec = template_contract(resolved_template_id or resolve_template_id(template))
     if option_id not in spec.editable_options:
         raise ValueError(
             f"Template `{template}` does not support option `{option_id}`. "
@@ -44,20 +56,31 @@ def _ensure_template_option_supported(template: str, option_id: str) -> None:
         )
 
 
-def _normalize_manual_bound(template: str, option_id: str, value: float | None) -> float | None:
+def _normalize_manual_bound(
+    template: str,
+    option_id: str,
+    value: float | None,
+    *,
+    resolved_template_id: str | None = None,
+) -> float | None:
     if value is None:
         return None
-    _ensure_template_option_supported(template, option_id)
+    _ensure_template_option_supported(template, option_id, resolved_template_id=resolved_template_id)
     numeric = float(value)
     if not math.isfinite(numeric):
         raise ValueError(f"`{option_id}` must be a finite number.")
     return numeric
 
 
-def _normalize_series_order(template: str, series_order: list[str] | tuple[str, ...] | None) -> tuple[str, ...] | None:
+def _normalize_series_order(
+    template: str,
+    series_order: list[str] | tuple[str, ...] | None,
+    *,
+    resolved_template_id: str | None = None,
+) -> tuple[str, ...] | None:
     if series_order is None:
         return None
-    _ensure_template_option_supported(template, "series_order")
+    _ensure_template_option_supported(template, "series_order", resolved_template_id=resolved_template_id)
     cleaned: list[str] = []
     seen: set[str] = set()
     for item in series_order:
@@ -85,10 +108,11 @@ def _normalize_enumerated_option(
     value: str | None,
     *,
     allowed: frozenset[str],
+    resolved_template_id: str | None = None,
 ) -> str | None:
     if value is None:
         return None
-    _ensure_template_option_supported(template, option_id)
+    _ensure_template_option_supported(template, option_id, resolved_template_id=resolved_template_id)
     cleaned = str(value).strip().lower()
     if not cleaned or cleaned == "auto":
         return None
@@ -123,10 +147,12 @@ def resolve_render_options(
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
+    resolved_template_id: str | None = None,
 ) -> RenderOptions:
-    width_mm, height_mm = resolve_size(size, template)
-    spec = template_contract(template)
-    defaults = default_options_for_template(template)
+    contract_template = resolved_template_id or resolve_template_id(template)
+    width_mm, height_mm = resolve_size(size, template, resolved_template_id=contract_template)
+    spec = template_contract(contract_template)
+    defaults = default_options_for_template(contract_template)
     normalized_style = plot_style.normalize_style_preset(style_preset or defaults.get("style_preset"))
     if normalized_style not in spec.available_styles:
         raise ValueError(
@@ -154,35 +180,43 @@ def resolve_render_options(
         show_colorbar=defaults.get("show_colorbar", True) if show_colorbar is None else show_colorbar,
         style_preset=normalized_style,
         palette_preset=resolved_palette,
-        x_min=_normalize_manual_bound(template, "x_min", x_min),
-        x_max=_normalize_manual_bound(template, "x_max", x_max),
-        y_min=_normalize_manual_bound(template, "y_min", y_min),
-        y_max=_normalize_manual_bound(template, "y_max", y_max),
+        x_min=_normalize_manual_bound(template, "x_min", x_min, resolved_template_id=contract_template),
+        x_max=_normalize_manual_bound(template, "x_max", x_max, resolved_template_id=contract_template),
+        y_min=_normalize_manual_bound(template, "y_min", y_min, resolved_template_id=contract_template),
+        y_max=_normalize_manual_bound(template, "y_max", y_max, resolved_template_id=contract_template),
         x_tick_density=_normalize_enumerated_option(
             template,
             "x_tick_density",
             x_tick_density,
             allowed=_VALID_TICK_DENSITIES,
+            resolved_template_id=contract_template,
         ),
         y_tick_density=_normalize_enumerated_option(
             template,
             "y_tick_density",
             y_tick_density,
             allowed=_VALID_TICK_DENSITIES,
+            resolved_template_id=contract_template,
         ),
         x_tick_edge_labels=_normalize_enumerated_option(
             template,
             "x_tick_edge_labels",
             x_tick_edge_labels,
             allowed=_VALID_TICK_EDGE_LABELS,
+            resolved_template_id=contract_template,
         ),
         y_tick_edge_labels=_normalize_enumerated_option(
             template,
             "y_tick_edge_labels",
             y_tick_edge_labels,
             allowed=_VALID_TICK_EDGE_LABELS,
+            resolved_template_id=contract_template,
         ),
-        series_order=_normalize_series_order(template, series_order),
+        series_order=_normalize_series_order(
+            template,
+            series_order,
+            resolved_template_id=contract_template,
+        ),
         x_label_override=_normalize_label_override(x_label_override),
         y_label_override=_normalize_label_override(y_label_override),
         use_sidecar=use_sidecar,

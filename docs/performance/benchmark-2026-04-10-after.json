@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-04-10T01:12:19+0800",
+  "samples": 30,
+  "warmup": 5,
+  "fixtures": {
+    "curve_csv": "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_h0v8j_yh/curve.csv",
+    "workbooks": [
+      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_h0v8j_yh/left.xlsx",
+      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_h0v8j_yh/right.xlsx"
+    ]
+  },
+  "measurements": {
+    "plot.preview": {
+      "samples": 30,
+      "p50": 0.0007,
+      "p95": 0.0008,
+      "min": 0.0007,
+      "max": 0.0008,
+      "mean": 0.0007
+    },
+    "plot.export": {
+      "samples": 30,
+      "p50": 0.2439,
+      "p95": 0.2485,
+      "min": 0.2117,
+      "max": 0.249,
+      "mean": 0.2377
+    },
+    "data_studio.context": {
+      "samples": 30,
+      "p50": 0.0012,
+      "p95": 0.0013,
+      "min": 0.0011,
+      "max": 0.0014,
+      "mean": 0.0012
+    },
+    "data_studio.preview": {
+      "samples": 30,
+      "p50": 0.0012,
+      "p95": 0.0012,
+      "min": 0.0011,
+      "max": 0.0013,
+      "mean": 0.0012
+    },
+    "code_console.run": {
+      "samples": 30,
+      "p50": 0.0022,
+      "p95": 0.0036,
+      "min": 0.0019,
+      "max": 0.0038,
+      "mean": 0.0023
+    }
+  }
+}

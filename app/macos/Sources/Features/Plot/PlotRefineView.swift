@@ -18,13 +18,15 @@ struct PlotRefineView: View {
     @ViewBuilder
     private var previewSurface: some View {
         if let preview = session.previewResponse?.previews.first {
+            let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
             Base64PDFPreviewView(base64PDF: preview.pdfBase64)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(previewShape)
+                .compositingGroup()
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+                    previewShape
+                        .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1, antialiased: true)
                 )
         } else if session.isInspecting || session.isPreviewing {
             BusyStateCard(

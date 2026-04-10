@@ -144,8 +144,8 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "version": 1,
           "defaults": {
-            "style_preset": "journal_calm",
-            "palette_preset": "aqua_graphite"
+            "style_preset": "nature",
+            "palette_preset": "colorblind_safe"
           },
           "size_presets": {
             "single_panel": {
@@ -165,8 +165,8 @@ final class SchemaDecodingTests: XCTestCase {
               "allowed_sizes": ["single_panel"],
               "editable_options": ["size", "xscale", "yscale"],
               "default_options": {},
-              "available_styles": ["journal_calm"],
-              "available_palettes": ["aqua_graphite"],
+              "available_styles": ["nature"],
+              "available_palettes": ["colorblind_safe"],
               "hard_rules": [],
               "soft_rules": []
             }
@@ -184,7 +184,7 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "version": 1,
           "defaults": {
-            "style_preset": "default",
+            "style_preset": "nature",
             "palette_preset": "colorblind_safe"
           },
           "sizes": [
@@ -197,12 +197,12 @@ final class SchemaDecodingTests: XCTestCase {
           ],
           "styles": [
             {
-              "id": "default",
-              "label": "Default",
+              "id": "nature",
+              "label": "Nature",
               "public": true,
-              "description": "Default style",
+              "description": "Nature style",
               "hard_constraints": true,
-              "preset_note": "Repo default"
+              "preset_note": "Repo nature"
             }
           ],
           "palettes": [
@@ -224,7 +224,7 @@ final class SchemaDecodingTests: XCTestCase {
               "allowed_sizes": ["60x55"],
               "editable_options": ["size", "style_preset", "palette_preset"],
               "default_options": {},
-              "available_styles": ["default"],
+              "available_styles": ["nature"],
               "available_palettes": ["colorblind_safe"],
               "canonical_id": "curve",
               "role": "canonical",

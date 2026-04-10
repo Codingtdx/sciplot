@@ -306,9 +306,8 @@ enum NativeExportCoordinator {
         context.fill(CGRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
 
         context.saveGState()
-        context.translateBy(x: 0, y: CGFloat(pixelsHigh))
         let scale = dpi / 72.0
-        context.scaleBy(x: scale, y: -scale)
+        context.scaleBy(x: scale, y: scale)
         page.draw(with: .mediaBox, to: context)
         context.restoreGState()
 
@@ -336,8 +335,10 @@ enum NativeExportCoordinator {
             kCGImagePropertyDPIWidth: dpi,
             kCGImagePropertyDPIHeight: dpi,
             kCGImagePropertyColorModel: kCGImagePropertyColorModelRGB,
+            kCGImagePropertyOrientation: 1,
             kCGImagePropertyTIFFDictionary: [
                 kCGImagePropertyTIFFCompression: 1,
+                kCGImagePropertyTIFFOrientation: 1,
             ],
         ]
 

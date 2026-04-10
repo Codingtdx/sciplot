@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 import PDFKit
 import XCTest
 @testable import SciPlotGodMac
@@ -293,17 +294,9 @@ final class PlotSessionTests: XCTestCase {
         let baseMeta = TestPayloads.meta()
         let strictMeta = SidecarMetaResponse(
             version: baseMeta.version,
-            defaults: .init(stylePreset: "default", palettePreset: "colorblind_safe"),
+            defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizes: baseMeta.sizes,
             styles: [
-                .init(
-                    id: "default",
-                    label: "Default",
-                    public: true,
-                    description: "Default style.",
-                    hardConstraints: true,
-                    presetNote: "Default preset"
-                ),
                 .init(
                     id: "nature",
                     label: "Nature",
@@ -332,7 +325,7 @@ final class PlotSessionTests: XCTestCase {
                     allowedSizes: $0.allowedSizes,
                     editableOptions: $0.editableOptions,
                     defaultOptions: $0.defaultOptions,
-                    availableStyles: ["default", "nature"],
+                    availableStyles: ["nature"],
                     availablePalettes: ["colorblind_safe"],
                     canonicalID: $0.canonicalID,
                     role: $0.role,
@@ -352,13 +345,13 @@ final class PlotSessionTests: XCTestCase {
 
         let initialRenderCount = client.renderRequests.count
         session.updateRenderOptions(policy: .immediate) {
-            $0.stylePreset = "journal_calm"
+            $0.stylePreset = "default"
         }
 
         await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
 
-        XCTAssertEqual(client.renderRequests.last?.options.stylePreset, "default")
-        XCTAssertEqual(session.renderOptions.stylePreset, "default")
+        XCTAssertEqual(client.renderRequests.last?.options.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
         XCTAssertNil(session.errorMessage)
     }
 
@@ -473,6 +466,61 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.userExportURLs.map { $0.pathExtension.lowercased() }, ["tiff"])
     }
 
+    func testNativeTIFFExportPreservesPDFVerticalOrientation() throws {
+        let tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sciplot-tiff-orientation-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+        let sourcePDFURL = tempDirectory.appendingPathComponent("orientation-source.pdf")
+        let destinationTIFFURL = tempDirectory.appendingPathComponent("orientation-output.tiff")
+        try writeOrientationProbePDF(to: sourcePDFURL)
+
+        _ = try NativeExportCoordinator.materializePlotOutputs(
+            sourceURLs: [sourcePDFURL],
+            destinationURL: destinationTIFFURL
+        )
+
+        guard
+            let tiffData = try? Data(contentsOf: destinationTIFFURL),
+            let bitmap = NSBitmapImageRep(data: tiffData)
+        else {
+            XCTFail("Expected TIFF export to be readable.")
+            return
+        }
+
+        guard
+            let imageSource = CGImageSourceCreateWithURL(destinationTIFFURL as CFURL, nil),
+            let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
+        else {
+            XCTFail("Expected TIFF export metadata to be readable.")
+            return
+        }
+        let orientation = (imageProperties[kCGImagePropertyOrientation] as? NSNumber)?.intValue
+        let tiffProperties = imageProperties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        let tiffOrientation = (tiffProperties?[kCGImagePropertyTIFFOrientation] as? NSNumber)?.intValue
+        XCTAssertEqual(orientation, 1)
+        XCTAssertEqual(tiffOrientation, 1)
+
+        let sampleX = min(max(bitmap.pixelsWide / 2, 0), max(bitmap.pixelsWide - 1, 0))
+        // NSBitmapImageRep samples pixels from a top-left origin.
+        let topY = min(4, max(bitmap.pixelsHigh - 1, 0))
+        let bottomY = max(bitmap.pixelsHigh - 5, 0)
+
+        guard
+            let topColor = bitmap.colorAt(x: sampleX, y: topY)?.usingColorSpace(NSColorSpace.sRGB),
+            let bottomColor = bitmap.colorAt(x: sampleX, y: bottomY)?.usingColorSpace(NSColorSpace.sRGB)
+        else {
+            XCTFail("Expected TIFF export to expose sample pixels.")
+            return
+        }
+
+        XCTAssertGreaterThan(topColor.redComponent, 0.8)
+        XCTAssertLessThan(topColor.blueComponent, 0.25)
+        XCTAssertGreaterThan(bottomColor.blueComponent, 0.8)
+        XCTAssertLessThan(bottomColor.redComponent, 0.25)
+    }
+
     func testPreviewErrorShowsOnlyUserFacingTailSentence() async throws {
         let client = MockSidecarClient()
         client.renderHandler = { _ in
@@ -505,6 +553,30 @@ final class PlotSessionTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for PlotSession state")
+    }
+
+    private func writeOrientationProbePDF(to url: URL) throws {
+        var mediaBox = CGRect(x: 0, y: 0, width: 72, height: 72)
+        guard
+            let consumer = CGDataConsumer(url: url as CFURL),
+            let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil)
+        else {
+            XCTFail("Expected PDF probe context to be created.")
+            return
+        }
+
+        context.beginPDFPage(nil)
+        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        context.fill(mediaBox)
+
+        context.setFillColor(red: 0, green: 0, blue: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: mediaBox.width, height: 16))
+
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: mediaBox.height - 16, width: mediaBox.width, height: 16))
+
+        context.endPDFPage()
+        context.closePDF()
     }
 }
 

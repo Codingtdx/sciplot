@@ -39,7 +39,7 @@ from src.rendering.render_service import (
     export_rendered_plots,
     render_template,
 )
-from src.rendering.template_lifecycle import template_identity
+from src.rendering.template_lifecycle import resolve_template_id, template_identity
 from src.submission import build_render_submission_report
 
 __all__ = [
@@ -75,6 +75,7 @@ __all__ = [
     "render_template",
     "resolve_output_dir",
     "resolve_render_options",
+    "resolve_template_id",
     "template_identity",
     "validate_template_name",
 ]

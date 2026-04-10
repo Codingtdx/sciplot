@@ -36,9 +36,7 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "point_line",
         "scatter",
         "bubble_scatter",
-        "scatter_with_fit",
         "scatter_fit",
-        "replicate_curves_with_band",
         "mean_band",
         "stacked_curve",
         "segmented_stacked_curve",
@@ -50,13 +48,12 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
         "lollipop_error",
     }:
         return ("replicate_table", "distribution")
-    if template_id in {"distribution_compare", "histogram_density"}:
+    if template_id == "histogram_density":
         return ("replicate_table", "distribution")
     if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix",)
@@ -69,9 +66,7 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "point_line",
         "scatter",
         "bubble_scatter",
-        "scatter_with_fit",
         "scatter_fit",
-        "replicate_curves_with_band",
         "mean_band",
         "stacked_curve",
         "segmented_stacked_curve",
@@ -83,11 +78,9 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
         "lollipop_error",
-        "distribution_compare",
         "histogram_density",
     }:
         return ("distribution", "statistics")
@@ -102,9 +95,7 @@ def _family(template_id: str) -> str:
         "point_line",
         "scatter",
         "bubble_scatter",
-        "scatter_with_fit",
         "scatter_fit",
-        "replicate_curves_with_band",
         "mean_band",
         "stacked_curve",
         "segmented_stacked_curve",
@@ -116,11 +107,9 @@ def _family(template_id: str) -> str:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_compare",
         "grouped_bar_error",
         "point_error",
         "lollipop_error",
-        "distribution_compare",
         "histogram_density",
     }:
         return "statistics"
@@ -134,12 +123,8 @@ def _preview_priority(template_id: str) -> int:
         return 100
     if template_id == "point_line":
         return 95
-    if template_id == "replicate_curves_with_band":
-        return 92
     if template_id == "mean_band":
         return 91
-    if template_id == "scatter_with_fit":
-        return 88
     if template_id == "scatter_fit":
         return 87
     if template_id == "scatter":
@@ -150,8 +135,6 @@ def _preview_priority(template_id: str) -> int:
         return 91
     if template_id == "heatmap":
         return 90
-    if template_id == "distribution_compare":
-        return 86
     if template_id == "box_strip":
         return 84
     if template_id == "violin_box":
@@ -161,8 +144,6 @@ def _preview_priority(template_id: str) -> int:
     if template_id == "point_error":
         return 81
     if template_id == "lollipop_error":
-        return 80
-    if template_id == "grouped_bar_compare":
         return 80
     if template_id == "histogram_density":
         return 78

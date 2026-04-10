@@ -48,7 +48,7 @@ final class PlotSession {
         guard selectedFileURL != nil else {
             return .disabled("Import a source file before exporting.")
         }
-        guard selectedTemplateID != nil else {
+        guard effectiveTemplateID != nil else {
             return .disabled("Choose a template before exporting.")
         }
         guard !needsInspection else {
@@ -78,11 +78,11 @@ final class PlotSession {
     }
 
     var hasSessionContent: Bool {
-        selectedFileURL != nil || inspectionResponse != nil || selectedTemplateID != nil
+        selectedFileURL != nil || inspectionResponse != nil || effectiveTemplateID != nil
     }
 
     var hasRenderableSelection: Bool {
-        selectedFileURL != nil && selectedTemplateID != nil && !needsInspection
+        selectedFileURL != nil && effectiveTemplateID != nil && !needsInspection
     }
 
     var needsInspection: Bool {
@@ -241,7 +241,7 @@ final class PlotSession {
         runtimeState.inspectedSheet = nil
         if !preserveRenderOptions {
             renderOptions = RenderOptionsPayload(
-                stylePreset: metadata?.defaults.stylePreset ?? "default",
+                stylePreset: metadata?.defaults.stylePreset ?? "nature",
                 palettePreset: metadata?.defaults.palettePreset ?? "colorblind_safe",
                 visualThemeID: metadata?.visualThemes.first?.id
             )
@@ -356,7 +356,7 @@ final class PlotSession {
         guard
             let client,
             let selectedFileURL,
-            let selectedTemplateID,
+            let selectedTemplateID = effectiveTemplateID,
             hasRenderableSelection
         else {
             return
@@ -500,11 +500,36 @@ final class PlotSession {
     }
 
     var selectedTemplateRecommendation: TemplateRecommendationResponse? {
-        guard let selectedTemplateID else {
+        guard let selectedTemplateID = effectiveTemplateID else {
             return nil
         }
         return compatibleRecommendations.first { $0.templateID == selectedTemplateID }
             ?? inspectionResponse?.inspection.recommendations.first { $0.templateID == selectedTemplateID }
+    }
+
+    var effectiveTemplateID: String? {
+        if let selectedTemplateID, !selectedTemplateID.isEmpty {
+            return selectedTemplateID
+        }
+        if let stagedTemplateID = runtimeState.stagedExternalPinnedTemplateID, !stagedTemplateID.isEmpty {
+            return stagedTemplateID
+        }
+        if let requestedTemplateID = previewResponse?.requestedTemplateID, !requestedTemplateID.isEmpty {
+            return requestedTemplateID
+        }
+        if let previewTemplate = previewResponse?.template, !previewTemplate.isEmpty {
+            return previewTemplate
+        }
+        if let requestedTemplateID = preflightResponse?.requestedTemplateID, !requestedTemplateID.isEmpty {
+            return requestedTemplateID
+        }
+        if let preflightTemplate = preflightResponse?.template, !preflightTemplate.isEmpty {
+            return preflightTemplate
+        }
+        if let requestedTemplateID = exportResponse?.requestedTemplateID, !requestedTemplateID.isEmpty {
+            return requestedTemplateID
+        }
+        return nil
     }
 
     var recommendedXAxisLabel: String? {
@@ -536,7 +561,7 @@ final class PlotSession {
     }
 
     var selectedTemplateSummary: MetaTemplateSummary? {
-        availableTemplateSummaries.first { $0.id == selectedTemplateID }
+        effectiveTemplateID.flatMap(templateSummary(for:))
     }
 
     var editableOptionIDs: Set<String> {
@@ -838,7 +863,7 @@ final class PlotSession {
     private func currentRenderRequest() -> RenderRequest? {
         guard
             let selectedFileURL,
-            let selectedTemplateID,
+            let selectedTemplateID = effectiveTemplateID,
             !needsInspection
         else {
             return nil
@@ -927,7 +952,7 @@ final class PlotSession {
             return defaultStyle
         }
 
-        return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "default"
+        return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "nature"
     }
 
     private func defaultPalette(for template: MetaTemplateSummary?) -> String {
@@ -959,7 +984,7 @@ final class PlotSession {
             if !validStyles.contains(resolved.stylePreset) {
                 resolved.stylePreset = validStyles.contains(metadata.defaults.stylePreset)
                     ? metadata.defaults.stylePreset
-                    : (metadata.styles.first?.id ?? "default")
+                    : (metadata.styles.first?.id ?? "nature")
             }
             if !validPalettes.contains(resolved.palettePreset) {
                 resolved.palettePreset = validPalettes.contains(metadata.defaults.palettePreset)

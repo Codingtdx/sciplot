@@ -1,12 +1,16 @@
 {
   "version": 3,
   "defaults": {
-    "style_preset": "default",
+    "style_preset": "nature",
     "palette_preset": "colorblind_safe"
   },
   "aliases": {
     "style_presets": {
-      "lab_default": "default"
+      "default": "nature",
+      "lab_default": "nature",
+      "science_editorial": "nature",
+      "jacs_analytical": "nature",
+      "advanced_materials_spacious": "nature"
     }
   },
   "global_frame": {
@@ -18,10 +22,18 @@
     "top_margin_mm": 5.5
   },
   "axis_policy": {
-    "linear_nice_steps": [1.0, 2.0, 5.0],
+    "linear_nice_steps": [
+      1.0,
+      2.0,
+      5.0
+    ],
     "linear_outer_padding_fraction": 0.05,
     "linear_force_visible_labeled_endpoints": true,
-    "log_display_steps": [1.0, 2.0, 5.0],
+    "log_display_steps": [
+      1.0,
+      2.0,
+      5.0
+    ],
     "log_label_mode": "decade_only",
     "log_allow_unlabeled_outer_padding": true,
     "bar_zero_baseline_no_lower_padding": true,
@@ -180,58 +192,6 @@
     }
   },
   "styles": {
-    "default": {
-      "label": "Default",
-      "public": true,
-      "description": "Default: the most stable 60 mm panel style.",
-      "hard_constraints": false,
-      "preset_note": "Default research style that prioritizes stability and usability.",
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 7.0,
-        "legend_font_size_pt": 6.0,
-        "panel_label_size_pt": 8.0,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 1.0,
-        "tick_width_pt": 1.0,
-        "tick_length_pt": 3.5,
-        "minor_tick_width_pt": 0.8,
-        "minor_tick_length_pt": 2.0,
-        "line_width_pt": 1.3,
-        "line_alpha": 0.7,
-        "marker_alpha": 0.8,
-        "fill_alpha": 0.4,
-        "max_fill_alpha": 0.5,
-        "marker_size_pt": 3.8
-      },
-      "spacing": {
-        "axes_labelpad": 2.0,
-        "xtick_major_pad": 1.5,
-        "ytick_major_pad": 1.5,
-        "legend_inset_fraction": 0.025
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "balanced",
-        "label_tightness": "balanced"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
-      }
-    },
     "nature": {
       "label": "Nature",
       "public": true,
@@ -282,164 +242,6 @@
         "color_space": "RGB",
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      }
-    },
-    "science_editorial": {
-      "label": "Science Editorial",
-      "public": false,
-      "description": "Science: quieter, lighter on annotations, and more open in feel.",
-      "hard_constraints": false,
-      "preset_note": "A soft style preset inspired by common Science editorial figures, not a submission-compliance guarantee.",
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica Neue",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 7.0,
-        "legend_font_size_pt": 6.0,
-        "panel_label_size_pt": 8.0,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 0.95,
-        "tick_width_pt": 0.95,
-        "tick_length_pt": 3.2,
-        "minor_tick_width_pt": 0.75,
-        "minor_tick_length_pt": 1.9,
-        "line_width_pt": 1.15,
-        "line_alpha": 0.88,
-        "marker_alpha": 0.92,
-        "fill_alpha": 0.3,
-        "max_fill_alpha": 0.42,
-        "marker_size_pt": 3.5
-      },
-      "spacing": {
-        "axes_labelpad": 2.4,
-        "xtick_major_pad": 1.8,
-        "ytick_major_pad": 1.8,
-        "legend_inset_fraction": 0.024
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "airy",
-        "label_tightness": "balanced"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
-      }
-    },
-    "jacs_analytical": {
-      "label": "JACS Analytical",
-      "public": false,
-      "description": "JACS: tighter and more analytical in tone.",
-      "hard_constraints": false,
-      "preset_note": "A soft style preset inspired by common ACS/JACS analytical figures, not a submission-compliance guarantee.",
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 6.8,
-        "legend_font_size_pt": 5.9,
-        "panel_label_size_pt": 8.0,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 1.05,
-        "tick_width_pt": 1.05,
-        "tick_length_pt": 3.5,
-        "minor_tick_width_pt": 0.85,
-        "minor_tick_length_pt": 2.0,
-        "line_width_pt": 1.4,
-        "line_alpha": 0.86,
-        "marker_alpha": 0.95,
-        "fill_alpha": 0.28,
-        "max_fill_alpha": 0.4,
-        "marker_size_pt": 3.6
-      },
-      "spacing": {
-        "axes_labelpad": 1.8,
-        "xtick_major_pad": 1.4,
-        "ytick_major_pad": 1.4,
-        "legend_inset_fraction": 0.022
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "tight",
-        "label_tightness": "tight"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
-      }
-    },
-    "advanced_materials_spacious": {
-      "label": "Advanced Materials Spacious",
-      "public": false,
-      "description": "Advanced Materials: more white space and a stronger presentation feel.",
-      "hard_constraints": false,
-      "preset_note": "A soft style preset inspired by common Advanced Materials layouts, not a submission-compliance guarantee.",
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica Neue",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 7.0,
-        "legend_font_size_pt": 6.2,
-        "panel_label_size_pt": 8.0,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 0.95,
-        "tick_width_pt": 0.95,
-        "tick_length_pt": 3.2,
-        "minor_tick_width_pt": 0.75,
-        "minor_tick_length_pt": 1.9,
-        "line_width_pt": 1.18,
-        "line_alpha": 0.9,
-        "marker_alpha": 0.96,
-        "fill_alpha": 0.33,
-        "max_fill_alpha": 0.44,
-        "marker_size_pt": 3.8
-      },
-      "spacing": {
-        "axes_labelpad": 2.6,
-        "xtick_major_pad": 1.8,
-        "ytick_major_pad": 1.8,
-        "legend_inset_fraction": 0.026
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "airy",
-        "label_tightness": "airy"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Avoid red-green collisions and rainbow scales when possible."
       }
     }
   },
@@ -618,10 +420,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -667,10 +468,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -707,10 +507,9 @@
         "size": "60x55",
         "reverse_x": false,
         "baseline": "none",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -745,11 +544,10 @@
         "size": "60x110",
         "reverse_x": true,
         "baseline": "linear_endpoints",
-        "style_preset": "default",
+        "style_preset": "nature",
         "use_sidecar": true
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -786,10 +584,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -826,10 +623,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -867,10 +663,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -907,10 +702,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -948,51 +742,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
-        "nature"
-      ],
-      "available_palettes": [
-        "colorblind_safe",
-        "deep",
-        "muted",
-        "mono"
-      ],
-      "hard_rules": [
-        "single_panel_axis_frame",
-        "non_blank_pdf"
-      ],
-      "soft_rules": [
-        "dense_group_label_warning"
-      ]
-    },
-    "grouped_bar_compare": {
-      "label": "Grouped bar compare",
-      "description": "Grouped bar comparison with deterministic spacing and summary error bars.",
-      "category": "single_panel",
-      "default_size": "60x55",
-      "allowed_sizes": [
-        "60x55",
-        "120x55"
-      ],
-      "editable_options": [
-        "size",
-        "y_min",
-        "y_max",
-        "y_tick_density",
-        "y_tick_edge_labels",
-        "series_order",
-        "style_preset",
-        "palette_preset"
-      ],
-      "default_options": {
-        "size": "60x55",
-        "style_preset": "default"
-      },
-      "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1030,10 +782,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1071,10 +822,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1112,49 +862,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
-        "nature"
-      ],
-      "available_palettes": [
-        "colorblind_safe",
-        "deep",
-        "muted",
-        "mono"
-      ],
-      "hard_rules": [
-        "single_panel_axis_frame",
-        "non_blank_pdf"
-      ],
-      "soft_rules": [
-        "dense_group_label_warning"
-      ]
-    },
-    "distribution_compare": {
-      "label": "Distribution compare",
-      "description": "Single structural family for group-wise distribution comparison with deterministic internal variant selection.",
-      "category": "single_panel",
-      "default_size": "60x55",
-      "allowed_sizes": [
-        "60x55",
-        "120x55"
-      ],
-      "editable_options": [
-        "size",
-        "y_min",
-        "y_max",
-        "series_order",
-        "style_preset",
-        "palette_preset"
-      ],
-      "default_options": {
-        "size": "60x55",
-        "style_preset": "default"
-      },
-      "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1196,10 +906,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1247,10 +956,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1296,59 +1004,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
-        "nature"
-      ],
-      "available_palettes": [
-        "colorblind_safe",
-        "deep",
-        "muted",
-        "mono"
-      ],
-      "hard_rules": [
-        "single_panel_axis_frame",
-        "non_blank_pdf"
-      ],
-      "soft_rules": []
-    },
-    "scatter_with_fit": {
-      "label": "Scatter with fit",
-      "description": "Single-panel scatter plot with a deterministic linear fit overlay.",
-      "category": "single_panel",
-      "default_size": "60x55",
-      "allowed_sizes": [
-        "60x55",
-        "120x55"
-      ],
-      "editable_options": [
-        "size",
-        "xscale",
-        "yscale",
-        "reverse_x",
-        "x_min",
-        "x_max",
-        "y_min",
-        "y_max",
-        "x_tick_density",
-        "x_tick_edge_labels",
-        "y_tick_density",
-        "y_tick_edge_labels",
-        "series_order",
-        "style_preset",
-        "palette_preset"
-      ],
-      "default_options": {
-        "size": "60x55",
-        "xscale": "linear",
-        "yscale": "linear",
-        "reverse_x": false,
-        "style_preset": "default"
-      },
-      "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1394,59 +1052,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
-        "nature"
-      ],
-      "available_palettes": [
-        "colorblind_safe",
-        "deep",
-        "muted",
-        "mono"
-      ],
-      "hard_rules": [
-        "single_panel_axis_frame",
-        "non_blank_pdf"
-      ],
-      "soft_rules": []
-    },
-    "replicate_curves_with_band": {
-      "label": "Replicate curves with band",
-      "description": "Single-panel curve plot with a replicate mean band overlay.",
-      "category": "single_panel",
-      "default_size": "60x55",
-      "allowed_sizes": [
-        "60x55",
-        "120x55"
-      ],
-      "editable_options": [
-        "size",
-        "xscale",
-        "yscale",
-        "reverse_x",
-        "x_min",
-        "x_max",
-        "y_min",
-        "y_max",
-        "x_tick_density",
-        "x_tick_edge_labels",
-        "y_tick_density",
-        "y_tick_edge_labels",
-        "series_order",
-        "style_preset",
-        "palette_preset"
-      ],
-      "default_options": {
-        "size": "60x55",
-        "xscale": "linear",
-        "yscale": "linear",
-        "reverse_x": false,
-        "style_preset": "default"
-      },
-      "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1492,10 +1100,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1528,10 +1135,9 @@
       "default_options": {
         "size": "60x55",
         "show_colorbar": true,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [
@@ -1567,10 +1173,9 @@
       "default_options": {
         "size": "60x55",
         "show_colorbar": true,
-        "style_preset": "default"
+        "style_preset": "nature"
       },
       "available_styles": [
-        "default",
         "nature"
       ],
       "available_palettes": [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from contextlib import suppress
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -32,6 +33,10 @@ from src.rendering.recommender_models import TemplateRecommendation
 from src.wide_nmr import wide_nmr_sidecar_path
 
 INSPECTION_RECOMMENDATION_LIMIT = 10
+
+
+def _inspection_cache_key(input_path: Path, sheet: str | int) -> tuple[str, int, str | int]:
+    return (str(input_path.resolve()), input_path.stat().st_mtime_ns, sheet)
 
 
 def model_label(model: str) -> str:
@@ -237,7 +242,13 @@ def _inspection(
     )
 
 
-def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspection:
+@lru_cache(maxsize=64)
+def _inspect_input_file_cached(
+    resolved_path: str,
+    _mtime_ns: int,
+    sheet: str | int,
+) -> InputInspection:
+    input_path = Path(resolved_path)
     normalized_dataset = build_normalized_dataset(input_path, sheet)
     ranked_recommendations = DEFAULT_RECOMMENDER.recommend(
         normalized_dataset,
@@ -415,12 +426,7 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
         compatibility_reason = (
             "Detected a standard paired curve table, so a basic curve plot is recommended by default."
         )
-        if compatibility_template == "replicate_curves_with_band":
-            compatibility_reason = (
-                "Detected aligned paired curves with replicate-like structure, "
-                "so a mean-band curve summary is recommended."
-            )
-        elif compatibility_template == "mean_band":
+        if compatibility_template == "mean_band":
             compatibility_reason = (
                 "Detected aligned paired curves with replicate-like structure, "
                 "so mean_band is recommended for deterministic mean±band summary."
@@ -429,11 +435,6 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             compatibility_reason = (
                 "Detected paired curves with a strong trend pattern, "
                 "so scatter fit with deterministic linear overlay is recommended."
-            )
-        elif compatibility_template == "scatter_with_fit":
-            compatibility_reason = (
-                "Detected paired curves with a strong trend pattern, "
-                "so scatter with deterministic linear fit is recommended."
             )
         elif compatibility_template == "bubble_scatter":
             compatibility_reason = (
@@ -482,3 +483,11 @@ def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspectio
             "Row 4 onward contains replicate values, which fits statistical plots well.",
         ),
     )
+
+
+def inspect_input_file(input_path: Path, sheet: str | int = 0) -> InputInspection:
+    return _inspect_input_file_cached(*_inspection_cache_key(input_path, sheet))
+
+
+def clear_inspection_cache() -> None:
+    _inspect_input_file_cached.cache_clear()

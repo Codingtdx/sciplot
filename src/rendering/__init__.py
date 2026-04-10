@@ -6,7 +6,11 @@ from src.rendering.constants import (
     STYLE_PRESET_CHOICES,
     TEMPLATE_CHOICES,
 )
-from src.rendering.dataset_models import NormalizedDataset, build_normalized_dataset
+from src.rendering.dataset_models import (
+    NormalizedDataset,
+    build_normalized_dataset,
+    clear_normalized_dataset_cache,
+)
 from src.rendering.io import (
     coerce_sheet,
     default_output_dir,
@@ -25,7 +29,7 @@ from src.rendering.models import (
 )
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.preflight import preflight_render_request
-from src.rendering.recommendation import inspect_input_file
+from src.rendering.recommendation import clear_inspection_cache, inspect_input_file
 from src.rendering.recommender_models import TemplateRecommendation
 from src.rendering.render_registry import TEMPLATE_RENDERERS
 from src.rendering.render_service import (
@@ -56,7 +60,9 @@ __all__ = [
     "TemplateRenderer",
     "build_rendered_plots",
     "build_normalized_dataset",
+    "clear_inspection_cache",
     "clear_input_cache",
+    "clear_normalized_dataset_cache",
     "close_rendered_plots",
     "coerce_sheet",
     "default_output_dir",
