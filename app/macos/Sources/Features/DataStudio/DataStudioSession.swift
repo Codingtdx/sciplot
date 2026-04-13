@@ -164,6 +164,9 @@ final class DataStudioSession {
                 selectedTemplateID = templates.first?.id
             }
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

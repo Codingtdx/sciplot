@@ -131,6 +131,22 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.pendingImportKind, .rawFiles)
     }
 
+    func testRefreshTemplatesCancellationDoesNotSurfaceError() async {
+        let client = MockSidecarClient()
+        client.dataStudioTemplateListHandler = {
+            throw CancellationError()
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+
+        await session.refreshTemplates()
+
+        XCTAssertNil(session.errorMessage)
+        XCTAssertEqual(session.currentActivity, .idle)
+        XCTAssertTrue(session.templates.isEmpty)
+    }
+
     func testCancelledImportAfterKindSelectionEndsImportFlow() async {
         let session = DataStudioSession()
 

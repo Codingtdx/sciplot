@@ -1503,6 +1503,39 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`109 tests`)
   - Manual macOS UI verification for duplicate workbench titles: not executed in this terminal pass
 
+### 2026-04-13 (Round AE): Data Studio launch cancellation no longer surfaces as an error
+
+- Scope:
+  - Updated `app/macos/Sources/Features/DataStudio/DataStudioSession.swift` so `refreshTemplates()` treats task cancellation as a non-user-facing control-flow event instead of copying `CancellationError.localizedDescription` into `errorMessage`.
+  - Added `testRefreshTemplatesCancellationDoesNotSurfaceError` in `app/macos/Tests/DataStudioSessionTests.swift` to lock the startup behavior: cancelled template refresh leaves the session idle, empty, and error-free.
+- User-visible impact:
+  - Opening `Data Studio` and doing nothing no longer shows `The operation couldn’t be completed. (Swift.CancellationError error 1.)` when SwiftUI cancels the initial template-refresh task during view/task lifecycle changes.
+  - Real template-loading failures still surface through the existing diagnostic banner.
+- Risks:
+  - This round only suppresses cancellation for the template bootstrap path; if future async entrypoints introduce the same mistake elsewhere, they still need their own explicit cancellation handling.
+  - Manual UI verification against the exact launch sequence from the screenshot was not run after the fix; validation here is code-path and test based.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+- Decision:
+  - Treat `CancellationError`, URL cancellation, and user-cancelled Cocoa errors as lifecycle/control-flow signals, not actionable GUI failures, when the Data Studio template bootstrap task ends early.
+  - Rejected alternatives:
+    - keep surfacing the raw Swift cancellation text: rejected because it is implementation leakage rather than meaningful user feedback
+    - blanket-suppress every Data Studio error: rejected because genuine template-fetch failures still need to stay visible
+  - Boundary:
+    - only the automatic template refresh path changed
+    - no sidecar contract, import workflow, or comparison/export semantics changed
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`42 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`110 tests`)
+  - Manual macOS UI verification for the reported launch-only banner: not executed in this terminal pass
+
 Use this block for every new round:
 
 ```
