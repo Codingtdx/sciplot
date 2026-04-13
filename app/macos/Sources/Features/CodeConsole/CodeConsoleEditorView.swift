@@ -13,13 +13,8 @@ struct CodeConsoleEditorView: View {
     private var promptCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("External AI Prompt")
-                        .font(.headline)
-                    Text("Copy this controlled prompt, let the external AI return Python, then paste that code below.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                Text("External AI Prompt")
+                    .font(.headline)
                 Spacer()
                 Button("Refresh") {
                     session.refreshPrompt()
@@ -47,13 +42,8 @@ struct CodeConsoleEditorView: View {
     private var editorCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Python Code")
-                        .font(.headline)
-                    Text("Use the repo-native helper imports so the figure style stays aligned with Plot.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Python Code")
+                    .font(.headline)
                 Spacer()
                 Button("Restore Starter") {
                     session.restoreStarterCode()

@@ -18,14 +18,8 @@ struct CodeConsoleOutputsView: View {
                 }
             }
 
-            Text(session.outputsSummary)
-                .foregroundStyle(.secondary)
-
             if session.isRunning {
-                BusyStateCard(
-                    title: "Running Code Console",
-                    message: "SciPlot God is executing the pasted Python in the repo-native runner."
-                )
+                BusyStateCard(title: "Running Code Console")
             } else if let run = session.latestRunResponse {
                 summaryGrid(run: run)
 
@@ -41,10 +35,7 @@ struct CodeConsoleOutputsView: View {
                 logsSection(title: "Stdout", text: run.stdout)
                 logsSection(title: "Stderr", text: run.stderr)
             } else {
-                EmptyStateCard(
-                    title: "No run output yet",
-                    message: "Copy the prompt, paste the returned Python, then run the script to review logs and generated files here."
-                )
+                EmptyStateCard(title: "No run output")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,20 +60,24 @@ struct CodeConsoleOutputsView: View {
                 .font(.headline)
 
             if run.generatedFiles.isEmpty {
-                Text("The script finished without writing anything to `OUTPUT_DIR`.")
+                Text("No generated files")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(run.generatedFiles) { item in
                     Button {
                         session.selectGeneratedFile(path: item.path)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(item.name)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+
+                            Spacer(minLength: 8)
+
                             Text("\(item.fileType.uppercased()) · \(ByteCountFormatter.string(fromByteCount: Int64(item.sizeBytes), countStyle: .file))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
@@ -119,10 +114,7 @@ struct CodeConsoleOutputsView: View {
             if let selectedGeneratedFileURL = session.selectedGeneratedFileURL {
                 QuickLookThumbnailView(url: selectedGeneratedFileURL, size: 360)
             } else {
-                EmptyStateCard(
-                    title: "No preview selected",
-                    message: "Choose a generated file to inspect its preview."
-                )
+                EmptyStateCard(title: "No preview selected")
             }
         }
     }

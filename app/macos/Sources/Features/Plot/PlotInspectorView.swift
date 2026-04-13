@@ -131,7 +131,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     }
                 }
             } else {
-                InspectorEmptyState(message: "Choose a template to edit figure controls.")
+                InspectorEmptyState(message: "No figure controls")
             }
         }
     }
@@ -260,12 +260,11 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     private var seriesSection: some View {
         Section("Legend") {
             if session.seriesOrderLabels.isEmpty {
-                InspectorEmptyState(message: "No legend entries are available for this figure.")
+                InspectorEmptyState(message: "No legend entries")
             } else {
                 DisclosureGroup("Advanced") {
                     SortableSeriesListView(
                         title: "Legend order",
-                        detail: "Session-only reorder.",
                         items: Binding(
                             get: { session.seriesOrderLabels },
                             set: { session.setSeriesOrder($0) }

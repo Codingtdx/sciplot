@@ -12,16 +12,8 @@ struct DataStudioSpecimenFilterPrimaryTrigger: View {
                 anchor: .focusedStrip(workbookPath: workbook.response.workbookPath)
             )
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(presentation.title)
-                    .font(.subheadline.weight(.semibold))
-                if let summary = presentation.summary {
-                    Text(summary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
+            Text(presentation.title)
+                .font(.subheadline.weight(.semibold))
             .frame(minWidth: 108, alignment: .leading)
         }
         .buttonStyle(.bordered)
@@ -64,7 +56,7 @@ struct DataStudioSpecimenFilterPopover: View {
         VStack(alignment: .leading, spacing: 16) {
             header
 
-            if let refreshMessage = refreshMessage(presentation: presentation) {
+            if let refreshMessage = refreshMessage() {
                 Label(refreshMessage.message, systemImage: refreshMessage.symbol)
                     .font(.footnote)
                     .foregroundStyle(refreshMessage.tint)
@@ -77,13 +69,8 @@ struct DataStudioSpecimenFilterPopover: View {
                     unavailable(reason: baselinePreview.unsupportedReason)
                 }
             } else {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading specimen ranking…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                BusyStateCard(title: "Loading Specimen Filter")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .padding(16)
@@ -111,13 +98,8 @@ struct DataStudioSpecimenFilterPopover: View {
         session.baselineWorkbookPreview(for: workbook.response.workbookPath)
     }
 
-    private func refreshMessage(
-        presentation: DataStudioSpecimenFilterPresentation
-    ) -> (message: String, symbol: String, tint: Color)? {
+    private func refreshMessage() -> (message: String, symbol: String, tint: Color)? {
         let workbookPath = workbook.response.workbookPath
-        if presentation.isBusy {
-            return ("Refreshing specimen order…", "arrow.triangle.2.circlepath", .secondary)
-        }
         switch session.focusedWorkbookPreviewRefreshState {
         case let .failed(currentPath, message) where currentPath == workbookPath:
             return (message, "exclamationmark.triangle.fill", .orange)
@@ -141,11 +123,13 @@ struct DataStudioSpecimenFilterPopover: View {
                     Text(presentation.title)
                         .font(.subheadline.weight(.semibold))
                     Spacer()
-                    if let summary = presentation.summary {
-                        Text(summary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+                    if presentation.hasPendingChanges {
+                        Text("Edited")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.14), in: Capsule())
+                            .foregroundStyle(.orange)
                     }
                 }
 
@@ -160,13 +144,6 @@ struct DataStudioSpecimenFilterPopover: View {
                     sortDescriptor: presentation.sortDescriptor,
                     rows: presentation.rankedRows
                 )
-
-                if presentation.hasPendingChanges {
-                    Text("Manual edits stay in draft until you apply them in Advanced.")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
                 actionSection(presentation: presentation)
 
@@ -224,21 +201,12 @@ private struct DataStudioSpecimenFilterRankedList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(sortDescriptor.label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(sortDescriptor.orderHint)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
+            Text(sortDescriptor.label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
 
             if rows.isEmpty {
-                Text("No specimen ranking is available for this workbook.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                EmptyStateCard(title: "No Specimen Ranking")
             } else {
                 VStack(spacing: 0) {
                     ForEach(rows) { row in
@@ -329,30 +297,6 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
     var body: some View {
         let presentation = session.specimenFilterPresentation(for: workbookPath)
         VStack(alignment: .leading, spacing: 12) {
-            if presentation.hasPendingChanges {
-                Text("Preview keeps using the last applied filter until you apply or revert these manual edits.")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                if let appliedRepresentativeFilename = presentation.appliedRepresentativeFilename {
-                    Text("Applied representative curve: \(appliedRepresentativeFilename)")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if presentation.hasPendingChanges,
-                   presentation.draftRepresentativeFilename != presentation.appliedRepresentativeFilename
-                {
-                    Text("Draft representative curve: \(presentation.draftRepresentativeFilename ?? "Auto")")
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
             HStack(spacing: 10) {
                 Button("Apply Changes") {
                     session.applyManualFilter(for: workbookPath)
@@ -466,10 +410,6 @@ private struct DataStudioSpecimenFilterAdvancedRow: View {
                         tag("Ineligible", tint: .secondary)
                     }
                 }
-                Text(specimen.filename)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

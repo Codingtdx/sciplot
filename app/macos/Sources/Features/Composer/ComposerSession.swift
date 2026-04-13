@@ -178,24 +178,6 @@ final class ComposerSession {
         return canPlace(panelID: panelID, in: target)
     }
 
-    var mergeGuidance: String {
-        DerivedState.mergeGuidance(
-            selectedCells: selectedCells,
-            selectedCellSelection: selectedCellSelection,
-            canMergeSelectedCells: canMergeSelectedCells
-        )
-    }
-
-    var placementGuidance: String {
-        DerivedState.placementGuidance(
-            selectedPanel: selectedPanel,
-            selectedPlacementTarget: selectedPlacementTarget,
-            canPlaceInTarget: { panelID, target in
-                canPlace(panelID: panelID, in: target)
-            }
-        )
-    }
-
     var placementActionTitle: String {
         guard let panel = selectedPanel else {
             return "Place Here"
@@ -1416,47 +1398,4 @@ private extension ComposerSession {
         let preview = AsyncLatestTaskCoordinator()
     }
 
-    enum DerivedState {
-        static func mergeGuidance(
-            selectedCells: Set<ComposerGridCell>,
-            selectedCellSelection: ComposerCellSelection?,
-            canMergeSelectedCells: Bool
-        ) -> String {
-            guard !selectedCells.isEmpty else {
-                return "Select adjacent empty cells on the 3x3 grid to merge them into one region."
-            }
-            guard let selection = selectedCellSelection else {
-                return "Use a rectangular cell selection for merge."
-            }
-            guard selection.cellCount > 1 else {
-                return "A single cell is selected. Add adjacent cells if you want to merge."
-            }
-            guard canMergeSelectedCells else {
-                return "Merge requires an empty rectangular selection with no existing panel or merged-region coverage."
-            }
-            return "This \(selection.colSpan)x\(selection.rowSpan) selection can be merged into one free region."
-        }
-
-        static func placementGuidance(
-            selectedPanel: ComposerPanelPayload?,
-            selectedPlacementTarget: ComposerPlacementTarget?,
-            canPlaceInTarget: (_ panelID: String, _ target: ComposerPlacementTarget) -> Bool
-        ) -> String {
-            guard let panel = selectedPanel else {
-                return "Select a panel from the Library or the board, then choose a target cell or merged region."
-            }
-            if panel.hidden {
-                return "This panel is off the board. Select a target and place it back into the composition."
-            }
-            if panel.locked {
-                return "Unlock this panel before moving it on the board."
-            }
-            guard let target = selectedPlacementTarget else {
-                return "Drag the panel directly, or select a destination cell / region to move it there."
-            }
-            return canPlaceInTarget(panel.id, target)
-                ? "This destination is valid."
-                : "That destination is not valid for the selected panel."
-        }
-    }
 }

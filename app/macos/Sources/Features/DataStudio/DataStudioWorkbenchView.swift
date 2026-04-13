@@ -7,7 +7,9 @@ struct DataStudioWorkbenchView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            topBar
+            if session.focusedWorkbook != nil {
+                topBar
+            }
 
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
@@ -50,63 +52,21 @@ struct DataStudioWorkbenchView: View {
     private var topBar: some View {
         let isBusyActivity = session.currentActivity != .idle
         return HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(session.focusTitle)
-                    .font(.title2.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Text(session.documentStatusSummary)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Text(session.focusTitle)
+                .font(.title2.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
 
             Spacer(minLength: 16)
 
-            if let focusedWorkbook = session.focusedWorkbook {
-                Label(
-                    focusedWorkbook.response.templateMatch.label,
-                    systemImage: focusedWorkbook.response.templateMatch.family == "tensile" ? "waveform.path.ecg" : "tablecells"
+            Image(systemName: activitySymbol)
+                .symbolEffect(
+                    .pulse.byLayer,
+                    options: .repeating,
+                    value: isBusyActivity
                 )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 6) {
-                Image(systemName: activitySymbol)
-                    .symbolEffect(
-                        .pulse.byLayer,
-                        options: .repeating,
-                        value: isBusyActivity
-                    )
-                Text(activityLabel)
-                    .contentTransition(.opacity)
-            }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .animation(MotionTokens.status, value: activityLabel)
-        }
-    }
-
-    private var activityLabel: String {
-        switch session.currentActivity {
-        case .loadingTemplates:
-            return "Loading templates"
-        case .previewingSource:
-            return "Matching parse template"
-        case .creatingTemplate:
-            return "Saving parse template"
-        case .buildingWorkbook:
-            return "Building workbook"
-        case .importingWorkbooks:
-            return "Importing workbook"
-        case .previewingComparison:
-            return session.previewStatusLabel
-        case .exportingComparison:
-            return "Exporting bundle"
-        case .idle:
-            return session.previewStatusLabel
+                .font(.headline)
+                .foregroundStyle(session.errorMessage == nil ? Color.secondary : Color.orange)
         }
     }
 
@@ -183,16 +143,7 @@ private struct DataStudioGroupRailView: View {
             }
 
             if session.orderedGroups.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let hint = session.groupRailEmptyHint {
-                        Text(hint)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 0)
-                }
+                EmptyStateCard(title: "No groups")
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 List(selection: focusedWorkbookSelection) {
@@ -271,19 +222,6 @@ private struct DataStudioGroupRowView: View {
 
                 if session.workbookHasWarnings(group.workbook) {
                     badge(title: "Warning", tint: .orange)
-                } else {
-                    badge(title: "Ready", tint: .green)
-                }
-            }
-
-            if !metricSummaries.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(metricSummaries, id: \.self) { line in
-                        Text(line)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                 }
             }
         }
@@ -317,13 +255,6 @@ private struct DataStudioGroupRowView: View {
             get: { group.state.includeInCompare },
             set: { session.updateCompareInclusion(for: group.workbook.response.workbookPath, includeInCompare: $0) }
         )
-    }
-
-    private var metricSummaries: [String] {
-        Array(session.displayedMetrics(for: group.workbook).prefix(3)).map { metric in
-            let value = metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a"
-            return "\(metric.label): \(value) \(metric.unit)"
-        }
     }
 
     private func badge(title: String, tint: Color) -> some View {
@@ -397,10 +328,6 @@ private struct DataStudioPreviewWorkspaceView: View {
                 }
 
                 Spacer()
-
-                Text(session.currentRecipeLabel)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -408,16 +335,10 @@ private struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var workspaceBody: some View {
         if session.orderedGroups.isEmpty {
-            EmptyStateCard(
-                title: "No workbook groups",
-                message: "Use the toolbar Import action to add raw files or existing workbooks."
-            )
+            EmptyStateCard(title: "No workbook groups")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if session.includedGroups.isEmpty {
-            EmptyStateCard(
-                title: "No groups in compare",
-                message: "Turn on Compare for at least one group in the left rail."
-            )
+            EmptyStateCard(title: "No groups in compare")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             if let warning = session.previewWarning {
@@ -460,9 +381,6 @@ private struct DataStudioFocusedWorkbookStrip: View {
                 Text("Focused Group")
                     .font(.headline)
                 Spacer()
-                Text(workbook.response.templateMatch.label)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
                 DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
             }
 
@@ -470,13 +388,10 @@ private struct DataStudioFocusedWorkbookStrip: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
                     ForEach(Array(displayedMetrics.prefix(3)), id: \.id) { metric in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(metric.label)
+                            Text(metric.unit.isEmpty ? metric.label : "\(metric.label) (\(metric.unit))")
                                 .font(.subheadline.weight(.semibold))
                             Text(metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
                                 .font(.title3.weight(.semibold))
-                            Text(metric.unit)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(14)
@@ -525,7 +440,6 @@ private struct DataStudioInlinePreviewBanner: View {
                 .foregroundStyle(stale ? .orange : .yellow)
 
             Text(message)
-                .font(.footnote)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 
@@ -565,8 +479,7 @@ private struct DataStudioImportScopeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             DataStudioSheetHeader(
-                title: "Start Import",
-                subtitle: "Choose whether the next import should extend the current comparison session or begin a new one."
+                title: "Start Import"
             )
 
             Divider()
@@ -574,16 +487,14 @@ private struct DataStudioImportScopeSheet: View {
             VStack(spacing: 10) {
                 DataStudioSheetOptionRow(
                     symbol: "plus.rectangle.on.rectangle",
-                    title: DataStudioImportDisposition.addToCurrentSession.title,
-                    detail: "Keep the current workbook groups and append the new import to this session."
+                    title: DataStudioImportDisposition.addToCurrentSession.title
                 ) {
                     session.chooseImportDisposition(.addToCurrentSession)
                 }
 
                 DataStudioSheetOptionRow(
                     symbol: "sparkles.rectangle.stack",
-                    title: DataStudioImportDisposition.startNewSession.title,
-                    detail: "Clear current workbook group display state and start a fresh Data Studio session."
+                    title: DataStudioImportDisposition.startNewSession.title
                 ) {
                     session.chooseImportDisposition(.startNewSession)
                 }
@@ -609,8 +520,7 @@ private struct DataStudioImportChooserSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             DataStudioSheetHeader(
-                title: "Import into Data Studio",
-                subtitle: "Choose whether to import source files or prepared workbooks."
+                title: "Import into Data Studio"
             )
 
             Divider()
@@ -618,16 +528,14 @@ private struct DataStudioImportChooserSheet: View {
             VStack(spacing: 10) {
                 DataStudioSheetOptionRow(
                     symbol: "tray.and.arrow.down",
-                    title: DataStudioImportKind.rawFiles.title,
-                    detail: "Import source csv / txt / xls / xlsx files and let Data Studio match or create a parse template."
+                    title: DataStudioImportKind.rawFiles.title
                 ) {
                     session.chooseImportKind(.rawFiles)
                 }
 
                 DataStudioSheetOptionRow(
                     symbol: "tablecells",
-                    title: DataStudioImportKind.existingWorkbook.title,
-                    detail: "Import a prepared workbook directly into the current workbook group list and compare context."
+                    title: DataStudioImportKind.existingWorkbook.title
                 ) {
                     session.chooseImportKind(.existingWorkbook)
                 }
@@ -681,11 +589,7 @@ private struct DataStudioImportResolverSheet: View {
             Divider()
 
             if recommendedMatches.isEmpty && otherTemplates.isEmpty {
-                ContentUnavailableView(
-                    "No Parse Templates Available",
-                    systemImage: "questionmark.folder",
-                    description: Text("Create a new parse template for this file to continue importing.")
-                )
+                ContentUnavailableView("No Parse Templates", systemImage: "questionmark.folder")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(selection: selectedTemplateBinding) {
@@ -695,7 +599,6 @@ private struct DataStudioImportResolverSheet: View {
                                 DataStudioResolverTemplateRow(
                                     title: match.label,
                                     family: match.family,
-                                    reason: match.reasons.first ?? "Matched the current file structure.",
                                     warning: match.warnings.first
                                 )
                                 .tag(Optional(match.templateID))
@@ -709,7 +612,6 @@ private struct DataStudioImportResolverSheet: View {
                                 DataStudioResolverTemplateRow(
                                     title: template.label,
                                     family: template.family,
-                                    reason: template.description,
                                     warning: nil
                                 )
                                 .tag(Optional(template.id))
@@ -758,16 +660,7 @@ private struct DataStudioImportResolverSheet: View {
                 Text(URL(fileURLWithPath: preview.sourcePath).lastPathComponent)
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
-
-                Text(sourceSummary(for: preview))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
-
-            Label("No unique parse template match", systemImage: "exclamationmark.circle")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
         }
         .padding(20)
     }
@@ -779,15 +672,6 @@ private struct DataStudioImportResolverSheet: View {
         )
     }
 
-    private func sourceSummary(for preview: DataStudioRawFilePreviewResponse) -> String {
-        let blockCount = preview.sheets.reduce(into: 0) { partialResult, sheet in
-            partialResult += sheet.blocks.count
-        }
-        let hasCurveLikeBlock = preview.bindingSuggestions.contains(where: { $0.kind == "curve_pair" })
-        var pieces = ["\(blockCount) data block(s)"]
-        pieces.append(hasCurveLikeBlock ? "Curve-like block detected" : "No clear curve block detected")
-        return pieces.joined(separator: " · ")
-    }
 }
 
 private struct DataStudioCreateTemplateEditorSheet: View {
@@ -902,9 +786,6 @@ private struct DataStudioCreateTemplateEditorSheet: View {
                 Text(URL(fileURLWithPath: preview.sourcePath).lastPathComponent)
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
-                Text("Confirm the recommended table bindings, then save this structure as a reusable parse template.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(20)
@@ -927,7 +808,7 @@ private struct DataStudioCreateTemplateEditorSheet: View {
                     .listStyle(.inset)
                     .frame(minHeight: 180, maxHeight: 240)
                 } else {
-                    Text("No blocks detected for this source file.")
+                    Text("No blocks")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -940,15 +821,7 @@ private struct DataStudioCreateTemplateEditorSheet: View {
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
                             Text("\(block.rowCount) × \(block.colCount)")
-                                .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-
-                        if let previewCaption = session.createTemplatePreviewCaption {
-                            Text(previewCaption)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
                         }
 
                         KeyValueGrid(values: [
@@ -1038,7 +911,7 @@ private struct DataStudioCreateTemplateEditorSheet: View {
 
                 GroupBox("Selected for Template") {
                     if selectedSummaryItems.isEmpty && session.selectedCandidateIDs.isEmpty {
-                        Text("Click the recommendations you want to keep in this parse template.")
+                        Text("Nothing selected")
                             .foregroundStyle(.secondary)
                     } else {
                         VStack(alignment: .leading, spacing: 10) {
@@ -1212,15 +1085,11 @@ private struct DataStudioCreateTemplateEditorSheet: View {
 
 private struct DataStudioSheetHeader: View {
     let title: String
-    let subtitle: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.headline)
-            Text(subtitle)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .padding(20)
     }
@@ -1246,7 +1115,6 @@ private struct DataStudioSheetFooter<Content: View>: View {
 private struct DataStudioSheetOptionRow: View {
     let symbol: String
     let title: String
-    let detail: String
     let action: () -> Void
 
     var body: some View {
@@ -1257,15 +1125,9 @@ private struct DataStudioSheetOptionRow: View {
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 28)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
 
                 Spacer(minLength: 12)
 
@@ -1287,7 +1149,6 @@ private struct DataStudioSheetOptionRow: View {
 private struct DataStudioResolverTemplateRow: View {
     let title: String
     let family: String
-    let reason: String
     let warning: String?
 
     var body: some View {
@@ -1295,20 +1156,11 @@ private struct DataStudioResolverTemplateRow: View {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.body.weight(.semibold))
+                Spacer()
                 Text(family.capitalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Spacer()
-                Text(warning == nil ? "Use Template" : "Review")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
             }
-
-            Text(reason)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
             if let warning, !warning.isEmpty {
                 Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption)
@@ -1362,28 +1214,10 @@ private struct DataStudioCurveSuggestionHeroCard: View {
             session.toggleSuggestion(id: suggestion.id)
         } label: {
             VStack(alignment: .leading, spacing: compact ? 10 : 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Label("Recommended Curve", systemImage: "waveform.path")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    if isPreviewing {
-                        statusCapsule(text: "Previewing", tint: .blue)
-                    }
-                    if isSelected {
-                        statusCapsule(text: "Selected", tint: .accentColor)
-                    }
-                }
-
                 VStack(alignment: .leading, spacing: compact ? 8 : 10) {
                     axisRow(axis: "X", label: xLabel, tint: .blue)
                     axisRow(axis: "Y", label: yLabel, tint: .orange)
                 }
-
-                Text(location)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             .padding(compact ? 12 : 14)
             .background(backgroundFill, in: RoundedRectangle(cornerRadius: 12))
@@ -1437,15 +1271,6 @@ private struct DataStudioCurveSuggestionHeroCard: View {
             Spacer(minLength: 0)
         }
     }
-
-    private func statusCapsule(text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(tint.opacity(0.12), in: Capsule())
-    }
 }
 
 private struct DataStudioSuggestionResultCard: View {
@@ -1471,13 +1296,6 @@ private struct DataStudioSuggestionResultCard: View {
                 HStack(spacing: 10) {
                     Image(systemName: iconName)
                         .foregroundStyle(accentColor)
-                    Spacer()
-                    if isPreviewing {
-                        statusCapsule(text: "Previewing", tint: accentColor)
-                    }
-                    if isSelected {
-                        statusCapsule(text: "Selected", tint: .accentColor)
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -1493,13 +1311,6 @@ private struct DataStudioSuggestionResultCard: View {
                                 .multilineTextAlignment(.leading)
                         }
                     }
-                }
-
-                if let location, !location.isEmpty {
-                    Text(location)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1551,15 +1362,6 @@ private struct DataStudioSuggestionResultCard: View {
             return 2
         }
         return isSelected ? 1.4 : 1
-    }
-
-    private func statusCapsule(text: String, tint: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(tint.opacity(0.12), in: Capsule())
     }
 }
 
@@ -1621,35 +1423,6 @@ private struct DataStudioCandidateRow: View {
                     Text(candidate.kindLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(candidate.confidence.formatted(.percent.precision(.fractionLength(0))))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 8) {
-                    Text(candidate.sheetName)
-                    if let blockID = candidate.blockID {
-                        Text(blockID)
-                    }
-                    if let unitHint = candidate.unitHint, !unitHint.isEmpty {
-                        Text(unitHint)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                if !compact {
-                    Text(candidate.rationale)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    if !candidate.sampleValues.isEmpty {
-                        Text(candidate.sampleValues.joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
                 }
             }
             .contentShape(Rectangle())

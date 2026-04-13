@@ -106,14 +106,6 @@ final class DataStudioSession {
         bulkAutoKeepPresentation.help
     }
 
-    var documentStatusSummary: String {
-        let source = focusedWorkbook?.workbookURL.lastPathComponent ?? "No workbook"
-        let figure = currentRecipeLabel
-        let output = comparisonExportDestinationURL?.lastPathComponent ?? "No export"
-        let failure = errorMessage ?? previewWarning ?? "No failure"
-        return "Source: \(source) · Figure: \(figure) · Latest output: \(output) · Last failure: \(failure)"
-    }
-
     init(
         plotSession: PlotSession = PlotSession(),
         chooseDirectory: @escaping DirectoryChooser = { title, message in
@@ -464,8 +456,6 @@ final class DataStudioSession {
         } else {
             autoFilterReason = nil
         }
-        let appliedRepresentativeFilename = appliedPreview?.representativeFilename
-        let draftRepresentativeFilename = draftRepresentativeFilename(for: workbookPath)
         let title: String
         switch mode {
         case .off:
@@ -476,13 +466,6 @@ final class DataStudioSession {
             title = "Manual Keep \(appliedIncludedCount)"
         }
         let help = hasPendingChanges ? "Advanced manual edits are still draft." : (autoFilterReason ?? mode.defaultHelp)
-
-        let summary: String?
-        if totalSpecimenCount > 0, appliedIncludedCount < totalSpecimenCount {
-            summary = "\(totalSpecimenCount) -> \(appliedIncludedCount)"
-        } else {
-            summary = nil
-        }
 
         let sortDescriptor = specimenFilterSortDescriptor(for: baselinePreview)
         let rankedSourceRows = sortedSpecimenRows(
@@ -512,18 +495,12 @@ final class DataStudioSession {
         return DataStudioSpecimenFilterPresentation(
             mode: mode,
             title: title,
-            summary: summary,
             help: help,
             rowBadge: hasPendingChanges ? "Edited" : nil,
             hasPendingChanges: hasPendingChanges,
             isBusy: isBusy,
-            totalSpecimenCount: totalSpecimenCount,
-            appliedIncludedCount: appliedIncludedCount,
-            autoKeepCount: autoKeepCount,
             autoFilterSupported: autoFilterSupported,
             autoFilterReason: autoFilterReason,
-            appliedRepresentativeFilename: appliedRepresentativeFilename,
-            draftRepresentativeFilename: draftRepresentativeFilename,
             canApplyAuto: canApplyAuto,
             canTurnOff: canTurnOff,
             sortDescriptor: sortDescriptor,
@@ -738,16 +715,6 @@ final class DataStudioSession {
         return "No workbook groups loaded"
     }
 
-    var previewStatusLabel: String {
-        if currentActivity == .previewingComparison {
-            return "Refreshing"
-        }
-        if isPreviewStale {
-            return "Stale"
-        }
-        return "Ready"
-    }
-
     var previewStatusSymbol: String {
         if currentActivity == .previewingComparison {
             return "arrow.triangle.2.circlepath"
@@ -779,10 +746,6 @@ final class DataStudioSession {
 
     var showsInspectorActions: Bool {
         !showsCompactEmptyInspector
-    }
-
-    var groupRailEmptyHint: String? {
-        showsCompactEmptyInspector ? "Use the toolbar Import action to add workbook groups." : nil
     }
 
     var canOpenCurrentFigureInPlot: Bool {

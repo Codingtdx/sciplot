@@ -95,13 +95,21 @@ extension View {
 
 struct EmptyStateCard: View {
     let title: String
-    let message: String
+    var message: String? = nil
 
     var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: "sparkles.rectangle.stack")
-        } description: {
-            Text(message)
+        Group {
+            if let message, !message.isEmpty {
+                ContentUnavailableView {
+                    Label(title, systemImage: "sparkles.rectangle.stack")
+                } description: {
+                    Text(message)
+                }
+            } else {
+                ContentUnavailableView {
+                    Label(title, systemImage: "sparkles.rectangle.stack")
+                }
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
         .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
@@ -121,10 +129,6 @@ struct LatestExportList: View {
 
         return AnyView(
             VStack(alignment: .leading, spacing: 8) {
-                Text("Latest Export")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
                 ForEach(items) { item in
                     Button(openButtonTitle(item)) {
                         openAction(item)
@@ -243,7 +247,7 @@ struct DiagnosticIssueCard: View {
 
 struct BusyStateCard: View {
     let title: String
-    let message: String
+    var message: String? = nil
 
     var body: some View {
         VStack(spacing: 12) {
@@ -251,8 +255,10 @@ struct BusyStateCard: View {
                 .controlSize(.large)
             Text(title)
                 .font(.headline)
-            Text(message)
-                .foregroundStyle(.secondary)
+            if let message, !message.isEmpty {
+                Text(message)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
         .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))

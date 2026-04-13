@@ -2,33 +2,17 @@ import SwiftUI
 
 struct SortableSeriesListView: View {
     let title: String
-    let detail: String?
     @Binding var items: [String]
     let canEdit: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                    if let detail {
-                        Text(detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                Text(canEdit ? "Session-only" : "Read only")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(title)
+                .font(.subheadline.weight(.semibold))
 
             if items.isEmpty {
-                Text("No series labels are available yet.")
-                    .font(.footnote)
+                Text("No legend entries")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {

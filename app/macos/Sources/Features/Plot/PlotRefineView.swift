@@ -30,16 +30,11 @@ struct PlotRefineView: View {
                 )
         } else if session.isInspecting || session.isPreviewing {
             BusyStateCard(
-                title: session.isInspecting ? "Inspecting source" : "Rendering preview",
-                message: "Plot keeps the last successful preview visible until the next render succeeds."
+                title: session.isInspecting ? "Inspecting Source" : "Rendering Preview"
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ContentUnavailableView(
-                "No preview yet",
-                systemImage: "photo.on.rectangle",
-                description: Text("Import a source from the toolbar to inspect and render a live preview.")
-            )
+            ContentUnavailableView("No Preview", systemImage: "photo.on.rectangle")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -47,11 +42,9 @@ struct PlotRefineView: View {
     }
 
     private var updatingBadge: some View {
-        Label("Updating preview", systemImage: "arrow.triangle.2.circlepath")
-            .font(.footnote.weight(.semibold))
-            .symbolEffect(.rotate.byLayer, options: .repeating, value: session.isPreviewing)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+        ProgressView()
+            .controlSize(.small)
+            .padding(10)
             .background(.thinMaterial, in: Capsule())
             .foregroundStyle(.secondary)
             .transition(MotionTokens.stateTransition)

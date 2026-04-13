@@ -5,20 +5,17 @@ struct ComposerAssetBrowserView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            Text("Library")
+                .font(.title3.weight(.semibold))
 
             if session.orderedPanels.isEmpty {
-                EmptyStateCard(
-                    title: "No imported panels",
-                    message: "Use the Import action in the toolbar to add graph PDFs or supporting assets."
-                )
+                EmptyStateCard(title: "No imported panels")
             } else {
                 List(selection: panelSelectionBinding) {
                     ForEach(session.orderedPanels) { panel in
                         ComposerLibraryRow(
                             panel: panel,
-                            resolvedLabel: session.resolvedLabel(for: panel),
-                            placementSummary: session.placementSummary(for: panel)
+                            resolvedLabel: session.resolvedLabel(for: panel)
                         ) {
                             session.beginPanelDrag(panel.id)
                         } onDragEnded: {
@@ -63,15 +60,6 @@ struct ComposerAssetBrowserView: View {
         .background(.quinary.opacity(0.12), in: RoundedRectangle(cornerRadius: 24))
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Library")
-                .font(.title3.weight(.semibold))
-            Text("Imported panels stay here until you place them into the composition grid.")
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var panelSelectionBinding: Binding<Set<String>> {
         Binding(
             get: {
@@ -90,7 +78,6 @@ struct ComposerAssetBrowserView: View {
 private struct ComposerLibraryRow: View {
     let panel: ComposerPanelPayload
     let resolvedLabel: String
-    let placementSummary: String
     let onDragStarted: () -> Void
     let onDragEnded: () -> Void
 
@@ -143,7 +130,7 @@ private struct ComposerLibraryRow: View {
                 }
 
                 HStack(spacing: 8) {
-                    Label(kindTitle, systemImage: kindSymbol)
+                    Image(systemName: kindSymbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -159,11 +146,6 @@ private struct ComposerLibraryRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                Text(placementSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
         }
         .padding(.vertical, 4)
@@ -173,11 +155,6 @@ private struct ComposerLibraryRow: View {
     private var fileName: String {
         URL(fileURLWithPath: panel.filePath).lastPathComponent
     }
-
-    private var kindTitle: String {
-        panel.kind == "graph" ? "Graph" : "Asset"
-    }
-
     private var kindSymbol: String {
         panel.kind == "graph" ? "chart.xyaxis.line" : "photo"
     }

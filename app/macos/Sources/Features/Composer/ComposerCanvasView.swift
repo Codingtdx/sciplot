@@ -384,10 +384,6 @@ private struct ComposerBoardQuickActionPopover: View {
                 Text(selection.cellCount > 1 ? "\(selection.colSpan)x\(selection.rowSpan) selection" : "Cell \(session.cellDisplayLabel(selection.origin))")
                     .font(.headline)
 
-                Text(session.mergeGuidance)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
                 if selection.cellCount > 1 {
                     Button("Merge") {
                         session.mergeSelectedCells()
@@ -409,12 +405,8 @@ private struct ComposerBoardQuickActionPopover: View {
                 .buttonStyle(.bordered)
 
             case let .emptyMergedRegion(region):
-                Text("Merged region")
-                    .font(.headline)
-
                 Text(session.regionSummary(region))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.headline)
 
                 Button("Unmerge") {
                     session.selectRegion(region.id)

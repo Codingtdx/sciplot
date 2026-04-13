@@ -8,7 +8,6 @@ enum PlotPreviewRefreshPolicy {
 struct PlotTemplateGalleryItem: Identifiable, Hashable {
     let id: String
     let title: String
-    let hint: String
     let selectable: Bool
 }
 

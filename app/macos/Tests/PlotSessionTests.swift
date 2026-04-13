@@ -67,7 +67,7 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedTemplateID, "curve")
         XCTAssertEqual(client.renderRequests.first?.template, "curve")
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
-        XCTAssertEqual(session.liveStatusLabel, "Preview ready")
+        XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
     }
 
     func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {

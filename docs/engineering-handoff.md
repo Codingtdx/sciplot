@@ -1407,6 +1407,102 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`109 tests`)
 
+### 2026-04-10 (Round AC): macOS GUI microcopy trim and header/layout tightening
+
+- Scope:
+  - Trimmed redundant inline microcopy across `app/macos` workbench surfaces for `Plot`, `Data Studio`, `Composer`, and `Code Console`, with matching cleanup of shared state/view models that only existed to feed deleted subtitle or caption text.
+  - Updated shared placeholder/export primitives in `app/macos/Sources/Shared/UI/StateViews.swift` plus list helpers in `app/macos/Sources/Shared/UI/SortableSeriesListView.swift` so empty/busy states can render title-only and inspector export lists no longer repeat a nested `Latest Export` heading.
+  - Collapsed Plot / Data Studio / Code Console top bars to single-row headers with icon-only live status affordances, removed template-rail/specimen-filter/import-sheet/footer/helper microcopy, and tightened Composer library / quick-action / inspector presentation to rely on primary labels, badges, and disabled-with-help behavior instead of explanatory footnotes.
+  - Updated macOS regression tests to assert behavior/state (`liveStatusSymbol`, ranked keep rows, generated file availability, empty-state behavior) rather than removed copy strings.
+- User-visible impact:
+  - The supported macOS workbenches now render with materially less secondary caption text and fewer stacked subtitle rows.
+  - Status narration like `Top 5`, `Latest Export`, prompt/output summaries, specimen-filter summaries, draft-warning paragraphs, and repeated empty-state descriptions no longer clutter the main surfaces.
+  - Inspector/export/help affordances remain intact: toolbar `Help`, guide sheets, and `.help(...)` explanations still exist, while disabled actions still explain why they are unavailable.
+- Risks:
+  - Because several views now rely on title-only empty/busy states, any future surface that still depends on descriptive helper text for orientation will need an explicit decision instead of inheriting the old default.
+  - The specimen-filter presentation model is slimmer; future UI work should not reintroduce a second summary string or draft-status paragraph outside the existing badge/help surfaces.
+  - Manual visual verification for long filenames, popover spacing, and sheet layout was not executed in this terminal-only pass, so any remaining polish issues would most likely be purely visual rather than contract/runtime failures.
+- Rollback points:
+  - `app/macos/Sources/Shared/UI/StateViews.swift`
+  - `app/macos/Sources/Shared/UI/SortableSeriesListView.swift`
+  - `app/macos/Sources/App/Workbench.swift`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionTypes.swift`
+  - `app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - `app/macos/Sources/Features/Plot/PlotImportView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSession.swift`
+  - `app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerCanvasView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerInspectorView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/Tests/CodeConsoleSessionTests.swift`
+- Decision:
+  - Chose to remove redundant inline microcopy at the point of presentation and delete the matching derived-state helpers instead of introducing a new shared “copy suppression” abstraction.
+  - Rejected alternatives:
+    - keep the old subtitle/status strings but hide them conditionally: rejected because the extra state and copy plumbing would still exist and keep the UI model noisy
+    - centralize a second layer of macOS-only presentation summaries: rejected because it would add another truth source for status/copy, directly against the current first-principles cleanup rules
+  - Boundary:
+    - this round is macOS-only and does not change sidecar routes, plot contract, or backend semantics
+    - explicit help surfaces remain intentionally excluded from the trim
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`109 tests`)
+  - Manual macOS UI verification for long filenames / popovers / import sheets / help tooltips: not executed in this terminal pass
+
+### 2026-04-10 (Round AD): macOS workbench title deduplication
+
+- Scope:
+  - Removed the detail-pane fallback workbench title in `app/macos/Sources/App/RootSplitView.swift` so the selected sidebar item remains the only generic workbench label source.
+  - Updated `app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`, `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`, and `app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift` to render their top headers only when real document context exists, instead of falling back to generic titles like `Plot`, `Data Studio`, or `Code Console`.
+  - Kept the native sidebar application title (`SciPlot God`) and help-sheet navigation titles intact because they are utility/container labels rather than duplicated content headers.
+- User-visible impact:
+  - Plot / Composer / Data Studio / Code Console no longer show a second generic title in the main content area when no file or workbook context is selected.
+  - When a real source file or focused workbook exists, the content header now shows only that contextual name, which matches the native macOS split-view pattern more closely.
+- Risks:
+  - This round was validated by build/test only; a manual visual pass was not run, so any remaining title-spacing issue would be presentation-only.
+  - Plot / Data Studio / Code Console now rely on contextual document names for their top bars; if a future flow needs an always-visible header, that should be an explicit UX decision instead of reintroducing a generic fallback label.
+- Rollback points:
+  - `app/macos/Sources/App/RootSplitView.swift`
+  - `app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+- Decision:
+  - Adopted a single-title-source rule for workbench identity: sidebar selection owns the generic workbench label, while the detail pane may only show contextual document/workbook names.
+  - Rejected alternatives:
+    - keep both layers and restyle one of them smaller: rejected because it preserves duplicate semantics and still reads as noisy UI
+    - replace the removed generic header with a second custom title bar: rejected because macOS already provides the split-view/sidebar identity affordance natively
+  - Boundary:
+    - this round does not change workflows, sidecar behavior, or inspector/export affordances
+    - the sidebar app title and help/guide sheet titles remain intentionally unchanged
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`175 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`109 tests`)
+  - Manual macOS UI verification for duplicate workbench titles: not executed in this terminal pass
+
 Use this block for every new round:
 
 ```

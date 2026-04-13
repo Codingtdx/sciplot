@@ -59,14 +59,6 @@ final class PlotSession {
         return .enabled()
     }
 
-    var documentStatusSummary: String {
-        let source = selectedSourceFilename ?? "No source"
-        let template = selectedTemplateSummary?.label ?? "No template"
-        let output = latestExportItems.first?.label ?? "No export"
-        let failure = errorMessage ?? "No failure"
-        return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
-    }
-
     var latestExportItems: [ExportedFileItem] {
         userExportURLs.map { ExportedFileItem(url: $0) }
     }
@@ -106,15 +98,6 @@ final class PlotSession {
             inspectedSheet: runtimeState.inspectedSheet,
             selectedSheet: selectedSheet,
             inspectionResponse: inspectionResponse
-        )
-    }
-
-    var liveStatusLabel: String {
-        DerivedState.liveStatusLabel(
-            selectedFileURL: selectedFileURL,
-            isInspecting: isInspecting,
-            isPreviewing: isPreviewing,
-            previewResponse: previewResponse
         )
     }
 
@@ -493,7 +476,6 @@ final class PlotSession {
                 PlotTemplateGalleryItem(
                     id: template.id,
                     title: template.label,
-                    hint: "Inspect first",
                     selectable: false
                 )
             }
@@ -505,7 +487,6 @@ final class PlotSession {
             return PlotTemplateGalleryItem(
                 id: recommendation.templateID,
                 title: summary?.label ?? recommendation.templateID,
-                hint: shortCompatibilityHint(from: recommendation),
                 selectable: true
             )
         }
@@ -1068,26 +1049,6 @@ final class PlotSession {
         return model == "frequency_sweep" || model == "temperature_sweep" || model == "stress_relaxation"
     }
 
-    private func shortCompatibilityHint(from recommendation: TemplateRecommendationResponse) -> String {
-        let text = recommendation.suitabilityHint.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty {
-            let lower = text.lowercased()
-            if lower.contains("recommend") {
-                return "Recommended"
-            }
-            if lower.contains("fallback") {
-                return "Fallback"
-            }
-            if lower.contains("compat") {
-                return "Compatible"
-            }
-        }
-        if let rank = recommendation.rank {
-            return rank == 1 ? "Recommended" : "Compatible"
-        }
-        return "Compatible"
-    }
-
     private func resolveThumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
         let normalizedID = templateID.lowercased()
         let category = templateSummary(for: templateID)?.category.lowercased() ?? ""
@@ -1246,27 +1207,6 @@ private extension PlotSession {
                 return true
             }
             return inspectedInputPath != selectedFileURL.path || inspectedSheet != selectedSheet || inspectionResponse == nil
-        }
-
-        static func liveStatusLabel(
-            selectedFileURL: URL?,
-            isInspecting: Bool,
-            isPreviewing: Bool,
-            previewResponse: RenderPreviewResponse?
-        ) -> String {
-            if selectedFileURL == nil {
-                return "Awaiting import"
-            }
-            if isInspecting {
-                return "Inspecting source"
-            }
-            if isPreviewing {
-                return previewResponse == nil ? "Rendering preview" : "Refreshing preview"
-            }
-            if previewResponse != nil {
-                return "Preview ready"
-            }
-            return "Ready"
         }
 
         static func liveStatusSymbol(

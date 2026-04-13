@@ -20,7 +20,7 @@ struct DataStudioInspectorView: View {
     private var compactEmptyInspector: some View {
         Form {
             Section("Actions") {
-                InspectorEmptyState(message: "Use Import to add workbook groups.")
+                InspectorEmptyState(message: "No workbook groups")
             }
         }
         .formStyle(.grouped)
@@ -30,7 +30,7 @@ struct DataStudioInspectorView: View {
     private var figureSection: some View {
         Section("Figure") {
             if session.figureFamilies.isEmpty {
-                InspectorEmptyState(message: "Import a workbook group to activate figure controls.")
+                InspectorEmptyState(message: "No figure controls")
             } else {
                 if !session.availableFigureTemplates.isEmpty {
                     AdaptiveInspectorControlRow(title: "Template") {
@@ -108,10 +108,6 @@ struct DataStudioInspectorView: View {
 
                 if session.comparisonExportResponse != nil {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Latest Export")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-
                         Button("Open Comparison Workbook") {
                             session.openLatestComparisonWorkbook()
                         }

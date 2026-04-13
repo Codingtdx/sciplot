@@ -185,7 +185,7 @@ final class DataStudioSessionTests: XCTestCase {
         let session = DataStudioSession()
         XCTAssertTrue(session.showsCompactEmptyInspector)
         XCTAssertFalse(session.showsInspectorActions)
-        XCTAssertEqual(session.groupRailEmptyHint, "Use the toolbar Import action to add workbook groups.")
+        XCTAssertTrue(session.orderedGroups.isEmpty)
 
         session.workbooks = [
             .init(
@@ -199,7 +199,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertFalse(session.showsCompactEmptyInspector)
         XCTAssertTrue(session.showsInspectorActions)
-        XCTAssertNil(session.groupRailEmptyHint)
+        XCTAssertFalse(session.orderedGroups.isEmpty)
     }
 
     func testImportingWorkbookDoesNotSurfaceMisclassifiedComparisonWorkbookWarning() async {
@@ -1018,7 +1018,13 @@ final class DataStudioSessionTests: XCTestCase {
             Set(session.baselineWorkbookPreview(for: workbookPath)?.suggestedExclusionIds ?? []),
             ["sample-1", "sample-7"]
         )
-        XCTAssertEqual(session.specimenFilterPresentation(for: workbookPath).autoKeepCount, 5)
+        XCTAssertEqual(
+            session.specimenFilterPresentation(for: workbookPath)
+                .rankedRows
+                .filter { $0.disposition == .keep }
+                .count,
+            5
+        )
 
         session.applySuggestedExclusions(for: workbookPath)
         try? await Task.sleep(nanoseconds: 200_000_000)
@@ -1100,7 +1106,7 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 200_000_000)
 
         let presentation = session.specimenFilterPresentation(for: workbookPath)
-        XCTAssertEqual(presentation.autoKeepCount, 5)
+        XCTAssertEqual(presentation.rankedRows.filter { $0.disposition == .keep }.count, 5)
         XCTAssertEqual(presentation.rankedRows.count, 7)
         XCTAssertEqual(
             Array(presentation.rankedRows.prefix(5).map(\.disposition)),

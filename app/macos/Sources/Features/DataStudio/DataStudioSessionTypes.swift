@@ -15,14 +15,6 @@ enum DataStudioImportKind: String, Identifiable {
         }
     }
 
-    var summary: String {
-        switch self {
-        case .rawFiles:
-            return "Import source csv / txt / xls / xlsx files and let Data Studio match or create a parse template."
-        case .existingWorkbook:
-            return "Import a prepared workbook directly into the current group list and compare context."
-        }
-    }
 }
 
 enum DataStudioImportDisposition: String, Identifiable {
@@ -124,15 +116,6 @@ struct DataStudioSpecimenFilterSortDescriptor: Equatable {
     let label: String
     let unit: String?
 
-    var orderHint: String {
-        switch key {
-        case .metric:
-            return "High to low"
-        case .distanceFromMean:
-            return "Closest first"
-        }
-    }
-
     var sortsHighToLow: Bool {
         switch key {
         case .metric:
@@ -171,18 +154,12 @@ struct DataStudioGroupRowItem: Identifiable, Equatable {
 struct DataStudioSpecimenFilterPresentation {
     let mode: DataStudioSpecimenFilterMode
     let title: String
-    let summary: String?
     let help: String
     let rowBadge: String?
     let hasPendingChanges: Bool
     let isBusy: Bool
-    let totalSpecimenCount: Int
-    let appliedIncludedCount: Int
-    let autoKeepCount: Int
     let autoFilterSupported: Bool
     let autoFilterReason: String?
-    let appliedRepresentativeFilename: String?
-    let draftRepresentativeFilename: String?
     let canApplyAuto: Bool
     let canTurnOff: Bool
     let sortDescriptor: DataStudioSpecimenFilterSortDescriptor

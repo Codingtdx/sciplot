@@ -16,21 +16,11 @@ struct PlotTemplateView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Templates")
-                    .font(.headline)
-                Spacer()
-                Text("Top 5")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Templates")
+                .font(.headline)
 
             if session.templateGalleryItems.isEmpty {
-                ContentUnavailableView(
-                    "No templates yet",
-                    systemImage: "rectangle.grid.2x2",
-                    description: Text("Import a file from the toolbar to inspect template recommendations.")
-                )
+                ContentUnavailableView("No templates", systemImage: "rectangle.grid.2x2")
                 .frame(maxWidth: .infinity, minHeight: 160)
             } else {
                 ScrollView {
@@ -44,7 +34,6 @@ struct PlotTemplateView: View {
                             } label: {
                                 PlotTemplateCard(
                                     title: item.title,
-                                    hint: item.hint,
                                     kind: session.thumbnailKind(for: item.id),
                                     aspectRatio: session.templateThumbnailAspectRatio(for: item.id),
                                     selected: session.selectedTemplateID == item.id,
@@ -368,7 +357,6 @@ private extension CGRect {
 
 private struct PlotTemplateCard: View {
     let title: String
-    let hint: String
     let kind: PlotTemplateThumbnailKind
     let aspectRatio: CGFloat
     let selected: Bool
@@ -387,14 +375,6 @@ private struct PlotTemplateCard: View {
                     .truncationMode(.tail)
 
                 Spacer(minLength: 4)
-
-                Text(hint)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(hintForeground)
-                    .lineLimit(1)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(hintBackground, in: Capsule())
             }
         }
         .padding(10)
@@ -415,25 +395,5 @@ private struct PlotTemplateCard: View {
 
     private var cardBackground: some ShapeStyle {
         selected ? AnyShapeStyle(Color.accentColor.opacity(0.10)) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private var hintForeground: some ShapeStyle {
-        if hint.lowercased().contains("recommend") {
-            return AnyShapeStyle(Color.accentColor)
-        }
-        if hint.lowercased().contains("fallback") {
-            return AnyShapeStyle(Color.orange)
-        }
-        return AnyShapeStyle(Color.secondary)
-    }
-
-    private var hintBackground: some ShapeStyle {
-        if hint.lowercased().contains("recommend") {
-            return AnyShapeStyle(Color.accentColor.opacity(0.14))
-        }
-        if hint.lowercased().contains("fallback") {
-            return AnyShapeStyle(Color.orange.opacity(0.14))
-        }
-        return AnyShapeStyle(Color.secondary.opacity(0.12))
     }
 }

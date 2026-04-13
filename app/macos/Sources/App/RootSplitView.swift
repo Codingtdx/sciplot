@@ -16,7 +16,6 @@ struct RootSplitView: View {
                 .id(model.selectedWorkbench)
                 .transition(MotionTokens.stateTransition)
                 .animation(MotionTokens.workbenchSwitch, value: model.selectedWorkbench)
-                .navigationTitle(model.selectedWorkbench.title)
                 .toolbar {
                     activeToolbarContent
                 }

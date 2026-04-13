@@ -58,9 +58,6 @@ struct CodeConsoleContextView: View {
     @ViewBuilder
     private var bindingSection: some View {
         Section("Binding") {
-            Label(session.liveStatusLabel, systemImage: session.liveStatusSymbol)
-                .foregroundStyle(session.errorMessage == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
-
             if let binding = session.selectedBinding {
                 AdaptiveInspectorTextRow(
                     title: "Source",
@@ -74,16 +71,10 @@ struct CodeConsoleContextView: View {
                     Divider()
                     ForEach(session.boundContext) { item in
                         AdaptiveInspectorTextRow(title: item.label, value: item.value, selectable: true)
-                        if !item.detail.isEmpty, item.detail != item.value {
-                            Text(item.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     }
                 }
             } else {
-                InspectorEmptyState(message: "Bind a dataset to enable context.")
+                InspectorEmptyState(message: "No bound dataset")
             }
 
             if let errorMessage = session.errorMessage {
@@ -100,10 +91,6 @@ struct CodeConsoleContextView: View {
             AdaptiveInspectorTextRow(title: "Prompt", value: session.promptText.isEmpty ? "Not ready" : "Ready")
             AdaptiveInspectorTextRow(title: "Editor", value: session.editorText.isEmpty ? "Empty" : "Loaded")
             AdaptiveInspectorTextRow(title: "Runner", value: session.isRunning ? "Running" : "Idle")
-            Text(session.promptStatusMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -118,15 +105,8 @@ struct CodeConsoleContextView: View {
                     value: run.outputDir,
                     selectable: true
                 )
-
-                if !session.outputsSummary.isEmpty {
-                    Text(session.outputsSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             } else {
-                InspectorEmptyState(message: "Run code to generate managed outputs.")
+                InspectorEmptyState(message: "No outputs")
             }
         }
     }

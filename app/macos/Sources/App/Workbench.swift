@@ -21,19 +21,6 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .plot:
-            return "Publication-ready figure workflow"
-        case .dataStudio:
-            return "Workbook group compare plotting"
-        case .composer:
-            return "Canvas-first panel composition"
-        case .codeConsole:
-            return "Context-aware native shell"
-        }
-    }
-
     var systemImage: String {
         switch self {
         case .plot:

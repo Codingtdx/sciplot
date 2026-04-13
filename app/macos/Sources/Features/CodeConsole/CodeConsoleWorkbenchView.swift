@@ -5,7 +5,9 @@ struct CodeConsoleWorkbenchView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            topBar
+            if session.selectedSourceFilename != nil {
+                topBar
+            }
 
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
@@ -54,17 +56,10 @@ struct CodeConsoleWorkbenchView: View {
 
     private var topBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(session.selectedSourceFilename ?? "No source selected")
-                    .font(.title2.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Text(session.documentStatusSummary)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Text(session.selectedSourceFilename ?? "")
+                .font(.title2.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
 
             Spacer(minLength: 16)
 
@@ -78,19 +73,14 @@ struct CodeConsoleWorkbenchView: View {
                 .frame(width: 220, alignment: .leading)
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: session.liveStatusSymbol)
-                    .symbolEffect(
-                        .pulse.byLayer,
-                        options: .repeating,
-                        value: session.isRefreshingContext || session.isRunning
-                    )
-                Text(session.liveStatusLabel)
-                    .contentTransition(.opacity)
-            }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .animation(MotionTokens.status, value: session.liveStatusLabel)
+            Image(systemName: session.liveStatusSymbol)
+                .symbolEffect(
+                    .pulse.byLayer,
+                    options: .repeating,
+                    value: session.isRefreshingContext || session.isRunning
+                )
+                .font(.headline)
+                .foregroundStyle(session.errorMessage == nil ? Color.secondary : Color.orange)
         }
     }
 
@@ -109,16 +99,12 @@ struct CodeConsoleWorkbenchView: View {
                                 Text(binding.title)
                                     .font(.headline)
                                 Spacer()
-                                Text(binding.sourceKind.title)
-                                    .font(.caption)
+                                Image(systemName: sourceSymbol(for: binding.sourceKind))
                                     .foregroundStyle(.secondary)
                             }
                             Text(binding.sourceURL.lastPathComponent)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
-                            Text(binding.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -129,14 +115,13 @@ struct CodeConsoleWorkbenchView: View {
 
                 if !session.boundContext.isEmpty {
                     ForEach(session.boundContext) { item in
-                        VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(item.label)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer(minLength: 10)
                             Text(item.value)
-                            Text(item.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                                .lineLimit(2)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -163,6 +148,17 @@ struct CodeConsoleWorkbenchView: View {
 
     private func cardBackground(isSelected: Bool) -> some ShapeStyle {
         isSelected ? AnyShapeStyle(.quinary.opacity(0.32)) : AnyShapeStyle(.quinary.opacity(0.15))
+    }
+
+    private func sourceSymbol(for kind: CodeConsoleSourceKind) -> String {
+        switch kind {
+        case .plot:
+            return "chart.xyaxis.line"
+        case .dataStudio:
+            return "tablecells"
+        case .importedFile:
+            return "doc"
+        }
     }
 
     private var bindingForImporter: Binding<Bool> {

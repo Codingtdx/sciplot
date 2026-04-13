@@ -96,7 +96,8 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(client.codeConsoleRunRequests.count, 1)
         XCTAssertEqual(session.latestRunResponse?.status, "succeeded")
         XCTAssertEqual(session.selectedGeneratedFile?.name, "sample.pdf")
-        XCTAssertTrue(session.outputsSummary.contains("files"))
+        XCTAssertEqual(session.latestRunResponse?.generatedFiles.count, 2)
+        XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
     }
 
     func testCodeConsoleExportUsesOnlyLatestRunPDFFigures() async {

@@ -7,7 +7,9 @@ struct PlotWorkbenchView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            topSourceBar
+            if session.selectedSourceFilename != nil {
+                topSourceBar
+            }
 
             if let bootstrapErrorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: bootstrapErrorMessage))
@@ -55,17 +57,10 @@ struct PlotWorkbenchView: View {
 
     private var topSourceBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(session.selectedSourceFilename ?? "No source selected")
-                    .font(.title2.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Text(session.documentStatusSummary)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Text(session.selectedSourceFilename ?? "")
+                .font(.title2.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
 
             Spacer(minLength: 16)
 
@@ -79,19 +74,14 @@ struct PlotWorkbenchView: View {
                 .frame(width: 220, alignment: .leading)
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: session.liveStatusSymbol)
-                    .symbolEffect(
-                        .pulse.byLayer,
-                        options: .repeating,
-                        value: session.isInspecting || session.isPreviewing
-                    )
-                Text(session.liveStatusLabel)
-                    .contentTransition(.opacity)
-            }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .animation(MotionTokens.status, value: session.liveStatusLabel)
+            Image(systemName: session.liveStatusSymbol)
+                .symbolEffect(
+                    .pulse.byLayer,
+                    options: .repeating,
+                    value: session.isInspecting || session.isPreviewing
+                )
+                .font(.headline)
+                .foregroundStyle(session.errorMessage == nil ? Color.secondary : Color.orange)
         }
     }
 
@@ -388,7 +378,7 @@ private struct PlotSourceInspectorSheet: View {
                         }
                     }
                 } else {
-                    Text("No inspect payload yet.")
+                    Text("No inspect payload")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -404,7 +394,7 @@ private struct PlotSourceInspectorSheet: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 if session.candidateRoleRows.isEmpty {
-                    Text("Candidate role hints will appear after inspect.")
+                    Text("No candidate roles")
                         .foregroundStyle(.secondary)
                 } else {
                     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
@@ -431,7 +421,7 @@ private struct PlotSourceInspectorSheet: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 if session.sampleColumns.isEmpty || session.sampleRows.isEmpty {
-                    Text("Raw sample rows are not available for this source.")
+                    Text("No raw sample rows")
                         .foregroundStyle(.secondary)
                 } else {
                     ScrollView(.horizontal) {

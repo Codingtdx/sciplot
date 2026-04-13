@@ -18,9 +18,8 @@ struct ComposerInspectorView: View {
     private var selectionSection: some View {
         Section("Selection") {
             if let region = session.selectedFreeRegion {
-                AdaptiveInspectorTextRow(title: "Target", value: "Merged free region")
+                AdaptiveInspectorTextRow(title: "Target", value: session.regionSummary(region))
                 AdaptiveInspectorTextRow(title: "Span", value: "\(region.colSpan)x\(region.rowSpan)")
-                AdaptiveInspectorTextRow(title: "Coverage", value: session.regionSummary(region))
             } else if let selection = session.selectedCellSelection {
                 AdaptiveInspectorTextRow(
                     title: "Target",
@@ -28,9 +27,9 @@ struct ComposerInspectorView: View {
                 )
                 AdaptiveInspectorTextRow(title: "Cells", value: "\(selection.cellCount)")
                 AdaptiveInspectorTextRow(title: "Span", value: "\(selection.colSpan)x\(selection.rowSpan)")
-                AdaptiveInspectorTextRow(title: "Coverage", value: cellSelectionSummary(selection))
+                AdaptiveInspectorTextRow(title: "Range", value: cellSelectionSummary(selection))
             } else if session.selectedPanel == nil {
-                InspectorEmptyState(message: "Select cells or a panel to edit.")
+                InspectorEmptyState(message: "No selection")
             }
 
             if let panel = session.selectedPanel {
@@ -160,7 +159,7 @@ struct ComposerInspectorView: View {
                     .inspectorActionButton()
                 }
             } else {
-                InspectorEmptyState(message: "Select cells or a panel to reveal edit actions.")
+                InspectorEmptyState(message: "No edit target")
             }
         }
     }
@@ -210,30 +209,18 @@ struct ComposerInspectorView: View {
     private var previewSection: some View {
         Section("Preview") {
             if session.isPreviewing {
-                BusyStateCard(
-                    title: "Rendering preview",
-                    message: "The sidecar is recomposing the current figure."
-                )
+                BusyStateCard(title: "Rendering preview")
                 .frame(height: 180)
             } else if let preview = session.previewResponse {
                 Base64PreviewImageView(base64PNG: preview.pngBase64)
                     .frame(height: 200)
-
-                if let report = preview.submissionReport {
-                    Label(
-                        report.summary,
-                        systemImage: report.readiness == "ready" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(report.readiness == "ready" ? .green : .orange)
-                    .font(.footnote)
-                }
             } else {
-                InspectorEmptyState(message: "Preview updates automatically.")
+                InspectorEmptyState(message: "No preview")
             }
 
             if session.isExporting {
-                Label("Exporting composition…", systemImage: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(.secondary)
+                ProgressView()
+                    .controlSize(.small)
             }
         }
     }

@@ -7,16 +7,9 @@ struct PlotImportView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if session.selectedFileURL == nil {
-                    ContentUnavailableView(
-                        "Import a Plot source",
-                        systemImage: "tray.and.arrow.down",
-                        description: Text("Choose a `.csv`, `.xlsx`, or `.xlsm` file to inspect and continue.")
-                    )
+                    ContentUnavailableView("Import Plot Source", systemImage: "tray.and.arrow.down")
                 } else if session.isInspecting, session.inspectionResponse == nil {
-                    BusyStateCard(
-                        title: "Inspecting source",
-                        message: "Loading compatible templates and source summary."
-                    )
+                    BusyStateCard(title: "Inspecting Source")
                 }
 
                 sourceSummary
@@ -33,21 +26,9 @@ private extension PlotImportView {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(session.selectedSourceFilename ?? "No source selected")
-                            .font(.headline)
-                            .lineLimit(1)
-
-                        if let modelLabel = session.inspectionResponse?.inspection.modelLabel {
-                            Text(modelLabel)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("Import a file and run inspect to unlock compatible templates.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Text(session.selectedSourceFilename ?? "No source selected")
+                        .font(.headline)
+                        .lineLimit(1)
 
                     Spacer()
 
@@ -58,26 +39,6 @@ private extension PlotImportView {
                             .padding(.vertical, 4)
                             .background(.quinary.opacity(0.35), in: Capsule())
                     }
-                }
-
-                if let path = session.selectedSourcePath {
-                    Text(path)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .textSelection(.enabled)
-                }
-
-                if let inspection = session.inspectionResponse {
-                    HStack(spacing: 10) {
-                        Label(inspection.inspection.modelLabel, systemImage: "doc.text.magnifyingglass")
-                        Label("\(session.compatibleRecommendations.count) compatible", systemImage: "checkmark.circle")
-                        if let selectedTemplate = session.selectedTemplateSummary?.label {
-                            Label(selectedTemplate, systemImage: "square.grid.2x2")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
             }
             .padding(.top, 4)

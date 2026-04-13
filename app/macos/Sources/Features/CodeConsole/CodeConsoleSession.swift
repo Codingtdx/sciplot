@@ -6,7 +6,6 @@ struct CodeConsoleContextItem: Identifiable, Equatable, Sendable {
     let id: String
     let label: String
     let value: String
-    let detail: String
 }
 
 enum CodeConsoleSourceKind: String, Sendable {
@@ -32,7 +31,6 @@ struct CodeConsoleBindingOption: Identifiable, Equatable, Sendable {
     let sourceURL: URL
     let sheet: SheetValue
     let title: String
-    let subtitle: String
     let templateID: String?
     let renderOptions: RenderOptionsPayload
 }
@@ -56,7 +54,6 @@ final class CodeConsoleSession {
     var editorText = ""
     var promptText = ""
     var starterCode = ""
-    var promptStatusMessage = "Bind a dataset, copy the prompt for external AI, then paste the returned Python here."
     var boundContext: [CodeConsoleContextItem] = []
     var availableBindings: [CodeConsoleBindingOption] = []
     var selectedBindingID: String?
@@ -82,22 +79,6 @@ final class CodeConsoleSession {
             return .disabled("The latest run did not generate any PDF figures to export.")
         }
         return .enabled()
-    }
-
-    var documentStatusSummary: String {
-        let source = selectedSourceFilename ?? "No source"
-        let template = contextResponse?.template ?? selectedBinding?.templateID ?? "Auto recommendation"
-        let output = latestExportItems.first?.label ?? latestRunResponse?.outputDir ?? "No export"
-        let failure = errorMessage ?? "No failure"
-        return "Source: \(source) · Template: \(template) · Latest output: \(output) · Last failure: \(failure)"
-    }
-
-    var outputsSummary: String {
-        DerivedState.outputsSummary(
-            latestRunResponse: latestRunResponse,
-            isRunning: isRunning,
-            hasContextResponse: contextResponse != nil
-        )
     }
 
     var selectedBinding: CodeConsoleBindingOption? {
@@ -139,15 +120,6 @@ final class CodeConsoleSession {
 
     var latestExportItems: [ExportedFileItem] {
         userExportURLs.map { ExportedFileItem(url: $0) }
-    }
-
-    var liveStatusLabel: String {
-        DerivedState.liveStatusLabel(
-            selectedFileURL: selectedFileURL,
-            isRunning: isRunning,
-            isRefreshingContext: isRefreshingContext,
-            hasContextResponse: contextResponse != nil
-        )
     }
 
     var liveStatusSymbol: String {
@@ -201,7 +173,6 @@ final class CodeConsoleSession {
                     sourceURL: fileURL,
                     sheet: plot.selectedSheet,
                     title: "Current Plot session",
-                    subtitle: plot.selectedTemplateID ?? plot.selectedSheet.displayName,
                     templateID: plot.selectedTemplateID,
                     renderOptions: plot.renderOptions
                 )
@@ -216,7 +187,6 @@ final class CodeConsoleSession {
                     sourceURL: sourceURL,
                     sheet: dataStudio.currentFigureSheet,
                     title: "Current Data Studio figure",
-                    subtitle: dataStudio.currentRecipeLabel,
                     templateID: dataStudio.currentFigureTemplateID,
                     renderOptions: dataStudio.currentFigureRenderOptions
                 )
@@ -257,7 +227,6 @@ final class CodeConsoleSession {
             sourceURL: url,
             sheet: .index(0),
             title: "Imported file",
-            subtitle: "Direct Code Console input",
             templateID: nil,
             renderOptions: runtimeState.defaultRenderOptions
         )
@@ -321,13 +290,11 @@ final class CodeConsoleSession {
 
     func copyPromptToPasteboard() {
         guard !promptText.isEmpty else {
-            promptStatusMessage = "Import or bind a dataset first."
             return
         }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(promptText, forType: .string)
-        promptStatusMessage = "Prompt copied. Paste it into the external AI, then bring the returned Python back here."
     }
 
     func runCurrentCode() async {
@@ -465,7 +432,6 @@ final class CodeConsoleSession {
             contextResponse = response
             selectedSheet = response.sheet
             promptText = response.promptText
-            promptStatusMessage = "Prompt ready for external AI."
             let previousStarterCode = starterCode
             starterCode = response.starterCode
             if editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editorText == previousStarterCode {
@@ -517,26 +483,27 @@ final class CodeConsoleSession {
             .init(
                 id: "source",
                 label: "Bound source",
-                value: binding.sourceURL.lastPathComponent,
-                detail: binding.sourceKind.title
+                value: binding.sourceURL.lastPathComponent
             ),
             .init(
                 id: "sheet",
                 label: "Sheet",
-                value: selectedSheet.displayName,
-                detail: response?.inspection.modelLabel ?? "Input sheet"
+                value: selectedSheet.displayName
             ),
             .init(
                 id: "template",
                 label: "Template context",
-                value: response?.template ?? binding.templateID ?? "Auto recommendation",
-                detail: response?.inspection.recommendationSummary ?? binding.subtitle
+                value: response?.template ?? binding.templateID ?? "Auto recommendation"
             ),
             .init(
                 id: "style",
                 label: "Style + palette",
-                value: response?.options.stylePreset ?? binding.renderOptions.stylePreset,
-                detail: response?.options.palettePreset ?? binding.renderOptions.palettePreset
+                value: [
+                    response?.options.stylePreset ?? binding.renderOptions.stylePreset,
+                    response?.options.palettePreset ?? binding.renderOptions.palettePreset,
+                ]
+                .filter { !$0.isEmpty }
+                .joined(separator: " / ")
             ),
         ]
 
@@ -545,8 +512,7 @@ final class CodeConsoleSession {
                 .init(
                     id: "dataset",
                     label: "Dataset summary",
-                    value: "\(dataset.rawRows) rows × \(dataset.rawCols) cols",
-                    detail: dataset.model
+                    value: "\(dataset.rawRows) rows × \(dataset.rawCols) cols"
                 )
             )
         }
@@ -618,47 +584,6 @@ private extension CodeConsoleSession {
     }
 
     enum DerivedState {
-        static func outputsSummary(
-            latestRunResponse: CodeConsoleRunResponse?,
-            isRunning: Bool,
-            hasContextResponse: Bool
-        ) -> String {
-            if let latestRunResponse {
-                let outputCount = latestRunResponse.generatedFiles.count
-                let duration = String(format: "%.2fs", latestRunResponse.durationSeconds)
-                let exitText = latestRunResponse.exitCode.map(String.init) ?? "n/a"
-                return "\(latestRunResponse.status.capitalized) · \(outputCount) files · \(duration) · exit \(exitText)"
-            }
-            if isRunning {
-                return "Running the pasted Python in the repo-native Code Console runner."
-            }
-            if hasContextResponse {
-                return "Prompt ready. Paste the returned Python script here to run it."
-            }
-            return "Import or bind a dataset to generate the controlled prompt and runner context."
-        }
-
-        static func liveStatusLabel(
-            selectedFileURL: URL?,
-            isRunning: Bool,
-            isRefreshingContext: Bool,
-            hasContextResponse: Bool
-        ) -> String {
-            if selectedFileURL == nil {
-                return "Awaiting context"
-            }
-            if isRunning {
-                return "Running script"
-            }
-            if isRefreshingContext {
-                return "Refreshing prompt"
-            }
-            if hasContextResponse {
-                return "Prompt ready"
-            }
-            return "Ready"
-        }
-
         static func liveStatusSymbol(
             hasError: Bool,
             isRunning: Bool,
