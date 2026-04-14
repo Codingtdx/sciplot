@@ -125,6 +125,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 ## More
 
 - Product architecture: `docs/product-architecture.md`
+- Maintenance governance: `docs/maintenance-governance.md`
 - Plot contract doc (generated): `docs/plot_contract.md`
 - Contributor/agent rules: `AGENTS.md`
 - Engineering handoff + runbook: `docs/engineering-handoff.md`
@@ -134,19 +135,21 @@ When behavior is a contract change, update contract first, regenerate docs, then
 If you are taking over development, use this order:
 
 1. Read `AGENTS.md` for boundaries, invariants, and forbidden legacy restores.
-2. Read `docs/engineering-handoff.md` for latest change history, risk points, and troubleshooting.
-3. Run the full validation matrix once in your machine:
+2. Read `docs/maintenance-governance.md` for maintenance method, change taxonomy, review gates, and rollback duties.
+3. Read `docs/engineering-handoff.md` for latest change history, risk points, and troubleshooting.
+4. Run the full validation matrix once in your machine:
    - clean
    - ruff
    - mypy
    - pytest
    - smoke_check
    - xcodebuild build/test
-4. Confirm you can execute one complete end-to-end flow in each workbench:
+5. Confirm you can execute one complete end-to-end flow in each workbench:
    - Plot
    - Data Studio
    - Composer
    - Code Console
-5. Before shipping any change, update both:
-   - `AGENTS.md` / `README.md` (if responsibilities/boundaries/workflow changed)
+6. Before shipping any change, update the required docs:
+   - `AGENTS.md` / `README.md` (if responsibilities, boundaries, workflow, or discoverability changed)
+   - `docs/maintenance-governance.md` (if maintenance method, review gates, or documentation duties changed)
    - `docs/engineering-handoff.md` (every round, required)

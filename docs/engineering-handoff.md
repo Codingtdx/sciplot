@@ -1726,6 +1726,107 @@ Every development round must update this file.
     - Code Console inspector `Reveal Output` and Outputs panel no longer compete as duplicate action surfaces
     - Toolbar `Export` and inspector `Actions` copy still read consistently across Plot / Composer / Code Console
 
+### 2026-04-14 (Round AI): Maintenance governance handbook
+
+- Scope:
+  - Added `docs/maintenance-governance.md` as the maintainer-facing governance handbook for this repo.
+  - Defined document precedence, ownership boundaries, change taxonomy, review gates, rollback/incident duties, documentation responsibilities, and the 30-minute takeover standard without changing runtime behavior.
+  - Updated `README.md` so the new handbook is discoverable from `More` and sits in the intended onboarding order between `AGENTS.md` and `docs/engineering-handoff.md`.
+- User-visible impact:
+  - No user-visible product behavior change.
+  - Maintainers now have one explicit governance document for day-to-day change management instead of piecing the process together from `AGENTS.md`, `README.md`, and scattered handoff notes.
+- Risks:
+  - The new handbook intentionally summarizes and points to existing truth sources; if future rounds update `AGENTS.md` or runtime behavior without updating this handbook, the repo could drift at the process layer even while code remains correct.
+  - This round does not create new CI or release automation; enforcement still depends on maintainers following the documented matrix and handoff duties.
+- Rollback points:
+  - `docs/maintenance-governance.md`
+  - `README.md`
+  - `docs/engineering-handoff.md`
+- Decision:
+  - The repo now treats maintenance governance as a separate document layer: runtime truth stays in code/schema/contract, hard engineering boundaries stay in `AGENTS.md`, onboarding stays in `README.md`, and round evidence stays in `docs/engineering-handoff.md`.
+  - Rejected alternatives:
+    - keep adding maintenance/process guidance only to `AGENTS.md`: rejected because it would continue mixing hard boundary rules with day-to-day governance and make takeover harder to scan
+    - push the governance material into `README.md`: rejected because the README should stay concise and discovery-oriented rather than becoming a full operating manual
+    - copy large rule blocks out of `AGENTS.md` into the new handbook: rejected because that would create a second rule catalog and increase drift risk
+  - Boundary:
+    - this round changes documentation structure only; there are no sidecar, schema, contract, runtime, or workflow changes
+    - `AGENTS.md` remains the hard-rule truth source and was intentionally not rewritten in this round
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`122 tests`)
+
+### 2026-04-14 (Round AJ): Quick Look race fix, Data Studio warning merge, and workbook seam split
+
+- Scope:
+  - Fixed the shared Quick Look thumbnail race in `app/macos/Sources/Shared/UI/QuickLookThumbnailView.swift` by adding per-request revision gating, clearing stale images when a new load starts, and introducing a loader seam that tests can drive deterministically.
+  - Cleaned up Data Studio import and warning presentation:
+    - removed the writable import bridge booleans from `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+    - rewired `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift` to consume `importFlow` directly
+    - added typed focused-workbook notice presentation in `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+    - centralized preview warning, workbook warning, and exclusion merging in `app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+  - Added macOS regression coverage for both bug fixes and a lightweight GUI renderability smoke path in:
+    - `app/macos/Tests/DataStudioSessionTests.swift`
+    - `app/macos/Tests/AppModelTests.swift`
+    - `app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - Split `src/data_studio/workbooks.py` into narrower internal seams without changing the public Python entry surface:
+    - `src/data_studio/workbook_constants.py`
+    - `src/data_studio/workbook_template_authoring.py`
+    - `src/data_studio/workbook_building.py`
+    - `src/data_studio/workbook_export.py`
+    - `src/data_studio/workbooks.py` remains the façade and now delegates to those modules
+- User-visible impact:
+  - Rapid thumbnail selection changes in Composer and Code Console no longer leave the old preview on screen or let a slow older callback overwrite the latest file selection.
+  - Data Studio `Focused Group` now surfaces preview warnings, workbook-level warnings, and exclusion notes together instead of silently dropping workbook warnings once preview warnings exist.
+  - No intended sidecar/public API or canonical workflow change.
+- Risks:
+  - Quick Look now clears the previous thumbnail immediately when a new load begins, so users may briefly see an empty/loading state where they previously saw a stale image.
+  - The new GUI smoke tests only verify that key views render to PNG successfully; they are not golden-image comparisons and will not catch subtle visual regressions by themselves.
+  - The Data Studio Python split preserves the existing façade but adds new internal module boundaries; future edits that bypass the façade or duplicate helper ownership can reintroduce drift.
+- Rollback points:
+  - `app/macos/Sources/Shared/UI/QuickLookThumbnailView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/Tests/AppModelTests.swift`
+  - `app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `src/data_studio/workbooks.py`
+  - `src/data_studio/workbook_constants.py`
+  - `src/data_studio/workbook_template_authoring.py`
+  - `src/data_studio/workbook_building.py`
+  - `src/data_studio/workbook_export.py`
+- Decision:
+  - The shared thumbnail component now owns latest-write-wins protection itself rather than asking each consumer to invent its own stale-result guard. This keeps async image loading aligned with the repo-wide revision-gated task model.
+  - Focused Group warnings are now composed in session truth instead of view-local helper logic so preview warnings cannot shadow workbook warnings or exclusions.
+  - `src/data_studio/workbooks.py` remains the supported façade, but large internal responsibilities now live behind narrower modules so future Data Studio maintenance can change import/build/export behavior without reopening the entire monolith.
+  - Rejected alternatives:
+    - patch Quick Look behavior separately in Composer and Code Console: rejected because the bug lives in the shared thumbnail model and a per-consumer fix would duplicate async semantics
+    - keep the Data Studio warning merge in `DataStudioWorkbenchView`: rejected because it had already drifted into a view-local rule that swallowed workbook warnings
+    - fully rewrite the Data Studio backend seam in one step: rejected because the safer move this round is to carve out stable helpers while preserving the existing public façade and test matrix
+  - Boundary:
+    - this round does not add endpoints, change project schema, modify plot contract payloads, or alter canonical Plot/Data Studio/Composer/Code Console workflows
+    - the Python split is internal-only and the new GUI smoke coverage is deliberately lightweight infrastructure, not a full visual diff system
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed (`55 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py src/data_studio/workbooks.py src/data_studio/workbook_building.py src/data_studio/workbook_export.py src/data_studio/workbook_template_authoring.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`123 tests`)
+  - Manual macOS visual QA checklist for this round (not executed in terminal pass):
+    - rapid thumbnail switching in Composer panel previews and Code Console outputs no longer feels stale or jumpy
+    - Data Studio `Focused Group` shows preview warnings, workbook warnings, and exclusions together with clear ordering
+    - import wizard presentation still opens/closes cleanly after the `importFlow` cleanup for both empty-session and existing-session entry points
+    - Plot template gallery, Data Studio template editor/specimen filter, Composer board quick actions, and Code Console outputs all render cleanly under the new snapshot smoke harness
+
 Use this block for every new round:
 
 ```

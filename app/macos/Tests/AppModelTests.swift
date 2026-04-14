@@ -18,7 +18,7 @@ final class AppModelTests: XCTestCase {
         model.switchWorkbench(.dataStudio)
         model.beginImportForActiveWorkbench()
         XCTAssertEqual(model.selectedWorkbench, .dataStudio)
-        XCTAssertTrue(model.dataStudioSession.isImportChooserPresented)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
 
         model.switchWorkbench(.composer)
         model.beginImportForActiveWorkbench()
@@ -31,17 +31,13 @@ final class AppModelTests: XCTestCase {
 
         model.switchWorkbench(.dataStudio)
         model.beginImportForActiveWorkbench()
-        XCTAssertTrue(model.dataStudioSession.isImportWizardPresented)
-        XCTAssertTrue(model.dataStudioSession.isImportChooserPresented)
-        XCTAssertFalse(model.dataStudioSession.isImportPresented)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
 
         model.dataStudioSession.chooseImportKind(.rawFiles)
-        XCTAssertFalse(model.dataStudioSession.isImportWizardPresented)
-        XCTAssertFalse(model.dataStudioSession.isImportPresented)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .idle)
 
         try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertTrue(model.dataStudioSession.isImportPresented)
-        XCTAssertFalse(model.dataStudioSession.isImportWizardPresented)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .importer(kind: .rawFiles))
     }
 
     func testOpenInPlotSeedsPlotSessionAndContext() async {

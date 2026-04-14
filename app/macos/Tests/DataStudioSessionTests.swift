@@ -4,11 +4,20 @@ import XCTest
 
 @MainActor
 final class DataStudioSessionTests: XCTestCase {
+    private func assertImportFlow(
+        _ session: DataStudioSession,
+        equals expected: DataStudioImportFlowState,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(session.importFlow, expected, file: file, line: line)
+    }
+
     func testImportWizardUsesSinglePresentationStateAndStepTransitions() {
         let session = DataStudioSession()
 
         session.beginImportFlow()
-        XCTAssertTrue(session.isImportWizardPresented)
+        assertImportFlow(session, equals: .wizard(step: .kind))
         XCTAssertEqual(session.importWizardStep, .kind)
 
         session.workbooks = [
@@ -22,6 +31,7 @@ final class DataStudioSessionTests: XCTestCase {
         ]
 
         session.beginImportFlow()
+        assertImportFlow(session, equals: .wizard(step: .scope))
         XCTAssertEqual(session.importWizardStep, .scope)
 
         session.chooseImportDisposition(.addToCurrentSession)
@@ -36,25 +46,15 @@ final class DataStudioSessionTests: XCTestCase {
         let session = DataStudioSession()
         session.beginImportFlow()
 
-        XCTAssertTrue(session.isImportWizardPresented)
-        XCTAssertTrue(session.isImportChooserPresented)
-        XCTAssertFalse(session.isImportPresented)
+        assertImportFlow(session, equals: .wizard(step: .kind))
 
         session.chooseImportKind(.rawFiles)
 
-        XCTAssertFalse(session.isImportWizardPresented)
-        XCTAssertFalse(session.isImportScopePresented)
-        XCTAssertFalse(session.isImportChooserPresented)
-        XCTAssertFalse(session.isImportResolverPresented)
-        XCTAssertFalse(session.isCreateTemplateEditorPresented)
-        XCTAssertFalse(session.isImportPresented)
-        XCTAssertFalse(session.isImportWizardPresented && session.isImportPresented)
+        assertImportFlow(session, equals: .idle)
 
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertTrue(session.isImportPresented)
-        XCTAssertFalse(session.isImportWizardPresented)
-        XCTAssertFalse(session.isImportWizardPresented && session.isImportPresented)
+        assertImportFlow(session, equals: .importer(kind: .rawFiles))
     }
 
     func testExportAvailabilityExplainsBlockingStates() {
@@ -97,8 +97,7 @@ final class DataStudioSessionTests: XCTestCase {
         let session = DataStudioSession()
 
         session.beginImportFlow()
-        XCTAssertTrue(session.isImportChooserPresented)
-        XCTAssertFalse(session.isImportScopePresented)
+        assertImportFlow(session, equals: .wizard(step: .kind))
 
         session.dismissImportChooser()
         session.workbooks = [
@@ -112,21 +111,20 @@ final class DataStudioSessionTests: XCTestCase {
         ]
 
         session.beginImportFlow()
-        XCTAssertTrue(session.isImportScopePresented)
-        XCTAssertFalse(session.isImportChooserPresented)
+        assertImportFlow(session, equals: .wizard(step: .scope))
     }
 
     func testCancelledImportPanelDoesNotSetErrorAndResetsPendingImportState() {
         let session = DataStudioSession()
         session.pendingImportDisposition = .startNewSession
         session.pendingImportKind = .existingWorkbook
-        session.isImportPresented = true
+        session.importFlow = .importer(kind: .existingWorkbook)
         session.errorMessage = "Old import error"
 
         session.handleImportPanelFailure(CancellationError())
 
         XCTAssertNil(session.errorMessage)
-        XCTAssertFalse(session.isImportPresented)
+        assertImportFlow(session, equals: .idle)
         XCTAssertEqual(session.pendingImportDisposition, .addToCurrentSession)
         XCTAssertEqual(session.pendingImportKind, .rawFiles)
     }
@@ -153,12 +151,11 @@ final class DataStudioSessionTests: XCTestCase {
         session.beginImportFlow()
         session.chooseImportKind(.existingWorkbook)
         try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertTrue(session.isImportPresented)
+        assertImportFlow(session, equals: .importer(kind: .existingWorkbook))
 
         session.handleImportPanelFailure(CancellationError())
 
-        XCTAssertFalse(session.isImportPresented)
-        XCTAssertFalse(session.isImportWizardPresented)
+        assertImportFlow(session, equals: .idle)
         XCTAssertEqual(session.pendingImportDisposition, .addToCurrentSession)
         XCTAssertEqual(session.pendingImportKind, .rawFiles)
     }
@@ -179,7 +176,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertNil(session.errorMessage)
 
         session.pendingImportDisposition = .startNewSession
-        session.isImportChooserPresented = true
+        session.importFlow = .wizard(step: .kind)
         session.errorMessage = "Chooser warning"
         session.dismissImportChooser()
         XCTAssertNil(session.errorMessage)
@@ -187,12 +184,12 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.pendingImportKind, .rawFiles)
 
         await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
-        XCTAssertTrue(session.isImportResolverPresented)
+        assertImportFlow(session, equals: .wizard(step: .resolver))
         session.errorMessage = "Resolver warning"
         session.dismissImportResolver()
 
         XCTAssertNil(session.errorMessage)
-        XCTAssertFalse(session.isImportResolverPresented)
+        assertImportFlow(session, equals: .idle)
         XCTAssertNil(session.sourcePreview)
         XCTAssertTrue(session.importedSourceURLs.isEmpty)
     }
@@ -436,8 +433,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
 
-        XCTAssertTrue(session.isImportResolverPresented)
-        XCTAssertFalse(session.isCreateTemplateEditorPresented)
+        assertImportFlow(session, equals: .wizard(step: .resolver))
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 0)
         XCTAssertEqual(session.selectedTemplateID, "builtin/tensile")
     }
@@ -456,8 +452,7 @@ final class DataStudioSessionTests: XCTestCase {
         session.beginCreateTemplateEditor()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertFalse(session.isImportResolverPresented)
-        XCTAssertTrue(session.isCreateTemplateEditorPresented)
+        assertImportFlow(session, equals: .wizard(step: .createTemplate))
 
         let draftName = session.templateDraftLabel
         let selectedCandidates = session.selectedCandidateIDs
@@ -465,8 +460,7 @@ final class DataStudioSessionTests: XCTestCase {
         session.returnToImportResolver()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertTrue(session.isImportResolverPresented)
-        XCTAssertFalse(session.isCreateTemplateEditorPresented)
+        assertImportFlow(session, equals: .wizard(step: .resolver))
         XCTAssertEqual(session.templateDraftLabel, draftName)
         XCTAssertEqual(session.selectedCandidateIDs, selectedCandidates)
         XCTAssertEqual(session.selectedSuggestionIDs, selectedSuggestions)
@@ -626,8 +620,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 0)
         XCTAssertEqual(session.selectedTemplateID, "user/new_template")
         XCTAssertTrue(session.templates.contains(where: { $0.id == "user/new_template" }))
-        XCTAssertTrue(session.isImportResolverPresented)
-        XCTAssertFalse(session.isCreateTemplateEditorPresented)
+        assertImportFlow(session, equals: .wizard(step: .resolver))
     }
 
     func testSaveTemplateAndContinueImportBuildsWorkbook() async {
@@ -657,8 +650,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "user/new_template")
-        XCTAssertFalse(session.isImportResolverPresented)
-        XCTAssertFalse(session.isCreateTemplateEditorPresented)
+        assertImportFlow(session, equals: .idle)
         XCTAssertEqual(session.orderedGroups.count, 1)
     }
 
@@ -679,9 +671,58 @@ final class DataStudioSessionTests: XCTestCase {
         session.selectedTemplateID = "builtin/tensile"
         await session.importWithSelectedTemplate()
 
-        XCTAssertFalse(session.isImportResolverPresented)
+        assertImportFlow(session, equals: .idle)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "builtin/tensile")
+    }
+
+    func testFocusedWorkbookNoticesMergePreviewWarningsWorkbookWarningsAndExclusions() {
+        let session = DataStudioSession()
+        let workbook = DataStudioWorkbookItem(
+            id: "workbook-1",
+            response: DataStudioWorkbookResponse(
+                workbookID: "workbook-1",
+                workbookPath: "/tmp/prepared.xlsx",
+                label: "Prepared",
+                templateMatch: TestPayloads.dataStudioWorkbook().templateMatch,
+                sourceFiles: ["/tmp/raw_a.csv"],
+                sheetNames: ["Representative_Curve"],
+                preferredSheet: "Representative_Curve",
+                parsedSampleCount: 1,
+                failedSampleCount: 0,
+                representativeFilename: "raw_a.csv",
+                metrics: [],
+                warnings: ["Workbook warning"],
+                exclusions: ["Excluded sample"],
+                samples: []
+            )
+        )
+        session.workbooks = [workbook]
+        session.groupStates = [
+            .init(workbookPath: "/tmp/prepared.xlsx", displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+        session.workbookPreviewByPath["/tmp/prepared.xlsx"] = DataStudioWorkbookPreviewResponse(
+            workbookPath: "/tmp/prepared.xlsx",
+            label: "Prepared",
+            supported: true,
+            unsupportedReason: "",
+            totalSpecimenCount: 1,
+            includedSpecimenCount: 1,
+            excludedSpecimenCount: 0,
+            representativeSpecimenId: nil,
+            representativeFilename: nil,
+            metrics: [],
+            specimens: [],
+            warnings: ["Preview warning", "Workbook warning"],
+            suggestedExclusionIds: [],
+            suggestionSupported: false,
+            suggestionSupportReason: ""
+        )
+
+        let notices = session.focusedWorkbookNotices(for: workbook)
+
+        XCTAssertEqual(notices.map(\.message), ["Preview warning", "Workbook warning", "Excluded sample"])
+        XCTAssertEqual(notices.map(\.style), [.warning, .warning, .exclusion])
     }
 
     func testNewSessionClearsContentStateButPreservesFigurePreferences() {

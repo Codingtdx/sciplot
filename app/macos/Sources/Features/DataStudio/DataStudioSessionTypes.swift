@@ -85,6 +85,29 @@ enum DataStudioWorkbookPreviewRefreshState: Equatable {
     case failed(workbookPath: String, message: String)
 }
 
+enum DataStudioFocusedWorkbookNoticeStyle: String, Equatable {
+    case warning
+    case exclusion
+
+    var systemImage: String {
+        switch self {
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .exclusion:
+            return "xmark.circle.fill"
+        }
+    }
+}
+
+struct DataStudioFocusedWorkbookNotice: Identifiable, Equatable {
+    let style: DataStudioFocusedWorkbookNoticeStyle
+    let message: String
+
+    var id: String {
+        "\(style.rawValue):\(message)"
+    }
+}
+
 enum DataStudioSpecimenFilterMode: String, Equatable {
     case off
     case auto

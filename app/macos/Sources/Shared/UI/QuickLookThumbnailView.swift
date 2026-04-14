@@ -2,17 +2,43 @@ import AppKit
 import Observation
 import QuickLookThumbnailing
 import SwiftUI
-import UniformTypeIdentifiers
+
+struct QuickLookThumbnailLoadResult {
+    let image: NSImage?
+    let errorMessage: String?
+}
 
 @MainActor
 @Observable
 final class QuickLookThumbnailModel {
+    typealias Loader = @Sendable (_ url: URL, _ size: CGSize) async -> QuickLookThumbnailLoadResult
+
     var image: NSImage?
     var errorMessage: String?
+    @ObservationIgnored private let loader: Loader
+    @ObservationIgnored private var activeRequestID = UUID()
+
+    init(loader: @escaping Loader = QuickLookThumbnailModel.defaultLoader) {
+        self.loader = loader
+    }
 
     func load(url: URL, size: CGSize) async {
+        let requestID = UUID()
+        activeRequestID = requestID
+        image = nil
         errorMessage = nil
 
+        let result = await loader(url, size)
+        guard activeRequestID == requestID else {
+            return
+        }
+        image = result.image
+        errorMessage = result.image == nil
+            ? (result.errorMessage ?? "Could not load a thumbnail for this asset.")
+            : nil
+    }
+
+    private static func defaultLoader(url: URL, size: CGSize) async -> QuickLookThumbnailLoadResult {
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
             size: size,
@@ -23,21 +49,17 @@ final class QuickLookThumbnailModel {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("png")
 
-        await withCheckedContinuation { continuation in
-            QLThumbnailGenerator.shared.saveBestRepresentation(for: request, to: temporaryURL, as: .png) { [weak self] error in
+        return await withCheckedContinuation { continuation in
+            QLThumbnailGenerator.shared.saveBestRepresentation(for: request, to: temporaryURL, as: .png) { error in
                 let loadedImage = NSImage(contentsOf: temporaryURL)
                 let message = error?.localizedDescription ?? "Could not load a thumbnail for this asset."
-                Task { @MainActor in
-                    if let loadedImage {
-                        self?.image = loadedImage
-                        self?.errorMessage = nil
-                    } else {
-                        self?.image = nil
-                        self?.errorMessage = message
-                    }
-                    try? FileManager.default.removeItem(at: temporaryURL)
-                    continuation.resume()
-                }
+                try? FileManager.default.removeItem(at: temporaryURL)
+                continuation.resume(
+                    returning: QuickLookThumbnailLoadResult(
+                        image: loadedImage,
+                        errorMessage: loadedImage == nil ? message : nil
+                    )
+                )
             }
         }
     }

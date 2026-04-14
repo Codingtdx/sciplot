@@ -93,17 +93,17 @@ struct DataStudioWorkbenchView: View {
 
     private var importerBinding: Binding<Bool> {
         Binding(
-            get: { session.isImportPresented },
-            set: { session.isImportPresented = $0 }
+            get: { session.importFlow.isImporterPresented },
+            set: { _ in }
         )
     }
 
     private var importWizardBinding: Binding<Bool> {
         Binding(
-            get: { session.isImportWizardPresented },
+            get: { session.importFlow.isWizardPresented },
             set: { isPresented in
                 if isPresented {
-                    session.isImportWizardPresented = true
+                    session.beginImportFlow()
                 } else {
                     session.dismissImportWizard()
                 }
@@ -400,17 +400,12 @@ private struct DataStudioFocusedWorkbookStrip: View {
                 }
             }
 
-            if !workbook.response.warnings.isEmpty || !workbook.response.exclusions.isEmpty || !previewWarnings.isEmpty {
+            if !notices.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(previewWarnings.prefix(3)), id: \.self) { warning in
-                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    ForEach(Array(notices.prefix(3))) { notice in
+                        Label(notice.message, systemImage: notice.style.systemImage)
                             .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
-                    ForEach(Array(workbook.response.exclusions.prefix(3)), id: \.self) { exclusion in
-                        Label(exclusion, systemImage: "xmark.circle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(notice.style == .warning ? .orange : .secondary)
                     }
                 }
             }
@@ -423,9 +418,8 @@ private struct DataStudioFocusedWorkbookStrip: View {
         session.displayedMetrics(for: workbook)
     }
 
-    private var previewWarnings: [String] {
-        let preview = session.workbookPreview(for: workbook.response.workbookPath)
-        return !(preview?.warnings.isEmpty ?? true) ? (preview?.warnings ?? []) : workbook.response.warnings
+    private var notices: [DataStudioFocusedWorkbookNotice] {
+        session.focusedWorkbookNotices(for: workbook)
     }
 }
 

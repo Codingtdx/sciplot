@@ -112,6 +112,32 @@ extension DataStudioSession {
         return workbook.response.failedSampleCount > 0 || !workbook.response.warnings.isEmpty
     }
 
+    func focusedWorkbookNotices(for workbook: DataStudioWorkbookItem) -> [DataStudioFocusedWorkbookNotice] {
+        let workbookPath = workbook.response.workbookPath
+        let previewWarnings = workbookPreview(for: workbookPath)?.warnings ?? []
+        var notices: [DataStudioFocusedWorkbookNotice] = []
+        var seen = Set<String>()
+
+        func append(_ messages: [String], style: DataStudioFocusedWorkbookNoticeStyle) {
+            for message in messages {
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    continue
+                }
+                let notice = DataStudioFocusedWorkbookNotice(style: style, message: trimmed)
+                guard seen.insert(notice.id).inserted else {
+                    continue
+                }
+                notices.append(notice)
+            }
+        }
+
+        append(previewWarnings, style: .warning)
+        append(workbook.response.warnings, style: .warning)
+        append(workbook.response.exclusions, style: .exclusion)
+        return notices
+    }
+
     func hasPendingFilterChanges(for workbookPath: String) -> Bool {
         normalizedSpecimenStates(draftSpecimenStates(for: workbookPath)) != normalizedSpecimenStates(specimenStates(for: workbookPath))
     }
