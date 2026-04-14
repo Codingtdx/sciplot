@@ -1654,6 +1654,78 @@ Every development round must update this file.
     - inspector `Figure Template`, `Open in Plot`, and `Export Bundle` affordances still read consistently after the session split
     - specimen-filter primary and advanced buttons expose the expected disabled help text
 
+### 2026-04-14 (Round AH): Plot / Composer / Code Console GUI parity cleanup
+
+- Scope:
+  - Brought the remaining three macOS workbenches in line with the Data Studio single-source/disabled-with-explanation rule without changing any sidecar or plot-contract surface.
+  - Plot:
+    - upgraded `app/macos/Sources/Features/Plot/PlotSessionTypes.swift` `PlotTemplateGalleryItem` into a real presentation payload carrying backend description, thumbnail kind, aspect ratio, and `ActionAvailability`
+    - moved Plot template-card disabled reasons into `app/macos/Sources/Features/Plot/PlotSession.swift` so the gallery no longer guesses why templates are unavailable before inspect
+    - added typed `resetSeriesOrderAvailability` so legend reset uses the same truth source as the reorderability decision, and removed the dead `latestExportDestinationDescription`
+  - Composer:
+    - added `ComposerInspectorEditPresentation` in `app/macos/Sources/Features/Composer/ComposerSessionTypes.swift`
+    - centralized merge / unmerge / place / remove / manual-label gating in `app/macos/Sources/Features/Composer/ComposerSession.swift`
+    - rewired both `ComposerInspectorView.swift` and the board quick-action popover in `ComposerCanvasView.swift` to consume those typed availabilities instead of scattered booleans
+  - Code Console:
+    - added typed editor/source/output presentations in `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+    - rewired `CodeConsoleEditorView.swift`, `CodeConsoleContextView.swift`, `CodeConsoleOutputsView.swift`, and `CodeConsoleWorkbenchView.swift` to consume session-provided availability/help instead of local guard logic
+    - removed the extra Outputs-panel `Reveal Output Folder` button so reveal/export affordances stay concentrated in the inspector `Actions -> Advanced` path as documented
+    - tightened `revealManagedOutputFolder()` so Code Console reveal actions no longer silently fall back to the bound source file when no managed output exists
+  - Added regression coverage in:
+    - `app/macos/Tests/PlotSessionTests.swift`
+    - `app/macos/Tests/ComposerSessionTests.swift`
+    - `app/macos/Tests/CodeConsoleSessionTests.swift`
+- User-visible impact:
+  - Plot template cards now explain why they are unavailable before inspect, and legend reset explains when the current legend order is already canonical.
+  - Composer merge/unmerge/place/remove/manual-label controls now disable with concrete help instead of leaving gray buttons with no reason.
+  - Code Console `Refresh`, `Copy Prompt`, `Restore Starter`, `Run Script`, source open/reveal, generated-file open/reveal, and inspector `Reveal Output` now all share stable disabled reasons from session state.
+  - Code Console no longer exposes a second reveal-output affordance in the Outputs panel; export/reveal stays anchored in the inspector `Actions` section as intended.
+- Risks:
+  - Plot/Composer/Code Console now rely more heavily on session-built presentation state; future GUI changes that bypass those payloads can easily reintroduce view-local business logic drift.
+  - Code Console reveal semantics are now stricter: when no managed output exists, reveal no longer falls back to the bound source file. This matches the documented workflow, but any caller that implicitly relied on the old fallback will need to use the source buttons instead.
+  - Manual visual verification of the refreshed Plot/Composer/Code Console surfaces was not run in this terminal pass, so the remaining risk is hover/help polish and layout feel rather than logic correctness.
+- Rollback points:
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionTypes.swift`
+  - `app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSession.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSessionTypes.swift`
+  - `app/macos/Sources/Features/Composer/ComposerInspectorView.swift`
+  - `app/macos/Sources/Features/Composer/ComposerCanvasView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/ComposerSessionTests.swift`
+  - `app/macos/Tests/CodeConsoleSessionTests.swift`
+- Decision:
+  - The remaining three workbenches now follow the same first-principles rule already applied to Data Studio: button enablement and explanation belong to session truth, not to ad hoc SwiftUI booleans or string branches.
+  - Rejected alternatives:
+    - only patch the visible disabled buttons in-place: rejected because that would preserve duplicated business rules in views and reopen drift the next time a second surface is added
+    - keep Code Console’s Outputs-panel reveal button because it is convenient: rejected because it violates the existing inspector-centered export/reveal affordance rule and duplicates action ownership
+    - preserve the old Code Console reveal-to-source fallback: rejected because it hides the difference between source navigation and managed output navigation
+  - Boundary:
+    - this round does not change sidecar endpoints, saved project schema, plot contract payloads, or canonical workflow definitions
+    - the changes are internal macOS GUI/state cleanup only
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/ComposerSessionTests -only-testing:SciPlotGodMacTests/CodeConsoleSessionTests`: passed (`51 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`122 tests`)
+  - Manual macOS visual QA checklist for this round (not executed in terminal pass):
+    - Plot template gallery hover/help reads well before and after inspect, and legend reset explanation appears only when relevant
+    - Composer inspector and board quick-action popover show consistent disabled reasons for merge/unmerge/place/remove/manual-label cases
+    - Code Console prompt/editor/source/output buttons expose the expected help text for empty, loading, and ready states
+    - Code Console inspector `Reveal Output` and Outputs panel no longer compete as duplicate action surfaces
+    - Toolbar `Export` and inspector `Actions` copy still read consistently across Plot / Composer / Code Console
+
 Use this block for every new round:
 
 ```

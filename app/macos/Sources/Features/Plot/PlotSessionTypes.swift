@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 enum PlotPreviewRefreshPolicy {
@@ -5,10 +6,17 @@ enum PlotPreviewRefreshPolicy {
     case debounced
 }
 
-struct PlotTemplateGalleryItem: Identifiable, Hashable {
+struct PlotTemplateGalleryItem: Identifiable, Equatable {
     let id: String
     let title: String
-    let selectable: Bool
+    let description: String?
+    let thumbnailKind: PlotTemplateThumbnailKind
+    let aspectRatio: CGFloat
+    let availability: ActionAvailability
+
+    var selectable: Bool {
+        availability.isEnabled
+    }
 }
 
 struct PlotSampleColumn: Identifiable, Hashable {

@@ -444,16 +444,6 @@ final class PlotSession {
         }
     }
 
-    var latestExportDestinationDescription: String? {
-        guard !userExportURLs.isEmpty else {
-            return nil
-        }
-        if userExportURLs.count == 1 {
-            return userExportURLs[0].path
-        }
-        return userExportURLs[0].deletingLastPathComponent().path
-    }
-
     var availableSheets: [SheetValue] {
         if let inspectionResponse, !inspectionResponse.sheetNames.isEmpty {
             return inspectionResponse.sheetNames.map(SheetValue.name)
@@ -479,7 +469,10 @@ final class PlotSession {
                 PlotTemplateGalleryItem(
                     id: template.id,
                     title: template.label,
-                    selectable: false
+                    description: template.description,
+                    thumbnailKind: thumbnailKind(for: template.id),
+                    aspectRatio: templateThumbnailAspectRatio(for: template.id),
+                    availability: .disabled("Import a source file to inspect compatible templates.")
                 )
             }
         }
@@ -490,7 +483,10 @@ final class PlotSession {
             return PlotTemplateGalleryItem(
                 id: recommendation.templateID,
                 title: summary?.label ?? recommendation.templateID,
-                selectable: true
+                description: summary?.description,
+                thumbnailKind: thumbnailKind(for: recommendation.templateID),
+                aspectRatio: templateThumbnailAspectRatio(for: recommendation.templateID),
+                availability: .enabled()
             )
         }
     }
@@ -641,6 +637,16 @@ final class PlotSession {
 
     var canEditSeriesOrder: Bool {
         shouldShowSeriesLegendControls
+    }
+
+    var resetSeriesOrderAvailability: ActionAvailability {
+        guard canEditSeriesOrder else {
+            return .disabled("This plot does not expose reorderable legend entries.")
+        }
+        guard renderOptions.seriesOrder != nil else {
+            return .disabled("Legend order already matches the source order.")
+        }
+        return .enabled()
     }
 
     func setSeriesOrder(_ labels: [String]) {

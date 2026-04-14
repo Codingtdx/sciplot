@@ -16,6 +16,8 @@ struct CodeConsoleContextView: View {
 
     @ViewBuilder
     private var actionsSection: some View {
+        let presentation = session.outputsPresentation
+
         Section("Actions") {
             InspectorActionStack {
                 Button("Export") {
@@ -36,11 +38,10 @@ struct CodeConsoleContextView: View {
                         session.revealLatestOutput()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(session.latestRunResponse == nil && session.latestExportItems.isEmpty)
+                    .disabled(!presentation.revealLatestOutputAvailability.isEnabled)
                     .help(
-                        session.latestRunResponse == nil && session.latestExportItems.isEmpty
-                            ? "Run code to generate managed outputs first."
-                            : "Reveal the latest export or managed output folder in Finder."
+                        presentation.revealLatestOutputAvailability.reason
+                            ?? "Reveal the latest export or managed output folder in Finder."
                     )
                     .inspectorActionButton()
                 }

@@ -19,6 +19,53 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertNil(session.exportAvailability.reason)
     }
 
+    func testEditPresentationExplainsBlockedComposerActions() {
+        let session = ComposerSession()
+
+        XCTAssertFalse(session.editPresentation.mergeSelectedCellsAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.mergeSelectedCellsAvailability.reason?.contains("Select adjacent cells") ?? false)
+        XCTAssertFalse(session.editPresentation.placementAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.placementAvailability.reason?.contains("Select a cell or merged region") ?? false)
+
+        session.project.panels = [graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0)]
+        session.focusedPanelID = "panel-1"
+        XCTAssertTrue(session.shouldShowPlacementAction)
+        XCTAssertFalse(session.editPresentation.placementAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.placementAvailability.reason?.contains("Select a cell or merged region") ?? false)
+
+        session.beginCellDragSelection(at: .init(col: 1, row: 0))
+        XCTAssertTrue(session.editPresentation.placementAvailability.isEnabled)
+        XCTAssertNil(session.editPresentation.placementAvailability.reason)
+
+        session.project.autoLabels = true
+        XCTAssertFalse(session.editPresentation.manualLabelAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.manualLabelAvailability.reason?.contains("Turn off Auto Labels") ?? false)
+
+        session.project.autoLabels = false
+        XCTAssertTrue(session.editPresentation.manualLabelAvailability.isEnabled)
+        XCTAssertNil(session.editPresentation.manualLabelAvailability.reason)
+    }
+
+    func testRemoveAndUnmergePresentationExplainsLockedOrOccupiedTargets() {
+        let session = ComposerSession()
+        var lockedGraph = graphPanel(id: "panel-1", col: 0, row: 0, zIndex: 0)
+        lockedGraph.locked = true
+        session.project.panels = [lockedGraph]
+        session.focusedPanelID = "panel-1"
+
+        XCTAssertFalse(session.editPresentation.removeSelectedPanelAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.removeSelectedPanelAvailability.reason?.contains("Unlock the selected panel") ?? false)
+
+        session.project.regions = [
+            .init(id: "free-1", kind: "free", col: 0, row: 0, colSpan: 2, rowSpan: 1, label: nil, locked: false, slotKind: nil),
+        ]
+        session.project.panels = [assetPanel(id: "asset-1", regionID: "free-1", xMm: 0, yMm: 0, wMm: 60, hMm: 55, zIndex: 0)]
+        session.selectedRegionID = "free-1"
+
+        XCTAssertFalse(session.editPresentation.unmergeSelectedRegionAvailability.isEnabled)
+        XCTAssertTrue(session.editPresentation.unmergeSelectedRegionAvailability.reason?.contains("Remove any panel") ?? false)
+    }
+
     func testBoardGeometryResolvesAllNineCellsFromBoardLocalPoints() {
         let geometry = ComposerBoardGeometry(
             project: ComposerRequestPayload(),

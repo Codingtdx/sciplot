@@ -35,6 +35,24 @@ struct CodeConsoleBindingOption: Identifiable, Equatable, Sendable {
     let renderOptions: RenderOptionsPayload
 }
 
+struct CodeConsoleEditorPresentation: Equatable, Sendable {
+    let refreshPromptAvailability: ActionAvailability
+    let copyPromptAvailability: ActionAvailability
+    let restoreStarterAvailability: ActionAvailability
+    let runAvailability: ActionAvailability
+}
+
+struct CodeConsoleSourceActionsPresentation: Equatable, Sendable {
+    let openSourceAvailability: ActionAvailability
+    let revealSourceAvailability: ActionAvailability
+}
+
+struct CodeConsoleOutputsPresentation: Equatable, Sendable {
+    let revealLatestOutputAvailability: ActionAvailability
+    let openSelectedGeneratedFileAvailability: ActionAvailability
+    let revealSelectedGeneratedFileAvailability: ActionAvailability
+}
+
 @MainActor
 @Observable
 final class CodeConsoleSession {
@@ -79,6 +97,36 @@ final class CodeConsoleSession {
             return .disabled("The latest run did not generate any PDF figures to export.")
         }
         return .enabled()
+    }
+
+    var editorPresentation: CodeConsoleEditorPresentation {
+        CodeConsoleEditorPresentation(
+            refreshPromptAvailability: refreshPromptAvailability,
+            copyPromptAvailability: copyPromptAvailability,
+            restoreStarterAvailability: restoreStarterAvailability,
+            runAvailability: runAvailability
+        )
+    }
+
+    var sourceActionsPresentation: CodeConsoleSourceActionsPresentation {
+        let availability: ActionAvailability
+        if selectedFileURL != nil {
+            availability = .enabled()
+        } else {
+            availability = .disabled("Bind a dataset before opening its source file.")
+        }
+        return CodeConsoleSourceActionsPresentation(
+            openSourceAvailability: availability,
+            revealSourceAvailability: availability
+        )
+    }
+
+    var outputsPresentation: CodeConsoleOutputsPresentation {
+        CodeConsoleOutputsPresentation(
+            revealLatestOutputAvailability: revealLatestOutputAvailability,
+            openSelectedGeneratedFileAvailability: selectedGeneratedFileOpenAvailability,
+            revealSelectedGeneratedFileAvailability: selectedGeneratedFileRevealAvailability
+        )
     }
 
     var selectedBinding: CodeConsoleBindingOption? {
@@ -265,6 +313,9 @@ final class CodeConsoleSession {
     }
 
     func refreshPrompt() {
+        guard refreshPromptAvailability.isEnabled else {
+            return
+        }
         scheduleContextRefresh()
     }
 
@@ -282,14 +333,14 @@ final class CodeConsoleSession {
     }
 
     func restoreStarterCode() {
-        guard !starterCode.isEmpty else {
+        guard restoreStarterAvailability.isEnabled else {
             return
         }
         editorText = starterCode
     }
 
     func copyPromptToPasteboard() {
-        guard !promptText.isEmpty else {
+        guard copyPromptAvailability.isEnabled else {
             return
         }
         let pasteboard = NSPasteboard.general
@@ -298,6 +349,10 @@ final class CodeConsoleSession {
     }
 
     func runCurrentCode() async {
+        guard runAvailability.isEnabled else {
+            errorMessage = runAvailability.reason
+            return
+        }
         guard !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Paste Python code from the external AI before running Code Console."
             return
@@ -326,20 +381,23 @@ final class CodeConsoleSession {
     }
 
     func openSelectedGeneratedFile() {
-        guard let selectedGeneratedFileURL else {
+        guard selectedGeneratedFileOpenAvailability.isEnabled, let selectedGeneratedFileURL else {
             return
         }
         WorkspaceBridge.open(selectedGeneratedFileURL)
     }
 
     func revealSelectedGeneratedFile() {
-        guard let selectedGeneratedFileURL else {
+        guard selectedGeneratedFileRevealAvailability.isEnabled, let selectedGeneratedFileURL else {
             return
         }
         WorkspaceBridge.reveal([selectedGeneratedFileURL])
     }
 
     func revealLatestOutput() {
+        guard revealLatestOutputAvailability.isEnabled else {
+            return
+        }
         if !userExportURLs.isEmpty {
             WorkspaceBridge.reveal(userExportURLs)
             return
@@ -350,8 +408,6 @@ final class CodeConsoleSession {
     func revealManagedOutputFolder() {
         if let outputDir = latestRunResponse?.outputDir {
             WorkspaceBridge.reveal([URL(fileURLWithPath: outputDir)])
-        } else if let selectedFileURL {
-            WorkspaceBridge.reveal([selectedFileURL])
         }
     }
 
@@ -569,6 +625,79 @@ final class CodeConsoleSession {
 
     private func bindingID(kind: CodeConsoleSourceKind, url: URL) -> String {
         "\(kind.rawValue)::\(url.standardizedFileURL.path)"
+    }
+
+    private var refreshPromptAvailability: ActionAvailability {
+        if isRefreshingContext {
+            return .disabled("Wait for the current context refresh to finish.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard selectedBinding != nil else {
+            return .disabled("Import or bind a dataset before refreshing the prompt.")
+        }
+        return .enabled()
+    }
+
+    private var copyPromptAvailability: ActionAvailability {
+        guard !promptText.isEmpty else {
+            return .disabled("Bind a dataset to generate the external AI prompt first.")
+        }
+        return .enabled()
+    }
+
+    private var restoreStarterAvailability: ActionAvailability {
+        guard !starterCode.isEmpty else {
+            return .disabled("Refresh the bound context before restoring starter code.")
+        }
+        return .enabled()
+    }
+
+    private var runAvailability: ActionAvailability {
+        if isRunning {
+            return .disabled("Wait for the current run to finish.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .disabled("Paste Python code from the external AI before running Code Console.")
+        }
+        guard currentRunRequest() != nil else {
+            return .disabled("Import or bind a dataset before running Code Console.")
+        }
+        return .enabled()
+    }
+
+    private var selectedGeneratedFileOpenAvailability: ActionAvailability {
+        guard latestRunResponse != nil else {
+            return .disabled("Run code to generate files before opening an output.")
+        }
+        guard selectedGeneratedFileURL != nil else {
+            return .disabled("Select a generated file before opening it.")
+        }
+        return .enabled()
+    }
+
+    private var selectedGeneratedFileRevealAvailability: ActionAvailability {
+        guard latestRunResponse != nil else {
+            return .disabled("Run code to generate files before revealing an output.")
+        }
+        guard selectedGeneratedFileURL != nil else {
+            return .disabled("Select a generated file before revealing it in Finder.")
+        }
+        return .enabled()
+    }
+
+    private var revealLatestOutputAvailability: ActionAvailability {
+        if !userExportURLs.isEmpty {
+            return .enabled()
+        }
+        guard latestRunResponse != nil else {
+            return .disabled("Run code or export figures before revealing the latest output.")
+        }
+        return .enabled()
     }
 }
 

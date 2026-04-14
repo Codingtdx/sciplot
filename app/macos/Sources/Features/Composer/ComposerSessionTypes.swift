@@ -95,3 +95,11 @@ struct ComposerBoardOrderingKey: Comparable {
         return lhs.panelID < rhs.panelID
     }
 }
+
+struct ComposerInspectorEditPresentation: Equatable {
+    let mergeSelectedCellsAvailability: ActionAvailability
+    let unmergeSelectedRegionAvailability: ActionAvailability
+    let placementAvailability: ActionAvailability
+    let removeSelectedPanelAvailability: ActionAvailability
+    let manualLabelAvailability: ActionAvailability
+}

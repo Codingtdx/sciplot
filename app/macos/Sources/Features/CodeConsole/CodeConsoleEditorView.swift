@@ -11,7 +11,9 @@ struct CodeConsoleEditorView: View {
     }
 
     private var promptCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let presentation = session.editorPresentation
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("External AI Prompt")
                     .font(.headline)
@@ -20,11 +22,21 @@ struct CodeConsoleEditorView: View {
                     session.refreshPrompt()
                 }
                 .buttonStyle(.bordered)
+                .disabled(!presentation.refreshPromptAvailability.isEnabled)
+                .help(
+                    presentation.refreshPromptAvailability.reason
+                        ?? "Refresh the bound context and regenerate the external AI prompt."
+                )
 
                 Button("Copy Prompt") {
                     session.copyPromptToPasteboard()
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!presentation.copyPromptAvailability.isEnabled)
+                .help(
+                    presentation.copyPromptAvailability.reason
+                        ?? "Copy the current external AI prompt to the clipboard."
+                )
             }
 
             ScrollView {
@@ -40,7 +52,9 @@ struct CodeConsoleEditorView: View {
     }
 
     private var editorCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let presentation = session.editorPresentation
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Python Code")
                     .font(.headline)
@@ -49,12 +63,21 @@ struct CodeConsoleEditorView: View {
                     session.restoreStarterCode()
                 }
                 .buttonStyle(.bordered)
+                .disabled(!presentation.restoreStarterAvailability.isEnabled)
+                .help(
+                    presentation.restoreStarterAvailability.reason
+                        ?? "Restore the starter code that matches the current bound context."
+                )
 
                 Button("Run Script") {
                     Task { await session.runCurrentCode() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(session.editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || session.isRunning)
+                .disabled(!presentation.runAvailability.isEnabled)
+                .help(
+                    presentation.runAvailability.reason
+                        ?? "Run the current Python code against the bound Code Console context."
+                )
             }
 
             TextEditor(text: $session.editorText)

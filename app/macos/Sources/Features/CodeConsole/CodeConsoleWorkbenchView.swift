@@ -85,7 +85,9 @@ struct CodeConsoleWorkbenchView: View {
     }
 
     private var sourceRail: some View {
-        ScrollView {
+        let presentation = session.sourceActionsPresentation
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Bound Context")
                     .font(.headline)
@@ -134,11 +136,21 @@ struct CodeConsoleWorkbenchView: View {
                         session.openCurrentSource()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.openSourceAvailability.isEnabled)
+                    .help(
+                        presentation.openSourceAvailability.reason
+                            ?? "Open the bound source file."
+                    )
 
                     Button("Reveal") {
                         session.revealCurrentSource()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.revealSourceAvailability.isEnabled)
+                    .help(
+                        presentation.revealSourceAvailability.reason
+                            ?? "Reveal the bound source file in Finder."
+                    )
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -61,6 +61,8 @@ struct ComposerInspectorView: View {
     @ViewBuilder
     private var editSection: some View {
         Section("Edit") {
+            let presentation = session.editPresentation
+
             if let selection = session.selectedCellSelection, selection.cellCount > 1 {
                 AdaptiveInspectorTextRow(title: "Merge", value: "\(selection.colSpan)x\(selection.rowSpan)")
 
@@ -69,7 +71,11 @@ struct ComposerInspectorView: View {
                         session.mergeSelectedCells()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!session.canMergeSelectedCells)
+                    .disabled(!presentation.mergeSelectedCellsAvailability.isEnabled)
+                    .help(
+                        presentation.mergeSelectedCellsAvailability.reason
+                            ?? "Merge the selected empty cells into one free region."
+                    )
                     .inspectorActionButton()
                 }
             } else if session.selectedFreeRegion != nil {
@@ -78,25 +84,39 @@ struct ComposerInspectorView: View {
                         session.unmergeSelectedRegion()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!session.canUnmergeSelectedRegion)
+                    .disabled(!presentation.unmergeSelectedRegionAvailability.isEnabled)
+                    .help(
+                        presentation.unmergeSelectedRegionAvailability.reason
+                            ?? "Return the selected free region back to its underlying grid cells."
+                    )
                     .inspectorActionButton()
 
-                    if session.canPlaceFocusedPanelInSelectedTarget {
+                    if session.shouldShowPlacementAction {
                         Button(session.placementActionTitle) {
                             session.placeFocusedPanelInSelectedTarget()
                         }
                         .buttonStyle(.bordered)
+                        .disabled(!presentation.placementAvailability.isEnabled)
+                        .help(
+                            presentation.placementAvailability.reason
+                                ?? "Place the focused panel into the selected target."
+                        )
                         .inspectorActionButton()
                     }
                 }
             }
 
-            if session.canPlaceFocusedPanelInSelectedTarget {
+            if session.shouldShowPlacementAction {
                 InspectorActionStack {
                     Button(session.placementActionTitle) {
                         session.placeFocusedPanelInSelectedTarget()
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(!presentation.placementAvailability.isEnabled)
+                    .help(
+                        presentation.placementAvailability.reason
+                            ?? "Place the focused panel into the selected target."
+                    )
                     .inspectorActionButton()
                 }
             }
@@ -119,7 +139,11 @@ struct ComposerInspectorView: View {
                             session.removeSelectedPanelFromBoard()
                         }
                         .buttonStyle(.bordered)
-                        .disabled(panel.locked)
+                        .disabled(!presentation.removeSelectedPanelAvailability.isEnabled)
+                        .help(
+                            presentation.removeSelectedPanelAvailability.reason
+                                ?? "Remove the selected panel from the board while keeping it in the asset rail."
+                        )
                         .inspectorActionButton()
                     }
                 }
@@ -145,7 +169,11 @@ struct ComposerInspectorView: View {
                             )
                         )
                         .textFieldStyle(.roundedBorder)
-                        .disabled(session.project.autoLabels)
+                        .disabled(!presentation.manualLabelAvailability.isEnabled)
+                        .help(
+                            presentation.manualLabelAvailability.reason
+                                ?? "Enter a manual label for the selected graph panel."
+                        )
                     }
                 }
             }

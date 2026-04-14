@@ -228,6 +228,39 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.thumbnailKind(for: "bar"), .histogramDensity)
     }
 
+    func testTemplateGalleryPresentationExplainsDisabledTemplatesBeforeInspect() {
+        let session = PlotSession()
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        let items = session.templateGalleryItems
+
+        XCTAssertFalse(items.isEmpty)
+        XCTAssertFalse(items[0].availability.isEnabled)
+        XCTAssertTrue(items[0].availability.reason?.contains("Import a source file") ?? false)
+        XCTAssertEqual(items[0].thumbnailKind, session.thumbnailKind(for: items[0].id))
+    }
+
+    func testResetSeriesOrderAvailabilityExplainsBlockedStates() async throws {
+        let client = MockSidecarClient()
+        client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.multiSeriesMeta(), contract: TestPayloads.contract())
+
+        XCTAssertFalse(session.resetSeriesOrderAvailability.isEnabled)
+        XCTAssertTrue(session.resetSeriesOrderAvailability.reason?.contains("does not expose reorderable legend entries") ?? false)
+
+        session.importFile(URL(fileURLWithPath: "/tmp/multiseries.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertFalse(session.resetSeriesOrderAvailability.isEnabled)
+        XCTAssertTrue(session.resetSeriesOrderAvailability.reason?.contains("already matches the source order") ?? false)
+
+        session.setSeriesOrder(["Series B", "Series A"])
+        XCTAssertTrue(session.resetSeriesOrderAvailability.isEnabled)
+        XCTAssertNil(session.resetSeriesOrderAvailability.reason)
+    }
+
     func testDebouncedNumericEditsRefreshOnlyAfterThePause() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

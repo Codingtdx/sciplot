@@ -275,7 +275,11 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     Button("Reset Series Order") {
                         session.resetSeriesOrder()
                     }
-                    .disabled(!session.canEditSeriesOrder || session.renderOptions.seriesOrder == nil)
+                    .disabled(!session.resetSeriesOrderAvailability.isEnabled)
+                    .help(
+                        session.resetSeriesOrderAvailability.reason
+                            ?? "Reset legend ordering back to the source order."
+                    )
                 }
             }
         }

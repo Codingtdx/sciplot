@@ -45,14 +45,15 @@ struct PlotTemplateView: View {
                             } label: {
                                 PlotTemplateCard(
                                     title: item.title,
-                                    kind: session.thumbnailKind(for: item.id),
-                                    aspectRatio: session.templateThumbnailAspectRatio(for: item.id),
+                                    kind: item.thumbnailKind,
+                                    aspectRatio: item.aspectRatio,
                                     selected: session.selectedTemplateID == item.id,
                                     enabled: item.selectable
                                 )
                             }
                             .buttonStyle(.plain)
-                            .disabled(!item.selectable)
+                            .disabled(!item.availability.isEnabled)
+                            .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
                         }
                     }
                 }

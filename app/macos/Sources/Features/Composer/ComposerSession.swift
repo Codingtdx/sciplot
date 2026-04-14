@@ -178,11 +178,25 @@ final class ComposerSession {
         return canPlace(panelID: panelID, in: target)
     }
 
+    var shouldShowPlacementAction: Bool {
+        focusedPanelID != nil || selectedPlacementTarget != nil
+    }
+
     var placementActionTitle: String {
         guard let panel = selectedPanel else {
             return "Place Here"
         }
         return panel.hidden ? "Place Here" : "Move Here"
+    }
+
+    var editPresentation: ComposerInspectorEditPresentation {
+        ComposerInspectorEditPresentation(
+            mergeSelectedCellsAvailability: mergeSelectedCellsAvailability,
+            unmergeSelectedRegionAvailability: unmergeSelectedRegionAvailability,
+            placementAvailability: placementAvailability,
+            removeSelectedPanelAvailability: removeSelectedPanelAvailability,
+            manualLabelAvailability: manualLabelAvailability
+        )
     }
 
     func configure(client: any SidecarClienting) {
@@ -1385,6 +1399,96 @@ final class ComposerSession {
             break
         }
         return ComposerBoardOrderingKey(row: .max, col: .max, area: .max, panelID: panel.id)
+    }
+
+    private var mergeSelectedCellsAvailability: ActionAvailability {
+        guard let selection = selectedCellSelection else {
+            return .disabled("Select adjacent cells before merging.")
+        }
+        guard selection.cellCount > 1 else {
+            return .disabled("Select two or more adjacent cells before merging.")
+        }
+        guard selection.cells.allSatisfy({ isCellMergeable($0) }) else {
+            return .disabled("Only empty, unlocked cells can be merged.")
+        }
+        return .enabled()
+    }
+
+    private var unmergeSelectedRegionAvailability: ActionAvailability {
+        guard let region = selectedFreeRegion else {
+            return .disabled("Select an empty merged region before unmerging.")
+        }
+        guard !region.locked else {
+            return .disabled("Unlock the merged region before unmerging it.")
+        }
+        guard regionOccupants(regionID: region.id).isEmpty else {
+            return .disabled("Remove any panel from this merged region before unmerging it.")
+        }
+        return .enabled()
+    }
+
+    private var placementAvailability: ActionAvailability {
+        guard let target = selectedPlacementTarget else {
+            return .disabled("Select a cell or merged region before placing the focused panel.")
+        }
+        guard let panelID = focusedPanelID, let panel = panelByID(panelID) else {
+            return .disabled("Select a panel before placing it on the board.")
+        }
+        guard !panel.locked else {
+            return .disabled("Unlock the selected panel before moving it.")
+        }
+        guard isStructurallyCompatible(panel: panel, with: target, in: project) else {
+            return .disabled("This target does not match the selected panel's required span.")
+        }
+
+        let occupantID = occupantPanelID(at: target, in: project, excluding: [panelID])
+        let sourceTarget = placementTarget(forPanelID: panelID, in: project)
+
+        if let occupantID {
+            guard let occupant = panelByID(occupantID) else {
+                return .disabled("This target is occupied and cannot be resolved right now.")
+            }
+            guard !occupant.locked else {
+                return .disabled("The target is occupied by a locked panel.")
+            }
+            guard let sourceTarget else {
+                return .disabled("Only panels already on the board can swap positions.")
+            }
+            guard isStructurallyCompatible(panel: occupant, with: sourceTarget, in: project) else {
+                return .disabled("Swapping would move the occupied panel into an incompatible slot.")
+            }
+            guard targetIsAvailable(target, in: project, excluding: [panelID, occupantID]),
+                  targetIsAvailable(sourceTarget, in: project, excluding: [panelID, occupantID])
+            else {
+                return .disabled("The selected placement would collide with another panel.")
+            }
+            return .enabled()
+        }
+
+        guard targetIsAvailable(target, in: project, excluding: [panelID]) else {
+            return .disabled("The selected placement would collide with another panel.")
+        }
+        return .enabled()
+    }
+
+    private var removeSelectedPanelAvailability: ActionAvailability {
+        guard let panel = selectedPanel else {
+            return .disabled("Select a panel before removing it from the board.")
+        }
+        guard !panel.locked else {
+            return .disabled("Unlock the selected panel before removing it from the board.")
+        }
+        return .enabled()
+    }
+
+    private var manualLabelAvailability: ActionAvailability {
+        guard let panel = selectedPanel, panel.kind == "graph" else {
+            return .disabled("Select a graph panel before editing its manual label.")
+        }
+        guard !project.autoLabels else {
+            return .disabled("Turn off Auto Labels before editing the manual label.")
+        }
+        return .enabled()
     }
 }
 

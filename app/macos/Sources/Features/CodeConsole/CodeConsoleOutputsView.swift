@@ -6,17 +6,8 @@ struct CodeConsoleOutputsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Outputs")
-                    .font(.headline)
-                Spacer()
-                if session.latestRunResponse != nil {
-                    Button("Reveal Output Folder") {
-                        session.revealManagedOutputFolder()
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
+            Text("Outputs")
+                .font(.headline)
 
             if session.isRunning {
                 BusyStateCard(title: "Running Code Console")
@@ -55,7 +46,9 @@ struct CodeConsoleOutputsView: View {
     }
 
     private func generatedFilesSection(run: CodeConsoleRunResponse) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let presentation = session.outputsPresentation
+
+        return VStack(alignment: .leading, spacing: 10) {
             Text("Generated Files")
                 .font(.headline)
 
@@ -96,11 +89,21 @@ struct CodeConsoleOutputsView: View {
                         session.openSelectedGeneratedFile()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.openSelectedGeneratedFileAvailability.isEnabled)
+                    .help(
+                        presentation.openSelectedGeneratedFileAvailability.reason
+                            ?? "Open the selected generated file."
+                    )
 
                     Button("Reveal") {
                         session.revealSelectedGeneratedFile()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.revealSelectedGeneratedFileAvailability.isEnabled)
+                    .help(
+                        presentation.revealSelectedGeneratedFileAvailability.reason
+                            ?? "Reveal the selected generated file in Finder."
+                    )
                 }
             }
         }

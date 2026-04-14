@@ -378,6 +378,8 @@ private struct ComposerBoardQuickActionPopover: View {
     let context: ComposerBoardQuickActionState
 
     var body: some View {
+        let presentation = session.editPresentation
+
         VStack(alignment: .leading, spacing: 12) {
             switch context {
             case let .mergeableMultiCellSelection(selection):
@@ -389,14 +391,23 @@ private struct ComposerBoardQuickActionPopover: View {
                         session.mergeSelectedCells()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!session.canMergeSelectedCells)
+                    .disabled(!presentation.mergeSelectedCellsAvailability.isEnabled)
+                    .help(
+                        presentation.mergeSelectedCellsAvailability.reason
+                            ?? "Merge the selected empty cells into one free region."
+                    )
                 }
 
-                if session.canPlaceFocusedPanelInSelectedTarget {
+                if session.shouldShowPlacementAction {
                     Button(session.placementActionTitle) {
                         session.placeFocusedPanelInSelectedTarget()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.placementAvailability.isEnabled)
+                    .help(
+                        presentation.placementAvailability.reason
+                            ?? "Place the focused panel into the selected target."
+                    )
                 }
 
                 Button("Clear Selection") {
@@ -413,14 +424,23 @@ private struct ComposerBoardQuickActionPopover: View {
                     session.unmergeSelectedRegion()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!session.canUnmergeSelectedRegion)
+                .disabled(!presentation.unmergeSelectedRegionAvailability.isEnabled)
+                .help(
+                    presentation.unmergeSelectedRegionAvailability.reason
+                        ?? "Return the selected free region back to its underlying grid cells."
+                )
 
-                if session.canPlaceFocusedPanelInSelectedTarget {
+                if session.shouldShowPlacementAction {
                     Button(session.placementActionTitle) {
                         session.selectRegion(region.id)
                         session.placeFocusedPanelInSelectedTarget()
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!presentation.placementAvailability.isEnabled)
+                    .help(
+                        presentation.placementAvailability.reason
+                            ?? "Place the focused panel into the selected target."
+                    )
                 }
 
                 Button("Clear Selection") {

@@ -18,6 +18,43 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertNil(session.exportAvailability.reason)
     }
 
+    func testEditorSourceAndOutputPresentationsExplainBlockingStates() {
+        let session = CodeConsoleSession()
+
+        XCTAssertFalse(session.editorPresentation.refreshPromptAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.refreshPromptAvailability.reason?.contains("sidecar") ?? false)
+        XCTAssertFalse(session.editorPresentation.copyPromptAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.copyPromptAvailability.reason?.contains("generate the external AI prompt") ?? false)
+        XCTAssertFalse(session.editorPresentation.restoreStarterAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.restoreStarterAvailability.reason?.contains("Refresh the bound context") ?? false)
+        XCTAssertFalse(session.editorPresentation.runAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.runAvailability.reason?.contains("sidecar") ?? false)
+
+        XCTAssertFalse(session.sourceActionsPresentation.openSourceAvailability.isEnabled)
+        XCTAssertTrue(session.sourceActionsPresentation.openSourceAvailability.reason?.contains("Bind a dataset") ?? false)
+        XCTAssertFalse(session.outputsPresentation.revealLatestOutputAvailability.isEnabled)
+        XCTAssertTrue(session.outputsPresentation.revealLatestOutputAvailability.reason?.contains("Run code or export figures") ?? false)
+        XCTAssertFalse(session.outputsPresentation.openSelectedGeneratedFileAvailability.isEnabled)
+        XCTAssertTrue(session.outputsPresentation.openSelectedGeneratedFileAvailability.reason?.contains("Run code to generate files") ?? false)
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        session.configure(client: MockSidecarClient())
+        session.promptText = "prompt"
+        session.starterCode = "print('starter')"
+        session.editorText = "print('run')"
+
+        XCTAssertTrue(session.editorPresentation.refreshPromptAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.copyPromptAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.restoreStarterAvailability.isEnabled)
+        XCTAssertTrue(session.editorPresentation.runAvailability.isEnabled)
+        XCTAssertTrue(session.sourceActionsPresentation.openSourceAvailability.isEnabled)
+
+        session.latestRunResponse = TestPayloads.codeConsoleRun()
+        XCTAssertTrue(session.outputsPresentation.revealLatestOutputAvailability.isEnabled)
+        XCTAssertTrue(session.outputsPresentation.openSelectedGeneratedFileAvailability.isEnabled)
+        XCTAssertTrue(session.outputsPresentation.revealSelectedGeneratedFileAvailability.isEnabled)
+    }
+
     func testExportAvailabilityExplainsLatestRunWithoutPDFFigures() {
         let session = CodeConsoleSession()
         session.latestRunResponse = CodeConsoleRunResponse(
