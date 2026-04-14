@@ -472,7 +472,6 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         f"Detected {group_count} replicate groups with a shared value label.",
     )
 
-    grouped_bar_error_score = 72.0
     point_error_score = 73.0
     lollipop_error_score = 64.0
     histogram_density_score = 68.0
@@ -480,8 +479,8 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
     box_strip_score = 77.0
     violin_box_score = 73.0
     violin_score = 74.0
-    bar_score = 70.0
-    grouped_bar_error_soft = ["Grouped bars with error bars keep cross-group mean differences explicit."]
+    bar_score = 72.0
+    bar_soft = ["Bar charts keep group means and error bars explicit with filled summaries."]
     point_error_soft = ["Point + error keeps group means and uncertainty visible without bar area fill."]
     lollipop_error_soft = ["Lollipop stems keep group means explicit while preserving vertical uncertainty cues."]
     histogram_density_soft = ["Histogram with density overlays highlights overlap between groups."]
@@ -489,27 +488,24 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
     box_strip_soft = ["Box + strip keeps spread summaries while exposing individual replicate points."]
     violin_box_soft = ["Violin + box combines density shape with a compact box-summary overlay."]
     violin_soft = ["Violin plots reveal distribution shape when replicate density is sufficient."]
-    bar_soft = ["Bar charts keep simple group means easy to compare."]
 
     if group_count <= 3:
-        grouped_bar_error_score += 4.0
+        bar_score += 4.0
         point_error_score += 5.0
         lollipop_error_score += 2.0
         histogram_density_score += 2.0
-        bar_score += 2.0
         box_score += 2.0
         box_strip_score += 2.0
         violin_box_score += 1.0
         violin_score -= 1.0
-        grouped_bar_error_soft.append("A small number of groups keeps grouped bars compact and readable.")
+        bar_soft.append("A small number of groups keeps filled bars compact and readable.")
         point_error_soft.append("A small number of groups keeps point+error markers compact and readable.")
         lollipop_error_soft.append("A small number of groups keeps lollipop stems compact and readable.")
         histogram_density_soft.append("Fewer groups keep overlap in histogram densities legible.")
-        bar_soft.append("Few groups keep bar labels compact and readable.")
         box_strip_soft.append("Few groups keep strip overlays clean without clutter.")
         violin_box_soft.append("Few groups keep violin+box overlays compact and readable.")
     if group_count >= 5:
-        grouped_bar_error_score -= 2.0
+        bar_score -= 2.0
         point_error_score -= 1.0
         lollipop_error_score -= 1.0
         histogram_density_score -= 2.0
@@ -517,8 +513,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_strip_score += 1.0
         violin_box_score += 2.0
         violin_score += 6.0
-        bar_score -= 4.0
-        grouped_bar_error_soft.append("Many groups can make grouped bars visually dense.")
+        bar_soft.append("Many groups can make filled bars visually dense.")
         point_error_soft.append("Many groups can still remain readable with compact point+error markers.")
         lollipop_error_soft.append("Many groups can make lollipop stems dense, so spacing discipline is important.")
         histogram_density_soft.append("Many groups can make density overlays visually crowded.")
@@ -528,7 +523,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         violin_soft.append("More groups make the density shape more informative.")
 
     if "replicate_sparse_replicates" in quality_flags:
-        grouped_bar_error_score += 3.0
+        bar_score += 3.0
         point_error_score += 4.0
         lollipop_error_score += 2.0
         histogram_density_score -= 10.0
@@ -536,20 +531,16 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_strip_score += 3.0
         violin_box_score += 1.0
         violin_score -= 2.0
-        bar_score += 2.0
-        grouped_bar_error_soft.append(
-            "Sparse replicates keep grouped means easier to read than detailed distributions."
-        )
+        bar_soft.append("Sparse replicates keep mean+error bar summaries easy to read.")
         point_error_soft.append("Sparse replicates still read well with explicit mean points and error bars.")
         lollipop_error_soft.append("Sparse replicates keep lollipop mean+error summaries readable.")
         histogram_density_soft.append("Sparse replicate counts make histogram-density overlays unstable.")
         box_soft.append("Box summaries stay robust when replicate counts are low.")
         box_strip_soft.append("Sparse replicates benefit from explicit point overlays on top of box summaries.")
         violin_box_soft.append("Sparse replicates can still use violin+box as a balanced spread summary.")
-        bar_soft.append("Simple mean comparisons remain readable with sparse replicates.")
 
     if "replicate_singleton_groups" in quality_flags:
-        grouped_bar_error_score += 2.0
+        bar_score += 2.0
         point_error_score += 2.0
         lollipop_error_score += 1.0
         histogram_density_score -= 8.0
@@ -561,6 +552,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         violin_soft.append("Very low group replicate counts reduce violin-shape reliability.")
         box_strip_soft.append("Visible strip points make singleton-like groups explicit.")
         violin_box_soft.append("Very low replicate counts reduce violin-shape confidence even with box overlays.")
+        bar_soft.append("Singleton-like groups remain explicit in filled mean+error bar summaries.")
         point_error_soft.append("Point+error keeps singleton-like groups explicit while preserving uncertainty cues.")
         lollipop_error_soft.append(
             "Lollipop stems keep singleton-like groups explicit while preserving uncertainty cues."
@@ -568,7 +560,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
 
     if "replicate_highly_discrete" in quality_flags:
         histogram_density_score -= 8.0
-        grouped_bar_error_score += 2.0
+        bar_score += 2.0
         point_error_score += 2.0
         lollipop_error_score += 1.0
         box_score += 2.0
@@ -578,6 +570,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
         box_soft.append("Discrete-valued replicates remain clear in box summaries.")
         box_strip_soft.append("Discrete replicates stay interpretable when each point remains visible.")
         violin_box_soft.append("Discrete groups keep both shape and quartile cues in violin+box overlays.")
+        bar_soft.append("Discrete-valued replicates remain clear in filled mean+error bar summaries.")
         point_error_soft.append("Discrete replicates stay readable with uncluttered mean/error markers.")
         lollipop_error_soft.append("Discrete replicates remain readable with lollipop stems and explicit error bars.")
     if estimated_points >= 24:
@@ -656,7 +649,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                         "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
                         "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
                     },
-                    optional_enhancements=["Use grouped_bar_error when filled group bars are required."],
+                    optional_enhancements=["Use bar when filled group bars are required."],
                     dataset=dataset,
                 ),
                 _build_candidate(
@@ -672,18 +665,6 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                     dataset=dataset,
                 ),
                 _build_candidate(
-                    template_id="grouped_bar_error",
-                    score=grouped_bar_error_score,
-                    why_hard_match=hard,
-                    why_soft_prior=grouped_bar_error_soft,
-                    inferred_mapping={
-                        "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
-                        "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
-                    },
-                    optional_enhancements=["Use box, box_strip, or violin when spread shape matters more than means."],
-                    dataset=dataset,
-                ),
-                _build_candidate(
                     template_id="histogram_density",
                     score=histogram_density_score,
                     why_hard_match=hard,
@@ -692,7 +673,7 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
                         "group": dataset.candidate_roles.group[0] if dataset.candidate_roles.group else "",
                         "value": dataset.candidate_roles.value[0] if dataset.candidate_roles.value else "",
                     },
-                    optional_enhancements=["Use grouped_bar_error when category means are the primary focus."],
+                    optional_enhancements=["Use bar when category means are the primary focus."],
                     dataset=dataset,
                 ),
                 _build_candidate(

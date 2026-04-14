@@ -447,6 +447,7 @@ struct MetaTemplateSummary: Codable, Equatable, Sendable, Identifiable {
     let label: String
     let description: String
     let category: String
+    let presentationKind: String
     let defaultSize: String
     let allowedSizes: [String]
     let editableOptions: [String]
@@ -463,6 +464,7 @@ struct MetaTemplateSummary: Codable, Equatable, Sendable, Identifiable {
         case label
         case description
         case category
+        case presentationKind
         case defaultSize
         case allowedSizes
         case editableOptions
@@ -499,6 +501,7 @@ struct ContractTemplateResponse: Codable, Equatable, Sendable {
     let label: String
     let description: String
     let category: String
+    let presentationKind: String
     let defaultSize: String
     let allowedSizes: [String]
     let editableOptions: [String]

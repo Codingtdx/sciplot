@@ -38,6 +38,7 @@ enum TestPayloads {
                     label: "Curve",
                     description: "Continuous curve template.",
                     category: "curve",
+                    presentationKind: "curve",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel", "double_panel"],
                     editableOptions: [
@@ -68,6 +69,7 @@ enum TestPayloads {
                     label: "Bar",
                     description: "Bar comparison template.",
                     category: "stats",
+                    presentationKind: "bar",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [
@@ -90,6 +92,7 @@ enum TestPayloads {
                     label: "Box",
                     description: "Box comparison template.",
                     category: "stats",
+                    presentationKind: "box",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [
@@ -114,6 +117,7 @@ enum TestPayloads {
                     label: "Box + Strip",
                     description: "Box comparison template with strip overlay.",
                     category: "stats",
+                    presentationKind: "box_strip",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [
@@ -177,6 +181,7 @@ enum TestPayloads {
                     label: "Curve",
                     description: "Continuous curve template.",
                     category: "curve",
+                    presentationKind: "curve",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel", "double_panel"],
                     editableOptions: [
@@ -231,6 +236,7 @@ enum TestPayloads {
                     label: "Curve",
                     description: "Continuous curve template.",
                     category: "curve",
+                    presentationKind: "curve",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [
@@ -258,6 +264,7 @@ enum TestPayloads {
                     label: "Box",
                     description: "Box comparison template.",
                     category: "stats",
+                    presentationKind: "box",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [
@@ -279,6 +286,7 @@ enum TestPayloads {
                     label: "Box + Strip",
                     description: "Box comparison template with strip overlay.",
                     category: "stats",
+                    presentationKind: "box_strip",
                     defaultSize: "single_panel",
                     allowedSizes: ["single_panel"],
                     editableOptions: [

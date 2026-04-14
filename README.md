@@ -87,7 +87,8 @@ When behavior is a contract change, update contract first, regenerate docs, then
 - Public plotting style is now a single preset: `nature`.
 - Legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, and `advanced_materials_spacious` are ingress-only compatibility aliases and must normalize immediately to `nature`.
 - Public template/catalog/recommendation surfaces expose only explicit chart templates.
-- Legacy template ids such as `scatter_with_fit`, `replicate_curves_with_band`, and `grouped_bar_compare` are ingress-only aliases and must normalize immediately to `scatter_fit`, `mean_band`, and `grouped_bar_error`.
+- Legacy template ids such as `scatter_with_fit`, `replicate_curves_with_band`, `grouped_bar_error`, and `grouped_bar_compare` are ingress-only aliases and must normalize immediately to `scatter_fit`, `mean_band`, and `bar`.
+- Template presentation metadata such as gallery thumbnail kind must come from `src/plot_contract.json` and `/meta`, not from macOS-local template-id heuristics.
 - `distribution_compare` is compatibility-only and must never be emitted as a public template id; resolve it to `box`, `box_strip`, or `violin`, with `box` as the conservative fallback when source inspection is unavailable.
 
 ## Engineering Principles

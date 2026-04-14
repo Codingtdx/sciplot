@@ -129,6 +129,7 @@ final class PlotSession {
     func apply(meta: SidecarMetaResponse, contract: PlotContractResponse) {
         metadata = meta
         self.contract = contract
+        selectedTemplateID = migrateLegacyTemplateID(selectedTemplateID)
         renderOptions.stylePreset = meta.defaults.stylePreset
         renderOptions.palettePreset = meta.defaults.palettePreset
         renderOptions.visualThemeID = meta.visualThemes.first?.id
@@ -193,11 +194,12 @@ final class PlotSession {
     }
 
     func chooseTemplate(_ templateID: String) {
-        guard selectedTemplateID != templateID else {
+        let migratedTemplateID = migrateLegacyTemplateID(templateID) ?? templateID
+        guard selectedTemplateID != migratedTemplateID else {
             return
         }
         let previousSnapshot = undoSnapshot()
-        setTemplate(templateID, shouldResetRenderOptions: true)
+        setTemplate(migratedTemplateID, shouldResetRenderOptions: true)
         schedulePreviewRefresh(policy: .immediate)
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Template")
     }
@@ -272,9 +274,10 @@ final class PlotSession {
     ) {
         prepareSource(url: inputURL, sheet: sheet, resetTemplate: true)
         runtimeState.stagedExternalPinnedSheet = sheet
-        runtimeState.stagedExternalPinnedTemplateID = preferredTemplateID
-        if let preferredTemplateID {
-            selectedTemplateID = preferredTemplateID
+        let migratedTemplateID = migrateLegacyTemplateID(preferredTemplateID)
+        runtimeState.stagedExternalPinnedTemplateID = migratedTemplateID
+        if let migratedTemplateID {
+            selectedTemplateID = migratedTemplateID
         }
         if let preferredOptions {
             renderOptions = preferredOptions
@@ -306,7 +309,7 @@ final class PlotSession {
         }
 
         var didResetRenderOptionsDuringTemplateSelection = false
-        if let preferredTemplateID,
+        if let preferredTemplateID = migrateLegacyTemplateID(preferredTemplateID),
            selectedTemplateID != preferredTemplateID,
            (compatibleTemplateIDs.contains(preferredTemplateID) || templateSummary(for: preferredTemplateID) != nil)
         {
@@ -715,13 +718,10 @@ final class PlotSession {
     }
 
     func thumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
-        if let cached = runtimeState.thumbnailKindCache[templateID] {
-            return cached
+        guard let summary = templateSummary(for: templateID) else {
+            return .fallback
         }
-
-        let resolved = resolveThumbnailKind(for: templateID)
-        runtimeState.thumbnailKindCache[templateID] = resolved
-        return resolved
+        return PlotTemplateThumbnailKind(rawValue: summary.presentationKind) ?? .fallback
     }
 
     private func prepareSource(url: URL, sheet: SheetValue, resetTemplate: Bool) {
@@ -815,9 +815,10 @@ final class PlotSession {
     }
 
     private func setTemplate(_ templateID: String, shouldResetRenderOptions: Bool) {
-        selectedTemplateID = templateID
+        let migratedTemplateID = migrateLegacyTemplateID(templateID) ?? templateID
+        selectedTemplateID = migratedTemplateID
         if shouldResetRenderOptions {
-            resetRenderOptions(for: templateID)
+            resetRenderOptions(for: migratedTemplateID)
         }
         invalidateSubmissionArtifacts()
         errorMessage = nil
@@ -1049,34 +1050,6 @@ final class PlotSession {
         return model == "frequency_sweep" || model == "temperature_sweep" || model == "stress_relaxation"
     }
 
-    private func resolveThumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {
-        let normalizedID = templateID.lowercased()
-        let category = templateSummary(for: templateID)?.category.lowercased() ?? ""
-
-        if normalizedID.contains("heatmap") || category.contains("heatmap") {
-            return .heatmap
-        }
-        if normalizedID.contains("bar") || normalizedID.contains("hist") || category.contains("stats") {
-            return .bar
-        }
-        if normalizedID.contains("box") {
-            return .box
-        }
-        if normalizedID.contains("violin") {
-            return .violin
-        }
-        if normalizedID.contains("scatter") {
-            return .scatter
-        }
-        if normalizedID.contains("point_line") || normalizedID.contains("pointline") {
-            return .pointLine
-        }
-        if normalizedID.contains("curve") || normalizedID.contains("line") || category.contains("curve") {
-            return .curve
-        }
-        return .fallback
-    }
-
     private func exampleDataTemplateURL(named filename: String) throws -> URL {
         let rootURL = try RepoLocator().locateRepositoryRoot()
         let url = rootURL
@@ -1153,7 +1126,7 @@ final class PlotSession {
 
     private func restore(from snapshot: UndoSnapshot) {
         selectedSheet = snapshot.selectedSheet
-        selectedTemplateID = snapshot.selectedTemplateID
+        selectedTemplateID = migrateLegacyTemplateID(snapshot.selectedTemplateID)
         renderOptions = snapshot.renderOptions
         notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
@@ -1180,7 +1153,6 @@ private extension PlotSession {
     struct RuntimeState {
         var inspectedInputPath: String?
         var inspectedSheet: SheetValue?
-        var thumbnailKindCache: [String: PlotTemplateThumbnailKind] = [:]
         var stagedExternalPinnedSheet: SheetValue?
         var stagedExternalPinnedTemplateID: String?
         var isApplyingUndoRedo = false
@@ -1190,6 +1162,19 @@ private extension PlotSession {
     final class AsyncCoordination {
         let inspection = AsyncLatestTaskCoordinator()
         let preview = AsyncLatestTaskCoordinator()
+    }
+
+    static func migrateLegacyTemplateID(_ templateID: String?) -> String? {
+        switch templateID {
+        case "grouped_bar_error", "grouped_bar_compare":
+            return "bar"
+        default:
+            return templateID
+        }
+    }
+
+    func migrateLegacyTemplateID(_ templateID: String?) -> String? {
+        Self.migrateLegacyTemplateID(templateID)
     }
 
     enum DerivedState {

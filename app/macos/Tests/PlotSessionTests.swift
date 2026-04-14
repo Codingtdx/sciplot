@@ -169,6 +169,65 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_bar.pdf")
     }
 
+    func testLegacyGroupedBarTemplateMigratesToBar() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.chooseTemplate("grouped_bar_error")
+
+        await waitUntil({ client.renderRequests.last?.template == "bar" }, timeout: 2.0)
+        XCTAssertEqual(session.selectedTemplateID, "bar")
+        XCTAssertEqual(client.renderRequests.last?.template, "bar")
+    }
+
+    func testThumbnailKindUsesPresentationKindFromMetadata() {
+        let session = PlotSession()
+        let baseMeta = TestPayloads.meta()
+        let templates = baseMeta.templates.map { template in
+            guard template.id == "bar" else {
+                return template
+            }
+            return MetaTemplateSummary(
+                id: template.id,
+                label: template.label,
+                description: template.description,
+                category: template.category,
+                presentationKind: "histogram_density",
+                defaultSize: template.defaultSize,
+                allowedSizes: template.allowedSizes,
+                editableOptions: template.editableOptions,
+                defaultOptions: template.defaultOptions,
+                availableStyles: template.availableStyles,
+                availablePalettes: template.availablePalettes,
+                canonicalID: template.canonicalID,
+                role: template.role,
+                lifecyclePolicy: template.lifecyclePolicy,
+                implementationID: template.implementationID
+            )
+        }
+        let meta = SidecarMetaResponse(
+            version: baseMeta.version,
+            defaults: baseMeta.defaults,
+            sizes: baseMeta.sizes,
+            styles: baseMeta.styles,
+            palettes: baseMeta.palettes,
+            templates: templates,
+            templateIds: baseMeta.templateIds,
+            sizeIds: baseMeta.sizeIds,
+            palettePresetIds: baseMeta.palettePresetIds,
+            visualThemes: baseMeta.visualThemes
+        )
+
+        session.apply(meta: meta, contract: TestPayloads.contract())
+
+        XCTAssertEqual(session.thumbnailKind(for: "bar"), .histogramDensity)
+    }
+
     func testDebouncedNumericEditsRefreshOnlyAfterThePause() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
@@ -321,6 +380,7 @@ final class PlotSessionTests: XCTestCase {
                     label: $0.label,
                     description: $0.description,
                     category: $0.category,
+                    presentationKind: $0.presentationKind,
                     defaultSize: $0.defaultSize,
                     allowedSizes: $0.allowedSizes,
                     editableOptions: $0.editableOptions,

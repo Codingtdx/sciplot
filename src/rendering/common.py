@@ -28,7 +28,7 @@ from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label, slugify_label
 from src.wide_nmr import WideNMRConfig, WideNMRSegment, load_wide_nmr_config, wide_nmr_sidecar_path
 
-_BAR_ZERO_BASELINE_TEMPLATES = {"bar", "grouped_bar_error"}
+_BAR_ZERO_BASELINE_TEMPLATES = {"bar"}
 
 
 @dataclass(frozen=True)
@@ -412,12 +412,7 @@ def preview_output_filenames(
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)
-    if template in {
-        "grouped_bar_error",
-        "point_error",
-        "lollipop_error",
-        "histogram_density",
-    }:
+    if template in {"point_error", "lollipop_error", "histogram_density"}:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)

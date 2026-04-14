@@ -126,6 +126,7 @@ class TemplateContract:
     label: str
     description: str
     category: str
+    presentation_kind: str
     default_size: str
     allowed_sizes: tuple[str, ...]
     editable_options: tuple[str, ...]
@@ -238,6 +239,7 @@ def load_plot_contract() -> PlotContract:
                 label=value["label"],
                 description=value["description"],
                 category=value["category"],
+                presentation_kind=value["presentation_kind"],
                 default_size=value["default_size"],
                 allowed_sizes=_tuple_of_strings(value["allowed_sizes"]),
                 editable_options=_tuple_of_strings(value["editable_options"]),
@@ -415,6 +417,7 @@ def meta_payload() -> dict[str, Any]:
                 "label": value.label,
                 "description": value.description,
                 "category": value.category,
+                "presentation_kind": value.presentation_kind,
                 "default_size": value.default_size,
                 "allowed_sizes": list(value.allowed_sizes),
                 "editable_options": list(value.editable_options),
@@ -499,6 +502,7 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
                 f"### `{name}` / {template_spec.label}",
                 "",
                 f"- Category: `{template_spec.category}`",
+                f"- Presentation kind: `{template_spec.presentation_kind}`",
                 f"- Default size: `{template_spec.default_size}`",
                 f"- Allowed sizes: {', '.join(f'`{item}`' for item in template_spec.allowed_sizes)}",
                 f"- Editable options: {', '.join(f'`{item}`' for item in template_spec.editable_options)}",

@@ -1536,6 +1536,124 @@ Every development round must update this file.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`110 tests`)
   - Manual macOS UI verification for the reported launch-only banner: not executed in this terminal pass
 
+### 2026-04-14 (Round AF): Collapse duplicate grouped-bar semantics into canonical `bar`
+
+- Scope:
+  - Removed public `grouped_bar_error` from `src/plot_contract.json`, kept `bar` as the only public filled mean+error categorical template, and made both `grouped_bar_error` and `grouped_bar_compare` ingress-only compatibility ids that normalize immediately to `bar` through `src/rendering/template_lifecycle.py`.
+  - Added explicit `presentation_kind` metadata to the plot contract and sidecar meta payloads so GUI thumbnail rendering consumes backend truth instead of inferring chart families from template-id substrings.
+  - Simplified the Python rendering path by deleting the old grouped-bar renderer branch, folding recommendation/preflight/render/export behavior onto canonical `bar`, and removing the dead `run_code_console_script_legacy` wrapper from `src/code_console_service.py`.
+  - Updated Data Studio recipe/session normalization and macOS Plot/Data Studio sessions so legacy grouped-bar ids migrate to `bar` before labels, thumbnails, recipe selection, export filenames, or persisted state are emitted.
+  - Regenerated `docs/plot_contract.md` and updated `README.md`, `AGENTS.md`, and `docs/data-to-template-v1-handoff.md` to reflect the new public template surface and backend-driven presentation metadata.
+- User-visible impact:
+  - Plot and Data Studio no longer present `grouped_bar_error` as a separate public chart choice; the canonical mean+error categorical option is now just `bar`.
+  - Legacy projects or saved selections that still reference `grouped_bar_error` / `grouped_bar_compare` are upgraded to `bar` during restore instead of round-tripping those removed public ids back into UI state or exported filenames.
+  - Plot template thumbnails no longer collapse multiple stats templates into the same local guess based on name matching; they now follow explicit backend `presentation_kind` metadata.
+  - Data Studio figure-template labels now come from backend recipe/template truth instead of a second hardcoded macOS label table.
+- Risks:
+  - `bar.allowed_sizes` now includes `120x55` to preserve historical grouped-bar wide-layout behavior under the canonical template id; future contract edits must keep that size if wide stats panels remain a supported workflow.
+  - Compatibility ids remain intentionally accepted at ingress, so any future caller that bypasses canonicalization and persists raw requested ids can silently reintroduce duplicate public semantics.
+  - Manual visual verification of the refreshed Plot template gallery and Data Studio figure picker was not run in this terminal-only pass; remaining risk is presentation polish, not backend/schema correctness.
+- Rollback points:
+  - `src/plot_contract.json`
+  - `src/plot_contract.py`
+  - `app/sidecar/schemas_meta.py`
+  - `src/rendering/template_lifecycle.py`
+  - `src/rendering/recommender.py`
+  - `src/rendering/preflight.py`
+  - `src/rendering/render_registry.py`
+  - `src/rendering/render_stats.py`
+  - `src/data_studio/comparison.py`
+  - `src/data_studio/session.py`
+  - `src/code_console_service.py`
+  - `app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+- Decision:
+  - Public chart semantics must map one-to-one to actual rendered behavior. Because `grouped_bar_error` and `bar` rendered the same default figure for the same replicate-table input, the duplicate id was removed from the public surface and retained only as a compatibility alias that normalizes at the boundary.
+  - Rejected alternatives:
+    - keep both ids public and “document the difference later”: rejected because the contract, recommendation payloads, thumbnails, and saved state would continue advertising a semantic distinction that the renderer does not actually honor
+    - let macOS keep guessing thumbnail kind and label text locally: rejected because it creates a second business-meaning table outside the contract and had already drifted on grouped-bar templates
+    - keep the grouped-bar renderer branch around “just in case”: rejected because it preserved dead-path complexity after canonicalization made the branch unreachable in supported flows
+  - Boundary:
+    - compatibility ids are still accepted at ingress, but they must not be emitted back out via `/meta`, `/plot-contract`, recommendation payloads, Data Studio recipes/exports, macOS gallery state, or persisted session state
+    - `presentation_kind` is presentation metadata only; it does not create a second render contract or override the canonical template id
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python -m pytest tests/test_plot_contract.py tests/test_sidecar_schema_contract.py tests/test_rendering_template_lifecycle.py tests/test_rendering_recommender.py tests/test_recommendation_policy.py tests/test_rendering_services.py tests/test_data_studio.py tests/test_sidecar_data_studio.py`: passed (`103 passed, 5 warnings`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`66 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`114 tests`)
+  - Manual macOS UI verification for the updated Plot gallery/Data Studio figure picker: not executed in this terminal pass
+
+### 2026-04-14 (Round AG): Data Studio GUI presentation cleanup and session split
+
+- Scope:
+  - Replaced the remaining implicit Data Studio import/template-editor workflow toggles with the single typed `importFlow` state carried by `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`, and kept the sheet entrypoints (`beginImportFlow`, `goBackInImportWizard`, resolver/template-editor transitions, importer presentation) routed through that one state machine.
+  - Added typed Data Studio presentation payloads in `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift` so resolver/template-editor cards, preview captions, selected summary rows, suggestion location metadata, and button availability all come from session-built presentation instead of duplicated SwiftUI helper logic.
+  - Split the large Data Studio session implementation into responsibility files:
+    - `app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+    - `app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+    - `app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+    - root `app/macos/Sources/Features/DataStudio/DataStudioSession.swift` now acts as the state shell, initializer, and shared undo/cancellation utility host
+  - Split the oversized Data Studio view layer so import sheets and template-editor UI live outside `DataStudioWorkbenchView.swift`, via:
+    - `app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+    - `app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+  - Unified suggestion-card chrome and removed dead location plumbing by having cards render backend/session-provided location text only when it exists, while the preview table now always surfaces the active preview caption.
+  - Moved specimen-filter action gating onto typed `ActionAvailability` in session presentation so `Use Auto Keep 5`, `Turn Off`, `Apply Changes`, `Use Auto Representative`, and `Revert` all use the same disabled-reason source instead of view-local guard logic.
+  - Added targeted regression coverage in `app/macos/Tests/DataStudioSessionTests.swift` for resolver/template-editor presentation text, import flow transitions, specimen-filter action availability reasons, and bulk auto-keep help text.
+- User-visible impact:
+  - Resolver and create-template sheets now give consistent disabled reasons for key actions instead of silently graying out buttons.
+  - Data Studio suggestion cards show stable location metadata and the template-editor preview column now keeps its active caption visible.
+  - `Auto Keep 5 All` now advertises how many workbook groups it will touch, matching the actual eligible session scope.
+  - No sidecar endpoint, schema, or plot-contract payload changed in this round.
+- Risks:
+  - The session logic is now layered across multiple files, but it is still one large observable type; future refactors should avoid turning the new split into cross-file hidden coupling.
+  - A few helpers that were formerly `private` are now module-visible to support the file split; future edits should keep them Data Studio-internal and avoid reusing them as generic app utilities.
+  - Manual macOS visual verification of the restructured import/template/specimen-filter surfaces was not executed in this terminal pass, so residual risk is presentation polish rather than schema/runtime correctness.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+- Decision:
+  - Data Studio GUI semantics now follow a single-source rule: import flow state lives in one typed state machine, and resolver/template/specimen-filter labels plus button gating live in typed session presentation models rather than being recomputed inside SwiftUI views.
+  - Rejected alternatives:
+    - keep `DataStudioSession.swift` as a 3000+ line omnibus file and only extract the obvious SwiftUI sheets: rejected because the view cleanup would still leave the business-flow ownership and presentation truth split across one massive file
+    - keep specimen-filter disabled reasons as ad hoc `.help(...)` branches in `DataStudioWorkbenchSpecimenViews.swift`: rejected because the UI would still own business-meaning decisions that should stay with session state
+    - preserve the older parallel import/template booleans and “just keep them in sync”: rejected because they encode an implicit state machine and make back/cancel/import-panel transitions harder to reason about and test
+  - Boundary:
+    - this round did not change sidecar endpoints, plot-contract data, or the canonical Plot/Data Studio workflow definitions
+    - the file split is internal macOS structure work only; external saved-state and API semantics remain unchanged
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`47 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`117 tests`)
+  - Manual macOS visual QA checklist for this round (not executed in terminal pass):
+    - empty session and non-empty session both enter the single import wizard correctly
+    - resolver/create-template sheet titles, back chain, and disabled button explanations read cleanly
+    - suggestion cards show hover/selected state, location metadata, and acceptable truncation for long labels
+    - preview block table and advanced disclosure maintain clear hierarchy after the file split
+    - inspector `Figure Template`, `Open in Plot`, and `Export Bundle` affordances still read consistently after the session split
+    - specimen-filter primary and advanced buttons expose the expected disabled help text
+
 Use this block for every new round:
 
 ```

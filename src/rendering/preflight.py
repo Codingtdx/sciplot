@@ -30,7 +30,6 @@ from src.submission import build_render_submission_report
 _FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
 _BUBBLE_SCATTER_TEMPLATES = set(template_family_ids("bubble_scatter"))
 _MEAN_BAND_TEMPLATES = set(template_family_ids("mean_band"))
-_GROUPED_BAR_ERROR_TEMPLATES = set(template_family_ids("grouped_bar_error"))
 
 
 def preflight_render_request(
@@ -165,7 +164,6 @@ def preflight_render_request(
             "box_strip",
             "violin",
             "violin_box",
-            "grouped_bar_error",
             "point_error",
             "lollipop_error",
             "histogram_density",
@@ -181,8 +179,6 @@ def preflight_render_request(
             if unknown_groups:
                 raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))
             summary = summarize_replicate_distribution(groups)
-            if resolved_template in _GROUPED_BAR_ERROR_TEMPLATES and len(groups) < 2:
-                raise ValueError(f"{resolved_template} requires at least two replicate groups.")
             if resolved_template == "histogram_density":
                 if summary.total_points < 12 or summary.min_group_points < 4:
                     warnings.append(

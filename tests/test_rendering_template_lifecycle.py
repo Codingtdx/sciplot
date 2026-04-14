@@ -47,14 +47,18 @@ def test_template_lifecycle_inventory_marks_aliases_and_policies() -> None:
 
     assert canonical_template_id("scatter_with_fit") == "scatter_fit"
     assert canonical_template_id("replicate_curves_with_band") == "mean_band"
-    assert canonical_template_id("grouped_bar_compare") == "grouped_bar_error"
+    assert canonical_template_id("grouped_bar_error") == "bar"
+    assert canonical_template_id("grouped_bar_compare") == "bar"
     assert alias_templates_for("scatter_fit") == ("scatter_with_fit",)
     assert alias_templates_for("mean_band") == ("replicate_curves_with_band",)
+    assert alias_templates_for("bar") == ("grouped_bar_error", "grouped_bar_compare")
     assert alias_lifecycle_policy("scatter_with_fit") == "deprecated_in_practice"
     assert alias_lifecycle_policy("replicate_curves_with_band") == "deprecated_in_practice"
+    assert alias_lifecycle_policy("grouped_bar_error") == "indefinite_compat"
     assert alias_lifecycle_policy("grouped_bar_compare") == "indefinite_compat"
     assert entries["scatter_fit"].role == "canonical"
     assert entries["scatter_with_fit"].role == "alias"
+    assert entries["bar"].role == "canonical"
     scatter_alias_identity = template_identity("scatter_with_fit")
     assert scatter_alias_identity.requested_template_id == "scatter_with_fit"
     assert scatter_alias_identity.canonical_id == "scatter_fit"
@@ -105,5 +109,6 @@ def test_recommender_keeps_grouped_bar_compare_as_compatibility_only(tmp_path: P
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=10)
     template_ids = [item.template_id for item in recommendations]
 
-    assert "grouped_bar_error" in template_ids
+    assert "bar" in template_ids
+    assert "grouped_bar_error" not in template_ids
     assert "grouped_bar_compare" not in template_ids

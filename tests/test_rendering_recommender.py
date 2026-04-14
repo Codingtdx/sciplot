@@ -159,7 +159,8 @@ def test_replicate_table_recommender_includes_e2_templates_with_deterministic_or
     assert template_ids[0] == "box"
     assert "box_strip" in template_ids
     assert "point_error" in template_ids
-    assert "grouped_bar_error" in template_ids
+    assert "bar" in template_ids
+    assert "grouped_bar_error" not in template_ids
     assert "distribution_compare" not in template_ids
     assert recommendations[0].why_hard_match[0].startswith("Normalized dataset shape includes")
     box_candidate = next(item for item in recommendations if item.template_id == "box")
@@ -194,7 +195,7 @@ def test_replicate_table_recommender_promotes_histogram_density_when_replicates_
     template_ids = [item.template_id for item in recommendations]
     assert template_ids[0] == "violin"
     assert "box_strip" in template_ids[:3]
-    assert template_ids.index("histogram_density") < template_ids.index("grouped_bar_error")
+    assert template_ids.index("histogram_density") < template_ids.index("bar")
     histogram_candidate = next(item for item in recommendations if item.template_id == "histogram_density")
     assert any(
         "Higher replicate counts make histogram density overlays more informative." in reason
@@ -211,10 +212,11 @@ def test_replicate_table_recommender_downranks_histogram_for_highly_discrete_val
     assert template_ids[0] == "box"
     assert "box_strip" in template_ids
     assert "point_error" in template_ids
-    assert "grouped_bar_error" in template_ids
+    assert "bar" in template_ids
+    assert "grouped_bar_error" not in template_ids
     if "histogram_density" in template_ids:
         histogram_candidate = next(item for item in recommendations if item.template_id == "histogram_density")
-        assert template_ids.index("histogram_density") > template_ids.index("grouped_bar_error")
+        assert template_ids.index("histogram_density") > template_ids.index("bar")
         assert any("highly discrete values" in reason.lower() for reason in histogram_candidate.why_soft_prior)
 
 

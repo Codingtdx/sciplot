@@ -10,6 +10,7 @@ class PlotContractTests(unittest.TestCase):
         contract = load_plot_contract()
         meta = meta_payload()
         removed_template_ids = {
+            "grouped_bar_error",
             "scatter_with_fit",
             "replicate_curves_with_band",
             "grouped_bar_compare",
@@ -38,8 +39,10 @@ class PlotContractTests(unittest.TestCase):
 
         for template in meta["templates"]:
             self.assertIn(template["id"], contract.templates)
+            self.assertIn("presentation_kind", template)
             self.assertIn(template["default_size"], template["allowed_sizes"])
             self.assertEqual(template["available_styles"], ["nature"])
+            self.assertEqual(template["presentation_kind"], contract.templates[template["id"]].presentation_kind)
 
         for template in contract.templates.values():
             self.assertEqual(template.available_styles, ("nature",))

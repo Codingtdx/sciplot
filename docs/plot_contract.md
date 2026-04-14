@@ -35,6 +35,7 @@
 ### `curve` / Curve
 
 - Category: `single_panel`
+- Presentation kind: `curve`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -45,6 +46,7 @@
 ### `point_line` / Point line
 
 - Category: `single_panel`
+- Presentation kind: `point_line`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -55,8 +57,9 @@
 ### `stacked_curve` / Stacked curve
 
 - Category: `stacked_spectrum`
+- Presentation kind: `stacked_curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`
+- Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-column stacked curves for spectrum-like figures.
 - Hard rules: `non_blank_pdf`
@@ -65,6 +68,7 @@
 ### `segmented_stacked_curve` / Segmented stacked curve
 
 - Category: `wide_nmr`
+- Presentation kind: `segmented_stacked_curve`
 - Default size: `60x110`
 - Allowed sizes: `60x110`
 - Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`, `use_sidecar`
@@ -75,6 +79,7 @@
 ### `bar` / Bar
 
 - Category: `single_panel`
+- Presentation kind: `bar`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -85,6 +90,7 @@
 ### `box` / Box
 
 - Category: `single_panel`
+- Presentation kind: `box`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -95,6 +101,7 @@
 ### `box_strip` / Box + strip
 
 - Category: `single_panel`
+- Presentation kind: `box_strip`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -105,6 +112,7 @@
 ### `violin` / Violin
 
 - Category: `single_panel`
+- Presentation kind: `violin`
 - Default size: `60x55`
 - Allowed sizes: `60x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -115,6 +123,7 @@
 ### `violin_box` / Violin + box
 
 - Category: `single_panel`
+- Presentation kind: `violin_box`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -122,19 +131,10 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `dense_group_label_warning`
 
-### `grouped_bar_error` / Grouped bar + error
-
-- Category: `single_panel`
-- Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
-- Description: Grouped bar means with deterministic error bars and summary-only bars.
-- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
-- Soft rules: `dense_group_label_warning`
-
 ### `point_error` / Point + error
 
 - Category: `single_panel`
+- Presentation kind: `point_error`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -145,6 +145,7 @@
 ### `lollipop_error` / Lollipop + error
 
 - Category: `single_panel`
+- Presentation kind: `lollipop_error`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -155,6 +156,7 @@
 ### `histogram_density` / Histogram density
 
 - Category: `single_panel`
+- Presentation kind: `histogram_density`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -165,6 +167,7 @@
 ### `scatter` / Scatter
 
 - Category: `single_panel`
+- Presentation kind: `scatter`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -175,6 +178,7 @@
 ### `bubble_scatter` / Bubble scatter
 
 - Category: `single_panel`
+- Presentation kind: `bubble_scatter`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -185,6 +189,7 @@
 ### `scatter_fit` / Scatter fit
 
 - Category: `single_panel`
+- Presentation kind: `scatter_fit`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -195,6 +200,7 @@
 ### `mean_band` / Mean band
 
 - Category: `single_panel`
+- Presentation kind: `mean_band`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
@@ -205,6 +211,7 @@
 ### `heatmap` / Heatmap
 
 - Category: `heatmap`
+- Presentation kind: `heatmap`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `show_colorbar`, `style_preset`, `palette_preset`
@@ -215,6 +222,7 @@
 ### `annotated_heatmap` / Annotated heatmap
 
 - Category: `heatmap`
+- Presentation kind: `annotated_heatmap`
 - Default size: `60x55`
 - Allowed sizes: `60x55`, `120x55`
 - Editable options: `size`, `show_colorbar`, `style_preset`, `palette_preset`

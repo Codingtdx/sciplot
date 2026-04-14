@@ -847,11 +847,11 @@ def test_normalize_session_payload_expands_paths() -> None:
             "selected_template_id": "builtin/tensile",
             "selected_workbook_id": "workbook-1",
             "primary_workbook_id": "workbook-1",
-            "selected_recipe_id": "representative_curve",
+            "selected_recipe_id": "strength_grouped_bar_error",
             "workbook_paths": ["~/tmp/prepared.xlsx"],
-            "comparison_recipe_ids": ["representative_curve", "strength_box"],
+            "comparison_recipe_ids": ["representative_curve", "strength_grouped_bar_compare"],
             "selected_figure_family_id": "representative_curve",
-            "selected_figure_template_id": "curve",
+            "selected_figure_template_id": "grouped_bar_error",
             "group_states": [
                 {
                     "workbook_path": "~/tmp/prepared.xlsx",
@@ -871,9 +871,9 @@ def test_normalize_session_payload_expands_paths() -> None:
             "figure_preferences": [
                 {
                     "family_id": "representative_curve",
-                    "selected_template_id": "curve",
+                    "selected_template_id": "grouped_bar_error",
                     "options_by_template": {
-                        "curve": {
+                        "grouped_bar_error": {
                             "style_preset": "default",
                             "palette_preset": "colorblind_safe",
                         }
@@ -886,11 +886,16 @@ def test_normalize_session_payload_expands_paths() -> None:
     )
 
     assert payload.selected_template_id == "builtin/tensile"
+    assert payload.selected_recipe_id == "strength_bar"
+    assert payload.comparison_recipe_ids == ("representative_curve", "strength_bar")
     assert payload.selected_figure_family_id == "representative_curve"
+    assert payload.selected_figure_template_id == "bar"
     assert payload.group_states[0].display_name == "Prepared"
     assert payload.specimen_states[0].specimen_id == "sample_1csv"
     assert payload.specimen_states[0].included is False
     assert payload.specimen_states[0].selected_as_representative is True
+    assert payload.figure_preferences[0].selected_template_id == "bar"
+    assert set(payload.figure_preferences[0].options_by_template) == {"bar"}
     assert payload.workbook_paths[0].startswith(str(Path.home()))
     assert payload.imported_paths[0].startswith(str(Path.home()))
     assert payload.template_draft_path and payload.template_draft_path.startswith(str(Path.home()))

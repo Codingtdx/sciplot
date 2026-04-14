@@ -21,12 +21,11 @@ _CURVE_QA_TEMPLATES = {
     *template_family_ids("mean_band"),
 }
 _STATS_QA_TEMPLATES = {
-    "bar",
+    *template_family_ids("bar"),
     "box",
     "box_strip",
     "violin",
     "violin_box",
-    *template_family_ids("grouped_bar_error"),
     "point_error",
     "lollipop_error",
     "histogram_density",

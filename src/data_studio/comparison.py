@@ -41,6 +41,7 @@ from src.text_normalization import slugify_label
 
 
 _COMPARISON_PREVIEW_PDF_CACHE = LRUCache[str, str](maxsize=64)
+_METRIC_COMPARISON_TEMPLATE_IDS = ("bar", "box", "box_strip", "violin", "point_error")
 
 
 @dataclass(frozen=True)
@@ -255,58 +256,17 @@ def _comparison_recipes_for_loaded_workbooks(
         )
     ]
     for metric_id in metric_ids:
-        recipes.extend(
-            [
+        for template_id in _METRIC_COMPARISON_TEMPLATE_IDS:
+            recipes.append(
                 ComparisonRecipe(
-                    id=f"{metric_id.lower()}_bar",
-                    label=f"{metric_id} Bar Compare",
+                    id=f"{metric_id.lower()}_{template_id}",
+                    label=f"{metric_id} {template_contract(template_id).label} Compare",
                     category="metric",
-                    template_id="bar",
+                    template_id=template_id,
                     sheet_name=f"{metric_id}_Replicates",
                     metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_box",
-                    label=f"{metric_id} Box Compare",
-                    category="metric",
-                    template_id="box",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_box_strip",
-                    label=f"{metric_id} Box + Strip Compare",
-                    category="metric",
-                    template_id="box_strip",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_violin",
-                    label=f"{metric_id} Violin Compare",
-                    category="metric",
-                    template_id="violin",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_point_error",
-                    label=f"{metric_id} Point + Error Compare",
-                    category="metric",
-                    template_id="point_error",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                ),
-                ComparisonRecipe(
-                    id=f"{metric_id.lower()}_grouped_bar_error",
-                    label=f"{metric_id} Grouped Bar + Error Compare",
-                    category="metric",
-                    template_id="grouped_bar_error",
-                    sheet_name=f"{metric_id}_Replicates",
-                    metric_id=metric_id,
-                ),
-            ]
-        )
+                )
+            )
     return tuple(recipes)
 
 

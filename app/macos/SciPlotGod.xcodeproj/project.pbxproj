@@ -66,6 +66,11 @@
 		C00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift */; };
 		C00000000000000000000044 /* Sources/Features/Composer/ComposerSessionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000044 /* Sources/Features/Composer/ComposerSessionTypes.swift */; };
 		C00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift */; };
+		C00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift */; };
+		C00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift */; };
+		C00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */; };
+		C00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */; };
+		C00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -138,6 +143,11 @@
 		B00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionTypes.swift; sourceTree = "<group>"; };
 		B00000000000000000000044 /* Sources/Features/Composer/ComposerSessionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSessionTypes.swift; sourceTree = "<group>"; };
 		B00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift; sourceTree = "<group>"; };
+		B00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift; sourceTree = "<group>"; };
+		B00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift; sourceTree = "<group>"; };
+		B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift; sourceTree = "<group>"; };
+		B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift; sourceTree = "<group>"; };
+		B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionComparison.swift; sourceTree = "<group>"; };
 		A00000000000000000000008 /* SciPlot God.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot God.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000009 /* SciPlotGodMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotGodMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -191,6 +201,11 @@
 				B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */,
 				B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */,
 				B00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift */,
+				B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */,
+				B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */,
+				B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */,
+				B00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift */,
+				B00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift */,
 				B0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift */,
 				B00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift */,
 				B00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift */,
@@ -360,6 +375,11 @@
 				C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */,
 				C0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift in Sources */,
 				C00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift in Sources */,
+				C00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift in Sources */,
+				C00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift in Sources */,
+				C00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift in Sources */,
+				C00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift in Sources */,
+				C00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift in Sources */,
 				C0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift in Sources */,
 				C00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift in Sources */,
 				C00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift in Sources */,

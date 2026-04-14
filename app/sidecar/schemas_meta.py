@@ -50,6 +50,7 @@ class MetaTemplateSummaryResponse(StrictModel):
     label: str
     description: str
     category: str
+    presentation_kind: str
     default_size: str
     allowed_sizes: list[str] = Field(default_factory=list)
     editable_options: list[str] = Field(default_factory=list)

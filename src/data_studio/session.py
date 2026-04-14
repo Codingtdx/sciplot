@@ -4,13 +4,22 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from src import plot_style
+from src.plot_contract import template_names
 from src.data_studio.models import (
     DataStudioFigurePreference,
     DataStudioGroupState,
     DataStudioSessionPayload,
     DataStudioSpecimenState,
 )
-from src.rendering.template_lifecycle import resolve_template_id
+from src.rendering.template_lifecycle import compatibility_template_ids, resolve_template_id
+
+_RECIPE_TEMPLATE_IDS = tuple(
+    sorted(
+        {*(str(template_id) for template_id in template_names()), *compatibility_template_ids()},
+        key=len,
+        reverse=True,
+    )
+)
 
 
 def _iter_objects(value: object) -> tuple[object, ...]:
@@ -63,10 +72,36 @@ def _normalize_render_options(value: object) -> dict[str, object]:
     return normalized
 
 
+def _normalize_comparison_recipe_id(value: object) -> str | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    if not cleaned or cleaned == "representative_curve":
+        return cleaned or None
+    for template_id in _RECIPE_TEMPLATE_IDS:
+        suffix = f"_{template_id}"
+        if not cleaned.endswith(suffix):
+            continue
+        metric_prefix = cleaned[: -len(suffix)]
+        if not metric_prefix:
+            return cleaned
+        normalized_template_id = _normalize_template_id(template_id)
+        if normalized_template_id is None:
+            return cleaned
+        return f"{metric_prefix}_{normalized_template_id}"
+    return cleaned
+
+
 def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPayload:
     workbook_paths = tuple(str(Path(str(path)).expanduser()) for path in _iter_objects(payload.get("workbook_paths")))
     imported_paths = tuple(str(Path(str(path)).expanduser()) for path in _iter_objects(payload.get("imported_paths")))
-    comparison_recipe_ids = tuple(str(item) for item in _iter_objects(payload.get("comparison_recipe_ids")))
+    comparison_recipe_ids = tuple(
+        dict.fromkeys(
+            recipe_id
+            for item in _iter_objects(payload.get("comparison_recipe_ids"))
+            if (recipe_id := _normalize_comparison_recipe_id(item))
+        )
+    )
 
     group_states_list: list[DataStudioGroupState] = []
     for item in _iter_objects(payload.get("group_states")):
@@ -138,9 +173,7 @@ def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPa
         primary_workbook_id=(
             str(payload["primary_workbook_id"]) if payload.get("primary_workbook_id") is not None else None
         ),
-        selected_recipe_id=(
-            str(payload["selected_recipe_id"]) if payload.get("selected_recipe_id") is not None else None
-        ),
+        selected_recipe_id=_normalize_comparison_recipe_id(payload.get("selected_recipe_id")),
         workbook_paths=workbook_paths,
         comparison_recipe_ids=comparison_recipe_ids,
         selected_figure_family_id=(

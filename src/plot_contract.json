@@ -435,7 +435,8 @@
         "single_panel_axis_frame",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "curve"
     },
     "point_line": {
       "label": "Point line",
@@ -485,7 +486,8 @@
       ],
       "soft_rules": [
         "multi_output_bundle_notice"
-      ]
+      ],
+      "presentation_kind": "point_line"
     },
     "stacked_curve": {
       "label": "Stacked curve",
@@ -493,7 +495,8 @@
       "category": "stacked_spectrum",
       "default_size": "60x55",
       "allowed_sizes": [
-        "60x55"
+        "60x55",
+        "120x55"
       ],
       "editable_options": [
         "size",
@@ -521,7 +524,8 @@
       "hard_rules": [
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "stacked_curve"
     },
     "segmented_stacked_curve": {
       "label": "Segmented stacked curve",
@@ -562,7 +566,8 @@
         "wide_nmr_segment_alignment",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "segmented_stacked_curve"
     },
     "bar": {
       "label": "Bar",
@@ -601,7 +606,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "bar"
     },
     "box": {
       "label": "Box",
@@ -640,7 +646,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "box"
     },
     "box_strip": {
       "label": "Box + strip",
@@ -680,7 +687,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "box_strip"
     },
     "violin": {
       "label": "Violin",
@@ -719,7 +727,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "violin"
     },
     "violin_box": {
       "label": "Violin + box",
@@ -759,47 +768,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
-    },
-    "grouped_bar_error": {
-      "label": "Grouped bar + error",
-      "description": "Grouped bar means with deterministic error bars and summary-only bars.",
-      "category": "single_panel",
-      "default_size": "60x55",
-      "allowed_sizes": [
-        "60x55",
-        "120x55"
       ],
-      "editable_options": [
-        "size",
-        "y_min",
-        "y_max",
-        "y_tick_density",
-        "y_tick_edge_labels",
-        "series_order",
-        "style_preset",
-        "palette_preset"
-      ],
-      "default_options": {
-        "size": "60x55",
-        "style_preset": "nature"
-      },
-      "available_styles": [
-        "nature"
-      ],
-      "available_palettes": [
-        "colorblind_safe",
-        "deep",
-        "muted",
-        "mono"
-      ],
-      "hard_rules": [
-        "single_panel_axis_frame",
-        "non_blank_pdf"
-      ],
-      "soft_rules": [
-        "dense_group_label_warning"
-      ]
+      "presentation_kind": "violin_box"
     },
     "point_error": {
       "label": "Point + error",
@@ -839,7 +809,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "point_error"
     },
     "lollipop_error": {
       "label": "Lollipop + error",
@@ -879,7 +850,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "lollipop_error"
     },
     "histogram_density": {
       "label": "Histogram density",
@@ -923,7 +895,8 @@
       ],
       "soft_rules": [
         "dense_group_label_warning"
-      ]
+      ],
+      "presentation_kind": "histogram_density"
     },
     "scatter": {
       "label": "Scatter",
@@ -971,7 +944,8 @@
         "single_panel_axis_frame",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "scatter"
     },
     "bubble_scatter": {
       "label": "Bubble scatter",
@@ -1019,7 +993,8 @@
         "single_panel_axis_frame",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "bubble_scatter"
     },
     "scatter_fit": {
       "label": "Scatter fit",
@@ -1067,7 +1042,8 @@
         "single_panel_axis_frame",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "scatter_fit"
     },
     "mean_band": {
       "label": "Mean band",
@@ -1115,7 +1091,8 @@
         "single_panel_axis_frame",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "mean_band"
     },
     "heatmap": {
       "label": "Heatmap",
@@ -1153,7 +1130,8 @@
         "heatmap_colorbar_inside_canvas",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "heatmap"
     },
     "annotated_heatmap": {
       "label": "Annotated heatmap",
@@ -1191,7 +1169,8 @@
         "heatmap_colorbar_inside_canvas",
         "non_blank_pdf"
       ],
-      "soft_rules": []
+      "soft_rules": [],
+      "presentation_kind": "annotated_heatmap"
     }
   },
   "validation_rules": {

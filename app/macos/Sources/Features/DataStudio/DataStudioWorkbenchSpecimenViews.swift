@@ -180,15 +180,15 @@ struct DataStudioSpecimenFilterPopover: View {
                 session.applySuggestedExclusions(for: workbook.response.workbookPath)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!presentation.canApplyAuto)
-            .help(presentation.autoFilterReason ?? "Keep the five specimens closest to the mean.")
+            .disabled(!presentation.useAutoKeepAvailability.isEnabled)
+            .help(presentation.useAutoKeepAvailability.reason ?? "Keep the five specimens closest to the mean.")
 
             Button("Turn Off") {
                 session.restoreAllSpecimens(for: workbook.response.workbookPath)
             }
             .buttonStyle(.bordered)
-            .disabled(!presentation.canTurnOff)
-            .help("Restore all specimens to the comparison preview.")
+            .disabled(!presentation.turnOffAvailability.isEnabled)
+            .help(presentation.turnOffAvailability.reason ?? "Restore all specimens to the comparison preview.")
 
             Spacer()
         }
@@ -295,26 +295,28 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
     let workbookPath: String
 
     var body: some View {
-        let presentation = session.specimenFilterPresentation(for: workbookPath)
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Button("Apply Changes") {
                     session.applyManualFilter(for: workbookPath)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!presentation.hasPendingChanges || presentation.isBusy)
+                .disabled(!presentation.applyDraftAvailability.isEnabled)
+                .help(applyChangesHelp)
 
                 Button("Use Auto Representative") {
                     session.restoreAutoRepresentativeSelection(for: workbookPath)
                 }
                 .buttonStyle(.bordered)
-                .disabled(session.draftRepresentativeSpecimenID(for: workbookPath) == nil || presentation.isBusy)
+                .disabled(!presentation.useAutoRepresentativeAvailability.isEnabled)
+                .help(useAutoRepresentativeHelp)
 
                 Button("Revert") {
                     session.revertDraftSpecimenStates(for: workbookPath)
                 }
                 .buttonStyle(.bordered)
-                .disabled(!presentation.hasPendingChanges)
+                .disabled(!presentation.revertDraftAvailability.isEnabled)
+                .help(revertHelp)
 
                 Spacer()
             }
@@ -354,6 +356,25 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    private var presentation: DataStudioSpecimenFilterPresentation {
+        session.specimenFilterPresentation(for: workbookPath)
+    }
+
+    private var applyChangesHelp: String {
+        presentation.applyDraftAvailability.reason
+            ?? "Commit the current draft inclusion and representative edits to the focused workbook group."
+    }
+
+    private var useAutoRepresentativeHelp: String {
+        presentation.useAutoRepresentativeAvailability.reason
+            ?? "Clear the manual representative override and fall back to the auto-selected specimen."
+    }
+
+    private var revertHelp: String {
+        presentation.revertDraftAvailability.reason
+            ?? "Discard the current draft specimen edits and return to the committed filter state."
     }
 }
 

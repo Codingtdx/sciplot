@@ -83,6 +83,7 @@ def _render_bar(input_path: Path, sheet: str | int, options: RenderOptions) -> l
         )
     ]
 
+
 def _render_box(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     groups = _ordered_groups(input_path, sheet, options)
     validate_manual_axis_overrides(options, template="box")
@@ -151,15 +152,6 @@ def _render_violin(input_path: Path, sheet: str | int, options: RenderOptions) -
         )
     ]
 
-def _render_grouped_bar_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    return _render_grouped_bar_error_like(
-        input_path,
-        sheet,
-        options,
-        template="grouped_bar_error",
-        filename_suffix="grouped_bar_error",
-        profile_autofix="grouped_bar_error_profile",
-    )
 
 def _render_point_error(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     groups = _ordered_groups(input_path, sheet, options)
@@ -276,56 +268,6 @@ def _render_lollipop_error(input_path: Path, sheet: str | int, options: RenderOp
         )
     ]
 
-def _render_grouped_bar_error_like(
-    input_path: Path,
-    sheet: str | int,
-    options: RenderOptions,
-    *,
-    template: str,
-    filename_suffix: str,
-    profile_autofix: str,
-) -> list[RenderedPlot]:
-    groups = _ordered_groups(input_path, sheet, options)
-    validate_manual_axis_overrides(options, template=template)
-    if len(groups) < 2:
-        raise ValueError(f"{template} requires at least two replicate groups.")
-    stats_profile = _stats_profile(groups)
-    fig, _ = plot_bar(
-        groups,
-        width_mm=options.width_mm,
-        height_mm=options.height_mm,
-        bar_width=max(0.2, stats_profile.bar_width * 0.9),
-        spacing_scale=max(1.02, stats_profile.spacing_scale),
-        capsize=stats_profile.capsize,
-        show_raw_points=False,
-        raw_point_size=max(stats_profile.raw_point_size, 10.0),
-        raw_point_alpha=max(stats_profile.raw_point_alpha, 0.72),
-        y_tick_density=options.y_tick_density,
-        y_tick_edge_labels=options.y_tick_edge_labels,
-        ylim=_manual_y_override(options),
-    )
-    if fig.axes:
-        first = groups[0]
-        fig.axes[0].set_ylabel(
-            _format_axis_label(
-                first.value_label,
-                first.value_unit,
-                override_label=options.y_label_override,
-            )
-        )
-    return [
-        _rendered_plot_with_qa(
-            filename=f"{predict_bar_box_slug(groups)}_{filename_suffix}.pdf",
-            figure=fig,
-            template=template,
-            options=options,
-            autofixes_applied=(
-                "stats_spacing_profile",
-                "bar_capsize_profile",
-                profile_autofix,
-            ),
-        )
-    ]
 
 def _emphasize_strip_point_overlay(
     ax: plt.Axes,

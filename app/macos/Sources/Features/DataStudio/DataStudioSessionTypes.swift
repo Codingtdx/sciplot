@@ -40,6 +40,34 @@ enum DataStudioImportWizardStep: String, Equatable {
     case createTemplate
 }
 
+enum DataStudioImportFlowState: Equatable {
+    case idle
+    case wizard(step: DataStudioImportWizardStep)
+    case importer(kind: DataStudioImportKind)
+
+    var wizardStep: DataStudioImportWizardStep? {
+        guard case let .wizard(step) = self else {
+            return nil
+        }
+        return step
+    }
+
+    var importerKind: DataStudioImportKind? {
+        guard case let .importer(kind) = self else {
+            return nil
+        }
+        return kind
+    }
+
+    var isWizardPresented: Bool {
+        wizardStep != nil
+    }
+
+    var isImporterPresented: Bool {
+        importerKind != nil
+    }
+}
+
 enum DataStudioActivity: Equatable {
     case idle
     case loadingTemplates
@@ -160,8 +188,11 @@ struct DataStudioSpecimenFilterPresentation {
     let isBusy: Bool
     let autoFilterSupported: Bool
     let autoFilterReason: String?
-    let canApplyAuto: Bool
-    let canTurnOff: Bool
+    let useAutoKeepAvailability: ActionAvailability
+    let turnOffAvailability: ActionAvailability
+    let applyDraftAvailability: ActionAvailability
+    let useAutoRepresentativeAvailability: ActionAvailability
+    let revertDraftAvailability: ActionAvailability
     let sortDescriptor: DataStudioSpecimenFilterSortDescriptor
     let rankedRows: [DataStudioSpecimenFilterRankedRow]
     let advancedRows: [DataStudioSpecimenPreviewResponse]
@@ -196,4 +227,37 @@ struct DataStudioTemplateSummaryItem: Identifiable, Equatable {
     let id: String
     let title: String
     let value: String
+}
+
+enum DataStudioSuggestionCardKind: Equatable {
+    case curve
+    case metric
+    case metadata
+    case structure
+}
+
+struct DataStudioSuggestionCardPresentation: Identifiable, Equatable {
+    let id: String
+    let kind: DataStudioSuggestionCardKind
+    let values: [String]
+    let location: String?
+}
+
+struct DataStudioResolverPresentation: Equatable {
+    let recommendedMatches: [DataStudioTemplateMatchResponse]
+    let otherTemplates: [DataStudioTemplateResponse]
+    let useSelectedTemplateAvailability: ActionAvailability
+}
+
+struct DataStudioTemplateEditorPresentation: Equatable {
+    let previewCaption: String?
+    let primaryCurveSuggestion: DataStudioSuggestionCardPresentation?
+    let primaryMetricSuggestion: DataStudioSuggestionCardPresentation?
+    let primaryMetadataSuggestion: DataStudioSuggestionCardPresentation?
+    let primaryStructureSuggestion: DataStudioSuggestionCardPresentation?
+    let secondaryCurveSuggestions: [DataStudioSuggestionCardPresentation]
+    let advancedCandidates: [DataStudioFieldCandidateResponse]
+    let selectedSummaryItems: [DataStudioTemplateSummaryItem]
+    let saveTemplateAvailability: ActionAvailability
+    let saveTemplateAndContinueAvailability: ActionAvailability
 }

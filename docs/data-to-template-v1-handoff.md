@@ -29,7 +29,7 @@ Major additions completed in this refactor:
   - `scatter_fit` (shipped publicly after alias cleanup; historical alias: `scatter_with_fit`)
   - `annotated_heatmap`
   - `mean_band` (historical alias: `replicate_curves_with_band`)
-  - `grouped_bar_error` (historical alias: `grouped_bar_compare`)
+  - `bar` (historical aliases: `grouped_bar_error`, `grouped_bar_compare`)
   - `distribution_compare` (historical family alias; now compatibility-only and resolved to `box` / `box_strip` / `violin`)
   - `histogram_density`
 - Ranked recommendation surface is canonical:
@@ -117,7 +117,7 @@ Newly added in the original v1 refactor (with current public ids shown here):
 - `scatter_fit`
 - `annotated_heatmap`
 - `mean_band`
-- `grouped_bar_error`
+- `bar`
 - `distribution_compare` compatibility mapping to `box` / `box_strip` / `violin`
 - `histogram_density`
 

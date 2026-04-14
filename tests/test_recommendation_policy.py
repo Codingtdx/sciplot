@@ -69,7 +69,8 @@ def test_replicate_policy_allows_co_primary_and_limits_visible_budget(tmp_path: 
         "violin",
     ]
     assert "lollipop_error" in _recommendation_ids(policy.advanced_templates)
-    assert "grouped_bar_error" in _recommendation_ids(policy.advanced_templates)
+    assert "bar" in _recommendation_ids(policy.advanced_templates)
+    assert "grouped_bar_error" not in _recommendation_ids(policy.advanced_templates)
     assert "grouped_bar_compare" not in _recommendation_ids(policy.visible_recommendations)
 
 

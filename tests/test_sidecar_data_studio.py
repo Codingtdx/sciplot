@@ -151,13 +151,18 @@ def test_data_studio_template_routes_and_source_preview_stay_live(tmp_path: Path
             "payload": {
                 "selected_template_id": "builtin/tensile",
                 "workbook_paths": [str(tmp_path / "a.xlsx")],
-                "comparison_recipe_ids": ["representative_curve"],
+                "selected_recipe_id": "strength_grouped_bar_error",
+                "comparison_recipe_ids": ["representative_curve", "strength_grouped_bar_compare"],
+                "selected_figure_template_id": "grouped_bar_error",
                 "imported_paths": [str(FIXTURE_DIR / "BlendSet_A.csv")],
             }
         },
     )
     assert normalize.status_code == 200, normalize.text
     assert normalize.json()["selected_template_id"] == "builtin/tensile"
+    assert normalize.json()["selected_recipe_id"] == "strength_bar"
+    assert normalize.json()["comparison_recipe_ids"] == ["representative_curve", "strength_bar"]
+    assert normalize.json()["selected_figure_template_id"] == "bar"
 
 
 def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(tmp_path: Path) -> None:

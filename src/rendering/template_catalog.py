@@ -48,7 +48,6 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_error",
         "point_error",
         "lollipop_error",
     }:
@@ -78,7 +77,6 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_error",
         "point_error",
         "lollipop_error",
         "histogram_density",
@@ -107,7 +105,6 @@ def _family(template_id: str) -> str:
         "box_strip",
         "violin",
         "violin_box",
-        "grouped_bar_error",
         "point_error",
         "lollipop_error",
         "histogram_density",
@@ -139,8 +136,6 @@ def _preview_priority(template_id: str) -> int:
         return 84
     if template_id == "violin_box":
         return 83
-    if template_id == "grouped_bar_error":
-        return 82
     if template_id == "point_error":
         return 81
     if template_id == "lollipop_error":

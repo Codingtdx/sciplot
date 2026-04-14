@@ -2,12 +2,23 @@ import SwiftUI
 
 enum PlotTemplateThumbnailKind: String, Sendable {
     case curve
-    case pointLine
+    case pointLine = "point_line"
+    case stackedCurve = "stacked_curve"
+    case segmentedStackedCurve = "segmented_stacked_curve"
     case scatter
+    case bubbleScatter = "bubble_scatter"
+    case scatterFit = "scatter_fit"
+    case meanBand = "mean_band"
     case bar
+    case pointError = "point_error"
+    case lollipopError = "lollipop_error"
+    case histogramDensity = "histogram_density"
     case box
+    case boxStrip = "box_strip"
     case violin
+    case violinBox = "violin_box"
     case heatmap
+    case annotatedHeatmap = "annotated_heatmap"
     case fallback
 }
 
@@ -73,16 +84,41 @@ struct PlotTemplateThumbnailView: View {
                 drawCurve(in: plotRect, context: &context, palette: palette, withPoints: false)
             case .pointLine:
                 drawCurve(in: plotRect, context: &context, palette: palette, withPoints: true)
+            case .stackedCurve:
+                drawStackedCurves(in: plotRect, context: &context, palette: palette, reservedHeaderFraction: 0)
+            case .segmentedStackedCurve:
+                drawStackedCurves(in: plotRect, context: &context, palette: palette, reservedHeaderFraction: 0.18)
             case .scatter:
                 drawScatter(in: plotRect, context: &context, palette: palette)
+            case .bubbleScatter:
+                drawBubbleScatter(in: plotRect, context: &context, palette: palette)
+            case .scatterFit:
+                drawScatterFit(in: plotRect, context: &context, palette: palette)
+            case .meanBand:
+                drawMeanBand(in: plotRect, context: &context, palette: palette)
             case .bar:
                 drawBars(in: plotRect, context: &context, palette: palette)
+            case .pointError:
+                drawPointError(in: plotRect, context: &context, palette: palette, withStems: false)
+            case .lollipopError:
+                drawPointError(in: plotRect, context: &context, palette: palette, withStems: true)
+            case .histogramDensity:
+                drawHistogramDensity(in: plotRect, context: &context, palette: palette)
             case .box:
                 drawBoxes(in: plotRect, context: &context, palette: palette)
+            case .boxStrip:
+                drawBoxes(in: plotRect, context: &context, palette: palette)
+                drawStripOverlay(in: plotRect, context: &context, palette: palette)
             case .violin:
                 drawViolins(in: plotRect, context: &context, palette: palette)
+            case .violinBox:
+                drawViolins(in: plotRect, context: &context, palette: palette)
+                drawCompactBoxOverlay(in: plotRect, context: &context, palette: palette)
             case .heatmap:
                 drawHeatmap(in: plotRect, context: &context)
+            case .annotatedHeatmap:
+                drawHeatmap(in: plotRect, context: &context)
+                drawHeatmapAnnotations(in: plotRect, context: &context, palette: palette)
             case .fallback:
                 drawScatter(in: plotRect, context: &context, palette: palette)
             }
@@ -204,6 +240,99 @@ struct PlotTemplateThumbnailView: View {
         }
     }
 
+    private func drawBubbleScatter(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let bubbles: [(CGPoint, CGFloat, Color)] = [
+            (plotPoint(0.18, 0.24, in: rect), 5.0, palette.primary.opacity(0.78)),
+            (plotPoint(0.32, 0.38, in: rect), 7.0, palette.secondary.opacity(0.66)),
+            (plotPoint(0.52, 0.49, in: rect), 4.2, palette.primary.opacity(0.72)),
+            (plotPoint(0.7, 0.69, in: rect), 8.2, palette.secondary.opacity(0.62)),
+            (plotPoint(0.82, 0.78, in: rect), 5.6, palette.primary.opacity(0.76)),
+        ]
+
+        var trend = Path()
+        trend.move(to: plotPoint(0.1, 0.14, in: rect))
+        trend.addLine(to: plotPoint(0.88, 0.82, in: rect))
+        context.stroke(
+            trend,
+            with: .color(palette.axis.opacity(0.65)),
+            style: StrokeStyle(lineWidth: 1.0, lineCap: .round, dash: [3.2, 2.2])
+        )
+
+        for (center, radius, color) in bubbles {
+            let bubbleRect = CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+            context.fill(Path(ellipseIn: bubbleRect), with: .color(color))
+        }
+    }
+
+    private func drawScatterFit(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        drawScatter(in: rect, context: &context, palette: palette)
+
+        var fit = Path()
+        fit.move(to: plotPoint(0.08, 0.11, in: rect))
+        fit.addLine(to: plotPoint(0.9, 0.86, in: rect))
+        context.stroke(fit, with: .color(palette.primary.opacity(0.9)), lineWidth: 1.3)
+    }
+
+    private func drawMeanBand(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let centerline = sampleCurvePointsA(in: rect)
+        let upper = centerline.map { CGPoint(x: $0.x, y: $0.y - 4.5) }
+        let lower = centerline.reversed().map { CGPoint(x: $0.x, y: $0.y + 4.5) }
+
+        var band = Path()
+        band.move(to: upper[0])
+        upper.dropFirst().forEach { band.addLine(to: $0) }
+        lower.forEach { band.addLine(to: $0) }
+        band.closeSubpath()
+        context.fill(band, with: .color(palette.secondary.opacity(0.25)))
+
+        var line = Path()
+        line.move(to: centerline[0])
+        centerline.dropFirst().forEach { line.addLine(to: $0) }
+        context.stroke(line, with: .color(palette.primary), lineWidth: 1.7)
+    }
+
+    private func drawStackedCurves(
+        in rect: CGRect,
+        context: inout GraphicsContext,
+        palette: ThumbnailPalette,
+        reservedHeaderFraction: CGFloat
+    ) {
+        if reservedHeaderFraction > 0 {
+            let reservedRect = CGRect(
+                x: rect.minX,
+                y: rect.minY,
+                width: rect.width,
+                height: rect.height * reservedHeaderFraction
+            )
+            context.fill(
+                Path(roundedRect: reservedRect, cornerRadius: 4),
+                with: .color(palette.secondary.opacity(0.12))
+            )
+        }
+
+        let adjustedRect = CGRect(
+            x: rect.minX,
+            y: rect.minY + rect.height * reservedHeaderFraction,
+            width: rect.width,
+            height: rect.height * (1 - reservedHeaderFraction)
+        )
+        let offsets: [CGFloat] = [0, 7, 14]
+        let colors: [Color] = [palette.primary, palette.secondary, palette.axis.opacity(0.82)]
+
+        for (offset, color) in zip(offsets, colors) {
+            let points = sampleCurvePointsA(in: adjustedRect).map { CGPoint(x: $0.x, y: $0.y + offset) }
+            var path = Path()
+            path.move(to: points[0])
+            points.dropFirst().forEach { path.addLine(to: $0) }
+            context.stroke(path, with: .color(color), lineWidth: 1.3)
+        }
+    }
+
     private func drawBars(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
         let heights: [CGFloat] = [0.28, 0.46, 0.73, 0.58]
         let slot = rect.width / CGFloat(max(heights.count, 1))
@@ -226,6 +355,46 @@ struct PlotTemplateThumbnailView: View {
             cap.move(to: CGPoint(x: centerX - 2.8, y: barRect.minY - 5))
             cap.addLine(to: CGPoint(x: centerX + 2.8, y: barRect.minY - 5))
             context.stroke(cap, with: .color(palette.axis.opacity(0.72)), lineWidth: 0.9)
+        }
+    }
+
+    private func drawPointError(
+        in rect: CGRect,
+        context: inout GraphicsContext,
+        palette: ThumbnailPalette,
+        withStems: Bool
+    ) {
+        let points: [(CGFloat, CGFloat, CGFloat)] = [
+            (0.16, 0.32, 0.10),
+            (0.38, 0.49, 0.13),
+            (0.62, 0.69, 0.11),
+            (0.82, 0.58, 0.09),
+        ]
+
+        for (xFraction, yFraction, errorHeight) in points {
+            let center = plotPoint(xFraction, yFraction, in: rect)
+            let top = plotPoint(xFraction, min(0.96, yFraction + errorHeight), in: rect)
+            let bottom = plotPoint(xFraction, max(0.08, yFraction - errorHeight), in: rect)
+
+            if withStems {
+                let baseline = plotPoint(xFraction, 0.02, in: rect)
+                var stem = Path()
+                stem.move(to: baseline)
+                stem.addLine(to: center)
+                context.stroke(stem, with: .color(palette.secondary.opacity(0.62)), lineWidth: 1.2)
+            }
+
+            var errorBar = Path()
+            errorBar.move(to: top)
+            errorBar.addLine(to: bottom)
+            errorBar.move(to: CGPoint(x: top.x - 3, y: top.y))
+            errorBar.addLine(to: CGPoint(x: top.x + 3, y: top.y))
+            errorBar.move(to: CGPoint(x: bottom.x - 3, y: bottom.y))
+            errorBar.addLine(to: CGPoint(x: bottom.x + 3, y: bottom.y))
+            context.stroke(errorBar, with: .color(palette.axis.opacity(0.78)), lineWidth: 0.95)
+
+            let markerRect = CGRect(x: center.x - 2.8, y: center.y - 2.8, width: 5.6, height: 5.6)
+            context.fill(Path(ellipseIn: markerRect), with: .color(palette.primary))
         }
     }
 
@@ -254,6 +423,25 @@ struct PlotTemplateThumbnailView: View {
         }
     }
 
+    private func drawStripOverlay(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let jitteredPoints: [CGPoint] = [
+            plotPoint(0.18, 0.32, in: rect),
+            plotPoint(0.21, 0.45, in: rect),
+            plotPoint(0.22, 0.57, in: rect),
+            plotPoint(0.5, 0.36, in: rect),
+            plotPoint(0.49, 0.48, in: rect),
+            plotPoint(0.52, 0.62, in: rect),
+            plotPoint(0.79, 0.29, in: rect),
+            plotPoint(0.81, 0.44, in: rect),
+            plotPoint(0.78, 0.56, in: rect),
+        ]
+
+        for point in jitteredPoints {
+            let dotRect = CGRect(x: point.x - 1.7, y: point.y - 1.7, width: 3.4, height: 3.4)
+            context.fill(Path(ellipseIn: dotRect), with: .color(palette.primary.opacity(0.58)))
+        }
+    }
+
     private func drawViolins(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
         let centers: [CGFloat] = stride(from: 0.2, through: 0.8, by: 0.3).map {
             rect.minX + CGFloat($0) * rect.width
@@ -271,6 +459,17 @@ struct PlotTemplateThumbnailView: View {
             )
             context.fill(shape, with: .color(palette.secondary.opacity(0.45)))
             context.stroke(shape, with: .color(palette.primary.opacity(0.75)), lineWidth: 1)
+        }
+    }
+
+    private func drawCompactBoxOverlay(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let centers: [CGFloat] = stride(from: 0.2, through: 0.8, by: 0.3).map {
+            rect.minX + CGFloat($0) * rect.width
+        }
+        for center in centers {
+            let boxRect = CGRect(x: center - 4.2, y: rect.midY - 6.2, width: 8.4, height: 12.4)
+            context.fill(Path(roundedRect: boxRect, cornerRadius: 1.8), with: .color(Color.white.opacity(0.7)))
+            context.stroke(Path(roundedRect: boxRect, cornerRadius: 1.8), with: .color(palette.axis.opacity(0.82)), lineWidth: 0.9)
         }
     }
 
@@ -318,6 +517,58 @@ struct PlotTemplateThumbnailView: View {
                 context.fill(Path(cellRect), with: .color(color))
             }
         }
+    }
+
+    private func drawHeatmapAnnotations(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let annotationPoints: [CGPoint] = [
+            plotPoint(0.16, 0.18, in: rect),
+            plotPoint(0.44, 0.43, in: rect),
+            plotPoint(0.71, 0.67, in: rect),
+        ]
+        for point in annotationPoints {
+            let markerRect = CGRect(x: point.x - 2.0, y: point.y - 2.0, width: 4.0, height: 4.0)
+            context.stroke(Path(ellipseIn: markerRect), with: .color(palette.axis.opacity(0.82)), lineWidth: 0.8)
+        }
+    }
+
+    private func drawHistogramDensity(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let bins: [(CGFloat, CGFloat)] = [
+            (0.12, 0.18),
+            (0.24, 0.36),
+            (0.36, 0.58),
+            (0.48, 0.74),
+            (0.60, 0.51),
+            (0.72, 0.29),
+        ]
+
+        let barWidth = rect.width * 0.08
+        for (index, bin) in bins.enumerated() {
+            let centerX = rect.minX + bin.0 * rect.width
+            let height = rect.height * bin.1
+            let barRect = CGRect(
+                x: centerX - barWidth / 2,
+                y: rect.maxY - height,
+                width: barWidth,
+                height: height
+            )
+            let color = index.isMultiple(of: 2) ? palette.primary.opacity(0.25) : palette.secondary.opacity(0.25)
+            context.fill(Path(roundedRect: barRect, cornerRadius: 1.4), with: .color(color))
+        }
+
+        let leftDensity = [(0.08, 0.16), (0.22, 0.42), (0.4, 0.71), (0.58, 0.52), (0.78, 0.22)]
+            .map { plotPoint($0.0, $0.1, in: rect) }
+        let rightDensity = [(0.1, 0.12), (0.28, 0.28), (0.46, 0.49), (0.63, 0.61), (0.83, 0.44)]
+            .map { plotPoint($0.0, $0.1, in: rect) }
+
+        var leftPath = Path()
+        leftPath.move(to: leftDensity[0])
+        leftDensity.dropFirst().forEach { leftPath.addLine(to: $0) }
+        context.stroke(leftPath, with: .color(palette.primary), lineWidth: 1.3)
+
+        var rightPath = Path()
+        rightPath.move(to: rightDensity[0])
+        rightDensity.dropFirst().forEach { rightPath.addLine(to: $0) }
+        context.stroke(rightPath, with: .color(palette.secondary), lineWidth: 1.2)
     }
 
     private func sampleCurvePointsA(in rect: CGRect) -> [CGPoint] {

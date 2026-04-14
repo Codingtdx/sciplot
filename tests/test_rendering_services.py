@@ -636,9 +636,10 @@ def test_replicate_inspection_keeps_single_recommendation_compatibility_default(
     assert inspection.recommendations[0].template_id == "box"
     assert inspection.recommendations
     assert inspection.recommendations[0].template_id == "box"
-    assert {"grouped_bar_error", "point_error", "box_strip"}.issubset(
+    assert {"bar", "point_error", "box_strip"}.issubset(
         {item.template_id for item in inspection.recommendations}
     )
+    assert "grouped_bar_error" not in {item.template_id for item in inspection.recommendations}
     assert "distribution_compare" not in {item.template_id for item in inspection.recommendations}
     assert "lollipop_error" in {item.template_id for item in inspection.advanced_templates}
 
@@ -650,14 +651,14 @@ def test_grouped_bar_compare_preflight_matches_render_filename(tmp_path: Path) -
     preflight = preflight_render_request("grouped_bar_compare", input_path, 0, options)
     assert preflight.errors == ()
     assert preflight.requested_template_id == "grouped_bar_compare"
-    assert preflight.canonical_id == "grouped_bar_error"
-    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_error.pdf",)
+    assert preflight.canonical_id == "bar"
+    assert preflight.output_filenames == ("tensile_modulus_bar.pdf",)
 
     rendered = build_rendered_plots("grouped_bar_compare", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
-        assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
+        assert "bar_capsize_profile" in rendered[0].qa_report.autofixes_applied
         assert "bar_raw_points_overlay" not in rendered[0].qa_report.autofixes_applied
         assert not _path_collections(rendered[0].figure.axes[0])
     finally:
@@ -670,17 +671,39 @@ def test_grouped_bar_error_preflight_matches_render_filename(tmp_path: Path) -> 
     options = resolve_render_options(template="grouped_bar_error")
     preflight = preflight_render_request("grouped_bar_error", input_path, 0, options)
     assert preflight.errors == ()
-    assert preflight.output_filenames == ("tensile_modulus_grouped_bar_error.pdf",)
+    assert preflight.canonical_id == "bar"
+    assert preflight.output_filenames == ("tensile_modulus_bar.pdf",)
 
     rendered = build_rendered_plots("grouped_bar_error", input_path)
     try:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
-        assert "grouped_bar_error_profile" in rendered[0].qa_report.autofixes_applied
+        assert "bar_capsize_profile" in rendered[0].qa_report.autofixes_applied
         assert "bar_raw_points_overlay" not in rendered[0].qa_report.autofixes_applied
         assert not _path_collections(rendered[0].figure.axes[0])
     finally:
         close_rendered_plots(rendered)
+
+
+def test_grouped_bar_error_alias_renders_identically_to_bar(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    canonical = build_rendered_plots("bar", input_path)
+    legacy = build_rendered_plots("grouped_bar_error", input_path)
+    try:
+        canonical[0].figure.canvas.draw()
+        legacy[0].figure.canvas.draw()
+
+        canonical_pixels = np.asarray(canonical[0].figure.canvas.buffer_rgba())
+        legacy_pixels = np.asarray(legacy[0].figure.canvas.buffer_rgba())
+
+        assert canonical[0].filename == "tensile_modulus_bar.pdf"
+        assert legacy[0].filename == canonical[0].filename
+        assert canonical_pixels.shape == legacy_pixels.shape
+        assert np.array_equal(canonical_pixels, legacy_pixels)
+    finally:
+        close_rendered_plots(canonical)
+        close_rendered_plots(legacy)
 
 
 def test_point_error_preflight_matches_render_filename(tmp_path: Path) -> None:

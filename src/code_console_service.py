@@ -638,43 +638,11 @@ def run_code_console_script(
         stderr_path=stderr_path,
         generated_files=_generated_files(output_dir),
     )
-
-
-def run_code_console_script_legacy(
-    *,
-    input_path: Path,
-    sheet: str | int,
-    template: str | None,
-    size: str | None,
-    style_preset: str | None,
-    palette_preset: str | None,
-    visual_theme_id: str | None,
-    code: str,
-    timeout_seconds: int,
-    source_kind: str | None = None,
-    source_label: str | None = None,
-) -> CodeConsoleRunResult:
-    return run_code_console_script(
-        code=code,
-        timeout_seconds=timeout_seconds,
-        input_path=input_path,
-        sheet=sheet,
-        template=template,
-        size=size,
-        style_preset=style_preset,
-        palette_preset=palette_preset,
-        visual_theme_id=visual_theme_id,
-        source_kind=source_kind,
-        source_label=source_label,
-    )
-
-
 __all__ = [
     "CodeConsoleGeneratedFile",
     "CodeConsoleResolvedContext",
     "CodeConsoleRunResult",
     "build_code_console_context",
     "resolve_code_console_context",
-    "run_code_console_script_legacy",
     "run_code_console_script",
 ]

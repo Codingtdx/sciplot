@@ -13,7 +13,7 @@ from src.rendering.common import summarize_replicate_distribution
 _CANONICAL_TO_ALIASES: Final[dict[str, tuple[str, ...]]] = {
     "scatter_fit": ("scatter_with_fit",),
     "mean_band": ("replicate_curves_with_band",),
-    "grouped_bar_error": ("grouped_bar_compare",),
+    "bar": ("grouped_bar_error", "grouped_bar_compare"),
 }
 
 _DISTRIBUTION_COMPARE_TEMPLATE_ID: Final[str] = "distribution_compare"
@@ -22,6 +22,7 @@ _DISTRIBUTION_COMPARE_FALLBACK: Final[str] = "box"
 _LIFECYCLE_POLICY: Final[dict[str, str]] = {
     "scatter_with_fit": "deprecated_in_practice",
     "replicate_curves_with_band": "deprecated_in_practice",
+    "grouped_bar_error": "indefinite_compat",
     "grouped_bar_compare": "indefinite_compat",
     _DISTRIBUTION_COMPARE_TEMPLATE_ID: "compat_family",
 }
@@ -29,6 +30,7 @@ _LIFECYCLE_POLICY: Final[dict[str, str]] = {
 _ALIAS_RECOMMENDATION_PENALTY: Final[dict[str, float]] = {
     "scatter_with_fit": 5.0,
     "replicate_curves_with_band": 4.0,
+    "grouped_bar_error": 4.0,
     "grouped_bar_compare": 4.0,
 }
 

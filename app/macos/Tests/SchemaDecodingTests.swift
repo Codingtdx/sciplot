@@ -161,6 +161,7 @@ final class SchemaDecodingTests: XCTestCase {
               "label": "Curve",
               "description": "Continuous curve template.",
               "category": "curve",
+              "presentation_kind": "curve",
               "default_size": "single_panel",
               "allowed_sizes": ["single_panel"],
               "editable_options": ["size", "xscale", "yscale"],
@@ -177,6 +178,7 @@ final class SchemaDecodingTests: XCTestCase {
         let response = try decoder.decode(PlotContractResponse.self, from: Data(payload.utf8))
         XCTAssertEqual(response.sizePresets["single_panel"]?.widthMm, 60)
         XCTAssertEqual(response.sizePresets["single_panel"]?.heightMm, 55)
+        XCTAssertEqual(response.templates["curve"]?.presentationKind, "curve")
     }
 
     func testDecodeMetaPayloadWithSnakeCaseIDCollections() throws {
@@ -220,6 +222,7 @@ final class SchemaDecodingTests: XCTestCase {
               "label": "Curve",
               "description": "Continuous curve template.",
               "category": "curve",
+              "presentation_kind": "curve",
               "default_size": "60x55",
               "allowed_sizes": ["60x55"],
               "editable_options": ["size", "style_preset", "palette_preset"],
@@ -250,6 +253,7 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.sizeIds, ["60x55"])
         XCTAssertEqual(response.palettePresetIds, ["colorblind_safe"])
         XCTAssertEqual(response.visualThemes.first?.id, "clean_light")
+        XCTAssertEqual(response.templates.first?.presentationKind, "curve")
     }
 
     func testDecodeComposerPreviewPayload() throws {

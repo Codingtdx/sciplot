@@ -497,6 +497,61 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.createTemplatePreviewCaption, "Previewing Recommended Curve in Sheet1 / Primary Data Block")
     }
 
+    func testResolverPresentationExplainsMissingTemplateSelection() async {
+        let client = MockSidecarClient()
+        client.dataStudioSourcePreviewHandler = { request in
+            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
+            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.selectedTemplateID = nil
+
+        XCTAssertFalse(session.resolverPresentation.useSelectedTemplateAvailability.isEnabled)
+        XCTAssertEqual(
+            session.resolverPresentation.useSelectedTemplateAvailability.reason,
+            "Choose a parse template before continuing."
+        )
+    }
+
+    func testTemplateEditorPresentationUsesSingleSourceValuesLocationsAndSaveReasons() async throws {
+        let client = MockSidecarClient()
+        client.dataStudioSourcePreviewHandler = { request in
+            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
+            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.beginCreateTemplateEditor()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        let curvePresentation = try XCTUnwrap(session.templateEditorPresentation.primaryCurveSuggestion)
+        XCTAssertEqual(curvePresentation.values, ["X: Strain (%)", "Y: Stress (MPa)"])
+        XCTAssertEqual(curvePresentation.location, "Sheet1 / Primary Data Block")
+        XCTAssertEqual(session.templateEditorPresentation.previewCaption, session.createTemplatePreviewCaption)
+
+        session.templateDraftLabel = ""
+        XCTAssertFalse(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+        XCTAssertEqual(
+            session.templateEditorPresentation.saveTemplateAvailability.reason,
+            "Provide a parse template name before saving it."
+        )
+
+        session.templateDraftLabel = "New Template"
+        session.selectedCandidateIDs = []
+        XCTAssertFalse(session.templateEditorPresentation.saveTemplateAndContinueAvailability.isEnabled)
+        XCTAssertEqual(
+            session.templateEditorPresentation.saveTemplateAndContinueAvailability.reason,
+            "Select at least one suggested or manual field before saving the parse template."
+        )
+    }
+
     func testTogglingSuggestionAndManualCandidateSelectionStayInSync() async {
         let client = MockSidecarClient()
         client.dataStudioSourcePreviewHandler = { request in
@@ -654,6 +709,85 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertNil(session.focusedWorkbook)
         XCTAssertEqual(session.selectedFigureFamilyID, "strength")
         XCTAssertEqual(session.figurePreferences.first?.selectedTemplateID, "box")
+    }
+
+    func testAvailableFigureTemplatesUseBackendTemplateLabels() {
+        let session = DataStudioSession()
+        let baseMeta = TestPayloads.meta()
+        let templates = baseMeta.templates.map { template in
+            guard template.id == "box_strip" else {
+                return template
+            }
+            return MetaTemplateSummary(
+                id: template.id,
+                label: "Backend Box Strip",
+                description: template.description,
+                category: template.category,
+                presentationKind: template.presentationKind,
+                defaultSize: template.defaultSize,
+                allowedSizes: template.allowedSizes,
+                editableOptions: template.editableOptions,
+                defaultOptions: template.defaultOptions,
+                availableStyles: template.availableStyles,
+                availablePalettes: template.availablePalettes,
+                canonicalID: template.canonicalID,
+                role: template.role,
+                lifecyclePolicy: template.lifecyclePolicy,
+                implementationID: template.implementationID
+            )
+        }
+        let meta = SidecarMetaResponse(
+            version: baseMeta.version,
+            defaults: baseMeta.defaults,
+            sizes: baseMeta.sizes,
+            styles: baseMeta.styles,
+            palettes: baseMeta.palettes,
+            templates: templates,
+            templateIds: baseMeta.templateIds,
+            sizeIds: baseMeta.sizeIds,
+            palettePresetIds: baseMeta.palettePresetIds,
+            visualThemes: baseMeta.visualThemes
+        )
+
+        session.apply(meta: meta, contract: TestPayloads.contract())
+        session.comparisonSet = TestPayloads.dataStudioComparisonSetSharedMetricTemplate()
+        session.selectedFigureFamilyID = "strength"
+
+        XCTAssertEqual(session.availableFigureTemplates.first?.label, "Backend Box Strip")
+    }
+
+    func testRestoreSessionMigratesLegacyGroupedBarSelections() async {
+        let session = DataStudioSession()
+
+        await session.restoreSession(
+            from: DataStudioSessionResponse(
+                version: 1,
+                selectedTemplateID: "builtin/tensile",
+                selectedWorkbookID: nil,
+                primaryWorkbookID: nil,
+                selectedRecipeID: "strength_grouped_bar_error",
+                workbookPaths: [],
+                comparisonRecipeIDs: ["strength_grouped_bar_error"],
+                selectedFigureFamilyID: "strength",
+                selectedFigureTemplateID: "grouped_bar_error",
+                groupStates: [],
+                specimenStates: [],
+                figurePreferences: [
+                    .init(
+                        familyID: "strength",
+                        selectedTemplateID: "grouped_bar_error",
+                        optionsByTemplate: ["grouped_bar_error": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")]
+                    ),
+                ],
+                importedPaths: [],
+                templateDraftPath: nil
+            )
+        )
+
+        XCTAssertEqual(session.selectedRecipeID, "strength_bar")
+        XCTAssertEqual(session.selectedFigureTemplateID, "bar")
+        XCTAssertEqual(session.figurePreferences.first?.selectedTemplateID, "bar")
+        XCTAssertNotNil(session.figurePreferences.first?.optionsByTemplate["bar"])
     }
 
     func testExportAndOpenCurrentFigureInPlotUseCurrentFigureContext() async {
@@ -1185,9 +1319,55 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(presentation.mode, .off)
         XCTAssertEqual(presentation.title, "All Specimens")
         XCTAssertFalse(presentation.autoFilterSupported)
-        XCTAssertFalse(presentation.canApplyAuto)
+        XCTAssertFalse(presentation.useAutoKeepAvailability.isEnabled)
+        XCTAssertEqual(
+            presentation.useAutoKeepAvailability.reason,
+            "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation."
+        )
         XCTAssertEqual(presentation.help, "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation.")
         XCTAssertEqual(presentation.autoFilterReason, "Auto Keep 5 needs at least 5 included specimens with Strength / Modulus / Elongation.")
+    }
+
+    func testSpecimenFilterPresentationProvidesTypedActionAvailabilityReasons() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioWorkbookPreviewHandler = { request in
+            Self.makeSuggestedWorkbookPreviewResponse(from: request)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: workbookPath)])
+        session.openSpecimenFilter(for: workbookPath)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        var presentation = session.specimenFilterPresentation(for: workbookPath)
+        XCTAssertTrue(presentation.useAutoKeepAvailability.isEnabled)
+        XCTAssertFalse(presentation.turnOffAvailability.isEnabled)
+        XCTAssertEqual(presentation.turnOffAvailability.reason, "All specimens are already included.")
+        XCTAssertFalse(presentation.applyDraftAvailability.isEnabled)
+        XCTAssertEqual(
+            presentation.applyDraftAvailability.reason,
+            "Change inclusion or representative selection in Advanced before applying it."
+        )
+        XCTAssertFalse(presentation.useAutoRepresentativeAvailability.isEnabled)
+        XCTAssertEqual(
+            presentation.useAutoRepresentativeAvailability.reason,
+            "The focused workbook is already using the auto representative."
+        )
+        XCTAssertFalse(presentation.revertDraftAvailability.isEnabled)
+        XCTAssertEqual(
+            presentation.revertDraftAvailability.reason,
+            "There are no draft specimen edits to revert."
+        )
+
+        session.updateDraftRepresentativeSelection(for: workbookPath, specimenId: "sample-2")
+        presentation = session.specimenFilterPresentation(for: workbookPath)
+        XCTAssertTrue(presentation.applyDraftAvailability.isEnabled)
+        XCTAssertTrue(presentation.useAutoRepresentativeAvailability.isEnabled)
+        XCTAssertTrue(presentation.revertDraftAvailability.isEnabled)
     }
 
     func testManualDraftDoesNotChangeCommittedComparisonUntilApply() async {

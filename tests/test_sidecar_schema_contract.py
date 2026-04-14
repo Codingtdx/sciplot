@@ -18,6 +18,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert meta_response.status_code == 200, meta_response.text
     meta = MetaResponse.model_validate(meta_response.json())
     removed_template_ids = {
+        "grouped_bar_error",
         "scatter_with_fit",
         "replicate_curves_with_band",
         "grouped_bar_compare",
@@ -29,6 +30,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert removed_template_ids.isdisjoint(meta.template_ids)
     assert removed_template_ids.isdisjoint({item.id for item in meta.templates})
     assert {item.default_options.get("style_preset") for item in meta.templates} == {"nature"}
+    assert all(item.presentation_kind for item in meta.templates)
 
     contract_response = client.get("/plot-contract")
     assert contract_response.status_code == 200, contract_response.text
@@ -38,6 +40,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert set(contract.styles.keys()) == {"nature"}
     assert removed_template_ids.isdisjoint(contract.templates)
     assert contract.aliases["style_presets"]["default"] == "nature"
+    assert all(template["presentation_kind"] for template in contract.templates.values())
 
 
 def test_delete_data_studio_template_returns_status_response() -> None:
