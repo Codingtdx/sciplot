@@ -261,6 +261,31 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertNil(session.resetSeriesOrderAvailability.reason)
     }
 
+    func testSeriesOrderRowsExplainBlockedMoveDirections() async throws {
+        let client = MockSidecarClient()
+        client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.multiSeriesMeta(), contract: TestPayloads.contract())
+
+        XCTAssertEqual(session.seriesOrderRows.count, 0)
+
+        session.importFile(URL(fileURLWithPath: "/tmp/multiseries.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let rows = session.seriesOrderRows
+        XCTAssertEqual(rows.map(\.title), ["Series A", "Series B"])
+        XCTAssertFalse(rows[0].moveUpAvailability.isEnabled)
+        XCTAssertTrue(rows[0].moveUpAvailability.reason?.contains("already first") ?? false)
+        XCTAssertTrue(rows[0].moveDownAvailability.isEnabled)
+        XCTAssertTrue(rows[1].moveUpAvailability.isEnabled)
+        XCTAssertFalse(rows[1].moveDownAvailability.isEnabled)
+        XCTAssertTrue(rows[1].moveDownAvailability.reason?.contains("already last") ?? false)
+
+        session.moveSeriesOrder(id: rows[1].id, by: -1)
+        XCTAssertEqual(session.seriesOrderLabels, ["Series B", "Series A"])
+    }
+
     func testDebouncedNumericEditsRefreshOnlyAfterThePause() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

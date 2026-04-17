@@ -265,11 +265,10 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                 DisclosureGroup("Advanced") {
                     SortableSeriesListView(
                         title: "Legend order",
-                        items: Binding(
-                            get: { session.seriesOrderLabels },
-                            set: { session.setSeriesOrder($0) }
-                        ),
-                        canEdit: session.canEditSeriesOrder
+                        rows: session.seriesOrderRows,
+                        moveItem: { id, offset in
+                            session.moveSeriesOrder(id: id, by: offset)
+                        }
                     )
 
                     Button("Reset Series Order") {

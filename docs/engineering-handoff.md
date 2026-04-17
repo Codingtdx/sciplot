@@ -1827,6 +1827,81 @@ Every development round must update this file.
     - import wizard presentation still opens/closes cleanly after the `importFlow` cleanup for both empty-session and existing-session entry points
     - Plot template gallery, Data Studio template editor/specimen filter, Composer board quick actions, and Code Console outputs all render cleanly under the new snapshot smoke harness
 
+### 2026-04-17 (Round AK): Plot legend move availability, GUI fingerprint regression coverage, and session seam phase 2
+
+- Scope:
+  - Fixed the remaining Plot legend reorder GUI rule gap by moving per-row move availability into Plot session truth:
+    - `app/macos/Sources/Features/Plot/PlotSessionPresentation.swift` now emits typed series-order rows with `move up` / `move down` availability and explanations
+    - `app/macos/Sources/Shared/UI/SortableSeriesListView.swift` now renders those typed rows instead of relying on a raw `canEdit` boolean
+    - `app/macos/Sources/Features/Plot/PlotInspectorView.swift` now consumes the typed row payload directly
+  - Added a stronger macOS GUI regression layer in `app/macos/Tests/InspectorLayoutPolicyTests.swift`:
+    - retained render-to-PNG smoke coverage for the canonical workbench scenes
+    - added tolerant perceptual snapshot fingerprints for Plot template gallery, Data Studio template editor, Data Studio specimen filter, Composer quick-action canvas state, and Code Console outputs preview
+    - added shared Quick Look stale-result regression tests to keep latest-write-wins thumbnail semantics locked down
+  - Split the oversized macOS session monoliths into state shells plus focused seam files without changing their public observable type names:
+    - Plot: `PlotSession.swift`, `PlotSessionImportInspect.swift`, `PlotSessionPresentation.swift`, `PlotSessionPreviewExport.swift`, `PlotSessionRestore.swift`
+    - Composer: `ComposerSession.swift`, `ComposerSessionImportExport.swift`, `ComposerSessionPreviewUndo.swift`, `ComposerSessionSelectionPlacement.swift`
+  - Continued Data Studio backend seam work by extracting the remaining heavy internal responsibilities out of `src/data_studio/workbooks.py`:
+    - preview/filter/specimen scoring moved into `src/data_studio/workbook_previewing.py`
+    - comparison-bundle recovery/materialization moved into `src/data_studio/workbook_comparison_bundle.py`
+    - `src/data_studio/workbooks.py` remains the supported façade
+- User-visible impact:
+  - Plot legend reorder controls now explain why the first row cannot move up, why the last row cannot move down, and why reordering is unavailable for non-reorderable plots.
+  - No intended sidecar/public API, schema, or canonical workflow change.
+  - Internal GUI regressions should now get caught earlier because the repo has a deterministic fingerprint layer in addition to basic renderability smoke.
+- Risks:
+  - The new GUI regression layer is intentionally tolerant and fingerprint-based; it will catch obvious visual drift but is not a substitute for manual visual QA when layout details change significantly.
+  - Plot and Composer session seam splits preserve behavior through tests, but future edits can still drift if new logic is pushed back into the root shell files instead of the focused seam files.
+  - `src/data_studio/workbooks.py` is now thinner, but callers still rely on it as the façade; bypassing that façade or reintroducing direct helper coupling would recreate the old maintenance hotspot.
+- Rollback points:
+  - `app/macos/Sources/Shared/UI/SortableSeriesListView.swift`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSession.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSessionImportExport.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSessionPreviewUndo.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSessionSelectionPlacement.swift`
+  - `app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - `src/data_studio/workbooks.py`
+  - `src/data_studio/workbook_export.py`
+  - `src/data_studio/workbook_previewing.py`
+  - `src/data_studio/workbook_comparison_bundle.py`
+- Decision:
+  - Row-level Plot legend move rules now live only in session truth. The shared sortable list view renders and explains those rules, but does not recompute business semantics locally.
+  - GUI regression protection now uses deterministic perceptual fingerprints rather than exact golden PNG comparisons. This keeps the suite sensitive to meaningful drift without making the tests brittle to harmless rendering noise.
+  - Plot and Composer root session files now act as ownership maps and state shells instead of continuing to absorb import, preview, export, undo, and presentation logic in one place.
+  - `src/data_studio/workbooks.py` remains the stable façade while preview/filter and comparison-bundle internals evolve behind narrower modules.
+  - Rejected alternatives:
+    - keep the legend reorder explanation logic inside the shared view: rejected because it would recreate a second truth source for move rules
+    - adopt exact snapshot goldens immediately: rejected because they would be too fragile for the current SwiftUI workbench surfaces and slow down routine maintenance
+    - leave Plot/Composer/Data Studio seam debt in place until a future feature forces the split: rejected because new feature work would continue to pile onto the same monoliths
+  - Boundary:
+    - this round does not change sidecar routes, plot contract payloads, project schema, canonical workflows, or public Python entrypoints
+    - the new GUI regression coverage is test infrastructure only; it does not alter runtime rendering behavior
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/ComposerSessionTests`: passed (`42 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed (`5 tests`)
+  - `.venv/bin/python -m pytest tests/test_data_studio.py tests/test_sidecar_data_studio.py`: passed (`28 passed, 5 warnings`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`129 tests`)
+  - Manual macOS visual QA checklist for this round (not executed in terminal pass):
+    - Plot legend reorder controls read naturally for first-row, last-row, and non-reorderable states
+    - Plot template gallery, Data Studio template editor/specimen filter, Composer quick actions, and Code Console outputs still look intentional under real window sizing, not just the normalized test harness
+    - Snapshot fingerprint updates are only required when the UI change is intentional and visually reviewed
+    - Plot and Composer inspector/export flows still feel unchanged after the internal seam split
+    - Data Studio preview/filter and comparison export still match previous behavior on real imported workbooks
+
 Use this block for every new round:
 
 ```

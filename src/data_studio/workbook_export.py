@@ -15,7 +15,7 @@ from src.data_studio.workbook_constants import (
 )
 
 if TYPE_CHECKING:
-    from src.data_studio.workbooks import FilteredWorkbookContext, LoadedWorkbookSpecimen
+    from src.data_studio.workbook_previewing import FilteredWorkbookContext, LoadedWorkbookSpecimen
 
 
 def export_filtered_workbook_from_context(

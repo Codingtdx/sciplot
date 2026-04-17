@@ -1,47 +1,63 @@
 import SwiftUI
 
+struct SortableSeriesListRow: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let positionLabel: String
+    let moveUpAvailability: ActionAvailability
+    let moveDownAvailability: ActionAvailability
+}
+
 struct SortableSeriesListView: View {
     let title: String
-    @Binding var items: [String]
-    let canEdit: Bool
+    let rows: [SortableSeriesListRow]
+    let moveItem: (_ id: String, _ offset: Int) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
 
-            if items.isEmpty {
+            if rows.isEmpty {
                 Text("No legend entries")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    ForEach(rows) { row in
                         HStack(spacing: 8) {
                             Image(systemName: "line.3.horizontal")
                                 .foregroundStyle(.secondary)
-                            Text(item)
+                            Text(row.title)
                                 .lineLimit(1)
                             Spacer()
-                            Text("#\(index + 1)")
+                            Text(row.positionLabel)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button {
-                                moveItem(at: index, by: -1)
+                                moveItem(row.id, -1)
                             } label: {
                                 Image(systemName: "chevron.up")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(!canEdit || index == 0)
+                            .disabled(!row.moveUpAvailability.isEnabled)
+                            .help(
+                                row.moveUpAvailability.reason
+                                    ?? "Move \(row.title) earlier in the legend order."
+                            )
 
                             Button {
-                                moveItem(at: index, by: 1)
+                                moveItem(row.id, 1)
                             } label: {
                                 Image(systemName: "chevron.down")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(!canEdit || index == items.count - 1)
+                            .disabled(!row.moveDownAvailability.isEnabled)
+                            .help(
+                                row.moveDownAvailability.reason
+                                    ?? "Move \(row.title) later in the legend order."
+                            )
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 10)
@@ -55,12 +71,5 @@ struct SortableSeriesListView: View {
         }
         .padding(12)
         .background(.quinary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func moveItem(at index: Int, by offset: Int) {
-        guard canEdit else { return }
-        let newIndex = index + offset
-        guard items.indices.contains(index), items.indices.contains(newIndex) else { return }
-        items.swapAt(index, newIndex)
     }
 }
