@@ -226,9 +226,12 @@ final class SchemaDecodingTests: XCTestCase {
               "default_size": "60x55",
               "allowed_sizes": ["60x55"],
               "editable_options": ["size", "style_preset", "palette_preset"],
-              "default_options": {},
+              "default_options": {
+                "palette_preset": "roma",
+                "visual_theme_id": "roma"
+              },
               "available_styles": ["nature"],
-              "available_palettes": ["colorblind_safe"],
+              "available_palettes": ["colorblind_safe", "roma", "macarons"],
               "canonical_id": "curve",
               "role": "canonical",
               "lifecycle_policy": "canonical",
@@ -237,12 +240,17 @@ final class SchemaDecodingTests: XCTestCase {
           ],
           "template_ids": ["curve"],
           "size_ids": ["60x55"],
-          "palette_preset_ids": ["colorblind_safe"],
+          "palette_preset_ids": ["colorblind_safe", "roma", "macarons"],
           "visual_themes": [
             {
               "id": "clean_light",
               "label": "Clean Light",
               "description": "A minimal theme"
+            },
+            {
+              "id": "roma",
+              "label": "Roma",
+              "description": "A warm neutral theme"
             }
           ]
         }
@@ -251,9 +259,11 @@ final class SchemaDecodingTests: XCTestCase {
         let response = try decoder.decode(SidecarMetaResponse.self, from: Data(payload.utf8))
         XCTAssertEqual(response.templateIds, ["curve"])
         XCTAssertEqual(response.sizeIds, ["60x55"])
-        XCTAssertEqual(response.palettePresetIds, ["colorblind_safe"])
+        XCTAssertEqual(response.palettePresetIds, ["colorblind_safe", "roma", "macarons"])
         XCTAssertEqual(response.visualThemes.first?.id, "clean_light")
         XCTAssertEqual(response.templates.first?.presentationKind, "curve")
+        XCTAssertEqual(response.templates.first?.defaultOptions["palette_preset"]?.stringValue, "roma")
+        XCTAssertEqual(response.templates.first?.defaultOptions["visual_theme_id"]?.stringValue, "roma")
     }
 
     func testDecodeComposerPreviewPayload() throws {

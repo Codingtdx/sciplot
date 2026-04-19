@@ -46,6 +46,10 @@
 - sidecar `/meta`、`/plot-contract`、渲染/预检/smoke 一律消费同一份契约。
 - GUI 不得维护模板、尺寸、palette/style、本地默认值的第二套常量。
 - public `style_preset` 目前只允许一个值：`nature`。
+- `palette_preset` 与 `visual_theme_id` 是独立 public 维度：
+  - palette 负责颜色；
+  - theme 只允许做软视觉变化（背景、网格、legend/panel 气质），不得改字体、线宽、间距、axis frame、导出规格。
+- 每个 public template 的推荐 palette/theme 默认值都必须写在 contract `default_options`，并由 `/meta`、`/plot-contract`、sidecar、macOS 统一消费；不要在 GUI 侧再拼一套推荐逻辑。
 - 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
 - 模板的展示元数据（例如 macOS gallery thumbnail kind）必须由 contract `/meta` 提供并由前端直接消费；禁止再按 template id 字符串做本地猜测。
@@ -84,6 +88,10 @@
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
+- Plot / Data Studio 的 template 切换与 reset 语义必须保持：
+  - 若当前 figure context 没有显式持久化的 theme/palette，则回落到当前 template `default_options` 推荐的 `palette_preset + visual_theme_id`；
+  - 用户显式修改 theme 后再改 palette，theme 必须保持；反之亦然；
+  - 打开已保存 figure/project 时，持久化值优先，只有缺失或失效时才回退到 template 推荐值。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
 - macOS 导出交互统一以 Data Studio inspector 模式为准：
   - toolbar `Export` 保留为全局主入口；

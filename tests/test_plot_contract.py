@@ -22,6 +22,7 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(contract.defaults.style_preset, "nature")
         self.assertEqual({item["id"] for item in meta["styles"]}, {"nature"})
         self.assertEqual(set(contract.styles.keys()), {"nature"})
+        self.assertTrue({"infographic", "roma", "macarons"}.issubset({item["id"] for item in meta["palettes"]}))
         self.assertEqual(
             {item["id"] for item in meta["templates"]},
             set(contract.templates.keys()),
@@ -42,11 +43,15 @@ class PlotContractTests(unittest.TestCase):
             self.assertIn("presentation_kind", template)
             self.assertIn(template["default_size"], template["allowed_sizes"])
             self.assertEqual(template["available_styles"], ["nature"])
+            self.assertIn("palette_preset", template["default_options"])
+            self.assertIn("visual_theme_id", template["default_options"])
             self.assertEqual(template["presentation_kind"], contract.templates[template["id"]].presentation_kind)
 
         for template in contract.templates.values():
             self.assertEqual(template.available_styles, ("nature",))
             self.assertEqual(template.default_options.get("style_preset"), "nature")
+            self.assertIsNotNone(template.default_options.get("palette_preset"))
+            self.assertIsNotNone(template.default_options.get("visual_theme_id"))
 
     def test_plot_contract_dict_exposes_validation_rules_from_loader(self) -> None:
         contract = load_plot_contract()

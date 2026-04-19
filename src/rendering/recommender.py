@@ -51,6 +51,7 @@ def template_recommendation_from_override(
     style_preset: str | None,
     palette_preset: str | None,
     use_sidecar: bool | None,
+    visual_theme_id: str | None,
 ) -> TemplateRecommendation:
     identity = template_identity(template_id)
     return TemplateRecommendation(
@@ -74,6 +75,7 @@ def template_recommendation_from_override(
             "style_preset": style_preset,
             "palette_preset": palette_preset,
             "use_sidecar": use_sidecar,
+            "visual_theme_id": visual_theme_id,
         },
         canonical_id=identity.canonical_id,
         role=identity.role,
@@ -119,6 +121,7 @@ def _default_preview_summary(template_id: str, dataset: NormalizedDataset, **ove
         "style_preset": defaults.get("style_preset"),
         "palette_preset": defaults.get("palette_preset"),
         "use_sidecar": defaults.get("use_sidecar"),
+        "visual_theme_id": defaults.get("visual_theme_id"),
         "model": dataset.model,
         "shape": dataset.data_shapes[0] if dataset.data_shapes else None,
     }

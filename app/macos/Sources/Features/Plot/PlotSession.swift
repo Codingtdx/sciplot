@@ -157,9 +157,19 @@ final class PlotSession {
         metadata = meta
         self.contract = contract
         selectedTemplateID = migrateLegacyTemplateID(selectedTemplateID)
-        renderOptions.stylePreset = meta.defaults.stylePreset
-        renderOptions.palettePreset = meta.defaults.palettePreset
-        renderOptions.visualThemeID = meta.visualThemes.first?.id
+        let validStyleIDs = Set(meta.styles.map(\.id))
+        let validPaletteIDs = Set(meta.palettes.map(\.id))
+        let validThemeIDs = Set(meta.visualThemes.map(\.id))
+
+        renderOptions.stylePreset = validStyleIDs.contains(renderOptions.stylePreset)
+            ? renderOptions.stylePreset
+            : meta.defaults.stylePreset
+        renderOptions.palettePreset = validPaletteIDs.contains(renderOptions.palettePreset)
+            ? renderOptions.palettePreset
+            : meta.defaults.palettePreset
+        if let themeID = renderOptions.visualThemeID, !validThemeIDs.contains(themeID) {
+            renderOptions.visualThemeID = nil
+        }
         schedulePreviewRefresh(policy: .immediate)
     }
 

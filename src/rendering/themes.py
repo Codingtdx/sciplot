@@ -122,6 +122,52 @@ _VISUAL_THEMES: dict[str, VisualThemeSpec] = {
             "legend.fancybox": True,
         },
     ),
+    "infographic": VisualThemeSpec(
+        label="Infographic",
+        description="A brighter theme with gentle structure and warmer paper-like surfaces.",
+        soft_overrides={
+            "axes.facecolor": "#fffaf2",
+            "figure.facecolor": "#fffaf2",
+            "axes.grid": True,
+            "grid.alpha": 0.14,
+            "grid.color": "#d9c7a3",
+            "grid.linestyle": "-",
+            "legend.frameon": True,
+            "legend.fancybox": True,
+            "legend.facecolor": "#fffdf8",
+            "legend.edgecolor": "#d9c7a3",
+        },
+    ),
+    "roma": VisualThemeSpec(
+        label="Roma",
+        description="A warm neutral theme with restrained grid treatment and a softer panel background.",
+        soft_overrides={
+            "axes.facecolor": "#fbf6f2",
+            "figure.facecolor": "#fbf6f2",
+            "axes.grid": False,
+            "grid.alpha": 0.0,
+            "legend.frameon": True,
+            "legend.fancybox": True,
+            "legend.facecolor": "#fffaf7",
+            "legend.edgecolor": "#d8c4b8",
+        },
+    ),
+    "macarons": VisualThemeSpec(
+        label="Macarons",
+        description="A cooler pastel theme with very light grid guidance and soft legend chrome.",
+        soft_overrides={
+            "axes.facecolor": "#f7fbff",
+            "figure.facecolor": "#f7fbff",
+            "axes.grid": True,
+            "grid.alpha": 0.12,
+            "grid.color": "#c9d9ef",
+            "grid.linestyle": "-",
+            "legend.frameon": True,
+            "legend.fancybox": True,
+            "legend.facecolor": "#fcfdff",
+            "legend.edgecolor": "#c9d9ef",
+        },
+    ),
 }
 
 

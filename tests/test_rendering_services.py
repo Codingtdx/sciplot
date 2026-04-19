@@ -464,6 +464,17 @@ def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
         resolve_render_options(template="curve", visual_theme_id="not-a-theme")
 
 
+def test_resolve_render_options_uses_template_recommended_theme_and_palette_defaults() -> None:
+    options = resolve_render_options(template="curve")
+
+    assert options.palette_preset == "roma"
+    assert options.visual_theme_id == "roma"
+
+    heatmap_options = resolve_render_options(template="heatmap")
+    assert heatmap_options.palette_preset == "infographic"
+    assert heatmap_options.visual_theme_id == "infographic"
+
+
 def test_resolve_render_options_accepts_tick_label_preferences_for_supported_templates() -> None:
     options = resolve_render_options(
         template="curve",

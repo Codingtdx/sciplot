@@ -325,8 +325,8 @@ def _build_code_console_context_uncached(
     resolved_render_options = resolve_render_options(
         template=resolved_template,
         size=size or (str(recommended_size) if recommended_size is not None else None),
-        style_preset=style_preset or plot_style.DEFAULT_STYLE_PRESET,
-        palette_preset=palette_preset or plot_style.DEFAULT_PALETTE_PRESET,
+        style_preset=style_preset,
+        palette_preset=palette_preset,
         visual_theme_id=visual_theme_id,
     )
     input_mtime_ns = resolved_input_path.stat().st_mtime_ns

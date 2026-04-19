@@ -2014,6 +2014,73 @@ Every development round must update this file.
     - `Computer Use` confirmed on 2026-04-19 that empty Plot state left `File > Reveal in Finder` enabled while `Export` was already disabled
     - Additional `Computer Use` exploration was stopped once the native macOS automation session lost window handles during system open-panel interaction, per this round's instruction to stop on permission/automation issues
 
+### 2026-04-19 (Round AN): Independent theme + palette defaults with `nature` metrics frozen
+
+- Scope:
+  - Expanded `src/plot_contract.json` with three new public palettes, `infographic`, `roma`, and `macarons`, and added per-template recommended `default_options.visual_theme_id` while keeping public `style_preset` limited to `nature`.
+  - Added matching soft visual themes in `src/rendering/themes.py` and extended rendering/recommendation option resolution so missing `palette_preset` / `visual_theme_id` fall back to the active template defaults instead of silently forcing workspace-global carry-over.
+  - Updated Plot/Data Studio macOS session restore/reset paths and tests so:
+    - template switch/reset loads the current template's recommended theme + palette when the current figure has no explicit saved override
+    - user edits remain independent, so changing theme does not rewrite palette and vice versa
+    - reopened saved figures keep persisted values and only fall back when values are missing or invalid
+  - Regenerated `docs/plot_contract.md` and updated `README.md` plus `AGENTS.md` so the documented public surface matches the shipped contract.
+- User-visible impact:
+  - Plot and Data Studio now expose new ECharts-inspired visual options through independent `Theme` and `Palette` controls while still showing a single public hard style, `Nature`.
+  - New figures and template resets now start from the selected template's recommended theme/palette pair instead of inheriting the last unsaved figure's still-valid visual combination.
+  - Saved/opened figures preserve their explicit theme/palette choices.
+  - Typography, stroke widths, spacing, axis frame, and export metrics remain unchanged from `nature`.
+- Risks:
+  - Every public template now depends on contract-owned `default_options.palette_preset` and `default_options.visual_theme_id`; future templates must populate both or macOS will fall back to broader meta defaults.
+  - This round intentionally changed unsaved figure reset behavior for palette/theme. Future macOS session refactors should preserve the new figure-scoped default semantics instead of reintroducing workspace carry-over.
+  - Direct `Computer Use` automation could not obtain a live `SciPlot God` window handle in this environment (`cgWindowNotFound`), so the final visual pass used exported GUI smoke attachments as the fallback artifact source.
+- Rollback points:
+  - `src/plot_contract.json`
+  - `src/rendering/themes.py`
+  - `src/rendering/options.py`
+  - `src/rendering/recommendation.py`
+  - `src/rendering/recommender.py`
+  - `src/rendering/render_service.py`
+  - `src/code_console_service.py`
+  - `app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `app/macos/Tests/TestPayloads.swift`
+  - `app/macos/Tests/PlotSessionTests.swift`
+  - `app/macos/Tests/DataStudioSessionTests.swift`
+  - `app/macos/Tests/SchemaDecodingTests.swift`
+  - `tests/test_plot_contract.py`
+  - `tests/test_rendering_services.py`
+  - `tests/test_sidecar_schema_contract.py`
+- Decision:
+  - Template-recommended theme and palette are figure-scoped defaults, not a second workspace-global preference layer. When the active figure context changes without explicit saved overrides, the supported behavior is to re-seed from the target template's contract defaults.
+  - Public visual variety now grows through independent `palette_preset` and `visual_theme_id`, while hard publication style remains a single `nature` profile. This keeps fonts, line widths, spacing, and export metrics frozen while still giving users more visual range.
+  - Rejected alternatives:
+    - add a second public `style_preset`: rejected because that would fork the hard publication metrics the product is intentionally keeping frozen
+    - auto-bind theme and palette as one combined preset after selection: rejected because it would break the existing independent-control inspector model and make user overrides unpredictable
+    - preserve the previous figure's valid theme/palette during template reset: rejected because visual defaults are part of the new figure's template identity, not the last figure's unsaved local state
+  - Boundary:
+    - this round does not add new public schema fields or change saved render-option shape
+    - this round does not alter `nature` typography, stroke, spacing, axis frame, export settings, or QA thresholds
+    - soft visual themes remain limited to allowed background/grid/legend/panel styling
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`177 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests`: passed (`78 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`138 tests`)
+  - `xcrun xcresulttool export attachments --path app/macos/.derivedData/Logs/Test/Test-SciPlotGodMac-2026.04.19_19-16-50-+0800.xcresult --output-path app/macos/.derivedData/gui-attachments`: passed (`5 attachments exported`)
+  - `Computer Use` visual QA:
+    - direct automation against `SciPlot God` returned `cgWindowNotFound` for the live app window
+    - fallback inspection succeeded by opening exported GUI smoke attachments in Preview and visually checking:
+      - `Plot template gallery`
+      - `Data Studio template editor`
+
 Use this block for every new round:
 
 ```

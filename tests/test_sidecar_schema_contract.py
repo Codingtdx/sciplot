@@ -27,9 +27,13 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert meta.template_ids
     assert meta.visual_themes
     assert {item.id for item in meta.styles} == {"nature"}
+    assert {"infographic", "roma", "macarons"}.issubset({item.id for item in meta.palettes})
+    assert {"infographic", "roma", "macarons"}.issubset({item.id for item in meta.visual_themes})
     assert removed_template_ids.isdisjoint(meta.template_ids)
     assert removed_template_ids.isdisjoint({item.id for item in meta.templates})
     assert {item.default_options.get("style_preset") for item in meta.templates} == {"nature"}
+    assert all(item.default_options.get("palette_preset") for item in meta.templates)
+    assert all(item.default_options.get("visual_theme_id") for item in meta.templates)
     assert all(item.presentation_kind for item in meta.templates)
 
     contract_response = client.get("/plot-contract")

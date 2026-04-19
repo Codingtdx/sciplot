@@ -113,6 +113,10 @@ extension PlotSession {
         if !template.availablePalettes.contains(resolved.palettePreset) {
             resolved.palettePreset = defaultPalette(for: template)
         }
+        let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
+        if resolved.visualThemeID == nil || !validThemeIDs.contains(resolved.visualThemeID ?? "") {
+            resolved.visualThemeID = defaultThemeID(for: template)
+        }
         renderOptions = resolved
         notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()

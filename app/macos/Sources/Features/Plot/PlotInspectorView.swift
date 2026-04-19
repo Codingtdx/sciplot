@@ -101,7 +101,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                         if themes.count > 1 {
                             AdaptiveInspectorControlRow(title: "Theme") {
                                 Picker("", selection: stringBinding(
-                                    get: { session.renderOptions.visualThemeID ?? themes.first?.id ?? "" },
+                                    get: { session.renderOptions.visualThemeID ?? session.defaultThemeID(for: template) ?? themes.first?.id ?? "" },
                                     set: { newValue in
                                         session.updateRenderOptions(policy: .immediate) { $0.visualThemeID = newValue.isEmpty ? nil : newValue }
                                     }

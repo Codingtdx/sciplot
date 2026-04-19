@@ -205,9 +205,6 @@ extension PlotSession {
     func resetRenderOptions(for templateID: String) {
         let template = metadata?.templates.first { $0.id == templateID }
         let recommendationSummary = recommendedPreviewConfigSummary(for: templateID)
-        let preservedThemeID = metadata?.visualThemes.contains(where: { $0.id == renderOptions.visualThemeID }) == true
-            ? renderOptions.visualThemeID
-            : metadata?.visualThemes.first?.id
 
         renderOptions = RenderOptionsPayload(
             size: recommendationSummary["size"]?.stringValue ?? template?.defaultSize,
@@ -219,10 +216,19 @@ extension PlotSession {
             yLabelOverride: nil,
             baseline: recommendationSummary["baseline"]?.stringValue,
             showColorbar: recommendationSummary["show_colorbar"]?.boolValue,
-            stylePreset: defaultStyle(for: template),
-            palettePreset: defaultPalette(for: template),
+            stylePreset: defaultStyle(
+                for: template,
+                recommendedStyleID: recommendationSummary["style_preset"]?.stringValue
+            ),
+            palettePreset: defaultPalette(
+                for: template,
+                recommendedPaletteID: recommendationSummary["palette_preset"]?.stringValue
+            ),
             useSidecar: recommendationSummary["use_sidecar"]?.boolValue ?? true,
-            visualThemeID: preservedThemeID
+            visualThemeID: defaultThemeID(
+                for: template,
+                recommendedThemeID: recommendationSummary["visual_theme_id"]?.stringValue
+            )
         )
         notifyRenderOptionsDidChange()
     }
@@ -235,9 +241,19 @@ extension PlotSession {
         return selected?.previewConfigSummary ?? [:]
     }
 
-    func defaultStyle(for template: MetaTemplateSummary?) -> String {
-        if let template, template.availableStyles.contains(renderOptions.stylePreset) {
-            return renderOptions.stylePreset
+    func defaultStyle(for template: MetaTemplateSummary?, recommendedStyleID: String? = nil) -> String {
+        if let template,
+           let recommendedStyleID,
+           template.availableStyles.contains(recommendedStyleID)
+        {
+            return recommendedStyleID
+        }
+
+        if let template,
+           let defaultStyle = template.defaultOptions["style_preset"]?.stringValue,
+           template.availableStyles.contains(defaultStyle)
+        {
+            return defaultStyle
         }
 
         if let template, let defaultStyle = metadata?.defaults.stylePreset, template.availableStyles.contains(defaultStyle) {
@@ -247,9 +263,19 @@ extension PlotSession {
         return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "nature"
     }
 
-    func defaultPalette(for template: MetaTemplateSummary?) -> String {
-        if let template, template.availablePalettes.contains(renderOptions.palettePreset) {
-            return renderOptions.palettePreset
+    func defaultPalette(for template: MetaTemplateSummary?, recommendedPaletteID: String? = nil) -> String {
+        if let template,
+           let recommendedPaletteID,
+           template.availablePalettes.contains(recommendedPaletteID)
+        {
+            return recommendedPaletteID
+        }
+
+        if let template,
+           let defaultPalette = template.defaultOptions["palette_preset"]?.stringValue,
+           template.availablePalettes.contains(defaultPalette)
+        {
+            return defaultPalette
         }
 
         if let template, let defaultPalette = metadata?.defaults.palettePreset, template.availablePalettes.contains(defaultPalette) {
@@ -257,6 +283,20 @@ extension PlotSession {
         }
 
         return template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "colorblind_safe"
+    }
+
+    func defaultThemeID(for template: MetaTemplateSummary?, recommendedThemeID: String? = nil) -> String? {
+        let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
+        if let recommendedThemeID, validThemeIDs.contains(recommendedThemeID) {
+            return recommendedThemeID
+        }
+        if let template,
+           let defaultThemeID = template.defaultOptions["visual_theme_id"]?.stringValue,
+           validThemeIDs.contains(defaultThemeID)
+        {
+            return defaultThemeID
+        }
+        return metadata?.visualThemes.first?.id
     }
 
     func sanitizeRenderOptionsForCurrentTemplateIfNeeded() {
@@ -269,9 +309,14 @@ extension PlotSession {
             if !template.availablePalettes.contains(resolved.palettePreset) {
                 resolved.palettePreset = defaultPalette(for: template)
             }
+            let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
+            if resolved.visualThemeID == nil || !validThemeIDs.contains(resolved.visualThemeID ?? "") {
+                resolved.visualThemeID = defaultThemeID(for: template)
+            }
         } else if let metadata {
             let validStyles = Set(metadata.styles.map(\.id))
             let validPalettes = Set(metadata.palettes.map(\.id))
+            let validThemes = Set(metadata.visualThemes.map(\.id))
 
             if !validStyles.contains(resolved.stylePreset) {
                 resolved.stylePreset = validStyles.contains(metadata.defaults.stylePreset)
@@ -282,6 +327,9 @@ extension PlotSession {
                 resolved.palettePreset = validPalettes.contains(metadata.defaults.palettePreset)
                     ? metadata.defaults.palettePreset
                     : (metadata.palettes.first?.id ?? "colorblind_safe")
+            }
+            if let themeID = resolved.visualThemeID, !validThemes.contains(themeID) {
+                resolved.visualThemeID = metadata.visualThemes.first?.id
             }
         }
 

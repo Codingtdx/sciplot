@@ -162,6 +162,9 @@
         "muted",
         "bright",
         "mono",
+        "infographic",
+        "roma",
+        "macarons",
         "okabe_ito",
         "tol_muted",
         "materials_warm"
@@ -336,6 +339,61 @@
       "sequential": "Greys",
       "diverging": "Greys"
     },
+    "infographic": {
+      "label": "Infographic",
+      "public": true,
+      "description": "ECharts-inspired palette with brighter editorial contrast and clean category separation.",
+      "categorical": [
+        "#5470c6",
+        "#91cc75",
+        "#fac858",
+        "#ee6666",
+        "#73c0de",
+        "#3ba272",
+        "#fc8452",
+        "#9a60b4",
+        "#ea7ccc"
+      ],
+      "sequential": "viridis",
+      "diverging": "PuOr"
+    },
+    "roma": {
+      "label": "Roma",
+      "public": true,
+      "description": "Soft warm-cool palette inspired by ECharts theme galleries, suited to cleaner comparison figures.",
+      "categorical": [
+        "#e01f54",
+        "#001852",
+        "#f5e8c8",
+        "#b8d2c7",
+        "#c6b38e",
+        "#82b6e9",
+        "#ff6347",
+        "#a092f1",
+        "#0e6e55"
+      ],
+      "sequential": "magma",
+      "diverging": "BrBG"
+    },
+    "macarons": {
+      "label": "Macarons",
+      "public": true,
+      "description": "Pastel-forward ECharts-inspired palette that stays readable in scientific multi-group charts.",
+      "categorical": [
+        "#2ec7c9",
+        "#b6a2de",
+        "#5ab1ef",
+        "#ffb980",
+        "#d87a80",
+        "#8d98b3",
+        "#e5cf0d",
+        "#97b552",
+        "#95706d",
+        "#dc69aa"
+      ],
+      "sequential": "cividis",
+      "diverging": "vlag"
+    },
     "okabe_ito": {
       "label": "Okabe-Ito",
       "public": false,
@@ -420,7 +478,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -429,7 +489,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -469,7 +532,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -478,7 +543,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -510,7 +578,9 @@
         "size": "60x55",
         "reverse_x": false,
         "baseline": "none",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -519,7 +589,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "non_blank_pdf"
@@ -549,6 +622,8 @@
         "reverse_x": true,
         "baseline": "linear_endpoints",
         "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma",
         "use_sidecar": true
       },
       "available_styles": [
@@ -558,7 +633,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "wide_nmr_horizontal_alignment",
@@ -589,7 +667,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -598,7 +678,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -629,7 +712,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -638,7 +723,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -670,7 +758,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -679,7 +769,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -710,7 +803,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -719,7 +814,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -751,7 +849,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -760,7 +860,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -792,7 +895,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -801,7 +906,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -833,7 +941,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -842,7 +952,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -878,7 +991,9 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
       },
       "available_styles": [
         "nature"
@@ -887,7 +1002,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -929,7 +1047,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -938,7 +1058,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -978,7 +1101,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -987,7 +1112,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1027,7 +1155,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -1036,7 +1166,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1076,7 +1209,9 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature"
@@ -1085,7 +1220,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1112,7 +1250,9 @@
       "default_options": {
         "size": "60x55",
         "show_colorbar": true,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "infographic",
+        "visual_theme_id": "infographic"
       },
       "available_styles": [
         "nature"
@@ -1121,7 +1261,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1151,7 +1294,9 @@
       "default_options": {
         "size": "60x55",
         "show_colorbar": true,
-        "style_preset": "nature"
+        "style_preset": "nature",
+        "palette_preset": "infographic",
+        "visual_theme_id": "infographic"
       },
       "available_styles": [
         "nature"
@@ -1160,7 +1305,10 @@
         "colorblind_safe",
         "deep",
         "muted",
-        "mono"
+        "mono",
+        "infographic",
+        "roma",
+        "macarons"
       ],
       "hard_rules": [
         "single_panel_axis_frame",

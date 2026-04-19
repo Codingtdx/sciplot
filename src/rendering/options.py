@@ -143,8 +143,8 @@ def resolve_render_options(
     y_label_override: str | None = None,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
-    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
-    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
+    style_preset: str | None = None,
+    palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
     resolved_template_id: str | None = None,
@@ -165,7 +165,11 @@ def resolve_render_options(
             f"Template `{template}` does not support palette `{resolved_palette}`. "
             f"Supported palettes: {', '.join(spec.available_palettes)}"
         )
-    resolved_theme = visual_theme_id.strip() if isinstance(visual_theme_id, str) else None
+    resolved_theme = (
+        visual_theme_id.strip()
+        if isinstance(visual_theme_id, str)
+        else (str(defaults.get("visual_theme_id")).strip() if defaults.get("visual_theme_id") is not None else None)
+    )
     if resolved_theme and resolved_theme not in visual_theme_ids():
         raise ValueError(
             f"Unknown visual theme: {resolved_theme}. Supported themes: {', '.join(visual_theme_ids())}"

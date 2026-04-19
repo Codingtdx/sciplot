@@ -473,6 +473,69 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertNil(session.errorMessage)
     }
 
+    func testTemplateResetUsesRecommendedThemeAndPaletteWhileKeepingIndependentEdits() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertEqual(session.selectedTemplateID, "curve")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+
+        session.updateRenderOptions(policy: .immediate) {
+            $0.visualThemeID = "macarons"
+        }
+        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+
+        session.updateRenderOptions(policy: .immediate) {
+            $0.palettePreset = "infographic"
+        }
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+
+        session.chooseTemplate("box")
+        XCTAssertEqual(session.selectedTemplateID, "box")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "macarons")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+    }
+
+    func testExternalRenderOptionsFallbackThemeOnlyWhenMissing() {
+        let session = PlotSession()
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.selectedTemplateID = "curve"
+
+        session.applyExternalRenderOptions(
+            RenderOptionsPayload(
+                size: "single_panel",
+                stylePreset: "nature",
+                palettePreset: "infographic",
+                visualThemeID: nil
+            )
+        )
+
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+
+        session.applyExternalRenderOptions(
+            RenderOptionsPayload(
+                size: "single_panel",
+                stylePreset: "nature",
+                palettePreset: "macarons",
+                visualThemeID: "infographic"
+            )
+        )
+
+        XCTAssertEqual(session.renderOptions.palettePreset, "macarons")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "infographic")
+    }
+
     func testSeriesLegendControlsOnlyAppearForMultiSeriesTemplates() async throws {
         let client = MockSidecarClient()
         client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")

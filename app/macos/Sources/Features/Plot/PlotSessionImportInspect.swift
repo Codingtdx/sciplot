@@ -64,7 +64,7 @@ extension PlotSession {
             renderOptions = RenderOptionsPayload(
                 stylePreset: metadata?.defaults.stylePreset ?? "nature",
                 palettePreset: metadata?.defaults.palettePreset ?? "colorblind_safe",
-                visualThemeID: metadata?.visualThemes.first?.id
+                visualThemeID: nil
             )
             notifyRenderOptionsDidChange()
         }

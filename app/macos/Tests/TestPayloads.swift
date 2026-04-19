@@ -5,6 +5,39 @@ enum TestPayloads {
     static let pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9oNnfdcAAAAASUVORK5CYII="
     static let pdfBase64 = "JVBERi0xLjEKMSAwIG9iajw8Pj5lbmRvYmoKMiAwIG9iajw8IC9UeXBlIC9DYXRhbG9nIC9QYWdlcyAzIDAgUiA+PmVuZG9iagozIDAgb2JqPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFs0IDAgUl0gL0NvdW50IDEgPj5lbmRvYmoKNCAwIG9iajw8IC9UeXBlIC9QYWdlIC9QYXJlbnQgMyAwIFIgL01lZGlhQm94IFswIDAgNzIgNzJdID4+ZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxMCAwMDAwMCBuIAowMDAwMDAwMDMwIDAwMDAwIG4gCjAwMDAwMDAwODEgMDAwMDAgbiAKMDAwMDAwMDEzOCAwMDAwMCBuIAp0cmFpbGVyPDwgL1NpemUgNSAvUm9vdCAyIDAgUiA+PgpzdGFydHhyZWYKMjA5CiUlRU9GCg=="
 
+    static let sharedAvailablePalettes = [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+    ]
+
+    static func paletteCatalog() -> [MetaPaletteResponse] {
+        [
+            .init(id: "colorblind_safe", label: "Colorblind Safe", public: true, description: "Default palette.", swatches: ["#112233", "#445566"]),
+            .init(id: "deep", label: "Deep", public: true, description: "Balanced palette.", swatches: ["#4c72b0", "#dd8452"]),
+            .init(id: "muted", label: "Muted", public: true, description: "Restrained palette.", swatches: ["#4878d0", "#ee854a"]),
+            .init(id: "mono", label: "Mono", public: true, description: "Monochrome palette.", swatches: ["#111827", "#6b7280"]),
+            .init(id: "infographic", label: "Infographic", public: true, description: "Brighter ECharts-inspired palette.", swatches: ["#5470c6", "#91cc75"]),
+            .init(id: "roma", label: "Roma", public: true, description: "Warm-cool ECharts-inspired palette.", swatches: ["#e01f54", "#001852"]),
+            .init(id: "macarons", label: "Macarons", public: true, description: "Pastel ECharts-inspired palette.", swatches: ["#2ec7c9", "#b6a2de"]),
+        ]
+    }
+
+    static func visualThemeCatalog() -> [VisualThemeResponse] {
+        [
+            .init(id: "clean_light", label: "Clean Light", description: "A minimal theme"),
+            .init(id: "soft_grid", label: "Soft Grid", description: "A quiet grid-forward theme"),
+            .init(id: "presentation_like", label: "Presentation Like", description: "A warmer slide-friendly theme"),
+            .init(id: "infographic", label: "Infographic", description: "A brighter editorial theme"),
+            .init(id: "roma", label: "Roma", description: "A warm neutral theme"),
+            .init(id: "macarons", label: "Macarons", description: "A cooler pastel theme"),
+        ]
+    }
+
     static func meta() -> SidecarMetaResponse {
         SidecarMetaResponse(
             version: 1,
@@ -23,15 +56,7 @@ enum TestPayloads {
                     presetNote: "Repo default"
                 ),
             ],
-            palettes: [
-                .init(
-                    id: "colorblind_safe",
-                    label: "Colorblind Safe",
-                    public: true,
-                    description: "Default palette.",
-                    swatches: ["#112233", "#445566"]
-                ),
-            ],
+            palettes: paletteCatalog(),
             templates: [
                 .init(
                     id: "curve",
@@ -56,9 +81,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("roma"),
+                        "visual_theme_id": .string("roma"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     canonicalID: "curve",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -79,9 +107,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     canonicalID: "bar",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -104,9 +135,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     canonicalID: "box",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -130,9 +164,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     canonicalID: "box_strip",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -141,10 +178,8 @@ enum TestPayloads {
             ],
             templateIds: ["curve", "bar", "box", "box_strip"],
             sizeIds: ["single_panel", "double_panel"],
-            palettePresetIds: ["colorblind_safe"],
-            visualThemes: [
-                .init(id: "paper", label: "Paper", description: "Paper preview"),
-            ]
+            palettePresetIds: sharedAvailablePalettes,
+            visualThemes: visualThemeCatalog()
         )
     }
 
@@ -166,15 +201,7 @@ enum TestPayloads {
                     presetNote: "Repo default"
                 ),
             ],
-            palettes: [
-                .init(
-                    id: "colorblind_safe",
-                    label: "Colorblind Safe",
-                    public: true,
-                    description: "Default palette.",
-                    swatches: ["#112233", "#445566"]
-                ),
-            ],
+            palettes: paletteCatalog(),
             templates: [
                 .init(
                     id: "curve",
@@ -200,9 +227,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("roma"),
+                        "visual_theme_id": .string("roma"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     canonicalID: "curve",
                     role: "plot",
                     lifecyclePolicy: "stable",
@@ -211,10 +241,8 @@ enum TestPayloads {
             ],
             templateIds: ["curve"],
             sizeIds: ["single_panel", "double_panel"],
-            palettePresetIds: ["colorblind_safe"],
-            visualThemes: [
-                .init(id: "paper", label: "Paper", description: "Paper preview"),
-            ]
+            palettePresetIds: sharedAvailablePalettes,
+            visualThemes: visualThemeCatalog()
         )
     }
 
@@ -230,6 +258,12 @@ enum TestPayloads {
             ],
             palettes: [
                 "colorblind_safe": .string("Colorblind Safe"),
+                "deep": .string("Deep"),
+                "muted": .string("Muted"),
+                "mono": .string("Mono"),
+                "infographic": .string("Infographic"),
+                "roma": .string("Roma"),
+                "macarons": .string("Macarons"),
             ],
             templates: [
                 "curve": .init(
@@ -254,9 +288,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("roma"),
+                        "visual_theme_id": .string("roma"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Use the shared axis frame."],
                     softRules: ["Keep labels minimal."]
                 ),
@@ -276,9 +313,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
                 ),
@@ -299,9 +339,12 @@ enum TestPayloads {
                         "style_preset",
                         "palette_preset",
                     ],
-                    defaultOptions: [:],
+                    defaultOptions: [
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
                     availableStyles: ["nature"],
-                    availablePalettes: ["colorblind_safe"],
+                    availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
                 ),
@@ -425,7 +468,7 @@ enum TestPayloads {
                 size: "single_panel",
                 stylePreset: "nature",
                 palettePreset: "colorblind_safe",
-                visualThemeID: "paper"
+                visualThemeID: "roma"
             ),
             promptText: """
             Write one Python script for the SciPlot God Code Console.
@@ -1321,7 +1364,7 @@ enum TestPayloads {
                             size: "single_panel",
                             stylePreset: "nature",
                             palettePreset: "colorblind_safe",
-                            visualThemeID: "paper"
+                            visualThemeID: "roma"
                         ),
                     ]
                 ),

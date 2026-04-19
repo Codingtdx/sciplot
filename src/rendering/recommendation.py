@@ -132,6 +132,7 @@ def recommendation(template: TemplateName, reason: str, **overrides: object) -> 
         "style_preset": defaults.get("style_preset"),
         "palette_preset": defaults.get("palette_preset"),
         "use_sidecar": defaults.get("use_sidecar"),
+        "visual_theme_id": defaults.get("visual_theme_id"),
     }
     payload.update(overrides)
     return Recommendation(**payload)
@@ -189,6 +190,7 @@ def _inspection(
         style_preset=recommendation_value.style_preset,
         palette_preset=recommendation_value.palette_preset,
         use_sidecar=recommendation_value.use_sidecar,
+        visual_theme_id=recommendation_value.visual_theme_id,
     )
     if recommendations:
         matched = next(

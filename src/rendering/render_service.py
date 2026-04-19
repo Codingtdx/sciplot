@@ -53,8 +53,8 @@ def build_rendered_plots(
     y_label_override: str | None = None,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
-    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
-    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
+    style_preset: str | None = None,
+    palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
 ) -> list[RenderedPlot]:
@@ -118,8 +118,8 @@ def render_template(
     y_label_override: str | None = None,
     baseline: str | None = None,
     show_colorbar: bool | None = None,
-    style_preset: str = plot_style.DEFAULT_STYLE_PRESET,
-    palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET,
+    style_preset: str | None = None,
+    palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
 ) -> list[Path]:

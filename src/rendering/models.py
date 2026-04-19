@@ -108,6 +108,7 @@ class Recommendation:
     style_preset: str | None = None
     palette_preset: str | None = None
     use_sidecar: bool | None = None
+    visual_theme_id: str | None = None
 
 
 @dataclass(frozen=True)

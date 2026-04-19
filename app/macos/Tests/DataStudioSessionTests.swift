@@ -797,6 +797,23 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.availableFigureTemplates.first?.label, "Backend Box Strip")
     }
 
+    func testDisplayedFigureFallsBackToRecommendedThemeAndPaletteWithoutStoredPreferences() async throws {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.comparisonSet = TestPayloads.dataStudioComparisonSet()
+        session.selectedFigureFamilyID = "strength"
+        session.syncFigureSelection()
+
+        try await session.refreshDisplayedFigure()
+
+        XCTAssertEqual(session.currentFigureTemplateID, "box")
+        XCTAssertEqual(session.plotSession.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.plotSession.renderOptions.palettePreset, "macarons")
+        XCTAssertEqual(session.plotSession.renderOptions.visualThemeID, "macarons")
+    }
+
     func testRestoreSessionMigratesLegacyGroupedBarSelections() async {
         let session = DataStudioSession()
 
