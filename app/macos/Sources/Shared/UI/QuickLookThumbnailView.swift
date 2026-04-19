@@ -39,6 +39,13 @@ final class QuickLookThumbnailModel {
     }
 
     private static func defaultLoader(url: URL, size: CGSize) async -> QuickLookThumbnailLoadResult {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return QuickLookThumbnailLoadResult(
+                image: nil,
+                errorMessage: "The selected file could not be found on disk."
+            )
+        }
+
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
             size: size,
@@ -68,8 +75,21 @@ final class QuickLookThumbnailModel {
 struct QuickLookThumbnailView: View {
     let url: URL
     var size: CGFloat = 240
+    var loadsOnAppear = true
 
-    @State private var model = QuickLookThumbnailModel()
+    @State private var model: QuickLookThumbnailModel
+
+    init(
+        url: URL,
+        size: CGFloat = 240,
+        model: QuickLookThumbnailModel? = nil,
+        loadsOnAppear: Bool = true
+    ) {
+        self.url = url
+        self.size = size
+        self.loadsOnAppear = loadsOnAppear
+        _model = State(initialValue: model ?? QuickLookThumbnailModel())
+    }
 
     var body: some View {
         Group {
@@ -87,6 +107,9 @@ struct QuickLookThumbnailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.quinary.opacity(0.2), in: RoundedRectangle(cornerRadius: 16))
         .task(id: url) {
+            guard loadsOnAppear else {
+                return
+            }
             await model.load(url: url, size: CGSize(width: size, height: size))
         }
     }

@@ -1902,6 +1902,67 @@ Every development round must update this file.
     - Plot and Composer inspector/export flows still feel unchanged after the internal seam split
     - Data Studio preview/filter and comparison export still match previous behavior on real imported workbooks
 
+### 2026-04-17 (Round AL): Manual macOS visual QA and targeted workbench polish
+
+- Scope:
+  - Executed the deferred macOS visual QA pass against the five canonical workbench scenes introduced in Round AK by using the normalized GUI smoke as an attachment-export harness:
+    - Plot template gallery
+    - Data Studio template editor
+    - Data Studio specimen filter
+    - Composer canvas selection / quick-action state
+    - Code Console outputs preview
+  - Polished `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift` so the specimen filter keeps its primary action row outside the scrolling content and expands the canonical popover height from `620` to `648`, preventing the footer action from feeling cramped or clipped in the default visual pass.
+  - Polished `app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift` so preview routing now reflects actual document state:
+    - missing generated files show an explicit `Preview unavailable` empty state
+    - PDFs render through `PDFPreviewView`
+    - non-PDF generated files render through `QuickLookThumbnailView`
+  - Hardened `app/macos/Sources/Shared/UI/QuickLookThumbnailView.swift` for GUI validation and ready-state previews:
+    - missing files now fail with a visible user-facing message instead of silently attempting Quick Look generation
+    - tests can inject a deterministic thumbnail model and disable auto-load on appear without affecting production call sites
+  - Strengthened `app/macos/Tests/InspectorLayoutPolicyTests.swift` so the canonical scene smoke can retain/export attachments, generate stable ready-state Code Console preview fixtures, and keep perceptual fingerprints aligned with the intended UI.
+  - Declared the Composer drag payload UTI in `app/macos/Info.plist` (`com.codegod.composer-panel-drag`) to remove the runtime warning that surfaced during repeated GUI smoke and attachment-export runs.
+- User-visible impact:
+  - Data Studio specimen filter keeps its primary `Use Auto Keep 5` action visibly anchored below the ranked list instead of letting the footer compete with scroll content.
+  - Code Console preview now distinguishes missing files, PDFs, and non-PDF outputs instead of always falling back to the same thumbnail path.
+  - No intended sidecar/public API, schema, project format, or canonical workflow change.
+- Risks:
+  - The new `QuickLookThumbnailView` and `CodeConsoleOutputsView` injection hooks are test seams only; if future runtime code starts depending on them, that would blur the production/test boundary.
+  - Attachment-based visual QA is materially better than “not executed,” but it is still not a substitute for real click-through interaction if a future round changes hover, focus, or sheet/popover behavior.
+  - The specimen filter height/footer adjustment is tuned for the canonical scene; future content growth inside the `Advanced` section should still be reviewed manually before increasing default density again.
+- Rollback points:
+  - `app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+  - `app/macos/Sources/Shared/UI/QuickLookThumbnailView.swift`
+  - `app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `app/macos/Info.plist`
+- Decision:
+  - When direct desktop automation is unavailable for `com.codegod.desktop`, the supported fallback for manual macOS visual QA is to export the canonical workbench scene attachments from `InspectorLayoutPolicyTests/testGuiSmokeRendersKeyWorkbenchViews` and inspect those rendered artifacts directly instead of marking the round as visually unverified.
+  - Code Console preview semantics now follow the document state truth source: existence first, then explicit file type routing, rather than asking Quick Look to handle every generated file uniformly.
+  - The Data Studio specimen filter keeps ranked content scrollable, but primary actions anchored, so the default Auto Keep flow stays readable and reachable without reopening a second pane or adding duplicate controls.
+  - Rejected alternatives:
+    - leave the specimen filter footer inside the scroll view: rejected because it made the default action feel visually unstable and easier to clip at canonical sizing
+    - keep Code Console on a single Quick Look preview path: rejected because missing files and PDFs deserve clearer, more faithful preview behavior
+    - continue recording “manual visual QA not executed”: rejected because the repo now has enough deterministic scene coverage to support a real artifact-based human pass
+  - Boundary:
+    - this round does not change sidecar routes, plot contract payloads, project schema, persistence semantics, or canonical workbench flows
+    - the new preview injection hooks are internal test-support seams only
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData -resultBundlePath app/macos/.derivedData/visual-qa-result test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSmokeRendersKeyWorkbenchViews`: passed (`1 test`)
+  - `xcrun xcresulttool export attachments --path app/macos/.derivedData/visual-qa-result --output-path app/macos/.derivedData/gui-attachments`: passed (`5 attachments exported`)
+  - Manual inspection completed against exported PNG attachments in `app/macos/.derivedData/gui-attachments/` for:
+    - Plot template gallery
+    - Data Studio template editor
+    - Data Studio specimen filter
+    - Composer canvas selection
+    - Code Console outputs preview
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`129 tests`)
+
 Use this block for every new round:
 
 ```

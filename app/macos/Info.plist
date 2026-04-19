@@ -22,5 +22,18 @@
 	<true/>
 	<key>RepoRootHint</key>
 	<string>$(PROJECT_DIR)/../..</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Composer Panel Drag Payload</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.codegod.composer-panel-drag</string>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -74,7 +74,7 @@ struct DataStudioSpecimenFilterPopover: View {
             }
         }
         .padding(16)
-        .frame(width: 460, height: 620, alignment: .topLeading)
+        .frame(width: 460, height: 648, alignment: .topLeading)
     }
 
     private var header: some View {
@@ -117,46 +117,49 @@ struct DataStudioSpecimenFilterPopover: View {
     private func supportedContent(
         presentation: DataStudioSpecimenFilterPresentation
     ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(presentation.title)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    if presentation.hasPendingChanges {
-                        Text("Edited")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.orange.opacity(0.14), in: Capsule())
-                            .foregroundStyle(.orange)
-                    }
-                }
-
-                if let reason = presentation.autoFilterReason, !presentation.autoFilterSupported {
-                    Text(reason)
-                        .font(.footnote)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(presentation.title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if presentation.hasPendingChanges {
+                    Text("Edited")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.14), in: Capsule())
                         .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                DataStudioSpecimenFilterRankedList(
-                    sortDescriptor: presentation.sortDescriptor,
-                    rows: presentation.rankedRows
-                )
-
-                actionSection(presentation: presentation)
-
-                DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
-                    DataStudioSpecimenFilterAdvancedSection(
-                        session: session,
-                        workbookPath: workbook.response.workbookPath
-                    )
-                    .padding(.top, 10)
-                }
-                .font(.subheadline.weight(.semibold))
             }
-            .padding(.vertical, 2)
+
+            if let reason = presentation.autoFilterReason, !presentation.autoFilterSupported {
+                Text(reason)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    DataStudioSpecimenFilterRankedList(
+                        sortDescriptor: presentation.sortDescriptor,
+                        rows: presentation.rankedRows
+                    )
+
+                    DisclosureGroup("Advanced", isExpanded: $isAdvancedExpanded) {
+                        DataStudioSpecimenFilterAdvancedSection(
+                            session: session,
+                            workbookPath: workbook.response.workbookPath
+                        )
+                        .padding(.top, 10)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .padding(.vertical, 2)
+                .padding(.bottom, 4)
+            }
+
+            actionSection(presentation: presentation)
         }
     }
 

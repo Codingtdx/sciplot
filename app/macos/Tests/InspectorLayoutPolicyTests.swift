@@ -81,8 +81,13 @@ final class InspectorLayoutPolicyTests: XCTestCase {
 
     func testGuiSmokeRendersKeyWorkbenchViews() async throws {
         let snapshots = try await canonicalWorkbenchSnapshots()
+        exportSnapshotsIfRequested(snapshots)
 
         for (label, data) in snapshots {
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+            attachment.name = label
+            attachment.lifetime = .keepAlways
+            add(attachment)
             XCTAssertGreaterThan(data.count, 1_000, "\(label) should produce a non-trivial bitmap.")
         }
     }
@@ -135,8 +140,10 @@ final class InspectorLayoutPolicyTests: XCTestCase {
             TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(path: specimenWorkbook.response.workbookPath)
 
         let codeConsoleSession = CodeConsoleSession()
-        codeConsoleSession.latestRunResponse = TestPayloads.codeConsoleRun()
-        codeConsoleSession.selectedGeneratedFilePath = TestPayloads.codeConsoleRun().generatedFiles.first?.path
+        let codeConsoleRun = try makeCodeConsoleRunFixture()
+        codeConsoleSession.latestRunResponse = codeConsoleRun
+        codeConsoleSession.selectedGeneratedFilePath = codeConsoleRun.generatedFiles.last?.path
+        let codeConsoleThumbnailModel = makeSnapshotQuickLookModel()
 
         let composerSession = ComposerSession()
         composerSession.selectedCells = [
@@ -163,13 +170,17 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                 "Data Studio specimen filter",
                 snapshotPNGData(
                     for: DataStudioSpecimenFilterPopover(session: specimenSession, workbook: specimenWorkbook),
-                    size: CGSize(width: 460, height: 620)
+                    size: CGSize(width: 460, height: 648)
                 )
             ),
             (
                 "Code Console outputs preview",
                 snapshotPNGData(
-                    for: CodeConsoleOutputsView(session: codeConsoleSession),
+                    for: CodeConsoleOutputsView(
+                        session: codeConsoleSession,
+                        quickLookThumbnailModel: codeConsoleThumbnailModel,
+                        quickLookLoadsOnAppear: false
+                    ),
                     size: CGSize(width: 880, height: 720)
                 )
             ),
@@ -199,12 +210,121 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         hostingView.setFrameSize(size)
         hostingView.appearance = NSAppearance(named: .aqua)
         hostingView.layoutSubtreeIfNeeded()
+        hostingView.displayIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.displayIfNeeded()
 
         guard let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else {
             return nil
         }
         hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
         return bitmap.representation(using: .png, properties: [:])
+    }
+
+    private func makeCodeConsoleRunFixture() throws -> CodeConsoleRunResponse {
+        let run = TestPayloads.codeConsoleRun()
+        let outputDirectory = URL(fileURLWithPath: run.outputDir, isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+
+        let pdfURL = URL(fileURLWithPath: run.generatedFiles[0].path)
+        let csvURL = URL(fileURLWithPath: run.generatedFiles[1].path)
+        try writeSnapshotFixturePDF(to: pdfURL)
+        try Data("x,y\n1,2\n".utf8).write(to: csvURL, options: .atomic)
+        return run
+    }
+
+    private func writeSnapshotFixturePDF(to url: URL) throws {
+        var mediaBox = CGRect(x: 0, y: 0, width: 320, height: 220)
+        guard
+            let consumer = CGDataConsumer(url: url as CFURL),
+            let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil)
+        else {
+            XCTFail("Expected code-console snapshot PDF context to be created.")
+            return
+        }
+
+        context.beginPDFPage(nil)
+        context.setFillColor(gray: 1.0, alpha: 1.0)
+        context.fill(mediaBox)
+
+        context.setFillColor(red: 0.10, green: 0.34, blue: 0.76, alpha: 1.0)
+        context.fill(CGRect(x: 24, y: 150, width: 48, height: 46))
+
+        context.setFillColor(red: 0.18, green: 0.56, blue: 0.32, alpha: 1.0)
+        context.fill(CGRect(x: 92, y: 124, width: 48, height: 72))
+
+        context.setFillColor(red: 0.89, green: 0.47, blue: 0.12, alpha: 1.0)
+        context.fill(CGRect(x: 160, y: 96, width: 48, height: 100))
+
+        context.setStrokeColor(gray: 0.55, alpha: 1.0)
+        context.setLineWidth(2)
+        context.move(to: CGPoint(x: 24, y: 54))
+        context.addLine(to: CGPoint(x: 292, y: 54))
+        context.move(to: CGPoint(x: 24, y: 54))
+        context.addLine(to: CGPoint(x: 24, y: 196))
+        context.strokePath()
+
+        let title = NSAttributedString(
+            string: "Code Console Preview",
+            attributes: [
+                .font: NSFont.boldSystemFont(ofSize: 16),
+                .foregroundColor: NSColor(calibratedWhite: 0.18, alpha: 1.0),
+            ]
+        )
+        title.draw(at: CGPoint(x: 24, y: 24))
+
+        context.endPDFPage()
+        context.closePDF()
+    }
+
+    private func makeSnapshotQuickLookModel() -> QuickLookThumbnailModel {
+        let thumbnail = NSImage(size: NSSize(width: 320, height: 220))
+        thumbnail.lockFocus()
+        defer { thumbnail.unlockFocus() }
+
+        NSColor(calibratedWhite: 0.98, alpha: 1.0).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 320, height: 220)).fill()
+
+        NSColor(calibratedRed: 0.18, green: 0.48, blue: 0.90, alpha: 1.0).setFill()
+        NSBezierPath(roundedRect: NSRect(x: 20, y: 30, width: 280, height: 160), xRadius: 18, yRadius: 18).fill()
+
+        NSColor.white.withAlphaComponent(0.9).setFill()
+        NSBezierPath(roundedRect: NSRect(x: 42, y: 122, width: 112, height: 16), xRadius: 8, yRadius: 8).fill()
+        NSBezierPath(roundedRect: NSRect(x: 42, y: 92, width: 196, height: 12), xRadius: 6, yRadius: 6).fill()
+        NSBezierPath(roundedRect: NSRect(x: 42, y: 68, width: 160, height: 12), xRadius: 6, yRadius: 6).fill()
+
+        let model = QuickLookThumbnailModel { _, _ in
+            QuickLookThumbnailLoadResult(image: thumbnail, errorMessage: nil)
+        }
+        model.image = thumbnail
+        return model
+    }
+
+    private func exportSnapshotsIfRequested(_ snapshots: [(String, Data)]) {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["SCIPLOT_EXPORT_GUI_SNAPSHOTS"] == "1" else {
+            return
+        }
+
+        let destinationRoot: URL
+        if let explicitPath = environment["SCIPLOT_EXPORT_GUI_SNAPSHOTS_DIR"], explicitPath.isEmpty == false {
+            destinationRoot = URL(fileURLWithPath: explicitPath, isDirectory: true)
+        } else {
+            destinationRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("sciplot-gui-snapshots", isDirectory: true)
+        }
+        try? FileManager.default.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
+
+        for (label, data) in snapshots {
+            let filename = label
+                .lowercased()
+                .replacingOccurrences(of: " ", with: "-")
+                .replacingOccurrences(of: "/", with: "-")
+                .appending(".png")
+            let destinationURL = destinationRoot.appendingPathComponent(filename)
+            try? data.write(to: destinationURL, options: .atomic)
+        }
     }
 }
 
@@ -220,18 +340,18 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         nonWhiteFraction: 0.5417
     ),
     "Data Studio specimen filter": SnapshotFingerprint(
-        differenceHash: 0x06c0c8c8c8c8c000,
-        averageLuma: 0.6560,
+        differenceHash: 0x8ec0c8c8c8c8c880,
+        averageLuma: 0.6377,
         nonWhiteFraction: 0.6111
     ),
     "Code Console outputs preview": SnapshotFingerprint(
-        differenceHash: 0x0000000000000000,
-        averageLuma: 0.0000,
+        differenceHash: 0x000000c0e0e0c000,
+        averageLuma: 0.0492,
         nonWhiteFraction: 1.0000
     ),
     "Composer canvas selection": SnapshotFingerprint(
-        differenceHash: 0x8000150000070787,
-        averageLuma: 0.9840,
+        differenceHash: 0x8000050001070787,
+        averageLuma: 0.9800,
         nonWhiteFraction: 0.2083
     ),
 ]

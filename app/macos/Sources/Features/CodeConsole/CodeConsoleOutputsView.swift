@@ -3,6 +3,8 @@ import SwiftUI
 
 struct CodeConsoleOutputsView: View {
     @Bindable var session: CodeConsoleSession
+    var quickLookThumbnailModel: QuickLookThumbnailModel? = nil
+    var quickLookLoadsOnAppear = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -114,11 +116,38 @@ struct CodeConsoleOutputsView: View {
             Text("Preview")
                 .font(.headline)
 
-            if let selectedGeneratedFileURL = session.selectedGeneratedFileURL {
-                QuickLookThumbnailView(url: selectedGeneratedFileURL, size: 360)
+            if let selectedGeneratedFile = session.selectedGeneratedFile,
+               let selectedGeneratedFileURL = session.selectedGeneratedFileURL
+            {
+                previewContent(for: selectedGeneratedFile, url: selectedGeneratedFileURL)
             } else {
                 EmptyStateCard(title: "No preview selected")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func previewContent(
+        for file: CodeConsoleGeneratedFileResponse,
+        url: URL
+    ) -> some View {
+        if !FileManager.default.fileExists(atPath: url.path) {
+            EmptyStateCard(
+                title: "Preview unavailable",
+                message: "The selected generated file could not be found on disk."
+            )
+        } else if file.fileType.caseInsensitiveCompare("pdf") == .orderedSame {
+            let previewShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+            PDFPreviewView(url: url)
+                .clipShape(previewShape)
+                .background(.quinary.opacity(0.2), in: previewShape)
+        } else {
+            QuickLookThumbnailView(
+                url: url,
+                size: 360,
+                model: quickLookThumbnailModel,
+                loadsOnAppear: quickLookLoadsOnAppear
+            )
         }
     }
 
