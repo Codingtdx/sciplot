@@ -97,11 +97,10 @@ struct DataStudioInspectorView: View {
                         session.revealLatestExport()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil)
+                    .disabled(!session.revealOutputAvailability.isEnabled)
                     .help(
-                        session.focusedWorkbook == nil && session.comparisonExportDestinationURL == nil
-                            ? "Export or focus a workbook first."
-                            : "Reveal the latest output location in Finder."
+                        session.revealOutputAvailability.reason
+                            ?? "Reveal the latest output location in Finder."
                     )
                     .inspectorActionButton()
                 }

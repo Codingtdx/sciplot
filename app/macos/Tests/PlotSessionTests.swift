@@ -730,6 +730,15 @@ final class PlotSessionTests: XCTestCase {
         context.endPDFPage()
         context.closePDF()
     }
+
+    func testOpenCurrentSourceSurfacesMissingFileError() {
+        let session = PlotSession()
+        session.selectedFileURL = URL(fileURLWithPath: "/tmp/does-not-exist.csv")
+
+        session.openCurrentSource()
+
+        XCTAssertTrue(session.errorMessage?.contains("Couldn't find") ?? false)
+    }
 }
 
 @MainActor

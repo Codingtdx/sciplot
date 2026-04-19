@@ -99,6 +99,16 @@ final class CodeConsoleSession {
         return .enabled()
     }
 
+    var revealOutputAvailability: ActionAvailability {
+        if !userExportURLs.isEmpty {
+            return .enabled()
+        }
+        guard latestRunResponse != nil else {
+            return .disabled("Run code or export figures before revealing the latest output.")
+        }
+        return .enabled()
+    }
+
     var editorPresentation: CodeConsoleEditorPresentation {
         CodeConsoleEditorPresentation(
             refreshPromptAvailability: refreshPromptAvailability,
@@ -123,7 +133,7 @@ final class CodeConsoleSession {
 
     var outputsPresentation: CodeConsoleOutputsPresentation {
         CodeConsoleOutputsPresentation(
-            revealLatestOutputAvailability: revealLatestOutputAvailability,
+            revealLatestOutputAvailability: revealOutputAvailability,
             openSelectedGeneratedFileAvailability: selectedGeneratedFileOpenAvailability,
             revealSelectedGeneratedFileAvailability: selectedGeneratedFileRevealAvailability
         )
@@ -384,30 +394,42 @@ final class CodeConsoleSession {
         guard selectedGeneratedFileOpenAvailability.isEnabled, let selectedGeneratedFileURL else {
             return
         }
-        WorkspaceBridge.open(selectedGeneratedFileURL)
+        do {
+            try WorkspaceBridge.open(selectedGeneratedFileURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func revealSelectedGeneratedFile() {
         guard selectedGeneratedFileRevealAvailability.isEnabled, let selectedGeneratedFileURL else {
             return
         }
-        WorkspaceBridge.reveal([selectedGeneratedFileURL])
+        do {
+            try WorkspaceBridge.reveal([selectedGeneratedFileURL])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func revealLatestOutput() {
-        guard revealLatestOutputAvailability.isEnabled else {
+        guard revealOutputAvailability.isEnabled else {
             return
         }
-        if !userExportURLs.isEmpty {
-            WorkspaceBridge.reveal(userExportURLs)
-            return
+        do {
+            if !userExportURLs.isEmpty {
+                try WorkspaceBridge.reveal(userExportURLs)
+                return
+            }
+            try revealManagedOutputFolder()
+        } catch {
+            errorMessage = error.localizedDescription
         }
-        revealManagedOutputFolder()
     }
 
-    func revealManagedOutputFolder() {
+    func revealManagedOutputFolder() throws {
         if let outputDir = latestRunResponse?.outputDir {
-            WorkspaceBridge.reveal([URL(fileURLWithPath: outputDir)])
+            try WorkspaceBridge.reveal([URL(fileURLWithPath: outputDir)])
         }
     }
 
@@ -441,21 +463,33 @@ final class CodeConsoleSession {
         guard let item = latestExportItems.first(where: { $0.id == id }) else {
             return
         }
-        WorkspaceBridge.open(item.url)
+        do {
+            try WorkspaceBridge.open(item.url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openCurrentSource() {
         guard let selectedFileURL else {
             return
         }
-        WorkspaceBridge.open(selectedFileURL)
+        do {
+            try WorkspaceBridge.open(selectedFileURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func revealCurrentSource() {
         guard let selectedFileURL else {
             return
         }
-        WorkspaceBridge.reveal([selectedFileURL])
+        do {
+            try WorkspaceBridge.reveal([selectedFileURL])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func scheduleContextRefresh() {
@@ -690,15 +724,6 @@ final class CodeConsoleSession {
         return .enabled()
     }
 
-    private var revealLatestOutputAvailability: ActionAvailability {
-        if !userExportURLs.isEmpty {
-            return .enabled()
-        }
-        guard latestRunResponse != nil else {
-            return .disabled("Run code or export figures before revealing the latest output.")
-        }
-        return .enabled()
-    }
 }
 
 private extension CodeConsoleSession {

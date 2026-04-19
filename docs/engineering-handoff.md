@@ -1960,8 +1960,59 @@ Every development round must update this file.
   - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
   - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
   - `.venv/bin/python scripts/smoke_check.py`: passed
-  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`129 tests`)
+
+### 2026-04-19 (Round AM): Make GUI workspace actions fail visibly and close silent desktop no-ops
+
+- Scope:
+  - Hardened `app/macos/Sources/Shared/Utilities/WorkspaceBridge.swift` so desktop `open` and `reveal` actions validate target existence and throw visible, user-facing errors instead of silently returning.
+  - Routed Plot, Data Studio, Composer, and Code Console file/open/reveal helpers through that throwing bridge so missing exports, missing sources, and missing managed output folders now surface into each session's `errorMessage`.
+  - Added shared `revealOutputAvailability` state where needed and wired menu/inspector enablement to that state so `Reveal in Finder` is disabled when the current workbench has nothing valid to reveal.
+  - Moved runtime bootstrap failure presentation to `app/macos/Sources/App/RootSplitView.swift` so sidecar/bootstrap errors remain visible across Plot, Data Studio, Composer, and Code Console rather than disappearing outside Plot.
+  - Added a top-level Composer workbench diagnostic card and removed inspector-only error rendering so Composer failures remain visible even when the inspector is hidden.
+  - Added targeted macOS regression coverage in `app/macos/Tests/AppModelTests.swift`, `PlotSessionTests.swift`, `ComposerSessionTests.swift`, `DataStudioSessionTests.swift`, `CodeConsoleSessionTests.swift`, and new `WorkspaceBridgeTests.swift` for the new visible-failure semantics.
+- User-visible impact:
+  - `File > Reveal in Finder` and inspector `Reveal Output` actions now disable with the correct explanation when there is nothing to reveal, instead of doing nothing.
+  - Failed file-open, Finder-reveal, and latest-export actions now show a concrete error message when the target file or folder is gone.
+  - Sidecar/bootstrap startup failures now stay visible no matter which primary workbench is active.
+  - Composer import/export/placement failures stay visible in the main workbench even if the inspector is closed.
+- Risks:
+  - Existing tests covered the success paths more than the desktop failure surface, so this round intentionally changed user-facing error timing for missing files and folders; future UX cleanup should preserve the new visible-failure behavior rather than reintroducing guard-return no-ops.
+  - The global runtime error card now appears above every workbench detail. If a future round adds another app-level diagnostic surface, those surfaces should be reconciled instead of stacked independently.
+- Rollback points:
+  - `app/macos/Sources/Shared/Utilities/WorkspaceBridge.swift`
+  - `app/macos/Sources/App/AppModel.swift`
+  - `app/macos/Sources/App/AppCommands.swift`
+  - `app/macos/Sources/App/RootSplitView.swift`
+  - `app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+  - `app/macos/Sources/Features/Composer/ComposerSessionImportExport.swift`
+  - `app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+  - `app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+  - `app/macos/Tests/WorkspaceBridgeTests.swift`
+- Decision:
+  - Desktop file-system actions must share one explicit failure contract: validate availability first, disable and explain when there is nothing actionable, and surface a visible error when a previously actionable path becomes invalid.
+  - Runtime bootstrap failure is app-level state, not Plot-only state, so the supported presentation surface now lives at the shared workbench detail layer instead of a single feature workbench.
+  - Rejected alternatives:
+    - leave `NSWorkspace` failures silent and only tune inspector button disablement: rejected because menu actions and stale paths would still fail without visible feedback
+    - keep bootstrap errors local to Plot and duplicate equivalent banners elsewhere later: rejected because it would recreate the same runtime truth in multiple workbenches
+    - keep Composer error feedback inside the inspector: rejected because hiding the inspector also hid the only failure surface
+  - Boundary:
+    - this round does not change sidecar routes, plot contract payloads, project schema, persistence format, or canonical workbench flows
+    - the new availability/error plumbing is macOS UI/runtime behavior only
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`135 tests`)
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`176 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `git diff --check`: passed
+  - Manual desktop verification before implementation:
+    - `Computer Use` confirmed on 2026-04-19 that empty Plot state left `File > Reveal in Finder` enabled while `Export` was already disabled
+    - Additional `Computer Use` exploration was stopped once the native macOS automation session lost window handles during system open-panel interaction, per this round's instruction to stop on permission/automation issues
 
 Use this block for every new round:
 

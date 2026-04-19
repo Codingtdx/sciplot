@@ -1,16 +1,46 @@
 import AppKit
 import Foundation
 
-enum WorkspaceBridge {
-    static func reveal(_ urls: [URL]) {
-        guard !urls.isEmpty else {
-            return
+enum WorkspaceBridgeError: LocalizedError, Equatable {
+    case noTargets
+    case missingTarget(String)
+    case openFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .noTargets:
+            return "Nothing is available to reveal in Finder yet."
+        case let .missingTarget(path):
+            let label = URL(fileURLWithPath: path).lastPathComponent
+            return "Couldn't find “\(label)” in its last known location."
+        case let .openFailed(path):
+            let label = URL(fileURLWithPath: path).lastPathComponent
+            return "macOS couldn't open “\(label)”."
         }
+    }
+}
+
+enum WorkspaceBridge {
+    static func reveal(_ urls: [URL]) throws {
+        guard !urls.isEmpty else {
+            throw WorkspaceBridgeError.noTargets
+        }
+        try ensureTargetsExist(urls)
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
-    static func open(_ url: URL) {
-        NSWorkspace.shared.open(url)
+    static func open(_ url: URL) throws {
+        try ensureTargetsExist([url])
+        guard NSWorkspace.shared.open(url) else {
+            throw WorkspaceBridgeError.openFailed(url.path)
+        }
+    }
+
+    private static func ensureTargetsExist(_ urls: [URL]) throws {
+        let fileManager = FileManager.default
+        if let missingURL = urls.first(where: { !fileManager.fileExists(atPath: $0.path) }) {
+            throw WorkspaceBridgeError.missingTarget(missingURL.path)
+        }
     }
 }
 

@@ -17,6 +17,13 @@ extension DataStudioSession {
         return .enabled()
     }
 
+    var revealOutputAvailability: ActionAvailability {
+        guard focusedWorkbook != nil || comparisonExportDestinationURL != nil else {
+            return .disabled("Export or focus a workbook first.")
+        }
+        return .enabled()
+    }
+
     var selectedComparisonFigure: DataStudioExportFigureItem? {
         guard let selectedComparisonFigureID else {
             return comparisonFigureItems.first
@@ -233,21 +240,33 @@ extension DataStudioSession {
         guard let focusedWorkbook else {
             return
         }
-        WorkspaceBridge.reveal([focusedWorkbook.workbookURL])
+        do {
+            try WorkspaceBridge.reveal([focusedWorkbook.workbookURL])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openFocusedWorkbook() {
         guard let focusedWorkbook else {
             return
         }
-        WorkspaceBridge.open(focusedWorkbook.workbookURL)
+        do {
+            try WorkspaceBridge.open(focusedWorkbook.workbookURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func revealLatestExport() {
-        if let comparisonExportDestinationURL {
-            WorkspaceBridge.reveal([comparisonExportDestinationURL])
-        } else if let focusedWorkbook {
-            WorkspaceBridge.reveal([focusedWorkbook.workbookURL])
+        do {
+            if let comparisonExportDestinationURL {
+                try WorkspaceBridge.reveal([comparisonExportDestinationURL])
+            } else if let focusedWorkbook {
+                try WorkspaceBridge.reveal([focusedWorkbook.workbookURL])
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -255,21 +274,33 @@ extension DataStudioSession {
         guard let latestComparisonWorkbookURL else {
             return
         }
-        WorkspaceBridge.open(latestComparisonWorkbookURL)
+        do {
+            try WorkspaceBridge.open(latestComparisonWorkbookURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openSelectedComparisonFigure() {
         guard let selectedComparisonFigure else {
             return
         }
-        WorkspaceBridge.open(selectedComparisonFigure.url)
+        do {
+            try WorkspaceBridge.open(selectedComparisonFigure.url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openFilteredWorkbook(id: String) {
         guard let item = comparisonFilteredWorkbookItems.first(where: { $0.id == id }) else {
             return
         }
-        WorkspaceBridge.open(item.url)
+        do {
+            try WorkspaceBridge.open(item.url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func selectComparisonFigure(id: String) {

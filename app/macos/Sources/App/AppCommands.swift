@@ -35,6 +35,7 @@ struct AppCommands: Commands {
                 model.revealActiveOutput()
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
+            .disabled(!model.activeRevealAvailability.isEnabled)
 
             Button("Clear Current Session", role: .destructive) {
                 model.clearCurrentDataStudioSession()

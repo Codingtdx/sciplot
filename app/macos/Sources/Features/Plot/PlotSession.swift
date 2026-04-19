@@ -79,6 +79,13 @@ final class PlotSession {
         return .enabled()
     }
 
+    var revealOutputAvailability: ActionAvailability {
+        guard !latestExportItems.isEmpty else {
+            return .disabled("Export a plot first.")
+        }
+        return .enabled()
+    }
+
     var latestExportItems: [ExportedFileItem] {
         userExportURLs.map { ExportedFileItem(url: $0) }
     }

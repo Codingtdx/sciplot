@@ -119,6 +119,44 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.activeExportHelpText.contains("Run code to generate PDF figures"))
     }
 
+    func testActiveRevealAvailabilityTracksSelectedWorkbench() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.plot)
+        XCTAssertFalse(model.activeRevealAvailability.isEnabled)
+        XCTAssertTrue(model.activeRevealAvailability.reason?.contains("Export a plot first") ?? false)
+
+        let workbook = DataStudioWorkbookItem(
+            id: "workbook-1",
+            response: TestPayloads.dataStudioWorkbook(path: "/tmp/prepared.xlsx", label: "Prepared")
+        )
+        model.dataStudioSession.workbooks = [workbook]
+        model.dataStudioSession.groupStates = [
+            .init(workbookPath: workbook.response.workbookPath, displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+        model.dataStudioSession.focusedWorkbookPath = workbook.response.workbookPath
+        model.switchWorkbench(.dataStudio)
+        XCTAssertTrue(model.activeRevealAvailability.isEnabled)
+
+        model.composerSession.exportURL = URL(fileURLWithPath: "/tmp/composer-final.pdf")
+        model.switchWorkbench(.composer)
+        XCTAssertTrue(model.activeRevealAvailability.isEnabled)
+
+        model.codeConsoleSession.latestRunResponse = TestPayloads.codeConsoleRun()
+        model.switchWorkbench(.codeConsole)
+        XCTAssertTrue(model.activeRevealAvailability.isEnabled)
+    }
+
+    func testRuntimeIssueMessageUsesBootstrapError() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        XCTAssertNil(model.runtimeIssueMessage)
+
+        model.bootstrapErrorMessage = "Sidecar failed to start."
+        XCTAssertEqual(model.runtimeIssueMessage?.summary, "Runtime unavailable")
+        XCTAssertEqual(model.runtimeIssueMessage?.detail, "Sidecar failed to start.")
+    }
+
     func testBootstrapAndPlotImportInspectTemplateFlowWithSidecarClient() async throws {
         let fixture = try makeRuntimeFixture()
         let model = AppModel(runtime: fixture.runtime, client: fixture.client)

@@ -6,13 +6,19 @@ struct ComposerWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        HStack(alignment: .top, spacing: 20) {
-            ComposerAssetBrowserView(session: session)
-                .frame(width: 300)
-                .frame(maxHeight: .infinity)
+        VStack(alignment: .leading, spacing: 14) {
+            if let errorMessage = session.errorMessage {
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
+            }
 
-            ComposerCanvasView(session: session)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(alignment: .top, spacing: 20) {
+                ComposerAssetBrowserView(session: session)
+                    .frame(width: 300)
+                    .frame(maxHeight: .infinity)
+
+                ComposerCanvasView(session: session)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

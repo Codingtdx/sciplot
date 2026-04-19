@@ -2,17 +2,12 @@ import SwiftUI
 
 struct PlotWorkbenchView: View {
     @Bindable var session: PlotSession
-    let bootstrapErrorMessage: String?
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if session.selectedSourceFilename != nil {
                 topSourceBar
-            }
-
-            if let bootstrapErrorMessage {
-                DiagnosticIssueCard(message: DiagnosticMessage(detail: bootstrapErrorMessage))
             }
 
             if let errorMessage = session.errorMessage {

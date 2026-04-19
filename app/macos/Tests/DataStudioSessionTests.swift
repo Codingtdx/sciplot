@@ -1697,6 +1697,23 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
     }
 
+    func testRevealFocusedWorkbookSurfacesMissingFileError() {
+        let session = DataStudioSession()
+        let workbook = DataStudioWorkbookItem(
+            id: "workbook-1",
+            response: TestPayloads.dataStudioWorkbook(path: "/tmp/missing-workbook.xlsx", label: "Prepared")
+        )
+        session.workbooks = [workbook]
+        session.groupStates = [
+            .init(workbookPath: workbook.response.workbookPath, displayName: "Prepared", includeInCompare: true, sortOrder: 0),
+        ]
+        session.focusedWorkbookPath = workbook.response.workbookPath
+
+        session.revealFocusedWorkbook()
+
+        XCTAssertTrue(session.errorMessage?.contains("Couldn't find") ?? false)
+    }
+
     private func waitUntil(
         _ condition: @escaping () -> Bool,
         timeout: TimeInterval

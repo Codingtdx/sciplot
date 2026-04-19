@@ -49,12 +49,6 @@ struct ComposerInspectorView: View {
                 }
             }
 
-            if let errorMessage = session.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-            }
         }
     }
 
@@ -214,11 +208,10 @@ struct ComposerInspectorView: View {
                         session.revealLatestExport()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(session.latestExportItems.isEmpty)
+                    .disabled(!session.revealOutputAvailability.isEnabled)
                     .help(
-                        session.latestExportItems.isEmpty
-                            ? "Export a composition first."
-                            : "Reveal the latest exported composition in Finder."
+                        session.revealOutputAvailability.reason
+                            ?? "Reveal the latest exported composition in Finder."
                     )
                     .inspectorActionButton()
                 }

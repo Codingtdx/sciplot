@@ -12,7 +12,7 @@ struct RootSplitView: View {
             .navigationTitle("SciPlot God")
             .listStyle(.sidebar)
         } detail: {
-            activeWorkbenchView
+            activeWorkbenchDetail
                 .id(model.selectedWorkbench)
                 .transition(MotionTokens.stateTransition)
                 .animation(MotionTokens.workbenchSwitch, value: model.selectedWorkbench)
@@ -51,10 +51,29 @@ struct RootSplitView: View {
     }
 
     @ViewBuilder
+    private var activeWorkbenchDetail: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let runtimeIssueMessage = model.runtimeIssueMessage {
+                DiagnosticIssueCard(
+                    message: runtimeIssueMessage,
+                    retryTitle: "Retry Runtime"
+                ) {
+                    Task { await model.bootstrapIfNeeded() }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+            }
+
+            activeWorkbenchView
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
     private var activeWorkbenchView: some View {
         switch model.selectedWorkbench {
         case .plot:
-            PlotWorkbenchView(session: model.plotSession, bootstrapErrorMessage: model.bootstrapErrorMessage)
+            PlotWorkbenchView(session: model.plotSession)
         case .dataStudio:
             DataStudioWorkbenchView(session: model.dataStudioSession)
         case .composer:

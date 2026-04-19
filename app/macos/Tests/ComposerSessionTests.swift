@@ -244,6 +244,15 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertEqual(session.latestExportItems.map(\.label), ["composer-final.tiff"])
     }
 
+    func testRevealLatestExportSurfacesMissingFileError() {
+        let session = ComposerSession()
+        session.exportURL = URL(fileURLWithPath: "/tmp/missing-composer-export.pdf")
+
+        session.revealLatestExport()
+
+        XCTAssertTrue(session.errorMessage?.contains("Couldn't find") ?? false)
+    }
+
     func testShiftSelectionMergeCreatesFreeRegionWithoutChangingPanelOrder() {
         let session = ComposerSession()
         session.project.panels = [

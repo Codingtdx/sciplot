@@ -39,6 +39,19 @@ final class AppModel {
         }
     }
 
+    var activeRevealAvailability: ActionAvailability {
+        switch selectedWorkbench {
+        case .plot:
+            return plotSession.revealOutputAvailability
+        case .dataStudio:
+            return dataStudioSession.revealOutputAvailability
+        case .composer:
+            return composerSession.revealOutputAvailability
+        case .codeConsole:
+            return codeConsoleSession.revealOutputAvailability
+        }
+    }
+
     var activeExportCommandTitle: String {
         switch selectedWorkbench {
         case .plot:
@@ -67,6 +80,13 @@ final class AppModel {
         case .codeConsole:
             return "Export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
         }
+    }
+
+    var runtimeIssueMessage: DiagnosticMessage? {
+        guard let bootstrapErrorMessage else {
+            return nil
+        }
+        return DiagnosticMessage(summary: "Runtime unavailable", detail: bootstrapErrorMessage)
     }
 
     @ObservationIgnored private var pendingPlotReplacementAction: PendingPlotReplacementAction?

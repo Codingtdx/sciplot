@@ -282,6 +282,29 @@ final class CodeConsoleSessionTests: XCTestCase {
         )
     }
 
+    func testRevealLatestOutputSurfacesMissingManagedOutputFolderError() {
+        let session = CodeConsoleSession()
+        session.latestRunResponse = CodeConsoleRunResponse(
+            status: "succeeded",
+            exitCode: 0,
+            durationSeconds: 0.2,
+            stdout: "",
+            stderr: "",
+            runDir: "/tmp/code_console/run-missing",
+            outputDir: "/tmp/code_console/run-missing/outputs",
+            scriptPath: "/tmp/code_console/run-missing/user_code.py",
+            promptPath: "/tmp/code_console/run-missing/external_ai_prompt.txt",
+            contextPath: "/tmp/code_console/run-missing/context.json",
+            stdoutPath: "/tmp/code_console/run-missing/stdout.txt",
+            stderrPath: "/tmp/code_console/run-missing/stderr.txt",
+            generatedFiles: []
+        )
+
+        session.revealLatestOutput()
+
+        XCTAssertTrue(session.errorMessage?.contains("Couldn't find") ?? false)
+    }
+
     func testContextRefreshDebouncesRapidBindingChangesToLatestRequest() async {
         let plot = PlotSession()
         plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))

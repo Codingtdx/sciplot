@@ -72,8 +72,13 @@ extension ComposerSession {
     }
 
     func revealLatestExport() {
-        if let exportURL {
-            WorkspaceBridge.reveal([exportURL])
+        guard let exportURL else {
+            return
+        }
+        do {
+            try WorkspaceBridge.reveal([exportURL])
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -81,7 +86,11 @@ extension ComposerSession {
         guard let item = latestExportItems.first(where: { $0.id == id }) else {
             return
         }
-        WorkspaceBridge.open(item.url)
+        do {
+            try WorkspaceBridge.open(item.url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func suggestedComposerExportFilename(format: ExportGraphicFormat) -> String {

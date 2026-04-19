@@ -539,11 +539,10 @@ struct PlotExportInspectorSection: View {
                         session.revealLatestExport()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(session.latestExportItems.isEmpty)
+                    .disabled(!session.revealOutputAvailability.isEnabled)
                     .help(
-                        session.latestExportItems.isEmpty
-                            ? "Export a plot first."
-                            : "Reveal the latest exported plot files in Finder."
+                        session.revealOutputAvailability.reason
+                            ?? "Reveal the latest exported plot files in Finder."
                     )
                     .inspectorActionButton()
                 }

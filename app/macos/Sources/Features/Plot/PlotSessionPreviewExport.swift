@@ -66,8 +66,13 @@ extension PlotSession {
     }
 
     func revealLatestExport() {
-        if !userExportURLs.isEmpty {
-            WorkspaceBridge.reveal(userExportURLs)
+        guard !userExportURLs.isEmpty else {
+            return
+        }
+        do {
+            try WorkspaceBridge.reveal(userExportURLs)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -75,26 +80,38 @@ extension PlotSession {
         guard let item = latestExportItems.first(where: { $0.id == id }) else {
             return
         }
-        WorkspaceBridge.open(item.url)
+        do {
+            try WorkspaceBridge.open(item.url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openCurrentSource() {
         guard let selectedFileURL else {
             return
         }
-        WorkspaceBridge.open(selectedFileURL)
+        do {
+            try WorkspaceBridge.open(selectedFileURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func revealCurrentSource() {
         guard let selectedFileURL else {
             return
         }
-        WorkspaceBridge.reveal([selectedFileURL])
+        do {
+            try WorkspaceBridge.reveal([selectedFileURL])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func openExampleDataTemplate(named filename: String) {
         do {
-            WorkspaceBridge.open(try exampleDataTemplateURL(named: filename))
+            try WorkspaceBridge.open(exampleDataTemplateURL(named: filename))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -102,7 +119,7 @@ extension PlotSession {
 
     func revealExampleDataTemplates() {
         do {
-            WorkspaceBridge.reveal(try availableExampleDataTemplateURLs())
+            try WorkspaceBridge.reveal(availableExampleDataTemplateURLs())
         } catch {
             errorMessage = error.localizedDescription
         }

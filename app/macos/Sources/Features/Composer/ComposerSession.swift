@@ -54,6 +54,13 @@ final class ComposerSession {
         return .enabled()
     }
 
+    var revealOutputAvailability: ActionAvailability {
+        guard exportURL != nil else {
+            return .disabled("Export a composition first.")
+        }
+        return .enabled()
+    }
+
     var latestExportItems: [ExportedFileItem] {
         guard let exportURL else {
             return []
