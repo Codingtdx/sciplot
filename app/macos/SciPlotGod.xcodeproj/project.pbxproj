@@ -55,6 +55,7 @@
 		C0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */; };
 		C0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */; };
 		C0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */; };
+		C00000000000000000000076 /* Sources/Shared/Utilities/UserCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000076 /* Sources/Shared/Utilities/UserCancellation.swift */; };
 		C00000000000000000000031 /* Tests/AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000031 /* Tests/AppModelTests.swift */; };
 		C00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */; };
 		C00000000000000000000033 /* Tests/ComposerSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* Tests/ComposerSessionTests.swift */; };
@@ -140,6 +141,7 @@
 		B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/PreviewImageDecoder.swift; sourceTree = "<group>"; };
 		B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/SheetValue.swift; sourceTree = "<group>"; };
 		B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/WorkspaceBridge.swift; sourceTree = "<group>"; };
+		B00000000000000000000076 /* Sources/Shared/Utilities/UserCancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Shared/Utilities/UserCancellation.swift; sourceTree = "<group>"; };
 		B00000000000000000000031 /* Tests/AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/AppModelTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000032 /* Tests/CodeConsoleSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/CodeConsoleSessionTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000033 /* Tests/ComposerSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ComposerSessionTests.swift; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 				B0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift */,
 				B0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift */,
 				B0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift */,
+				B00000000000000000000076 /* Sources/Shared/Utilities/UserCancellation.swift */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -441,6 +444,7 @@
 				C0000000000000000000002C /* Sources/Shared/Utilities/PreviewImageDecoder.swift in Sources */,
 				C0000000000000000000002D /* Sources/Shared/Utilities/SheetValue.swift in Sources */,
 				C0000000000000000000002E /* Sources/Shared/Utilities/WorkspaceBridge.swift in Sources */,
+				C00000000000000000000076 /* Sources/Shared/Utilities/UserCancellation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

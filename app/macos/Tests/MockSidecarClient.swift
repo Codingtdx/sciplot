@@ -30,6 +30,8 @@ final class MockSidecarClient: SidecarClienting {
     var composePreviewResponse = TestPayloads.composerPreview()
     var composeExportResponse = PathResponse(outputPath: "/tmp/composer-export.pdf")
     var importedComposerProject = TestPayloads.composerProject()
+    var metaHandler: (() async throws -> SidecarMetaResponse)?
+    var plotContractHandler: (() async throws -> PlotContractResponse)?
     var dataStudioTemplateListHandler: (() async throws -> DataStudioTemplateListResponse)?
     var dataStudioSourcePreviewHandler: ((DataStudioSourcePreviewRequest) async throws -> DataStudioSourcePreviewResponse)?
     var dataStudioCreateTemplateHandler: ((DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse)?
@@ -75,11 +77,17 @@ final class MockSidecarClient: SidecarClienting {
     }
 
     func fetchMeta() async throws -> SidecarMetaResponse {
-        metaResponse
+        if let metaHandler {
+            return try await metaHandler()
+        }
+        return metaResponse
     }
 
     func fetchPlotContract() async throws -> PlotContractResponse {
-        contractResponse
+        if let plotContractHandler {
+            return try await plotContractHandler()
+        }
+        return contractResponse
     }
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {

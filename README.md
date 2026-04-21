@@ -84,14 +84,17 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 ## Plot Contract Semantics
 
-- Public plotting style is now a single preset: `nature`.
+- Public plotting styles are `nature`, `editorial`, `presentation`, and `poster`.
+- `nature` remains the frozen publication profile and the default global style.
 - Legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, and `advanced_materials_spacious` are ingress-only compatibility aliases and must normalize immediately to `nature`.
-- `palette_preset` and `visual_theme_id` are independent public controls. Templates may recommend defaults for both through contract `default_options`, but user edits to one must not silently rewrite the other.
-- Public palette/theme catalogs can grow without introducing a second hard style. The current visual catalogs include the ECharts-inspired `infographic`, `roma`, and `macarons` options while keeping `nature` typography, stroke widths, spacing, and export metrics unchanged.
+- `palette_preset` and `visual_theme_id` are independent public controls. Templates may recommend defaults for `style_preset`, `palette_preset`, and `visual_theme_id` through contract `default_options`, but user edits to one control must not silently rewrite the others.
+- Public palette/theme catalogs now include the ECharts-inspired `infographic`, `roma`, `macarons`, `shine`, and `vintage` options. `theme` stays a soft visual layer only; hard typography/stroke changes belong to `style_preset`.
+- Public curve/stat template coverage now includes ECharts-inspired `area_curve`, `step_line`, `stacked_area`, and `density_area` alongside the existing explicit templates.
 - Public template/catalog/recommendation surfaces expose only explicit chart templates.
 - Legacy template ids such as `scatter_with_fit`, `replicate_curves_with_band`, `grouped_bar_error`, and `grouped_bar_compare` are ingress-only aliases and must normalize immediately to `scatter_fit`, `mean_band`, and `bar`.
 - Template presentation metadata such as gallery thumbnail kind must come from `src/plot_contract.json` and `/meta`, not from macOS-local template-id heuristics.
 - `distribution_compare` is compatibility-only and must never be emitted as a public template id; resolve it to `box`, `box_strip`, or `violin`, with `box` as the conservative fallback when source inspection is unavailable.
+- `scripts/smoke_check.py` is expected to enforce public-surface guardrails, including contract lint plus a fixed style/theme/template render matrix over representative templates. Do not weaken that matrix when adding new templates or visual catalogs.
 
 ## Engineering Principles
 
@@ -119,6 +122,8 @@ When behavior is a contract change, update contract first, regenerate docs, then
   - `.venv/bin/python -m pytest tests`
 - Smoke:
   - `.venv/bin/python scripts/smoke_check.py`
+- macOS GUI smoke/fingerprint guardrails:
+  - imported-state Plot inspector and Data Studio figure inspector snapshots are part of the canonical `InspectorLayoutPolicyTests` matrix and should keep exporting xcresult attachments for artifact-based visual QA.
 - macOS build:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
 - macOS test:

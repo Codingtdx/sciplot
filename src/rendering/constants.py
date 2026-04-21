@@ -47,6 +47,18 @@ FREQUENCY_CURVE_OUTPUTS = {
     "loss_factor": "freq_loss_factor_curve.pdf",
     "complex_viscosity": "freq_complex_viscosity_curve.pdf",
 }
+FREQUENCY_AREA_CURVE_OUTPUTS = {
+    "storage_modulus": "freq_storage_modulus_area_curve.pdf",
+    "loss_modulus": "freq_loss_modulus_area_curve.pdf",
+    "loss_factor": "freq_loss_factor_area_curve.pdf",
+    "complex_viscosity": "freq_complex_viscosity_area_curve.pdf",
+}
+FREQUENCY_STEP_LINE_OUTPUTS = {
+    "storage_modulus": "freq_storage_modulus_step_line.pdf",
+    "loss_modulus": "freq_loss_modulus_step_line.pdf",
+    "loss_factor": "freq_loss_factor_step_line.pdf",
+    "complex_viscosity": "freq_complex_viscosity_step_line.pdf",
+}
 TEMPERATURE_OUTPUTS = {
     "storage_modulus": "temp_storage_modulus.pdf",
     "complex_viscosity": "temp_complex_viscosity.pdf",
@@ -55,5 +67,15 @@ TEMPERATURE_CURVE_OUTPUTS = {
     "storage_modulus": "temp_storage_modulus_curve.pdf",
     "complex_viscosity": "temp_complex_viscosity_curve.pdf",
 }
+TEMPERATURE_AREA_CURVE_OUTPUTS = {
+    "storage_modulus": "temp_storage_modulus_area_curve.pdf",
+    "complex_viscosity": "temp_complex_viscosity_area_curve.pdf",
+}
+TEMPERATURE_STEP_LINE_OUTPUTS = {
+    "storage_modulus": "temp_storage_modulus_step_line.pdf",
+    "complex_viscosity": "temp_complex_viscosity_step_line.pdf",
+}
 STRESS_RELAXATION_OUTPUT = "stress_relaxation_sigma_over_sigma0.pdf"
 STRESS_RELAXATION_CURVE_OUTPUT = "stress_relaxation_sigma_over_sigma0_curve.pdf"
+STRESS_RELAXATION_AREA_CURVE_OUTPUT = "stress_relaxation_sigma_over_sigma0_area_curve.pdf"
+STRESS_RELAXATION_STEP_LINE_OUTPUT = "stress_relaxation_sigma_over_sigma0_step_line.pdf"

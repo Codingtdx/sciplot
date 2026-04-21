@@ -107,9 +107,9 @@ def test_curve_table_recommender_returns_five_ranked_choices(tmp_path: Path) -> 
     assert [item.template_id for item in recommendations] == [
         "curve",
         "point_line",
+        "area_curve",
         "scatter_fit",
-        "stacked_curve",
-        "scatter",
+        "step_line",
     ]
     assert recommendations[0].score > recommendations[1].score > recommendations[2].score
     assert recommendations[0].rank == 1
@@ -143,8 +143,9 @@ def test_multi_curve_table_recommender_surfaces_mean_band_without_legacy_aliases
         "point_line",
         "mean_band",
         "stacked_curve",
-        "scatter_fit",
+        "stacked_area",
     ]
+    assert "step_line" in [item.template_id for item in DEFAULT_RECOMMENDER.recommend(dataset, limit=7)]
     mean_band = next(item for item in recommendations if item.template_id == "mean_band")
     assert any("mean band" in reason.lower() for reason in mean_band.why_soft_prior)
     assert "replicate_curves_with_band" not in [item.template_id for item in recommendations]
@@ -243,9 +244,9 @@ def test_wide_nmr_sidecar_promotes_segmented_stacked_curve(tmp_path: Path) -> No
     assert {item.template_id for item in recommendations} == {
         "curve",
         "point_line",
-        "mean_band",
         "stacked_curve",
-        "scatter",
+        "stacked_area",
         "scatter_fit",
         "segmented_stacked_curve",
+        "step_line",
     }

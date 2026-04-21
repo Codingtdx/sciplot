@@ -532,6 +532,10 @@ final class CodeConsoleSession {
             guard asyncCoordination.context.isLatest(revision), !Task.isCancelled else {
                 return
             }
+            if isUserCancellationError(error) {
+                errorMessage = nil
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

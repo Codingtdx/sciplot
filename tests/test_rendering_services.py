@@ -7,10 +7,11 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib import rcParams
-from matplotlib.collections import PathCollection
+from matplotlib.collections import PathCollection, PolyCollection
 from matplotlib.colors import to_hex
 
 from src import plot_style
+from src.plot_contract import lint_public_template_contract
 from src.rendering import (
     build_normalized_dataset,
     build_rendered_plots,
@@ -22,7 +23,12 @@ from src.rendering import (
 from src.rendering import themes as rendering_themes
 from src.rendering.render_curve_support import _apply_compact_inside_legend
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
-from src.rendering.themes import VisualThemeSpec, visual_theme_ids, visual_theme_soft_overrides
+from src.rendering.themes import (
+    VisualThemeSpec,
+    publication_profile_protected_rcparams,
+    visual_theme_ids,
+    visual_theme_soft_overrides,
+)
 
 
 def _path_collections(ax) -> list[PathCollection]:
@@ -308,7 +314,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
 
     inspection = inspect_input_file(input_path)
     assert inspection.recommendations[0].template_id == "curve"
-    assert len(inspection.recommendations) == 8
+    assert len(inspection.recommendations) == 10
     assert inspection.recommendations[0].template_id == "curve"
     assert inspection.recommendations[1].template_id == "point_line"
     assert inspection.recommendations[0].rank == 1
@@ -323,11 +329,12 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
     assert [item.template_id for item in inspection.primary_recommendation] == ["curve"]
     assert [item.template_id for item in inspection.alternative_recommendations] == [
         "point_line",
+        "area_curve",
         "scatter_fit",
-        "stacked_curve",
     ]
-    assert inspection.recommendations[5].template_id == "bubble_scatter"
-    assert "bubble_scatter" in {item.template_id for item in inspection.advanced_templates}
+    advanced_template_ids = [item.template_id for item in inspection.advanced_templates]
+    assert "bubble_scatter" in advanced_template_ids
+    assert "stacked_area" in [item.template_id for item in inspection.recommendations]
 
     options = resolve_render_options(template="curve")
     preflight = preflight_render_request("curve", input_path, 0, options)
@@ -352,14 +359,14 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
 
     options = resolve_render_options(
         template="curve",
-        style_preset="nature",
+        style_preset="editorial",
         palette_preset="colorblind_safe",
     )
     preflight = preflight_render_request("curve", input_path, 0, options)
 
-    assert options.style_preset == "nature"
+    assert options.style_preset == "editorial"
     assert preflight.submission_report is not None
-    assert preflight.submission_report.style_preset == "nature"
+    assert preflight.submission_report.style_preset == "editorial"
 
 
 @pytest.mark.parametrize(
@@ -453,6 +460,51 @@ def test_visual_themes_do_not_mutate_protected_publication_typography_defaults()
             assert rcParams["legend.fontsize"] == protected_legend_size
     finally:
         plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+
+def test_visual_themes_never_override_protected_publication_rcparams() -> None:
+    def _snapshot(keys: tuple[str, ...]) -> dict[str, object]:
+        snapshot: dict[str, object] = {}
+        for key in keys:
+            value = rcParams[key]
+            if isinstance(value, list):
+                snapshot[key] = tuple(value)
+            else:
+                snapshot[key] = value
+        return snapshot
+
+    try:
+        for style_id in plot_style.list_public_style_presets():
+            protected_keys = publication_profile_protected_rcparams(style_id)
+            plot_style.apply_style(style_id, "colorblind_safe")
+            baseline = _snapshot(protected_keys)
+            for theme_id in visual_theme_ids():
+                overrides = visual_theme_soft_overrides(theme_id)
+                assert not (set(overrides) & set(protected_keys))
+                plot_style.apply_style(style_id, "colorblind_safe", soft_overrides=overrides)
+                assert _snapshot(protected_keys) == baseline
+    finally:
+        plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+
+def test_public_template_contract_lint_passes() -> None:
+    assert lint_public_template_contract() == ()
+
+
+def test_public_styles_can_change_hard_typography_and_stroke_metrics() -> None:
+    try:
+        plot_style.apply_style("nature", "colorblind_safe")
+        nature_font_size = float(rcParams["font.size"])
+        nature_line_width = float(rcParams["lines.linewidth"])
+
+        plot_style.apply_style("presentation", "colorblind_safe")
+        presentation_font_size = float(rcParams["font.size"])
+        presentation_line_width = float(rcParams["lines.linewidth"])
+    finally:
+        plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+    assert presentation_font_size > nature_font_size
+    assert presentation_line_width > nature_line_width
 
 
 def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
@@ -855,6 +907,35 @@ def test_histogram_density_render_uses_discrete_binning_autofix_for_discrete_val
         close_rendered_plots(rendered)
 
 
+def test_density_area_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="density_area")
+    preflight = preflight_render_request("density_area", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("tensile_modulus_density_area.pdf",)
+
+    rendered = build_rendered_plots("density_area", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        assert rendered[0].qa_report is not None
+        assert "density_area_overlay" in rendered[0].qa_report.autofixes_applied
+        ax = rendered[0].figure.axes[0]
+        assert any(isinstance(collection, PolyCollection) for collection in ax.collections)
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_density_area_preflight_warns_on_sparse_replicates(tmp_path: Path) -> None:
+    input_path = _write_replicate_table(tmp_path / "replicates.csv")
+
+    options = resolve_render_options(template="density_area")
+    preflight = preflight_render_request("density_area", input_path, 0, options)
+
+    assert preflight.errors == ()
+    assert any("less stable with sparse replicates" in warning for warning in preflight.warnings)
+
+
 def test_distribution_compare_uses_violin_variant_when_groups_are_few_and_dense(tmp_path: Path) -> None:
     input_path = _write_dense_replicate_table(tmp_path / "dense_replicates.csv")
 
@@ -931,6 +1012,57 @@ def test_scatter_fit_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_area_curve_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="area_curve")
+    preflight = preflight_render_request("area_curve", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_area_curve.pdf",)
+
+    rendered = build_rendered_plots("area_curve", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        ax = rendered[0].figure.axes[0]
+        assert any(isinstance(collection, PolyCollection) for collection in ax.collections)
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_step_line_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="step_line")
+    preflight = preflight_render_request("step_line", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_step_line.pdf",)
+
+    rendered = build_rendered_plots("step_line", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        ax = rendered[0].figure.axes[0]
+        assert "steps-mid" in {line.get_drawstyle() for line in ax.lines}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_stacked_area_preflight_matches_render_filename(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    options = resolve_render_options(template="stacked_area")
+    preflight = preflight_render_request("stacked_area", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("curve_stacked_area.pdf",)
+
+    rendered = build_rendered_plots("stacked_area", input_path)
+    try:
+        assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
+        ax = rendered[0].figure.axes[0]
+        assert any(isinstance(collection, PolyCollection) for collection in ax.collections)
     finally:
         close_rendered_plots(rendered)
 

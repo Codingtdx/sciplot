@@ -506,6 +506,84 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
     }
 
+    func testTemplateResetAppliesIndependentStylePaletteAndThemeDefaultsForNewCurveTemplates() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.chooseTemplate("area_curve")
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "infographic")
+
+        session.chooseTemplate("stacked_area")
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "vintage")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "vintage")
+
+        session.chooseTemplate("step_line")
+        XCTAssertEqual(session.renderOptions.stylePreset, "editorial")
+        XCTAssertEqual(session.renderOptions.palettePreset, "shine")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "shine")
+    }
+
+    func testTemplateResetAppliesIndependentDefaultsForNewDensityAreaTemplate() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.chooseTemplate("density_area")
+
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "macarons")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+    }
+
+    func testInspectionCancellationDoesNotSurfaceError() async {
+        let client = MockSidecarClient()
+        client.inspectHandler = { _ in
+            throw CancellationError()
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/cancelled.csv"))
+        await waitUntil({ session.isInspecting == false }, timeout: 2.0)
+
+        XCTAssertNil(session.errorMessage)
+        XCTAssertNil(session.inspectionResponse)
+    }
+
+    func testPreviewCancellationDoesNotSurfaceError() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        client.renderHandler = { _ in
+            throw CancellationError()
+        }
+
+        session.chooseTemplate("area_curve")
+        await waitUntil({ session.isPreviewing == false }, timeout: 2.0)
+
+        XCTAssertNil(session.errorMessage)
+        XCTAssertNotNil(session.previewResponse)
+    }
+
     func testExternalRenderOptionsFallbackThemeOnlyWhenMissing() {
         let session = PlotSession()
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())

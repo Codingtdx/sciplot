@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import to_rgba
 from matplotlib.legend import Legend
+from matplotlib.lines import Line2D
 from matplotlib.ticker import FixedLocator
 
 from src import plot_style
@@ -225,6 +226,8 @@ def plot_curves(
     legend_expand_axes: str = "xy",
     legend_inset_fraction: float | None = None,
     preserve_stress_label: bool = False,
+    line_drawstyle: str = "default",
+    fill_to_axis: bool = False,
 ) -> tuple[plt.Figure, plt.Axes]:
     _validate_curve_series_input(series_list)
     stroke = plot_style.current_stroke()
@@ -263,6 +266,7 @@ def plot_curves(
 
     for step_scale in retry_scales:
         ax.cla()
+        plotted_lines: list[tuple[CurveSeries, tuple[float, float, float], Line2D]] = []
         stacked_layout = (
             _prepare_stacked_layout(
                 normalized_series,
@@ -278,12 +282,13 @@ def plot_curves(
         for idx, (color, series) in enumerate(zip(palette, plotted_series, strict=True)):
             markevery = marker_every if marker_every is not None else _infer_markevery(len(series.data))
             line_color = to_rgba(color, stroke.line_alpha)
-            ax.plot(
+            (line,) = ax.plot(
                 series.data["x"],
                 series.data["y"],
                 label=series.sample,
                 color=line_color,
                 linewidth=stroke.line_width_pt,
+                drawstyle=line_drawstyle,
                 marker=markers[idx % len(markers)] if show_markers else None,
                 markersize=resolved_marker_size,
                 markerfacecolor=color,
@@ -291,6 +296,7 @@ def plot_curves(
                 markeredgewidth=0.5,
                 markevery=markevery,
             )
+            plotted_lines.append((series, color, line))
 
         if stacked_layout is not None:
             limits = _compute_stacked_axis_limits(
@@ -317,6 +323,32 @@ def plot_curves(
         ax.set_yscale(yscale)
         if reverse_x:
             ax.invert_xaxis()
+
+        if fill_to_axis:
+            y_floor = ax.get_ylim()[0]
+            baseline = y_floor
+            if yscale != "log" and all((series.data["y"] >= 0).all() for series, _color, _line in plotted_lines):
+                baseline = 0.0
+            elif yscale != "log" and y_floor <= 0.0 <= ax.get_ylim()[1]:
+                baseline = 0.0
+            fill_alpha = min(stroke.max_fill_alpha, stroke.fill_alpha)
+            for idx, (series, color, line) in enumerate(plotted_lines):
+                x_values = series.data["x"].to_numpy(dtype=float)
+                y_values = series.data["y"].to_numpy(dtype=float)
+                valid = np.isfinite(x_values) & np.isfinite(y_values)
+                if np.count_nonzero(valid) < 2:
+                    continue
+                series_baseline = baseline
+                if stacked_layout is not None:
+                    series_baseline = stacked_layout.floor + idx * stacked_layout.step
+                ax.fill_between(
+                    x_values[valid],
+                    y_values[valid],
+                    series_baseline,
+                    color=to_rgba(color, fill_alpha),
+                    linewidth=0.0,
+                    zorder=line.get_zorder() - 0.2,
+                )
 
         first = series_list[0]
         ax.set_xlabel(_format_axis_label(first.x_label, first.x_unit))

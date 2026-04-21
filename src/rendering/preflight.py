@@ -30,6 +30,7 @@ from src.submission import build_render_submission_report
 _FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
 _BUBBLE_SCATTER_TEMPLATES = set(template_family_ids("bubble_scatter"))
 _MEAN_BAND_TEMPLATES = set(template_family_ids("mean_band"))
+_STANDARD_CURVE_TEMPLATES = {"point_line", "curve", "area_curve", "step_line"}
 
 
 def preflight_render_request(
@@ -45,7 +46,7 @@ def preflight_render_request(
     normalized_dataset = (
         build_normalized_dataset(input_path, sheet)
         if resolved_template
-        in {"point_line", "curve"}
+        in _STANDARD_CURVE_TEMPLATES
         | _FIT_SCATTER_TEMPLATES
         | _BUBBLE_SCATTER_TEMPLATES
         | _MEAN_BAND_TEMPLATES
@@ -53,7 +54,7 @@ def preflight_render_request(
     )
 
     try:
-        if resolved_template in {"point_line", "curve"} | _MEAN_BAND_TEMPLATES:
+        if resolved_template in _STANDARD_CURVE_TEMPLATES | _MEAN_BAND_TEMPLATES:
             if normalized_dataset and normalized_dataset.model in {
                 "frequency_sweep",
                 "temperature_sweep",
@@ -95,7 +96,7 @@ def preflight_render_request(
                     )
                 if resolved_template in _MEAN_BAND_TEMPLATES:
                     aligned_replicate_band(curve_series)
-        elif resolved_template == "stacked_curve":
+        elif resolved_template in {"stacked_curve", "stacked_area"}:
             curve_series = load_curve_table_cached(input_path, sheet)
             validate_manual_axis_overrides(options, template=resolved_template)
             unknown_series = unknown_series_order_labels(
@@ -167,6 +168,7 @@ def preflight_render_request(
             "point_error",
             "lollipop_error",
             "histogram_density",
+            "density_area",
         }:
             groups = load_replicate_table_cached(input_path, sheet)
             if not groups:
@@ -179,15 +181,15 @@ def preflight_render_request(
             if unknown_groups:
                 raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))
             summary = summarize_replicate_distribution(groups)
-            if resolved_template == "histogram_density":
+            if resolved_template in {"histogram_density", "density_area"}:
                 if summary.total_points < 12 or summary.min_group_points < 4:
                     warnings.append(
-                        "Histogram-density overlays are less stable with sparse replicates; "
+                        "Density overlays are less stable with sparse replicates; "
                         "box/distribution views may read better."
                     )
                 if summary.total_points >= 8 and summary.pooled_unique_ratio <= 0.35:
                     warnings.append(
-                        "Values are highly discrete, so histogram-density overlays may look blocky."
+                        "Values are highly discrete, so density overlays may look blocky."
                     )
             if len(groups) >= 6:
                 warnings.append(validation_rule("dense_group_label_warning").description)

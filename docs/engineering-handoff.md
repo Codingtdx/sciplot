@@ -376,6 +376,17 @@ Every development round must update this file.
   - rerun the failed command serially after the previous build fully exits.
   - if parallel CI is ever needed, give each job an isolated `-derivedDataPath`.
 
+### Symptom: Swift compile error `cannot find '<helper>' in scope` right after adding a new shared utility file
+
+- Typical cause:
+  - the new Swift file exists on disk but was not added to `app/macos/SciPlotGod.xcodeproj`, so Xcode never compiled it into the app target.
+- Check:
+  - confirm the file appears in `project.pbxproj` as both a `PBXFileReference` and a `PBXBuildFile`.
+  - confirm it is listed under the shared `Sources` group and the app target `PBXSourcesBuildPhase`.
+- Fix pattern:
+  - add the file to the Xcode project and app target membership, then rerun the smallest meaningful `xcodebuild` scope first.
+  - if the missing helper is only referenced from tests, still prefer compiling it through the main app target instead of duplicating the helper in test-only code.
+
 ### Symptom: Data Studio representative tensile curve preview shows scattered per-series labels instead of a compact legend
 
 - Typical cause:
@@ -2080,6 +2091,157 @@ Every development round must update this file.
     - fallback inspection succeeded by opening exported GUI smoke attachments in Preview and visually checking:
       - `Plot template gallery`
       - `Data Studio template editor`
+
+### 2026-04-19 (Round AO): Public multi-style surface, ECharts-inspired visual families, and new curve templates
+
+- Scope:
+  - Superseded the same-day Round AN assumption that public hard style must remain single-`nature`; the public contract now exposes `nature`, `editorial`, `presentation`, and `poster`, while still normalizing every legacy ingress alias back to `nature`.
+  - Expanded [src/plot_contract.json](/Users/dongxutian/Documents/codegod/src/plot_contract.json) with two more official ECharts-inspired palette/theme families, `shine` and `vintage`, and added two new explicit public templates, `area_curve` and `step_line`.
+  - Kept `style_preset`, `palette_preset`, and `visual_theme_id` as independent persisted controls across sidecar, rendering, export manifest, Plot, and Data Studio. Template defaults now recommend all three, but changing one control never rewrites the other two.
+  - Added rendering support, recommendation support, output naming, QA/test coverage, and macOS gallery/test fixtures for `area_curve` and `step_line` without reintroducing local template heuristics or a second GUI constant table.
+- User-visible impact:
+  - Plot and Data Studio now expose four public hard styles instead of just `Nature`; `Nature` stays the frozen publication baseline, while `Editorial`, `Presentation`, and `Poster` intentionally vary font size, line width, marker size, and related hard metrics.
+  - Users can still change palette/theme while staying on `Nature`, so the frozen `Nature` preset no longer blocks softer visual variation.
+  - Plot gallery now includes `Area curve` and `Step line` as first-class template choices with dedicated thumbnails and backend-owned defaults.
+  - New visual families now include `infographic`, `roma`, `macarons`, `shine`, and `vintage`, with template-specific recommendations instead of one global carry-over look.
+- Risks:
+  - Adding multiple public style ids means future contract edits must keep the non-`nature` style metrics intentional and documented; accidental drift is now a broader regression surface than the previous single-style model.
+  - `area_curve` and `step_line` reuse the standard curve pipeline; future curve refactors must keep their fill/drawstyle behavior, bundle output naming, and recommender eligibility in sync rather than treating them as plain `curve` aliases.
+  - The live app visual check reached Plot/Data Studio empty states and Plot import flow, but the richer Data Studio figure-inspector picker state was still verified through shared `PlotInspectorView` tests plus exported GUI smoke attachments rather than a fully interactive manual session.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+  - `/Users/dongxutian/Documents/codegod/src/plot_style.py`
+  - `/Users/dongxutian/Documents/codegod/src/plotting_curves.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/common.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/constants.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/preflight.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/qa.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/recommender.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_registry.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/template_catalog.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/themes.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+  - `/Users/dongxutian/Documents/codegod/docs/plot_contract.md`
+- Decision:
+  - First-principles motivation: the product needs independent control over chart template, hard style, palette, and soft theme. Freezing `nature` alone is useful for a publication-safe baseline, but it should not block users from opting into other deliberate hard styles when they want a different presentation density or stage scale.
+  - `nature` remains the compatibility anchor and frozen publication profile. Legacy style aliases still collapse into `nature`, while the newly public non-`nature` styles are explicit product semantics rather than hidden private presets.
+  - ECharts inspiration is now applied in two layers:
+    - official palette/theme mood via `infographic`, `roma`, `macarons`, `shine`, and `vintage`
+    - explicit chart-type inspiration via `area_curve` and `step_line`
+  - Rejected alternatives:
+    - keep public style fixed to `nature` and only add palettes/themes: rejected because it still blocks intentional hard-style variation that the user explicitly approved
+    - bind each style to a single palette/theme bundle: rejected because the current product model requires independent picker control with template recommendations only
+    - treat `area_curve` and `step_line` as hidden aliases of `curve`: rejected because users asked for visible chart-type templates aligned with the rest of the gallery
+  - Boundary:
+    - `nature` typography, line widths, spacing, axis frame, and export settings remain frozen
+    - visual themes still cannot override protected rcParams, even for non-`nature` styles
+    - this round adds no new route shapes or saved project schema fields; it only expands the allowed public catalog values
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`180 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`139 tests`)
+  - `git diff --check`: passed
+  - `Computer Use` visual QA:
+    - launched the locally built `/Users/dongxutian/Documents/codegod/app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`
+    - confirmed the live Plot gallery shows `Curve`, `Point line`, `Area curve`, `Step line`, and `Stacked curve` with distinct thumbnails
+    - confirmed the live Data Studio empty-state shell still uses the shared workbench/inspector structure
+    - exported GUI smoke attachments from `/Users/dongxutian/Documents/codegod/app/macos/.derivedData/Logs/Test/Test-SciPlotGodMac-2026.04.19_19-51-35-+0800.xcresult` and used them as the artifact fallback for Data Studio template/specimen views
+
+### 2026-04-20 (Round AP): Public-surface guardrails, second-wave templates, imported-state GUI smoke, and shared cancellation cleanup
+
+- Scope:
+  - Expanded the public contract/rendering surface with two more explicit templates that reuse existing data shapes:
+    - `stacked_area` for curve-like grouped traces
+    - `density_area` for replicate-table density distributions
+  - Updated `src/plot_contract.json`, `src/plot_contract.py`, `src/rendering/*`, recommendation logic, preflight/output naming, and Plot/Data Studio gallery metadata so the new templates are first-class contract-backed entries rather than aliases.
+  - Strengthened `scripts/smoke_check.py` with:
+    - public-template contract lint for required `default_options.style_preset / palette_preset / visual_theme_id`
+    - a fixed style/theme/template render matrix over representative `curve / area_curve / step_line / bar / scatter / heatmap`
+  - Extended macOS GUI smoke/fingerprint coverage in `app/macos/Tests/InspectorLayoutPolicyTests.swift` to include imported-state inspector snapshots for:
+    - `Plot imported inspector`
+    - `Data Studio figure inspector`
+  - Added the shared macOS cancellation helper `app/macos/Sources/Shared/Utilities/UserCancellation.swift` and routed Plot import/preview, Data Studio template refresh, Code Console context refresh, and app bootstrap through the same cancellation-as-control-flow check.
+  - Updated `README.md`, `AGENTS.md`, generated `docs/plot_contract.md`, fixtures, mocks, and regression tests so the documented surface matches the new guardrails.
+- User-visible impact:
+  - Plot/Data Studio can now expose `stacked_area` and `density_area` as real contract-backed templates with their own recommendations, output naming, and gallery thumbnails.
+  - Imported-state inspector coverage is now part of the shipped macOS regression harness, so visual regressions in the real Plot/Data Studio picker state should get caught earlier.
+  - Plot, Code Console, and app bootstrap flows now suppress cancellation noise consistently instead of surfacing implementation-level failure text when lifecycle work is cancelled.
+  - No new explanatory microcopy or extra inspector controls were added.
+- Risks:
+  - `stacked_area` and `density_area` now widen the explicit public template surface; future changes must keep contract/catalog/recommender/preflight/render/output naming/macOS thumbnail coverage in sync.
+  - The new smoke matrix is intentionally fixed and representative rather than exhaustive; weakening or deleting it will reduce coverage exactly where the public surface is now broadest.
+  - Shared cancellation handling depends on `UserCancellation.swift` staying in the Xcode target; future file moves must preserve target membership.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.py`
+  - `/Users/dongxutian/Documents/codegod/src/plotting_curves.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/common.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/preflight.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/qa.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/recommender.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_registry.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_stats.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/template_catalog.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/Utilities/UserCancellation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/MockSidecarClient.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/CodeConsoleSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+  - `/Users/dongxutian/Documents/codegod/docs/plot_contract.md`
+- Decision:
+  - First-principles motivation: once style/theme/palette/template surfaces become broader, the dominant product risk shifts from “missing one more option” to “combinations drift silently.” That makes fixed guardrails more valuable than immediately adding even more templates.
+  - Public second-wave templates were limited to existing data shapes on purpose. `stacked_area` reuses grouped curve semantics, and `density_area` reuses replicate-table density semantics, so this round expands visible choices without opening a second raw-schema migration.
+  - Imported-state GUI smoke now treats the inspector itself as a canonical product surface. Artifact-based xcresult attachments remain the preferred visual QA source instead of inventing a parallel screenshot pipeline.
+  - Rejected alternatives:
+    - keep adding ECharts-inspired templates without strengthening smoke/contract lint first: rejected because regressions would be more likely than net product improvement
+    - do imported-state visual QA only by ad-hoc manual clicking: rejected because the critical states must be reproducible in automated regression runs
+    - keep per-workbench cancellation filtering as one-off conditionals: rejected because lifecycle cancellation is a shared runtime concern, not feature-local copy
+  - Boundary:
+    - this round does not introduce a new raw data schema
+    - this round does not loosen `nature`'s frozen publication metrics
+    - the smoke matrix is representative coverage, not a requirement to render every style/theme/template combination in one run
+- Troubleshooting note:
+  - During implementation, `xcodebuild` initially failed because `UserCancellation.swift` existed on disk but was not yet in the Xcode project target. Future shared utilities should be checked for PBX file reference + sources-phase membership as soon as Swift reports a helper missing from scope.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 34 source files`)
+  - `.venv/bin/python -m pytest tests/test_plot_contract.py tests/test_sidecar_schema_contract.py tests/test_rendering_services.py tests/test_rendering_recommender.py tests/test_recommendation_policy.py`: passed (`81 passed, 5 warnings`)
+  - `.venv/bin/python -m pytest tests`: passed (`186 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed (`5 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/CodeConsoleSessionTests -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests`: passed (`104 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`144 tests`)
+  - `git diff --check`: passed
+  - Imported-state GUI artifact pass:
+    - exported snapshot PNGs during the focused inspector run to `/tmp/sciplot-gui-snapshots`
+    - full `InspectorLayoutPolicyTests` fingerprint/smoke coverage now includes `Plot imported inspector` and `Data Studio figure inspector`
 
 Use this block for every new round:
 

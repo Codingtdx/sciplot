@@ -132,7 +132,11 @@ final class AppModel {
             hasBootstrapped = true
             bootstrapErrorMessage = nil
         } catch {
-            bootstrapErrorMessage = error.localizedDescription
+            if isUserCancellationError(error) {
+                bootstrapErrorMessage = nil
+            } else {
+                bootstrapErrorMessage = error.localizedDescription
+            }
         }
     }
 

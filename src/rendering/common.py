@@ -16,12 +16,18 @@ from src.rendering.cache import (
     load_temperature_sweep_metrics_cached,
 )
 from src.rendering.constants import (
+    FREQUENCY_AREA_CURVE_OUTPUTS,
     FREQUENCY_CURVE_OUTPUTS,
     FREQUENCY_OUTPUTS,
+    FREQUENCY_STEP_LINE_OUTPUTS,
+    STRESS_RELAXATION_AREA_CURVE_OUTPUT,
     STRESS_RELAXATION_CURVE_OUTPUT,
     STRESS_RELAXATION_OUTPUT,
+    STRESS_RELAXATION_STEP_LINE_OUTPUT,
+    TEMPERATURE_AREA_CURVE_OUTPUTS,
     TEMPERATURE_CURVE_OUTPUTS,
     TEMPERATURE_OUTPUTS,
+    TEMPERATURE_STEP_LINE_OUTPUTS,
 )
 from src.rendering.models import RenderOptions, TemplateName
 from src.rheology_loader import RheologySeries
@@ -346,6 +352,20 @@ def rheology_output_filenames(
             return TEMPERATURE_CURVE_OUTPUTS
         if bundle == "stress_relaxation":
             return {"sigma_over_sigma0": STRESS_RELAXATION_CURVE_OUTPUT}
+    if template == "area_curve":
+        if bundle == "frequency_sweep":
+            return FREQUENCY_AREA_CURVE_OUTPUTS
+        if bundle == "temperature_sweep":
+            return TEMPERATURE_AREA_CURVE_OUTPUTS
+        if bundle == "stress_relaxation":
+            return {"sigma_over_sigma0": STRESS_RELAXATION_AREA_CURVE_OUTPUT}
+    if template == "step_line":
+        if bundle == "frequency_sweep":
+            return FREQUENCY_STEP_LINE_OUTPUTS
+        if bundle == "temperature_sweep":
+            return TEMPERATURE_STEP_LINE_OUTPUTS
+        if bundle == "stress_relaxation":
+            return {"sigma_over_sigma0": STRESS_RELAXATION_STEP_LINE_OUTPUT}
     raise ValueError(f"Unsupported bundle/template combination: {bundle} / {template}")
 
 
@@ -382,7 +402,7 @@ def preview_output_filenames(
     sheet: str | int,
     bundle: str | None,
 ) -> tuple[str, ...]:
-    if template in {"point_line", "curve"} and bundle in {
+    if template in {"point_line", "curve", "area_curve", "step_line"} and bundle in {
         "frequency_sweep",
         "temperature_sweep",
         "stress_relaxation",
@@ -392,12 +412,18 @@ def preview_output_filenames(
         return (f"{input_path.stem}_point_line.pdf",)
     if template == "curve":
         return (f"{input_path.stem}_curve.pdf",)
+    if template == "area_curve":
+        return (f"{input_path.stem}_area_curve.pdf",)
+    if template == "step_line":
+        return (f"{input_path.stem}_step_line.pdf",)
     if template == "scatter_fit":
         return (f"{input_path.stem}_scatter_fit.pdf",)
     if template == "mean_band":
         return (f"{input_path.stem}_mean_band.pdf",)
     if template == "stacked_curve":
         return (f"{input_path.stem}_stacked_curve.pdf",)
+    if template == "stacked_area":
+        return (f"{input_path.stem}_stacked_area.pdf",)
     if template == "segmented_stacked_curve":
         return (f"{input_path.stem}_segmented_stacked_curve.pdf",)
     if template == "scatter":
@@ -412,7 +438,7 @@ def preview_output_filenames(
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)
-    if template in {"point_error", "lollipop_error", "histogram_density"}:
+    if template in {"point_error", "lollipop_error", "histogram_density", "density_area"}:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)
         return (f"{slug}_{template}.pdf",)

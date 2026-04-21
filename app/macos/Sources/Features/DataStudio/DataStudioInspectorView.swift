@@ -2,12 +2,22 @@ import SwiftUI
 
 struct DataStudioInspectorView: View {
     @Bindable var session: DataStudioSession
+    private let plotOptionsAdvancedExpanded: Bool
+
+    init(session: DataStudioSession, plotOptionsAdvancedExpanded: Bool = false) {
+        self.session = session
+        self.plotOptionsAdvancedExpanded = plotOptionsAdvancedExpanded
+    }
 
     var body: some View {
         if session.showsCompactEmptyInspector {
             compactEmptyInspector
         } else {
-            PlotInspectorView(session: session.plotSession, styleSectionTitle: "Style") {
+            PlotInspectorView(
+                session: session.plotSession,
+                styleSectionTitle: "Style",
+                plotOptionsAdvancedExpanded: plotOptionsAdvancedExpanded
+            ) {
                 figureSection
             } trailingSections: {
                 if session.showsInspectorActions {

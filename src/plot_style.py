@@ -289,8 +289,8 @@ def apply_style(
     _CURRENT_STYLE_PRESET = normalized_style
     _CURRENT_PALETTE_PRESET = palette_preset
 
-    # The contract now exposes a single publication profile (`nature`).
-    # Visual themes remain the only soft-variation layer on top of this base.
+    # The contract owns the public publication profiles. Hard style metrics live
+    # here, while visual themes remain the soft-variation layer on top.
     plt.style.use(list(_PUBLICATION_BASE_STYLE_STACK))
     sns.set_theme(
         context="paper",

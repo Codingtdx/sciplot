@@ -13,7 +13,53 @@ enum TestPayloads {
         "infographic",
         "roma",
         "macarons",
+        "shine",
+        "vintage",
     ]
+
+    static let sharedAvailableStyles = [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster",
+    ]
+
+    static func styleCatalog() -> [MetaStyleResponse] {
+        [
+            .init(
+                id: "nature",
+                label: "Nature",
+                public: true,
+                description: "Default publication style.",
+                hardConstraints: true,
+                presetNote: "Repo default"
+            ),
+            .init(
+                id: "editorial",
+                label: "Editorial",
+                public: true,
+                description: "Balanced research style with slightly larger typography.",
+                hardConstraints: false,
+                presetNote: "Paper-first relaxed preset"
+            ),
+            .init(
+                id: "presentation",
+                label: "Presentation",
+                public: true,
+                description: "Slide-friendly style with larger labels and strokes.",
+                hardConstraints: false,
+                presetNote: "Talk-friendly preset"
+            ),
+            .init(
+                id: "poster",
+                label: "Poster",
+                public: true,
+                description: "Large-format display style with the boldest metrics.",
+                hardConstraints: false,
+                presetNote: "Display-focused preset"
+            ),
+        ]
+    }
 
     static func paletteCatalog() -> [MetaPaletteResponse] {
         [
@@ -24,6 +70,8 @@ enum TestPayloads {
             .init(id: "infographic", label: "Infographic", public: true, description: "Brighter ECharts-inspired palette.", swatches: ["#5470c6", "#91cc75"]),
             .init(id: "roma", label: "Roma", public: true, description: "Warm-cool ECharts-inspired palette.", swatches: ["#e01f54", "#001852"]),
             .init(id: "macarons", label: "Macarons", public: true, description: "Pastel ECharts-inspired palette.", swatches: ["#2ec7c9", "#b6a2de"]),
+            .init(id: "shine", label: "Shine", public: true, description: "Official ECharts Shine palette.", swatches: ["#c12e34", "#e6b600"]),
+            .init(id: "vintage", label: "Vintage", public: true, description: "Official ECharts Vintage palette.", swatches: ["#d87c7c", "#919e8b"]),
         ]
     }
 
@@ -35,6 +83,8 @@ enum TestPayloads {
             .init(id: "infographic", label: "Infographic", description: "A brighter editorial theme"),
             .init(id: "roma", label: "Roma", description: "A warm neutral theme"),
             .init(id: "macarons", label: "Macarons", description: "A cooler pastel theme"),
+            .init(id: "shine", label: "Shine", description: "A brighter high-contrast theme"),
+            .init(id: "vintage", label: "Vintage", description: "A warm paper-tone theme"),
         ]
     }
 
@@ -46,16 +96,7 @@ enum TestPayloads {
                 .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
                 .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
             ],
-            styles: [
-                .init(
-                    id: "nature",
-                    label: "Nature",
-                    public: true,
-                    description: "Default publication style.",
-                    hardConstraints: true,
-                    presetNote: "Repo default"
-                ),
-            ],
+            styles: styleCatalog(),
             palettes: paletteCatalog(),
             templates: [
                 .init(
@@ -82,15 +123,114 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("roma"),
                         "visual_theme_id": .string("roma"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     canonicalID: "curve",
                     role: "plot",
                     lifecyclePolicy: "stable",
                     implementationID: "curve"
+                ),
+                .init(
+                    id: "area_curve",
+                    label: "Area Curve",
+                    description: "Curve template with translucent area fill.",
+                    category: "curve",
+                    presentationKind: "area_curve",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "xscale",
+                        "yscale",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("infographic"),
+                        "visual_theme_id": .string("infographic"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    canonicalID: "area_curve",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "area_curve"
+                ),
+                .init(
+                    id: "step_line",
+                    label: "Step Line",
+                    description: "Curve template with stepped interpolation.",
+                    category: "curve",
+                    presentationKind: "step_line",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "xscale",
+                        "yscale",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("editorial"),
+                        "palette_preset": .string("shine"),
+                        "visual_theme_id": .string("shine"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    canonicalID: "step_line",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "step_line"
+                ),
+                .init(
+                    id: "stacked_area",
+                    label: "Stacked Area",
+                    description: "Stacked curve template with translucent filled bands.",
+                    category: "curve",
+                    presentationKind: "stacked_area",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "reverse_x",
+                        "baseline",
+                        "series_order",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("vintage"),
+                        "visual_theme_id": .string("vintage"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    canonicalID: "stacked_area",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "stacked_area"
                 ),
                 .init(
                     id: "bar",
@@ -108,10 +248,11 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("macarons"),
                         "visual_theme_id": .string("macarons"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     canonicalID: "bar",
                     role: "plot",
@@ -136,10 +277,11 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("macarons"),
                         "visual_theme_id": .string("macarons"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     canonicalID: "box",
                     role: "plot",
@@ -165,18 +307,53 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("macarons"),
                         "visual_theme_id": .string("macarons"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     canonicalID: "box_strip",
                     role: "plot",
                     lifecyclePolicy: "stable",
                     implementationID: "box_strip"
                 ),
+                .init(
+                    id: "density_area",
+                    label: "Density Area",
+                    description: "Smoothed density areas with outline overlays.",
+                    category: "stats",
+                    presentationKind: "density_area",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "series_order",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    canonicalID: "density_area",
+                    role: "plot",
+                    lifecyclePolicy: "stable",
+                    implementationID: "density_area"
+                ),
             ],
-            templateIds: ["curve", "bar", "box", "box_strip"],
+            templateIds: ["curve", "area_curve", "step_line", "stacked_area", "bar", "box", "box_strip", "density_area"],
             sizeIds: ["single_panel", "double_panel"],
             palettePresetIds: sharedAvailablePalettes,
             visualThemes: visualThemeCatalog()
@@ -191,16 +368,7 @@ enum TestPayloads {
                 .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
                 .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
             ],
-            styles: [
-                .init(
-                    id: "nature",
-                    label: "Nature",
-                    public: true,
-                    description: "Default publication style.",
-                    hardConstraints: true,
-                    presetNote: "Repo default"
-                ),
-            ],
+            styles: styleCatalog(),
             palettes: paletteCatalog(),
             templates: [
                 .init(
@@ -231,7 +399,7 @@ enum TestPayloads {
                         "palette_preset": .string("roma"),
                         "visual_theme_id": .string("roma"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     canonicalID: "curve",
                     role: "plot",
@@ -255,6 +423,9 @@ enum TestPayloads {
             ],
             styles: [
                 "nature": .string("Nature"),
+                "editorial": .string("Editorial"),
+                "presentation": .string("Presentation"),
+                "poster": .string("Poster"),
             ],
             palettes: [
                 "colorblind_safe": .string("Colorblind Safe"),
@@ -264,6 +435,8 @@ enum TestPayloads {
                 "infographic": .string("Infographic"),
                 "roma": .string("Roma"),
                 "macarons": .string("Macarons"),
+                "shine": .string("Shine"),
+                "vintage": .string("Vintage"),
             ],
             templates: [
                 "curve": .init(
@@ -289,13 +462,127 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("roma"),
                         "visual_theme_id": .string("roma"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Use the shared axis frame."],
                     softRules: ["Keep labels minimal."]
+                ),
+                "area_curve": .init(
+                    label: "Area Curve",
+                    description: "Curve template with translucent area fill.",
+                    category: "curve",
+                    presentationKind: "area_curve",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "xscale",
+                        "yscale",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("infographic"),
+                        "visual_theme_id": .string("infographic"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    hardRules: ["Use the shared axis frame."],
+                    softRules: ["Keep labels minimal."]
+                ),
+                "step_line": .init(
+                    label: "Step Line",
+                    description: "Curve template with stepped interpolation.",
+                    category: "curve",
+                    presentationKind: "step_line",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "xscale",
+                        "yscale",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("editorial"),
+                        "palette_preset": .string("shine"),
+                        "visual_theme_id": .string("shine"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    hardRules: ["Use the shared axis frame."],
+                    softRules: ["Keep labels minimal."]
+                ),
+                "stacked_area": .init(
+                    label: "Stacked Area",
+                    description: "Stacked curve template with translucent filled bands.",
+                    category: "curve",
+                    presentationKind: "stacked_area",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "reverse_x",
+                        "baseline",
+                        "series_order",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("vintage"),
+                        "visual_theme_id": .string("vintage"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    hardRules: ["Preserve stacked spectral readability."],
+                    softRules: ["Keep filled bands translucent."]
+                ),
+                "bar": .init(
+                    label: "Bar",
+                    description: "Bar comparison template.",
+                    category: "stats",
+                    presentationKind: "bar",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel"],
+                    editableOptions: [
+                        "size",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    hardRules: ["Keep the shared axis frame."],
+                    softRules: ["Preserve readable outlier spacing."]
                 ),
                 "box": .init(
                     label: "Box",
@@ -314,10 +601,11 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("macarons"),
                         "visual_theme_id": .string("macarons"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
@@ -340,13 +628,45 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
+                        "style_preset": .string("nature"),
                         "palette_preset": .string("macarons"),
                         "visual_theme_id": .string("macarons"),
                     ],
-                    availableStyles: ["nature"],
+                    availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
                     hardRules: ["Keep the shared axis frame."],
                     softRules: ["Preserve readable outlier spacing."]
+                ),
+                "density_area": .init(
+                    label: "Density Area",
+                    description: "Smoothed density areas with outline overlays.",
+                    category: "stats",
+                    presentationKind: "density_area",
+                    defaultSize: "single_panel",
+                    allowedSizes: ["single_panel", "double_panel"],
+                    editableOptions: [
+                        "size",
+                        "x_min",
+                        "x_max",
+                        "y_min",
+                        "y_max",
+                        "x_tick_density",
+                        "x_tick_edge_labels",
+                        "y_tick_density",
+                        "y_tick_edge_labels",
+                        "series_order",
+                        "style_preset",
+                        "palette_preset",
+                    ],
+                    defaultOptions: [
+                        "style_preset": .string("presentation"),
+                        "palette_preset": .string("macarons"),
+                        "visual_theme_id": .string("macarons"),
+                    ],
+                    availableStyles: sharedAvailableStyles,
+                    availablePalettes: sharedAvailablePalettes,
+                    hardRules: ["Keep the shared axis frame."],
+                    softRules: ["Preserve readable density overlap."]
                 ),
             ]
         )

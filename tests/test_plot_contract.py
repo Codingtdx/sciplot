@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from src.plot_contract import load_plot_contract, meta_payload, plot_contract_dict
+from src.plot_contract import (
+    lint_public_template_contract,
+    load_plot_contract,
+    meta_payload,
+    plot_contract_dict,
+)
 
 
 class PlotContractTests(unittest.TestCase):
@@ -20,9 +25,17 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(meta["defaults"]["style_preset"], contract.defaults.style_preset)
         self.assertEqual(meta["defaults"]["palette_preset"], contract.defaults.palette_preset)
         self.assertEqual(contract.defaults.style_preset, "nature")
-        self.assertEqual({item["id"] for item in meta["styles"]}, {"nature"})
-        self.assertEqual(set(contract.styles.keys()), {"nature"})
-        self.assertTrue({"infographic", "roma", "macarons"}.issubset({item["id"] for item in meta["palettes"]}))
+        self.assertEqual({item["id"] for item in meta["styles"]}, {"nature", "editorial", "presentation", "poster"})
+        self.assertEqual(set(contract.styles.keys()), {"nature", "editorial", "presentation", "poster"})
+        self.assertTrue(
+            {"infographic", "roma", "macarons", "shine", "vintage"}.issubset(
+                {item["id"] for item in meta["palettes"]}
+            )
+        )
+        self.assertIn("area_curve", contract.templates)
+        self.assertIn("step_line", contract.templates)
+        self.assertIn("stacked_area", contract.templates)
+        self.assertIn("density_area", contract.templates)
         self.assertEqual(
             {item["id"] for item in meta["templates"]},
             set(contract.templates.keys()),
@@ -42,16 +55,19 @@ class PlotContractTests(unittest.TestCase):
             self.assertIn(template["id"], contract.templates)
             self.assertIn("presentation_kind", template)
             self.assertIn(template["default_size"], template["allowed_sizes"])
-            self.assertEqual(template["available_styles"], ["nature"])
+            self.assertEqual(set(template["available_styles"]), {"nature", "editorial", "presentation", "poster"})
             self.assertIn("palette_preset", template["default_options"])
             self.assertIn("visual_theme_id", template["default_options"])
             self.assertEqual(template["presentation_kind"], contract.templates[template["id"]].presentation_kind)
 
         for template in contract.templates.values():
-            self.assertEqual(template.available_styles, ("nature",))
-            self.assertEqual(template.default_options.get("style_preset"), "nature")
+            self.assertEqual(set(template.available_styles), {"nature", "editorial", "presentation", "poster"})
+            self.assertIsNotNone(template.default_options.get("style_preset"))
             self.assertIsNotNone(template.default_options.get("palette_preset"))
             self.assertIsNotNone(template.default_options.get("visual_theme_id"))
+
+    def test_public_template_contract_lint_passes(self) -> None:
+        self.assertEqual(lint_public_template_contract(), ())
 
     def test_plot_contract_dict_exposes_validation_rules_from_loader(self) -> None:
         contract = load_plot_contract()
@@ -70,7 +86,7 @@ class PlotContractTests(unittest.TestCase):
             set(contract_dict["templates"].keys()),
             set(contract.templates.keys()),
         )
-        self.assertEqual(set(contract_dict["styles"].keys()), {"nature"})
+        self.assertEqual(set(contract_dict["styles"].keys()), {"nature", "editorial", "presentation", "poster"})
         self.assertEqual(
             contract_dict["aliases"]["style_presets"],
             {

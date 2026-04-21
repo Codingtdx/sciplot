@@ -3,7 +3,10 @@ import SwiftUI
 enum PlotTemplateThumbnailKind: String, Sendable {
     case curve
     case pointLine = "point_line"
+    case areaCurve = "area_curve"
+    case stepLine = "step_line"
     case stackedCurve = "stacked_curve"
+    case stackedArea = "stacked_area"
     case segmentedStackedCurve = "segmented_stacked_curve"
     case scatter
     case bubbleScatter = "bubble_scatter"
@@ -13,6 +16,7 @@ enum PlotTemplateThumbnailKind: String, Sendable {
     case pointError = "point_error"
     case lollipopError = "lollipop_error"
     case histogramDensity = "histogram_density"
+    case densityArea = "density_area"
     case box
     case boxStrip = "box_strip"
     case violin
@@ -85,8 +89,20 @@ struct PlotTemplateThumbnailView: View {
                 drawCurve(in: plotRect, context: &context, palette: palette, withPoints: false)
             case .pointLine:
                 drawCurve(in: plotRect, context: &context, palette: palette, withPoints: true)
+            case .areaCurve:
+                drawAreaCurve(in: plotRect, context: &context, palette: palette)
+            case .stepLine:
+                drawStepLine(in: plotRect, context: &context, palette: palette)
             case .stackedCurve:
                 drawStackedCurves(in: plotRect, context: &context, palette: palette, reservedHeaderFraction: 0)
+            case .stackedArea:
+                drawStackedCurves(
+                    in: plotRect,
+                    context: &context,
+                    palette: palette,
+                    reservedHeaderFraction: 0,
+                    filled: true
+                )
             case .segmentedStackedCurve:
                 drawStackedCurves(in: plotRect, context: &context, palette: palette, reservedHeaderFraction: 0.18)
             case .scatter:
@@ -105,6 +121,8 @@ struct PlotTemplateThumbnailView: View {
                 drawPointError(in: plotRect, context: &context, palette: palette, withStems: true)
             case .histogramDensity:
                 drawHistogramDensity(in: plotRect, context: &context, palette: palette)
+            case .densityArea:
+                drawDensityArea(in: plotRect, context: &context, palette: palette)
             case .box:
                 drawBoxes(in: plotRect, context: &context, palette: palette)
             case .boxStrip:
@@ -207,6 +225,52 @@ struct PlotTemplateThumbnailView: View {
         }
     }
 
+    private func drawAreaCurve(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let primary = sampleCurvePointsA(in: rect)
+        let secondary = sampleCurvePointsB(in: rect)
+
+        var primaryFill = Path()
+        primaryFill.move(to: CGPoint(x: primary[0].x, y: rect.maxY))
+        primary.forEach { primaryFill.addLine(to: $0) }
+        primaryFill.addLine(to: CGPoint(x: primary.last?.x ?? rect.maxX, y: rect.maxY))
+        primaryFill.closeSubpath()
+        context.fill(primaryFill, with: .color(palette.primary.opacity(0.18)))
+
+        var secondaryFill = Path()
+        secondaryFill.move(to: CGPoint(x: secondary[0].x, y: rect.maxY))
+        secondary.forEach { secondaryFill.addLine(to: $0) }
+        secondaryFill.addLine(to: CGPoint(x: secondary.last?.x ?? rect.maxX, y: rect.maxY))
+        secondaryFill.closeSubpath()
+        context.fill(secondaryFill, with: .color(palette.secondary.opacity(0.14)))
+
+        drawCurve(in: rect, context: &context, palette: palette, withPoints: false)
+    }
+
+    private func drawStepLine(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let primary = sampleCurvePointsA(in: rect)
+        let secondary = sampleCurvePointsB(in: rect)
+
+        var primaryPath = Path()
+        primaryPath.move(to: primary[0])
+        for index in 1..<primary.count {
+            let previous = primary[index - 1]
+            let point = primary[index]
+            primaryPath.addLine(to: CGPoint(x: point.x, y: previous.y))
+            primaryPath.addLine(to: point)
+        }
+        context.stroke(primaryPath, with: .color(palette.primary), lineWidth: 1.8)
+
+        var secondaryPath = Path()
+        secondaryPath.move(to: secondary[0])
+        for index in 1..<secondary.count {
+            let previous = secondary[index - 1]
+            let point = secondary[index]
+            secondaryPath.addLine(to: CGPoint(x: point.x, y: previous.y))
+            secondaryPath.addLine(to: point)
+        }
+        context.stroke(secondaryPath, with: .color(palette.secondary), lineWidth: 1.35)
+    }
+
     private func drawScatter(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
         let pointsA: [CGPoint] = [
             plotPoint(0.13, 0.18, in: rect),
@@ -301,7 +365,8 @@ struct PlotTemplateThumbnailView: View {
         in rect: CGRect,
         context: inout GraphicsContext,
         palette: ThumbnailPalette,
-        reservedHeaderFraction: CGFloat
+        reservedHeaderFraction: CGFloat,
+        filled: Bool = false
     ) {
         if reservedHeaderFraction > 0 {
             let reservedRect = CGRect(
@@ -327,6 +392,14 @@ struct PlotTemplateThumbnailView: View {
 
         for (offset, color) in zip(offsets, colors) {
             let points = sampleCurvePointsA(in: adjustedRect).map { CGPoint(x: $0.x, y: $0.y + offset) }
+            if filled, let first = points.first, let last = points.last {
+                var fill = Path()
+                fill.move(to: CGPoint(x: first.x, y: adjustedRect.maxY))
+                points.forEach { fill.addLine(to: $0) }
+                fill.addLine(to: CGPoint(x: last.x, y: adjustedRect.maxY))
+                fill.closeSubpath()
+                context.fill(fill, with: .color(color.opacity(0.18)))
+            }
             var path = Path()
             path.move(to: points[0])
             points.dropFirst().forEach { path.addLine(to: $0) }
@@ -570,6 +643,33 @@ struct PlotTemplateThumbnailView: View {
         rightPath.move(to: rightDensity[0])
         rightDensity.dropFirst().forEach { rightPath.addLine(to: $0) }
         context.stroke(rightPath, with: .color(palette.secondary), lineWidth: 1.2)
+    }
+
+    private func drawDensityArea(in rect: CGRect, context: inout GraphicsContext, palette: ThumbnailPalette) {
+        let leftDensity = [(0.08, 0.16), (0.22, 0.42), (0.4, 0.71), (0.58, 0.52), (0.78, 0.22)]
+            .map { plotPoint($0.0, $0.1, in: rect) }
+        let rightDensity = [(0.1, 0.12), (0.28, 0.28), (0.46, 0.49), (0.63, 0.61), (0.83, 0.44)]
+            .map { plotPoint($0.0, $0.1, in: rect) }
+
+        func fillDensity(_ points: [CGPoint], color: Color) {
+            guard let first = points.first, let last = points.last else {
+                return
+            }
+            var fill = Path()
+            fill.move(to: CGPoint(x: first.x, y: rect.maxY))
+            points.forEach { fill.addLine(to: $0) }
+            fill.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+            fill.closeSubpath()
+            context.fill(fill, with: .color(color.opacity(0.22)))
+
+            var stroke = Path()
+            stroke.move(to: points[0])
+            points.dropFirst().forEach { stroke.addLine(to: $0) }
+            context.stroke(stroke, with: .color(color), lineWidth: 1.25)
+        }
+
+        fillDensity(leftDensity, color: palette.primary)
+        fillDensity(rightDensity, color: palette.secondary)
     }
 
     private func sampleCurvePointsA(in rect: CGRect) -> [CGPoint] {

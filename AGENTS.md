@@ -45,13 +45,22 @@
 - typed loader：`src/plot_contract.py`
 - sidecar `/meta`、`/plot-contract`、渲染/预检/smoke 一律消费同一份契约。
 - GUI 不得维护模板、尺寸、palette/style、本地默认值的第二套常量。
-- public `style_preset` 目前只允许一个值：`nature`。
+- public `style_preset` 当前允许：`nature`、`editorial`、`presentation`、`poster`。
+- `nature` 是冻结 public style：
+  - legacy style alias 仍然一律归一化到 `nature`；
+  - `nature` 的字体、字号、线宽、间距、axis frame、导出规格不可漂移。
+- 非 `nature` public style 可以调整 hard metrics（例如字号、线宽、marker、padding），但仍必须通过 contract 暴露，不能在前端本地偷配第二套数值。
 - `palette_preset` 与 `visual_theme_id` 是独立 public 维度：
   - palette 负责颜色；
   - theme 只允许做软视觉变化（背景、网格、legend/panel 气质），不得改字体、线宽、间距、axis frame、导出规格。
-- 每个 public template 的推荐 palette/theme 默认值都必须写在 contract `default_options`，并由 `/meta`、`/plot-contract`、sidecar、macOS 统一消费；不要在 GUI 侧再拼一套推荐逻辑。
+- 每个 public template 的推荐 `style_preset + palette_preset + visual_theme_id` 默认值都必须写在 contract `default_options`，并由 `/meta`、`/plot-contract`、sidecar、macOS 统一消费；不要在 GUI 侧再拼一套推荐逻辑。
+- `scripts/smoke_check.py` 必须维护 public surface 的固定 guardrail：
+  - contract lint，检查每个 public template 显式提供 `default_options.style_preset / palette_preset / visual_theme_id`；
+  - style/theme/template 固定矩阵，至少覆盖代表性 `curve / area_curve / step_line / bar / scatter / heatmap`，并同时验证 `nature` 与至少一个非 `nature` style；
+  - 不要因为新增模板或 catalog 扩面而删弱这组 matrix。
 - 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
+- 当前 public template 扩面已包含 `area_curve`、`step_line`、`stacked_area`、`density_area`；它们必须继续走显式 contract/catalog/recommendation/render/output-naming 路径，不能退化成隐藏 alias。
 - 模板的展示元数据（例如 macOS gallery thumbnail kind）必须由 contract `/meta` 提供并由前端直接消费；禁止再按 template id 字符串做本地猜测。
 - `distribution_compare` 只能在兼容迁移层被解析为显式模板：优先按当前数据解析成 `violin` / `box_strip` / `box`，拿不到源数据时保守回退到 `box`。
 
@@ -88,8 +97,12 @@
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
+- 跨 workbench 的 async 失败处理必须统一把“用户取消 / 生命周期取消”视为控制流，而不是 GUI 错误：
+  - 优先复用共享 helper（当前是 `app/macos/Sources/Shared/Utilities/UserCancellation.swift` 的 `isUserCancellationError`）；
+  - 不要在单个 session 里重新发明一套 cancellation 文案过滤逻辑。
 - Plot / Data Studio 的 template 切换与 reset 语义必须保持：
-  - 若当前 figure context 没有显式持久化的 theme/palette，则回落到当前 template `default_options` 推荐的 `palette_preset + visual_theme_id`；
+  - 若当前 figure context 没有显式持久化的 style/theme/palette，则回落到当前 template `default_options` 推荐的 `style_preset + palette_preset + visual_theme_id`；
+  - 用户显式修改 style 后再改 theme/palette，style 必须保持；
   - 用户显式修改 theme 后再改 palette，theme 必须保持；反之亦然；
   - 打开已保存 figure/project 时，持久化值优先，只有缺失或失效时才回退到 template 推荐值。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
@@ -110,6 +123,10 @@
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
+- macOS GUI smoke / fingerprint 基线必须继续覆盖 imported-state inspector：
+  - Plot imported inspector
+  - Data Studio figure inspector
+  - 输出继续以 xcresult attachments 为视觉 QA artifact，不要并行维护第二套本地截图链路。
 
 ## 绘图与工作流不变量
 

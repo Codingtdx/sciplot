@@ -371,6 +371,53 @@ def default_options_for_template(template: str) -> dict[str, Any]:
     return dict(template_contract(template).default_options)
 
 
+def lint_public_template_contract(contract: PlotContract | None = None) -> tuple[str, ...]:
+    resolved = contract or load_plot_contract()
+    valid_styles = set(public_style_names())
+    valid_palettes = set(public_palette_names())
+    from src.rendering.themes import visual_theme_ids
+
+    valid_theme_ids = set(visual_theme_ids())
+    issues: list[str] = []
+
+    for template_id, spec in resolved.templates.items():
+        defaults = dict(spec.default_options)
+        for key in ("style_preset", "palette_preset", "visual_theme_id"):
+            if defaults.get(key) in {None, ""}:
+                issues.append(f"Template `{template_id}` is missing default_options.{key}.")
+        if not spec.available_styles:
+            issues.append(f"Template `{template_id}` must expose at least one available style.")
+        if not spec.available_palettes:
+            issues.append(f"Template `{template_id}` must expose at least one available palette.")
+        if spec.default_size not in spec.allowed_sizes:
+            issues.append(f"Template `{template_id}` default_size must also appear in allowed_sizes.")
+        style_default = defaults.get("style_preset")
+        if style_default is not None and style_default not in spec.available_styles:
+            issues.append(
+                f"Template `{template_id}` default style `{style_default}` is not listed in available_styles."
+            )
+        palette_default = defaults.get("palette_preset")
+        if palette_default is not None and palette_default not in spec.available_palettes:
+            issues.append(
+                f"Template `{template_id}` default palette `{palette_default}` is not listed in available_palettes."
+            )
+        if style_default is not None and style_default not in valid_styles:
+            issues.append(f"Template `{template_id}` default style `{style_default}` is not public.")
+        if palette_default is not None and palette_default not in valid_palettes:
+            issues.append(f"Template `{template_id}` default palette `{palette_default}` is not public.")
+        theme_default = defaults.get("visual_theme_id")
+        if theme_default is not None and theme_default not in valid_theme_ids:
+            issues.append(f"Template `{template_id}` default visual theme `{theme_default}` is unknown.")
+        for style_id in spec.available_styles:
+            if style_id not in valid_styles:
+                issues.append(f"Template `{template_id}` lists unknown style `{style_id}`.")
+        for palette_id in spec.available_palettes:
+            if palette_id not in valid_palettes:
+                issues.append(f"Template `{template_id}` lists unknown palette `{palette_id}`.")
+
+    return tuple(issues)
+
+
 def normalize_style_alias(style_name: str | None) -> str:
     contract = load_plot_contract()
     candidate = (style_name or contract.defaults.style_preset).strip()

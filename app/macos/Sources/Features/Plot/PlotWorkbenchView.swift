@@ -39,7 +39,11 @@ struct PlotWorkbenchView: View {
                     session.importFile(first)
                 }
             case let .failure(error):
-                session.errorMessage = error.localizedDescription
+                if isUserCancellationError(error) {
+                    session.errorMessage = nil
+                } else {
+                    session.errorMessage = error.localizedDescription
+                }
             }
         }
         .sheet(isPresented: bindingForGuide) {

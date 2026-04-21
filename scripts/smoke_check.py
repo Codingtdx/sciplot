@@ -44,7 +44,7 @@ from src.composer import (
 )
 from src.composer_qa import analyze_composer_project
 from src.data_loader import CurveSeries, load_curve_table, load_replicate_table
-from src.plot_contract import load_plot_contract, validation_rule
+from src.plot_contract import lint_public_template_contract, load_plot_contract, validation_rule
 from src.plotting import (
     INSIDE_LEGEND_INSET_FRACTION,
     _cap_visible_major_ticks,
@@ -1296,6 +1296,119 @@ def _assert_style_palette_presets(
         plt.close(heatmap_fig)
 
 
+def _assert_public_template_contract_lint() -> list[dict[str, object]]:
+    issues = list(lint_public_template_contract())
+    if issues:
+        joined = "; ".join(issues)
+        raise AssertionError(f"Public template contract lint failed: {joined}")
+    return [
+        {
+            "id": "public_template_contract_lint",
+            "passed": True,
+            "issue_count": 0,
+        }
+    ]
+
+
+def _style_theme_template_matrix(
+    *,
+    tensile_path: Path,
+    replicate_path: Path,
+    heatmap_path: Path,
+) -> list[dict[str, object]]:
+    cases = [
+        ("curve", tensile_path, {"style_preset": "nature", "palette_preset": "roma", "visual_theme_id": "roma"}),
+        (
+            "curve",
+            tensile_path,
+            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+        ),
+        (
+            "area_curve",
+            tensile_path,
+            {"style_preset": "nature", "palette_preset": "macarons", "visual_theme_id": "macarons"},
+        ),
+        (
+            "area_curve",
+            tensile_path,
+            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+        ),
+        ("step_line", tensile_path, {"style_preset": "nature", "palette_preset": "shine", "visual_theme_id": "shine"}),
+        (
+            "step_line",
+            tensile_path,
+            {"style_preset": "editorial", "palette_preset": "vintage", "visual_theme_id": "vintage"},
+        ),
+        (
+            "bar",
+            replicate_path,
+            {"style_preset": "nature", "palette_preset": "macarons", "visual_theme_id": "macarons"},
+        ),
+        (
+            "bar",
+            replicate_path,
+            {"style_preset": "poster", "palette_preset": "shine", "visual_theme_id": "shine"},
+        ),
+        (
+            "scatter",
+            tensile_path,
+            {"style_preset": "nature", "palette_preset": "shine", "visual_theme_id": "shine"},
+        ),
+        (
+            "scatter",
+            tensile_path,
+            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+        ),
+        (
+            "heatmap",
+            heatmap_path,
+            {"style_preset": "nature", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+        ),
+        (
+            "heatmap",
+            heatmap_path,
+            {"style_preset": "poster", "palette_preset": "vintage", "visual_theme_id": "vintage"},
+        ),
+    ]
+
+    manifest: list[dict[str, object]] = []
+    for template, input_path, options in cases:
+        rendered = build_rendered_plots(template, input_path, 0, **options)
+        try:
+            if not rendered:
+                raise AssertionError(f"{template} matrix case should render at least one figure.")
+            manifest.append(
+                {
+                    "template": template,
+                    "input_path": _repo_relative_path(input_path),
+                    "style_preset": options["style_preset"],
+                    "palette_preset": options["palette_preset"],
+                    "visual_theme_id": options["visual_theme_id"],
+                    "output_filenames": [plot.filename for plot in rendered],
+                    "qa_grades": [plot.qa_report.grade if plot.qa_report is not None else None for plot in rendered],
+                }
+            )
+        finally:
+            close_rendered_plots(rendered)
+
+    coverage_by_template: dict[str, dict[str, set[str]]] = {}
+    for item in manifest:
+        template = str(item["template"])
+        coverage = coverage_by_template.setdefault(template, {"styles": set(), "combos": set()})
+        coverage["styles"].add(str(item["style_preset"]))
+        coverage["combos"].add(f"{item['palette_preset']}::{item['visual_theme_id']}")
+
+    for template, coverage in coverage_by_template.items():
+        if "nature" not in coverage["styles"]:
+            raise AssertionError(f"{template} matrix must include a Nature style case.")
+        if len(coverage["styles"]) < 2:
+            raise AssertionError(f"{template} matrix must include at least one non-Nature style case.")
+        if len(coverage["combos"]) < 2:
+            raise AssertionError(f"{template} matrix must include at least two palette/theme combinations.")
+
+    return manifest
+
+
 def _assert_frequency_batch_sync(freq_path: Path) -> None:
     metric_series = {
         metric_name: _to_curve_series(series_list)
@@ -1906,6 +2019,8 @@ def _write_smoke_report(
     output_reports: list[dict[str, object]],
     validation_reports: list[dict[str, object]],
     preprocess_reports: list[dict[str, object]],
+    contract_lint_reports: list[dict[str, object]],
+    style_theme_matrix: list[dict[str, object]],
 ) -> Path:
     contract = load_plot_contract()
     payload = {
@@ -1915,11 +2030,15 @@ def _write_smoke_report(
             "pdf_count": len(output_reports),
             "validation_count": len(validation_reports),
             "preprocess_case_count": len(preprocess_reports),
+            "contract_lint_check_count": len(contract_lint_reports),
+            "style_theme_matrix_case_count": len(style_theme_matrix),
             "templates_checked": sorted({str(item["template"]) for item in output_reports}),
         },
         "outputs": output_reports,
         "validations": validation_reports,
         "preprocess_runs": preprocess_reports,
+        "contract_lint": contract_lint_reports,
+        "style_theme_template_matrix": style_theme_matrix,
     }
     SMOKE_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     SMOKE_REPORT_PATH.write_text(
@@ -1981,6 +2100,7 @@ def _run_smoke_workspace(base: Path) -> Path:
         ("curve", tensile_path, {}),
         ("scatter", tensile_path, {}),
         ("stacked_curve", ftir_path, {"reverse_x": True}),
+        ("stacked_area", ftir_path, {"reverse_x": True}),
         ("stacked_curve", nmr_path, {"reverse_x": True, "baseline": "linear_endpoints"}),
         (
             "segmented_stacked_curve",
@@ -1989,6 +2109,7 @@ def _run_smoke_workspace(base: Path) -> Path:
         ),
         ("stacked_curve", xrd_path, {}),
         ("stacked_curve", dsc_path, {"baseline": "linear_endpoints"}),
+        ("density_area", replicate_path, {}),
         ("curve", tga_path, {}),
         ("curve", dma_path, {}),
         ("heatmap", heatmap_path, {}),
@@ -2059,10 +2180,18 @@ def _run_smoke_workspace(base: Path) -> Path:
     _assert_frequency_batch_sync(freq_path)
     _assert_legend_candidate_insets()
     _assert_composer_workflow(outputs, base)
+    contract_lint_reports = _assert_public_template_contract_lint()
+    style_theme_matrix = _style_theme_template_matrix(
+        tensile_path=tensile_path,
+        replicate_path=replicate_path,
+        heatmap_path=heatmap_path,
+    )
     return _write_smoke_report(
         output_reports=output_reports,
         validation_reports=validation_reports,
         preprocess_reports=preprocess_reports,
+        contract_lint_reports=contract_lint_reports,
+        style_theme_matrix=style_theme_matrix,
     )
 
 

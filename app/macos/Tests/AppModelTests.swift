@@ -157,6 +157,23 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.runtimeIssueMessage?.detail, "Sidecar failed to start.")
     }
 
+    func testBootstrapCancellationDoesNotSurfaceRuntimeIssue() async throws {
+        let fixture = try makeRuntimeFixture()
+        let client = MockSidecarClient()
+        client.metaHandler = {
+            throw CancellationError()
+        }
+        client.plotContractHandler = {
+            TestPayloads.contract()
+        }
+        let model = AppModel(runtime: fixture.runtime, client: client)
+
+        await model.bootstrapIfNeeded()
+
+        XCTAssertNil(model.bootstrapErrorMessage)
+        XCTAssertFalse(model.hasBootstrapped)
+    }
+
     func testBootstrapAndPlotImportInspectTemplateFlowWithSidecarClient() async throws {
         let fixture = try makeRuntimeFixture()
         let model = AppModel(runtime: fixture.runtime, client: fixture.client)

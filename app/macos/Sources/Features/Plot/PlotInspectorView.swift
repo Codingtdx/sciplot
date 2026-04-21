@@ -5,10 +5,12 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     private let styleSectionTitle: String
     private let leadingSections: LeadingSections
     private let trailingSections: TrailingSections
+    @State private var isPlotOptionsAdvancedExpanded: Bool
 
     init(
         session: PlotSession,
         styleSectionTitle: String = "Plot Options",
+        plotOptionsAdvancedExpanded: Bool = false,
         @ViewBuilder leadingSections: () -> LeadingSections = { EmptyView() },
         @ViewBuilder trailingSections: () -> TrailingSections = { EmptyView() }
     ) {
@@ -16,6 +18,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         self.styleSectionTitle = styleSectionTitle
         self.leadingSections = leadingSections()
         self.trailingSections = trailingSections()
+        _isPlotOptionsAdvancedExpanded = State(initialValue: plotOptionsAdvancedExpanded)
     }
 
     var body: some View {
@@ -96,7 +99,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     }
                 }
 
-                DisclosureGroup("Advanced") {
+                DisclosureGroup("Advanced", isExpanded: $isPlotOptionsAdvancedExpanded) {
                     if let themes = session.metadata?.visualThemes, !themes.isEmpty {
                         if themes.count > 1 {
                             AdaptiveInspectorControlRow(title: "Theme") {

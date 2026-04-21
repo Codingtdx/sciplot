@@ -26,12 +26,13 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     }
     assert meta.template_ids
     assert meta.visual_themes
-    assert {item.id for item in meta.styles} == {"nature"}
-    assert {"infographic", "roma", "macarons"}.issubset({item.id for item in meta.palettes})
-    assert {"infographic", "roma", "macarons"}.issubset({item.id for item in meta.visual_themes})
+    assert {item.id for item in meta.styles} == {"nature", "editorial", "presentation", "poster"}
+    assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.palettes})
+    assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.visual_themes})
     assert removed_template_ids.isdisjoint(meta.template_ids)
     assert removed_template_ids.isdisjoint({item.id for item in meta.templates})
-    assert {item.default_options.get("style_preset") for item in meta.templates} == {"nature"}
+    assert "nature" in {item.default_options.get("style_preset") for item in meta.templates}
+    assert {"area_curve", "step_line", "stacked_area", "density_area"}.issubset({item.id for item in meta.templates})
     assert all(item.default_options.get("palette_preset") for item in meta.templates)
     assert all(item.default_options.get("visual_theme_id") for item in meta.templates)
     assert all(item.presentation_kind for item in meta.templates)
@@ -41,8 +42,9 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     contract = PlotContractResponse.model_validate(contract_response.json())
     assert contract.templates
     assert contract.size_presets
-    assert set(contract.styles.keys()) == {"nature"}
+    assert set(contract.styles.keys()) == {"nature", "editorial", "presentation", "poster"}
     assert removed_template_ids.isdisjoint(contract.templates)
+    assert {"area_curve", "step_line", "stacked_area", "density_area"}.issubset(contract.templates)
     assert contract.aliases["style_presets"]["default"] == "nature"
     assert all(template["presentation_kind"] for template in contract.templates.values())
 

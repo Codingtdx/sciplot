@@ -168,6 +168,38 @@ _VISUAL_THEMES: dict[str, VisualThemeSpec] = {
             "legend.edgecolor": "#c9d9ef",
         },
     ),
+    "shine": VisualThemeSpec(
+        label="Shine",
+        description="A brighter official ECharts-inspired theme with high-contrast accents and crisp light structure.",
+        soft_overrides={
+            "axes.facecolor": "#f7fbfe",
+            "figure.facecolor": "#f7fbfe",
+            "axes.grid": True,
+            "grid.alpha": 0.14,
+            "grid.color": "#b8d1e8",
+            "grid.linestyle": "-",
+            "legend.frameon": True,
+            "legend.fancybox": True,
+            "legend.facecolor": "#fbfdff",
+            "legend.edgecolor": "#b8d1e8",
+        },
+    ),
+    "vintage": VisualThemeSpec(
+        label="Vintage",
+        description="A warm paper-tone theme inspired by the official ECharts Vintage theme.",
+        soft_overrides={
+            "axes.facecolor": "#fef8ef",
+            "figure.facecolor": "#fef8ef",
+            "axes.grid": True,
+            "grid.alpha": 0.12,
+            "grid.color": "#d7cab3",
+            "grid.linestyle": "-",
+            "legend.frameon": True,
+            "legend.fancybox": True,
+            "legend.facecolor": "#fffaf2",
+            "legend.edgecolor": "#d7cab3",
+        },
+    ),
 }
 
 

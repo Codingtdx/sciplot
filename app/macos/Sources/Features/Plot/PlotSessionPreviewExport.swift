@@ -178,6 +178,11 @@ extension PlotSession {
             guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return
             }
+            if isUserCancellationError(error) {
+                errorMessage = nil
+                isPreviewing = false
+                return
+            }
             errorMessage = error.localizedDescription
             isPreviewing = false
         }

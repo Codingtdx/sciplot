@@ -35,16 +35,17 @@ def test_curve_policy_keeps_primary_and_nearby_alternatives_visible(tmp_path: Pa
     assert _recommendation_ids(policy.primary_recommendation) == ["curve"]
     assert _recommendation_ids(policy.alternative_recommendations) == [
         "point_line",
+        "area_curve",
         "scatter_fit",
-        "stacked_curve",
     ]
     assert policy.score_gap_to_second_primary == 4.0
     assert _recommendation_ids(policy.visible_recommendations) == [
         "curve",
         "point_line",
+        "area_curve",
         "scatter_fit",
-        "stacked_curve",
     ]
+    assert "stacked_curve" in _recommendation_ids(policy.advanced_templates)
     assert "bubble_scatter" in _recommendation_ids(policy.advanced_templates)
     assert "scatter_with_fit" not in _recommendation_ids(policy.visible_recommendations)
 

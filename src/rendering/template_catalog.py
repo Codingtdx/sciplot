@@ -34,6 +34,9 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
     if template_id in {
         "curve",
         "point_line",
+        "area_curve",
+        "step_line",
+        "stacked_area",
         "scatter",
         "bubble_scatter",
         "scatter_fit",
@@ -50,6 +53,7 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         "violin_box",
         "point_error",
         "lollipop_error",
+        "density_area",
     }:
         return ("replicate_table", "distribution")
     if template_id == "histogram_density":
@@ -63,6 +67,9 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
     if template_id in {
         "curve",
         "point_line",
+        "area_curve",
+        "step_line",
+        "stacked_area",
         "scatter",
         "bubble_scatter",
         "scatter_fit",
@@ -80,6 +87,7 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         "point_error",
         "lollipop_error",
         "histogram_density",
+        "density_area",
     }:
         return ("distribution", "statistics")
     if template_id in {"heatmap", "annotated_heatmap"}:
@@ -91,6 +99,9 @@ def _family(template_id: str) -> str:
     if template_id in {
         "curve",
         "point_line",
+        "area_curve",
+        "step_line",
+        "stacked_area",
         "scatter",
         "bubble_scatter",
         "scatter_fit",
@@ -108,6 +119,7 @@ def _family(template_id: str) -> str:
         "point_error",
         "lollipop_error",
         "histogram_density",
+        "density_area",
     }:
         return "statistics"
     if template_id in {"heatmap", "annotated_heatmap"}:
@@ -118,8 +130,14 @@ def _family(template_id: str) -> str:
 def _preview_priority(template_id: str) -> int:
     if template_id == "curve":
         return 100
+    if template_id == "area_curve":
+        return 94
     if template_id == "point_line":
         return 95
+    if template_id == "step_line":
+        return 88
+    if template_id == "stacked_area":
+        return 82
     if template_id == "mean_band":
         return 91
     if template_id == "scatter_fit":
@@ -142,6 +160,8 @@ def _preview_priority(template_id: str) -> int:
         return 80
     if template_id == "histogram_density":
         return 78
+    if template_id == "density_area":
+        return 79
     if template_id in {"bar", "box", "violin"}:
         return 70
     return 60

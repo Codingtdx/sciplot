@@ -169,6 +169,8 @@ def _render_curve_candidate(
             y_tick_edge_labels=options.y_tick_edge_labels,
             xlim=base_kwargs.get("xlim"),
             ylim=base_kwargs.get("ylim"),
+            line_drawstyle=str(base_kwargs.get("line_drawstyle", "default")),
+            fill_to_axis=bool(base_kwargs.get("fill_to_axis", False)),
             y_padding_top=(
                 _float_plot_kw(base_kwargs, "y_padding_top", 0.18) + 0.04
                 if compact_legend
@@ -305,6 +307,9 @@ def _render_rheology_bundle(
     input_path: Path,
     sheet: str | int,
     options: RenderOptions,
+    *,
+    show_markers: bool,
+    extra_curve_kwargs: dict[str, object] | None = None,
 ) -> list[RenderedPlot]:
     metric_series = load_rheology_bundle_series(bundle, input_path, sheet)
     validate_manual_axis_overrides(options, template=template)
@@ -315,8 +320,6 @@ def _render_rheology_bundle(
     for series_list in metric_series.values():
         _ensure_known_series_order(series_list, options.series_order)
     output_filenames = rheology_output_filenames(bundle, template)
-    show_markers = template == "point_line"
-
     shared_x_layout = None
     if bundle in {"frequency_sweep", "temperature_sweep"}:
         all_x_values = [
@@ -347,6 +350,8 @@ def _render_rheology_bundle(
         if bundle == "stress_relaxation":
             plot_kwargs["y_padding_top"] = 0.12
             plot_kwargs["y_padding_bottom"] = 0.04
+        if extra_curve_kwargs:
+            plot_kwargs.update(extra_curve_kwargs)
 
         outputs.append(
             _render_curve_like_plot(
@@ -360,54 +365,84 @@ def _render_rheology_bundle(
         )
     return outputs
 
-def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+def _render_standard_curve_template(
+    *,
+    template: str,
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+    show_markers: bool,
+    extra_curve_kwargs: dict[str, object] | None = None,
+) -> list[RenderedPlot]:
     normalized_dataset = build_normalized_dataset(input_path, sheet)
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(normalized_dataset.model, "curve", input_path, sheet, options)
+        return _render_rheology_bundle(
+            normalized_dataset.model,
+            template,
+            input_path,
+            sheet,
+            options,
+            show_markers=show_markers,
+            extra_curve_kwargs=extra_curve_kwargs,
+        )
     series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)
-    validate_manual_axis_overrides(options, template="curve", is_tensile_curve=is_tensile_curve)
+    validate_manual_axis_overrides(options, template=template, is_tensile_curve=is_tensile_curve)
     axis_mode = "auto_positive" if is_tensile_curve else "auto"
     return [
         _render_curve_like_plot(
-            filename=f"{input_path.stem}_curve.pdf",
-            template="curve",
+            filename=f"{input_path.stem}_{template}.pdf",
+            template=template,
             series_list=series_list,
             options=options,
-            show_markers=False,
+            show_markers=show_markers,
             base_kwargs={
                 "axis_mode": axis_mode,
                 "preserve_stress_label": is_tensile_curve,
+                **(extra_curve_kwargs or {}),
             },
         )
     ]
+
+def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_standard_curve_template(
+        template="curve",
+        input_path=input_path,
+        sheet=sheet,
+        options=options,
+        show_markers=False,
+    )
 
 def _render_point_line(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    normalized_dataset = build_normalized_dataset(input_path, sheet)
-    if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
-        return _render_rheology_bundle(normalized_dataset.model, "point_line", input_path, sheet, options)
+    return _render_standard_curve_template(
+        template="point_line",
+        input_path=input_path,
+        sheet=sheet,
+        options=options,
+        show_markers=True,
+    )
 
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
-    _ensure_known_series_order(series_list, options.series_order)
-    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
-    is_tensile_curve = looks_like_tensile_curve(series_list)
-    validate_manual_axis_overrides(options, template="point_line", is_tensile_curve=is_tensile_curve)
-    axis_mode = "auto_positive" if is_tensile_curve else "auto"
-    return [
-        _render_curve_like_plot(
-            filename=f"{input_path.stem}_point_line.pdf",
-            template="point_line",
-            series_list=series_list,
-            options=options,
-            show_markers=True,
-            base_kwargs={
-                "axis_mode": axis_mode,
-                "preserve_stress_label": is_tensile_curve,
-            },
-        )
-    ]
+def _render_area_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_standard_curve_template(
+        template="area_curve",
+        input_path=input_path,
+        sheet=sheet,
+        options=options,
+        show_markers=False,
+        extra_curve_kwargs={"fill_to_axis": True},
+    )
+
+def _render_step_line(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    return _render_standard_curve_template(
+        template="step_line",
+        input_path=input_path,
+        sheet=sheet,
+        options=options,
+        show_markers=False,
+        extra_curve_kwargs={"line_drawstyle": "steps-mid"},
+    )
 
 def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
@@ -438,6 +473,40 @@ def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOpt
             options=options,
         )
     ]
+
+
+def _render_stacked_area(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    _ensure_known_series_order(series_list, options.series_order)
+    validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
+    validate_manual_axis_overrides(options, template="stacked_area")
+    fig, _ = plot_curves(
+        series_list,
+        show_markers=False,
+        legend_mode="none",
+        xscale=options.xscale,
+        yscale=options.yscale,
+        width_mm=options.width_mm,
+        height_mm=options.height_mm,
+        reverse_x=options.reverse_x,
+        stack_mode="auto_vertical",
+        series_label_mode="edge",
+        baseline_mode=options.baseline,
+        show_y_ticks=False,
+        line_drawstyle="default",
+        fill_to_axis=True,
+        y_padding_top=0.08,
+        y_padding_bottom=0.04,
+    )
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{input_path.stem}_stacked_area.pdf",
+            figure=fig,
+            template="stacked_area",
+            options=options,
+        )
+    ]
+
 
 def _render_segmented_stacked_curve(
     input_path: Path,

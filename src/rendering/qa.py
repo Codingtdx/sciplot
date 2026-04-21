@@ -15,6 +15,9 @@ from src.wide_nmr import WIDE_NMR_STRUCTURE_RESERVED_MM
 _CURVE_QA_TEMPLATES = {
     "curve",
     "point_line",
+    "area_curve",
+    "step_line",
+    "stacked_area",
     "scatter",
     "bubble_scatter",
     *template_family_ids("scatter_fit"),
@@ -29,6 +32,7 @@ _STATS_QA_TEMPLATES = {
     "point_error",
     "lollipop_error",
     "histogram_density",
+    "density_area",
 }
 
 

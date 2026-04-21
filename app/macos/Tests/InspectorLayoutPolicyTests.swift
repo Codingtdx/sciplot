@@ -115,6 +115,18 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         let plotSession = PlotSession()
         plotSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
+        let importedPlotSession = PlotSession()
+        importedPlotSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        importedPlotSession.selectedFileURL = URL(fileURLWithPath: "/tmp/imported-curve.csv")
+        importedPlotSession.selectedSheet = .name("Representative_Curve")
+        importedPlotSession.selectedTemplateID = "area_curve"
+        importedPlotSession.renderOptions = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "presentation",
+            palettePreset: "shine",
+            visualThemeID: "macarons"
+        )
+
         let dataStudioClient = MockSidecarClient()
         dataStudioClient.dataStudioSourcePreviewHandler = { request in
             let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
@@ -139,6 +151,50 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         specimenSession.baselineWorkbookPreviewByPath[specimenWorkbook.response.workbookPath] =
             TestPayloads.dataStudioWorkbookPreviewWithSuggestedExclusions(path: specimenWorkbook.response.workbookPath)
 
+        let figureSession = DataStudioSession()
+        figureSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        let figureWorkbook = DataStudioWorkbookItem(
+            id: "workbook-figure",
+            response: TestPayloads.dataStudioWorkbook(
+                id: "workbook-figure",
+                path: "/tmp/prepared-strength.xlsx",
+                label: "Strength Study"
+            )
+        )
+        figureSession.workbooks = [figureWorkbook]
+        figureSession.groupStates = [
+            .init(
+                workbookPath: figureWorkbook.response.workbookPath,
+                displayName: "Strength Study",
+                includeInCompare: true,
+                sortOrder: 0
+            ),
+        ]
+        figureSession.focusedWorkbookPath = figureWorkbook.response.workbookPath
+        figureSession.comparisonSet = TestPayloads.dataStudioComparisonSet()
+        figureSession.figurePreferences = [
+            .init(
+                familyID: "strength",
+                selectedTemplateID: "box",
+                optionsByTemplate: [
+                    "box": RenderOptionsPayload(
+                        size: "single_panel",
+                        stylePreset: "presentation",
+                        palettePreset: "shine",
+                        visualThemeID: "macarons"
+                    ),
+                ]
+            ),
+        ]
+        figureSession.selectedFigureFamilyID = "strength"
+        figureSession.syncFigureSelection()
+        figureSession.plotSession.renderOptions = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "presentation",
+            palettePreset: "shine",
+            visualThemeID: "macarons"
+        )
+
         let codeConsoleSession = CodeConsoleSession()
         let codeConsoleRun = try makeCodeConsoleRunFixture()
         codeConsoleSession.latestRunResponse = codeConsoleRun
@@ -160,6 +216,16 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                 )
             ),
             (
+                "Plot imported inspector",
+                snapshotPNGData(
+                    for: PlotInspectorView(
+                        session: importedPlotSession,
+                        plotOptionsAdvancedExpanded: true
+                    ),
+                    size: CGSize(width: 420, height: 760)
+                )
+            ),
+            (
                 "Data Studio template editor",
                 snapshotPNGData(
                     for: DataStudioCreateTemplateEditorSheet(session: dataStudioSession),
@@ -171,6 +237,16 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                 snapshotPNGData(
                     for: DataStudioSpecimenFilterPopover(session: specimenSession, workbook: specimenWorkbook),
                     size: CGSize(width: 460, height: 648)
+                )
+            ),
+            (
+                "Data Studio figure inspector",
+                snapshotPNGData(
+                    for: DataStudioInspectorView(
+                        session: figureSession,
+                        plotOptionsAdvancedExpanded: true
+                    ),
+                    size: CGSize(width: 420, height: 840)
                 )
             ),
             (
@@ -334,6 +410,11 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         averageLuma: 0.3163,
         nonWhiteFraction: 1.0000
     ),
+    "Plot imported inspector": SnapshotFingerprint(
+        differenceHash: 0x0000010101010101,
+        averageLuma: 0.9776,
+        nonWhiteFraction: 0.1806
+    ),
     "Data Studio template editor": SnapshotFingerprint(
         differenceHash: 0x700108090c0c0c0c,
         averageLuma: 0.9591,
@@ -343,6 +424,11 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         differenceHash: 0x8ec0c8c8c8c8c880,
         averageLuma: 0.6377,
         nonWhiteFraction: 0.6111
+    ),
+    "Data Studio figure inspector": SnapshotFingerprint(
+        differenceHash: 0x0101010101010101,
+        averageLuma: 0.9770,
+        nonWhiteFraction: 0.1528
     ),
     "Code Console outputs preview": SnapshotFingerprint(
         differenceHash: 0x000000c0e0e0c000,

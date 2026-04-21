@@ -205,6 +205,14 @@ final class SchemaDecodingTests: XCTestCase {
               "description": "Nature style",
               "hard_constraints": true,
               "preset_note": "Repo nature"
+            },
+            {
+              "id": "editorial",
+              "label": "Editorial",
+              "public": true,
+              "description": "Editorial style",
+              "hard_constraints": false,
+              "preset_note": "Relaxed preset"
             }
           ],
           "palettes": [
@@ -214,6 +222,13 @@ final class SchemaDecodingTests: XCTestCase {
               "public": true,
               "description": "Default palette",
               "swatches": ["#123456", "#abcdef"]
+            },
+            {
+              "id": "shine",
+              "label": "Shine",
+              "public": true,
+              "description": "Bright palette",
+              "swatches": ["#c12e34", "#e6b600"]
             }
           ],
           "templates": [
@@ -227,11 +242,12 @@ final class SchemaDecodingTests: XCTestCase {
               "allowed_sizes": ["60x55"],
               "editable_options": ["size", "style_preset", "palette_preset"],
               "default_options": {
+                "style_preset": "presentation",
                 "palette_preset": "roma",
                 "visual_theme_id": "roma"
               },
-              "available_styles": ["nature"],
-              "available_palettes": ["colorblind_safe", "roma", "macarons"],
+              "available_styles": ["nature", "editorial", "presentation"],
+              "available_palettes": ["colorblind_safe", "roma", "macarons", "shine"],
               "canonical_id": "curve",
               "role": "canonical",
               "lifecycle_policy": "canonical",
@@ -240,7 +256,7 @@ final class SchemaDecodingTests: XCTestCase {
           ],
           "template_ids": ["curve"],
           "size_ids": ["60x55"],
-          "palette_preset_ids": ["colorblind_safe", "roma", "macarons"],
+          "palette_preset_ids": ["colorblind_safe", "roma", "macarons", "shine"],
           "visual_themes": [
             {
               "id": "clean_light",
@@ -251,6 +267,11 @@ final class SchemaDecodingTests: XCTestCase {
               "id": "roma",
               "label": "Roma",
               "description": "A warm neutral theme"
+            },
+            {
+              "id": "shine",
+              "label": "Shine",
+              "description": "A brighter theme"
             }
           ]
         }
@@ -259,9 +280,10 @@ final class SchemaDecodingTests: XCTestCase {
         let response = try decoder.decode(SidecarMetaResponse.self, from: Data(payload.utf8))
         XCTAssertEqual(response.templateIds, ["curve"])
         XCTAssertEqual(response.sizeIds, ["60x55"])
-        XCTAssertEqual(response.palettePresetIds, ["colorblind_safe", "roma", "macarons"])
+        XCTAssertEqual(response.palettePresetIds, ["colorblind_safe", "roma", "macarons", "shine"])
         XCTAssertEqual(response.visualThemes.first?.id, "clean_light")
         XCTAssertEqual(response.templates.first?.presentationKind, "curve")
+        XCTAssertEqual(response.templates.first?.defaultOptions["style_preset"]?.stringValue, "presentation")
         XCTAssertEqual(response.templates.first?.defaultOptions["palette_preset"]?.stringValue, "roma")
         XCTAssertEqual(response.templates.first?.defaultOptions["visual_theme_id"]?.stringValue, "roma")
     }

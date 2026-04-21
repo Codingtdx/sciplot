@@ -156,6 +156,11 @@ extension PlotSession {
             guard asyncCoordination.inspection.isLatest(revision), !Task.isCancelled else {
                 return
             }
+            if isUserCancellationError(error) {
+                errorMessage = nil
+                isInspecting = false
+                return
+            }
             errorMessage = error.localizedDescription
             isInspecting = false
         }

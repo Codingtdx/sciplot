@@ -180,6 +180,23 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(session.latestExportItems.map(\.label), ["code-console-final.pdf"])
     }
 
+    func testContextRefreshCancellationDoesNotSurfaceError() async {
+        let client = MockSidecarClient()
+        client.codeConsoleContextHandler = { _ in
+            throw CancellationError()
+        }
+
+        let session = CodeConsoleSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+
+        await session.refreshCurrentContext()
+
+        XCTAssertNil(session.errorMessage)
+        XCTAssertNil(session.contextResponse)
+    }
+
     func testCodeConsoleExportCanMaterializeTIFFOutput() {
         var callOrder: [String] = []
         var chooserSuggestedName: String?

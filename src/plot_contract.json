@@ -167,7 +167,9 @@
         "macarons",
         "okabe_ito",
         "tol_muted",
-        "materials_warm"
+        "materials_warm",
+        "shine",
+        "vintage"
       ]
     },
     "stats": {
@@ -230,6 +232,162 @@
         "xtick_major_pad": 1.4,
         "ytick_major_pad": 1.4,
         "legend_inset_fraction": 0.025
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "editorial": {
+      "label": "Editorial",
+      "public": true,
+      "description": "Balanced research style with slightly larger text and a lighter stroke hierarchy than Nature.",
+      "hard_constraints": false,
+      "preset_note": "A balanced paper-first preset with relaxed typography and stroke sizing.",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.2,
+        "panel_label_size_pt": 8.6,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.4,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.35,
+        "line_alpha": 0.94,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.32,
+        "max_fill_alpha": 0.42,
+        "marker_size_pt": 3.7
+      },
+      "spacing": {
+        "axes_labelpad": 2.2,
+        "xtick_major_pad": 1.5,
+        "ytick_major_pad": 1.5,
+        "legend_inset_fraction": 0.028
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "presentation": {
+      "label": "Presentation",
+      "public": true,
+      "description": "Slide-friendly figure style with larger labels, longer ticks, and bolder data strokes.",
+      "hard_constraints": false,
+      "preset_note": "Optimized for talk-friendly readability while keeping the same physical panel frame.",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.8,
+        "legend_font_size_pt": 6.9,
+        "panel_label_size_pt": 9.4,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.1,
+        "tick_width_pt": 1.1,
+        "tick_length_pt": 3.9,
+        "minor_tick_width_pt": 0.9,
+        "minor_tick_length_pt": 2.3,
+        "line_width_pt": 1.55,
+        "line_alpha": 0.95,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.3,
+        "max_fill_alpha": 0.4,
+        "marker_size_pt": 4.3
+      },
+      "spacing": {
+        "axes_labelpad": 2.5,
+        "xtick_major_pad": 1.8,
+        "ytick_major_pad": 1.8,
+        "legend_inset_fraction": 0.032
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "poster": {
+      "label": "Poster",
+      "public": true,
+      "description": "Large-format display style with the strongest type and stroke hierarchy in the public catalog.",
+      "hard_constraints": false,
+      "preset_note": "The loosest public preset, intended for display contexts rather than Nature-tight print metrics.",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 8.6,
+        "legend_font_size_pt": 7.5,
+        "panel_label_size_pt": 10.2,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.2,
+        "tick_width_pt": 1.2,
+        "tick_length_pt": 4.4,
+        "minor_tick_width_pt": 1.0,
+        "minor_tick_length_pt": 2.6,
+        "line_width_pt": 1.8,
+        "line_alpha": 0.96,
+        "marker_alpha": 0.97,
+        "fill_alpha": 0.28,
+        "max_fill_alpha": 0.38,
+        "marker_size_pt": 4.9
+      },
+      "spacing": {
+        "axes_labelpad": 2.8,
+        "xtick_major_pad": 2.1,
+        "ytick_major_pad": 2.1,
+        "legend_inset_fraction": 0.036
       },
       "annotation": {
         "legend_frameon": false,
@@ -394,6 +552,42 @@
       "sequential": "cividis",
       "diverging": "vlag"
     },
+    "shine": {
+      "label": "Shine",
+      "public": true,
+      "description": "Official ECharts Shine palette with high-contrast warm primaries and cooler accents.",
+      "categorical": [
+        "#c12e34",
+        "#e6b600",
+        "#0098d9",
+        "#2b821d",
+        "#005eaa",
+        "#339ca8",
+        "#cda819",
+        "#32a487"
+      ],
+      "sequential": "viridis",
+      "diverging": "PuOr"
+    },
+    "vintage": {
+      "label": "Vintage",
+      "public": true,
+      "description": "Official ECharts Vintage palette with warm paper-tone neutrals and restrained contrast.",
+      "categorical": [
+        "#d87c7c",
+        "#919e8b",
+        "#d7ab82",
+        "#6e7074",
+        "#61a0a8",
+        "#efa18d",
+        "#787464",
+        "#cc7e63",
+        "#724e58",
+        "#4b565b"
+      ],
+      "sequential": "cividis",
+      "diverging": "BrBG"
+    },
     "okabe_ito": {
       "label": "Okabe-Ito",
       "public": false,
@@ -483,7 +677,10 @@
         "visual_theme_id": "roma"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -492,7 +689,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -537,7 +736,10 @@
         "visual_theme_id": "roma"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -546,7 +748,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -556,6 +760,124 @@
         "multi_output_bundle_notice"
       ],
       "presentation_kind": "point_line"
+    },
+    "area_curve": {
+      "label": "Area curve",
+      "description": "Single-panel line chart with a translucent area fill, inspired by ECharts area-line patterns.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "x_tick_density",
+        "x_tick_edge_labels",
+        "y_tick_density",
+        "y_tick_edge_labels",
+        "series_order",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false,
+        "style_preset": "presentation",
+        "palette_preset": "infographic",
+        "visual_theme_id": "infographic"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "area_curve"
+    },
+    "step_line": {
+      "label": "Step line",
+      "description": "Single-panel step-line chart for abrupt state changes, inspired by ECharts step-line patterns.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "x_tick_density",
+        "x_tick_edge_labels",
+        "y_tick_density",
+        "y_tick_edge_labels",
+        "series_order",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false,
+        "style_preset": "editorial",
+        "palette_preset": "shine",
+        "visual_theme_id": "shine"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "step_line"
     },
     "stacked_curve": {
       "label": "Stacked curve",
@@ -579,11 +901,14 @@
         "reverse_x": false,
         "baseline": "none",
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "vintage",
+        "visual_theme_id": "vintage"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -592,13 +917,63 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "non_blank_pdf"
       ],
       "soft_rules": [],
       "presentation_kind": "stacked_curve"
+    },
+    "stacked_area": {
+      "label": "Stacked area",
+      "description": "Single-column stacked curves with translucent area fills for layered spectrum-like comparisons.",
+      "category": "stacked_spectrum",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "reverse_x",
+        "baseline",
+        "series_order",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "reverse_x": false,
+        "baseline": "none",
+        "style_preset": "presentation",
+        "palette_preset": "vintage",
+        "visual_theme_id": "vintage"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "stacked_area"
     },
     "segmented_stacked_curve": {
       "label": "Segmented stacked curve",
@@ -622,12 +997,15 @@
         "reverse_x": true,
         "baseline": "linear_endpoints",
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma",
+        "palette_preset": "vintage",
+        "visual_theme_id": "vintage",
         "use_sidecar": true
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -636,7 +1014,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "wide_nmr_horizontal_alignment",
@@ -672,7 +1052,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -681,7 +1064,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -717,7 +1102,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -726,7 +1114,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -763,7 +1153,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -772,7 +1165,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -808,7 +1203,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -817,7 +1215,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -854,7 +1254,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -863,7 +1266,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -900,7 +1305,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -909,7 +1317,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -946,7 +1356,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -955,7 +1368,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -996,7 +1411,10 @@
         "visual_theme_id": "macarons"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1005,7 +1423,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1015,6 +1435,61 @@
         "dense_group_label_warning"
       ],
       "presentation_kind": "histogram_density"
+    },
+    "density_area": {
+      "label": "Density area",
+      "description": "Smoothed distribution density areas with outline overlays for clearer replicate comparisons.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "x_tick_density",
+        "x_tick_edge_labels",
+        "y_tick_density",
+        "y_tick_edge_labels",
+        "series_order",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "presentation",
+        "palette_preset": "macarons",
+        "visual_theme_id": "macarons"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [
+        "dense_group_label_warning"
+      ],
+      "presentation_kind": "density_area"
     },
     "scatter": {
       "label": "Scatter",
@@ -1048,11 +1523,14 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "shine",
+        "visual_theme_id": "shine"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1061,7 +1539,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1102,11 +1582,14 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "shine",
+        "visual_theme_id": "shine"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1115,7 +1598,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1156,11 +1641,14 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "shine",
+        "visual_theme_id": "shine"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1169,7 +1657,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1210,11 +1700,14 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "shine",
+        "visual_theme_id": "shine"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1223,7 +1716,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1255,7 +1750,10 @@
         "visual_theme_id": "infographic"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1264,7 +1762,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1299,7 +1799,10 @@
         "visual_theme_id": "infographic"
       },
       "available_styles": [
-        "nature"
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1308,7 +1811,9 @@
         "mono",
         "infographic",
         "roma",
-        "macarons"
+        "macarons",
+        "shine",
+        "vintage"
       ],
       "hard_rules": [
         "single_panel_axis_frame",

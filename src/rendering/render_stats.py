@@ -397,6 +397,28 @@ def _gaussian_density(values: np.ndarray, x_grid: np.ndarray) -> np.ndarray:
     kernel = np.exp(-0.5 * z * z) / np.sqrt(2.0 * np.pi)
     return kernel.mean(axis=1) / bandwidth
 
+
+def _finite_group_values(groups) -> list[np.ndarray]:
+    all_values: list[np.ndarray] = []
+    for group in groups:
+        values = group.data.to_numpy(dtype=float)
+        values = values[np.isfinite(values)]
+        if values.size:
+            all_values.append(values)
+    if not all_values:
+        raise ValueError("No valid groups were found in the replicate table.")
+    return all_values
+
+
+def _density_x_grid(values: np.ndarray) -> np.ndarray:
+    x_min = float(values.min())
+    x_max = float(values.max())
+    if np.isclose(x_min, x_max):
+        span = max(abs(x_min), 1.0) * 0.08
+        return np.linspace(x_min - span, x_max + span, 160)
+    return np.linspace(x_min, x_max, 160)
+
+
 def _render_histogram_density(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     groups = _ordered_groups(input_path, sheet, options)
     validate_manual_axis_overrides(options, template="histogram_density")
@@ -406,16 +428,8 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
     summary = summarize_replicate_distribution(groups)
     fig, ax = plot_style.create_panel_figure(width_mm=options.width_mm, height_mm=options.height_mm)
     palette = plot_style.get_categorical_palette(options.palette_preset, n_colors=len(groups))
-    all_values: list[np.ndarray] = []
+    all_values = _finite_group_values(groups)
     density_max = 0.0
-
-    for group in groups:
-        values = group.data.to_numpy(dtype=float)
-        values = values[np.isfinite(values)]
-        if values.size:
-            all_values.append(values)
-    if not all_values:
-        raise ValueError("No valid groups were found in the replicate table.")
 
     pooled = np.concatenate(all_values)
     if summary.pooled_unique_count <= max(6, int(round(summary.total_points * 0.35))):
@@ -436,13 +450,7 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
             linewidth=0.8,
             label=group.group,
         )
-        x_min = float(values.min())
-        x_max = float(values.max())
-        if np.isclose(x_min, x_max):
-            span = max(abs(x_min), 1.0) * 0.08
-            x_grid = np.linspace(x_min - span, x_max + span, 160)
-        else:
-            x_grid = np.linspace(x_min, x_max, 160)
+        x_grid = _density_x_grid(values)
         density = _gaussian_density(values, x_grid)
         density_max = max(density_max, float(np.max(density)) if density.size else 0.0)
         ax.plot(
@@ -508,5 +516,93 @@ def _render_histogram_density(input_path: Path, sheet: str | int, options: Rende
             template="histogram_density",
             options=options,
             autofixes_applied=tuple(autofixes),
+        )
+    ]
+
+
+def _render_density_area(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
+    groups = _ordered_groups(input_path, sheet, options)
+    validate_manual_axis_overrides(options, template="density_area")
+    if not groups:
+        raise ValueError("No valid groups were found in the replicate table.")
+
+    fig, ax = plot_style.create_panel_figure(width_mm=options.width_mm, height_mm=options.height_mm)
+    palette = plot_style.get_categorical_palette(options.palette_preset, n_colors=len(groups))
+    all_values = _finite_group_values(groups)
+    density_max = 0.0
+
+    for color, group, values in zip(palette, groups, all_values, strict=True):
+        x_grid = _density_x_grid(values)
+        density = _gaussian_density(values, x_grid)
+        density_max = max(density_max, float(np.max(density)) if density.size else 0.0)
+        ax.fill_between(
+            x_grid,
+            density,
+            0.0,
+            color=color,
+            alpha=min(plot_style.current_stroke().fill_alpha, 0.28),
+            linewidth=0.0,
+            zorder=2.8,
+        )
+        ax.plot(
+            x_grid,
+            density,
+            color=color,
+            linewidth=max(1.0, plot_style.current_stroke().line_width_pt),
+            alpha=min(0.96, plot_style.current_stroke().line_alpha + 0.15),
+            label=group.group,
+            zorder=3.4,
+        )
+
+    first = groups[0]
+    ax.set_xlabel(
+        _format_axis_label(
+            first.value_label,
+            first.value_unit,
+            override_label=options.x_label_override,
+        )
+    )
+    ax.set_ylabel("Density")
+    if len(groups) > 1:
+        ax.legend(loc="best", frameon=False)
+    if density_max > 0:
+        ax.set_ylim(bottom=0.0, top=density_max * 1.16)
+    else:
+        ax.set_ylim(bottom=0.0)
+
+    x_override, y_override = manual_axis_overrides(options)
+    if x_override is not None:
+        x_low, x_high = ax.get_xlim()
+        ax.set_xlim(
+            x_override[0] if x_override[0] is not None else x_low,
+            x_override[1] if x_override[1] is not None else x_high,
+        )
+    if y_override is not None:
+        y_low, y_high = ax.get_ylim()
+        ax.set_ylim(
+            y_override[0] if y_override[0] is not None else y_low,
+            y_override[1] if y_override[1] is not None else y_high,
+        )
+    _apply_numeric_axis_tick_preferences(
+        ax.xaxis,
+        scale="linear",
+        tick_density=options.x_tick_density,
+        tick_edge_labels=options.x_tick_edge_labels,
+    )
+    _apply_numeric_axis_tick_preferences(
+        ax.yaxis,
+        scale="linear",
+        tick_density=options.y_tick_density,
+        tick_edge_labels=options.y_tick_edge_labels,
+        max_major_ticks=7,
+    )
+
+    return [
+        _rendered_plot_with_qa(
+            filename=f"{predict_bar_box_slug(groups)}_density_area.pdf",
+            figure=fig,
+            template="density_area",
+            options=options,
+            autofixes_applied=("density_area_overlay",),
         )
     ]

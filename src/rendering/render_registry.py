@@ -1,5 +1,6 @@
 from src.rendering.models import TemplateName, TemplateRenderer
 from src.rendering.render_curve import (
+    _render_area_curve,
     _render_bubble_scatter,
     _render_curve,
     _render_mean_band,
@@ -7,13 +8,16 @@ from src.rendering.render_curve import (
     _render_scatter,
     _render_scatter_fit,
     _render_segmented_stacked_curve,
+    _render_stacked_area,
     _render_stacked_curve,
+    _render_step_line,
 )
 from src.rendering.render_heatmap import _render_annotated_heatmap, _render_heatmap
 from src.rendering.render_stats import (
     _render_bar,
     _render_box,
     _render_box_strip,
+    _render_density_area,
     _render_histogram_density,
     _render_lollipop_error,
     _render_point_error,
@@ -24,7 +28,10 @@ from src.rendering.render_stats import (
 TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "curve": TemplateRenderer(render=_render_curve),
     "point_line": TemplateRenderer(render=_render_point_line),
+    "area_curve": TemplateRenderer(render=_render_area_curve),
+    "step_line": TemplateRenderer(render=_render_step_line),
     "stacked_curve": TemplateRenderer(render=_render_stacked_curve),
+    "stacked_area": TemplateRenderer(render=_render_stacked_area),
     "segmented_stacked_curve": TemplateRenderer(render=_render_segmented_stacked_curve),
     "bar": TemplateRenderer(render=_render_bar),
     "box": TemplateRenderer(render=_render_box),
@@ -34,6 +41,7 @@ TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "point_error": TemplateRenderer(render=_render_point_error),
     "lollipop_error": TemplateRenderer(render=_render_lollipop_error),
     "histogram_density": TemplateRenderer(render=_render_histogram_density),
+    "density_area": TemplateRenderer(render=_render_density_area),
     "scatter": TemplateRenderer(render=_render_scatter),
     "bubble_scatter": TemplateRenderer(render=_render_bubble_scatter),
     "scatter_fit": TemplateRenderer(render=_render_scatter_fit),
