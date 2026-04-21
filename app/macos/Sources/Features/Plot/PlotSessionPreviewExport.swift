@@ -1,6 +1,9 @@
 import Foundation
 
 extension PlotSession {
+    private var sourceTablePageLimit: Int { 50 }
+    private var fitAnalysisPageLimit: Int { 50 }
+
     func runPreflight() async {
         guard let request = currentRenderRequest() else {
             return
@@ -12,6 +15,71 @@ extension PlotSession {
 
         do {
             preflightResponse = try await client?.preflightRender(request)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func openProject(_ url: URL) async {
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
+            return
+        }
+        resetDataWorkbookState()
+        errorMessage = nil
+        do {
+            let response = try await client.openProject(.init(projectPath: url.path))
+            await restoreProject(from: response)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func saveProject() async {
+        if let projectURL {
+            await saveProject(to: projectURL)
+            return
+        }
+        await saveProjectAs()
+    }
+
+    func saveProjectAs() async {
+        guard let destinationURL = chooseProjectSaveLocation(suggestedProjectFilename) else {
+            return
+        }
+        await saveProject(to: destinationURL)
+    }
+
+    func saveProject(to destinationURL: URL) async {
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
+            return
+        }
+        guard let selectedFileURL, let payload = buildProjectPayload() else {
+            errorMessage = "Import a plot source before saving a project."
+            return
+        }
+        isSavingProject = true
+        errorMessage = nil
+        defer { isSavingProject = false }
+        do {
+            let response = try await client.saveProject(
+                .init(
+                    projectPath: destinationURL.path,
+                    sourcePath: selectedFileURL.path,
+                    payload: payload
+                )
+            )
+            if let plotPayload = response.payload.plot {
+                applyNormalizedProjectState(
+                    plotPayload,
+                    projectURL: URL(fileURLWithPath: response.projectPath),
+                    scheduleRefresh: false
+                )
+            } else {
+                projectURL = URL(fileURLWithPath: response.projectPath)
+                runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -410,5 +478,156 @@ extension PlotSession {
 
     func notifyRenderOptionsDidChange() {
         renderOptionsDidChange?(renderOptions)
+    }
+
+    func buildProjectPayload() -> ProjectBundlePayload? {
+        guard let selectedFileURL, let selectedTemplateID = effectiveTemplateID else {
+            return nil
+        }
+        return ProjectBundlePayload(
+            version: 1,
+            selectedWorkbench: "plot",
+            plot: PlotProjectPayload(
+                sessionKind: "plot",
+                sourceFilename: selectedFileURL.lastPathComponent,
+                sourceMediaType: nil,
+                embeddedSourceRelpath: "sources/primary/\(selectedFileURL.lastPathComponent)",
+                sourceSHA256: "",
+                sheet: selectedSheet,
+                selectedTemplateID: selectedTemplateID,
+                renderOptions: renderOptions,
+                projectDisplayName: projectURL?.deletingPathExtension().lastPathComponent ?? selectedFileURL.deletingPathExtension().lastPathComponent,
+                sourceProvenance: PlotProjectSourceProvenancePayload(
+                    originalInputPath: sourceProvenance.originalInputPath ?? selectedFileURL.path,
+                    savedInputMtimeNs: sourceProvenance.savedInputMtimeNs ?? sourceProvenanceForCurrentURL(selectedFileURL).savedInputMtimeNs,
+                    savedAt: sourceProvenance.savedAt
+                )
+            ),
+            dataStudio: nil,
+            composer: nil,
+            codeConsole: nil,
+            artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]
+        )
+    }
+
+    func selectDataWorkbookTab(_ tab: PlotDataWorkbookTab) {
+        guard dataWorkbookTab != tab else {
+            return
+        }
+        dataWorkbookTab = tab
+        refreshDataWorkbookIfNeeded()
+    }
+
+    func refreshDataWorkbookIfNeeded() {
+        guard isDataWorkbookPresented else {
+            return
+        }
+        switch dataWorkbookTab {
+        case .sourceData:
+            loadSourceTablePreview(offset: sourceTableOffset)
+        case .fit:
+            if fitAnalysisAvailability.isEnabled {
+                loadFitAnalysis(offset: fitAnalysisOffset)
+            }
+        }
+    }
+
+    func resetDataWorkbookState() {
+        sourceTableResponse = nil
+        fitAnalysisResponse = nil
+        sourceTableErrorMessage = nil
+        fitAnalysisErrorMessage = nil
+        isLoadingSourceTable = false
+        isLoadingFitAnalysis = false
+        sourceTableOffset = 0
+        fitAnalysisOffset = 0
+        dataWorkbookTab = .sourceData
+    }
+
+    func loadSourceTablePreview(offset: Int = 0) {
+        guard let client, let selectedFileURL else {
+            return
+        }
+        let resolvedOffset = max(0, offset)
+        sourceTableOffset = resolvedOffset
+        isLoadingSourceTable = true
+        sourceTableErrorMessage = nil
+        Task {
+            do {
+                let response = try await client.sourceTablePreview(
+                    .init(
+                        inputPath: selectedFileURL.path,
+                        sheet: selectedSheet,
+                        offset: resolvedOffset,
+                        limit: sourceTablePageLimit
+                    )
+                )
+                sourceTableResponse = response
+                isLoadingSourceTable = false
+            } catch {
+                if isUserCancellationError(error) {
+                    sourceTableErrorMessage = nil
+                } else {
+                    sourceTableErrorMessage = error.localizedDescription
+                }
+                isLoadingSourceTable = false
+            }
+        }
+    }
+
+    func pageSourceTable(by delta: Int) {
+        let nextOffset = max(0, (sourceTableResponse?.offset ?? sourceTableOffset) + delta * sourceTablePageLimit)
+        loadSourceTablePreview(offset: nextOffset)
+    }
+
+    func loadFitAnalysis(offset: Int = 0) {
+        guard let client, let selectedFileURL else {
+            return
+        }
+        guard fitAnalysisAvailability.isEnabled else {
+            fitAnalysisErrorMessage = fitAnalysisAvailability.reason
+            return
+        }
+        let resolvedOffset = max(0, offset)
+        fitAnalysisOffset = resolvedOffset
+        isLoadingFitAnalysis = true
+        fitAnalysisErrorMessage = nil
+        Task {
+            do {
+                let response = try await client.fitAnalysis(
+                    .init(
+                        inputPath: selectedFileURL.path,
+                        sheet: selectedSheet,
+                        modelID: "linear",
+                        offset: resolvedOffset,
+                        limit: fitAnalysisPageLimit
+                    )
+                )
+                fitAnalysisResponse = response
+                isLoadingFitAnalysis = false
+            } catch {
+                if isUserCancellationError(error) {
+                    fitAnalysisErrorMessage = nil
+                } else {
+                    fitAnalysisErrorMessage = error.localizedDescription
+                }
+                isLoadingFitAnalysis = false
+            }
+        }
+    }
+
+    func pageFitAnalysis(by delta: Int) {
+        let nextOffset = max(0, (fitAnalysisResponse?.offset ?? fitAnalysisOffset) + delta * fitAnalysisPageLimit)
+        loadFitAnalysis(offset: nextOffset)
+    }
+
+    func sourceProvenanceForCurrentURL(_ url: URL) -> PlotProjectSourceProvenancePayload {
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+            .map { Int($0.timeIntervalSince1970 * 1_000_000_000) }
+        return PlotProjectSourceProvenancePayload(
+            originalInputPath: url.path,
+            savedInputMtimeNs: mtime,
+            savedAt: nil
+        )
     }
 }

@@ -8,14 +8,27 @@ from typing import cast
 
 from fastapi import APIRouter
 
+from app.sidecar.project_bundle import (
+    normalize_project_path,
+    open_project_bundle,
+    save_project_bundle,
+)
 from app.sidecar.schemas import (
     ExportRenderRequest,
     ExportRenderResponse,
     FileRequest,
+    FitAnalysisRequest,
+    FitAnalysisResponse,
     InspectFileResponse,
+    OpenProjectRequest,
+    OpenProjectResponse,
     PreflightRenderResponse,
     RenderPreviewResponse,
     RenderRequest,
+    SaveProjectRequest,
+    SaveProjectResponse,
+    SourceTablePreviewRequest,
+    SourceTablePreviewResponse,
     rendered_plots_to_preview_payload,
     serialize_dataclass,
 )
@@ -46,6 +59,8 @@ from src.core.application.render import (
 )
 from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
 from src.infrastructure.runtime_cache import LRUCache
+from src.rendering.cache import load_curve_table_cached
+from src.rendering.fit_analysis import fit_linear_series_list
 
 _RENDER_PREVIEW_CACHE = LRUCache[str, RenderPreviewResponse](maxsize=64)
 
@@ -71,6 +86,10 @@ def _render_preview_cache_key(
             "options": options_payload,
         }
     )
+
+
+def _bounded_page(offset: int, limit: int, *, maximum: int = 200) -> tuple[int, int]:
+    return max(0, offset), max(1, min(limit, maximum))
 
 
 def create_render_router(*, dep_provider: Callable[[], object] | None = None) -> APIRouter:
@@ -103,6 +122,95 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             )
         except Exception as exc:
             raise http_bad_request("inspect", exc) from exc
+
+    @router.post("/source-table-preview", response_model=SourceTablePreviewResponse)
+    def source_table_preview(request: SourceTablePreviewRequest) -> SourceTablePreviewResponse:
+        try:
+            input_path = normalize_path(request.input_path)
+            sheet = coerce_sheet(str(request.sheet))
+            offset, limit = _bounded_page(request.offset, request.limit)
+            inspection = inspect_input_file(input_path, sheet)
+            dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
+            raw = read_raw_table_cached(input_path, sheet).dropna(axis=1, how="all")
+            recommendation = inspection.recommendations[0] if inspection.recommendations else None
+            page = raw.iloc[offset : offset + limit]
+            return SourceTablePreviewResponse.model_validate(
+                {
+                    "input_path": str(input_path),
+                    "sheet": sheet,
+                    "offset": offset,
+                    "limit": limit,
+                    "total_rows": int(raw.shape[0]),
+                    "total_cols": int(raw.shape[1]),
+                    "column_headers": [profile.name for profile in dataset.column_profiles],
+                    "rows": dataframe_sample_rows(page, limit=limit),
+                    "candidate_roles": serialize_dataclass(dataset.candidate_roles),
+                    "detected_x_label": (
+                        recommendation.inferred_mapping.get("x") if recommendation is not None else None
+                    ),
+                    "detected_y_label": (
+                        recommendation.inferred_mapping.get("y") if recommendation is not None else None
+                    ),
+                }
+            )
+        except Exception as exc:
+            raise http_bad_request("source-table-preview", exc) from exc
+
+    @router.post("/fit-analysis", response_model=FitAnalysisResponse)
+    def fit_analysis(request: FitAnalysisRequest) -> FitAnalysisResponse:
+        try:
+            input_path = normalize_path(request.input_path)
+            sheet = coerce_sheet(str(request.sheet))
+            if request.model_id != "linear":
+                raise ValueError("Only the linear fit model is supported in this release.")
+            offset, limit = _bounded_page(request.offset, request.limit)
+            series_list = load_curve_table_cached(input_path, sheet)
+            fit_result = fit_linear_series_list(series_list)
+            rows = fit_result.derived_rows[offset : offset + limit]
+            return FitAnalysisResponse.model_validate(
+                {
+                    "input_path": str(input_path),
+                    "sheet": sheet,
+                    "model_id": request.model_id,
+                    "x_label": fit_result.x_label,
+                    "y_label": fit_result.y_label,
+                    "equation_display": fit_result.equation_display,
+                    "slope": fit_result.slope,
+                    "intercept": fit_result.intercept,
+                    "r_squared": fit_result.r_squared,
+                    "rmse": fit_result.rmse,
+                    "point_count": fit_result.point_count,
+                    "warnings": [],
+                    "total_rows": len(fit_result.derived_rows),
+                    "offset": offset,
+                    "limit": limit,
+                    "rows": [serialize_dataclass(row) for row in rows],
+                }
+            )
+        except Exception as exc:
+            raise http_bad_request("fit-analysis", exc) from exc
+
+    @router.post("/save-project", response_model=SaveProjectResponse)
+    def save_project(request: SaveProjectRequest) -> SaveProjectResponse:
+        try:
+            project_path = Path(request.project_path).expanduser()
+            if project_path.suffix.lower() != ".sciplotgod":
+                raise ValueError("Project file must use the .sciplotgod extension.")
+            source_path = normalize_path(request.source_path)
+            return save_project_bundle(
+                project_path=project_path,
+                source_path=source_path,
+                payload=request.payload,
+            )
+        except Exception as exc:
+            raise http_bad_request("save-project", exc) from exc
+
+    @router.post("/open-project", response_model=OpenProjectResponse)
+    def open_project(request: OpenProjectRequest) -> OpenProjectResponse:
+        try:
+            return open_project_bundle(project_path=normalize_project_path(request.project_path))
+        except Exception as exc:
+            raise http_bad_request("open-project", exc) from exc
 
     @router.post("/preflight-render", response_model=PreflightRenderResponse)
     def preflight_render(request: RenderRequest) -> PreflightRenderResponse:

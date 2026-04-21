@@ -25,6 +25,18 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command])
 
+            Button("Save Project…") {
+                Task { await model.savePlotProject() }
+            }
+            .keyboardShortcut("s", modifiers: [.command])
+            .disabled(model.selectedWorkbench != .plot || !model.plotSession.saveProjectAvailability.isEnabled)
+
+            Button("Save Project As…") {
+                Task { await model.savePlotProjectAs() }
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(model.selectedWorkbench != .plot || !model.plotSession.saveProjectAvailability.isEnabled)
+
             Button(model.activeExportCommandTitle) {
                 Task { await model.exportActiveWorkbench() }
             }

@@ -70,6 +70,117 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
     }
 
+    func testProjectDirtyTracksDurablePlotStateOnly() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertTrue(session.isProjectDirty)
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplotgod"))
+
+        XCTAssertFalse(session.isProjectDirty)
+        XCTAssertEqual(session.projectURL?.path, "/tmp/sample.sciplotgod")
+
+        session.showDataWorkbook()
+        session.sourceTableOffset = 50
+        session.errorMessage = "Temporary"
+
+        XCTAssertFalse(session.isProjectDirty)
+
+        session.updateRenderOptions(policy: .immediate) { $0.xMin = 1.0 }
+
+        XCTAssertTrue(session.isProjectDirty)
+    }
+
+    func testOpenProjectRestoresPlotStateAndClearsDirty() async throws {
+        let client = MockSidecarClient()
+        let restoredPayload = TestPayloads.plotProjectPayload(
+            sourcePath: "/tmp/restored/project-source.csv",
+            projectName: "Curve Study",
+            templateID: "area_curve",
+            sheet: .name("RestoredSheet"),
+            renderOptions: RenderOptionsPayload(
+                size: "single_panel",
+                stylePreset: "presentation",
+                palettePreset: "shine",
+                visualThemeID: "shine"
+            )
+        )
+        client.openProjectResponse = TestPayloads.openProjectResponse(
+            projectPath: "/tmp/curve.sciplotgod",
+            restoredSourcePath: "/tmp/restored/project-source.csv",
+            payload: restoredPayload
+        )
+        client.inspectHandler = { request in
+            InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["RestoredSheet"],
+                inspection: client.inspectResponse.inspection,
+                dataset: client.inspectResponse.dataset
+            )
+        }
+        client.renderHandler = { request in
+            RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [.init(filename: "restored_preview.pdf", pdfBase64: TestPayloads.pdfBase64, qa: nil)],
+                submissionReport: TestPayloads.submissionReport()
+            )
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.openProject(URL(fileURLWithPath: "/tmp/curve.sciplotgod"))
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "restored_preview.pdf" }, timeout: 2.0)
+
+        XCTAssertEqual(client.openProjectRequests.first?.projectPath, "/tmp/curve.sciplotgod")
+        XCTAssertEqual(session.projectURL?.path, "/tmp/curve.sciplotgod")
+        XCTAssertEqual(session.selectedFileURL?.path, "/tmp/restored/project-source.csv")
+        XCTAssertEqual(session.selectedSheet, .name("RestoredSheet"))
+        XCTAssertEqual(session.selectedTemplateID, "area_curve")
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "shine")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "shine")
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
+    func testDataWorkbookLoadsSourceTableAndFitAnalysis() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.showDataWorkbook()
+        session.refreshDataWorkbookIfNeeded()
+        await waitUntil({ session.sourceTableResponse != nil }, timeout: 2.0)
+
+        XCTAssertEqual(client.sourceTablePreviewRequests.count, 1)
+
+        session.selectDataWorkbookTab(.fit)
+        await waitUntil({ session.fitAnalysisResponse != nil }, timeout: 2.0)
+
+        XCTAssertEqual(client.fitAnalysisRequests.count, 1)
+        XCTAssertEqual(session.fitAnalysisResponse?.equationDisplay, TestPayloads.fitAnalysis().equationDisplay)
+    }
+
     func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

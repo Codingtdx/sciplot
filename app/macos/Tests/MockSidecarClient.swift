@@ -21,6 +21,10 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioComparisonExportResponse = TestPayloads.dataStudioComparisonExport()
     var dataStudioSessionResponse = TestPayloads.dataStudioSession()
     var inspectResponse = TestPayloads.inspectFile()
+    var sourceTablePreviewResponse = TestPayloads.sourceTablePreview()
+    var fitAnalysisResponse = TestPayloads.fitAnalysis()
+    var saveProjectResponse = TestPayloads.saveProjectResponse()
+    var openProjectResponse = TestPayloads.openProjectResponse()
     var codeConsoleContextResponse = TestPayloads.codeConsoleContext()
     var codeConsoleRunResponse = TestPayloads.codeConsoleRun()
     var preflightResponse = TestPayloads.preflight()
@@ -44,6 +48,10 @@ final class MockSidecarClient: SidecarClienting {
     var dataStudioExportComparisonHandler: ((DataStudioExportComparisonRequest) async throws -> DataStudioComparisonExportResponse)?
     var dataStudioNormalizeSessionHandler: ((DataStudioSessionNormalizeRequest) async throws -> DataStudioSessionResponse)?
     var inspectHandler: ((FileRequest) async throws -> InspectFileResponse)?
+    var sourceTablePreviewHandler: ((SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse)?
+    var fitAnalysisHandler: ((FitAnalysisRequest) async throws -> FitAnalysisResponse)?
+    var saveProjectHandler: ((SaveProjectRequest) async throws -> SaveProjectResponse)?
+    var openProjectHandler: ((OpenProjectRequest) async throws -> OpenProjectResponse)?
     var codeConsoleContextHandler: ((CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse)?
     var codeConsoleRunHandler: ((CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse)?
     var preflightHandler: ((RenderRequest) async throws -> PreflightRenderResponse)?
@@ -67,6 +75,10 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var preflightRequests: [RenderRequest] = []
     private(set) var renderRequests: [RenderRequest] = []
     private(set) var exportRequests: [ExportRenderRequest] = []
+    private(set) var sourceTablePreviewRequests: [SourceTablePreviewRequest] = []
+    private(set) var fitAnalysisRequests: [FitAnalysisRequest] = []
+    private(set) var saveProjectRequests: [SaveProjectRequest] = []
+    private(set) var openProjectRequests: [OpenProjectRequest] = []
     private(set) var thumbnailRequests: [ThumbnailRequest] = []
     private(set) var composePreviewRequests: [ComposerRequestPayload] = []
     private(set) var composeExportRequests: [ComposerRequestPayload] = []
@@ -210,6 +222,38 @@ final class MockSidecarClient: SidecarClienting {
             return try await inspectHandler(request)
         }
         return inspectResponse
+    }
+
+    func sourceTablePreview(_ request: SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse {
+        sourceTablePreviewRequests.append(request)
+        if let sourceTablePreviewHandler {
+            return try await sourceTablePreviewHandler(request)
+        }
+        return sourceTablePreviewResponse
+    }
+
+    func fitAnalysis(_ request: FitAnalysisRequest) async throws -> FitAnalysisResponse {
+        fitAnalysisRequests.append(request)
+        if let fitAnalysisHandler {
+            return try await fitAnalysisHandler(request)
+        }
+        return fitAnalysisResponse
+    }
+
+    func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {
+        saveProjectRequests.append(request)
+        if let saveProjectHandler {
+            return try await saveProjectHandler(request)
+        }
+        return saveProjectResponse
+    }
+
+    func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse {
+        openProjectRequests.append(request)
+        if let openProjectHandler {
+            return try await openProjectHandler(request)
+        }
+        return openProjectResponse
     }
 
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse {

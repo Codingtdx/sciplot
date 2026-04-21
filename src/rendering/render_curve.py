@@ -25,6 +25,7 @@ from src.rendering.common import (
     validate_series_scales,
 )
 from src.rendering.dataset_models import build_normalized_dataset
+from src.rendering.fit_analysis import fit_linear_series_list
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName
 from src.rendering.qa import apply_curve_autofix
 from src.rendering.render_curve_support import (
@@ -617,30 +618,8 @@ def _render_bubble_scatter(input_path: Path, sheet: str | int, options: RenderOp
     return [rendered]
 
 def _fit_line_xy(series_list) -> tuple[np.ndarray, np.ndarray, str]:
-    x_blocks: list[np.ndarray] = []
-    y_blocks: list[np.ndarray] = []
-    for series in series_list:
-        frame = series.data.dropna(subset=["x", "y"])
-        if frame.empty:
-            continue
-        x_values = frame["x"].to_numpy(dtype=float)
-        y_values = frame["y"].to_numpy(dtype=float)
-        valid = np.isfinite(x_values) & np.isfinite(y_values)
-        if np.any(valid):
-            x_blocks.append(x_values[valid])
-            y_blocks.append(y_values[valid])
-    if not x_blocks:
-        raise ValueError("No valid X/Y series found.")
-    x_all = np.concatenate(x_blocks)
-    y_all = np.concatenate(y_blocks)
-    if x_all.size < 2:
-        raise ValueError("At least two points are required to compute a deterministic linear fit.")
-    if np.allclose(x_all, x_all[0]):
-        raise ValueError("Linear fit cannot be computed when all x values are identical.")
-    slope, intercept = np.polyfit(x_all, y_all, 1)
-    x_line = np.linspace(float(np.min(x_all)), float(np.max(x_all)), 120, dtype=float)
-    y_line = slope * x_line + intercept
-    return x_line, y_line, f"fit: y = {slope:.3g}x + {intercept:.3g}"
+    result = fit_linear_series_list(series_list)
+    return result.x_line, result.y_line, result.legend_label
 
 def _render_scatter_fit_like(
     input_path: Path,

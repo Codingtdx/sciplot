@@ -1,6 +1,7 @@
 import UniformTypeIdentifiers
 
 enum FileTypeCatalog {
+    static let plotProject = UTType(exportedAs: "com.codegod.project")
     static let csv = UTType(filenameExtension: "csv") ?? .data
     static let txt = UTType(filenameExtension: "txt") ?? .data
     static let tsv = UTType(filenameExtension: "tsv") ?? .data
@@ -14,6 +15,7 @@ enum FileTypeCatalog {
     static let tiff = UTType.tiff
 
     static let plotInputs = [csv, xlsx, xlsm]
+    static let plotDocumentInputs = [plotProject, csv, xlsx, xlsm]
     static let dataStudioRawInputs = [csv, txt, tsv, xls, xlsx, xlsm]
     static let dataStudioWorkbookInputs = [xlsx, xlsm]
     static let composerImports = [pdf, png, jpeg, webP, tiff]

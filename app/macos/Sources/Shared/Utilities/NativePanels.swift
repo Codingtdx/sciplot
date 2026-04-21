@@ -88,6 +88,16 @@ enum NativePanels {
             prompt: "Save"
         )
     }
+
+    static func choosePlotProjectSaveLocation(suggestedName: String) -> URL? {
+        chooseSaveLocation(
+            title: "Save Plot Project",
+            message: "Save the current Plot source data and figure settings into one project file.",
+            suggestedName: suggestedName,
+            allowedContentTypes: [FileTypeCatalog.plotProject],
+            prompt: "Save"
+        )
+    }
 }
 
 @MainActor

@@ -10,6 +10,7 @@ final class AppModel {
 
     enum PendingPlotReplacementAction {
         case importFromFilesystem
+        case openPlotDocument(URL)
         case openExternalFigure(URL, SheetValue, String?, RenderOptionsPayload?)
     }
 
@@ -171,6 +172,22 @@ final class AppModel {
         }
     }
 
+    func savePlotProject() async {
+        guard selectedWorkbench == .plot else {
+            return
+        }
+        await plotSession.saveProject()
+        refreshCodeConsoleContext()
+    }
+
+    func savePlotProjectAs() async {
+        guard selectedWorkbench == .plot else {
+            return
+        }
+        await plotSession.saveProjectAs()
+        refreshCodeConsoleContext()
+    }
+
     func showHelpForActiveWorkbench() {
         switch selectedWorkbench {
         case .plot:
@@ -251,6 +268,16 @@ final class AppModel {
         switch pendingPlotReplacementAction {
         case .importFromFilesystem:
             plotSession.isImporterPresented = true
+        case let .openPlotDocument(url):
+            selectedWorkbench = .plot
+            Task {
+                if url.pathExtension.lowercased() == "sciplotgod" {
+                    await plotSession.openProject(url)
+                } else {
+                    plotSession.importFile(url)
+                }
+                refreshCodeConsoleContext()
+            }
         case let .openExternalFigure(url, sheet, templateID, options):
             plotSession.stageExternalFigure(
                 inputURL: url,
@@ -282,6 +309,23 @@ final class AppModel {
             isPlotReplacementConfirmationPresented = true
         } else {
             plotSession.isImporterPresented = true
+        }
+    }
+
+    func openPlotDocument(_ url: URL) {
+        selectedWorkbench = .plot
+        if plotSession.hasSessionContent {
+            pendingPlotReplacementAction = .openPlotDocument(url)
+            isPlotReplacementConfirmationPresented = true
+            return
+        }
+        Task {
+            if url.pathExtension.lowercased() == "sciplotgod" {
+                await plotSession.openProject(url)
+            } else {
+                plotSession.importFile(url)
+            }
+            refreshCodeConsoleContext()
         }
     }
 }

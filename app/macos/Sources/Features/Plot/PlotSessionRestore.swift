@@ -1,6 +1,60 @@
 import Foundation
 
 extension PlotSession {
+    func restoreProject(from response: OpenProjectResponse) async {
+        guard let plotPayload = response.payload.plot else {
+            errorMessage = "Opened project is missing its Plot payload."
+            return
+        }
+        let projectURL = URL(fileURLWithPath: response.projectPath)
+        let restoredSourceURL = URL(fileURLWithPath: response.restoredSourcePath)
+        resetDataWorkbookState()
+        stageExternalFigure(
+            inputURL: restoredSourceURL,
+            sheet: plotPayload.sheet,
+            preferredTemplateID: plotPayload.selectedTemplateID,
+            preferredOptions: plotPayload.renderOptions
+        )
+        await finishLoadingStagedExternalFigure(
+            preferredTemplateID: plotPayload.selectedTemplateID,
+            preferredOptions: plotPayload.renderOptions,
+            expectedInputURL: restoredSourceURL,
+            expectedSheet: plotPayload.sheet
+        )
+        guard errorMessage == nil else {
+            return
+        }
+        applyNormalizedProjectState(
+            plotPayload,
+            projectURL: projectURL,
+            scheduleRefresh: false
+        )
+    }
+
+    func applyNormalizedProjectState(
+        _ plotPayload: PlotProjectPayload,
+        projectURL: URL,
+        scheduleRefresh: Bool
+    ) {
+        let previousSnapshot = currentProjectSnapshot
+        self.projectURL = projectURL
+        selectedSheet = plotPayload.sheet
+        selectedTemplateID = migrateLegacyTemplateID(plotPayload.selectedTemplateID)
+        renderOptions = plotPayload.renderOptions
+        sourceProvenance = plotPayload.sourceProvenance
+        notifyRenderOptionsDidChange()
+        runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+
+        guard scheduleRefresh, previousSnapshot != currentProjectSnapshot else {
+            return
+        }
+        if needsInspection {
+            scheduleInspection()
+        } else {
+            schedulePreviewRefresh(policy: .immediate)
+        }
+    }
+
     func loadExternalFigure(
         inputURL: URL,
         sheet: SheetValue,

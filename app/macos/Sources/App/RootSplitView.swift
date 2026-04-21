@@ -35,6 +35,9 @@ struct RootSplitView: View {
         .onChange(of: model.selectedWorkbench) { _, _ in
             model.refreshCodeConsoleContext()
         }
+        .onOpenURL { url in
+            model.openPlotDocument(url)
+        }
         .confirmationDialog(
             "Replace the current Plot session?",
             isPresented: $model.isPlotReplacementConfirmationPresented

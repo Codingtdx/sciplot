@@ -99,6 +99,97 @@ struct FileRequest: Codable, Equatable, Sendable {
     let sheet: SheetValue
 }
 
+struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let offset: Int
+    let limit: Int
+}
+
+struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let offset: Int
+    let limit: Int
+    let totalRows: Int
+    let totalCols: Int
+    let columnHeaders: [String]
+    let rows: [[JSONValue]]
+    let candidateRoles: PlotCandidateRolesResponse
+    let detectedXLabel: String?
+    let detectedYLabel: String?
+}
+
+struct FitAnalysisRequest: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let modelID: String
+    let offset: Int
+    let limit: Int
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        modelID: String = "linear",
+        offset: Int = 0,
+        limit: Int = 50
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.modelID = modelID
+        self.offset = offset
+        self.limit = limit
+    }
+}
+
+struct FitDerivedRowResponse: Codable, Equatable, Sendable, Identifiable {
+    let rowIndex: Int
+    let x: Double
+    let y: Double
+    let yFit: Double
+    let residual: Double
+
+    var id: Int { rowIndex }
+}
+
+struct FitAnalysisResponse: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let modelID: String
+    let xLabel: String?
+    let yLabel: String?
+    let equationDisplay: String
+    let slope: Double
+    let intercept: Double
+    let rSquared: Double
+    let rmse: Double
+    let pointCount: Int
+    let warnings: [String]
+    let totalRows: Int
+    let offset: Int
+    let limit: Int
+    let rows: [FitDerivedRowResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case sheet
+        case modelID = "modelId"
+        case xLabel
+        case yLabel
+        case equationDisplay
+        case slope
+        case intercept
+        case rSquared
+        case rmse
+        case pointCount
+        case warnings
+        case totalRows
+        case offset
+        case limit
+        case rows
+    }
+}
+
 struct CodeConsoleContextRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
@@ -196,6 +287,69 @@ struct ExportRenderRequest: Codable, Equatable, Sendable {
     let template: String
     let options: RenderOptionsPayload
     let outputDir: String?
+}
+
+struct PlotProjectSourceProvenancePayload: Codable, Equatable, Sendable {
+    let originalInputPath: String?
+    let savedInputMtimeNs: Int?
+    let savedAt: String?
+}
+
+struct PlotProjectPayload: Codable, Equatable, Sendable {
+    let sessionKind: String
+    let sourceFilename: String
+    let sourceMediaType: String?
+    let embeddedSourceRelpath: String
+    let sourceSHA256: String
+    let sheet: SheetValue
+    let selectedTemplateID: String
+    let renderOptions: RenderOptionsPayload
+    let projectDisplayName: String?
+    let sourceProvenance: PlotProjectSourceProvenancePayload
+
+    enum CodingKeys: String, CodingKey {
+        case sessionKind
+        case sourceFilename
+        case sourceMediaType
+        case embeddedSourceRelpath
+        case sourceSHA256
+        case sheet
+        case selectedTemplateID
+        case renderOptions
+        case projectDisplayName
+        case sourceProvenance
+    }
+}
+
+struct ProjectBundlePayload: Codable, Equatable, Sendable {
+    let version: Int
+    let selectedWorkbench: String
+    let plot: PlotProjectPayload?
+    let dataStudio: JSONValue?
+    let composer: JSONValue?
+    let codeConsole: JSONValue?
+    let artifacts: [String: JSONValue]
+}
+
+struct SaveProjectRequest: Codable, Equatable, Sendable {
+    let projectPath: String
+    let sourcePath: String
+    let payload: ProjectBundlePayload
+}
+
+struct SaveProjectResponse: Codable, Equatable, Sendable {
+    let projectPath: String
+    let payload: ProjectBundlePayload
+}
+
+struct OpenProjectRequest: Codable, Equatable, Sendable {
+    let projectPath: String
+}
+
+struct OpenProjectResponse: Codable, Equatable, Sendable {
+    let projectPath: String
+    let restoredSourcePath: String
+    let payload: ProjectBundlePayload
 }
 
 struct TemplateRecommendationResponse: Codable, Equatable, Sendable, Identifiable {

@@ -28,6 +28,10 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("GET", "/meta") in signatures
     assert ("GET", "/plot-contract") in signatures
     assert ("POST", "/inspect-file") in signatures
+    assert ("POST", "/source-table-preview") in signatures
+    assert ("POST", "/fit-analysis") in signatures
+    assert ("POST", "/save-project") in signatures
+    assert ("POST", "/open-project") in signatures
     assert ("POST", "/code-console/context") in signatures
     assert ("POST", "/code-console/run") in signatures
     assert ("POST", "/render-preview") in signatures

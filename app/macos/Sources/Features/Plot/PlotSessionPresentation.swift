@@ -2,6 +2,143 @@ import CoreGraphics
 import Foundation
 
 extension PlotSession {
+    var currentProjectSnapshot: ProjectSnapshot? {
+        guard let selectedFileURL else {
+            return nil
+        }
+        guard let selectedTemplateID = effectiveTemplateID else {
+            return nil
+        }
+        return ProjectSnapshot(
+            sourcePath: selectedFileURL.path,
+            selectedSheet: selectedSheet,
+            selectedTemplateID: selectedTemplateID,
+            renderOptions: renderOptions
+        )
+    }
+
+    var isProjectDirty: Bool {
+        guard let currentProjectSnapshot else {
+            return false
+        }
+        guard let lastSavedProjectSnapshot = runtimeState.lastSavedProjectSnapshot else {
+            return true
+        }
+        return currentProjectSnapshot != lastSavedProjectSnapshot
+    }
+
+    var suggestedProjectFilename: String {
+        if let projectURL {
+            return projectURL.lastPathComponent
+        }
+        if let selectedFileURL {
+            return selectedFileURL.deletingPathExtension().lastPathComponent + ".sciplotgod"
+        }
+        return "plot-project.sciplotgod"
+    }
+
+    var dataWorkbookAvailability: ActionAvailability {
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before opening the Data Workbook.")
+        }
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before opening the Data Workbook.")
+        }
+        return .enabled()
+    }
+
+    var fitAnalysisAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before fitting a curve.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before fitting a curve.")
+        }
+        guard let dataset = inspectionResponse?.dataset else {
+            return .disabled("Fit analysis becomes available after inspect finishes.")
+        }
+        let supportedModels = Set(["curve_table", "tensile_curve", "frequency_sweep", "temperature_sweep", "stress_relaxation"])
+        guard supportedModels.contains(dataset.model) else {
+            return .disabled("Linear fit is only available for curve-like data in this release.")
+        }
+        guard !dataset.candidateRoles.x.isEmpty, !dataset.candidateRoles.y.isEmpty else {
+            return .disabled("This sheet does not expose X/Y fields for fitting.")
+        }
+        guard dataset.rawRows >= 2 else {
+            return .disabled("At least two points are required to fit a line.")
+        }
+        return .enabled()
+    }
+
+    var sourceTableRows: [PlotWorkbookTableRow] {
+        guard let sourceTableResponse else {
+            return []
+        }
+        return sourceTableResponse.rows.enumerated().map { index, values in
+            PlotWorkbookTableRow(id: sourceTableResponse.offset + index, values: values)
+        }
+    }
+
+    var sourceTablePageSummary: String {
+        guard let response = sourceTableResponse else {
+            return "0 / 0"
+        }
+        if response.totalRows == 0 || response.rows.isEmpty {
+            return "0 / \(response.totalRows)"
+        }
+        let start = response.offset + 1
+        let end = min(response.totalRows, response.offset + response.rows.count)
+        return "\(start)-\(end) / \(response.totalRows)"
+    }
+
+    var canPageSourceTableBackward: Bool {
+        (sourceTableResponse?.offset ?? sourceTableOffset) > 0
+    }
+
+    var canPageSourceTableForward: Bool {
+        guard let sourceTableResponse else {
+            return false
+        }
+        return sourceTableResponse.offset + sourceTableResponse.rows.count < sourceTableResponse.totalRows
+    }
+
+    var fitAnalysisPageSummary: String {
+        guard let fitAnalysisResponse else {
+            return "0 / 0"
+        }
+        if fitAnalysisResponse.totalRows == 0 || fitAnalysisResponse.rows.isEmpty {
+            return "0 / \(fitAnalysisResponse.totalRows)"
+        }
+        let start = fitAnalysisResponse.offset + 1
+        let end = min(fitAnalysisResponse.totalRows, fitAnalysisResponse.offset + fitAnalysisResponse.rows.count)
+        return "\(start)-\(end) / \(fitAnalysisResponse.totalRows)"
+    }
+
+    var canPageFitAnalysisBackward: Bool {
+        (fitAnalysisResponse?.offset ?? fitAnalysisOffset) > 0
+    }
+
+    var canPageFitAnalysisForward: Bool {
+        guard let fitAnalysisResponse else {
+            return false
+        }
+        return fitAnalysisResponse.offset + fitAnalysisResponse.rows.count < fitAnalysisResponse.totalRows
+    }
+
+    var fitSummaryRows: [(String, String)] {
+        guard let fitAnalysisResponse else {
+            return []
+        }
+        return [
+            ("Equation", fitAnalysisResponse.equationDisplay),
+            ("Slope", fitAnalysisResponse.slope.formatted(.number.precision(.fractionLength(4)))),
+            ("Intercept", fitAnalysisResponse.intercept.formatted(.number.precision(.fractionLength(4)))),
+            ("R²", fitAnalysisResponse.rSquared.formatted(.number.precision(.fractionLength(4)))),
+            ("RMSE", fitAnalysisResponse.rmse.formatted(.number.precision(.fractionLength(4)))),
+            ("Points", "\(fitAnalysisResponse.pointCount)"),
+        ]
+    }
+
     var availableSheets: [SheetValue] {
         if let inspectionResponse, !inspectionResponse.sheetNames.isEmpty {
             return inspectionResponse.sheetNames.map(SheetValue.name)

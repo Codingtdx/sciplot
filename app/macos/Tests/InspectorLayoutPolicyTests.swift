@@ -126,6 +126,8 @@ final class InspectorLayoutPolicyTests: XCTestCase {
             palettePreset: "shine",
             visualThemeID: "macarons"
         )
+        importedPlotSession.sourceTableResponse = TestPayloads.sourceTablePreview(path: "/tmp/imported-curve.csv")
+        importedPlotSession.fitAnalysisResponse = TestPayloads.fitAnalysis(path: "/tmp/imported-curve.csv")
 
         let dataStudioClient = MockSidecarClient()
         dataStudioClient.dataStudioSourcePreviewHandler = { request in
@@ -223,6 +225,13 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                         plotOptionsAdvancedExpanded: true
                     ),
                     size: CGSize(width: 420, height: 760)
+                )
+            ),
+            (
+                "Plot data workbook",
+                snapshotPNGData(
+                    for: PlotDataWorkbookSheet(session: importedPlotSession),
+                    size: CGSize(width: 900, height: 640)
                 )
             ),
             (
@@ -414,6 +423,11 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         differenceHash: 0x0000010101010101,
         averageLuma: 0.9776,
         nonWhiteFraction: 0.1806
+    ),
+    "Plot data workbook": SnapshotFingerprint(
+        differenceHash: 0x8080808080a48300,
+        averageLuma: 0.6247,
+        nonWhiteFraction: 0.5139
     ),
     "Data Studio template editor": SnapshotFingerprint(
         differenceHash: 0x700108090c0c0c0c,

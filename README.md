@@ -31,6 +31,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 
 ## macOS Interaction Conventions
 
+- Plot open/import accepts either raw source data (`csv` / `xlsx` / `xlsm`) or a self-contained `.sciplotgod` project bundle. Saving a Plot project embeds the original source file bytes together with durable Plot state, so reopening the project restores the same starting point even if the original source path is gone.
+- Plot exposes a `Data` utility affordance that opens `Data Workbook`, a read-only sheet with `Source Data` and `Fit` tabs. `Fit` v1 is linear-only and reports the fitted equation, coefficients, `R²`, `RMSE`, point count, and per-point residual rows.
 - Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
 - Export UX is unified around the Data Studio inspector pattern: toolbar `Export` remains the global entrypoint, while workbench inspectors expose `Section("Actions")` with a primary export action and an `Advanced` disclosure for `Reveal Output` plus `Latest Export`.
 - Plot / Composer / Code Console figure exports always choose `PDF` or `300 dpi TIFF` first, then choose the destination. Single-output exports keep an editable filename; multi-output exports choose one base filename and append deterministic suffixes per figure.
@@ -49,6 +51,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
+- `POST /source-table-preview` returns paged raw source-table rows plus detected role/x/y hints for Plot `Data Workbook`.
+- `POST /fit-analysis` returns typed Plot linear-fit summaries and paged derived rows; Plot rendering and fit analysis share the same backend coefficients/equation helper.
+- `POST /save-project` and `POST /open-project` are the only supported Plot project-file persistence routes. `.sciplotgod` bundles are zip-based single files with embedded source bytes, schema validation, and normalization at ingress.
 - `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
 - Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`, including any manually selected representative curve override.
 - After a workbook is imported, Data Studio preview/compare/export read curves and metrics from that workbook only. `source_files` remain provenance metadata and must not be used as a silent fallback data source.
@@ -123,7 +128,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 - Smoke:
   - `.venv/bin/python scripts/smoke_check.py`
 - macOS GUI smoke/fingerprint guardrails:
-  - imported-state Plot inspector and Data Studio figure inspector snapshots are part of the canonical `InspectorLayoutPolicyTests` matrix and should keep exporting xcresult attachments for artifact-based visual QA.
+  - imported-state Plot inspector, Plot data workbook, and Data Studio figure inspector snapshots are part of the canonical `InspectorLayoutPolicyTests` matrix and should keep exporting xcresult attachments for artifact-based visual QA.
 - macOS build:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
 - macOS test:

@@ -998,6 +998,121 @@ enum TestPayloads {
         )
     }
 
+    static func sourceTablePreview(path: String = "/tmp/sample.csv") -> SourceTablePreviewResponse {
+        SourceTablePreviewResponse(
+            inputPath: path,
+            sheet: .name("Representative_Curve"),
+            offset: 0,
+            limit: 50,
+            totalRows: 3,
+            totalCols: 2,
+            columnHeaders: ["Strain", "Stress"],
+            rows: [
+                [.number(0.0), .number(0.0)],
+                [.number(0.1), .number(6.2)],
+                [.number(0.2), .number(12.0)],
+            ],
+            candidateRoles: .init(
+                x: ["Strain"],
+                y: ["Stress"],
+                z: [],
+                group: [],
+                sample: [],
+                value: [],
+                metric: [],
+                label: [],
+                series: []
+            ),
+            detectedXLabel: "Strain",
+            detectedYLabel: "Stress"
+        )
+    }
+
+    static func fitAnalysis(path: String = "/tmp/sample.csv") -> FitAnalysisResponse {
+        FitAnalysisResponse(
+            inputPath: path,
+            sheet: .name("Representative_Curve"),
+            modelID: "linear",
+            xLabel: "Strain",
+            yLabel: "Stress",
+            equationDisplay: "y = 60x + 0.0333",
+            slope: 60.0,
+            intercept: 0.0333,
+            rSquared: 0.999,
+            rmse: 0.109,
+            pointCount: 3,
+            warnings: [],
+            totalRows: 3,
+            offset: 0,
+            limit: 50,
+            rows: [
+                .init(rowIndex: 0, x: 0.0, y: 0.0, yFit: 0.0333, residual: -0.0333),
+                .init(rowIndex: 1, x: 0.1, y: 6.2, yFit: 6.0333, residual: 0.1667),
+                .init(rowIndex: 2, x: 0.2, y: 12.0, yFit: 12.0333, residual: -0.0333),
+            ]
+        )
+    }
+
+    static func plotProjectPayload(
+        sourcePath: String = "/tmp/sample.csv",
+        projectName: String = "sample-project",
+        templateID: String = "curve",
+        sheet: SheetValue = .name("Representative_Curve"),
+        renderOptions: RenderOptionsPayload = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "nature",
+            palettePreset: "roma",
+            visualThemeID: "roma"
+        )
+    ) -> ProjectBundlePayload {
+        ProjectBundlePayload(
+            version: 1,
+            selectedWorkbench: "plot",
+            plot: PlotProjectPayload(
+                sessionKind: "plot",
+                sourceFilename: URL(fileURLWithPath: sourcePath).lastPathComponent,
+                sourceMediaType: "text/csv",
+                embeddedSourceRelpath: "sources/primary/\(URL(fileURLWithPath: sourcePath).lastPathComponent)",
+                sourceSHA256: "abc123",
+                sheet: sheet,
+                selectedTemplateID: templateID,
+                renderOptions: renderOptions,
+                projectDisplayName: projectName,
+                sourceProvenance: .init(
+                    originalInputPath: sourcePath,
+                    savedInputMtimeNs: 123,
+                    savedAt: "2026-04-21T10:00:00Z"
+                )
+            ),
+            dataStudio: nil,
+            composer: nil,
+            codeConsole: nil,
+            artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]
+        )
+    }
+
+    static func saveProjectResponse(
+        projectPath: String = "/tmp/sample.sciplotgod",
+        payload: ProjectBundlePayload? = nil
+    ) -> SaveProjectResponse {
+        SaveProjectResponse(
+            projectPath: projectPath,
+            payload: payload ?? plotProjectPayload()
+        )
+    }
+
+    static func openProjectResponse(
+        projectPath: String = "/tmp/sample.sciplotgod",
+        restoredSourcePath: String = "/tmp/restored/sample.csv",
+        payload: ProjectBundlePayload? = nil
+    ) -> OpenProjectResponse {
+        OpenProjectResponse(
+            projectPath: projectPath,
+            restoredSourcePath: restoredSourcePath,
+            payload: payload ?? plotProjectPayload(sourcePath: restoredSourcePath)
+        )
+    }
+
     static func dataStudioTemplate(
         id: String = "builtin/tensile",
         label: String = "Tensile"

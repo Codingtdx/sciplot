@@ -30,13 +30,13 @@ struct PlotWorkbenchView: View {
         }
         .fileImporter(
             isPresented: bindingForImporter,
-            allowedContentTypes: FileTypeCatalog.plotInputs,
+            allowedContentTypes: FileTypeCatalog.plotDocumentInputs,
             allowsMultipleSelection: false
         ) { result in
             switch result {
             case let .success(urls):
                 if let first = urls.first {
-                    session.importFile(first)
+                    session.handleImportedDocument(first)
                 }
             case let .failure(error):
                 if isUserCancellationError(error) {
@@ -49,8 +49,8 @@ struct PlotWorkbenchView: View {
         .sheet(isPresented: bindingForGuide) {
             PlotGuideSheet(session: session)
         }
-        .sheet(isPresented: bindingForSourceInspector) {
-            PlotSourceInspectorSheet(session: session)
+        .sheet(isPresented: bindingForDataWorkbook) {
+            PlotDataWorkbookSheet(session: session)
         }
     }
 
@@ -72,6 +72,13 @@ struct PlotWorkbenchView: View {
                 .pickerStyle(.menu)
                 .frame(width: 220, alignment: .leading)
             }
+
+            Button("Data") {
+                session.showDataWorkbook()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!session.dataWorkbookAvailability.isEnabled)
+            .help(session.dataWorkbookAvailability.reason ?? "Open the Data Workbook.")
 
             Image(systemName: session.liveStatusSymbol)
                 .symbolEffect(
@@ -98,10 +105,10 @@ struct PlotWorkbenchView: View {
         )
     }
 
-    private var bindingForSourceInspector: Binding<Bool> {
+    private var bindingForDataWorkbook: Binding<Bool> {
         Binding(
-            get: { session.isSourceInspectorPresented },
-            set: { session.isSourceInspectorPresented = $0 }
+            get: { session.isDataWorkbookPresented },
+            set: { session.isDataWorkbookPresented = $0 }
         )
     }
 
@@ -282,180 +289,324 @@ private struct PlotGuideSheet: View {
     }
 }
 
-private struct PlotSourceInspectorSheet: View {
+struct PlotDataWorkbookSheet: View {
     let session: PlotSession
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    sourceSummaryCard
-                    inspectSummaryCard
-                    candidateRolesCard
-                    rawDataCard
-                }
-                .padding(24)
+            VStack(alignment: .leading, spacing: 16) {
+                workbookHeader
+                tabBar
+                activeContent
             }
-            .navigationTitle("Source Inspector")
+            .padding(24)
+            .navigationTitle("Data Workbook")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         dismiss()
-                        session.dismissSourceInspector()
+                        session.dismissDataWorkbook()
                     }
                 }
             }
+        }
+        .onAppear {
+            session.refreshDataWorkbookIfNeeded()
         }
         .frame(minWidth: 760, minHeight: 560)
     }
 
-    private var sourceSummaryCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                LabeledContent("File", value: session.selectedSourceFilename ?? "Unknown")
-                if let path = session.selectedSourcePath {
-                    LabeledContent("Path", value: path)
-                        .textSelection(.enabled)
-                }
-                LabeledContent("Sheet", value: session.selectedSheet.displayName)
+    private var workbookHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(session.selectedSourceFilename ?? "Plot Source")
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 12)
+
                 if let template = session.selectedTemplateSummary?.label {
-                    LabeledContent("Template", value: template)
-                }
-
-                HStack(spacing: 10) {
-                    Button("Open Source") {
-                        session.openCurrentSource()
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Reveal Source") {
-                        session.revealCurrentSource()
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            .padding(.top, 4)
-        } label: {
-            Text("Source")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var inspectSummaryCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                if let inspection = session.inspectionResponse {
-                    LabeledContent("Model", value: inspection.inspection.modelLabel)
-                    LabeledContent("Confidence", value: inspection.inspection.recommendationConfidence.formatted(.percent.precision(.fractionLength(0...0))))
-                    if let dataset = inspection.dataset {
-                        LabeledContent("Rows", value: "\(dataset.rawRows)")
-                        LabeledContent("Columns", value: "\(dataset.rawCols)")
-                        if !dataset.dataShapes.isEmpty {
-                            LabeledContent("Shapes", value: dataset.dataShapes.joined(separator: ", "))
-                        }
-                        if !dataset.semanticSignals.isEmpty {
-                            LabeledContent("Signals", value: dataset.semanticSignals.joined(separator: ", "))
-                        }
-                        if !dataset.qualityFlags.isEmpty {
-                            LabeledContent("Flags", value: dataset.qualityFlags.joined(separator: ", "))
-                        }
-                    }
-                    if !inspection.inspection.warnings.isEmpty {
-                        ForEach(inspection.inspection.warnings, id: \.self) { warning in
-                            Label(warning, systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                                .font(.footnote)
-                        }
-                    }
-                    if !inspection.inspection.signals.isEmpty {
-                        ForEach(inspection.inspection.signals, id: \.self) { signal in
-                            Label(signal, systemImage: "info.circle")
-                                .foregroundStyle(.secondary)
-                                .font(.footnote)
-                        }
-                    }
-                } else {
-                    Text("No inspect payload")
+                    Text(template)
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.top, 4)
-        } label: {
-            Text("Inspect")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+
+            HStack(spacing: 16) {
+                Text("Sheet: \(session.selectedSheet.displayName)")
+                    .foregroundStyle(.secondary)
+                if let dataset = session.inspectionResponse?.dataset {
+                    Text("Rows: \(dataset.rawRows)")
+                        .foregroundStyle(.secondary)
+                    Text("Cols: \(dataset.rawCols)")
+                        .foregroundStyle(.secondary)
+                }
+                if let xLabel = session.sourceTableResponse?.detectedXLabel ?? session.recommendedXAxisLabel {
+                    Text("X: \(xLabel)")
+                        .foregroundStyle(.secondary)
+                }
+                if let yLabel = session.sourceTableResponse?.detectedYLabel ?? session.recommendedYAxisLabel {
+                    Text("Y: \(yLabel)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button("Open Source") {
+                    session.openCurrentSource()
+                }
+                .buttonStyle(.bordered)
+
+                Button("Reveal Source") {
+                    session.revealCurrentSource()
+                }
+                .buttonStyle(.bordered)
+            }
         }
     }
 
-    private var candidateRolesCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                if session.candidateRoleRows.isEmpty {
-                    Text("No candidate roles")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+    private var tabBar: some View {
+        HStack(spacing: 10) {
+            workbookTabButton(.sourceData, availability: ActionAvailability.enabled())
+            workbookTabButton(.fit, availability: session.fitAnalysisAvailability)
+        }
+    }
+
+    @ViewBuilder
+    private var activeContent: some View {
+        switch session.dataWorkbookTab {
+        case .sourceData:
+            sourceDataContent
+        case .fit:
+            fitContent
+        }
+    }
+
+    private var sourceDataContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !session.candidateRoleRows.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
                         ForEach(session.candidateRoleRows, id: \.0) { role, values in
-                            GridRow {
-                                Text(role)
-                                    .foregroundStyle(.secondary)
-                                Text(values)
-                                    .textSelection(.enabled)
-                            }
+                            Text("\(role): \(values)")
+                                .font(.footnote)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.quinary.opacity(0.3), in: Capsule())
                         }
                     }
                 }
             }
-            .padding(.top, 4)
-        } label: {
-            Text("Candidate Roles")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+
+            if let sourceTableErrorMessage = session.sourceTableErrorMessage {
+                ErrorStateCard(
+                    title: "Could not load the source table",
+                    message: sourceTableErrorMessage,
+                    retryTitle: "Retry"
+                ) {
+                    session.loadSourceTablePreview(offset: session.sourceTableOffset)
+                }
+            } else if session.isLoadingSourceTable && session.sourceTableResponse == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let sourceTableResponse = session.sourceTableResponse {
+                Table(session.sourceTableRows) {
+                    TableColumn("#") { row in
+                        Text("\(row.id + 1)")
+                            .foregroundStyle(.secondary)
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(0) {
+                        TableColumn(sourceTableResponse.columnHeaders[0]) { row in
+                            Text(row.value(at: 0).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(1) {
+                        TableColumn(sourceTableResponse.columnHeaders[1]) { row in
+                            Text(row.value(at: 1).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(2) {
+                        TableColumn(sourceTableResponse.columnHeaders[2]) { row in
+                            Text(row.value(at: 2).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(3) {
+                        TableColumn(sourceTableResponse.columnHeaders[3]) { row in
+                            Text(row.value(at: 3).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(4) {
+                        TableColumn(sourceTableResponse.columnHeaders[4]) { row in
+                            Text(row.value(at: 4).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(5) {
+                        TableColumn(sourceTableResponse.columnHeaders[5]) { row in
+                            Text(row.value(at: 5).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(6) {
+                        TableColumn(sourceTableResponse.columnHeaders[6]) { row in
+                            Text(row.value(at: 6).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(7) {
+                        TableColumn(sourceTableResponse.columnHeaders[7]) { row in
+                            Text(row.value(at: 7).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if sourceTableResponse.columnHeaders.indices.contains(8) {
+                        TableColumn(sourceTableResponse.columnHeaders[8]) { row in
+                            Text(row.value(at: 8).displayString)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                .frame(minHeight: 320)
+
+                HStack {
+                    Button("Previous") {
+                        session.pageSourceTable(by: -1)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.canPageSourceTableBackward)
+
+                    Button("Next") {
+                        session.pageSourceTable(by: 1)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.canPageSourceTableForward)
+
+                    Spacer()
+
+                    Text(session.sourceTablePageSummary)
+                        .foregroundStyle(.secondary)
+
+                    if sourceTableResponse.totalCols > 9 {
+                        Text("Showing first 9 of \(sourceTableResponse.totalCols) columns")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                EmptyStateCard(title: "No source table")
+            }
         }
     }
 
-    private var rawDataCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                if session.sampleColumns.isEmpty || session.sampleRows.isEmpty {
-                    Text("No raw sample rows")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ScrollView(.horizontal) {
-                        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-                            GridRow {
-                                Text("#")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                ForEach(session.sampleColumns) { column in
-                                    Text(column.title)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            ForEach(session.sampleRows) { row in
-                                GridRow {
-                                    Text("\(row.id + 1)")
-                                        .foregroundStyle(.secondary)
-                                    ForEach(session.sampleColumns) { column in
-                                        Text(row.value(at: column.id).displayString)
-                                            .textSelection(.enabled)
-                                    }
-                                }
-                            }
+    private var fitContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !session.fitAnalysisAvailability.isEnabled {
+                EmptyStateCard(
+                    title: "Linear Fit Unavailable",
+                    message: session.fitAnalysisAvailability.reason
+                )
+            } else if let fitAnalysisErrorMessage = session.fitAnalysisErrorMessage {
+                ErrorStateCard(
+                    title: "Could not analyze the linear fit",
+                    message: fitAnalysisErrorMessage,
+                    retryTitle: "Retry"
+                ) {
+                    session.loadFitAnalysis(offset: session.fitAnalysisOffset)
+                }
+            } else if session.isLoadingFitAnalysis && session.fitAnalysisResponse == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let fitAnalysisResponse = session.fitAnalysisResponse {
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                    ForEach(session.fitSummaryRows, id: \.0) { label, value in
+                        GridRow {
+                            Text(label)
+                                .foregroundStyle(.secondary)
+                            Text(value)
+                                .textSelection(.enabled)
                         }
-                        .padding(.vertical, 4)
                     }
                 }
+
+                if !fitAnalysisResponse.warnings.isEmpty {
+                    ForEach(fitAnalysisResponse.warnings, id: \.self) { warning in
+                        Text(warning)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Table(fitAnalysisResponse.rows) {
+                    TableColumn("X") { row in
+                        Text(row.x.formatted(.number.precision(.fractionLength(4))))
+                    }
+                    TableColumn("Y") { row in
+                        Text(row.y.formatted(.number.precision(.fractionLength(4))))
+                    }
+                    TableColumn("Y Fit") { row in
+                        Text(row.yFit.formatted(.number.precision(.fractionLength(4))))
+                    }
+                    TableColumn("Residual") { row in
+                        Text(row.residual.formatted(.number.precision(.fractionLength(4))))
+                    }
+                }
+                .frame(minHeight: 320)
+
+                HStack {
+                    Button("Previous") {
+                        session.pageFitAnalysis(by: -1)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.canPageFitAnalysisBackward)
+
+                    Button("Next") {
+                        session.pageFitAnalysis(by: 1)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.canPageFitAnalysisForward)
+
+                    Spacer()
+
+                    Text(session.fitAnalysisPageSummary)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                EmptyStateCard(title: "No fit analysis")
             }
-            .padding(.top, 4)
-        } label: {
-            Text("Raw Data")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func workbookTabButton(
+        _ tab: PlotDataWorkbookTab,
+        availability: ActionAvailability
+    ) -> some View {
+        if tab == session.dataWorkbookTab {
+            Button(tab.title) {
+                session.selectDataWorkbookTab(tab)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!availability.isEnabled)
+            .help(availability.reason ?? tab.title)
+        } else {
+            Button(tab.title) {
+                session.selectDataWorkbookTab(tab)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!availability.isEnabled)
+            .help(availability.reason ?? tab.title)
         }
     }
 }

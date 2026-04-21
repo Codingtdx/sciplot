@@ -1,6 +1,14 @@
 import Foundation
 
 extension PlotSession {
+    func handleImportedDocument(_ url: URL) {
+        if url.pathExtension.lowercased() == "sciplotgod" {
+            Task { await openProject(url) }
+            return
+        }
+        importFile(url)
+    }
+
     func importFile(_ url: URL) {
         prepareSource(url: url, sheet: .index(0), resetTemplate: true)
         scheduleInspection()
@@ -46,6 +54,7 @@ extension PlotSession {
         cancelInspectionTask()
         cancelPreviewTask()
         selectedFileURL = nil
+        projectURL = nil
         selectedSheet = .index(0)
         inspectionResponse = nil
         previewResponse = nil
@@ -57,9 +66,17 @@ extension PlotSession {
         isPreviewing = false
         isRunningPreflight = false
         isExporting = false
+        isSavingProject = false
         selectedTemplateID = nil
         runtimeState.inspectedInputPath = nil
         runtimeState.inspectedSheet = nil
+        runtimeState.lastSavedProjectSnapshot = nil
+        sourceProvenance = PlotProjectSourceProvenancePayload(
+            originalInputPath: nil,
+            savedInputMtimeNs: nil,
+            savedAt: nil
+        )
+        resetDataWorkbookState()
         if !preserveRenderOptions {
             renderOptions = RenderOptionsPayload(
                 stylePreset: metadata?.defaults.stylePreset ?? "nature",
@@ -110,6 +127,7 @@ extension PlotSession {
         _ = asyncCoordination.preview.beginNow()
         isPreviewing = false
         selectedFileURL = url
+        sourceProvenance = sourceProvenanceForCurrentURL(url)
         selectedSheet = sheet
         inspectionResponse = nil
         runtimeState.inspectedInputPath = nil
@@ -120,6 +138,7 @@ extension PlotSession {
         runtimeState.stagedExternalPinnedSheet = nil
         runtimeState.stagedExternalPinnedTemplateID = nil
         invalidateSubmissionArtifacts()
+        resetDataWorkbookState()
         errorMessage = nil
     }
 
@@ -185,6 +204,7 @@ extension PlotSession {
         }
 
         schedulePreviewRefresh(policy: .immediate)
+        refreshDataWorkbookIfNeeded()
     }
 
     func shouldAutoSelectTemplate(

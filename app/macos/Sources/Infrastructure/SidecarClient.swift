@@ -18,6 +18,10 @@ protocol SidecarClienting: AnyObject {
     func exportDataStudioComparison(_ request: DataStudioExportComparisonRequest) async throws -> DataStudioComparisonExportResponse
     func normalizeDataStudioSession(_ request: DataStudioSessionNormalizeRequest) async throws -> DataStudioSessionResponse
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse
+    func sourceTablePreview(_ request: SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse
+    func fitAnalysis(_ request: FitAnalysisRequest) async throws -> FitAnalysisResponse
+    func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse
+    func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse
     func runCodeConsole(_ request: CodeConsoleRunRequest) async throws -> CodeConsoleRunResponse
     func preflightRender(_ request: RenderRequest) async throws -> PreflightRenderResponse
@@ -113,6 +117,22 @@ final class SidecarClient: SidecarClienting {
 
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse {
         try await post("inspect-file", body: request)
+    }
+
+    func sourceTablePreview(_ request: SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse {
+        try await post("source-table-preview", body: request)
+    }
+
+    func fitAnalysis(_ request: FitAnalysisRequest) async throws -> FitAnalysisResponse {
+        try await post("fit-analysis", body: request)
+    }
+
+    func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {
+        try await post("save-project", body: request)
+    }
+
+    func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse {
+        try await post("open-project", body: request)
     }
 
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse {

@@ -8,10 +8,18 @@ final class PlotSession {
     typealias PlotExportFormatChooser = @MainActor (_ isMultiOutput: Bool) -> ExportGraphicFormat?
     typealias PlotExportDestinationChooser = @MainActor (_ suggestedName: String, _ isMultiOutput: Bool, _ format: ExportGraphicFormat) -> URL?
     typealias PlotExportMaterializer = @MainActor (_ sourceURLs: [URL], _ destinationURL: URL) throws -> [URL]
+    typealias PlotProjectSaveChooser = @MainActor (_ suggestedName: String) -> URL?
 
     struct UndoSnapshot: Equatable {
         let selectedSheet: SheetValue
         let selectedTemplateID: String?
+        let renderOptions: RenderOptionsPayload
+    }
+
+    struct ProjectSnapshot: Equatable {
+        let sourcePath: String
+        let selectedSheet: SheetValue
+        let selectedTemplateID: String
         let renderOptions: RenderOptionsPayload
     }
 
@@ -21,6 +29,7 @@ final class PlotSession {
         var stagedExternalPinnedSheet: SheetValue?
         var stagedExternalPinnedTemplateID: String?
         var isApplyingUndoRedo = false
+        var lastSavedProjectSnapshot: ProjectSnapshot?
     }
 
     @MainActor
@@ -35,6 +44,7 @@ final class PlotSession {
     @ObservationIgnored let chooseExportFormat: PlotExportFormatChooser
     @ObservationIgnored let chooseExportDestination: PlotExportDestinationChooser
     @ObservationIgnored let materializeExport: PlotExportMaterializer
+    @ObservationIgnored let chooseProjectSaveLocation: PlotProjectSaveChooser
     @ObservationIgnored var runtimeState = RuntimeState()
     @ObservationIgnored let asyncCoordination = AsyncCoordination()
     @ObservationIgnored weak var undoManager: UndoManager?
@@ -42,8 +52,9 @@ final class PlotSession {
 
     var isImporterPresented = false
     var isGuidePresented = false
-    var isSourceInspectorPresented = false
+    var isDataWorkbookPresented = false
     var selectedFileURL: URL?
+    var projectURL: URL?
     var selectedSheet: SheetValue = .index(0)
     var inspectionResponse: InspectFileResponse?
     var metadata: SidecarMetaResponse?
@@ -58,7 +69,22 @@ final class PlotSession {
     var isPreviewing = false
     var isRunningPreflight = false
     var isExporting = false
+    var isSavingProject = false
     var userExportURLs: [URL] = []
+    var dataWorkbookTab: PlotDataWorkbookTab = .sourceData
+    var sourceTableResponse: SourceTablePreviewResponse?
+    var fitAnalysisResponse: FitAnalysisResponse?
+    var sourceTableErrorMessage: String?
+    var fitAnalysisErrorMessage: String?
+    var isLoadingSourceTable = false
+    var isLoadingFitAnalysis = false
+    var sourceTableOffset = 0
+    var fitAnalysisOffset = 0
+    var sourceProvenance = PlotProjectSourceProvenancePayload(
+        originalInputPath: nil,
+        savedInputMtimeNs: nil,
+        savedAt: nil
+    )
 
     var exportAvailability: ActionAvailability {
         if isExporting {
@@ -75,6 +101,22 @@ final class PlotSession {
         }
         guard !needsInspection else {
             return .disabled("Wait for inspect to finish before exporting.")
+        }
+        return .enabled()
+    }
+
+    var saveProjectAvailability: ActionAvailability {
+        if isSavingProject {
+            return .disabled("Project save is already in progress.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard currentProjectSnapshot != nil else {
+            return .disabled("Import a plot source before saving a project.")
+        }
+        guard !needsInspection else {
+            return .disabled("Wait for inspect to finish before saving the project.")
         }
         return .enabled()
     }
@@ -103,11 +145,15 @@ final class PlotSession {
         },
         materializeExport: @escaping PlotExportMaterializer = {
             try NativeExportCoordinator.materializePlotOutputs(sourceURLs: $0, destinationURL: $1)
+        },
+        chooseProjectSaveLocation: @escaping PlotProjectSaveChooser = {
+            NativePanels.choosePlotProjectSaveLocation(suggestedName: $0)
         }
     ) {
         self.chooseExportFormat = chooseExportFormat
         self.chooseExportDestination = chooseExportDestination
         self.materializeExport = materializeExport
+        self.chooseProjectSaveLocation = chooseProjectSaveLocation
     }
 
     var hasSessionContent: Bool {
@@ -181,12 +227,12 @@ final class PlotSession {
         isGuidePresented = false
     }
 
-    func showSourceInspector() {
-        isSourceInspectorPresented = true
+    func showDataWorkbook() {
+        isDataWorkbookPresented = true
     }
 
-    func dismissSourceInspector() {
-        isSourceInspectorPresented = false
+    func dismissDataWorkbook() {
+        isDataWorkbookPresented = false
     }
 }
 

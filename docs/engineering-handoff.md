@@ -2243,6 +2243,103 @@ Every development round must update this file.
     - exported snapshot PNGs during the focused inspector run to `/tmp/sciplot-gui-snapshots`
     - full `InspectorLayoutPolicyTests` fingerprint/smoke coverage now includes `Plot imported inspector` and `Data Studio figure inspector`
 
+### 2026-04-21 (Round AQ): Plot self-contained project bundles, Data Workbook, and linear fit v1
+
+- Scope:
+  - Added Plot project-file persistence through sidecar schema normalization and zip-bundle IO:
+    - `POST /save-project`
+    - `POST /open-project`
+    - bundle structure:
+      - `project.json`
+      - `sources/primary/<original-filename>`
+      - `artifacts/manifest.json`
+  - Added Plot data-analysis routes:
+    - `POST /source-table-preview`
+    - `POST /fit-analysis`
+  - Introduced shared backend fit analysis in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/fit_analysis.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+    - linear fit now uses one `statsmodels.OLS`-backed helper for both `scatter_fit` rendering and Data Workbook fit summaries.
+  - Added app-managed restored source persistence in:
+    - `/Users/dongxutian/Documents/codegod/src/infrastructure/persistence/plot_projects.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - Extended macOS Plot session/client/runtime wiring so Plot can:
+    - open raw source files or `.sciplotgod`
+    - save `Save Project…` / `Save Project As…`
+    - track `projectURL` and `isProjectDirty`
+    - restore source file, sheet, template, style/palette/theme, and render options from a saved Plot project
+  - Replaced the old hidden `Source Inspector` with `PlotDataWorkbookSheet` in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`:
+    - `Source Data` tab: paged read-only table
+    - `Fit` tab: linear equation, slope, intercept, `R²`, `RMSE`, point count, and derived rows
+  - Updated `README.md`, `AGENTS.md`, snapshot fixtures, and new Python/macOS regression coverage for the new project/file-analysis surface.
+- User-visible impact:
+  - Plot can now save a self-contained `.sciplotgod` file that embeds the original csv/xlsx/xlsm bytes together with durable Plot state; reopening the project returns to the same Plot starting point even if the original source path is gone.
+  - Plot now exposes a discoverable `Data` affordance that opens `Data Workbook` instead of the old hidden diagnostic sheet.
+  - `Data Workbook` v1 lets users inspect paged source rows and run a linear fit with equation/statistics output directly inside Plot.
+  - Plot command menus now expose `Save Project…` and `Save Project As…`.
+  - No inline spreadsheet editing, autosave, or non-linear fitting was added in this round.
+- Risks:
+  - `.sciplotgod` is now a binary zip bundle with embedded source bytes; large workbook inputs will increase project-file size, and future schema changes must continue to go through sidecar normalization rather than direct client JSON edits.
+  - Data Workbook v1 intentionally caps the visible SwiftUI table to the index column plus the first nine source columns because of the current macOS `Table` builder limits; wide sheets remain paged by row but not fully horizontally exhaustive yet.
+  - Fit analysis is linear-only in v1; expanding to polynomial/custom models must keep the shared helper path intact or the rendered fit line, displayed equation, and derived rows can drift apart again.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/src/infrastructure/persistence/plot_projects.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/fit_analysis.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionTypes.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppCommands.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/Utilities/FileTypeCatalog.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/Utilities/NativePanels.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Info.plist`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/MockSidecarClient.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_active_routes.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: “open project and return to the same work starting point” is impossible if Plot only persists source paths. The durable state therefore has to be coupled to the original source bytes, not just to a JSON pointer.
+  - Chose one self-contained zip bundle over a path-only JSON file:
+    - accepted because it is portable, lets Plot recover after the original source path disappears, and keeps schema migration centralized in sidecar
+    - rejected path-only persistence because moving/deleting the original csv/xlsx would break the core restore promise
+  - Chose a read-only SwiftUI `Table` workbook v1 over an editable spreadsheet surface:
+    - accepted because the immediate product need is inspection + fit analysis, not cell editing
+    - rejected AppKit/NSTableView editing in this round because it would widen scope and runtime complexity before the fit/project-file loop is proven
+  - Boundary:
+    - Plot workflow remains `Import -> Inspect -> Template -> Refine -> Preflight -> Export`; `Data Workbook` is a utility affordance, not a new app-level stage
+    - v1 project restore covers Plot durable work state only, not undo history, temporary errors, export history, or transient sheet/popup UI
+    - v1 fit analysis is linear-only
+- Troubleshooting note:
+  - SwiftUI macOS `Table` column builders remain fragile here:
+    - dynamic `ForEach` over `TableColumn` content did not compile cleanly in this project setup
+    - the builder also effectively caps one table declaration at ten columns
+    - if Data Workbook wide-sheet work resumes later, prefer either an AppKit bridge or another explicit typed presentation strategy instead of trying to push a more dynamic `TableColumnBuilder` shape through the current view
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 35 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`190 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`147 tests`)
+  - `git diff --check`: passed
+
 Use this block for every new round:
 
 ```

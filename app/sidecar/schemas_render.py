@@ -53,6 +53,58 @@ class ExportRenderRequest(RenderRequest):
     output_dir: str | None = None
 
 
+class SourceTablePreviewRequest(FileRequest):
+    offset: int = 0
+    limit: int = 50
+
+
+class SourceTablePreviewResponse(StrictModel):
+    input_path: str
+    sheet: str | int
+    offset: int
+    limit: int
+    total_rows: int
+    total_cols: int
+    column_headers: list[str] = Field(default_factory=list)
+    rows: list[list[Any]] = Field(default_factory=list)
+    candidate_roles: PlotCandidateRolesResponse = Field(default_factory=lambda: PlotCandidateRolesResponse())
+    detected_x_label: str | None = None
+    detected_y_label: str | None = None
+
+
+class FitAnalysisRequest(FileRequest):
+    model_id: str = "linear"
+    offset: int = 0
+    limit: int = 50
+
+
+class FitDerivedRowResponse(StrictModel):
+    row_index: int
+    x: float
+    y: float
+    y_fit: float
+    residual: float
+
+
+class FitAnalysisResponse(StrictModel):
+    input_path: str
+    sheet: str | int
+    model_id: str
+    x_label: str | None = None
+    y_label: str | None = None
+    equation_display: str
+    slope: float
+    intercept: float
+    r_squared: float
+    rmse: float
+    point_count: int
+    warnings: list[str] = Field(default_factory=list)
+    total_rows: int
+    offset: int
+    limit: int
+    rows: list[FitDerivedRowResponse] = Field(default_factory=list)
+
+
 class TemplateRecommendationResponse(StrictModel):
     template_id: str
     canonical_id: str = ""
@@ -181,6 +233,58 @@ class ExportRenderResponse(StrictModel):
     submission_report: SubmissionReportResponse | None = None
 
 
+class PlotProjectSourceProvenancePayload(StrictModel):
+    original_input_path: str | None = None
+    saved_input_mtime_ns: int | None = None
+    saved_at: str | None = None
+
+
+class PlotProjectPayload(StrictModel):
+    session_kind: str = "plot"
+    source_filename: str
+    source_media_type: str | None = None
+    embedded_source_relpath: str
+    source_sha256: str
+    sheet: str | int
+    selected_template_id: str
+    render_options: RenderOptionsPayload
+    project_display_name: str | None = None
+    source_provenance: PlotProjectSourceProvenancePayload = Field(
+        default_factory=PlotProjectSourceProvenancePayload
+    )
+
+
+class ProjectBundlePayload(StrictModel):
+    version: int = 1
+    selected_workbench: str = "plot"
+    plot: PlotProjectPayload | None = None
+    data_studio: dict[str, Any] | None = None
+    composer: dict[str, Any] | None = None
+    code_console: dict[str, Any] | None = None
+    artifacts: dict[str, Any] = Field(default_factory=dict)
+
+
+class SaveProjectRequest(StrictModel):
+    project_path: str
+    source_path: str
+    payload: ProjectBundlePayload
+
+
+class SaveProjectResponse(StrictModel):
+    project_path: str
+    payload: ProjectBundlePayload
+
+
+class OpenProjectRequest(StrictModel):
+    project_path: str
+
+
+class OpenProjectResponse(StrictModel):
+    project_path: str
+    restored_source_path: str
+    payload: ProjectBundlePayload
+
+
 def rendered_plots_to_preview_payload(
     rendered_plots: list[Any],
 ) -> list[PreviewItemResponse]:
@@ -207,20 +311,35 @@ def rendered_plots_to_preview_payload(
     return previews
 
 
+SourceTablePreviewResponse.model_rebuild()
+
+
 __all__ = [
     "ExportRenderRequest",
     "ExportRenderResponse",
     "FileRequest",
+    "FitAnalysisRequest",
+    "FitAnalysisResponse",
+    "FitDerivedRowResponse",
     "InputInspectionResponse",
     "InspectFileResponse",
+    "OpenProjectRequest",
+    "OpenProjectResponse",
     "PlotCandidateRolesResponse",
     "PlotColumnProfileResponse",
     "PlotDatasetPreviewResponse",
+    "PlotProjectPayload",
+    "PlotProjectSourceProvenancePayload",
     "PreflightRenderResponse",
     "PreflightResultResponse",
+    "ProjectBundlePayload",
     "RenderOptionsPayload",
     "RenderPreviewResponse",
     "RenderRequest",
+    "SaveProjectRequest",
+    "SaveProjectResponse",
+    "SourceTablePreviewRequest",
+    "SourceTablePreviewResponse",
     "TemplateRecommendationResponse",
     "rendered_plots_to_preview_payload",
 ]

@@ -67,6 +67,8 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
+- Plot `Data Workbook` 原始表格统一走 `POST /source-table-preview`，按分页返回列头、rows、候选角色和检测到的 x/y 标签；不要把全量 workbook 表格塞回 inspect payload。
+- Plot 线性拟合分析统一走 `POST /fit-analysis`；图上的 `scatter_fit` 线、方程和 Data Workbook `Fit` 结果表必须共用同一份后端拟合 helper，禁止前端或第二条 Python 路径偷偷重算。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -87,6 +89,11 @@
 - filtered workbook 必须保持标准 Data Studio sheet 结构、支持再次 import / specimen filter；曲线 sheet 当前保留到小数点后四位，specimen / summary / replicate 数值表保留到小数点后两位。不要在 comparison workbook 上偷偷做第二套数值格式规则。
 - sidecar endpoint 必须返回显式 response model，禁止裸 dict。
 - 项目文件保存/打开必须经过 sidecar schema 校验迁移层（`/save-project`、`/open-project`）。
+- Plot 项目文件固定为自包含单文件 `.sciplotgod` bundle：
+  - `project.json`
+  - `sources/primary/<original-filename>`
+  - `artifacts/manifest.json`
+- Plot 项目恢复必须以 bundle 内嵌源文件为真相源；不能依赖原始绝对路径仍然存在。
 
 ## 桌面运行时约束（macOS）
 
@@ -96,6 +103,8 @@
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
+- Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。
+- Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 跨 workbench 的 async 失败处理必须统一把“用户取消 / 生命周期取消”视为控制流，而不是 GUI 错误：
   - 优先复用共享 helper（当前是 `app/macos/Sources/Shared/Utilities/UserCancellation.swift` 的 `isUserCancellationError`）；
@@ -123,8 +132,13 @@
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
+- Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
+  - v1 只读，不做 inline cell editing
+  - 页签固定为 `Source Data` 和 `Fit`
+  - `Fit` v1 只支持 `Linear`
 - macOS GUI smoke / fingerprint 基线必须继续覆盖 imported-state inspector：
   - Plot imported inspector
+  - Plot data workbook
   - Data Studio figure inspector
   - 输出继续以 xcresult attachments 为视觉 QA artifact，不要并行维护第二套本地截图链路。
 
@@ -232,6 +246,7 @@
 - 不要在 sidecar 增加“先兼容旧接口再说”的 fallback。
 - 不要把 contract 常量复制到第二份文件。
 - 不要绕开 schema 校验层直接读写项目 JSON。
+- 不要把 `.sciplotgod` 实现成只记绝对路径的轻量链接文件；它必须嵌入 Plot 当前绑定的原始源文件字节。
 - 不要把 legacy style/template alias 当成新的 public product 语义重新暴露出来。
 - 不要把 Data Studio import 重新拆回多 sheet 串联弹窗。
 - 不要做“按钮可点但 guard-return 无反馈”的 silent no-op 交互。
