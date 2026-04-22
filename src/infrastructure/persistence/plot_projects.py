@@ -69,13 +69,13 @@ def _hash_suffix(*parts: object, length: int = 10) -> str:
     return digest[:length]
 
 
-def prepare_managed_plot_project_restore_dir(project_path: Path, *, source_sha256: str) -> Path:
+def prepare_managed_project_restore_dir(project_path: Path, *, fingerprint: str) -> Path:
     root = managed_plot_project_restore_root()
     stem = slugify_label(project_path.stem) or "plot_project"
-    directory = root / f"{stem}_{_hash_suffix(project_path.resolve(), source_sha256)}"
+    directory = root / f"{stem}_{_hash_suffix(project_path.resolve(), fingerprint)}"
     _clear_directory(directory)
     _prune_directory_children(root, keep=_PLOT_PROJECT_RETENTION, skip={directory})
     return directory
 
 
-__all__ = ["prepare_managed_plot_project_restore_dir"]
+__all__ = ["prepare_managed_project_restore_dir"]

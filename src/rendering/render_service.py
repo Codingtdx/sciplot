@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 
 from src import plot_style
 from src.plot_style import save_pdf
+from src.rendering.fit_analysis import fit_options_from_payload
 from src.rendering.models import RenderedPlot, TemplateName
 from src.rendering.options import resolve_render_options, validate_template_name
 from src.rendering.render_registry import TEMPLATE_RENDERERS
@@ -57,6 +59,7 @@ def build_rendered_plots(
     palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
+    fit_options: dict[str, object] | None = None,
 ) -> list[RenderedPlot]:
     requested_template = validate_template_name(template)
     resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
@@ -85,6 +88,7 @@ def build_rendered_plots(
         visual_theme_id=visual_theme_id,
         resolved_template_id=resolved_template,
     )
+    options = replace(options, fit_options=fit_options_from_payload(fit_options).__dict__)
     style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
     plot_style.apply_style(
         style_bundle.publication_profile_id,
@@ -122,6 +126,7 @@ def render_template(
     palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
+    fit_options: dict[str, object] | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
         template,
@@ -148,6 +153,7 @@ def render_template(
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
         visual_theme_id=visual_theme_id,
+        fit_options=fit_options,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
 

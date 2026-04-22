@@ -60,7 +60,7 @@ from src.core.application.render import (
 from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
 from src.infrastructure.runtime_cache import LRUCache
 from src.rendering.cache import load_curve_table_cached
-from src.rendering.fit_analysis import fit_linear_series_list
+from src.rendering.fit_analysis import fit_series_list
 
 _RENDER_PREVIEW_CACHE = LRUCache[str, RenderPreviewResponse](maxsize=64)
 
@@ -76,6 +76,7 @@ def _render_preview_cache_key(
     sheet: str | int,
     template: str,
     options_payload: object,
+    fit_options_payload: object,
 ) -> str:
     return _stable_json_hash(
         {
@@ -84,6 +85,7 @@ def _render_preview_cache_key(
             "sheet": str(sheet),
             "template": template,
             "options": options_payload,
+            "fit_options": fit_options_payload,
         }
     )
 
@@ -161,27 +163,41 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         try:
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
-            if request.model_id != "linear":
-                raise ValueError("Only the linear fit model is supported in this release.")
             offset, limit = _bounded_page(request.offset, request.limit)
             series_list = load_curve_table_cached(input_path, sheet)
-            fit_result = fit_linear_series_list(series_list)
-            rows = fit_result.derived_rows[offset : offset + limit]
+            fit_result = fit_series_list(series_list, model_id=request.model_id)
+            selected_series = fit_result.selected_series(request.series_id)
+            rows = selected_series.derived_rows[offset : offset + limit]
             return FitAnalysisResponse.model_validate(
                 {
                     "input_path": str(input_path),
                     "sheet": sheet,
                     "model_id": request.model_id,
-                    "x_label": fit_result.x_label,
-                    "y_label": fit_result.y_label,
-                    "equation_display": fit_result.equation_display,
-                    "slope": fit_result.slope,
-                    "intercept": fit_result.intercept,
-                    "r_squared": fit_result.r_squared,
-                    "rmse": fit_result.rmse,
-                    "point_count": fit_result.point_count,
-                    "warnings": [],
-                    "total_rows": len(fit_result.derived_rows),
+                    "x_label": selected_series.x_label,
+                    "y_label": selected_series.y_label,
+                    "selected_series_id": selected_series.series_id,
+                    "equation_display": selected_series.equation_display,
+                    "slope": selected_series.slope,
+                    "intercept": selected_series.intercept,
+                    "r_squared": selected_series.r_squared,
+                    "rmse": selected_series.rmse,
+                    "point_count": selected_series.point_count,
+                    "series_summaries": [
+                        {
+                            "series_id": result.series_id,
+                            "series_label": result.series_label,
+                            "equation_display": result.equation_display,
+                            "r_squared": result.r_squared,
+                            "rmse": result.rmse,
+                            "point_count": result.point_count,
+                            "slope": result.slope,
+                            "intercept": result.intercept,
+                            "warnings": list(result.warnings),
+                        }
+                        for result in fit_result.series_results
+                    ],
+                    "warnings": list(fit_result.warnings) + list(selected_series.warnings),
+                    "total_rows": len(selected_series.derived_rows),
                     "offset": offset,
                     "limit": limit,
                     "rows": [serialize_dataclass(row) for row in rows],
@@ -196,10 +212,9 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             project_path = Path(request.project_path).expanduser()
             if project_path.suffix.lower() != ".sciplotgod":
                 raise ValueError("Project file must use the .sciplotgod extension.")
-            source_path = normalize_path(request.source_path)
             return save_project_bundle(
                 project_path=project_path,
-                source_path=source_path,
+                source_path=normalize_path(request.source_path) if request.source_path else None,
                 payload=request.payload,
             )
         except Exception as exc:
@@ -254,11 +269,13 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             identity = template_identity(requested_template, resolved_template_id=resolved_template)
             payload_options = request.options
             options_payload = payload_options.model_dump(mode="json")
+            fit_options_payload = request.fit_options.model_dump(mode="json")
             cache_key = _render_preview_cache_key(
                 input_path=input_path,
                 sheet=sheet,
                 template=resolved_template,
                 options_payload=options_payload,
+                fit_options_payload=fit_options_payload,
             )
             cached = _RENDER_PREVIEW_CACHE.get(cache_key)
             if cached is not None:
@@ -294,6 +311,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
                 visual_theme_id=payload_options.visual_theme_id,
+                fit_options=fit_options_payload,
             )
             try:
                 previews = rendered_plots_to_preview_payload(rendered_plots)
@@ -384,6 +402,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
                 visual_theme_id=payload_options.visual_theme_id,
+                fit_options=request.fit_options.model_dump(mode="json"),
             )
             try:
                 outputs = export_rendered_plots(rendered_plots, output_dir, close=False)

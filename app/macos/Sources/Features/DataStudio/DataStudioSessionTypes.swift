@@ -79,6 +79,38 @@ enum DataStudioActivity: Equatable {
     case exportingComparison
 }
 
+enum DataStudioAnalysisTarget: String, CaseIterable, Identifiable {
+    case focusedWorkbook
+    case currentFigure
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .focusedWorkbook:
+            return "Focused Workbook"
+        case .currentFigure:
+            return "Current Figure"
+        }
+    }
+}
+
+enum DataStudioAnalysisTab: String, CaseIterable, Identifiable {
+    case sourceData
+    case fit
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sourceData:
+            return "Source Data"
+        case .fit:
+            return "Fit"
+        }
+    }
+}
+
 enum DataStudioWorkbookPreviewRefreshState: Equatable {
     case idle
     case refreshing(workbookPath: String)

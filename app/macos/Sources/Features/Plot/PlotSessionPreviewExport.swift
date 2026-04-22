@@ -122,6 +122,7 @@ extension PlotSession {
                     sheet: selectedSheet,
                     template: selectedTemplateID,
                     options: renderOptions,
+                    fitOptions: fitOptions,
                     outputDir: nil
                 )
             )
@@ -271,7 +272,8 @@ extension PlotSession {
             inputPath: selectedFileURL.path,
             sheet: selectedSheet,
             template: selectedTemplateID,
-            options: renderOptions
+            options: renderOptions,
+            fitOptions: fitOptions
         )
     }
 
@@ -480,6 +482,10 @@ extension PlotSession {
         renderOptionsDidChange?(renderOptions)
     }
 
+    func notifyFitOptionsDidChange() {
+        fitOptionsDidChange?(fitOptions)
+    }
+
     func buildProjectPayload() -> ProjectBundlePayload? {
         guard let selectedFileURL, let selectedTemplateID = effectiveTemplateID else {
             return nil
@@ -491,7 +497,7 @@ extension PlotSession {
                 sessionKind: "plot",
                 sourceFilename: selectedFileURL.lastPathComponent,
                 sourceMediaType: nil,
-                embeddedSourceRelpath: "sources/primary/\(selectedFileURL.lastPathComponent)",
+                embeddedSourceRelpath: "sources/plot/primary/\(selectedFileURL.lastPathComponent)",
                 sourceSHA256: "",
                 sheet: selectedSheet,
                 selectedTemplateID: selectedTemplateID,

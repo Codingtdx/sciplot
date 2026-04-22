@@ -305,6 +305,7 @@ class DataStudioFigurePreference:
     family_id: str
     selected_template_id: str | None
     options_by_template: dict[str, dict[str, Any]] = field(default_factory=dict)
+    fit_options_by_template: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

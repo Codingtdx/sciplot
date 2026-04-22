@@ -71,6 +71,8 @@ extension PlotSession {
         runtimeState.inspectedInputPath = nil
         runtimeState.inspectedSheet = nil
         runtimeState.lastSavedProjectSnapshot = nil
+        fitOptions = FitOptionsPayload()
+        notifyFitOptionsDidChange()
         sourceProvenance = PlotProjectSourceProvenancePayload(
             originalInputPath: nil,
             savedInputMtimeNs: nil,
@@ -137,6 +139,8 @@ extension PlotSession {
         }
         runtimeState.stagedExternalPinnedSheet = nil
         runtimeState.stagedExternalPinnedTemplateID = nil
+        fitOptions = FitOptionsPayload()
+        notifyFitOptionsDidChange()
         invalidateSubmissionArtifacts()
         resetDataWorkbookState()
         errorMessage = nil

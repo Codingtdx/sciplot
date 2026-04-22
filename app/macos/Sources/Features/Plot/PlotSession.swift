@@ -49,6 +49,7 @@ final class PlotSession {
     @ObservationIgnored let asyncCoordination = AsyncCoordination()
     @ObservationIgnored weak var undoManager: UndoManager?
     @ObservationIgnored var renderOptionsDidChange: ((RenderOptionsPayload) -> Void)?
+    @ObservationIgnored var fitOptionsDidChange: ((FitOptionsPayload) -> Void)?
 
     var isImporterPresented = false
     var isGuidePresented = false
@@ -61,6 +62,7 @@ final class PlotSession {
     var contract: PlotContractResponse?
     var selectedTemplateID: String?
     var renderOptions = RenderOptionsPayload()
+    var fitOptions = FitOptionsPayload()
     var previewResponse: RenderPreviewResponse?
     var preflightResponse: PreflightRenderResponse?
     var exportResponse: ExportRenderResponse?

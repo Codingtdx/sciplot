@@ -187,6 +187,10 @@ def create_data_studio_router() -> APIRouter:
                     recipe_id: options.model_dump()
                     for recipe_id, options in request.figure_options_by_recipe_id.items()
                 },
+                figure_fit_options_by_recipe_id={
+                    recipe_id: options.model_dump()
+                    for recipe_id, options in request.figure_fit_options_by_recipe_id.items()
+                },
             )
             return DataStudioComparisonExportResponse.model_validate(
                 {

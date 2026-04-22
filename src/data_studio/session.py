@@ -11,6 +11,7 @@ from src.data_studio.models import (
     DataStudioSessionPayload,
     DataStudioSpecimenState,
 )
+from src.rendering.fit_analysis import normalize_fit_options_payload
 from src.rendering.template_lifecycle import compatibility_template_ids, resolve_template_id
 
 _RECIPE_TEMPLATE_IDS = tuple(
@@ -152,11 +153,19 @@ def normalize_session_payload(payload: dict[str, object]) -> DataStudioSessionPa
             if normalized_template_id is None:
                 continue
             options_by_template[normalized_template_id] = _normalize_render_options(options)
+        raw_fit_options = _mapping(item_map.get("fit_options_by_template")) or {}
+        fit_options_by_template: dict[str, dict[str, object]] = {}
+        for template_id, fit_options in raw_fit_options.items():
+            normalized_template_id = _normalize_template_id(template_id)
+            if normalized_template_id is None:
+                continue
+            fit_options_by_template[normalized_template_id] = normalize_fit_options_payload(fit_options)
         figure_preferences_list.append(
             DataStudioFigurePreference(
                 family_id=family_id,
                 selected_template_id=_normalize_template_id(item_map.get("selected_template_id")),
                 options_by_template=options_by_template,
+                fit_options_by_template=fit_options_by_template,
             )
         )
     figure_preferences = tuple(figure_preferences_list)

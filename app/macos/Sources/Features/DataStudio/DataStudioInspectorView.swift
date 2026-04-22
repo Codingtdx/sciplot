@@ -58,6 +58,23 @@ struct DataStudioInspectorView: View {
                     title: "Metric",
                     value: session.currentFigureFamily?.title ?? "Representative Curve"
                 )
+
+                if session.currentFigureFitAvailability.isEnabled {
+                    AdaptiveInspectorControlRow(title: "Fit") {
+                        Toggle("", isOn: fitEnabledBinding)
+                            .labelsHidden()
+                    }
+
+                    AdaptiveInspectorControlRow(title: "Model") {
+                        Picker("", selection: fitModelBinding) {
+                            Text("Linear").tag("linear")
+                            Text("Polynomial 2").tag("polynomial_2")
+                            Text("Polynomial 3").tag("polynomial_3")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                }
             }
         }
     }
@@ -86,6 +103,14 @@ struct DataStudioInspectorView: View {
                     session.exportAvailability.reason
                         ?? "Export the comparison workbook, filtered workbooks, and figure outputs."
                 )
+                .inspectorActionButton()
+
+                Button("Analysis") {
+                    session.showAnalysis()
+                }
+                .buttonStyle(.bordered)
+                .disabled(session.focusedWorkbook == nil && session.currentRecipe == nil)
+                .help("Open source data and fit analysis for the current Data Studio context.")
                 .inspectorActionButton()
             }
 
@@ -162,6 +187,20 @@ struct DataStudioInspectorView: View {
                     session.selectFigureTemplate(id: newValue)
                 }
             }
+        )
+    }
+
+    private var fitEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { session.currentFigureFitOptions.enabled },
+            set: { session.updateCurrentFigureFitEnabled($0) }
+        )
+    }
+
+    private var fitModelBinding: Binding<String> {
+        Binding(
+            get: { session.currentFigureFitOptions.modelID },
+            set: { session.updateCurrentFigureFitModel($0) }
         )
     }
 }

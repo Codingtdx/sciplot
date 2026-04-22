@@ -407,6 +407,7 @@ struct DataStudioFigurePreferencePayload: Codable, Equatable, Sendable, Identifi
     let familyID: String
     let selectedTemplateID: String?
     let optionsByTemplate: [String: RenderOptionsPayload]
+    let fitOptionsByTemplate: [String: FitOptionsPayload]
 
     var id: String { familyID }
 
@@ -414,6 +415,7 @@ struct DataStudioFigurePreferencePayload: Codable, Equatable, Sendable, Identifi
         case familyID = "familyId"
         case selectedTemplateID = "selectedTemplateId"
         case optionsByTemplate
+        case fitOptionsByTemplate
     }
 }
 
@@ -644,6 +646,7 @@ struct DataStudioExportComparisonRequest: Codable, Equatable, Sendable {
     let specimenStates: [DataStudioSpecimenStatePayload]
     let selectedRecipeIDs: [String]
     let figureOptionsByRecipeID: [String: RenderOptionsPayload]
+    let figureFitOptionsByRecipeID: [String: FitOptionsPayload]
 
     init(
         workbookPaths: [String],
@@ -651,7 +654,8 @@ struct DataStudioExportComparisonRequest: Codable, Equatable, Sendable {
         groupStates: [DataStudioGroupStatePayload] = [],
         specimenStates: [DataStudioSpecimenStatePayload] = [],
         selectedRecipeIDs: [String] = [],
-        figureOptionsByRecipeID: [String: RenderOptionsPayload] = [:]
+        figureOptionsByRecipeID: [String: RenderOptionsPayload] = [:],
+        figureFitOptionsByRecipeID: [String: FitOptionsPayload] = [:]
     ) {
         self.workbookPaths = workbookPaths
         self.outputDir = outputDir
@@ -659,6 +663,7 @@ struct DataStudioExportComparisonRequest: Codable, Equatable, Sendable {
         self.specimenStates = specimenStates
         self.selectedRecipeIDs = selectedRecipeIDs
         self.figureOptionsByRecipeID = figureOptionsByRecipeID
+        self.figureFitOptionsByRecipeID = figureFitOptionsByRecipeID
     }
 
     enum CodingKeys: String, CodingKey {
@@ -668,6 +673,7 @@ struct DataStudioExportComparisonRequest: Codable, Equatable, Sendable {
         case specimenStates
         case selectedRecipeIDs = "selectedRecipeIds"
         case figureOptionsByRecipeID = "figureOptionsByRecipeId"
+        case figureFitOptionsByRecipeID = "figureFitOptionsByRecipeId"
     }
 }
 

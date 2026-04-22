@@ -9,8 +9,12 @@ from fastapi.testclient import TestClient
 
 from app.sidecar.server import app
 from src.core.application.render import build_rendered_plots, close_rendered_plots
+from src.data_studio.builtin import tensile as tensile_builtin
 
 client = TestClient(app)
+
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
 
 
 def _curve_csv(path: Path) -> None:
@@ -54,6 +58,25 @@ def _project_payload(source_path: Path) -> dict[str, object]:
         "code_console": None,
         "artifacts": {},
     }
+
+
+def _build_data_studio_workbook(tmp_path: Path, name: str) -> tuple[Path, dict[str, object]]:
+    output_path = tmp_path / f"{name}.xlsx"
+    response = client.post(
+        "/data-studio/build-workbook",
+        json={
+            "file_paths": [
+                str(FIXTURE_DIR / "BlendSet_A.csv"),
+                str(FIXTURE_DIR / "BlendSet_B.csv"),
+                str(FIXTURE_DIR / "BlendSet_bad.csv"),
+            ],
+            "output_path": str(output_path),
+            "template_id": tensile_builtin.TENSILE_TEMPLATE_ID,
+            "group_name": name,
+        },
+    )
+    assert response.status_code == 200, response.text
+    return output_path, response.json()
 
 
 def test_source_table_preview_returns_headers_and_rows(tmp_path: Path) -> None:
@@ -101,7 +124,7 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
         names = set(archive.namelist())
         assert "project.json" in names
         assert "artifacts/manifest.json" in names
-        assert f"sources/primary/{source_path.name}" in names
+        assert f"sources/plot/primary/{source_path.name}" in names
 
     source_path.unlink()
 
@@ -133,13 +156,13 @@ def test_open_project_reports_checksum_mismatch(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(project_path) as archive:
         project_json = json.loads(archive.read("project.json").decode("utf-8"))
-        source_bytes = archive.read(f"sources/primary/{source_path.name}")
+        source_bytes = archive.read(f"sources/plot/primary/{source_path.name}")
         manifest_bytes = archive.read("artifacts/manifest.json")
 
     project_json["plot"]["source_sha256"] = "deadbeef"
     with zipfile.ZipFile(project_path, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("project.json", json.dumps(project_json, ensure_ascii=False, indent=2))
-        archive.writestr(f"sources/primary/{source_path.name}", source_bytes)
+        archive.writestr(f"sources/plot/primary/{source_path.name}", source_bytes)
         archive.writestr("artifacts/manifest.json", manifest_bytes)
 
     response = client.post("/open-project", json={"project_path": str(project_path)})
@@ -186,3 +209,86 @@ def test_fit_analysis_matches_scatter_fit_equation_label(tmp_path: Path) -> None
         close_rendered_plots(rendered_plots)
 
     assert f"fit: {equation_display}" in labels
+
+
+def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_path: Path) -> None:
+    workbook_path, workbook_payload = _build_data_studio_workbook(tmp_path, "Roundtrip Group")
+    imported_source = FIXTURE_DIR / "BlendSet_A.csv"
+    project_path = tmp_path / "roundtrip-data-studio.sciplotgod"
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": None,
+            "payload": {
+                "version": 1,
+                "selected_workbench": "data_studio",
+                "plot": None,
+                "data_studio": {
+                    "session_kind": "data_studio",
+                    "version": 1,
+                    "selected_template_id": tensile_builtin.TENSILE_TEMPLATE_ID,
+                    "workbook_paths": [str(workbook_path)],
+                    "selected_workbook_id": workbook_payload["workbook_id"],
+                    "primary_workbook_id": workbook_payload["workbook_id"],
+                    "selected_recipe_id": "representative_scatter",
+                    "comparison_recipe_ids": ["representative_curve", "representative_scatter"],
+                    "selected_figure_family_id": "representative_curve",
+                    "selected_figure_template_id": "scatter",
+                    "group_states": [
+                        {
+                            "workbook_path": str(workbook_path),
+                            "display_name": "Roundtrip Group",
+                            "include_in_compare": True,
+                            "sort_order": 0,
+                        }
+                    ],
+                    "specimen_states": [],
+                    "figure_preferences": [
+                        {
+                            "family_id": "representative_curve",
+                            "selected_template_id": "scatter",
+                            "options_by_template": {
+                                "scatter": {
+                                    "style_preset": "nature",
+                                    "palette_preset": "colorblind_safe",
+                                    "visual_theme_id": "clean_light",
+                                }
+                            },
+                            "fit_options_by_template": {
+                                "scatter": {
+                                    "enabled": True,
+                                    "model_id": "polynomial_2",
+                                }
+                            },
+                        }
+                    ],
+                    "imported_paths": [str(imported_source)],
+                    "template_draft_path": str(imported_source),
+                    "embedded_workbooks": [],
+                    "project_display_name": "Roundtrip Data Studio",
+                    "source_provenance": {},
+                },
+                "composer": None,
+                "code_console": None,
+                "artifacts": {},
+            },
+        },
+    )
+
+    assert save_response.status_code == 200, save_response.text
+    workbook_path.unlink()
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+
+    assert open_response.status_code == 200, open_response.text
+    payload = open_response.json()
+    assert payload["payload"]["selected_workbench"] == "data_studio"
+    restored_workbook_path = Path(payload["restored_workbook_paths"][0])
+    assert restored_workbook_path.exists()
+    assert payload["payload"]["data_studio"]["workbook_paths"] == [str(restored_workbook_path)]
+    assert payload["payload"]["data_studio"]["selected_recipe_id"] == "representative_scatter"
+    figure_preference = payload["payload"]["data_studio"]["figure_preferences"][0]
+    assert figure_preference["selected_template_id"] == "scatter"
+    assert figure_preference["fit_options_by_template"]["scatter"]["model_id"] == "polynomial_2"

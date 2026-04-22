@@ -244,11 +244,31 @@ extension DataStudioSession {
     }
 
     func handleImportedFiles(_ urls: [URL]) async {
+        if let projectURL = urls.first(where: { $0.pathExtension.lowercased() == "sciplotgod" }) {
+            await openProject(projectURL)
+            return
+        }
         switch pendingImportKind {
         case .rawFiles:
             await handleImportedRawFiles(urls)
         case .existingWorkbook:
             await handleImportedWorkbooks(urls)
+        }
+    }
+
+    func openProject(_ url: URL) async {
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
+            return
+        }
+        do {
+            let response = try await client.openProject(.init(projectPath: url.path))
+            await restoreProject(from: response)
+        } catch {
+            if isUserCancelled(error) {
+                return
+            }
+            errorMessage = error.localizedDescription
         }
     }
 

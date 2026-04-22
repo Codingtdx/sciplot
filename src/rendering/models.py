@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 
@@ -39,6 +39,7 @@ class RenderOptions:
     y_label_override: str | None = None
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
+    fit_options: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

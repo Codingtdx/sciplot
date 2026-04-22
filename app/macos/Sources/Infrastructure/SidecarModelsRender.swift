@@ -94,6 +94,21 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     }
 }
 
+struct FitOptionsPayload: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var modelID: String
+
+    init(enabled: Bool = false, modelID: String = "linear") {
+        self.enabled = enabled
+        self.modelID = modelID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case modelID = "modelId"
+    }
+}
+
 struct FileRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
@@ -124,6 +139,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
     let modelID: String
+    let seriesID: String?
     let offset: Int
     let limit: Int
 
@@ -131,14 +147,25 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         inputPath: String,
         sheet: SheetValue,
         modelID: String = "linear",
+        seriesID: String? = nil,
         offset: Int = 0,
         limit: Int = 50
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
         self.modelID = modelID
+        self.seriesID = seriesID
         self.offset = offset
         self.limit = limit
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case sheet
+        case modelID = "modelId"
+        case seriesID = "seriesId"
+        case offset
+        case limit
     }
 }
 
@@ -152,18 +179,46 @@ struct FitDerivedRowResponse: Codable, Equatable, Sendable, Identifiable {
     var id: Int { rowIndex }
 }
 
+struct FitSeriesSummaryResponse: Codable, Equatable, Sendable, Identifiable {
+    let seriesID: String
+    let seriesLabel: String
+    let equationDisplay: String
+    let rSquared: Double
+    let rmse: Double
+    let pointCount: Int
+    let slope: Double?
+    let intercept: Double?
+    let warnings: [String]
+
+    var id: String { seriesID }
+
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "seriesId"
+        case seriesLabel
+        case equationDisplay
+        case rSquared
+        case rmse
+        case pointCount
+        case slope
+        case intercept
+        case warnings
+    }
+}
+
 struct FitAnalysisResponse: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
     let modelID: String
     let xLabel: String?
     let yLabel: String?
+    let selectedSeriesID: String?
     let equationDisplay: String
-    let slope: Double
-    let intercept: Double
+    let slope: Double?
+    let intercept: Double?
     let rSquared: Double
     let rmse: Double
     let pointCount: Int
+    let seriesSummaries: [FitSeriesSummaryResponse]
     let warnings: [String]
     let totalRows: Int
     let offset: Int
@@ -176,12 +231,14 @@ struct FitAnalysisResponse: Codable, Equatable, Sendable {
         case modelID = "modelId"
         case xLabel
         case yLabel
+        case selectedSeriesID = "selectedSeriesId"
         case equationDisplay
         case slope
         case intercept
         case rSquared
         case rmse
         case pointCount
+        case seriesSummaries
         case warnings
         case totalRows
         case offset
@@ -279,6 +336,21 @@ struct RenderRequest: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let template: String
     let options: RenderOptionsPayload
+    let fitOptions: FitOptionsPayload
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        template: String,
+        options: RenderOptionsPayload,
+        fitOptions: FitOptionsPayload = FitOptionsPayload()
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.template = template
+        self.options = options
+        self.fitOptions = fitOptions
+    }
 }
 
 struct ExportRenderRequest: Codable, Equatable, Sendable {
@@ -286,7 +358,24 @@ struct ExportRenderRequest: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let template: String
     let options: RenderOptionsPayload
+    let fitOptions: FitOptionsPayload
     let outputDir: String?
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        template: String,
+        options: RenderOptionsPayload,
+        fitOptions: FitOptionsPayload = FitOptionsPayload(),
+        outputDir: String? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.template = template
+        self.options = options
+        self.fitOptions = fitOptions
+        self.outputDir = outputDir
+    }
 }
 
 struct PlotProjectSourceProvenancePayload: Codable, Equatable, Sendable {
@@ -321,11 +410,71 @@ struct PlotProjectPayload: Codable, Equatable, Sendable {
     }
 }
 
+struct DataStudioProjectWorkbookPayload: Codable, Equatable, Sendable, Identifiable {
+    let workbookFilename: String
+    let embeddedWorkbookRelpath: String
+    let workbookSHA256: String
+    let originalWorkbookPath: String?
+    let savedWorkbookMtimeNs: Int?
+
+    var id: String { embeddedWorkbookRelpath }
+
+    enum CodingKeys: String, CodingKey {
+        case workbookFilename
+        case embeddedWorkbookRelpath
+        case workbookSHA256
+        case originalWorkbookPath
+        case savedWorkbookMtimeNs
+    }
+}
+
+struct DataStudioProjectPayload: Codable, Equatable, Sendable {
+    let sessionKind: String
+    let version: Int
+    let selectedTemplateID: String?
+    let workbookPaths: [String]
+    let selectedWorkbookID: String?
+    let primaryWorkbookID: String?
+    let selectedRecipeID: String?
+    let comparisonRecipeIDs: [String]
+    let selectedFigureFamilyID: String?
+    let selectedFigureTemplateID: String?
+    let groupStates: [DataStudioGroupStatePayload]
+    let specimenStates: [DataStudioSpecimenStatePayload]
+    let figurePreferences: [DataStudioFigurePreferencePayload]
+    let importedPaths: [String]
+    let templateDraftPath: String?
+    let embeddedWorkbooks: [DataStudioProjectWorkbookPayload]
+    let projectDisplayName: String?
+    let sourceProvenance: [String: JSONValue]
+
+    enum CodingKeys: String, CodingKey {
+        case sessionKind
+        case version
+        case selectedTemplateID
+        case workbookPaths
+        case selectedWorkbookID
+        case primaryWorkbookID
+        case selectedRecipeID
+        case comparisonRecipeIDs
+        case selectedFigureFamilyID
+        case selectedFigureTemplateID
+        case groupStates
+        case specimenStates
+        case figurePreferences
+        case importedPaths
+        case templateDraftPath
+        case embeddedWorkbooks
+        case projectDisplayName
+        case sourceProvenance
+    }
+}
+
 struct ProjectBundlePayload: Codable, Equatable, Sendable {
     let version: Int
     let selectedWorkbench: String
     let plot: PlotProjectPayload?
-    let dataStudio: JSONValue?
+    let dataStudio: DataStudioProjectPayload?
     let composer: JSONValue?
     let codeConsole: JSONValue?
     let artifacts: [String: JSONValue]
@@ -333,7 +482,7 @@ struct ProjectBundlePayload: Codable, Equatable, Sendable {
 
 struct SaveProjectRequest: Codable, Equatable, Sendable {
     let projectPath: String
-    let sourcePath: String
+    let sourcePath: String?
     let payload: ProjectBundlePayload
 }
 
@@ -348,7 +497,8 @@ struct OpenProjectRequest: Codable, Equatable, Sendable {
 
 struct OpenProjectResponse: Codable, Equatable, Sendable {
     let projectPath: String
-    let restoredSourcePath: String
+    let restoredSourcePath: String?
+    let restoredWorkbookPaths: [String]
     let payload: ProjectBundlePayload
 }
 

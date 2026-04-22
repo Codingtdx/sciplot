@@ -128,6 +128,7 @@ def export_data_studio_comparison(
     specimen_states=None,
     selected_recipe_ids: list[str] | None = None,
     figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
+    figure_fit_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
 ):
     return export_comparison_bundle(
         workbook_paths,
@@ -136,6 +137,7 @@ def export_data_studio_comparison(
         specimen_states=specimen_states,
         selected_recipe_ids=selected_recipe_ids,
         figure_options_by_recipe_id=figure_options_by_recipe_id,
+        figure_fit_options_by_recipe_id=figure_fit_options_by_recipe_id,
     )
 
 

@@ -42,6 +42,7 @@ from src.text_normalization import slugify_label
 
 _COMPARISON_PREVIEW_PDF_CACHE = LRUCache[str, str](maxsize=64)
 _METRIC_COMPARISON_TEMPLATE_IDS = ("bar", "box", "box_strip", "violin", "point_error")
+_CURVE_COMPARISON_TEMPLATE_IDS = ("curve", "point_line", "scatter")
 
 
 @dataclass(frozen=True)
@@ -255,6 +256,16 @@ def _comparison_recipes_for_loaded_workbooks(
             sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
         )
     ]
+    for template_id in _CURVE_COMPARISON_TEMPLATE_IDS[1:]:
+        recipes.append(
+            ComparisonRecipe(
+                id=f"representative_{template_id}",
+                label=f"Representative {template_contract(template_id).label} Compare",
+                category="curve",
+                template_id=template_id,
+                sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+            )
+        )
     for metric_id in metric_ids:
         for template_id in _METRIC_COMPARISON_TEMPLATE_IDS:
             recipes.append(
@@ -453,6 +464,7 @@ def export_comparison_bundle(
     specimen_states: list[DataStudioSpecimenState] | tuple[DataStudioSpecimenState, ...] | None = None,
     selected_recipe_ids: list[str] | None = None,
     figure_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
+    figure_fit_options_by_recipe_id: dict[str, dict[str, object]] | None = None,
 ) -> tuple[ComparisonSet, tuple[DataStudioFigureOutput, ...], tuple[DataStudioFilteredWorkbookOutput, ...]]:
     comparison_set = build_comparison_set(
         workbook_paths,
@@ -464,6 +476,7 @@ def export_comparison_bundle(
         selected_recipe_ids or [recipe.id for recipe in comparison_set.recipes if recipe.enabled_by_default]
     )
     figure_options_by_recipe_id = figure_options_by_recipe_id or {}
+    figure_fit_options_by_recipe_id = figure_fit_options_by_recipe_id or {}
     figure_outputs: list[DataStudioFigureOutput] = []
     bundle_dir = comparison_set.comparison_workbook_path.parent
     for recipe in comparison_set.recipes:
@@ -477,6 +490,7 @@ def export_comparison_bundle(
             recipe.template_id,
             comparison_set.comparison_workbook_path,
             recipe.sheet_name,
+            fit_options=figure_fit_options_by_recipe_id.get(recipe.id),
             **render_kwargs,
         )
         try:

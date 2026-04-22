@@ -25,7 +25,7 @@ from src.rendering.common import (
     validate_series_scales,
 )
 from src.rendering.dataset_models import build_normalized_dataset
-from src.rendering.fit_analysis import fit_linear_series_list
+from src.rendering.fit_analysis import fit_linear_series_list, fit_options_from_payload, fit_series_list
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName
 from src.rendering.qa import apply_curve_autofix
 from src.rendering.render_curve_support import (
@@ -239,6 +239,69 @@ def _ensure_known_series_order(series_list, series_order) -> None:
         raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown))
 
 
+def _fit_overlay_color(ax, *, series_index: int, scatter: bool) -> str:
+    if scatter:
+        scatter_collections = [collection for collection in ax.collections if np.asarray(collection.get_offsets()).size]
+        if series_index < len(scatter_collections):
+            collection = scatter_collections[series_index]
+            colors = collection.get_facecolors()
+            if len(colors):
+                return cast(str, tuple(colors[0]))
+    if series_index < len(ax.lines):
+        return cast(str, ax.lines[series_index].get_color())
+    return "black"
+
+
+def _apply_curve_fit_overlay(
+    rendered: RenderedPlot,
+    *,
+    template: str,
+    series_list,
+    options: RenderOptions,
+    scatter: bool,
+) -> RenderedPlot:
+    fit_options = fit_options_from_payload(options.fit_options)
+    if not fit_options.enabled:
+        return rendered
+    results = fit_series_list(series_list, model_id=fit_options.model_id)
+    ax = rendered.figure.axes[0]
+    stroke = plot_style.current_stroke()
+    for series_index, result in enumerate(results.series_results):
+        ax.plot(
+            result.x_line,
+            result.y_line,
+            color=_fit_overlay_color(ax, series_index=series_index, scatter=scatter),
+            linewidth=max(0.8, stroke.line_width_pt * 0.95),
+            alpha=min(0.88, stroke.line_alpha),
+            linestyle="--",
+            label="_nolegend_",
+            zorder=3.2,
+        )
+    if len(results.series_results) == 1:
+        equation = results.series_results[0].equation_display
+        ax.text(
+            0.03,
+            0.97,
+            equation,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=plot_style.current_typography().legend_font_size_pt,
+            bbox={"facecolor": "white", "alpha": 0.72, "linewidth": 0.0, "boxstyle": "round,pad=0.2"},
+            zorder=4.0,
+        )
+    return _rendered_plot_with_qa(
+        filename=rendered.filename,
+        figure=rendered.figure,
+        template=template,
+        options=options,
+        autofixes_applied=(
+            tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
+        )
+        + (f"{fit_options.model_id}_fit_overlay",),
+    )
+
+
 def _render_curve_like_plot(
     *,
     filename: str,
@@ -392,20 +455,27 @@ def _render_standard_curve_template(
     is_tensile_curve = looks_like_tensile_curve(series_list)
     validate_manual_axis_overrides(options, template=template, is_tensile_curve=is_tensile_curve)
     axis_mode = "auto_positive" if is_tensile_curve else "auto"
-    return [
-        _render_curve_like_plot(
-            filename=f"{input_path.stem}_{template}.pdf",
+    rendered = _render_curve_like_plot(
+        filename=f"{input_path.stem}_{template}.pdf",
+        template=template,
+        series_list=series_list,
+        options=options,
+        show_markers=show_markers,
+        base_kwargs={
+            "axis_mode": axis_mode,
+            "preserve_stress_label": is_tensile_curve,
+            **(extra_curve_kwargs or {}),
+        },
+    )
+    if template in {"curve", "point_line"}:
+        rendered = _apply_curve_fit_overlay(
+            rendered,
             template=template,
             series_list=series_list,
             options=options,
-            show_markers=show_markers,
-            base_kwargs={
-                "axis_mode": axis_mode,
-                "preserve_stress_label": is_tensile_curve,
-                **(extra_curve_kwargs or {}),
-            },
+            scatter=False,
         )
-    ]
+    return [rendered]
 
 def _render_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     return _render_standard_curve_template(
@@ -544,20 +614,26 @@ def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) 
     is_tensile_curve = looks_like_tensile_curve(series_list)
     validate_manual_axis_overrides(options, template="scatter", is_tensile_curve=is_tensile_curve)
     axis_mode = "auto_positive" if is_tensile_curve else "auto"
-    return [
-        _render_curve_like_plot(
-            filename=f"{input_path.stem}_scatter.pdf",
-            template="scatter",
-            series_list=series_list,
-            options=options,
-            show_markers=False,
-            scatter=True,
-            base_kwargs={
-                "axis_mode": axis_mode,
-                "preserve_stress_label": is_tensile_curve,
-            },
-        )
-    ]
+    rendered = _render_curve_like_plot(
+        filename=f"{input_path.stem}_scatter.pdf",
+        template="scatter",
+        series_list=series_list,
+        options=options,
+        show_markers=False,
+        scatter=True,
+        base_kwargs={
+            "axis_mode": axis_mode,
+            "preserve_stress_label": is_tensile_curve,
+        },
+    )
+    rendered = _apply_curve_fit_overlay(
+        rendered,
+        template="scatter",
+        series_list=series_list,
+        options=options,
+        scatter=True,
+    )
+    return [rendered]
 
 def _bubble_size_profile(values: np.ndarray) -> np.ndarray:
     finite = values[np.isfinite(values)]

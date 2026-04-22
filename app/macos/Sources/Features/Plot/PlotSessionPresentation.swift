@@ -129,14 +129,17 @@ extension PlotSession {
         guard let fitAnalysisResponse else {
             return []
         }
-        return [
-            ("Equation", fitAnalysisResponse.equationDisplay),
-            ("Slope", fitAnalysisResponse.slope.formatted(.number.precision(.fractionLength(4)))),
-            ("Intercept", fitAnalysisResponse.intercept.formatted(.number.precision(.fractionLength(4)))),
-            ("R²", fitAnalysisResponse.rSquared.formatted(.number.precision(.fractionLength(4)))),
-            ("RMSE", fitAnalysisResponse.rmse.formatted(.number.precision(.fractionLength(4)))),
-            ("Points", "\(fitAnalysisResponse.pointCount)"),
-        ]
+        var rows: [(String, String)] = [("Equation", fitAnalysisResponse.equationDisplay)]
+        if let slope = fitAnalysisResponse.slope {
+            rows.append(("Slope", slope.formatted(.number.precision(.fractionLength(4)))))
+        }
+        if let intercept = fitAnalysisResponse.intercept {
+            rows.append(("Intercept", intercept.formatted(.number.precision(.fractionLength(4)))))
+        }
+        rows.append(("R²", fitAnalysisResponse.rSquared.formatted(.number.precision(.fractionLength(4)))))
+        rows.append(("RMSE", fitAnalysisResponse.rmse.formatted(.number.precision(.fractionLength(4)))))
+        rows.append(("Points", "\(fitAnalysisResponse.pointCount)"))
+        return rows
     }
 
     var availableSheets: [SheetValue] {

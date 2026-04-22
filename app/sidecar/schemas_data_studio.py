@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from app.sidecar.schemas_common import PreviewItemResponse, StrictModel, serialize_dataclass
-from app.sidecar.schemas_render import RenderOptionsPayload
+from app.sidecar.schemas_render import FitOptionsPayload, RenderOptionsPayload
 
 
 class DataStudioRangeResponse(StrictModel):
@@ -278,6 +278,7 @@ class DataStudioFigurePreferenceResponse(StrictModel):
     family_id: str
     selected_template_id: str | None = None
     options_by_template: dict[str, dict[str, object]] = Field(default_factory=dict)
+    fit_options_by_template: dict[str, FitOptionsPayload] = Field(default_factory=dict)
 
 
 class DataStudioSessionResponse(StrictModel):
@@ -350,6 +351,7 @@ class DataStudioExportComparisonRequest(StrictModel):
     specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
     selected_recipe_ids: list[str] = Field(default_factory=list)
     figure_options_by_recipe_id: dict[str, RenderOptionsPayload] = Field(default_factory=dict)
+    figure_fit_options_by_recipe_id: dict[str, FitOptionsPayload] = Field(default_factory=dict)
 
 
 class DataStudioSessionNormalizeRequest(StrictModel):

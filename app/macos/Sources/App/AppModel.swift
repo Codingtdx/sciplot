@@ -11,7 +11,7 @@ final class AppModel {
     enum PendingPlotReplacementAction {
         case importFromFilesystem
         case openPlotDocument(URL)
-        case openExternalFigure(URL, SheetValue, String?, RenderOptionsPayload?)
+        case openExternalFigure(URL, SheetValue, String?, RenderOptionsPayload?, FitOptionsPayload?)
     }
 
     let runtime: SidecarRuntime
@@ -50,6 +50,17 @@ final class AppModel {
             return composerSession.revealOutputAvailability
         case .codeConsole:
             return codeConsoleSession.revealOutputAvailability
+        }
+    }
+
+    var activeSaveProjectAvailability: ActionAvailability {
+        switch selectedWorkbench {
+        case .plot:
+            return plotSession.saveProjectAvailability
+        case .dataStudio:
+            return dataStudioSession.saveProjectAvailability
+        case .composer, .codeConsole:
+            return .disabled("Project files are not available for this workbench.")
         }
     }
 
@@ -106,8 +117,8 @@ final class AppModel {
         composerSession.configure(client: resolvedClient)
         codeConsoleSession.configure(client: resolvedClient)
 
-        dataStudioSession.openInPlotHandler = { [weak self] url, sheet, templateID, options in
-            self?.openInPlot(inputURL: url, sheet: sheet, templateID: templateID, options: options)
+        dataStudioSession.openInPlotHandler = { [weak self] url, sheet, templateID, options, fitOptions in
+            self?.openInPlot(inputURL: url, sheet: sheet, templateID: templateID, options: options, fitOptions: fitOptions)
         }
     }
 
@@ -172,19 +183,27 @@ final class AppModel {
         }
     }
 
-    func savePlotProject() async {
-        guard selectedWorkbench == .plot else {
+    func saveProject() async {
+        switch selectedWorkbench {
+        case .plot:
+            await plotSession.saveProject()
+        case .dataStudio:
+            await dataStudioSession.saveProject()
+        case .composer, .codeConsole:
             return
         }
-        await plotSession.saveProject()
         refreshCodeConsoleContext()
     }
 
-    func savePlotProjectAs() async {
-        guard selectedWorkbench == .plot else {
+    func saveProjectAs() async {
+        switch selectedWorkbench {
+        case .plot:
+            await plotSession.saveProjectAs()
+        case .dataStudio:
+            await dataStudioSession.saveProjectAs()
+        case .composer, .codeConsole:
             return
         }
-        await plotSession.saveProjectAs()
         refreshCodeConsoleContext()
     }
 
@@ -228,17 +247,24 @@ final class AppModel {
         refreshCodeConsoleContext()
     }
 
-    func openInPlot(inputURL: URL, sheet: SheetValue, templateID: String?, options: RenderOptionsPayload?) {
+    func openInPlot(
+        inputURL: URL,
+        sheet: SheetValue,
+        templateID: String?,
+        options: RenderOptionsPayload?,
+        fitOptions: FitOptionsPayload? = nil
+    ) {
         selectedWorkbench = .plot
         if plotSession.hasSessionContent {
-            pendingPlotReplacementAction = .openExternalFigure(inputURL, sheet, templateID, options)
+            pendingPlotReplacementAction = .openExternalFigure(inputURL, sheet, templateID, options, fitOptions)
             isPlotReplacementConfirmationPresented = true
         } else {
             plotSession.stageExternalFigure(
                 inputURL: inputURL,
                 sheet: sheet,
                 preferredTemplateID: templateID,
-                preferredOptions: options
+                preferredOptions: options,
+                preferredFitOptions: fitOptions
             )
             refreshCodeConsoleContext()
             Task {
@@ -269,21 +295,22 @@ final class AppModel {
         case .importFromFilesystem:
             plotSession.isImporterPresented = true
         case let .openPlotDocument(url):
-            selectedWorkbench = .plot
             Task {
                 if url.pathExtension.lowercased() == "sciplotgod" {
-                    await plotSession.openProject(url)
+                    await openProjectDocument(url)
                 } else {
+                    selectedWorkbench = .plot
                     plotSession.importFile(url)
                 }
                 refreshCodeConsoleContext()
             }
-        case let .openExternalFigure(url, sheet, templateID, options):
+        case let .openExternalFigure(url, sheet, templateID, options, fitOptions):
             plotSession.stageExternalFigure(
                 inputURL: url,
                 sheet: sheet,
                 preferredTemplateID: templateID,
-                preferredOptions: options
+                preferredOptions: options,
+                preferredFitOptions: fitOptions
             )
             refreshCodeConsoleContext()
             Task {
@@ -313,6 +340,13 @@ final class AppModel {
     }
 
     func openPlotDocument(_ url: URL) {
+        if url.pathExtension.lowercased() == "sciplotgod" {
+            Task {
+                await openProjectDocument(url)
+                refreshCodeConsoleContext()
+            }
+            return
+        }
         selectedWorkbench = .plot
         if plotSession.hasSessionContent {
             pendingPlotReplacementAction = .openPlotDocument(url)
@@ -326,6 +360,32 @@ final class AppModel {
                 plotSession.importFile(url)
             }
             refreshCodeConsoleContext()
+        }
+    }
+
+    func openProjectDocument(_ url: URL) async {
+        do {
+            let response = try await client.openProject(.init(projectPath: url.path))
+            switch response.payload.selectedWorkbench {
+            case "data_studio":
+                selectedWorkbench = .dataStudio
+                await dataStudioSession.restoreProject(from: response)
+            default:
+                selectedWorkbench = .plot
+                await plotSession.restoreProject(from: response)
+            }
+        } catch {
+            if isUserCancellationError(error) {
+                return
+            }
+            if url.pathExtension.lowercased() == "sciplotgod" {
+                switch selectedWorkbench {
+                case .dataStudio:
+                    dataStudioSession.errorMessage = error.localizedDescription
+                default:
+                    plotSession.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 }

@@ -8,7 +8,14 @@ final class DataStudioSession {
     typealias WorkbookSaveChooser = @MainActor (_ suggestedName: String) -> URL?
     typealias ComparisonFigureFormatChooser = @MainActor (_ title: String, _ message: String) -> ExportGraphicFormat?
     typealias ComparisonOutputMaterializer = @MainActor (_ sourceURLs: [URL], _ format: ExportGraphicFormat) throws -> [URL]
-    typealias OpenInPlotHandler = @MainActor (_ url: URL, _ sheet: SheetValue, _ templateID: String?, _ options: RenderOptionsPayload?) -> Void
+    typealias ProjectSaveChooser = @MainActor (_ suggestedName: String) -> URL?
+    typealias OpenInPlotHandler = @MainActor (
+        _ url: URL,
+        _ sheet: SheetValue,
+        _ templateID: String?,
+        _ options: RenderOptionsPayload?,
+        _ fitOptions: FitOptionsPayload?
+    ) -> Void
 
     let plotSession: PlotSession
 
@@ -20,6 +27,7 @@ final class DataStudioSession {
     @ObservationIgnored let chooseWorkbookSaveLocation: WorkbookSaveChooser
     @ObservationIgnored let chooseComparisonFigureFormat: ComparisonFigureFormatChooser
     @ObservationIgnored let materializeComparisonOutputs: ComparisonOutputMaterializer
+    @ObservationIgnored let chooseProjectSaveLocation: ProjectSaveChooser
     @ObservationIgnored let asyncCoordination = AsyncCoordination()
     @ObservationIgnored var importPanelPresentationRevision = 0
     @ObservationIgnored weak var undoManager: UndoManager?
@@ -45,6 +53,7 @@ final class DataStudioSession {
     var showAdvancedCandidates = false
 
     var importedSourceURLs: [URL] = []
+    var projectURL: URL?
     var workbooks: [DataStudioWorkbookItem] = []
     var groupStates: [DataStudioGroupStatePayload] = []
     var specimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]] = [:]
@@ -63,6 +72,19 @@ final class DataStudioSession {
     var selectedFigureFamilyID: String?
     var selectedFigureTemplateID: String?
     var figurePreferences: [DataStudioFigurePreferencePayload] = []
+    var isAnalysisPresented = false
+    var analysisTarget: DataStudioAnalysisTarget = .focusedWorkbook
+    var analysisTab: DataStudioAnalysisTab = .sourceData
+    var analysisSourceTableResponse: SourceTablePreviewResponse?
+    var analysisFitResponse: FitAnalysisResponse?
+    var analysisSourceTableErrorMessage: String?
+    var analysisFitErrorMessage: String?
+    var analysisSelectedSeriesID: String?
+    var analysisSourceTableOffset = 0
+    var analysisFitOffset = 0
+    var isLoadingAnalysisSourceTable = false
+    var isLoadingAnalysisFit = false
+    var focusedWorkbookFitOptions = FitOptionsPayload(enabled: true, modelID: "linear")
     var comparisonExportResponse: DataStudioComparisonExportResponse?
     var comparisonExportDestinationURL: URL?
     var comparisonFigureItems: [DataStudioExportFigureItem] = []
@@ -74,6 +96,7 @@ final class DataStudioSession {
     var errorMessage: String?
     var currentActivity: DataStudioActivity = .idle
     var isBusy = false
+    var isSavingProject = false
     var openInPlotHandler: OpenInPlotHandler?
 
     var importWizardStep: DataStudioImportWizardStep {
@@ -94,6 +117,9 @@ final class DataStudioSession {
         },
         materializeComparisonOutputs: @escaping ComparisonOutputMaterializer = {
             try NativeExportCoordinator.materializeComparisonOutputs(sourceURLs: $0, format: $1)
+        },
+        chooseProjectSaveLocation: @escaping ProjectSaveChooser = {
+            NativePanels.choosePlotProjectSaveLocation(suggestedName: $0)
         }
     ) {
         self.plotSession = plotSession
@@ -101,9 +127,15 @@ final class DataStudioSession {
         self.chooseWorkbookSaveLocation = chooseWorkbookSaveLocation
         self.chooseComparisonFigureFormat = chooseComparisonFigureFormat
         self.materializeComparisonOutputs = materializeComparisonOutputs
+        self.chooseProjectSaveLocation = chooseProjectSaveLocation
         self.plotSession.renderOptionsDidChange = { [weak self] options in
             Task { @MainActor [weak self] in
                 self?.storeCurrentFigureOptions(options)
+            }
+        }
+        self.plotSession.fitOptionsDidChange = { [weak self] options in
+            Task { @MainActor [weak self] in
+                self?.storeCurrentFigureFitOptions(options)
             }
         }
     }
@@ -230,6 +262,7 @@ final class DataStudioSession {
         comparisonFilteredWorkbookItems = []
         selectedComparisonFigureID = nil
         selectedRecipeID = nil
+        projectURL = nil
         importedSourceURLs = []
         sourcePreview = nil
         sourceMatches = []
@@ -244,19 +277,103 @@ final class DataStudioSession {
         selectedPreviewBlockID = nil
         showAdvancedCandidates = false
         importFlow = .idle
+        isAnalysisPresented = false
+        analysisTarget = .focusedWorkbook
+        analysisTab = .sourceData
+        analysisSourceTableResponse = nil
+        analysisFitResponse = nil
+        analysisSourceTableErrorMessage = nil
+        analysisFitErrorMessage = nil
+        analysisSelectedSeriesID = nil
+        analysisSourceTableOffset = 0
+        analysisFitOffset = 0
+        isLoadingAnalysisSourceTable = false
+        isLoadingAnalysisFit = false
+        focusedWorkbookFitOptions = FitOptionsPayload(enabled: true, modelID: "linear")
         plotSession.clearPreviewContext(preserveRenderOptions: true)
         previewWarning = nil
         isPreviewStale = false
         errorMessage = nil
         currentActivity = .idle
+        runtimeState.lastSavedProjectSnapshot = nil
     }
 
     func isUserCancelled(_ error: Error) -> Bool {
         isUserCancellationError(error)
     }
+
+    var currentProjectSnapshot: ProjectSnapshot? {
+        guard !orderedWorkbooks.isEmpty else {
+            return nil
+        }
+        return ProjectSnapshot(
+            selectedTemplateID: selectedTemplateID,
+            selectedWorkbookID: focusedWorkbook?.response.workbookID,
+            primaryWorkbookID: focusedWorkbook?.response.workbookID,
+            selectedRecipeID: currentRecipe?.id,
+            workbookPaths: orderedWorkbooks.map { $0.response.workbookPath },
+            comparisonRecipeIDs: selectedExportRecipeIDs,
+            selectedFigureFamilyID: selectedFigureFamilyID,
+            selectedFigureTemplateID: selectedFigureTemplateID,
+            groupStates: requestGroupStates,
+            specimenStates: requestSpecimenStates,
+            figurePreferences: figurePreferences,
+            importedPaths: importedSourceURLs.map(\.path),
+            templateDraftPath: importedSourceURLs.first?.path
+        )
+    }
+
+    var isProjectDirty: Bool {
+        guard let currentProjectSnapshot else {
+            return false
+        }
+        guard let lastSavedProjectSnapshot = runtimeState.lastSavedProjectSnapshot else {
+            return true
+        }
+        return currentProjectSnapshot != lastSavedProjectSnapshot
+    }
+
+    var saveProjectAvailability: ActionAvailability {
+        if isSavingProject {
+            return .disabled("Project save is already in progress.")
+        }
+        guard client != nil else {
+            return .disabled("The sidecar is not ready yet.")
+        }
+        guard currentProjectSnapshot != nil else {
+            return .disabled("Import workbook groups before saving a project.")
+        }
+        return .enabled()
+    }
+
+    var suggestedProjectFilename: String {
+        if let projectURL {
+            return projectURL.lastPathComponent
+        }
+        if let focusedWorkbook {
+            return focusedWorkbook.workbookURL.deletingPathExtension().lastPathComponent + ".sciplotgod"
+        }
+        return "data-studio-project.sciplotgod"
+    }
 }
 
 extension DataStudioSession {
+    struct ProjectSnapshot: Equatable {
+        let selectedTemplateID: String?
+        let selectedWorkbookID: String?
+        let primaryWorkbookID: String?
+        let selectedRecipeID: String?
+        let workbookPaths: [String]
+        let comparisonRecipeIDs: [String]
+        let selectedFigureFamilyID: String?
+        let selectedFigureTemplateID: String?
+        let groupStates: [DataStudioGroupStatePayload]
+        let specimenStates: [DataStudioSpecimenStatePayload]
+        let figurePreferences: [DataStudioFigurePreferencePayload]
+        let importedPaths: [String]
+        let templateDraftPath: String?
+    }
+
     struct UndoSnapshot: Equatable {
         let groupStates: [DataStudioGroupStatePayload]
         let specimenStatesByWorkbookPath: [String: [DataStudioSpecimenStatePayload]]
@@ -270,6 +387,7 @@ extension DataStudioSession {
         var meta: SidecarMetaResponse?
         var contract: PlotContractResponse?
         var isApplyingUndoRedo = false
+        var lastSavedProjectSnapshot: ProjectSnapshot?
     }
 
     struct BulkAutoKeepPresentation {

@@ -39,6 +39,11 @@ class RenderOptionsPayload(StrictModel):
     visual_theme_id: str | None = None
 
 
+class FitOptionsPayload(StrictModel):
+    enabled: bool = False
+    model_id: str = "linear"
+
+
 class FileRequest(StrictModel):
     input_path: str
     sheet: str | int = 0
@@ -47,6 +52,7 @@ class FileRequest(StrictModel):
 class RenderRequest(FileRequest):
     template: str
     options: RenderOptionsPayload = Field(default_factory=RenderOptionsPayload)
+    fit_options: FitOptionsPayload = Field(default_factory=FitOptionsPayload)
 
 
 class ExportRenderRequest(RenderRequest):
@@ -74,6 +80,7 @@ class SourceTablePreviewResponse(StrictModel):
 
 class FitAnalysisRequest(FileRequest):
     model_id: str = "linear"
+    series_id: str | None = None
     offset: int = 0
     limit: int = 50
 
@@ -86,18 +93,32 @@ class FitDerivedRowResponse(StrictModel):
     residual: float
 
 
+class FitSeriesSummaryResponse(StrictModel):
+    series_id: str
+    series_label: str
+    equation_display: str
+    r_squared: float
+    rmse: float
+    point_count: int
+    slope: float | None = None
+    intercept: float | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class FitAnalysisResponse(StrictModel):
     input_path: str
     sheet: str | int
     model_id: str
     x_label: str | None = None
     y_label: str | None = None
+    selected_series_id: str | None = None
     equation_display: str
-    slope: float
-    intercept: float
+    slope: float | None = None
+    intercept: float | None = None
     r_squared: float
     rmse: float
     point_count: int
+    series_summaries: list[FitSeriesSummaryResponse] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     total_rows: int
     offset: int
@@ -254,11 +275,40 @@ class PlotProjectPayload(StrictModel):
     )
 
 
+class DataStudioProjectWorkbookPayload(StrictModel):
+    workbook_filename: str
+    embedded_workbook_relpath: str
+    workbook_sha256: str
+    original_workbook_path: str | None = None
+    saved_workbook_mtime_ns: int | None = None
+
+
+class DataStudioProjectPayload(StrictModel):
+    session_kind: str = "data_studio"
+    version: int = 1
+    selected_template_id: str | None = None
+    workbook_paths: list[str] = Field(default_factory=list)
+    selected_workbook_id: str | None = None
+    primary_workbook_id: str | None = None
+    selected_recipe_id: str | None = None
+    comparison_recipe_ids: list[str] = Field(default_factory=list)
+    selected_figure_family_id: str | None = None
+    selected_figure_template_id: str | None = None
+    group_states: list[dict[str, Any]] = Field(default_factory=list)
+    specimen_states: list[dict[str, Any]] = Field(default_factory=list)
+    figure_preferences: list[dict[str, Any]] = Field(default_factory=list)
+    imported_paths: list[str] = Field(default_factory=list)
+    template_draft_path: str | None = None
+    embedded_workbooks: list[DataStudioProjectWorkbookPayload] = Field(default_factory=list)
+    project_display_name: str | None = None
+    source_provenance: dict[str, Any] = Field(default_factory=dict)
+
+
 class ProjectBundlePayload(StrictModel):
     version: int = 1
     selected_workbench: str = "plot"
     plot: PlotProjectPayload | None = None
-    data_studio: dict[str, Any] | None = None
+    data_studio: DataStudioProjectPayload | None = None
     composer: dict[str, Any] | None = None
     code_console: dict[str, Any] | None = None
     artifacts: dict[str, Any] = Field(default_factory=dict)
@@ -266,7 +316,7 @@ class ProjectBundlePayload(StrictModel):
 
 class SaveProjectRequest(StrictModel):
     project_path: str
-    source_path: str
+    source_path: str | None = None
     payload: ProjectBundlePayload
 
 
@@ -281,7 +331,8 @@ class OpenProjectRequest(StrictModel):
 
 class OpenProjectResponse(StrictModel):
     project_path: str
-    restored_source_path: str
+    restored_source_path: str | None = None
+    restored_workbook_paths: list[str] = Field(default_factory=list)
     payload: ProjectBundlePayload
 
 
@@ -315,12 +366,16 @@ SourceTablePreviewResponse.model_rebuild()
 
 
 __all__ = [
+    "DataStudioProjectPayload",
+    "DataStudioProjectWorkbookPayload",
     "ExportRenderRequest",
     "ExportRenderResponse",
     "FileRequest",
     "FitAnalysisRequest",
     "FitAnalysisResponse",
     "FitDerivedRowResponse",
+    "FitOptionsPayload",
+    "FitSeriesSummaryResponse",
     "InputInspectionResponse",
     "InspectFileResponse",
     "OpenProjectRequest",

@@ -202,6 +202,29 @@ extension DataStudioSession {
         return plotSession.renderOptions
     }
 
+    var currentFigureFitOptions: FitOptionsPayload {
+        if let currentRecipe,
+           let options = preferredFitOptions(
+               forFamilyID: currentFigureFamily?.id,
+               templateID: currentRecipe.templateID
+           )
+        {
+            return options
+        }
+        return plotSession.fitOptions
+    }
+
+    var currentFigureFitAvailability: ActionAvailability {
+        guard let recipe = currentRecipe else {
+            return .disabled("Choose a figure before fitting.")
+        }
+        let supportedTemplates = Set(["curve", "point_line", "scatter"])
+        guard supportedTemplates.contains(recipe.templateID) else {
+            return .disabled("Fit is only available for curve-like figures in this release.")
+        }
+        return .enabled()
+    }
+
     func selectFigureFamily(id: String) {
         let previousSnapshot = undoSnapshot()
         cacheCurrentFigureOptions()
@@ -233,7 +256,24 @@ extension DataStudioSession {
         else {
             return
         }
-        openInPlotHandler?(inputURL, currentFigureSheet, templateID, currentFigureRenderOptions)
+        openInPlotHandler?(inputURL, currentFigureSheet, templateID, currentFigureRenderOptions, currentFigureFitOptions)
+    }
+
+    func updateCurrentFigureFitEnabled(_ enabled: Bool) {
+        var options = currentFigureFitOptions
+        options.enabled = enabled
+        plotSession.fitOptions = options
+        plotSession.notifyFitOptionsDidChange()
+        Task { await refreshDisplayedFigureHandlingFailure() }
+    }
+
+    func updateCurrentFigureFitModel(_ modelID: String) {
+        var options = currentFigureFitOptions
+        options.enabled = true
+        options.modelID = modelID
+        plotSession.fitOptions = options
+        plotSession.notifyFitOptionsDidChange()
+        Task { await refreshDisplayedFigureHandlingFailure() }
     }
 
     func revealFocusedWorkbook() {
@@ -347,7 +387,8 @@ extension DataStudioSession {
                     groupStates: requestGroupStates,
                     specimenStates: requestSpecimenStates,
                     selectedRecipeIDs: recipeIDs,
-                    figureOptionsByRecipeID: exportFigureOptionsByRecipeID()
+                    figureOptionsByRecipeID: exportFigureOptionsByRecipeID(),
+                    figureFitOptionsByRecipeID: exportFigureFitOptionsByRecipeID()
                 )
             )
             comparisonExportResponse = response
@@ -431,6 +472,391 @@ extension DataStudioSession {
         )
 
         await rebuildComparisonContext(refreshWorkbookPreviews: true)
+        runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+    }
+
+    func restoreProject(from response: OpenProjectResponse) async {
+        guard let projectPayload = response.payload.dataStudio else {
+            errorMessage = "Opened project is missing its Data Studio payload."
+            return
+        }
+        await restoreSession(from: sessionResponse(from: projectPayload))
+        projectURL = URL(fileURLWithPath: response.projectPath)
+        runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+    }
+
+    func saveProject() async {
+        if let projectURL {
+            await saveProject(to: projectURL)
+            return
+        }
+        await saveProjectAs()
+    }
+
+    func saveProjectAs() async {
+        guard let destinationURL = chooseProjectSaveLocation(suggestedProjectFilename) else {
+            return
+        }
+        await saveProject(to: destinationURL)
+    }
+
+    func saveProject(to destinationURL: URL) async {
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
+            return
+        }
+        guard let normalizedSession = await normalizeSessionPayload() else {
+            if errorMessage == nil {
+                errorMessage = "Could not normalize the current Data Studio session."
+            }
+            return
+        }
+        isSavingProject = true
+        errorMessage = nil
+        defer { isSavingProject = false }
+        do {
+            let response = try await client.saveProject(
+                .init(
+                    projectPath: destinationURL.path,
+                    sourcePath: nil,
+                    payload: buildProjectPayload(from: normalizedSession)
+                )
+            )
+            if let projectPayload = response.payload.dataStudio {
+                projectURL = URL(fileURLWithPath: response.projectPath)
+                runtimeState.lastSavedProjectSnapshot = projectSnapshot(from: projectPayload)
+            } else {
+                projectURL = URL(fileURLWithPath: response.projectPath)
+                runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func buildProjectPayload(from session: DataStudioSessionResponse) -> ProjectBundlePayload {
+        ProjectBundlePayload(
+            version: 1,
+            selectedWorkbench: "data_studio",
+            plot: nil,
+            dataStudio: DataStudioProjectPayload(
+                sessionKind: "data_studio",
+                version: session.version,
+                selectedTemplateID: session.selectedTemplateID,
+                workbookPaths: session.workbookPaths,
+                selectedWorkbookID: session.selectedWorkbookID,
+                primaryWorkbookID: session.primaryWorkbookID,
+                selectedRecipeID: session.selectedRecipeID,
+                comparisonRecipeIDs: session.comparisonRecipeIDs,
+                selectedFigureFamilyID: session.selectedFigureFamilyID,
+                selectedFigureTemplateID: session.selectedFigureTemplateID,
+                groupStates: session.groupStates,
+                specimenStates: session.specimenStates,
+                figurePreferences: session.figurePreferences,
+                importedPaths: session.importedPaths,
+                templateDraftPath: session.templateDraftPath,
+                embeddedWorkbooks: [],
+                projectDisplayName: projectURL?.deletingPathExtension().lastPathComponent
+                    ?? focusedWorkbook?.workbookURL.deletingPathExtension().lastPathComponent,
+                sourceProvenance: [
+                    "imported_paths": .array(importedSourceURLs.map { .string($0.path) }),
+                ]
+            ),
+            composer: nil,
+            codeConsole: nil,
+            artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]
+        )
+    }
+
+    func sessionResponse(from projectPayload: DataStudioProjectPayload) -> DataStudioSessionResponse {
+        DataStudioSessionResponse(
+            version: projectPayload.version,
+            selectedTemplateID: projectPayload.selectedTemplateID,
+            selectedWorkbookID: projectPayload.selectedWorkbookID,
+            primaryWorkbookID: projectPayload.primaryWorkbookID,
+            selectedRecipeID: projectPayload.selectedRecipeID,
+            workbookPaths: projectPayload.workbookPaths,
+            comparisonRecipeIDs: projectPayload.comparisonRecipeIDs,
+            selectedFigureFamilyID: projectPayload.selectedFigureFamilyID,
+            selectedFigureTemplateID: projectPayload.selectedFigureTemplateID,
+            groupStates: projectPayload.groupStates,
+            specimenStates: projectPayload.specimenStates,
+            figurePreferences: projectPayload.figurePreferences,
+            importedPaths: projectPayload.importedPaths,
+            templateDraftPath: projectPayload.templateDraftPath
+        )
+    }
+
+    func projectSnapshot(from projectPayload: DataStudioProjectPayload) -> ProjectSnapshot {
+        ProjectSnapshot(
+            selectedTemplateID: projectPayload.selectedTemplateID,
+            selectedWorkbookID: projectPayload.selectedWorkbookID,
+            primaryWorkbookID: projectPayload.primaryWorkbookID,
+            selectedRecipeID: projectPayload.selectedRecipeID,
+            workbookPaths: projectPayload.workbookPaths,
+            comparisonRecipeIDs: projectPayload.comparisonRecipeIDs,
+            selectedFigureFamilyID: projectPayload.selectedFigureFamilyID,
+            selectedFigureTemplateID: projectPayload.selectedFigureTemplateID,
+            groupStates: projectPayload.groupStates,
+            specimenStates: projectPayload.specimenStates,
+            figurePreferences: projectPayload.figurePreferences,
+            importedPaths: projectPayload.importedPaths,
+            templateDraftPath: projectPayload.templateDraftPath
+        )
+    }
+
+    func showAnalysis() {
+        isAnalysisPresented = true
+        refreshAnalysisIfNeeded()
+    }
+
+    func dismissAnalysis() {
+        isAnalysisPresented = false
+    }
+
+    func selectAnalysisTarget(_ target: DataStudioAnalysisTarget) {
+        guard analysisTarget != target else {
+            return
+        }
+        analysisTarget = target
+        analysisSelectedSeriesID = nil
+        analysisFitOffset = 0
+        analysisSourceTableOffset = 0
+        refreshAnalysisIfNeeded()
+    }
+
+    func selectAnalysisTab(_ tab: DataStudioAnalysisTab) {
+        guard analysisTab != tab else {
+            return
+        }
+        analysisTab = tab
+        refreshAnalysisIfNeeded()
+    }
+
+    var analysisSourceContext: (inputURL: URL, sheet: SheetValue)? {
+        switch analysisTarget {
+        case .focusedWorkbook:
+            guard let focusedWorkbook else {
+                return nil
+            }
+            return (focusedWorkbook.workbookURL, .name(focusedWorkbook.response.preferredSheet))
+        case .currentFigure:
+            guard let inputURL = currentFigureSourceURL else {
+                return nil
+            }
+            return (inputURL, currentFigureSheet)
+        }
+    }
+
+    var analysisFitAvailability: ActionAvailability {
+        guard analysisSourceContext != nil else {
+            return .disabled("Select a workbook or figure before running fit analysis.")
+        }
+        switch analysisTarget {
+        case .focusedWorkbook:
+            return .enabled()
+        case .currentFigure:
+            guard let recipe = currentRecipe else {
+                return .disabled("Choose a figure before running fit analysis.")
+            }
+            let supportedTemplates = Set(["curve", "point_line", "scatter"])
+            guard supportedTemplates.contains(recipe.templateID) else {
+                return .disabled("Fit is only available for curve-like figures in this release.")
+            }
+            return .enabled()
+        }
+    }
+
+    var analysisFitOptions: FitOptionsPayload {
+        switch analysisTarget {
+        case .focusedWorkbook:
+            return focusedWorkbookFitOptions
+        case .currentFigure:
+            return currentFigureFitOptions
+        }
+    }
+
+    func updateAnalysisFitModel(_ modelID: String) {
+        switch analysisTarget {
+        case .focusedWorkbook:
+            focusedWorkbookFitOptions = FitOptionsPayload(enabled: true, modelID: modelID)
+        case .currentFigure:
+            plotSession.fitOptions = FitOptionsPayload(enabled: true, modelID: modelID)
+            plotSession.notifyFitOptionsDidChange()
+            Task { await refreshDisplayedFigureHandlingFailure() }
+        }
+        analysisSelectedSeriesID = nil
+        loadAnalysisFit(offset: 0)
+    }
+
+    func selectAnalysisSeries(id: String?) {
+        analysisSelectedSeriesID = id
+        loadAnalysisFit(offset: 0)
+    }
+
+    func refreshAnalysisIfNeeded() {
+        guard isAnalysisPresented else {
+            return
+        }
+        switch analysisTab {
+        case .sourceData:
+            loadAnalysisSourceTable(offset: analysisSourceTableOffset)
+        case .fit:
+            if analysisFitAvailability.isEnabled {
+                loadAnalysisFit(offset: analysisFitOffset)
+            } else {
+                analysisFitResponse = nil
+                analysisFitErrorMessage = analysisFitAvailability.reason
+            }
+        }
+    }
+
+    func loadAnalysisSourceTable(offset: Int = 0) {
+        guard let client, let context = analysisSourceContext else {
+            analysisSourceTableResponse = nil
+            return
+        }
+        let resolvedOffset = max(0, offset)
+        analysisSourceTableOffset = resolvedOffset
+        isLoadingAnalysisSourceTable = true
+        analysisSourceTableErrorMessage = nil
+        Task {
+            do {
+                let response = try await client.sourceTablePreview(
+                    .init(
+                        inputPath: context.inputURL.path,
+                        sheet: context.sheet,
+                        offset: resolvedOffset,
+                        limit: 50
+                    )
+                )
+                analysisSourceTableResponse = response
+                isLoadingAnalysisSourceTable = false
+            } catch {
+                analysisSourceTableErrorMessage = error.localizedDescription
+                isLoadingAnalysisSourceTable = false
+            }
+        }
+    }
+
+    func loadAnalysisFit(offset: Int = 0) {
+        guard let client, let context = analysisSourceContext else {
+            analysisFitResponse = nil
+            return
+        }
+        guard analysisFitAvailability.isEnabled else {
+            analysisFitResponse = nil
+            analysisFitErrorMessage = analysisFitAvailability.reason
+            return
+        }
+        let resolvedOffset = max(0, offset)
+        analysisFitOffset = resolvedOffset
+        isLoadingAnalysisFit = true
+        analysisFitErrorMessage = nil
+        Task {
+            do {
+                let response = try await client.fitAnalysis(
+                    .init(
+                        inputPath: context.inputURL.path,
+                        sheet: context.sheet,
+                        modelID: analysisFitOptions.modelID,
+                        seriesID: analysisSelectedSeriesID,
+                        offset: resolvedOffset,
+                        limit: 50
+                    )
+                )
+                analysisFitResponse = response
+                analysisSelectedSeriesID = response.selectedSeriesID
+                isLoadingAnalysisFit = false
+            } catch {
+                analysisFitErrorMessage = error.localizedDescription
+                isLoadingAnalysisFit = false
+            }
+        }
+    }
+
+    func pageAnalysisSourceTable(by delta: Int) {
+        let nextOffset = max(0, (analysisSourceTableResponse?.offset ?? analysisSourceTableOffset) + delta * 50)
+        loadAnalysisSourceTable(offset: nextOffset)
+    }
+
+    func pageAnalysisFit(by delta: Int) {
+        let nextOffset = max(0, (analysisFitResponse?.offset ?? analysisFitOffset) + delta * 50)
+        loadAnalysisFit(offset: nextOffset)
+    }
+
+    var analysisSourceTableRows: [PlotWorkbookTableRow] {
+        guard let response = analysisSourceTableResponse else {
+            return []
+        }
+        return response.rows.enumerated().map { index, values in
+            PlotWorkbookTableRow(id: response.offset + index, values: values)
+        }
+    }
+
+    var analysisSourceTablePageSummary: String {
+        guard let response = analysisSourceTableResponse else {
+            return "0 / 0"
+        }
+        if response.totalRows == 0 || response.rows.isEmpty {
+            return "0 / \(response.totalRows)"
+        }
+        let start = response.offset + 1
+        let end = min(response.totalRows, response.offset + response.rows.count)
+        return "\(start)-\(end) / \(response.totalRows)"
+    }
+
+    var canPageAnalysisSourceBackward: Bool {
+        (analysisSourceTableResponse?.offset ?? analysisSourceTableOffset) > 0
+    }
+
+    var canPageAnalysisSourceForward: Bool {
+        guard let response = analysisSourceTableResponse else {
+            return false
+        }
+        return response.offset + response.rows.count < response.totalRows
+    }
+
+    var analysisFitPageSummary: String {
+        guard let response = analysisFitResponse else {
+            return "0 / 0"
+        }
+        if response.totalRows == 0 || response.rows.isEmpty {
+            return "0 / \(response.totalRows)"
+        }
+        let start = response.offset + 1
+        let end = min(response.totalRows, response.offset + response.rows.count)
+        return "\(start)-\(end) / \(response.totalRows)"
+    }
+
+    var canPageAnalysisFitBackward: Bool {
+        (analysisFitResponse?.offset ?? analysisFitOffset) > 0
+    }
+
+    var canPageAnalysisFitForward: Bool {
+        guard let response = analysisFitResponse else {
+            return false
+        }
+        return response.offset + response.rows.count < response.totalRows
+    }
+
+    var analysisFitSummaryRows: [(String, String)] {
+        guard let response = analysisFitResponse else {
+            return []
+        }
+        var rows: [(String, String)] = [
+            ("Equation", response.equationDisplay),
+            ("R²", response.rSquared.formatted(.number.precision(.fractionLength(4)))),
+            ("RMSE", response.rmse.formatted(.number.precision(.fractionLength(4)))),
+            ("Points", "\(response.pointCount)"),
+        ]
+        if let slope = response.slope {
+            rows.insert(("Slope", slope.formatted(.number.precision(.fractionLength(4)))), at: 1)
+        }
+        if let intercept = response.intercept {
+            rows.insert(("Intercept", intercept.formatted(.number.precision(.fractionLength(4)))), at: min(rows.count, 2))
+        }
+        return rows
     }
 
     var requestGroupStates: [DataStudioGroupStatePayload] {
@@ -562,13 +988,15 @@ extension DataStudioSession {
             return
         }
         let preferredOptions = preferredRenderOptions(forFamilyID: currentFigureFamily?.id, templateID: currentRecipe.templateID)
+        let preferredFitOptions = preferredFitOptions(forFamilyID: currentFigureFamily?.id, templateID: currentRecipe.templateID)
         selectedRecipeID = currentRecipe.id
         selectedFigureTemplateID = currentRecipe.templateID
         plotSession.stageExternalFigure(
             inputURL: URL(fileURLWithPath: comparisonSet.comparisonWorkbookPath),
             sheet: .name(currentRecipe.sheetName),
             preferredTemplateID: currentRecipe.templateID,
-            preferredOptions: preferredOptions
+            preferredOptions: preferredOptions,
+            preferredFitOptions: preferredFitOptions
         )
         await plotSession.finishLoadingStagedExternalFigure(
             preferredTemplateID: currentRecipe.templateID,
@@ -612,13 +1040,15 @@ extension DataStudioSession {
             return
         }
         let preferredOptions = preferredRenderOptions(forFamilyID: currentFigureFamily?.id, templateID: currentRecipe.templateID)
+        let preferredFitOptions = preferredFitOptions(forFamilyID: currentFigureFamily?.id, templateID: currentRecipe.templateID)
         selectedRecipeID = currentRecipe.id
         selectedFigureTemplateID = currentRecipe.templateID
         plotSession.stageExternalFigure(
             inputURL: URL(fileURLWithPath: comparisonSet.comparisonWorkbookPath),
             sheet: .name(currentRecipe.sheetName),
             preferredTemplateID: currentRecipe.templateID,
-            preferredOptions: preferredOptions
+            preferredOptions: preferredOptions,
+            preferredFitOptions: preferredFitOptions
         )
     }
 
@@ -713,6 +1143,8 @@ extension DataStudioSession {
     func preferredRecipe(in family: DataStudioFigureFamilyItem) -> DataStudioComparisonRecipeResponse? {
         let preferredTemplateOrder = [
             "curve",
+            "point_line",
+            "scatter",
             "box_strip",
             "point_error",
             "box",
@@ -747,14 +1179,16 @@ extension DataStudioSession {
             figurePreferences[index] = DataStudioFigurePreferencePayload(
                 familyID: familyID,
                 selectedTemplateID: migratedTemplateID,
-                optionsByTemplate: existing.optionsByTemplate
+                optionsByTemplate: existing.optionsByTemplate,
+                fitOptionsByTemplate: existing.fitOptionsByTemplate
             )
         } else {
             figurePreferences.append(
                 DataStudioFigurePreferencePayload(
                     familyID: familyID,
                     selectedTemplateID: migratedTemplateID,
-                    optionsByTemplate: [:]
+                    optionsByTemplate: [:],
+                    fitOptionsByTemplate: [:]
                 )
             )
         }
@@ -771,18 +1205,53 @@ extension DataStudioSession {
         let existing = figurePreferences.first(where: { $0.familyID == familyID })
         var optionsByTemplate = existing?.optionsByTemplate ?? [:]
         optionsByTemplate[templateID] = options
+        let fitOptionsByTemplate = existing?.fitOptionsByTemplate ?? [:]
         if let index = figurePreferences.firstIndex(where: { $0.familyID == familyID }) {
             figurePreferences[index] = DataStudioFigurePreferencePayload(
                 familyID: familyID,
                 selectedTemplateID: templateID,
-                optionsByTemplate: optionsByTemplate
+                optionsByTemplate: optionsByTemplate,
+                fitOptionsByTemplate: fitOptionsByTemplate
             )
         } else {
             figurePreferences.append(
                 DataStudioFigurePreferencePayload(
                     familyID: familyID,
                     selectedTemplateID: templateID,
-                    optionsByTemplate: optionsByTemplate
+                    optionsByTemplate: optionsByTemplate,
+                    fitOptionsByTemplate: fitOptionsByTemplate
+                )
+            )
+        }
+        selectedFigureTemplateID = templateID
+    }
+
+    func storeCurrentFigureFitOptions(_ options: FitOptionsPayload) {
+        guard let familyID = currentFigureFamily?.id else {
+            return
+        }
+        let templateID = plotSession.selectedTemplateID ?? selectedFigureTemplateID
+        guard let templateID else {
+            return
+        }
+        let existing = figurePreferences.first(where: { $0.familyID == familyID })
+        let optionsByTemplate = existing?.optionsByTemplate ?? [:]
+        var fitOptionsByTemplate = existing?.fitOptionsByTemplate ?? [:]
+        fitOptionsByTemplate[templateID] = options
+        if let index = figurePreferences.firstIndex(where: { $0.familyID == familyID }) {
+            figurePreferences[index] = DataStudioFigurePreferencePayload(
+                familyID: familyID,
+                selectedTemplateID: templateID,
+                optionsByTemplate: optionsByTemplate,
+                fitOptionsByTemplate: fitOptionsByTemplate
+            )
+        } else {
+            figurePreferences.append(
+                DataStudioFigurePreferencePayload(
+                    familyID: familyID,
+                    selectedTemplateID: templateID,
+                    optionsByTemplate: optionsByTemplate,
+                    fitOptionsByTemplate: fitOptionsByTemplate
                 )
             )
         }
@@ -791,6 +1260,7 @@ extension DataStudioSession {
 
     func cacheCurrentFigureOptions() {
         storeCurrentFigureOptions(plotSession.renderOptions)
+        storeCurrentFigureFitOptions(plotSession.fitOptions)
     }
 
     func preferredRenderOptions(
@@ -805,6 +1275,18 @@ extension DataStudioSession {
             .optionsByTemplate[templateID]
     }
 
+    func preferredFitOptions(
+        forFamilyID familyID: String?,
+        templateID: String
+    ) -> FitOptionsPayload? {
+        guard let familyID else {
+            return nil
+        }
+        return figurePreferences
+            .first(where: { $0.familyID == familyID })?
+            .fitOptionsByTemplate[templateID]
+    }
+
     func exportFigureOptionsByRecipeID() -> [String: RenderOptionsPayload] {
         var result: [String: RenderOptionsPayload] = [:]
         for family in figureFamilies {
@@ -815,6 +1297,21 @@ extension DataStudioSession {
                 result[recipe.id] = options
             } else if family.id == currentFigureFamily?.id {
                 result[recipe.id] = plotSession.renderOptions
+            }
+        }
+        return result
+    }
+
+    func exportFigureFitOptionsByRecipeID() -> [String: FitOptionsPayload] {
+        var result: [String: FitOptionsPayload] = [:]
+        for family in figureFamilies {
+            guard let recipe = recipe(forFamilyID: family.id) else {
+                continue
+            }
+            if let options = preferredFitOptions(forFamilyID: family.id, templateID: recipe.templateID) {
+                result[recipe.id] = options
+            } else if family.id == currentFigureFamily?.id {
+                result[recipe.id] = plotSession.fitOptions
             }
         }
         return result
@@ -890,10 +1387,16 @@ extension DataStudioSession {
             let migratedTemplateID = migrateLegacyFigureTemplateID(templateID) ?? templateID
             migratedOptions[migratedTemplateID] = options
         }
+        var migratedFitOptions: [String: FitOptionsPayload] = [:]
+        for (templateID, options) in preference.fitOptionsByTemplate {
+            let migratedTemplateID = migrateLegacyFigureTemplateID(templateID) ?? templateID
+            migratedFitOptions[migratedTemplateID] = options
+        }
         return DataStudioFigurePreferencePayload(
             familyID: preference.familyID,
             selectedTemplateID: migrateLegacyFigureTemplateID(preference.selectedTemplateID),
-            optionsByTemplate: migratedOptions
+            optionsByTemplate: migratedOptions,
+            fitOptionsByTemplate: migratedFitOptions
         )
     }
 
@@ -929,6 +1432,11 @@ extension DataStudioSession {
                         jsonValue(for: options)
                     }
                 ),
+                "fit_options_by_template": .object(
+                    preference.fitOptionsByTemplate.mapValues { options in
+                        jsonValue(for: options)
+                    }
+                ),
             ]
         )
     }
@@ -944,6 +1452,15 @@ extension DataStudioSession {
                 "x_max": options.xMax.map(JSONValue.number) ?? .null,
                 "y_min": options.yMin.map(JSONValue.number) ?? .null,
                 "y_max": options.yMax.map(JSONValue.number) ?? .null,
+            ]
+        )
+    }
+
+    func jsonValue(for options: FitOptionsPayload) -> JSONValue {
+        .object(
+            [
+                "enabled": .bool(options.enabled),
+                "model_id": .string(options.modelID),
             ]
         )
     }

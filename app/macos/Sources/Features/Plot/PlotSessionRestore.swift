@@ -6,8 +6,12 @@ extension PlotSession {
             errorMessage = "Opened project is missing its Plot payload."
             return
         }
+        guard let restoredSourcePath = response.restoredSourcePath else {
+            errorMessage = "Opened project is missing its embedded Plot source."
+            return
+        }
         let projectURL = URL(fileURLWithPath: response.projectPath)
-        let restoredSourceURL = URL(fileURLWithPath: response.restoredSourcePath)
+        let restoredSourceURL = URL(fileURLWithPath: restoredSourcePath)
         resetDataWorkbookState()
         stageExternalFigure(
             inputURL: restoredSourceURL,
@@ -59,13 +63,15 @@ extension PlotSession {
         inputURL: URL,
         sheet: SheetValue,
         preferredTemplateID: String? = nil,
-        preferredOptions: RenderOptionsPayload? = nil
+        preferredOptions: RenderOptionsPayload? = nil,
+        preferredFitOptions: FitOptionsPayload? = nil
     ) async {
         stageExternalFigure(
             inputURL: inputURL,
             sheet: sheet,
             preferredTemplateID: preferredTemplateID,
-            preferredOptions: preferredOptions
+            preferredOptions: preferredOptions,
+            preferredFitOptions: preferredFitOptions
         )
         await finishLoadingStagedExternalFigure(
             preferredTemplateID: preferredTemplateID,
@@ -77,7 +83,8 @@ extension PlotSession {
         inputURL: URL,
         sheet: SheetValue,
         preferredTemplateID: String? = nil,
-        preferredOptions: RenderOptionsPayload? = nil
+        preferredOptions: RenderOptionsPayload? = nil,
+        preferredFitOptions: FitOptionsPayload? = nil
     ) {
         prepareSource(url: inputURL, sheet: sheet, resetTemplate: true)
         runtimeState.stagedExternalPinnedSheet = sheet
@@ -90,6 +97,8 @@ extension PlotSession {
             renderOptions = preferredOptions
             notifyRenderOptionsDidChange()
         }
+        fitOptions = preferredFitOptions ?? FitOptionsPayload()
+        notifyFitOptionsDidChange()
     }
 
     func finishLoadingStagedExternalFigure(
