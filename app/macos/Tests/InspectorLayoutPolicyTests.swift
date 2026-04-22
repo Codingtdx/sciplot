@@ -185,7 +185,8 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                         palettePreset: "shine",
                         visualThemeID: "macarons"
                     ),
-                ]
+                ],
+                fitOptionsByTemplate: [:]
             ),
         ]
         figureSession.selectedFigureFamilyID = "strength"

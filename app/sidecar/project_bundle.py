@@ -431,7 +431,10 @@ def save_project_bundle(
         data_studio_payload = normalized_payload.data_studio
         if data_studio_payload is None:
             raise ValueError("Project payload is missing the Data Studio section.")
-        resolved_workbook_paths = [normalize_path(workbook_path) for workbook_path in data_studio_payload.workbook_paths]
+        resolved_workbook_paths = [
+            normalize_path(workbook_path)
+            for workbook_path in data_studio_payload.workbook_paths
+        ]
         if not resolved_workbook_paths:
             raise ValueError("Import workbook groups before saving a Data Studio project.")
         seen_members: set[str] = set()
@@ -636,7 +639,8 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
             restored_workbook_path.write_bytes(workbook_bytes)
             restored_workbook_paths.append(str(restored_workbook_path))
             if embedded_workbook.original_workbook_path:
-                path_lookup[str(Path(embedded_workbook.original_workbook_path).expanduser())] = str(restored_workbook_path)
+                expanded_original_path = str(Path(embedded_workbook.original_workbook_path).expanduser())
+                path_lookup[expanded_original_path] = str(restored_workbook_path)
                 path_lookup[embedded_workbook.original_workbook_path] = str(restored_workbook_path)
             if index < len(saved_workbook_paths):
                 path_lookup[str(Path(saved_workbook_paths[index]).expanduser())] = str(restored_workbook_path)

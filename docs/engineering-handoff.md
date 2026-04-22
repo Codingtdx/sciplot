@@ -2351,3 +2351,104 @@ Use this block for every new round:
 - Decision:
 - Validation (commands + result):
 ```
+
+### 2026-04-22 (Round AR): Data Studio analysis, shared multi-model fit, and app-level project bundles
+
+- Scope:
+  - Expanded `.sciplotgod` from a Plot-only bundle into an app-level project file in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_projects.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_projects.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppCommands.swift`
+  - New bundle layout now supports:
+    - `project.json`
+    - `sources/plot/primary/<filename>` optional
+    - `sources/data_studio/workbooks/<filename>` optional
+    - `artifacts/manifest.json`
+  - Added typed Data Studio project persistence so `selected_workbench=data_studio` can embed workbook bytes plus normalized session state and restore through the existing session pipeline instead of rebuilding from raw import paths.
+  - Promoted fit analysis into a shared rendering service in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/fit_analysis.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - Shared fit service now supports:
+    - `linear`
+    - `polynomial_2`
+    - `polynomial_3`
+    and returns per-series summaries, diagnostics, equations, and derived rows for both Plot and Data Studio.
+  - Added Data Studio `Analysis` utility in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `Analysis` supports two scopes:
+    - `Focused Workbook`
+    - `Current Figure`
+    with `Source Data` and `Fit` tabs, paging via `POST /source-table-preview`, and fit inspection via shared `POST /fit-analysis`.
+  - Extended Data Studio figure persistence so `render_options` and `fit_options` are kept independently by template/family and flow through preview, export, Open in Plot, save project, and restore project.
+  - Updated regression fixtures and tests in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_active_routes.py`
+  - Refreshed `README.md` and `AGENTS.md` to document the app-level bundle shape, shared fit routes, and Data Studio analysis surface.
+- User-visible impact:
+  - Data Studio can now save and reopen a self-contained `.sciplotgod` project that restores the same workbook-backed session even after the original workbook path is removed.
+  - Opening a saved Data Studio project returns directly to the Data Studio workbench instead of falling back to Plot first.
+  - Data Studio now exposes an `Analysis` utility for workbook rows and curve fitting without leaving the workbench.
+  - Curve-like figures in Data Studio can apply `linear`, `polynomial_2`, or `polynomial_3` fits, carry those fit settings into export and Open in Plot, and restore them from saved session/project state.
+  - Metric families remain unchanged in this round; fitting is intentionally limited to curve-like figure families.
+- Risks:
+  - `.sciplotgod` now has two embedded-source modes; future schema changes must continue to go through sidecar normalization and migration or Plot/Data Studio restore behavior can diverge.
+  - Data Studio restore now trusts embedded workbook bytes rather than `imported_paths`; any future optimization that bypasses materialization risks breaking the “reopen exactly where you left off” guarantee.
+  - Shared multi-model fit is now part of both analysis and renderer overlay paths; if one caller bypasses `src/rendering/fit_analysis.py`, displayed equations and exported fit lines can drift again.
+  - `Current Figure` fit remains intentionally bounded to curve-like contexts; widening it to metric families will need explicit UX and schema work instead of silent enablement.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_projects.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_projects.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/fit_analysis.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppCommands.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionProjects.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsProjects.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: Data Studio’s true work state is the workbook-backed compare/filter/figure session, not just a rendered figure snapshot. If the project file cannot restore that workbook-backed session from embedded bytes, it does not meet the “reopen exactly where you left off” requirement.
+  - Chose one app-level `.sciplotgod` bundle over separate Plot-only and Data Studio-only formats:
+    - accepted because one schema and one save/open route keep workbench restore behavior centralized in sidecar
+    - rejected separate per-workbench formats because they would duplicate migration logic and drift on restore semantics
+  - Chose fit as a shared orthogonal capability instead of duplicating `*_fit` recipes:
+    - accepted because Plot rendering, Data Studio analysis, export overlays, and Open in Plot all need the same coefficients, equations, and diagnostics
+    - rejected family-specific fit recipe duplication because it would multiply template ids and drift the backend math
+  - Boundary:
+    - Data Studio projects embed workbook files, not original raw files
+    - fitting remains limited to curve-like figure families
+    - no autosave, no multi-workbench concurrent editing conflict handling, and no user-defined formulas in this round
+- Troubleshooting note:
+  - New Data Studio project-save tests can fail if the mock normalize endpoint returns a stale canned session response instead of the session’s current fit-option state.
+  - The durable fix is to override `dataStudioNormalizeSessionHandler` in the test and synthesize the response from the live session state; otherwise project-save assertions can look like persistence regressions even when the runtime path is correct.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 35 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`191 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`54 tests`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`151 tests`)
+  - `git diff --check`: passed

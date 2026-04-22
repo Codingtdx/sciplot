@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 import statsmodels.api as sm
@@ -70,7 +69,7 @@ class FitSeriesResult:
             intercept = self.intercept or 0.0
             sign = "+" if intercept >= 0 else "-"
             return f"y = {slope:.3g}x {sign} {abs(intercept):.3g}"
-        terms: list[str] = []
+        terms: list[tuple[str, str]] = []
         degree = self.degree
         for index, coefficient in enumerate(self.coefficients):
             power = degree - index

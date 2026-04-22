@@ -67,8 +67,8 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
-- Plot `Data Workbook` 原始表格统一走 `POST /source-table-preview`，按分页返回列头、rows、候选角色和检测到的 x/y 标签；不要把全量 workbook 表格塞回 inspect payload。
-- Plot 线性拟合分析统一走 `POST /fit-analysis`；图上的 `scatter_fit` 线、方程和 Data Workbook `Fit` 结果表必须共用同一份后端拟合 helper，禁止前端或第二条 Python 路径偷偷重算。
+- Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、候选角色和检测到的 x/y 标签；不要把全量 workbook 表格塞回 inspect/session payload。
+- Plot / Data Studio 拟合分析统一走 `POST /fit-analysis`；当前支持 `linear`、`polynomial_2`、`polynomial_3`。图上的 fit overlay、方程和分析结果表必须共用同一份后端拟合 helper，禁止前端或第二条 Python 路径偷偷重算。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -89,11 +89,13 @@
 - filtered workbook 必须保持标准 Data Studio sheet 结构、支持再次 import / specimen filter；曲线 sheet 当前保留到小数点后四位，specimen / summary / replicate 数值表保留到小数点后两位。不要在 comparison workbook 上偷偷做第二套数值格式规则。
 - sidecar endpoint 必须返回显式 response model，禁止裸 dict。
 - 项目文件保存/打开必须经过 sidecar schema 校验迁移层（`/save-project`、`/open-project`）。
-- Plot 项目文件固定为自包含单文件 `.sciplotgod` bundle：
+- `.sciplotgod` 是 app-level 自包含单文件 bundle，当前固定结构为：
   - `project.json`
-  - `sources/primary/<original-filename>`
+  - `sources/plot/primary/<original-filename>` 可选
+  - `sources/data_studio/workbooks/<original-filename>` 一个或多个，可选
   - `artifacts/manifest.json`
-- Plot 项目恢复必须以 bundle 内嵌源文件为真相源；不能依赖原始绝对路径仍然存在。
+- Plot 项目恢复必须以 bundle 内嵌 raw source 为真相源；不能依赖原始绝对路径仍然存在。
+- Data Studio 项目恢复必须以 bundle 内嵌 workbook 为真相源；`imported_paths` 和 raw file path 只做 provenance，不能参与恢复真相源。
 
 ## 桌面运行时约束（macOS）
 
@@ -104,7 +106,9 @@
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。
+- Data Studio 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
 - Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
+- Data Studio `Save Project…` / `Save Project As…` 同样走命令菜单，不新增第二套 toolbar 主入口。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 跨 workbench 的 async 失败处理必须统一把“用户取消 / 生命周期取消”视为控制流，而不是 GUI 错误：
   - 优先复用共享 helper（当前是 `app/macos/Sources/Shared/Utilities/UserCancellation.swift` 的 `isUserCancellationError`）；
@@ -136,6 +140,11 @@
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data` 和 `Fit`
   - `Fit` v1 只支持 `Linear`
+- Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
+  - 作用域固定为 `Focused Workbook` 和 `Current Figure`
+  - 页签固定为 `Source Data` 和 `Fit`
+  - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`
+  - `Current Figure` 拟合只开放给 `curve / point_line / scatter`
 - macOS GUI smoke / fingerprint 基线必须继续覆盖 imported-state inspector：
   - Plot imported inspector
   - Plot data workbook

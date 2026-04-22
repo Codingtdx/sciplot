@@ -1035,12 +1035,26 @@ enum TestPayloads {
             modelID: "linear",
             xLabel: "Strain",
             yLabel: "Stress",
+            selectedSeriesID: "series-1",
             equationDisplay: "y = 60x + 0.0333",
             slope: 60.0,
             intercept: 0.0333,
             rSquared: 0.999,
             rmse: 0.109,
             pointCount: 3,
+            seriesSummaries: [
+                .init(
+                    seriesID: "series-1",
+                    seriesLabel: "Series 1",
+                    equationDisplay: "y = 60x + 0.0333",
+                    rSquared: 0.999,
+                    rmse: 0.109,
+                    pointCount: 3,
+                    slope: 60.0,
+                    intercept: 0.0333,
+                    warnings: []
+                ),
+            ],
             warnings: [],
             totalRows: 3,
             offset: 0,
@@ -1072,7 +1086,7 @@ enum TestPayloads {
                 sessionKind: "plot",
                 sourceFilename: URL(fileURLWithPath: sourcePath).lastPathComponent,
                 sourceMediaType: "text/csv",
-                embeddedSourceRelpath: "sources/primary/\(URL(fileURLWithPath: sourcePath).lastPathComponent)",
+                embeddedSourceRelpath: "sources/plot/primary/\(URL(fileURLWithPath: sourcePath).lastPathComponent)",
                 sourceSHA256: "abc123",
                 sheet: sheet,
                 selectedTemplateID: templateID,
@@ -1109,6 +1123,7 @@ enum TestPayloads {
         OpenProjectResponse(
             projectPath: projectPath,
             restoredSourcePath: restoredSourcePath,
+            restoredWorkbookPaths: [],
             payload: payload ?? plotProjectPayload(sourcePath: restoredSourcePath)
         )
     }
@@ -1801,7 +1816,8 @@ enum TestPayloads {
                             palettePreset: "colorblind_safe",
                             visualThemeID: "roma"
                         ),
-                    ]
+                    ],
+                    fitOptionsByTemplate: [:]
                 ),
             ],
             importedPaths: ["/tmp/raw_a.csv"],

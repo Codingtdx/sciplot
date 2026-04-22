@@ -33,7 +33,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 
 - Plot open/import accepts either raw source data (`csv` / `xlsx` / `xlsm`) or a self-contained `.sciplotgod` project bundle. Saving a Plot project embeds the original source file bytes together with durable Plot state, so reopening the project restores the same starting point even if the original source path is gone.
 - Plot exposes a `Data` utility affordance that opens `Data Workbook`, a read-only sheet with `Source Data` and `Fit` tabs. `Fit` v1 is linear-only and reports the fitted equation, coefficients, `R²`, `RMSE`, point count, and per-point residual rows.
+- Data Studio can also save/open `.sciplotgod` project bundles. Data Studio projects embed the current workbook file(s) together with durable compare/filter/figure session state, and reopening routes directly back to Data Studio instead of falling through Plot.
 - Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Data Studio exposes an `Analysis` utility sheet with `Focused Workbook` and `Current Figure` scopes. `Source Data` shows paged workbook rows; `Fit` supports `linear`, `polynomial_2`, and `polynomial_3`. Current-figure fitting is limited to curve-like templates (`curve`, `point_line`, `scatter`).
 - Export UX is unified around the Data Studio inspector pattern: toolbar `Export` remains the global entrypoint, while workbench inspectors expose `Section("Actions")` with a primary export action and an `Advanced` disclosure for `Reveal Output` plus `Latest Export`.
 - Plot / Composer / Code Console figure exports always choose `PDF` or `300 dpi TIFF` first, then choose the destination. Single-output exports keep an editable filename; multi-output exports choose one base filename and append deterministic suffixes per figure.
 - Code Console export only covers the latest run's generated PDF figure files. Managed run artifacts remain browsable in the Outputs panel, and revealing the managed output folder stays separate from user export destinations.
@@ -51,9 +53,9 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
-- `POST /source-table-preview` returns paged raw source-table rows plus detected role/x/y hints for Plot `Data Workbook`.
-- `POST /fit-analysis` returns typed Plot linear-fit summaries and paged derived rows; Plot rendering and fit analysis share the same backend coefficients/equation helper.
-- `POST /save-project` and `POST /open-project` are the only supported Plot project-file persistence routes. `.sciplotgod` bundles are zip-based single files with embedded source bytes, schema validation, and normalization at ingress.
+- `POST /source-table-preview` returns paged raw source-table rows plus detected role/x/y hints for Plot `Data Workbook` and Data Studio `Analysis`.
+- `POST /fit-analysis` is the shared Plot/Data Studio fit-analysis route. It returns typed summaries plus paged derived rows for `linear`, `polynomial_2`, and `polynomial_3`, and renderer overlays must use the same backend coefficients/equation helper.
+- `POST /save-project` and `POST /open-project` are the only supported app-level project-file persistence routes. `.sciplotgod` bundles are zip-based single files with schema validation/normalization at ingress and may embed Plot raw sources and/or Data Studio workbook files depending on the active workbench.
 - `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
 - Baseline specimen-filter analysis means Auto Keep 5 ranking over the full workbook. Compare/export still consume only committed `specimen_states`, including any manually selected representative curve override.
 - After a workbook is imported, Data Studio preview/compare/export read curves and metrics from that workbook only. `source_files` remain provenance metadata and must not be used as a silent fallback data source.

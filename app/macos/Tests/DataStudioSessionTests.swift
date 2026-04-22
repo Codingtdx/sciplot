@@ -740,7 +740,8 @@ final class DataStudioSessionTests: XCTestCase {
             .init(
                 familyID: "strength",
                 selectedTemplateID: "box",
-                optionsByTemplate: ["box": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")]
+                optionsByTemplate: ["box": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")],
+                fitOptionsByTemplate: [:]
             ),
         ]
 
@@ -834,7 +835,8 @@ final class DataStudioSessionTests: XCTestCase {
                     .init(
                         familyID: "strength",
                         selectedTemplateID: "grouped_bar_error",
-                        optionsByTemplate: ["grouped_bar_error": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")]
+                        optionsByTemplate: ["grouped_bar_error": RenderOptionsPayload(stylePreset: "nature", palettePreset: "colorblind_safe")],
+                        fitOptionsByTemplate: [:]
                     ),
                 ],
                 importedPaths: [],
@@ -877,7 +879,7 @@ final class DataStudioSessionTests: XCTestCase {
         )
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
-        session.openInPlotHandler = { url, sheet, templateID, options in
+        session.openInPlotHandler = { url, sheet, templateID, options, _ in
             openedURL = url
             openedSheet = sheet
             openedTemplateID = templateID
@@ -931,6 +933,55 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(
             session.comparisonFilteredWorkbookItems.map(\.response.representativeFilename),
             ["sample_2.csv", "sample_3.csv"]
+        )
+    }
+
+    func testCurveFitOptionsReachOpenInPlotAndExport() async {
+        let exportDirectoryURL = URL(fileURLWithPath: "/tmp/data_studio_exports", isDirectory: true)
+        let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
+
+        var openedFitOptions: FitOptionsPayload?
+
+        let session = DataStudioSession(
+            chooseDirectory: { _, _ in exportDirectoryURL },
+            chooseComparisonFigureFormat: { _, _ in .pdf },
+            materializeComparisonOutputs: { sourceURLs, _ in sourceURLs }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.openInPlotHandler = { _, _, _, _, fitOptions in
+            openedFitOptions = fitOptions
+        }
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/prepared.xlsx")])
+        await waitUntil(
+            {
+                session.currentRecipe?.id == "representative_curve" &&
+                session.currentFigureTemplateID == "curve"
+            },
+            timeout: 3.0
+        )
+
+        session.updateCurrentFigureFitModel("polynomial_2")
+        await waitUntil(
+            {
+                client.renderRequests.last?.template == "curve" &&
+                client.renderRequests.last?.fitOptions.enabled == true &&
+                client.renderRequests.last?.fitOptions.modelID == "polynomial_2"
+            },
+            timeout: 3.0
+        )
+
+        session.openCurrentFigureInPlot()
+        await session.exportComparisonBundle()
+
+        XCTAssertEqual(openedFitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
+        XCTAssertEqual(
+            client.dataStudioExportComparisonRequests.last?.figureFitOptionsByRecipeID["representative_curve"],
+            FitOptionsPayload(enabled: true, modelID: "polynomial_2")
         )
     }
 
@@ -1695,7 +1746,8 @@ final class DataStudioSessionTests: XCTestCase {
                 .init(
                     familyID: "strength",
                     selectedTemplateID: "box",
-                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe")]
+                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe")],
+                    fitOptionsByTemplate: [:]
                 ),
             ],
             importedPaths: ["/tmp/raw_a.csv"],
@@ -1712,6 +1764,176 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.specimenStates(for: "/tmp/prepared.xlsx").first?.selectedAsRepresentative, true)
         XCTAssertEqual(client.dataStudioImportWorkbookRequests.count, 2)
         XCTAssertEqual(client.dataStudioComparisonContextRequests.count, 1)
+    }
+
+    func testSaveProjectPersistsNormalizedDataStudioPayloadAndClearsDirty() async {
+        let destinationURL = URL(fileURLWithPath: "/tmp/data-studio-project.sciplotgod")
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            TestPayloads.dataStudioImportWorkbook(
+                workbooks: [TestPayloads.dataStudioWorkbook(id: "workbook-1", path: request.workbookPath, label: "Prepared Group")]
+            )
+        }
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        await session.restoreSession(from: TestPayloads.dataStudioSession())
+        client.dataStudioNormalizeSessionHandler = { _ in
+            DataStudioSessionResponse(
+                version: 1,
+                selectedTemplateID: session.selectedTemplateID,
+                selectedWorkbookID: session.focusedWorkbook?.response.workbookID,
+                primaryWorkbookID: session.focusedWorkbook?.response.workbookID,
+                selectedRecipeID: session.currentRecipe?.id,
+                workbookPaths: session.orderedWorkbooks.map { $0.response.workbookPath },
+                comparisonRecipeIDs: session.selectedExportRecipeIDs,
+                selectedFigureFamilyID: session.selectedFigureFamilyID,
+                selectedFigureTemplateID: session.selectedFigureTemplateID,
+                groupStates: session.requestGroupStates,
+                specimenStates: session.requestSpecimenStates,
+                figurePreferences: session.figurePreferences,
+                importedPaths: session.importedSourceURLs.map(\.path),
+                templateDraftPath: session.importedSourceURLs.first?.path
+            )
+        }
+
+        XCTAssertFalse(session.isProjectDirty)
+
+        session.updateCurrentFigureFitModel("polynomial_3")
+        await waitUntil({ session.isProjectDirty }, timeout: 3.0)
+
+        await session.saveProject(to: destinationURL)
+
+        XCTAssertEqual(client.saveProjectRequests.count, 1)
+        XCTAssertEqual(client.saveProjectRequests.last?.projectPath, destinationURL.path)
+        XCTAssertEqual(client.saveProjectRequests.last?.sourcePath, nil)
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.selectedWorkbench, "data_studio")
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.dataStudio?.workbookPaths, ["/tmp/prepared.xlsx"])
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.dataStudio?.figurePreferences.first?.fitOptionsByTemplate["curve"],
+            FitOptionsPayload(enabled: true, modelID: "polynomial_3")
+        )
+        XCTAssertEqual(session.projectURL?.path, destinationURL.path)
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
+    func testRestoreProjectRestoresDataStudioStateAndClearsDirty() async {
+        let restoredWorkbookPath = "/tmp/restored/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            TestPayloads.dataStudioImportWorkbook(
+                workbooks: [TestPayloads.dataStudioWorkbook(id: "workbook-1", path: request.workbookPath, label: "Prepared Group")]
+            )
+        }
+
+        let projectSession = DataStudioSessionResponse(
+            version: 1,
+            selectedTemplateID: "builtin/tensile",
+            selectedWorkbookID: "workbook-1",
+            primaryWorkbookID: "workbook-1",
+            selectedRecipeID: "representative_curve",
+            workbookPaths: [restoredWorkbookPath],
+            comparisonRecipeIDs: ["representative_curve", "strength_box"],
+            selectedFigureFamilyID: "representative_curve",
+            selectedFigureTemplateID: "curve",
+            groupStates: [
+                .init(
+                    workbookPath: restoredWorkbookPath,
+                    displayName: "Prepared Group",
+                    includeInCompare: true,
+                    sortOrder: 0
+                ),
+            ],
+            specimenStates: [
+                .init(
+                    workbookPath: restoredWorkbookPath,
+                    specimenId: "sample-a",
+                    included: true,
+                    selectedAsRepresentative: true
+                ),
+            ],
+            figurePreferences: [
+                .init(
+                    familyID: "representative_curve",
+                    selectedTemplateID: "curve",
+                    optionsByTemplate: ["curve": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe", visualThemeID: "roma")],
+                    fitOptionsByTemplate: ["curve": FitOptionsPayload(enabled: true, modelID: "polynomial_2")]
+                ),
+            ],
+            importedPaths: ["/tmp/raw_a.csv"],
+            templateDraftPath: "/tmp/raw_a.csv"
+        )
+        let payloadBuilder = DataStudioSession()
+        let response = OpenProjectResponse(
+            projectPath: "/tmp/restored.sciplotgod",
+            restoredSourcePath: nil,
+            restoredWorkbookPaths: [restoredWorkbookPath],
+            payload: payloadBuilder.buildProjectPayload(from: projectSession)
+        )
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.restoreProject(from: response)
+
+        XCTAssertEqual(session.projectURL?.path, "/tmp/restored.sciplotgod")
+        XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, restoredWorkbookPath)
+        XCTAssertEqual(session.selectedFigureFamilyID, "representative_curve")
+        XCTAssertEqual(session.currentFigureTemplateID, "curve")
+        XCTAssertEqual(
+            session.figurePreferences.first?.fitOptionsByTemplate["curve"],
+            FitOptionsPayload(enabled: true, modelID: "polynomial_2")
+        )
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
+    func testAnalysisLoadsFocusedWorkbookSourceTableAndFit() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.sourceTablePreviewHandler = { request in
+            XCTAssertEqual(request.inputPath, workbookPath)
+            XCTAssertEqual(request.sheet, .name("Representative_Curve"))
+            return TestPayloads.sourceTablePreview(path: request.inputPath)
+        }
+        client.fitAnalysisHandler = { request in
+            XCTAssertEqual(request.inputPath, workbookPath)
+            XCTAssertEqual(request.sheet, .name("Representative_Curve"))
+            return TestPayloads.fitAnalysis(path: request.inputPath)
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        let workbook = DataStudioWorkbookItem(
+            id: "workbook-1",
+            response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: workbookPath, label: "Prepared Group")
+        )
+        session.workbooks = [workbook]
+        session.groupStates = [
+            .init(workbookPath: workbookPath, displayName: "Prepared Group", includeInCompare: true, sortOrder: 0),
+        ]
+        session.focusedWorkbookPath = workbookPath
+
+        session.showAnalysis()
+        await waitUntil({ session.analysisSourceTableResponse != nil }, timeout: 3.0)
+
+        XCTAssertEqual(session.analysisSourceTableResponse?.inputPath, workbookPath)
+        XCTAssertEqual(client.sourceTablePreviewRequests.count, 1)
+
+        session.selectAnalysisTab(.fit)
+        await waitUntil({ session.analysisFitResponse != nil }, timeout: 3.0)
+
+        XCTAssertEqual(session.analysisFitResponse?.inputPath, workbookPath)
+        XCTAssertEqual(session.analysisFitResponse?.selectedSeriesID, "series-1")
+        XCTAssertEqual(client.fitAnalysisRequests.last?.modelID, "linear")
+
+        session.updateAnalysisFitModel("polynomial_2")
+        await waitUntil({ client.fitAnalysisRequests.last?.modelID == "polynomial_2" }, timeout: 3.0)
+        XCTAssertEqual(session.analysisFitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
     }
 
     func testRevealFocusedWorkbookSurfacesMissingFileError() {
