@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
 
 from src.data_studio.builtin import tensile as tensile_builtin
 from src.data_studio.io_utils import ensure_input_path, list_sheet_names
@@ -62,6 +61,14 @@ def _import_workbook_from_path(workbook_path: Path) -> DataStudioWorkbook:
     sample_count = int(metadata.get("sample_count", 0) or 0)
     source_files = tuple(Path(item) for item in metadata.get("source_files", ()))
     warnings = tuple(str(item) for item in metadata.get("warnings", ()))
+    if tensile_builtin.REPRESENTATIVE_CURVE_SHEET in sheet_names:
+        preferred_sheet = tensile_builtin.REPRESENTATIVE_CURVE_SHEET
+    elif tensile_builtin.ALL_CURVES_SHEET in sheet_names:
+        preferred_sheet = tensile_builtin.ALL_CURVES_SHEET
+    elif tensile_builtin.SUMMARY_SHEET in sheet_names:
+        preferred_sheet = tensile_builtin.SUMMARY_SHEET
+    else:
+        preferred_sheet = sheet_names[0]
     return DataStudioWorkbook(
         workbook_id=str(workbook_path),
         workbook_path=workbook_path,
@@ -76,7 +83,7 @@ def _import_workbook_from_path(workbook_path: Path) -> DataStudioWorkbook:
         ),
         source_files=source_files,
         sheet_names=sheet_names,
-        preferred_sheet=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+        preferred_sheet=preferred_sheet,
         parsed_sample_count=sample_count,
         failed_sample_count=0,
         representative_filename=representative_filename,

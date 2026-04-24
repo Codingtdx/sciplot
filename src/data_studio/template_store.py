@@ -88,6 +88,14 @@ def _segment_selector_from_payload(payload: dict[str, object]) -> TemplateSegmen
 
 
 def template_from_payload(payload: dict[str, object]) -> TemplateDefinition:
+    output_kind = str(payload.get("output_kind", "curve_metrics"))
+    comparison_enabled_payload = payload.get("comparison_enabled")
+    if output_kind != "curve_metrics":
+        resolved_comparison_enabled = True
+    elif comparison_enabled_payload is None:
+        resolved_comparison_enabled = True
+    else:
+        resolved_comparison_enabled = bool(comparison_enabled_payload)
     return TemplateDefinition(
         version=int(payload.get("version", 1)),
         id=str(payload["id"]),
@@ -104,7 +112,8 @@ def template_from_payload(payload: dict[str, object]) -> TemplateDefinition:
         workbook_metric_ids=tuple(str(item) for item in payload.get("workbook_metric_ids", ()) or ()),
         default_group_name_strategy=str(payload.get("default_group_name_strategy", "common_prefix")),
         preferred_sheet_name=str(payload.get("preferred_sheet_name", "Representative_Curve")),
-        output_kind=str(payload.get("output_kind", "curve_metrics")),
+        output_kind=output_kind,
+        comparison_enabled=resolved_comparison_enabled,
         source_format=_source_format_from_payload(dict(payload.get("source_format", {}) or {})),
         segment_policy=str(payload.get("segment_policy", "single_table")),
         segment_selectors=tuple(
@@ -153,6 +162,7 @@ def template_to_payload(template: TemplateDefinition) -> dict[str, object]:
         "default_group_name_strategy": template.default_group_name_strategy,
         "preferred_sheet_name": template.preferred_sheet_name,
         "output_kind": template.output_kind,
+        "comparison_enabled": template.comparison_enabled,
         "source_format": {
             "encoding": template.source_format.encoding,
             "delimiter": template.source_format.delimiter,
@@ -229,6 +239,7 @@ def rename_template(template_id: str, *, new_id: str | None = None, new_label: s
         default_group_name_strategy=template.default_group_name_strategy,
         preferred_sheet_name=template.preferred_sheet_name,
         output_kind=template.output_kind,
+        comparison_enabled=template.comparison_enabled,
         source_format=template.source_format,
         segment_policy=template.segment_policy,
         segment_selectors=template.segment_selectors,

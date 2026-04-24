@@ -35,6 +35,7 @@ final class SidecarRuntime {
         .init(method: "GET", path: "/data-studio/templates"),
         .init(method: "POST", path: "/source-table-preview"),
         .init(method: "POST", path: "/data-studio/template-preview"),
+        .init(method: "POST", path: "/data-studio/template-recommendations"),
         .init(method: "POST", path: "/data-studio/build-workbook"),
     ]
 

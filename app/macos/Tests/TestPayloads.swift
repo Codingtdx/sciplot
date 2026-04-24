@@ -1193,7 +1193,8 @@ enum TestPayloads {
 
     static func dataStudioTemplate(
         id: String = "builtin/tensile",
-        label: String = "Tensile"
+        label: String = "Tensile",
+        comparisonEnabled: Bool = true
     ) -> DataStudioTemplateResponse {
         DataStudioTemplateResponse(
             version: 1,
@@ -1244,6 +1245,7 @@ enum TestPayloads {
             defaultGroupNameStrategy: "common_prefix",
             preferredSheetName: "Representative_Curve",
             outputKind: "curve_metrics",
+            comparisonEnabled: comparisonEnabled,
             sourceFormat: .init(encoding: nil, delimiter: nil, sheetName: nil),
             segmentPolicy: "single_table",
             segmentSelectors: [],
@@ -1282,6 +1284,23 @@ enum TestPayloads {
                 dataStudioTemplate(id: "user/custom_curve", label: "Custom Curve Template"),
             ]
         )
+    }
+
+    static func dataStudioTemplateRecommendations(
+        matches: [DataStudioTemplateMatchResponse] = [
+            DataStudioTemplateMatchResponse(
+                templateID: "builtin/tensile",
+                label: "Tensile",
+                family: "tensile",
+                confidence: 0.98,
+                reasons: ["Matched by fixture hints."],
+                warnings: [],
+                matchedSheetNames: ["Sheet1"],
+                autoSelected: true
+            ),
+        ]
+    ) -> DataStudioTemplateRecommendationsResponse {
+        DataStudioTemplateRecommendationsResponse(matches: matches)
     }
 
     static func dataStudioWorkbook(

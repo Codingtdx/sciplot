@@ -178,6 +178,7 @@ class TemplateDefinition:
     default_group_name_strategy: str = "common_prefix"
     preferred_sheet_name: str = "Representative_Curve"
     output_kind: str = "curve_metrics"
+    comparison_enabled: bool = True
     source_format: TemplateSourceFormat = field(default_factory=TemplateSourceFormat)
     segment_policy: str = "single_table"
     segment_selectors: tuple[TemplateSegmentSelector, ...] = ()

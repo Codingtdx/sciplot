@@ -883,9 +883,21 @@ def match_template(preview: RawFilePreview, template: TemplateDefinition) -> Tem
 
 
 def recommend_templates_for_preview(preview: RawFilePreview) -> tuple[TemplateMatch, ...]:
-    matches = [match for template in list_templates() if (match := match_template(preview, template)) is not None]
-    matches.sort(key=lambda item: (-item.confidence, item.label.lower(), item.template_id))
-    return tuple(matches)
+    ranked: list[tuple[TemplateMatch, bool]] = []
+    for template in list_templates():
+        match = match_template(preview, template)
+        if match is None:
+            continue
+        ranked.append((match, template.builtin))
+    ranked.sort(
+        key=lambda item: (
+            -item[0].confidence,
+            item[1],  # Prefer user templates when confidence ties.
+            item[0].label.lower(),
+            item[0].template_id,
+        )
+    )
+    return tuple(match for match, _builtin in ranked)
 
 
 def preview_raw_file(path: str | Path) -> RawFilePreview:

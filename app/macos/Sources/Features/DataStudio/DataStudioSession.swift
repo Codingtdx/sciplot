@@ -34,6 +34,7 @@ final class DataStudioSession {
 
     var templates: [DataStudioTemplateResponse] = []
     var selectedTemplateID: String?
+    var recommendedTemplateMatches: [DataStudioTemplateMatchResponse] = []
     var sourcePreview: SourceTablePreviewResponse?
     var templatePreview: DataStudioTemplatePreviewResponse?
     var hoveredSuggestionID: String?
@@ -44,6 +45,7 @@ final class DataStudioSession {
     var templateDraftLabel = ""
     var templateDraftDescription = ""
     var templateDraftOutputKind = "curve_metrics"
+    var templateDraftComparisonEnabled = false
     var templateDraftXColumnName: String?
     var templateDraftYColumnNames: [String] = []
     var templateDraftMetricColumnNames: [String] = []
@@ -269,6 +271,7 @@ final class DataStudioSession {
         selectedRecipeID = nil
         projectURL = nil
         importedSourceURLs = []
+        recommendedTemplateMatches = []
         sourcePreview = nil
         templatePreview = nil
         hoveredSuggestionID = nil
@@ -279,6 +282,7 @@ final class DataStudioSession {
         templateDraftLabel = ""
         templateDraftDescription = ""
         templateDraftOutputKind = "curve_metrics"
+        templateDraftComparisonEnabled = false
         templateDraftXColumnName = nil
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []

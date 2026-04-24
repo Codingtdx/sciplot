@@ -9,6 +9,7 @@ from src.data_studio.comparison import (
     preview_comparison_recipe,
 )
 from src.data_studio.import_templates_v2 import create_template_definition, preview_template_apply
+from src.data_studio.ingest import preview_and_recommend
 from src.data_studio.models import (
     TemplateFieldBinding,
     TemplateMatchCondition,
@@ -35,12 +36,18 @@ def list_data_studio_templates():
     return list_templates()
 
 
+def list_data_studio_template_recommendations(source_path: str | Path):
+    _preview, recommendations = preview_and_recommend(source_path)
+    return recommendations
+
+
 def create_data_studio_template(
     *,
     label: str,
     template_id: str | None = None,
     description: str = "",
     output_kind: str = "curve_metrics",
+    comparison_enabled: bool | None = None,
     source_format: dict[str, object] | None = None,
     segment_policy: str = "single_table",
     segment_selectors: list[dict[str, object]] | None = None,
@@ -52,6 +59,7 @@ def create_data_studio_template(
         template_id=template_id,
         description=description,
         output_kind=output_kind,
+        comparison_enabled=comparison_enabled,
         source_format=_source_format_from_payload(source_format or {}),
         segment_policy=segment_policy,
         segment_selectors=tuple(_segment_selector_from_payload(item) for item in (segment_selectors or [])),
@@ -66,10 +74,17 @@ def preview_data_studio_template(source_path: str | Path, *, template_payload: d
     template = create_template_definition(
         label=str(template_payload.get("label", "Draft Import Template")),
         template_id=(
-            str(template_payload["template_id"]) if template_payload.get("template_id") is not None else "draft/template"
+            str(template_payload["template_id"])
+            if template_payload.get("template_id") is not None
+            else "draft/template"
         ),
         description=str(template_payload.get("description", "")),
         output_kind=str(template_payload.get("output_kind", "curve_metrics")),
+        comparison_enabled=(
+            bool(template_payload["comparison_enabled"])
+            if template_payload.get("comparison_enabled") is not None
+            else None
+        ),
         source_format=_source_format_from_payload(dict(template_payload.get("source_format", {}) or {})),
         segment_policy=str(template_payload.get("segment_policy", "single_table")),
         segment_selectors=tuple(
@@ -238,6 +253,7 @@ __all__ = [
     "import_data_studio_workbook",
     "import_data_studio_workbooks",
     "list_data_studio_recipes",
+    "list_data_studio_template_recommendations",
     "list_data_studio_templates",
     "load_template",
     "normalize_session_payload",

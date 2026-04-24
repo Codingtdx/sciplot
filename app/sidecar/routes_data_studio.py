@@ -18,6 +18,8 @@ from app.sidecar.schemas import (
     DataStudioTemplateListResponse,
     DataStudioTemplatePreviewRequest,
     DataStudioTemplatePreviewResponse,
+    DataStudioTemplateRecommendationsRequest,
+    DataStudioTemplateRecommendationsResponse,
     DataStudioTemplateResponse,
     DataStudioUpdateTemplateRequest,
     DataStudioWorkbookPreviewRequest,
@@ -34,6 +36,7 @@ from src.data_studio.service import (
     delete_data_studio_template,
     export_data_studio_comparison,
     import_data_studio_workbooks,
+    list_data_studio_template_recommendations,
     list_data_studio_templates,
     normalize_session_payload,
     preview_data_studio_comparison,
@@ -65,6 +68,7 @@ def create_data_studio_router() -> APIRouter:
                 template_id=request.template_id,
                 description=request.description,
                 output_kind=request.output_kind,
+                comparison_enabled=request.comparison_enabled,
                 source_format=request.source_format.model_dump(),
                 segment_policy=request.segment_policy,
                 segment_selectors=[item.model_dump() for item in request.segment_selectors],
@@ -85,6 +89,21 @@ def create_data_studio_router() -> APIRouter:
             return DataStudioTemplatePreviewResponse.model_validate(serialize_dataclass(preview))
         except Exception as exc:
             raise http_bad_request("data_studio_template_preview", exc) from exc
+
+    @router.post(
+        "/data-studio/template-recommendations",
+        response_model=DataStudioTemplateRecommendationsResponse,
+    )
+    def recommend_templates(
+        request: DataStudioTemplateRecommendationsRequest,
+    ) -> DataStudioTemplateRecommendationsResponse:
+        try:
+            matches = list_data_studio_template_recommendations(request.source_path)
+            return DataStudioTemplateRecommendationsResponse.model_validate(
+                {"matches": [serialize_dataclass(match) for match in matches]}
+            )
+        except Exception as exc:
+            raise http_bad_request("data_studio_template_recommendations", exc) from exc
 
     @router.put("/data-studio/templates/{template_id:path}", response_model=DataStudioTemplateResponse)
     def update_template(template_id: str, request: DataStudioUpdateTemplateRequest) -> DataStudioTemplateResponse:

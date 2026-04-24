@@ -40,6 +40,7 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/compose-export") in signatures
     assert ("GET", "/data-studio/templates") in signatures
     assert ("POST", "/data-studio/template-preview") in signatures
+    assert ("POST", "/data-studio/template-recommendations") in signatures
     assert ("POST", "/data-studio/build-workbook") in signatures
     assert ("POST", "/data-studio/import-workbook") in signatures
     assert ("POST", "/data-studio/comparison-preview") in signatures

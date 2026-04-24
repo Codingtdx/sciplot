@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -200,6 +201,82 @@ def test_create_template_from_candidates_persists_user_template(
         for binding in template.field_bindings
         if binding.role in {"curve_x", "curve_y"}
     ] == ["Tensile Strain", "Tensile Stress"]
+
+
+def test_create_template_rejects_comparison_enabled_without_metric_bindings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_template_dir = tmp_path / "templates" / "user"
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", user_template_dir)
+
+    with pytest.raises(ValueError, match="Enable Comparison needs at least one metric column binding"):
+        create_data_studio_template(
+            label="Invalid Compare Template",
+            template_id="user/invalid-compare-template",
+            description="Missing metrics with comparison enabled.",
+            output_kind="curve_metrics",
+            comparison_enabled=True,
+            source_format={"encoding": "utf-8", "delimiter": ","},
+            segment_policy="single_table",
+            segment_selectors=[
+                {
+                    "id": "result-table-2",
+                    "label": "Result Table 2",
+                    "header_row_index": 6,
+                    "unit_row_index": 7,
+                    "data_start_row_index": 8,
+                },
+            ],
+            field_bindings=[
+                {
+                    "id": "strain",
+                    "role": "curve_x",
+                    "label": "Tensile Strain",
+                    "column_name": "Tensile Strain (Displacement)",
+                },
+                {
+                    "id": "stress",
+                    "role": "curve_y",
+                    "label": "Tensile Stress",
+                    "column_name": "Tensile Stress",
+                },
+            ],
+        )
+
+
+def test_template_store_defaults_curve_metrics_comparison_enabled_for_legacy_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_template_dir = tmp_path / "templates" / "user"
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", user_template_dir)
+    template_store.ensure_template_dirs()
+    payload = {
+        "version": 2,
+        "id": "user/legacy-curve-template",
+        "label": "Legacy Curve Template",
+        "family": "table_import",
+        "builtin": False,
+        "description": "",
+        "file_types": ["csv"],
+        "parse_strategy": "table_template_v2",
+        "field_bindings": [
+            {"id": "x", "role": "curve_x", "label": "X", "column_name": "Strain"},
+            {"id": "y", "role": "curve_y", "label": "Y", "column_name": "Stress"},
+            {"id": "m", "role": "metric", "label": "Strength", "column_name": "Stress", "optional": True},
+        ],
+        "output_kind": "curve_metrics",
+        "source_format": {"encoding": "utf-8", "delimiter": ",", "sheet_name": "Sheet1"},
+        "segment_policy": "single_table",
+    }
+    path = template_store.template_path("user/legacy-curve-template", builtin=False)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    loaded = template_store.load_template("user/legacy-curve-template")
+
+    assert loaded.output_kind == "curve_metrics"
+    assert loaded.comparison_enabled is True
 
 
 def test_build_and_import_data_studio_workbook_keeps_tensile_behavior(tmp_path: Path) -> None:

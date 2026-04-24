@@ -125,11 +125,16 @@ struct DataStudioCreateTemplateEditorSheet: View {
                         TextField("Description", text: $session.templateDraftDescription, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                         Picker("Output", selection: outputKindBinding) {
-                            Text("Curve + Metrics").tag("curve_metrics")
+                            Text("Curves").tag("curve_metrics")
                             Text("Metric Table").tag("metric_table")
                             Text("Matrix / Heatmap").tag("matrix_heatmap")
                         }
                         .pickerStyle(.segmented)
+                        if session.templateDraftOutputKind == "curve_metrics" {
+                            Toggle("Enable Comparison", isOn: comparisonEnabledBinding)
+                                .toggleStyle(.switch)
+                                .help("Generate representative/metric compare sheets in addition to curves.")
+                        }
                     }
                 }
 
@@ -178,7 +183,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                                 }
                             )
 
-                            if session.templateDraftOutputKind == "curve_metrics" {
+                            if session.templateDraftOutputKind == "curve_metrics", session.templateDraftComparisonEnabled {
                                 DisclosureGroup("Metrics", isExpanded: $session.showAdvancedCandidates) {
                                     DataStudioColumnToggleList(
                                         title: "",
@@ -231,6 +236,13 @@ struct DataStudioCreateTemplateEditorSheet: View {
         Binding(
             get: { session.templateDraftOutputKind },
             set: { session.setTemplateOutputKind($0) }
+        )
+    }
+
+    private var comparisonEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { session.templateDraftComparisonEnabled },
+            set: { session.setTemplateComparisonEnabled($0) }
         )
     }
 

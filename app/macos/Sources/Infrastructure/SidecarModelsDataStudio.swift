@@ -229,6 +229,7 @@ struct DataStudioTemplateResponse: Codable, Equatable, Sendable, Identifiable {
     let defaultGroupNameStrategy: String
     let preferredSheetName: String
     let outputKind: String
+    let comparisonEnabled: Bool
     let sourceFormat: DataStudioTemplateSourceFormatResponse
     let segmentPolicy: String
     let segmentSelectors: [DataStudioTemplateSegmentSelectorResponse]
@@ -249,6 +250,7 @@ struct DataStudioTemplateResponse: Codable, Equatable, Sendable, Identifiable {
         case defaultGroupNameStrategy
         case preferredSheetName
         case outputKind
+        case comparisonEnabled
         case sourceFormat
         case segmentPolicy
         case segmentSelectors
@@ -593,6 +595,7 @@ struct DataStudioCreateTemplateRequest: Codable, Equatable, Sendable {
     let templateID: String?
     let description: String
     let outputKind: String
+    let comparisonEnabled: Bool
     let sourceFormat: DataStudioTemplateSourceFormatResponse
     let segmentPolicy: String
     let segmentSelectors: [DataStudioTemplateSegmentSelectorResponse]
@@ -604,6 +607,7 @@ struct DataStudioCreateTemplateRequest: Codable, Equatable, Sendable {
         templateID: String? = nil,
         description: String = "",
         outputKind: String = "curve_metrics",
+        comparisonEnabled: Bool = true,
         sourceFormat: DataStudioTemplateSourceFormatResponse = .init(),
         segmentPolicy: String = "single_table",
         segmentSelectors: [DataStudioTemplateSegmentSelectorResponse] = [],
@@ -614,6 +618,7 @@ struct DataStudioCreateTemplateRequest: Codable, Equatable, Sendable {
         self.templateID = templateID
         self.description = description
         self.outputKind = outputKind
+        self.comparisonEnabled = comparisonEnabled
         self.sourceFormat = sourceFormat
         self.segmentPolicy = segmentPolicy
         self.segmentSelectors = segmentSelectors
@@ -626,6 +631,7 @@ struct DataStudioCreateTemplateRequest: Codable, Equatable, Sendable {
         case templateID = "templateId"
         case description
         case outputKind
+        case comparisonEnabled
         case sourceFormat
         case segmentPolicy
         case segmentSelectors
@@ -647,6 +653,14 @@ struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
     let template: DataStudioCreateTemplateRequest
 }
 
+struct DataStudioTemplateRecommendationsRequest: Codable, Equatable, Sendable {
+    let sourcePath: String
+}
+
+struct DataStudioTemplateRecommendationsResponse: Codable, Equatable, Sendable {
+    let matches: [DataStudioTemplateMatchResponse]
+}
+
 struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
     let templateID: String
     let outputKind: String
@@ -659,6 +673,20 @@ struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
     let warnings: [String]
     let errors: [String]
     let segments: [DataStudioTemplatePreviewSegmentResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case templateID = "templateId"
+        case outputKind
+        case parsedSampleCount
+        case failedSampleCount
+        case seriesCount
+        case metricCount
+        case matrixRowCount
+        case missingRoles
+        case warnings
+        case errors
+        case segments
+    }
 }
 
 struct DataStudioUpdateTemplateRequest: Codable, Equatable, Sendable {

@@ -107,6 +107,8 @@ private struct DataStudioImportChooserSheet: View {
 
 private struct DataStudioImportResolverSheet: View {
     @Bindable var session: DataStudioSession
+    @State private var renameDraft = ""
+    @State private var isDeleteConfirmationPresented = false
 
     private var presentation: DataStudioResolverPresentation {
         session.resolverPresentation
@@ -152,6 +154,8 @@ private struct DataStudioImportResolverSheet: View {
                 .listStyle(.inset)
             }
 
+            templateManagementSection
+
             Divider()
 
             DataStudioSheetFooter {
@@ -184,6 +188,24 @@ private struct DataStudioImportResolverSheet: View {
         }
         .frame(minWidth: 620, idealWidth: 620, minHeight: 430, idealHeight: 500)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            syncRenameDraft(with: presentation.selectedTemplateLabel)
+        }
+        .onChange(of: presentation.selectedTemplateLabel) { _, newValue in
+            syncRenameDraft(with: newValue)
+        }
+        .confirmationDialog(
+            "Delete Parse Template?",
+            isPresented: $isDeleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Template", role: .destructive) {
+                Task { await session.deleteSelectedTemplate() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes '\(presentation.selectedTemplateLabel ?? "selected template")'.")
+        }
     }
 
     private var resolverHeader: some View {
@@ -198,6 +220,40 @@ private struct DataStudioImportResolverSheet: View {
             }
         }
         .padding(20)
+    }
+
+    private var templateManagementSection: some View {
+        GroupBox("Template Management") {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField("Template Name", text: $renameDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!presentation.renameTemplateAvailability.isEnabled)
+
+                HStack(spacing: 10) {
+                    Button("Rename") {
+                        Task { await session.renameSelectedTemplate(to: renameDraft) }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!presentation.renameTemplateAvailability.isEnabled)
+                    .help(presentation.renameTemplateAvailability.reason ?? "Rename the selected parse template.")
+
+                    Button("Delete", role: .destructive) {
+                        isDeleteConfirmationPresented = true
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!presentation.deleteTemplateAvailability.isEnabled)
+                    .help(presentation.deleteTemplateAvailability.reason ?? "Delete the selected parse template.")
+
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
+    }
+
+    private func syncRenameDraft(with selectedLabel: String?) {
+        renameDraft = selectedLabel ?? ""
     }
 
     private var selectedTemplateBinding: Binding<String?> {

@@ -6,6 +6,7 @@ protocol SidecarClienting: AnyObject {
     func fetchMeta() async throws -> SidecarMetaResponse
     func fetchPlotContract() async throws -> PlotContractResponse
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse
+    func recommendDataStudioTemplates(_ request: DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse
     func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse
     func createDataStudioTemplate(_ request: DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse
     func updateDataStudioTemplate(templateID: String, request: DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse
@@ -69,6 +70,10 @@ final class SidecarClient: SidecarClienting {
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {
         try await get("data-studio/templates")
+    }
+
+    func recommendDataStudioTemplates(_ request: DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse {
+        try await post("data-studio/template-recommendations", body: request)
     }
 
     func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse {
@@ -240,7 +245,47 @@ final class SidecarClient: SidecarClienting {
         do {
             return try decoder.decode(Response.self, from: data)
         } catch {
+            if let decodingError = error as? DecodingError {
+                throw SidecarError.invalidResponse(
+                    decodeErrorDescription(
+                        decodingError,
+                        request: request,
+                        responseBody: data
+                    )
+                )
+            }
             throw SidecarError.invalidResponse(error.localizedDescription)
+        }
+    }
+
+    private func decodeErrorDescription(
+        _ error: DecodingError,
+        request: URLRequest,
+        responseBody: Data
+    ) -> String {
+        let endpoint = request.url?.path ?? "(unknown endpoint)"
+        let hasBody = !responseBody.isEmpty
+
+        switch error {
+        case let .keyNotFound(key, context):
+            let path = (context.codingPath + [key]).map(\.stringValue).joined(separator: ".")
+            return "Missing key `\(key.stringValue)` while decoding `\(path)` from \(endpoint)."
+        case let .typeMismatch(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            let location = path.isEmpty ? "(root)" : path
+            return "Type mismatch for `\(type)` at `\(location)` from \(endpoint)."
+        case let .valueNotFound(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            let location = path.isEmpty ? "(root)" : path
+            return "Missing value for `\(type)` at `\(location)` from \(endpoint)."
+        case let .dataCorrupted(context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            let location = path.isEmpty ? "(root)" : path
+            let suffix = hasBody ? "" : " Response body is empty."
+            return "Data corrupted at `\(location)` from \(endpoint): \(context.debugDescription).\(suffix)"
+        @unknown default:
+            let suffix = hasBody ? "" : " Response body is empty."
+            return "Decoding failed from \(endpoint).\(suffix)"
         }
     }
 }

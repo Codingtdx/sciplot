@@ -139,6 +139,38 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(comparison.comparisonSet.workbookLabels.count, 2)
     }
 
+    func testDecodeDataStudioTemplatePreviewPayloadUsesTemplateID() throws {
+        let payload = """
+        {
+          "template_id": "user/e0",
+          "output_kind": "curve_metrics",
+          "parsed_sample_count": 1,
+          "failed_sample_count": 0,
+          "series_count": 4,
+          "metric_count": 2,
+          "matrix_row_count": 0,
+          "missing_roles": [],
+          "warnings": [],
+          "errors": [],
+          "segments": [
+            {
+              "id": "seg-1",
+              "label": "Frequency sweep 1 / Interval 1",
+              "curve_count": 4,
+              "metric_count": 2,
+              "row_count": 19
+            }
+          ]
+        }
+        """
+
+        let preview = try decoder.decode(DataStudioTemplatePreviewResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(preview.templateID, "user/e0")
+        XCTAssertEqual(preview.outputKind, "curve_metrics")
+        XCTAssertEqual(preview.segments.first?.id, "seg-1")
+    }
+
     func testDecodeRenderRequestWithExtraAxes() throws {
         let payload = """
         {

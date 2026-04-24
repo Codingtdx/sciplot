@@ -7,12 +7,14 @@ from fastapi.testclient import TestClient
 
 from app.sidecar.server import app
 from src.data_loader import load_curve_table
+from src.data_studio import template_store
 from src.data_studio.builtin import tensile as tensile_builtin
 
 client = TestClient(app)
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
+RHEOLOGY_FIXTURE = ROOT / "tests" / "fixtures" / "data_studio_import_v2" / "rheology" / "PA_240.csv"
 
 
 def _build_workbook(tmp_path: Path, name: str) -> Path:
@@ -154,6 +156,7 @@ def test_data_studio_template_routes_and_template_preview_stay_live(tmp_path: Pa
                 "template_id": "user/draft_tensile_curve",
                 "description": "",
                 "output_kind": "curve_metrics",
+                "comparison_enabled": False,
                 "source_format": {"encoding": "utf-8", "delimiter": ","},
                 "segment_policy": "single_table",
                 "segment_selectors": [
@@ -204,6 +207,132 @@ def test_data_studio_template_routes_and_template_preview_stay_live(tmp_path: Pa
     assert normalize.json()["selected_recipe_id"] == "strength_bar"
     assert normalize.json()["comparison_recipe_ids"] == ["representative_curve", "strength_bar"]
     assert normalize.json()["selected_figure_template_id"] == "bar"
+
+
+def test_data_studio_template_recommendations_prefer_user_template_for_matching_rheology_source(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", tmp_path / "templates" / "user")
+    template_store.ensure_template_dirs()
+
+    baseline = client.post(
+        "/data-studio/template-recommendations",
+        json={"source_path": str(RHEOLOGY_FIXTURE)},
+    )
+    assert baseline.status_code == 200, baseline.text
+    baseline_matches = baseline.json()["matches"]
+    assert all(match["template_id"] != "builtin/tensile" for match in baseline_matches)
+
+    source_preview = client.post(
+        "/source-table-preview",
+        json={
+            "input_path": str(RHEOLOGY_FIXTURE),
+            "sheet": 0,
+            "offset": 0,
+            "limit": 8,
+        },
+    )
+    assert source_preview.status_code == 200, source_preview.text
+    preview_payload = source_preview.json()
+    assert preview_payload["segments"], "Expected segmented rheology preview."
+    segment = preview_payload["segments"][0]
+
+    created = client.post(
+        "/data-studio/templates",
+        json={
+            "label": "Rheology Frequency Sweep",
+            "template_id": "user/rheology_frequency",
+            "description": "Recommendation regression fixture.",
+            "output_kind": "curve_metrics",
+            "comparison_enabled": False,
+            "source_format": {
+                "encoding": preview_payload["encoding"],
+                "delimiter": preview_payload["delimiter"],
+                "sheet_name": preview_payload["sheet"],
+            },
+            "segment_policy": "series_per_segment",
+            "segment_selectors": [
+                {
+                    "id": segment["id"],
+                    "label": segment["label"],
+                    "result_label": segment["result_label"],
+                    "interval_index": segment["interval_index"],
+                    "header_row_index": segment["header_row_index"],
+                    "unit_row_index": segment["unit_row_index"],
+                    "data_start_row_index": segment["data_start_row_index"],
+                }
+            ],
+            "field_bindings": [
+                {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
+                {"id": "y1", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
+                {"id": "y2", "role": "curve_y", "label": "Loss Modulus", "column_name": "Loss Modulus"},
+            ],
+            "match_conditions": [
+                {
+                    "text_contains": ["angular frequency", "storage modulus", "loss modulus"],
+                    "field_kinds": ["curve_x", "curve_y"],
+                    "minimum_score": 0.3,
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    recommended = client.post(
+        "/data-studio/template-recommendations",
+        json={"source_path": str(RHEOLOGY_FIXTURE)},
+    )
+    assert recommended.status_code == 200, recommended.text
+    matches = recommended.json()["matches"]
+    assert matches
+    assert matches[0]["template_id"] == "user/rheology_frequency"
+
+
+def test_data_studio_template_create_round_trips_comparison_enabled_and_rejects_missing_metric_when_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", tmp_path / "templates" / "user")
+    template_store.ensure_template_dirs()
+
+    curve_only = client.post(
+        "/data-studio/templates",
+        json={
+            "label": "Rheology Curve Only",
+            "template_id": "user/rheology_curve_only",
+            "description": "Curve mapping only.",
+            "output_kind": "curve_metrics",
+            "comparison_enabled": False,
+            "source_format": {"encoding": "utf-16", "delimiter": "\t", "sheet_name": "Sheet1"},
+            "segment_policy": "single_table",
+            "field_bindings": [
+                {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
+                {"id": "y", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
+            ],
+        },
+    )
+    assert curve_only.status_code == 200, curve_only.text
+    assert curve_only.json()["comparison_enabled"] is False
+
+    invalid_compare = client.post(
+        "/data-studio/templates",
+        json={
+            "label": "Invalid Compare Template",
+            "template_id": "user/invalid_compare_template",
+            "description": "Comparison enabled but metrics missing.",
+            "output_kind": "curve_metrics",
+            "comparison_enabled": True,
+            "source_format": {"encoding": "utf-16", "delimiter": "\t", "sheet_name": "Sheet1"},
+            "segment_policy": "single_table",
+            "field_bindings": [
+                {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
+                {"id": "y", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
+            ],
+        },
+    )
+    assert invalid_compare.status_code == 400, invalid_compare.text
+    assert "Enable Comparison needs at least one metric column binding" in invalid_compare.text
 
 
 def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(tmp_path: Path) -> None:

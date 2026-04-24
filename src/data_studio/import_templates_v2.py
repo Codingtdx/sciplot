@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
-from src.data_loader import CurveSeries
 from src.data_studio.builtin import tensile as tensile_builtin
 from src.data_studio.io_utils import list_sheet_names
 from src.data_studio.models import (
@@ -21,10 +19,8 @@ from src.data_studio.models import (
     WorkbookMetricSummary,
     WorkbookSample,
 )
-from src.data_studio.workbook_constants import GENERIC_TEMPLATE_PARSE_STRATEGY
 from src.rendering.source_table_preview import SourceTableSegment, detect_source_segments, read_source_sheets
 from src.text_normalization import normalize_label, normalize_unit, slugify_label
-
 
 V2_PARSE_STRATEGY = "table_template_v2"
 OUTPUT_CURVE_METRICS = "curve_metrics"
@@ -67,6 +63,7 @@ def create_template_definition(
     description: str,
     template_id: str | None,
     output_kind: str,
+    comparison_enabled: bool | None = None,
     source_format: TemplateSourceFormat,
     segment_policy: str,
     segment_selectors: tuple[TemplateSegmentSelector, ...],
@@ -75,6 +72,16 @@ def create_template_definition(
 ) -> TemplateDefinition:
     if output_kind not in SUPPORTED_OUTPUT_KINDS:
         raise ValueError(f"Unsupported Data Studio output kind: {output_kind}")
+    resolved_comparison_enabled = _resolved_comparison_enabled(
+        output_kind=output_kind,
+        comparison_enabled=comparison_enabled,
+    )
+    if (
+        output_kind == OUTPUT_CURVE_METRICS
+        and resolved_comparison_enabled
+        and not any(binding.role == "metric" for binding in field_bindings)
+    ):
+        raise ValueError("Enable Comparison needs at least one metric column binding.")
     trimmed_label = label.strip() or "Untitled Import Template"
     resolved_id = template_id or f"user/{slugify_label(trimmed_label) or 'template'}"
     return TemplateDefinition(
@@ -90,8 +97,13 @@ def create_template_definition(
         field_bindings=field_bindings,
         workbook_metric_ids=tuple(binding.label for binding in field_bindings if binding.role == "metric"),
         default_group_name_strategy="common_prefix",
-        preferred_sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+        preferred_sheet_name=(
+            tensile_builtin.REPRESENTATIVE_CURVE_SHEET
+            if resolved_comparison_enabled
+            else tensile_builtin.ALL_CURVES_SHEET
+        ),
         output_kind=output_kind,
+        comparison_enabled=resolved_comparison_enabled,
         source_format=source_format,
         segment_policy=segment_policy,
         segment_selectors=segment_selectors,
@@ -223,7 +235,11 @@ def build_workbook_from_template(
     metrics_df = _metrics_dataframe(parsed_files)
     metric_summaries = _metric_summaries(metrics_df)
     curves = [curve for parsed in parsed_files for curve in parsed.curves]
-    representative_curve = curves[0] if curves else None
+    comparison_enabled = _resolved_comparison_enabled(
+        output_kind=template.output_kind,
+        comparison_enabled=template.comparison_enabled,
+    )
+    representative_curve = curves[0] if curves and comparison_enabled else None
 
     with pd.ExcelWriter(workbook_path) as writer:
         _metadata_dataframe(
@@ -234,6 +250,13 @@ def build_workbook_from_template(
             sample_count=len(parsed_files),
             representative_filename=representative_curve.sample if representative_curve is not None else "",
         ).to_excel(writer, sheet_name=tensile_builtin.METADATA_SHEET, header=False, index=False)
+        if curves:
+            _curve_table_dataframe(curves).to_excel(
+                writer,
+                sheet_name=tensile_builtin.ALL_CURVES_SHEET,
+                header=False,
+                index=False,
+            )
         if representative_curve is not None:
             _curve_table_dataframe([representative_curve]).to_excel(
                 writer,
@@ -241,20 +264,18 @@ def build_workbook_from_template(
                 header=False,
                 index=False,
             )
-            _curve_table_dataframe(curves).to_excel(
-                writer,
-                sheet_name=tensile_builtin.ALL_CURVES_SHEET,
-                header=False,
-                index=False,
-            )
-        if metric_summaries:
+        if comparison_enabled and metric_summaries:
             tensile_builtin.plain_table_dataframe(metrics_df).to_excel(
                 writer,
                 sheet_name=tensile_builtin.ALL_SPECIMENS_SHEET,
                 header=False,
                 index=False,
             )
-            _summary_dataframe(metrics_df, representative_curve.sample if representative_curve else "", metric_summaries).to_excel(
+            _summary_dataframe(
+                metrics_df,
+                representative_curve.sample if representative_curve else "",
+                metric_summaries,
+            ).to_excel(
                 writer,
                 sheet_name=tensile_builtin.SUMMARY_SHEET,
                 header=False,
@@ -300,7 +321,7 @@ def build_workbook_from_template(
             else (
                 tensile_builtin.REPRESENTATIVE_CURVE_SHEET
                 if representative_curve is not None
-                else tensile_builtin.SUMMARY_SHEET
+                else tensile_builtin.ALL_CURVES_SHEET
             )
         ),
         parsed_sample_count=len(parsed_files),
@@ -388,7 +409,10 @@ def _match_segment(
 def _missing_required_roles(template: TemplateDefinition) -> list[str]:
     roles = {binding.role for binding in template.field_bindings if not binding.optional}
     if template.output_kind == OUTPUT_CURVE_METRICS:
-        return [role for role in ("curve_x", "curve_y") if role not in roles]
+        required = ["curve_x", "curve_y"]
+        if template.comparison_enabled:
+            required.append("metric")
+        return [role for role in required if role not in roles]
     if template.output_kind == OUTPUT_METRIC_TABLE:
         return ["metric"] if "metric" not in roles else []
     if template.output_kind == OUTPUT_MATRIX_HEATMAP:
@@ -643,6 +667,7 @@ def _metadata_dataframe(
             ["template_id", template.id],
             ["template_version", template.version],
             ["output_kind", template.output_kind],
+            ["comparison_enabled", "true" if template.comparison_enabled else "false"],
             ["source_files", " | ".join(str(path) for path in source_files)],
             ["warnings", " | ".join(warnings)],
             ["sample_count", sample_count],
@@ -655,3 +680,11 @@ def _infer_group_name(paths: list[Path]) -> str:
     if not paths:
         return "DataStudio_Group"
     return tensile_builtin.infer_group_name(paths)
+
+
+def _resolved_comparison_enabled(*, output_kind: str, comparison_enabled: bool | None) -> bool:
+    if output_kind != OUTPUT_CURVE_METRICS:
+        return True
+    if comparison_enabled is None:
+        return True
+    return bool(comparison_enabled)

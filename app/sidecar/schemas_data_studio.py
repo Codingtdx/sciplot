@@ -142,6 +142,7 @@ class DataStudioTemplateResponse(StrictModel):
     default_group_name_strategy: str = "common_prefix"
     preferred_sheet_name: str = "Representative_Curve"
     output_kind: str = "curve_metrics"
+    comparison_enabled: bool = True
     source_format: DataStudioTemplateSourceFormatResponse = Field(
         default_factory=DataStudioTemplateSourceFormatResponse
     )
@@ -330,6 +331,7 @@ class DataStudioCreateTemplateRequest(StrictModel):
     template_id: str | None = None
     description: str = ""
     output_kind: str = "curve_metrics"
+    comparison_enabled: bool = True
     source_format: DataStudioTemplateSourceFormatResponse = Field(
         default_factory=DataStudioTemplateSourceFormatResponse
     )
@@ -371,6 +373,10 @@ class DataStudioTemplatePreviewSegmentResponse(StrictModel):
 class DataStudioTemplatePreviewRequest(StrictModel):
     source_path: str
     template: DataStudioCreateTemplateRequest
+
+
+class DataStudioTemplateRecommendationsRequest(StrictModel):
+    source_path: str
 
 
 class DataStudioTemplatePreviewResponse(StrictModel):
@@ -416,6 +422,10 @@ class DataStudioSessionNormalizeRequest(StrictModel):
 
 class DataStudioTemplateListResponse(StrictModel):
     templates: list[DataStudioTemplateResponse] = Field(default_factory=list)
+
+
+class DataStudioTemplateRecommendationsResponse(StrictModel):
+    matches: list[DataStudioTemplateMatchResponse] = Field(default_factory=list)
 
 
 class DataStudioComparisonPreviewResponse(StrictModel):
@@ -474,6 +484,8 @@ __all__ = [
     "DataStudioTemplatePreviewRequest",
     "DataStudioTemplatePreviewResponse",
     "DataStudioTemplatePreviewSegmentResponse",
+    "DataStudioTemplateRecommendationsRequest",
+    "DataStudioTemplateRecommendationsResponse",
     "DataStudioTemplateResponse",
     "DataStudioTemplateSegmentSelectorResponse",
     "DataStudioTemplateSourceFormatResponse",

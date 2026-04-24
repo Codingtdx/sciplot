@@ -2,15 +2,22 @@ import Foundation
 
 extension DataStudioSession {
     var resolverPresentation: DataStudioResolverPresentation {
-        let sortedTemplates = templates.sorted { lhs, rhs in
+        let rankedMatches = rankedRecommendedMatches(availableTemplates: templates)
+        let recommendedTemplateIDs = Set(rankedMatches.map(\.templateID))
+        let sortedTemplates = templates
+            .filter { !recommendedTemplateIDs.contains($0.id) }
+            .sorted { lhs, rhs in
             lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
         }
         let useSelectedTemplateAvailability: ActionAvailability = selectedTemplateID == nil
             ? .disabled("Choose a parse template before continuing.")
             : .enabled()
         return DataStudioResolverPresentation(
-            recommendedMatches: [],
+            recommendedMatches: rankedMatches,
             otherTemplates: sortedTemplates,
+            selectedTemplateLabel: selectedTemplate?.label,
+            renameTemplateAvailability: renameSelectedTemplateAvailability,
+            deleteTemplateAvailability: deleteSelectedTemplateAvailability,
             useSelectedTemplateAvailability: useSelectedTemplateAvailability
         )
     }
@@ -67,12 +74,25 @@ extension DataStudioSession {
         if !templateDraftYColumnNames.isEmpty {
             items.append(.init(id: "y", title: "Y", value: templateDraftYColumnNames.joined(separator: ", ")))
         }
-        if !templateDraftMetricColumnNames.isEmpty {
+        if !templateDraftMetricColumnNames.isEmpty,
+           templateDraftOutputKind == "metric_table"
+           || templateDraftOutputKind == "matrix_heatmap"
+           || templateDraftComparisonEnabled
+        {
             items.append(
                 .init(
                     id: "metrics",
                     title: "Metrics",
                     value: templateDraftMetricColumnNames.joined(separator: ", ")
+                )
+            )
+        }
+        if templateDraftOutputKind == "curve_metrics" {
+            items.append(
+                .init(
+                    id: "comparison",
+                    title: "Comparison",
+                    value: templateDraftComparisonEnabled ? "Enabled" : "Disabled"
                 )
             )
         }
@@ -274,7 +294,14 @@ extension DataStudioSession {
             selectedPreviewSheetName = resolvedPreview.sheet.displayString
             selectedPreviewBlockID = selectedPreviewSegmentID
             configureDraftDefaults(from: resolvedPreview, sampleURL: sampleURL)
-            selectedTemplateID = templates.first(where: \.builtin)?.id ?? templates.first?.id
+            let recommendationResponse = try? await client.recommendDataStudioTemplates(
+                .init(sourcePath: sampleURL.path)
+            )
+            recommendedTemplateMatches = rankedRecommendedMatches(
+                recommendationResponse?.matches ?? [],
+                availableTemplates: templates
+            )
+            selectedTemplateID = recommendedTemplateMatches.first?.templateID
             importFlow = .wizard(step: .resolver)
         } catch {
             if isUserCancelled(error) {
@@ -380,7 +407,27 @@ extension DataStudioSession {
     }
 
     func setTemplateOutputKind(_ outputKind: String) {
+        let previousOutputKind = templateDraftOutputKind
         templateDraftOutputKind = outputKind
+        if outputKind == "curve_metrics", previousOutputKind != "curve_metrics" {
+            templateDraftComparisonEnabled = false
+        } else if outputKind != "curve_metrics" {
+            templateDraftComparisonEnabled = true
+        }
+        if outputKind != "curve_metrics" || !templateDraftComparisonEnabled {
+            showAdvancedCandidates = false
+        }
+        templatePreview = nil
+    }
+
+    func setTemplateComparisonEnabled(_ isEnabled: Bool) {
+        guard templateDraftComparisonEnabled != isEnabled else {
+            return
+        }
+        templateDraftComparisonEnabled = isEnabled
+        if !isEnabled {
+            showAdvancedCandidates = false
+        }
         templatePreview = nil
     }
 
@@ -545,6 +592,26 @@ extension DataStudioSession {
         }
     }
 
+    private var renameSelectedTemplateAvailability: ActionAvailability {
+        guard let selectedTemplate else {
+            return .disabled("Choose a parse template before renaming.")
+        }
+        guard !selectedTemplate.builtin else {
+            return .disabled("Built-in parse templates cannot be renamed.")
+        }
+        return .enabled()
+    }
+
+    private var deleteSelectedTemplateAvailability: ActionAvailability {
+        guard let selectedTemplate else {
+            return .disabled("Choose a parse template before deleting.")
+        }
+        guard !selectedTemplate.builtin else {
+            return .disabled("Built-in parse templates cannot be deleted.")
+        }
+        return .enabled()
+    }
+
     private var createTemplateSaveAvailability: ActionAvailability {
         let trimmedLabel = templateDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedLabel.isEmpty {
@@ -568,6 +635,12 @@ extension DataStudioSession {
             }
             if templateDraftYColumnNames.isEmpty {
                 return .disabled("Choose at least one Y column.")
+            }
+            if templateDraftOutputKind == "curve_metrics",
+               templateDraftComparisonEnabled,
+               templateDraftMetricColumnNames.isEmpty
+            {
+                return .disabled("Enable Comparison needs at least one metric column.")
             }
         }
         return .enabled()
@@ -655,8 +728,18 @@ extension DataStudioSession {
             for columnName in templateDraftYColumnNames {
                 bindings.append(fieldBinding(idPrefix: "y", role: "curve_y", label: columnName, columnName: columnName))
             }
-            for columnName in templateDraftMetricColumnNames {
-                bindings.append(fieldBinding(idPrefix: "metric", role: "metric", label: columnName, columnName: columnName, optional: true))
+            if templateDraftComparisonEnabled {
+                for columnName in templateDraftMetricColumnNames {
+                    bindings.append(
+                        fieldBinding(
+                            idPrefix: "metric",
+                            role: "metric",
+                            label: columnName,
+                            columnName: columnName,
+                            optional: true
+                        )
+                    )
+                }
             }
         }
         return DataStudioCreateTemplateRequest(
@@ -664,6 +747,7 @@ extension DataStudioSession {
             templateID: nil,
             description: templateDraftDescription,
             outputKind: templateDraftOutputKind,
+            comparisonEnabled: templateDraftOutputKind == "curve_metrics" ? templateDraftComparisonEnabled : true,
             sourceFormat: .init(
                 encoding: sourcePreview.encoding,
                 delimiter: sourcePreview.delimiter,
@@ -672,7 +756,7 @@ extension DataStudioSession {
             segmentPolicy: segmentSelectors.isEmpty ? "single_table" : "series_per_segment",
             segmentSelectors: segmentSelectors,
             fieldBindings: bindings,
-            matchConditions: []
+            matchConditions: draftMatchConditions(from: sourcePreview)
         )
     }
 
@@ -739,6 +823,8 @@ extension DataStudioSession {
         templateDraftLabel = inferGroupName(from: importedSourceURLs.isEmpty ? [sampleURL] : importedSourceURLs)
         templateDraftDescription = "Template created from \(sampleURL.lastPathComponent)."
         templateDraftOutputKind = "curve_metrics"
+        templateDraftComparisonEnabled = false
+        showAdvancedCandidates = false
         let availableNames = preview.columnHeaders.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         templateDraftXColumnName = preview.detectedXLabel ?? preview.candidateRoles.x.first ?? availableNames.first
         let xName = templateDraftXColumnName
@@ -748,6 +834,83 @@ extension DataStudioSession {
             templateDraftYColumnNames = Array(availableNames.filter { $0 != xName }.prefix(1))
         }
         templateDraftMetricColumnNames = Array(preview.candidateRoles.metric.prefix(4))
+    }
+
+    private func rankedRecommendedMatches(
+        _ matches: [DataStudioTemplateMatchResponse]? = nil,
+        availableTemplates: [DataStudioTemplateResponse]
+    ) -> [DataStudioTemplateMatchResponse] {
+        let source = matches ?? recommendedTemplateMatches
+        let availableTemplateIDs = Set(availableTemplates.map(\.id))
+        var byTemplateID: [String: DataStudioTemplateMatchResponse] = [:]
+        for match in source where availableTemplateIDs.contains(match.templateID) {
+            if let current = byTemplateID[match.templateID], current.confidence >= match.confidence {
+                continue
+            }
+            byTemplateID[match.templateID] = match
+        }
+        return byTemplateID.values.sorted { lhs, rhs in
+            if lhs.confidence != rhs.confidence {
+                return lhs.confidence > rhs.confidence
+            }
+            return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+        }
+    }
+
+    private func draftMatchConditions(from preview: SourceTablePreviewResponse) -> [DataStudioTemplateConditionResponse] {
+        let selectedSegment = preview.segments.first(where: { $0.id == selectedPreviewSegmentID })
+        let sheetHint = selectedSegment?.sheetName ?? preview.sheet.displayString
+
+        var textHints: [String] = []
+        if let label = selectedSegment?.resultLabel, !label.isEmpty {
+            textHints.append(label)
+        }
+        if let x = templateDraftXColumnName, !x.isEmpty {
+            textHints.append(x)
+        }
+        textHints.append(contentsOf: templateDraftYColumnNames.prefix(2))
+        if templateDraftComparisonEnabled {
+            textHints.append(contentsOf: templateDraftMetricColumnNames.prefix(1))
+        }
+
+        var dedupedTextHints: [String] = []
+        for hint in textHints {
+            let trimmed = hint.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                continue
+            }
+            let lowered = trimmed.lowercased()
+            if !dedupedTextHints.contains(where: { $0.lowercased() == lowered }) {
+                dedupedTextHints.append(trimmed)
+            }
+        }
+
+        let fieldKinds: [String]
+        let minimumScore: Double
+        switch templateDraftOutputKind {
+        case "metric_table":
+            fieldKinds = ["metric"]
+            minimumScore = 0.25
+        case "matrix_heatmap":
+            fieldKinds = ["metric", "curve_x", "curve_y"]
+            minimumScore = 0.25
+        default:
+            fieldKinds = templateDraftComparisonEnabled ? ["curve_x", "curve_y", "metric"] : ["curve_x", "curve_y"]
+            minimumScore = 0.3
+        }
+
+        if sheetHint.isEmpty, dedupedTextHints.isEmpty, fieldKinds.isEmpty {
+            return []
+        }
+
+        return [
+            DataStudioTemplateConditionResponse(
+                sheetNameContains: sheetHint.isEmpty ? [] : [sheetHint],
+                textContains: dedupedTextHints,
+                fieldKinds: fieldKinds,
+                minimumScore: minimumScore
+            ),
+        ]
     }
 
     private func buildWorkbookFromPendingRawFiles(templateID: String) async {
@@ -820,6 +983,7 @@ extension DataStudioSession {
     private func discardPendingSourcePreview() {
         importedSourceURLs = []
         sourcePreview = nil
+        recommendedTemplateMatches = []
         templatePreview = nil
         hoveredSuggestionID = nil
         selectedSuggestionIDs = []
@@ -829,6 +993,7 @@ extension DataStudioSession {
         templateDraftLabel = ""
         templateDraftDescription = ""
         templateDraftOutputKind = "curve_metrics"
+        templateDraftComparisonEnabled = false
         templateDraftXColumnName = nil
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []

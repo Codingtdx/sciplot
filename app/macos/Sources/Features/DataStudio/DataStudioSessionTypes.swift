@@ -301,6 +301,9 @@ struct DataStudioSuggestionCardPresentation: Identifiable, Equatable {
 struct DataStudioResolverPresentation: Equatable {
     let recommendedMatches: [DataStudioTemplateMatchResponse]
     let otherTemplates: [DataStudioTemplateResponse]
+    let selectedTemplateLabel: String?
+    let renameTemplateAvailability: ActionAvailability
+    let deleteTemplateAvailability: ActionAvailability
     let useSelectedTemplateAvailability: ActionAvailability
 }
 

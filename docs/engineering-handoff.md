@@ -293,6 +293,26 @@ Every development round must update this file.
   - Invalidation depends on `(path, mtime, sheet[, model])`; external mutation that preserves mtime can still produce stale reuse.
   - Cached values are immutable dataclasses only; no figure handles are cached in this layer.
 
+### 2026-04-24: Data Studio import template auto-adoption must be recommendation-driven
+
+- Change:
+  - Added `POST /data-studio/template-recommendations` (typed request/response) and wired it through sidecar runtime critical-route compatibility checks.
+  - macOS Data Studio resolver now consumes ranked template recommendations and preselects only the top recommended template.
+  - Removed resolver behavior that silently defaulted to builtin template on raw import when no recommendation existed.
+  - Template-creation flow now generates minimal `match_conditions` from current source preview hints so newly created user templates can participate in later recommendation matching.
+  - Recommendation ranking now prefers higher confidence first, and for equal confidence prefers user templates over builtin templates.
+- Why:
+  - First principles: the “template selected by default” state must come from one backend-owned semantic source, not from frontend hardcoded fallback.
+  - The broken user experience (“create succeeded but no effect”) was a post-creation adoption failure, not a create-template failure.
+- Rejected alternatives:
+  - Keep default fallback to builtin tensile when recommendation is empty: rejected because it silently applies incorrect parsing semantics for non-tensile sources.
+  - Reintroduce legacy `/data-studio/source-preview` candidate path: rejected because v2 template/recommendation flow already has a typed source of truth and legacy path is removed by policy.
+  - Add frontend-local recommendation heuristics: rejected because it creates a second rule engine outside Python ingest truth source.
+- Boundaries:
+  - No change to Data Studio staged wizard structure.
+  - No restoration of removed legacy endpoints.
+  - Resolver auto-selection only occurs when sidecar recommendation payload is non-empty; otherwise selection must remain explicit/manual.
+
 ## 4) Troubleshooting Playbook
 
 ### Symptom: `xcodebuild` fails with Swift 6 concurrency safety errors
@@ -3289,3 +3309,152 @@ Use this block for every new round:
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
+
+### 2026-04-24 (Round BA): Data Studio 新建模板“创建后没生效”修复闭环
+
+- Scope:
+  - Sidecar 新增模板推荐接口并接入既有 ingest 推荐链路：
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/service.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/ingest.py`
+  - 路由兼容门禁同步更新（sidecar + macOS runtime）：
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/server.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarRuntime.swift`
+  - macOS Data Studio resolver 改为推荐驱动预选，不再硬编码默认 builtin：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - 模板创建草稿补最小 `match_conditions`，避免“创建成功但后续无法命中推荐”。
+  - 同步更新 client/model/mock/test 及 sidecar/macOS 回归：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/MockSidecarClient.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SidecarRuntimeTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+    - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_active_routes.py`
+  - 文档契约同步：
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- User-visible impact:
+  - Data Studio 新建模板后，后续同类原始文件导入会进入推荐链路并可自动预选新模板，不再体感“保存了但没生效”。
+  - 当没有可靠推荐时，resolver 明确要求手动选择模板并给出禁用原因，不再默认落到 `builtin/tensile`。
+  - 推荐区展示真实推荐结果，且避免和“其他模板”重复显示。
+- Risks:
+  - 若模板草稿生成的最小 `match_conditions` 过弱，可能导致低置信度泛匹配；当前通过 `minimum_score` 与字段类型约束减小风险。
+  - 导入时新增一次模板推荐请求，sidecar 异常时会回落到“手动选择模板”，不会再静默误选。
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/ingest.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed, reclaimed approx `234.0 MB`
+  - `.venv/bin/python -m ruff check --fix app/sidecar/routes_data_studio.py tests/test_sidecar_data_studio.py`: passed (auto-fixed 2 import-order issues)
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 43 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`226 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`159 tests`)
+
+### 2026-04-24 (Round BB): Data Studio 模板预览解码修复（`template_id` -> `templateID`）
+
+- Scope:
+  - 修复 macOS 端 `DataStudioTemplatePreviewResponse` 的字段解码映射，显式补 `CodingKeys`，确保 sidecar 返回 `template_id` 时可稳定解码：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+  - 增加回归测试，锁定 `template_id` payload 能正确落到 `templateID`：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - 侧边车客户端 decode 失败提示补充 endpoint/path 语义，便于后续快速定位：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+- User-visible impact:
+  - Data Studio 导入向导里点击 `Save Template and Continue Import` 不再无效返回。
+  - 左上角不再出现由该解码失败触发的 `unexpected response` 提示。
+  - 现在会进入 `Save Data Studio Workbook` 保存面板并继续导入链路。
+- Risks:
+  - 本轮仅修复解码字段映射，不改变模板推荐/排序规则；若后端再次变更字段命名，仍需同步更新 Swift model 与解码测试。
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/SidecarRuntimeTests -only-testing:SciPlotGodMacTests/AppModelTests`: passed (`79 tests`)
+
+### 2026-04-24 (Round BC): Data Studio Resolver 增加模板改名/删除管理
+
+- Scope:
+  - 在 Data Studio `Resolve Parse Template` 导入 resolver sheet 增加 `Template Management` 区块，支持：
+    - 模板名编辑 + `Rename`
+    - `Delete`（二次确认 dialog）
+  - 模板管理动作可用性改为显式 presentation 字段，并在 builtin / 未选择场景下禁用并解释原因：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+  - 新增会话回归测试覆盖 resolver 可用性与 user template 改名/删除行为：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+- User-visible impact:
+  - 现在不需要离开导入 resolver，就能直接对 user 模板改名和删除。
+  - 删除动作会先弹确认；builtin 模板不会允许改名/删除，且会显示明确禁用原因。
+- Risks:
+  - 当前模板改名是按 `label` 更新；若后续引入额外命名约束（例如跨 family 唯一性策略变化），需要同步扩展前端提示文案。
+  - 删除后当前选中模板会回落到列表中的下一个可用模板；如果策略需要“删除后强制手动重选”，需额外修改会话选择逻辑。
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionTypes.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`58 tests`)
+
+### 2026-04-24 (Round BD): Data Studio `Curves` 默认仅曲线，勾选后启用对比结构
+
+- Scope:
+  - Data Studio v2 模板新增 `comparison_enabled` 字段，并贯穿 dataclass/store/service/sidecar schema+route：
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/template_store.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/service.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/import_templates_v2.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
+  - `curve_metrics` 工作簿输出改为可切换：
+    - `comparison_enabled=false`：只写 `DataStudio_Metadata + All_Curves`
+    - `comparison_enabled=true`：保持 representative + metrics compare 结构
+  - 旧模板兼容：
+    - 历史 payload 缺省 `comparison_enabled` 且 `output_kind=curve_metrics` 时默认按 `true` 读取。
+  - macOS 模板创建 UI：
+    - `Output` 文案改为 `Curves`
+    - 新增 `Enable Comparison` 开关（默认关闭）
+    - 仅开启后显示 metrics 选择，并在无 metric 时 `Save/Save and Continue` 禁用并解释
+    - 模板请求显式发送 `comparison_enabled`
+  - workbook import 偏好页修正：
+    - 无 `Representative_Curve` 时优先回落到 `All_Curves`，避免再次导入时落到不存在 sheet。
+  - 文档同步：
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+
+- User-visible impact:
+  - Data Studio 创建 `Curves` 模板时，默认行为是“整理原始列直接用于画曲线”，不再默认进入 Tensile 风格指标/代表曲线链路。
+  - 只有用户主动勾选 `Enable Comparison` 才生成 compare 所需 workbook 结构，且缺 metric 列会直接阻止保存并给原因。
+  - 仅曲线工作簿在 compare recipe 中继续以“禁用并解释”方式处理 metric/representative recipe。
+
+- Risks:
+  - 旧 `curve_metrics` 模板如果历史上没有 metric 绑定且未来被编辑为 `comparison_enabled=true`，会在模板校验阶段收到“缺 metric”错误（这是有意的 guardrail）。
+  - `comparison_enabled=false` 的曲线工作簿不支持 representative/metric compare recipe；这是产品语义，不是回归。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/template_store.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/workbooks.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+
+- Validation (executed):
+  - `.venv/bin/python -m ruff check src/data_studio/import_templates_v2.py src/data_studio/service.py src/data_studio/workbooks.py app/sidecar/routes_data_studio.py app/sidecar/schemas_data_studio.py tests/test_data_studio_import_templates_v2.py tests/test_data_studio.py tests/test_sidecar_data_studio.py tests/test_sidecar_schema_contract.py`: passed
+  - `.venv/bin/python -m pytest tests/test_data_studio_import_templates_v2.py tests/test_data_studio.py tests/test_sidecar_data_studio.py tests/test_sidecar_schema_contract.py`: passed (`44 passed, 5 warnings`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/SidecarRuntimeTests -only-testing:SciPlotGodMacTests/AppModelTests`: passed (`84 tests`)

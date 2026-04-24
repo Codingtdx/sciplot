@@ -11,6 +11,7 @@ final class MockSidecarClient: SidecarClienting {
     var metaResponse = TestPayloads.meta()
     var contractResponse = TestPayloads.contract()
     var dataStudioTemplatesResponse = TestPayloads.dataStudioTemplateList()
+    var dataStudioTemplateRecommendationsResponse = TestPayloads.dataStudioTemplateRecommendations()
     var dataStudioTemplatePreviewResponse = TestPayloads.dataStudioTemplatePreview()
     var dataStudioTemplateResponse = TestPayloads.dataStudioTemplate()
     var dataStudioWorkbookResponse = TestPayloads.dataStudioWorkbook()
@@ -37,6 +38,7 @@ final class MockSidecarClient: SidecarClienting {
     var metaHandler: (() async throws -> SidecarMetaResponse)?
     var plotContractHandler: (() async throws -> PlotContractResponse)?
     var dataStudioTemplateListHandler: (() async throws -> DataStudioTemplateListResponse)?
+    var dataStudioTemplateRecommendationsHandler: ((DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse)?
     var dataStudioTemplatePreviewHandler: ((DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse)?
     var dataStudioCreateTemplateHandler: ((DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioUpdateTemplateHandler: ((String, DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse)?
@@ -59,6 +61,7 @@ final class MockSidecarClient: SidecarClienting {
     var exportHandler: ((ExportRenderRequest) async throws -> ExportRenderResponse)?
 
     private(set) var inspectRequests: [FileRequest] = []
+    private(set) var dataStudioTemplateRecommendationRequests: [DataStudioTemplateRecommendationsRequest] = []
     private(set) var dataStudioTemplatePreviewRequests: [DataStudioTemplatePreviewRequest] = []
     private(set) var dataStudioCreateTemplateRequests: [DataStudioCreateTemplateRequest] = []
     private(set) var dataStudioUpdateTemplateRequests: [(String, DataStudioUpdateTemplateRequest)] = []
@@ -107,6 +110,14 @@ final class MockSidecarClient: SidecarClienting {
             return try await dataStudioTemplateListHandler()
         }
         return dataStudioTemplatesResponse
+    }
+
+    func recommendDataStudioTemplates(_ request: DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse {
+        dataStudioTemplateRecommendationRequests.append(request)
+        if let dataStudioTemplateRecommendationsHandler {
+            return try await dataStudioTemplateRecommendationsHandler(request)
+        }
+        return dataStudioTemplateRecommendationsResponse
     }
 
     func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse {

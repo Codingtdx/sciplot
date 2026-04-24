@@ -59,6 +59,7 @@ def test_delete_data_studio_template_returns_status_response() -> None:
             "label": "Schema Delete Test",
             "template_id": template_id,
             "output_kind": "curve_metrics",
+            "comparison_enabled": False,
             "source_format": {"encoding": "utf-8", "delimiter": ","},
             "segment_policy": "single_table",
             "segment_selectors": [

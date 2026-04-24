@@ -71,7 +71,9 @@
 - Plot 检查与推荐统一走 `POST /inspect-file`。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`。不要把全量 workbook 表格塞回 inspect/session payload。
 - Data Studio 用户导入模板统一是 v2 no-code table mapping：`output_kind`、`source_format`、`segment_policy`、`segment_selectors`、`field_bindings`、`match_conditions` 是唯一模板结构；旧用户模板 parser 不保留，不要恢复 `POST /data-studio/source-preview` 或 `source_path + accepted_candidate_ids` 创建路径。
+- Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`DataStudio_Metadata + All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
 - Data Studio 未保存模板草稿必须先走 `POST /data-studio/template-preview` 做真实解析，返回 normalized output preview、missing required roles、segment 曲线/指标数量；`build-workbook` 只消费保存后的 v2 template id。
+- Data Studio 模板自动采用统一走 `POST /data-studio/template-recommendations`：resolver 只可按 ranked matches 自动预选第一项；当推荐为空时必须保持未选择状态并要求用户手动选择，禁止回退到 builtin/tensile 之类的“瞎猜默认”。
 - Data Studio workbook 输出允许多形态：曲线+指标、纯指标表、矩阵/heatmap；compare recipes 必须按 workbook shape 暴露可用 figure，unsupported 入口要禁用并解释。
 - Plot / Data Studio 拟合分析统一走 `POST /fit-analysis`；当前支持 `linear`、`polynomial_2`、`polynomial_3`。图上的 fit overlay、方程和分析结果表必须共用同一份后端拟合 helper，禁止前端或第二条 Python 路径偷偷重算。
 - Plot 高级 secondary axis 统一走 `render_options.extra_x_axis / extra_y_axis` 这条 typed payload 链路；preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 extra-axis 状态或重算换算语义。`extra_x_axis` 只允许换算轴；`extra_y_axis` 额外支持 `binding_mode=series_assignment`，用来做 DataGraph 风格的 double-Y / series ownership。
@@ -138,6 +140,8 @@
   - 单文件导出保留可编辑文件名；多文件导出只选一个 base filename，再追加稳定 suffix；
   - Code Console 的 toolbar/inspector `Export` 只导出 latest run 生成的 PDF figure files，不得退回成 reveal output folder。
 - Data Studio import 必须维持单一分阶段 native sheet（wizard）：选择 raw files -> preview/resolve -> create/edit v2 template -> preview normalized output -> save/import；禁止恢复多个串联弹窗，也不要新增独立 Template Manager 作为 v1 入口。
+- Data Studio template editor 里 `Curves` 默认是“仅曲线整理”；只有勾选 `Enable Comparison` 才允许 metric 绑定并生成 compare 结构，且勾选后至少要有一个 metric 列（禁用并解释）。
+- Data Studio import resolver 的模板默认采用必须由 sidecar 推荐驱动：有推荐才自动预选首项；无推荐必须显式手动选择并给出 disabled/help 解释，不允许静默默认到 tensile。
 - Data Studio specimen filter 默认交互必须是 anchored popover，且只保留右侧 `Focused Group` 单一入口；不得恢复左侧重复入口或常驻 split pane。
 - Data Studio specimen filter 默认规则是 `Auto Keep 5`：按距离均值最近排序，只保留 5 个合格 specimen；少于 5 个时禁用自动筛选并解释原因。
 - `Workbook Groups` 标题栏允许一个全局批量动作 `Auto Keep 5 All`；它直接对当前 session 内所有 eligible workbook group 应用 committed auto-filter 结果，不要再新增第二个批量筛选入口。

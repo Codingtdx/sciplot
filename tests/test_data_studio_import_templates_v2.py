@@ -29,6 +29,7 @@ def _rheology_template(
     x_label: str,
     y_labels: tuple[str, ...],
     output_kind: str = "curve_metrics",
+    comparison_enabled: bool = True,
 ) -> TemplateDefinition:
     return TemplateDefinition(
         version=2,
@@ -58,6 +59,7 @@ def _rheology_template(
             ),
         ),
         output_kind=output_kind,
+        comparison_enabled=comparison_enabled,
         source_format=TemplateSourceFormat(encoding="utf-16", delimiter="\t", sheet_name="Sheet1"),
         segment_policy="series_per_segment",
         segment_selectors=(
@@ -107,6 +109,7 @@ def test_template_preview_parses_frequency_sweep_standard_roles() -> None:
         result_label="Frequency sweep 1",
         x_label="Angular Frequency",
         y_labels=("Storage Modulus", "Loss Modulus"),
+        comparison_enabled=False,
     )
 
     preview = preview_template_apply(RHEOLOGY_ROOT / "PA_240.csv", template)
@@ -123,6 +126,7 @@ def test_template_preview_reports_missing_required_roles() -> None:
         result_label="Frequency sweep 1",
         x_label="Angular Frequency",
         y_labels=(),
+        comparison_enabled=False,
     )
 
     preview = preview_template_apply(RHEOLOGY_ROOT / "PA_240.csv", template)
@@ -161,6 +165,44 @@ def test_v2_template_builds_curve_workbook_from_rheology_fixture(
     assert curves[0].y_label == "G'"
     assert curves[0].x_unit == r"rad$\cdot$s$^{-1}$"
     assert curves[0].y_unit == "Pa"
+
+
+def test_v2_template_builds_curve_only_workbook_when_comparison_disabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.data_studio import template_store
+
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", tmp_path / "templates" / "user")
+    template = _rheology_template(
+        template_id="user/rheology_curve_only",
+        label="Rheology Curve Only",
+        result_label="Frequency sweep 1",
+        x_label="Angular Frequency",
+        y_labels=("Storage Modulus", "Loss Modulus"),
+        comparison_enabled=False,
+    )
+    save_template(template)
+
+    workbook = build_data_studio_workbook(
+        file_paths=[RHEOLOGY_ROOT / "PA_240.csv"],
+        output_path=tmp_path / "curve_only.xlsx",
+        template_id=template.id,
+        group_name="Curve Only",
+    )
+
+    assert workbook.preferred_sheet == "All_Curves"
+    assert "All_Curves" in workbook.sheet_names
+    assert "Representative_Curve" not in workbook.sheet_names
+    assert "All_Specimens" not in workbook.sheet_names
+    assert not workbook.metrics
+    all_curves = load_curve_table(workbook.workbook_path, sheet_name="All_Curves")
+    assert len(all_curves) == 2
+
+    recipes = comparison_recipes_for_workbooks([workbook.workbook_path])
+    unsupported = {recipe.id: recipe for recipe in recipes if not recipe.supported}
+    assert unsupported["representative_curve"].support_reason
+    assert unsupported["metric_bar"].support_reason
 
 
 def test_v2_template_builds_metric_only_workbook(
