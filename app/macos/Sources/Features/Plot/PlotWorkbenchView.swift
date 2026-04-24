@@ -513,14 +513,42 @@ struct PlotDataWorkbookSheet: View {
 
     private var fitContent: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if session.fitAnalysisAvailability.isEnabled {
+                HStack(spacing: 12) {
+                    Text("Model")
+                        .foregroundStyle(.secondary)
+
+                    Picker("Model", selection: fitModelBinding) {
+                        Text("Linear").tag("linear")
+                        Text("Polynomial 2").tag("polynomial_2")
+                        Text("Polynomial 3").tag("polynomial_3")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 180, alignment: .leading)
+
+                    if session.supportsFitOverlayControls {
+                        Toggle("Overlay", isOn: fitEnabledBinding)
+                            .toggleStyle(.switch)
+                            .disabled(!session.fitOverlayAvailability.isEnabled)
+                            .help(
+                                session.fitOverlayAvailability.reason
+                                    ?? "Overlay the current Plot preview with the selected fit model."
+                            )
+                    }
+
+                    Spacer()
+                }
+            }
+
             if !session.fitAnalysisAvailability.isEnabled {
                 EmptyStateCard(
-                    title: "Linear Fit Unavailable",
+                    title: "Fit Unavailable",
                     message: session.fitAnalysisAvailability.reason
                 )
             } else if let fitAnalysisErrorMessage = session.fitAnalysisErrorMessage {
                 ErrorStateCard(
-                    title: "Could not analyze the linear fit",
+                    title: "Could not analyze the fit",
                     message: fitAnalysisErrorMessage,
                     retryTitle: "Retry"
                 ) {
@@ -530,6 +558,24 @@ struct PlotDataWorkbookSheet: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else if let fitAnalysisResponse = session.fitAnalysisResponse {
+                if fitAnalysisResponse.seriesSummaries.count > 1 {
+                    HStack(spacing: 12) {
+                        Text("Series")
+                            .foregroundStyle(.secondary)
+
+                        Picker("Series", selection: fitSeriesBinding(fitAnalysisResponse)) {
+                            ForEach(fitAnalysisResponse.seriesSummaries) { summary in
+                                Text(summary.seriesLabel).tag(summary.seriesID)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 220, alignment: .leading)
+
+                        Spacer()
+                    }
+                }
+
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
                     ForEach(session.fitSummaryRows, id: \.0) { label, value in
                         GridRow {
@@ -608,5 +654,29 @@ struct PlotDataWorkbookSheet: View {
             .disabled(!availability.isEnabled)
             .help(availability.reason ?? tab.title)
         }
+    }
+
+    private var fitEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { session.fitOptions.enabled },
+            set: { session.updateFitEnabled($0) }
+        )
+    }
+
+    private var fitModelBinding: Binding<String> {
+        Binding(
+            get: { session.fitOptions.modelID },
+            set: { session.updateFitModel($0) }
+        )
+    }
+
+    private func fitSeriesBinding(_ response: FitAnalysisResponse) -> Binding<String> {
+        Binding(
+            get: {
+                let selected = session.fitAnalysisSeriesSelection
+                return selected.isEmpty ? (response.selectedSeriesID ?? response.seriesSummaries.first?.seriesID ?? "") : selected
+            },
+            set: { session.selectFitAnalysisSeries(id: $0.isEmpty ? nil : $0) }
+        )
     }
 }

@@ -39,6 +39,15 @@ def _has_marker_lines(ax) -> bool:
     return any(line.get_marker() not in {None, "", "None", " "} for line in ax.lines)
 
 
+def _primary_and_secondary_axes(plot) -> list[object]:
+    primary = plot.figure.axes[0]
+    axes: list[object] = [primary]
+    for axis in list(plot.figure.axes[1:]) + list(primary.child_axes):
+        if axis not in axes:
+            axes.append(axis)
+    return axes
+
+
 def _write_curve_table(path: Path) -> Path:
     rows = [
         ["Time", "Stress", "Time", "Stress"],
@@ -439,7 +448,7 @@ def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> No
         )
         assert rcParams["axes.grid"] is True
         assert rcParams["legend.frameon"] is True
-        assert to_hex(rcParams["figure.facecolor"]) == "#fbfcfd"
+        assert to_hex(rcParams["figure.facecolor"]) == "#f5f8fb"
     finally:
         plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
 
@@ -519,12 +528,144 @@ def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
 def test_resolve_render_options_uses_template_recommended_theme_and_palette_defaults() -> None:
     options = resolve_render_options(template="curve")
 
-    assert options.palette_preset == "roma"
-    assert options.visual_theme_id == "roma"
+    assert options.palette_preset == "colorblind_safe"
+    assert options.visual_theme_id == "clean_light"
 
     heatmap_options = resolve_render_options(template="heatmap")
-    assert heatmap_options.palette_preset == "infographic"
-    assert heatmap_options.visual_theme_id == "infographic"
+    assert heatmap_options.palette_preset == "colorblind_safe"
+    assert heatmap_options.visual_theme_id == "clean_light"
+
+
+def test_resolve_render_options_uses_style_recommended_theme_and_palette_when_style_changes() -> None:
+    options = resolve_render_options(template="curve", style_preset="poster")
+
+    assert options.style_preset == "poster"
+    assert options.palette_preset == "shine"
+    assert options.visual_theme_id == "shine"
+
+
+def test_resolve_render_options_accepts_extra_axes_payloads() -> None:
+    options = resolve_render_options(
+        template="curve",
+        extra_x_axis={
+            "enabled": True,
+            "position": "top",
+            "title": "Gallons",
+            "data_value": 3.78541,
+            "display_value": 1.0,
+        },
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "title": "Half Stress",
+            "data_value": 2.0,
+            "display_value": 1.0,
+        },
+    )
+
+    assert options.extra_x_axis is not None
+    assert options.extra_x_axis["position"] == "top"
+    assert options.extra_x_axis["binding_mode"] == "conversion"
+    assert options.extra_x_axis["series_ids"] == ()
+    assert options.extra_x_axis["data_value"] == pytest.approx(3.78541)
+    assert options.extra_y_axis is not None
+    assert options.extra_y_axis["position"] == "right"
+    assert options.extra_y_axis["binding_mode"] == "conversion"
+    assert options.extra_y_axis["series_ids"] == ()
+    assert options.extra_y_axis["display_value"] == pytest.approx(1.0)
+
+
+def test_resolve_render_options_rejects_invalid_extra_axis_position() -> None:
+    with pytest.raises(ValueError, match="must be one of"):
+        resolve_render_options(
+            template="curve",
+            extra_x_axis={"enabled": True, "position": "right"},
+        )
+
+
+def test_resolve_render_options_rejects_extra_x_axis_series_assignment_mode() -> None:
+    with pytest.raises(ValueError, match="only supports `conversion`"):
+        resolve_render_options(
+            template="curve",
+            extra_x_axis={
+                "enabled": True,
+                "binding_mode": "series_assignment",
+                "series_ids": ["Sample B"],
+            },
+        )
+
+
+def test_resolve_render_options_accepts_axis_break_payloads() -> None:
+    options = resolve_render_options(
+        template="curve",
+        x_axis_breaks=[
+            {
+                "id": "x-gap",
+                "enabled": True,
+                "start": 0.8,
+                "end": 1.2,
+                "display_mode": "split",
+            }
+        ],
+        y_axis_breaks=[
+            {
+                "id": "y-gap",
+                "enabled": False,
+                "start": 1.4,
+                "end": 2.2,
+            }
+        ],
+    )
+
+    assert options.x_axis_breaks is not None
+    assert options.x_axis_breaks[0]["id"] == "x-gap"
+    assert options.x_axis_breaks[0]["start"] == pytest.approx(0.8)
+    assert options.x_axis_breaks[0]["display_mode"] == "split"
+    assert options.y_axis_breaks is not None
+    assert options.y_axis_breaks[0]["end"] == pytest.approx(2.2)
+    assert options.y_axis_breaks[0]["display_mode"] == "compress"
+
+
+def test_resolve_render_options_rejects_axis_breaks_on_log_axes_or_with_extra_axes() -> None:
+    with pytest.raises(ValueError, match="linear X axes only"):
+        resolve_render_options(
+            template="curve",
+            xscale="log",
+            x_axis_breaks=[{"id": "x-gap", "enabled": True, "start": 0.8, "end": 1.2}],
+        )
+
+    with pytest.raises(ValueError, match="cannot be combined with extra axes"):
+        resolve_render_options(
+            template="curve",
+            x_axis_breaks=[{"id": "x-gap", "enabled": True, "start": 0.8, "end": 1.2}],
+            extra_y_axis={
+                "enabled": True,
+                "position": "right",
+                "title": "Half Stress",
+                "data_value": 2.0,
+                "display_value": 1.0,
+            },
+        )
+
+    with pytest.raises(ValueError, match="single `display_mode`"):
+        resolve_render_options(
+            template="curve",
+            x_axis_breaks=[
+                {"id": "x-gap-1", "enabled": True, "start": 0.8, "end": 1.2, "display_mode": "compress"},
+                {"id": "x-gap-2", "enabled": True, "start": 1.8, "end": 2.2, "display_mode": "split"},
+            ],
+        )
+
+    with pytest.raises(ValueError, match="Split broken X axes cannot be combined"):
+        resolve_render_options(
+            template="curve",
+            x_axis_breaks=[
+                {"id": "x-gap", "enabled": True, "start": 0.8, "end": 1.2, "display_mode": "split"}
+            ],
+            y_axis_breaks=[
+                {"id": "y-gap", "enabled": True, "start": 1.4, "end": 2.2, "display_mode": "compress"}
+            ],
+        )
 
 
 def test_resolve_render_options_accepts_tick_label_preferences_for_supported_templates() -> None:
@@ -1012,6 +1153,504 @@ def test_scatter_fit_preflight_matches_render_filename(tmp_path: Path) -> None:
         assert tuple(plot.filename for plot in rendered) == preflight.output_filenames
         assert rendered[0].qa_report is not None
         assert "deterministic_linear_fit_overlay" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_reference_guides_overlay_line_and_band_on_curve(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        reference_guides=[
+            {
+                "id": "target-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 2.5,
+                "label": "Target",
+            },
+            {
+                "id": "window-region",
+                "enabled": True,
+                "kind": "band",
+                "axis_target": "x",
+                "start": 0.5,
+                "end": 1.5,
+                "label": "Window",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "reference_line_overlay" in plot.qa_report.autofixes_applied
+        assert "reference_band_overlay" in plot.qa_report.autofixes_applied
+        ax = plot.figure.axes[0]
+        assert any(line.get_linestyle() == "--" for line in ax.lines)
+        assert ax.patches
+        assert {"Target", "Window"} <= {text.get_text() for text in ax.texts}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_reference_line_rejects_non_positive_value_on_log_axis(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "curve.csv")
+
+    with pytest.raises(ValueError, match="positive value"):
+        build_rendered_plots(
+            "curve",
+            input_path,
+            xscale="log",
+            reference_guides=[
+                {
+                    "id": "bad-line",
+                    "enabled": True,
+                    "kind": "line",
+                    "axis_target": "x",
+                    "value": 0.0,
+                }
+            ],
+        )
+
+
+def test_reference_guides_support_secondary_y_axis_targets(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "title": "Half Stress",
+            "data_value": 2.0,
+            "display_value": 1.0,
+        },
+        reference_guides=[
+            {
+                "id": "secondary-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_secondary",
+                "value": 1.0,
+                "label": "Half target",
+            }
+        ],
+    )
+    try:
+        axes = _primary_and_secondary_axes(rendered[0])
+        secondary_axes = [axis for axis in axes[1:] if axis.get_ylabel() == "Half Stress"]
+        assert secondary_axes
+        assert any(line.get_linestyle() == "--" for line in axes[0].lines)
+        assert "Half target" in {
+            text.get_text()
+            for axis in axes
+            for text in axis.texts
+        }
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_text_annotations_overlay_can_place_multiple_labels_and_callouts(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        text_annotations=[
+            {
+                "id": "frame-note",
+                "enabled": True,
+                "text": "Frame note",
+                "coordinate_space": "axes_fraction",
+                "x": 0.04,
+                "y": 0.96,
+                "display_style": "callout",
+                "connector_enabled": True,
+                "target_x": 2.0,
+                "target_y": 2.8,
+                "horizontal_alignment": "left",
+                "vertical_alignment": "top",
+            },
+            {
+                "id": "data-note",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 2.0,
+                "y": 5.0,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "text_annotation_overlay" in plot.qa_report.autofixes_applied
+        assert {"Frame note", "Peak"} <= {text.get_text() for text in plot.figure.axes[0].texts}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_text_annotation_rejects_non_positive_data_coordinate_on_log_axis(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "curve.csv")
+
+    with pytest.raises(ValueError, match="positive x value"):
+        build_rendered_plots(
+            "curve",
+            input_path,
+            xscale="log",
+            text_annotations=[
+                {
+                    "id": "bad-note",
+                    "enabled": True,
+                    "text": "Bad",
+                    "coordinate_space": "data",
+                    "x": 0.0,
+                    "y": 1.0,
+                    "connector_enabled": True,
+                    "target_x": 1.0,
+                    "target_y": 1.0,
+                    "horizontal_alignment": "center",
+                    "vertical_alignment": "top",
+                }
+            ],
+        )
+
+
+def test_extra_axes_overlay_can_add_secondary_converted_axes(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        extra_x_axis={
+            "enabled": True,
+            "position": "top",
+            "title": "Gallons",
+            "data_value": 3.78541,
+            "display_value": 1.0,
+        },
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "title": "Half Stress",
+            "data_value": 2.0,
+            "display_value": 1.0,
+        },
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "extra_axis_overlay" in plot.qa_report.autofixes_applied
+        assert len(plot.figure.axes[0].child_axes) >= 2
+        labels = {
+            axis.get_xlabel()
+            for axis in _primary_and_secondary_axes(plot)
+            if axis.get_xlabel()
+        } | {
+            axis.get_ylabel()
+            for axis in _primary_and_secondary_axes(plot)
+            if axis.get_ylabel()
+        }
+        assert "Gallons" in labels
+        assert "Half Stress" in labels
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_extra_axes_overlay_supports_log_parent_axis(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        xscale="log",
+        extra_x_axis={
+            "enabled": True,
+            "position": "top",
+            "title": "Scaled X",
+            "data_value": 10.0,
+            "display_value": 1.0,
+        },
+    )
+    try:
+        labels = [
+            axis.get_xlabel()
+            for axis in _primary_and_secondary_axes(rendered[0])
+            if axis.get_xlabel()
+        ]
+        assert "Scaled X" in labels
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_extra_y_axis_series_assignment_moves_selected_curve_series_to_secondary_axis(tmp_path: Path) -> None:
+    input_path = _write_multi_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "binding_mode": "series_assignment",
+            "series_ids": ["Sample C", "Sample D"],
+            "title": "Secondary Stress",
+        },
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "extra_axis_series_assignment" in plot.qa_report.autofixes_applied
+        axes = plot.figure.axes
+        assert len(axes) >= 2
+        primary_ax, secondary_ax = axes[0], axes[1]
+        assert [line.get_label() for line in primary_ax.lines] == ["Sample A", "Sample B"]
+        assert [line.get_label() for line in secondary_ax.lines] == ["Sample C", "Sample D"]
+        assert secondary_ax.get_ylabel() == "Secondary Stress"
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_extra_y_axis_series_assignment_routes_scatter_fit_overlay_to_secondary_axis(tmp_path: Path) -> None:
+    input_path = _write_multi_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "scatter",
+        input_path,
+        fit_options={"enabled": True, "model_id": "linear"},
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "binding_mode": "series_assignment",
+            "series_ids": ["Sample D"],
+            "title": "Secondary Stress",
+        },
+    )
+    try:
+        axes = rendered[0].figure.axes
+        assert len(axes) >= 2
+        primary_ax, secondary_ax = axes[0], axes[1]
+        primary_overlay_count = sum(1 for line in primary_ax.lines if line.get_linestyle() == "--")
+        secondary_overlay_count = sum(1 for line in secondary_ax.lines if line.get_linestyle() == "--")
+        assert primary_overlay_count == 3
+        assert secondary_overlay_count == 1
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_axis_breaks_overlay_compresses_curve_and_reuses_reference_guides_and_annotations(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        x_axis_breaks=[
+            {
+                "id": "x-gap",
+                "enabled": True,
+                "start": 0.8,
+                "end": 1.2,
+            }
+        ],
+        y_axis_breaks=[
+            {
+                "id": "y-gap",
+                "enabled": True,
+                "start": 1.4,
+                "end": 2.2,
+            }
+        ],
+        reference_guides=[
+            {
+                "id": "target-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 2.4,
+                "label": "Target",
+            },
+            {
+                "id": "window-region",
+                "enabled": True,
+                "kind": "band",
+                "axis_target": "x",
+                "start": 0.5,
+                "end": 1.5,
+                "label": "Window",
+            },
+        ],
+        text_annotations=[
+            {
+                "id": "visible-note",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 2.0,
+                "y": 2.8,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+                "connector_enabled": True,
+                "target_x": 1.5,
+                "target_y": 2.4,
+                "target_y_axis_target": "y_primary",
+            },
+            {
+                "id": "hidden-note",
+                "enabled": True,
+                "text": "Hidden",
+                "coordinate_space": "data",
+                "x": 1.0,
+                "y": 2.0,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "center",
+                "vertical_alignment": "top",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "axis_break_overlay" in plot.qa_report.autofixes_applied
+        assert "reference_line_overlay" in plot.qa_report.autofixes_applied
+        assert "reference_band_overlay" in plot.qa_report.autofixes_applied
+        assert "text_annotation_overlay" in plot.qa_report.autofixes_applied
+
+        ax = plot.figure.axes[0]
+        assert ax.get_xlim()[1] < 2.0
+        assert ax.get_ylim()[1] < 2.8
+        assert any(
+            np.isnan(np.asarray(line.get_xdata(), dtype=float)).any()
+            for line in ax.lines
+            if line.get_label() != "_nolegend_"
+        )
+        assert len(ax.patches) >= 2
+
+        visible_texts = {text.get_text() for text in ax.texts if text.get_visible()}
+        assert "Peak" in visible_texts
+        assert "Hidden" not in visible_texts
+        assert "Target" in visible_texts
+        assert "Window" in visible_texts
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_axis_breaks_filter_scatter_points_inside_hidden_span(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "scatter",
+        input_path,
+        x_axis_breaks=[
+            {
+                "id": "x-gap",
+                "enabled": True,
+                "start": 0.8,
+                "end": 1.2,
+            }
+        ],
+    )
+    try:
+        ax = rendered[0].figure.axes[0]
+        collections = _path_collections(ax)
+        assert collections
+        total_points = sum(np.asarray(collection.get_offsets()).shape[0] for collection in collections)
+        assert total_points == 4
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_axis_breaks_split_layout_reuses_guides_and_annotations(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        x_axis_breaks=[
+            {
+                "id": "x-gap",
+                "enabled": True,
+                "start": 0.8,
+                "end": 1.2,
+                "display_mode": "split",
+            }
+        ],
+        reference_guides=[
+            {
+                "id": "target-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 2.4,
+                "label": "Target",
+            },
+            {
+                "id": "window-region",
+                "enabled": True,
+                "kind": "band",
+                "axis_target": "x",
+                "start": 0.5,
+                "end": 1.5,
+                "label": "Window",
+            },
+        ],
+        text_annotations=[
+            {
+                "id": "visible-note",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 2.0,
+                "y": 2.8,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+                "connector_enabled": True,
+                "target_x": 1.5,
+                "target_y": 2.4,
+                "target_y_axis_target": "y_primary",
+            },
+            {
+                "id": "hidden-note",
+                "enabled": True,
+                "text": "Hidden",
+                "coordinate_space": "data",
+                "x": 1.0,
+                "y": 2.0,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "center",
+                "vertical_alignment": "top",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "axis_break_overlay" in plot.qa_report.autofixes_applied
+        assert "axis_break_split_layout" in plot.qa_report.autofixes_applied
+        assert "reference_line_overlay" in plot.qa_report.autofixes_applied
+        assert "reference_band_overlay" in plot.qa_report.autofixes_applied
+        assert "text_annotation_overlay" in plot.qa_report.autofixes_applied
+
+        assert len(plot.figure.axes) == 2
+        visible_texts = {
+            text.get_text()
+            for axis in plot.figure.axes
+            for text in axis.texts
+            if text.get_visible()
+        }
+        assert "Peak" in visible_texts
+        assert "Hidden" not in visible_texts
+        assert "Target" in visible_texts
+        assert "Window" in visible_texts
+        assert sum(len(axis.patches) for axis in plot.figure.axes) >= 2
     finally:
         close_rendered_plots(rendered)
 

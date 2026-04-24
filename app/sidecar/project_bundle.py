@@ -10,20 +10,26 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.sidecar.schemas_render import (
+    AxisBreakPayload,
     DataStudioProjectPayload,
     DataStudioProjectWorkbookPayload,
+    ExtraAxisPayload,
+    FitOptionsPayload,
     OpenProjectResponse,
     PlotProjectPayload,
     PlotProjectSourceProvenancePayload,
     ProjectBundlePayload,
+    ReferenceGuidePayload,
     RenderOptionsPayload,
     SaveProjectResponse,
+    TextAnnotationPayload,
 )
 from app.sidecar.server_utils import normalize_path, options_from_payload
 from src.data_studio.models import serialize_model
 from src.data_studio.session import normalize_session_payload as normalize_data_studio_session_payload
 from src.infrastructure.persistence.plot_projects import prepare_managed_project_restore_dir
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE
+from src.rendering.fit_analysis import normalize_fit_options_payload
 from src.rendering.options import validate_template_name
 from src.rendering.template_lifecycle import resolve_template_id
 
@@ -155,6 +161,36 @@ def _normalize_render_options(
         palette_preset=resolved_options.palette_preset,
         use_sidecar=payload.use_sidecar,
         visual_theme_id=resolved_options.visual_theme_id,
+        extra_x_axis=(
+            ExtraAxisPayload.model_validate(resolved_options.extra_x_axis)
+            if resolved_options.extra_x_axis is not None
+            else None
+        ),
+        extra_y_axis=(
+            ExtraAxisPayload.model_validate(resolved_options.extra_y_axis)
+            if resolved_options.extra_y_axis is not None
+            else None
+        ),
+        x_axis_breaks=(
+            [AxisBreakPayload.model_validate(item) for item in resolved_options.x_axis_breaks]
+            if resolved_options.x_axis_breaks is not None
+            else None
+        ),
+        y_axis_breaks=(
+            [AxisBreakPayload.model_validate(item) for item in resolved_options.y_axis_breaks]
+            if resolved_options.y_axis_breaks is not None
+            else None
+        ),
+        reference_guides=(
+            [ReferenceGuidePayload.model_validate(item) for item in resolved_options.reference_guides]
+            if resolved_options.reference_guides is not None
+            else None
+        ),
+        text_annotations=(
+            [TextAnnotationPayload.model_validate(item) for item in resolved_options.text_annotations]
+            if resolved_options.text_annotations is not None
+            else None
+        ),
     )
 
 
@@ -183,6 +219,9 @@ def _normalize_plot_project_payload(
         input_path=source_path,
         sheet=sheet,
     )
+    normalized_fit_options = FitOptionsPayload.model_validate(
+        normalize_fit_options_payload(plot_map.get("fit_options"))
+    )
     provenance_map = _mapping(plot_map.get("source_provenance")) or {}
     provenance = PlotProjectSourceProvenancePayload(
         original_input_path=_string_or_none(provenance_map.get("original_input_path")) or str(source_path),
@@ -206,6 +245,7 @@ def _normalize_plot_project_payload(
         sheet=sheet,
         selected_template_id=template_id,
         render_options=normalized_options,
+        fit_options=normalized_fit_options,
         project_display_name=_string_or_none(plot_map.get("project_display_name")),
         source_provenance=provenance,
     )

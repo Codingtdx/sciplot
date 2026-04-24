@@ -717,6 +717,8 @@ def _render_kwargs_from_payload(
         "palette_preset": palette_preset,
         "use_sidecar": payload.get("use_sidecar"),
         "visual_theme_id": payload.get("visual_theme_id"),
+        "reference_guides": payload.get("reference_guides"),
+        "text_annotations": payload.get("text_annotations"),
     }
     return {key: value for key, value in resolved.items() if value is not None or key == "reverse_x"}
 

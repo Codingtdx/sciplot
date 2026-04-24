@@ -73,6 +73,7 @@ extension PlotSession {
         runtimeState.lastSavedProjectSnapshot = nil
         fitOptions = FitOptionsPayload()
         notifyFitOptionsDidChange()
+        fitAnalysisSelectedSeriesID = nil
         sourceProvenance = PlotProjectSourceProvenancePayload(
             originalInputPath: nil,
             savedInputMtimeNs: nil,
@@ -80,10 +81,11 @@ extension PlotSession {
         )
         resetDataWorkbookState()
         if !preserveRenderOptions {
+            let defaultStyle = metadata?.defaults.stylePreset ?? "nature"
             renderOptions = RenderOptionsPayload(
-                stylePreset: metadata?.defaults.stylePreset ?? "nature",
+                stylePreset: defaultStyle,
                 palettePreset: metadata?.defaults.palettePreset ?? "colorblind_safe",
-                visualThemeID: nil
+                visualThemeID: styleRecommendedThemeID(for: defaultStyle)
             )
             notifyRenderOptionsDidChange()
         }
@@ -116,6 +118,235 @@ extension PlotSession {
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Edit Plot Options")
     }
 
+    func updateFitOptions(mutate: (inout FitOptionsPayload) -> Void) {
+        let previousSnapshot = undoSnapshot()
+        mutate(&fitOptions)
+        guard previousSnapshot.fitOptions != fitOptions else {
+            return
+        }
+        notifyFitOptionsDidChange()
+        invalidateSubmissionArtifacts()
+        errorMessage = nil
+        if supportsFitOverlayControls && fitOverlayAvailability.isEnabled {
+            schedulePreviewRefresh(policy: .immediate)
+        }
+        if dataWorkbookTab == .fit {
+            loadFitAnalysis(offset: 0)
+        }
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Edit Plot Fit")
+    }
+
+    func updateFitEnabled(_ enabled: Bool) {
+        updateFitOptions { $0.enabled = enabled }
+    }
+
+    func updateFitModel(_ modelID: String) {
+        updateFitOptions {
+            $0.enabled = true
+            $0.modelID = modelID
+        }
+    }
+
+    func updateExtraXAxis(
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout ExtraAxisPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var axis = options.extraXAxis ?? ExtraAxisPayload(position: "top")
+            mutate(&axis)
+            options.extraXAxis = axis
+        }
+    }
+
+    func updateExtraYAxis(
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout ExtraAxisPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var axis = options.extraYAxis ?? ExtraAxisPayload(position: "right")
+            mutate(&axis)
+            options.extraYAxis = axis
+        }
+    }
+
+    func addAxisBreak(axis: PlotAxisSelection) {
+        updateRenderOptions(policy: .immediate) { options in
+            let displayMode: String
+            switch axis {
+            case .x:
+                displayMode = (options.xAxisBreaks ?? []).contains(where: { $0.displayMode == "split" }) ? "split" : "compress"
+            case .y:
+                displayMode = (options.yAxisBreaks ?? []).contains(where: { $0.displayMode == "split" }) ? "split" : "compress"
+            }
+            let axisBreak = AxisBreakPayload(enabled: true, start: 0.0, end: 1.0, displayMode: displayMode)
+            switch axis {
+            case .x:
+                var breaks = options.xAxisBreaks ?? []
+                breaks.append(axisBreak)
+                options.xAxisBreaks = breaks
+            case .y:
+                var breaks = options.yAxisBreaks ?? []
+                breaks.append(axisBreak)
+                options.yAxisBreaks = breaks
+            }
+        }
+    }
+
+    func updateAxisBreakDisplayMode(axis: PlotAxisSelection, mode: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            switch axis {
+            case .x:
+                let breaks = (options.xAxisBreaks ?? []).map { axisBreak in
+                    var updated = axisBreak
+                    updated.displayMode = mode
+                    return updated
+                }
+                options.xAxisBreaks = breaks.isEmpty ? nil : breaks
+                if mode == "split" {
+                    options.yAxisBreaks = nil
+                }
+            case .y:
+                let breaks = (options.yAxisBreaks ?? []).map { axisBreak in
+                    var updated = axisBreak
+                    updated.displayMode = mode
+                    return updated
+                }
+                options.yAxisBreaks = breaks.isEmpty ? nil : breaks
+                if mode == "split" {
+                    options.xAxisBreaks = nil
+                }
+            }
+        }
+    }
+
+    func updateAxisBreak(
+        axis: PlotAxisSelection,
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout AxisBreakPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            switch axis {
+            case .x:
+                var breaks = options.xAxisBreaks ?? []
+                guard let index = breaks.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
+                var axisBreak = breaks[index]
+                mutate(&axisBreak)
+                breaks[index] = axisBreak
+                options.xAxisBreaks = breaks
+            case .y:
+                var breaks = options.yAxisBreaks ?? []
+                guard let index = breaks.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
+                var axisBreak = breaks[index]
+                mutate(&axisBreak)
+                breaks[index] = axisBreak
+                options.yAxisBreaks = breaks
+            }
+        }
+    }
+
+    func removeAxisBreak(axis: PlotAxisSelection, id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            switch axis {
+            case .x:
+                var breaks = options.xAxisBreaks ?? []
+                breaks.removeAll { $0.id == id }
+                options.xAxisBreaks = breaks.isEmpty ? nil : breaks
+            case .y:
+                var breaks = options.yAxisBreaks ?? []
+                breaks.removeAll { $0.id == id }
+                options.yAxisBreaks = breaks.isEmpty ? nil : breaks
+            }
+        }
+    }
+
+    func addReferenceGuide(kind: String, axisTarget: String = "y_primary") {
+        updateRenderOptions(policy: .immediate) { options in
+            var guides = options.referenceGuides ?? []
+            let guide = ReferenceGuidePayload(
+                enabled: true,
+                kind: kind,
+                axisTarget: axisTarget,
+                value: kind == "line" ? 0.0 : nil,
+                start: kind == "band" ? 0.0 : nil,
+                end: kind == "band" ? 1.0 : nil
+            )
+            guides.append(guide)
+            options.referenceGuides = guides
+        }
+    }
+
+    func updateReferenceGuide(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout ReferenceGuidePayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var guides = options.referenceGuides ?? []
+            guard let index = guides.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var guide = guides[index]
+            mutate(&guide)
+            guides[index] = guide
+            options.referenceGuides = guides
+        }
+    }
+
+    func removeReferenceGuide(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var guides = options.referenceGuides ?? []
+            guides.removeAll { $0.id == id }
+            options.referenceGuides = guides.isEmpty ? nil : guides
+        }
+    }
+
+    func addTextAnnotation(
+        displayStyle: String = "plain",
+        connectorEnabled: Bool = false
+    ) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.textAnnotations ?? []
+            annotations.append(
+                TextAnnotationPayload(
+                    coordinateSpace: "axes_fraction",
+                    displayStyle: displayStyle,
+                    connectorEnabled: connectorEnabled
+                )
+            )
+            options.textAnnotations = annotations
+        }
+    }
+
+    func updateTextAnnotation(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout TextAnnotationPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var annotations = options.textAnnotations ?? []
+            guard let index = annotations.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var annotation = annotations[index]
+            mutate(&annotation)
+            annotations[index] = annotation
+            options.textAnnotations = annotations
+        }
+    }
+
+    func removeTextAnnotation(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.textAnnotations ?? []
+            annotations.removeAll { $0.id == id }
+            options.textAnnotations = annotations.isEmpty ? nil : annotations
+        }
+    }
+
     func cancelInspectionTask() {
         asyncCoordination.inspection.cancel()
     }
@@ -141,6 +372,7 @@ extension PlotSession {
         runtimeState.stagedExternalPinnedTemplateID = nil
         fitOptions = FitOptionsPayload()
         notifyFitOptionsDidChange()
+        fitAnalysisSelectedSeriesID = nil
         invalidateSubmissionArtifacts()
         resetDataWorkbookState()
         errorMessage = nil

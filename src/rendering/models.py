@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -40,6 +40,12 @@ class RenderOptions:
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
     fit_options: dict[str, Any] | None = None
+    extra_x_axis: Mapping[str, Any] | None = None
+    extra_y_axis: Mapping[str, Any] | None = None
+    x_axis_breaks: tuple[Mapping[str, Any], ...] | None = None
+    y_axis_breaks: tuple[Mapping[str, Any], ...] | None = None
+    reference_guides: tuple[Mapping[str, Any], ...] | None = None
+    text_annotations: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True)

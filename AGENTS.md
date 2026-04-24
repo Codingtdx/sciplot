@@ -50,10 +50,11 @@
   - legacy style alias 仍然一律归一化到 `nature`；
   - `nature` 的字体、字号、线宽、间距、axis frame、导出规格不可漂移。
 - 非 `nature` public style 可以调整 hard metrics（例如字号、线宽、marker、padding），但仍必须通过 contract 暴露，不能在前端本地偷配第二套数值。
+- 每个 public style 都必须在 contract 显式声明 `recommended_palette_preset` 和 `recommended_visual_theme_id`；当调用方显式切换 style 且未显式覆盖 palette/theme 时，sidecar 与 macOS 都必须回落到这组 style 推荐值，而不是各自猜默认值。
 - `palette_preset` 与 `visual_theme_id` 是独立 public 维度：
   - palette 负责颜色；
   - theme 只允许做软视觉变化（背景、网格、legend/panel 气质），不得改字体、线宽、间距、axis frame、导出规格。
-- 每个 public template 的推荐 `style_preset + palette_preset + visual_theme_id` 默认值都必须写在 contract `default_options`，并由 `/meta`、`/plot-contract`、sidecar、macOS 统一消费；不要在 GUI 侧再拼一套推荐逻辑。
+- 每个 public template 的推荐 `style_preset + palette_preset + visual_theme_id` 默认值都必须写在 contract `default_options`，并由 `/meta`、`/plot-contract`、sidecar、macOS 统一消费；这些默认值必须和该 template 默认 style 的 style-level 推荐保持一致，不要在 GUI 侧再拼一套推荐逻辑。
 - `scripts/smoke_check.py` 必须维护 public surface 的固定 guardrail：
   - contract lint，检查每个 public template 显式提供 `default_options.style_preset / palette_preset / visual_theme_id`；
   - style/theme/template 固定矩阵，至少覆盖代表性 `curve / area_curve / step_line / bar / scatter / heatmap`，并同时验证 `nature` 与至少一个非 `nature` style；
@@ -69,6 +70,10 @@
 - Plot 检查与推荐统一走 `POST /inspect-file`。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、候选角色和检测到的 x/y 标签；不要把全量 workbook 表格塞回 inspect/session payload。
 - Plot / Data Studio 拟合分析统一走 `POST /fit-analysis`；当前支持 `linear`、`polynomial_2`、`polynomial_3`。图上的 fit overlay、方程和分析结果表必须共用同一份后端拟合 helper，禁止前端或第二条 Python 路径偷偷重算。
+- Plot 高级 secondary axis 统一走 `render_options.extra_x_axis / extra_y_axis` 这条 typed payload 链路；preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 extra-axis 状态或重算换算语义。`extra_x_axis` 只允许换算轴；`extra_y_axis` 额外支持 `binding_mode=series_assignment`，用来做 DataGraph 风格的 double-Y / series ownership。
+- Plot 高级 broken axis 统一走 `render_options.x_axis_breaks / y_axis_breaks` 这条 typed payload 链路；preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 broken-axis 状态或重算坐标语义。当前支持 `display_mode=compress|split`：`compress` 是单图内压缩式 break overlay，`split` 是 joined multi-panel 布局；只允许在线性轴上启用，当前版本不能与 enabled `extra_x_axis / extra_y_axis` 共存，并且同一时刻只允许一个轴处于 active split 布局。
+- Plot 高级 guide overlay 统一走 `render_options.reference_guides` 这条 typed payload 链路；它是 DataGraph 风格的可堆叠 guide/region 命令层，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 reference guide 状态或重算 overlay 语义。
+- Plot 高级 text annotation overlay 统一走 `render_options.text_annotations` 这条 typed payload 链路；当前支持普通 note 与带 connector 的 callout，并允许绑定 `primary y / secondary y`，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 annotation 状态或重算坐标语义。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -115,6 +120,7 @@
   - 不要在单个 session 里重新发明一套 cancellation 文案过滤逻辑。
 - Plot / Data Studio 的 template 切换与 reset 语义必须保持：
   - 若当前 figure context 没有显式持久化的 style/theme/palette，则回落到当前 template `default_options` 推荐的 `style_preset + palette_preset + visual_theme_id`；
+  - 用户显式切换 style 且未显式改 palette/theme 时，必须同步采用该 style 的 contract 推荐 palette/theme；
   - 用户显式修改 style 后再改 theme/palette，style 必须保持；
   - 用户显式修改 theme 后再改 palette，theme 必须保持；反之亦然；
   - 打开已保存 figure/project 时，持久化值优先，只有缺失或失效时才回退到 template 推荐值。
@@ -139,7 +145,12 @@
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data` 和 `Fit`
-  - `Fit` v1 只支持 `Linear`
+  - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`
+  - Plot inspector `Advanced Plot` 里的 fit overlay 只开放给 `curve / point_line / scatter`
+  - Plot inspector `Advanced Plot` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
+  - Plot inspector `Axis -> Advanced` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
+  - Plot inspector `Advanced Plot` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
+  - Plot inspector `Advanced Plot` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`
@@ -155,6 +166,7 @@
 
 - 标准模板 `curve / point_line / bar / box / violin / scatter / heatmap` 共用同一物理 axis frame。
 - `wide_nmr`、`heatmap` 维持既定特例对齐规则，不得破坏标准模板对齐。
+- 共享标签/单位规范化统一走 `src/text_normalization.py`；未知但形如单位的指数写法（例如 `kJ/m2`、`J g-1 K-1`）必须保留 mathtext 上标，前端不得自行兜底格式化。
 - `bar` 的 y 轴从 0 起，`box/violin` 不强制从 0 起但下界需可见主刻度。
 - categorical 统计图模板保留横轴组名文字，但默认不画 x 轴 tick marks，也不要恢复 x 轴 minor ticks。
 - 标准 numeric axis 的 minor ticks 默认保持克制稀疏；不要回到当前这种密集副刻度观感。

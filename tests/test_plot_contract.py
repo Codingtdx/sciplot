@@ -27,6 +27,10 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(contract.defaults.style_preset, "nature")
         self.assertEqual({item["id"] for item in meta["styles"]}, {"nature", "editorial", "presentation", "poster"})
         self.assertEqual(set(contract.styles.keys()), {"nature", "editorial", "presentation", "poster"})
+        self.assertEqual(contract.styles["nature"].recommended_palette_preset, "colorblind_safe")
+        self.assertEqual(contract.styles["nature"].recommended_visual_theme_id, "clean_light")
+        self.assertEqual(contract.styles["editorial"].recommended_palette_preset, "roma")
+        self.assertEqual(contract.styles["presentation"].recommended_visual_theme_id, "presentation_like")
         self.assertTrue(
             {"infographic", "roma", "macarons", "shine", "vintage"}.issubset(
                 {item["id"] for item in meta["palettes"]}
@@ -56,6 +60,7 @@ class PlotContractTests(unittest.TestCase):
             self.assertIn("presentation_kind", template)
             self.assertIn(template["default_size"], template["allowed_sizes"])
             self.assertEqual(set(template["available_styles"]), {"nature", "editorial", "presentation", "poster"})
+            self.assertIn("recommended_palette_preset", next(item for item in meta["styles"] if item["id"] == "nature"))
             self.assertIn("palette_preset", template["default_options"])
             self.assertIn("visual_theme_id", template["default_options"])
             self.assertEqual(template["presentation_kind"], contract.templates[template["id"]].presentation_kind)
@@ -65,6 +70,9 @@ class PlotContractTests(unittest.TestCase):
             self.assertIsNotNone(template.default_options.get("style_preset"))
             self.assertIsNotNone(template.default_options.get("palette_preset"))
             self.assertIsNotNone(template.default_options.get("visual_theme_id"))
+            style_spec = contract.styles[str(template.default_options["style_preset"])]
+            self.assertEqual(template.default_options.get("palette_preset"), style_spec.recommended_palette_preset)
+            self.assertEqual(template.default_options.get("visual_theme_id"), style_spec.recommended_visual_theme_id)
 
     def test_public_template_contract_lint_passes(self) -> None:
         self.assertEqual(lint_public_template_contract(), ())
@@ -97,6 +105,8 @@ class PlotContractTests(unittest.TestCase):
                 "advanced_materials_spacious": "nature",
             },
         )
+        self.assertEqual(contract_dict["styles"]["nature"]["recommended_palette_preset"], "colorblind_safe")
+        self.assertEqual(contract_dict["styles"]["nature"]["recommended_visual_theme_id"], "clean_light")
 
     def test_tick_label_controls_are_exposed_only_on_supported_axes(self) -> None:
         contract = load_plot_contract()
@@ -107,10 +117,18 @@ class PlotContractTests(unittest.TestCase):
         self.assertTrue(
             {"x_tick_density", "x_tick_edge_labels", "y_tick_density", "y_tick_edge_labels"}.issubset(curve_options)
         )
+        self.assertIn("extra_x_axis", curve_options)
+        self.assertIn("extra_y_axis", curve_options)
+        self.assertIn("x_axis_breaks", curve_options)
+        self.assertIn("y_axis_breaks", curve_options)
         self.assertIn("y_tick_density", box_options)
         self.assertIn("y_tick_edge_labels", box_options)
         self.assertNotIn("x_tick_density", box_options)
         self.assertNotIn("x_tick_edge_labels", box_options)
+        self.assertNotIn("extra_x_axis", box_options)
+        self.assertNotIn("extra_y_axis", box_options)
+        self.assertNotIn("x_axis_breaks", box_options)
+        self.assertNotIn("y_axis_breaks", box_options)
 
 
 if __name__ == "__main__":

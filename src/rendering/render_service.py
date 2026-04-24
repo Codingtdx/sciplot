@@ -7,12 +7,16 @@ import matplotlib.pyplot as plt
 
 from src import plot_style
 from src.plot_style import save_pdf
+from src.rendering.axis_breaks import apply_axis_breaks, normalize_axis_breaks_payload
+from src.rendering.extra_axes import apply_extra_axes, normalize_extra_axis_payload
 from src.rendering.fit_analysis import fit_options_from_payload
 from src.rendering.models import RenderedPlot, TemplateName
 from src.rendering.options import resolve_render_options, validate_template_name
+from src.rendering.reference_guides import apply_reference_guides, normalize_reference_guides_payload
 from src.rendering.render_registry import TEMPLATE_RENDERERS
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.template_lifecycle import resolve_template_id
+from src.rendering.text_annotations import apply_text_annotations, normalize_text_annotations_payload
 
 
 def close_rendered_plots(rendered_plots: list[RenderedPlot]) -> None:
@@ -60,6 +64,14 @@ def build_rendered_plots(
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
     fit_options: dict[str, object] | None = None,
+    extra_x_axis: dict[str, object] | None = None,
+    extra_y_axis: dict[str, object] | None = None,
+    x_axis_breaks: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    y_axis_breaks: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    reference_guides: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    reference_line: dict[str, object] | None = None,
+    reference_band: dict[str, object] | None = None,
+    text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[RenderedPlot]:
     requested_template = validate_template_name(template)
     resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
@@ -86,9 +98,30 @@ def build_rendered_plots(
         palette_preset=palette_preset,
         use_sidecar=use_sidecar,
         visual_theme_id=visual_theme_id,
+        extra_x_axis=extra_x_axis,
+        extra_y_axis=extra_y_axis,
+        x_axis_breaks=x_axis_breaks,
+        y_axis_breaks=y_axis_breaks,
+        reference_guides=reference_guides,
+        reference_line=reference_line,
+        reference_band=reference_band,
+        text_annotations=text_annotations,
         resolved_template_id=resolved_template,
     )
-    options = replace(options, fit_options=fit_options_from_payload(fit_options).__dict__)
+    options = replace(
+        options,
+        fit_options=fit_options_from_payload(fit_options).__dict__,
+        extra_x_axis=normalize_extra_axis_payload(extra_x_axis, axis_name="x"),
+        extra_y_axis=normalize_extra_axis_payload(extra_y_axis, axis_name="y"),
+        x_axis_breaks=normalize_axis_breaks_payload(x_axis_breaks, axis_name="x"),
+        y_axis_breaks=normalize_axis_breaks_payload(y_axis_breaks, axis_name="y"),
+        reference_guides=normalize_reference_guides_payload(
+            reference_guides,
+            legacy_line=reference_line,
+            legacy_band=reference_band,
+        ),
+        text_annotations=normalize_text_annotations_payload(text_annotations),
+    )
     style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
     plot_style.apply_style(
         style_bundle.publication_profile_id,
@@ -96,7 +129,20 @@ def build_rendered_plots(
         soft_overrides=style_bundle.resolved_soft,
     )
     renderer = TEMPLATE_RENDERERS[resolved_template]
-    return renderer.render(input_path, sheet, options)
+    rendered_plots = renderer.render(input_path, sheet, options)
+    return [
+        apply_text_annotations(
+            apply_reference_guides(
+                apply_extra_axes(
+                    apply_axis_breaks(rendered, options=options),
+                    options=options,
+                ),
+                options=options,
+            ),
+            options=options,
+        )
+        for rendered in rendered_plots
+    ]
 
 
 def render_template(
@@ -127,6 +173,14 @@ def render_template(
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
     fit_options: dict[str, object] | None = None,
+    extra_x_axis: dict[str, object] | None = None,
+    extra_y_axis: dict[str, object] | None = None,
+    x_axis_breaks: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    y_axis_breaks: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    reference_guides: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    reference_line: dict[str, object] | None = None,
+    reference_band: dict[str, object] | None = None,
+    text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
         template,
@@ -154,6 +208,14 @@ def render_template(
         use_sidecar=use_sidecar,
         visual_theme_id=visual_theme_id,
         fit_options=fit_options,
+        extra_x_axis=extra_x_axis,
+        extra_y_axis=extra_y_axis,
+        x_axis_breaks=x_axis_breaks,
+        y_axis_breaks=y_axis_breaks,
+        reference_guides=reference_guides,
+        reference_line=reference_line,
+        reference_band=reference_band,
+        text_annotations=text_annotations,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
 

@@ -13,7 +13,8 @@ extension PlotSession {
             sourcePath: selectedFileURL.path,
             selectedSheet: selectedSheet,
             selectedTemplateID: selectedTemplateID,
-            renderOptions: renderOptions
+            renderOptions: renderOptions,
+            fitOptions: fitOptions
         )
     }
 
@@ -47,27 +48,120 @@ extension PlotSession {
         return .enabled()
     }
 
-    var fitAnalysisAvailability: ActionAvailability {
+    var showsAdvancedPlotSection: Bool {
+        selectedFileURL != nil && effectiveTemplateID != nil
+    }
+
+    var referenceGuideAvailability: ActionAvailability {
         guard selectedFileURL != nil else {
-            return .disabled("Import a source file before fitting a curve.")
+            return .disabled("Import a source file before adding reference guides.")
         }
         if isInspecting || needsInspection {
-            return .disabled("Wait for inspect to finish before fitting a curve.")
+            return .disabled("Wait for inspect to finish before adding reference guides.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Reference guides become available after inspect finishes.")
+        }
+        return .enabled()
+    }
+
+    var textAnnotationAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding text annotations.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding text annotations.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Text annotations become available after inspect finishes.")
+        }
+        return .enabled()
+    }
+
+    var extraXAxisAvailability: ActionAvailability {
+        extraAxisAvailability(optionID: "extra_x_axis", axisLabel: "X")
+    }
+
+    var extraYAxisAvailability: ActionAvailability {
+        extraAxisAvailability(optionID: "extra_y_axis", axisLabel: "Y")
+    }
+
+    var xAxisBreakAvailability: ActionAvailability {
+        axisBreakAvailability(optionID: "x_axis_breaks", axis: .x)
+    }
+
+    var yAxisBreakAvailability: ActionAvailability {
+        axisBreakAvailability(optionID: "y_axis_breaks", axis: .y)
+    }
+
+    var extraYAxisSeriesBindingAvailability: ActionAvailability {
+        guard extraYAxisAvailability.isEnabled else {
+            return .disabled(
+                extraYAxisAvailability.reason
+                    ?? "Double Y becomes available after inspect finishes."
+            )
+        }
+        guard supportsFitOverlayControls else {
+            return .disabled("Double Y is only available for curve, point-line, and scatter templates.")
+        }
+        guard seriesAssignmentCandidateIDs.count > 1 else {
+            return .disabled("Double Y becomes available once inspect finds at least two series.")
+        }
+        return .enabled()
+    }
+
+    var fitAnalysisAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before analyzing a fit.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before analyzing a fit.")
         }
         guard let dataset = inspectionResponse?.dataset else {
             return .disabled("Fit analysis becomes available after inspect finishes.")
         }
         let supportedModels = Set(["curve_table", "tensile_curve", "frequency_sweep", "temperature_sweep", "stress_relaxation"])
         guard supportedModels.contains(dataset.model) else {
-            return .disabled("Linear fit is only available for curve-like data in this release.")
+            return .disabled("Fit analysis is only available for curve-like data in this release.")
         }
         guard !dataset.candidateRoles.x.isEmpty, !dataset.candidateRoles.y.isEmpty else {
             return .disabled("This sheet does not expose X/Y fields for fitting.")
         }
         guard dataset.rawRows >= 2 else {
-            return .disabled("At least two points are required to fit a line.")
+            return .disabled("At least two points are required to compute a fit.")
         }
         return .enabled()
+    }
+
+    var fitOverlayAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding a fit overlay.")
+        }
+        guard supportsFitOverlayControls else {
+            return .disabled("Fit overlay is only available for curve, point-line, and scatter templates.")
+        }
+        guard fitAnalysisAvailability.isEnabled else {
+            return .disabled(fitAnalysisAvailability.reason ?? "Fit overlay becomes available after inspect finishes.")
+        }
+        return .enabled()
+    }
+
+    var supportsFitOverlayControls: Bool {
+        guard let templateID = effectiveTemplateID else {
+            return false
+        }
+        return Set(["curve", "point_line", "scatter"]).contains(templateID)
+    }
+
+    var fitModelLabel: String {
+        switch fitOptions.modelID {
+        case "polynomial_2":
+            return "Polynomial 2"
+        case "polynomial_3":
+            return "Polynomial 3"
+        default:
+            return "Linear"
+        }
     }
 
     var sourceTableRows: [PlotWorkbookTableRow] {
@@ -129,7 +223,10 @@ extension PlotSession {
         guard let fitAnalysisResponse else {
             return []
         }
-        var rows: [(String, String)] = [("Equation", fitAnalysisResponse.equationDisplay)]
+        var rows: [(String, String)] = [
+            ("Model", fitModelLabel),
+            ("Equation", fitAnalysisResponse.equationDisplay),
+        ]
         if let slope = fitAnalysisResponse.slope {
             rows.append(("Slope", slope.formatted(.number.precision(.fractionLength(4)))))
         }
@@ -140,6 +237,77 @@ extension PlotSession {
         rows.append(("RMSE", fitAnalysisResponse.rmse.formatted(.number.precision(.fractionLength(4)))))
         rows.append(("Points", "\(fitAnalysisResponse.pointCount)"))
         return rows
+    }
+
+    private func extraAxisAvailability(optionID: String, axisLabel: String) -> ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding an extra \(axisLabel) axis.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding an extra \(axisLabel) axis.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Extra \(axisLabel) axis becomes available after inspect finishes.")
+        }
+        guard editableOptionIDs.contains(optionID) else {
+            return .disabled("This plot does not expose an extra \(axisLabel) axis.")
+        }
+        if hasActiveAxisBreaks {
+            return .disabled("Extra \(axisLabel) axes are unavailable while broken axes are enabled.")
+        }
+        return .enabled()
+    }
+
+    private func axisBreakAvailability(optionID: String, axis: PlotAxisSelection) -> ActionAvailability {
+        let axisLabel = axis == .x ? "X" : "Y"
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding a broken \(axisLabel) axis.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding a broken \(axisLabel) axis.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Broken \(axisLabel) axis becomes available after inspect finishes.")
+        }
+        guard editableOptionIDs.contains(optionID) else {
+            return .disabled("This plot does not expose a broken \(axisLabel) axis.")
+        }
+        if hasActiveExtraXAxis || hasActiveExtraYAxis {
+            return .disabled("Broken axes are unavailable while extra axes are enabled.")
+        }
+        if axis == .x, hasActiveSplitYAxis {
+            return .disabled("Broken X axes are unavailable while split Y layout is enabled.")
+        }
+        if axis == .y, hasActiveSplitXAxis {
+            return .disabled("Broken Y axes are unavailable while split X layout is enabled.")
+        }
+        if axis == .x, (renderOptions.xscale ?? "linear") != "linear" {
+            return .disabled("Broken X axis is available on linear axes only.")
+        }
+        if axis == .y, (renderOptions.yscale ?? "linear") != "linear" {
+            return .disabled("Broken Y axis is available on linear axes only.")
+        }
+        return .enabled()
+    }
+
+    private func deduplicatedSeriesSelectionIDs(from labels: [String]) -> [String] {
+        var counts: [String: Int] = [:]
+        return labels.compactMap { raw in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                return nil
+            }
+            let nextCount = (counts[trimmed] ?? 0) + 1
+            counts[trimmed] = nextCount
+            return nextCount == 1 ? trimmed : "\(trimmed) (\(nextCount))"
+        }
+    }
+
+    var fitAnalysisSeriesSelection: String {
+        fitAnalysisSelectedSeriesID
+            ?? fitAnalysisResponse?.selectedSeriesID
+            ?? fitAnalysisResponse?.seriesSummaries.first?.seriesID
+            ?? ""
     }
 
     var availableSheets: [SheetValue] {
@@ -296,6 +464,54 @@ extension PlotSession {
         return (metadata?.palettes ?? []).filter { selectedTemplateSummary.availablePalettes.contains($0.id) }
     }
 
+    var textAnnotations: [TextAnnotationPayload] {
+        renderOptions.textAnnotations ?? []
+    }
+
+    var referenceGuides: [ReferenceGuidePayload] {
+        renderOptions.referenceGuides ?? []
+    }
+
+    var xAxisBreaks: [AxisBreakPayload] {
+        renderOptions.xAxisBreaks ?? []
+    }
+
+    var yAxisBreaks: [AxisBreakPayload] {
+        renderOptions.yAxisBreaks ?? []
+    }
+
+    var xAxisBreakDisplayMode: String {
+        axisBreakDisplayMode(for: xAxisBreaks)
+    }
+
+    var yAxisBreakDisplayMode: String {
+        axisBreakDisplayMode(for: yAxisBreaks)
+    }
+
+    var hasActiveSecondaryYAxis: Bool {
+        (renderOptions.extraYAxis?.enabled ?? false) && extraYAxisAvailability.isEnabled
+    }
+
+    var hasActiveExtraXAxis: Bool {
+        renderOptions.extraXAxis?.enabled ?? false
+    }
+
+    var hasActiveExtraYAxis: Bool {
+        renderOptions.extraYAxis?.enabled ?? false
+    }
+
+    var hasActiveAxisBreaks: Bool {
+        xAxisBreaks.contains(where: \.enabled) || yAxisBreaks.contains(where: \.enabled)
+    }
+
+    var hasActiveSplitXAxis: Bool {
+        xAxisBreaks.contains { $0.enabled && $0.displayMode == "split" }
+    }
+
+    var hasActiveSplitYAxis: Bool {
+        yAxisBreaks.contains { $0.enabled && $0.displayMode == "split" }
+    }
+
     var sampleColumns: [PlotSampleColumn] {
         if let dataset = inspectionResponse?.dataset, !dataset.columnProfiles.isEmpty {
             return dataset.columnProfiles.enumerated().map { index, profile in
@@ -317,8 +533,16 @@ extension PlotSession {
         inspectionResponse?.dataset?.candidateRoles.series ?? []
     }
 
+    var seriesAssignmentCandidateIDs: [String] {
+        deduplicatedSeriesSelectionIDs(from: seriesOrderLabels)
+    }
+
     var shouldShowSeriesLegendControls: Bool {
         editableOptionIDs.contains("series_order") && candidateSeriesLabels.count > 1
+    }
+
+    private func axisBreakDisplayMode(for breaks: [AxisBreakPayload]) -> String {
+        breaks.first(where: { $0.displayMode == "split" }) != nil ? "split" : "compress"
     }
 
     var seriesOrderLabels: [String] {

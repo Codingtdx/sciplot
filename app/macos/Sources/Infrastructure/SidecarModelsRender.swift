@@ -1,5 +1,277 @@
 import Foundation
 
+struct ExtraAxisPayload: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var position: String
+    var bindingMode: String
+    var seriesIDs: [String]
+    var title: String?
+    var displayUnit: String?
+    var dataValue: Double
+    var displayValue: Double
+
+    init(
+        enabled: Bool = false,
+        position: String = "top",
+        bindingMode: String = "conversion",
+        seriesIDs: [String] = [],
+        title: String? = nil,
+        displayUnit: String? = nil,
+        dataValue: Double = 1.0,
+        displayValue: Double = 1.0
+    ) {
+        self.enabled = enabled
+        self.position = position
+        self.bindingMode = bindingMode
+        self.seriesIDs = seriesIDs
+        self.title = title
+        self.displayUnit = displayUnit
+        self.dataValue = dataValue
+        self.displayValue = displayValue
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case position
+        case bindingMode = "binding_mode"
+        case seriesIDs = "series_ids"
+        case title
+        case displayUnit = "display_unit"
+        case dataValue = "data_value"
+        case displayValue = "display_value"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        position = try container.decodeIfPresent(String.self, forKey: .position) ?? "top"
+        bindingMode = try container.decodeIfPresent(String.self, forKey: .bindingMode) ?? "conversion"
+        seriesIDs = try container.decodeIfPresent([String].self, forKey: .seriesIDs) ?? []
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        displayUnit = try container.decodeIfPresent(String.self, forKey: .displayUnit)
+        dataValue = try container.decodeIfPresent(Double.self, forKey: .dataValue) ?? 1.0
+        displayValue = try container.decodeIfPresent(Double.self, forKey: .displayValue) ?? 1.0
+    }
+}
+
+struct ReferenceLinePayload: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var axis: String
+    var value: Double
+    var label: String?
+
+    init(
+        enabled: Bool = false,
+        axis: String = "y",
+        value: Double = 0.0,
+        label: String? = nil
+    ) {
+        self.enabled = enabled
+        self.axis = axis
+        self.value = value
+        self.label = label
+    }
+}
+
+struct ReferenceBandPayload: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var axis: String
+    var start: Double
+    var end: Double
+    var label: String?
+
+    init(
+        enabled: Bool = false,
+        axis: String = "y",
+        start: Double = 0.0,
+        end: Double = 1.0,
+        label: String? = nil
+    ) {
+        self.enabled = enabled
+        self.axis = axis
+        self.start = start
+        self.end = end
+        self.label = label
+    }
+}
+
+struct ReferenceGuidePayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var kind: String
+    var axisTarget: String
+    var value: Double?
+    var start: Double?
+    var end: Double?
+    var label: String?
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        kind: String = "line",
+        axisTarget: String = "y_primary",
+        value: Double? = 0.0,
+        start: Double? = nil,
+        end: Double? = nil,
+        label: String? = nil
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.kind = kind
+        self.axisTarget = axisTarget
+        self.value = value
+        self.start = start
+        self.end = end
+        self.label = label
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case enabled
+        case kind
+        case axisTarget
+        case value
+        case start
+        case end
+        case label
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? "line"
+        axisTarget = try container.decodeIfPresent(String.self, forKey: .axisTarget) ?? "y_primary"
+        value = try container.decodeIfPresent(Double.self, forKey: .value)
+        start = try container.decodeIfPresent(Double.self, forKey: .start)
+        end = try container.decodeIfPresent(Double.self, forKey: .end)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+    }
+}
+
+struct AxisBreakPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var start: Double
+    var end: Double
+    var displayMode: String
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        start: Double = 0.0,
+        end: Double = 1.0,
+        displayMode: String = "compress"
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.start = start
+        self.end = end
+        self.displayMode = displayMode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case enabled
+        case start
+        case end
+        case displayMode = "display_mode"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        start = try container.decodeIfPresent(Double.self, forKey: .start) ?? 0.0
+        end = try container.decodeIfPresent(Double.self, forKey: .end) ?? 1.0
+        displayMode = try container.decodeIfPresent(String.self, forKey: .displayMode) ?? "compress"
+    }
+}
+
+struct TextAnnotationPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var text: String
+    var coordinateSpace: String
+    var x: Double
+    var y: Double
+    var yAxisTarget: String
+    var horizontalAlignment: String
+    var verticalAlignment: String
+    var displayStyle: String
+    var connectorEnabled: Bool
+    var targetX: Double
+    var targetY: Double
+    var targetYAxisTarget: String
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        text: String = "",
+        coordinateSpace: String = "axes_fraction",
+        x: Double = 0.5,
+        y: Double = 0.95,
+        yAxisTarget: String = "y_primary",
+        horizontalAlignment: String = "center",
+        verticalAlignment: String = "top",
+        displayStyle: String = "plain",
+        connectorEnabled: Bool = false,
+        targetX: Double = 0.5,
+        targetY: Double = 0.5,
+        targetYAxisTarget: String = "y_primary"
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.text = text
+        self.coordinateSpace = coordinateSpace
+        self.x = x
+        self.y = y
+        self.yAxisTarget = yAxisTarget
+        self.horizontalAlignment = horizontalAlignment
+        self.verticalAlignment = verticalAlignment
+        self.displayStyle = displayStyle
+        self.connectorEnabled = connectorEnabled
+        self.targetX = targetX
+        self.targetY = targetY
+        self.targetYAxisTarget = targetYAxisTarget
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case enabled
+        case text
+        case coordinateSpace
+        case x
+        case y
+        case yAxisTarget
+        case horizontalAlignment
+        case verticalAlignment
+        case displayStyle
+        case connectorEnabled
+        case targetX
+        case targetY
+        case targetYAxisTarget
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
+        coordinateSpace = try container.decodeIfPresent(String.self, forKey: .coordinateSpace) ?? "axes_fraction"
+        x = try container.decodeIfPresent(Double.self, forKey: .x) ?? 0.5
+        y = try container.decodeIfPresent(Double.self, forKey: .y) ?? 0.95
+        yAxisTarget = try container.decodeIfPresent(String.self, forKey: .yAxisTarget) ?? "y_primary"
+        horizontalAlignment = try container.decodeIfPresent(String.self, forKey: .horizontalAlignment) ?? "center"
+        verticalAlignment = try container.decodeIfPresent(String.self, forKey: .verticalAlignment) ?? "top"
+        displayStyle = try container.decodeIfPresent(String.self, forKey: .displayStyle) ?? "plain"
+        connectorEnabled = try container.decodeIfPresent(Bool.self, forKey: .connectorEnabled) ?? false
+        targetX = try container.decodeIfPresent(Double.self, forKey: .targetX) ?? 0.5
+        targetY = try container.decodeIfPresent(Double.self, forKey: .targetY) ?? 0.5
+        targetYAxisTarget = try container.decodeIfPresent(String.self, forKey: .targetYAxisTarget) ?? "y_primary"
+    }
+}
+
 struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var size: String?
     var xscale: String?
@@ -22,6 +294,12 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var palettePreset: String
     var useSidecar: Bool?
     var visualThemeID: String?
+    var extraXAxis: ExtraAxisPayload?
+    var extraYAxis: ExtraAxisPayload?
+    var xAxisBreaks: [AxisBreakPayload]?
+    var yAxisBreaks: [AxisBreakPayload]?
+    var referenceGuides: [ReferenceGuidePayload]?
+    var textAnnotations: [TextAnnotationPayload]?
 
     init(
         size: String? = nil,
@@ -44,7 +322,13 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         stylePreset: String = "nature",
         palettePreset: String = "colorblind_safe",
         useSidecar: Bool? = nil,
-        visualThemeID: String? = nil
+        visualThemeID: String? = nil,
+        extraXAxis: ExtraAxisPayload? = nil,
+        extraYAxis: ExtraAxisPayload? = nil,
+        xAxisBreaks: [AxisBreakPayload]? = nil,
+        yAxisBreaks: [AxisBreakPayload]? = nil,
+        referenceGuides: [ReferenceGuidePayload]? = nil,
+        textAnnotations: [TextAnnotationPayload]? = nil
     ) {
         self.size = size
         self.xscale = xscale
@@ -67,6 +351,12 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.palettePreset = palettePreset
         self.useSidecar = useSidecar
         self.visualThemeID = visualThemeID
+        self.extraXAxis = extraXAxis
+        self.extraYAxis = extraYAxis
+        self.xAxisBreaks = xAxisBreaks
+        self.yAxisBreaks = yAxisBreaks
+        self.referenceGuides = referenceGuides
+        self.textAnnotations = textAnnotations
     }
 
     enum CodingKeys: String, CodingKey {
@@ -91,6 +381,106 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case palettePreset
         case useSidecar
         case visualThemeID = "visualThemeId"
+        case extraXAxis
+        case extraYAxis
+        case xAxisBreaks
+        case yAxisBreaks
+        case referenceGuides
+        case referenceLine
+        case referenceBand
+        case textAnnotations
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        size = try container.decodeIfPresent(String.self, forKey: .size)
+        xscale = try container.decodeIfPresent(String.self, forKey: .xscale)
+        yscale = try container.decodeIfPresent(String.self, forKey: .yscale)
+        reverseX = try container.decodeIfPresent(Bool.self, forKey: .reverseX) ?? false
+        xMin = try container.decodeIfPresent(Double.self, forKey: .xMin)
+        xMax = try container.decodeIfPresent(Double.self, forKey: .xMax)
+        yMin = try container.decodeIfPresent(Double.self, forKey: .yMin)
+        yMax = try container.decodeIfPresent(Double.self, forKey: .yMax)
+        xTickDensity = try container.decodeIfPresent(String.self, forKey: .xTickDensity)
+        yTickDensity = try container.decodeIfPresent(String.self, forKey: .yTickDensity)
+        xTickEdgeLabels = try container.decodeIfPresent(String.self, forKey: .xTickEdgeLabels)
+        yTickEdgeLabels = try container.decodeIfPresent(String.self, forKey: .yTickEdgeLabels)
+        seriesOrder = try container.decodeIfPresent([String].self, forKey: .seriesOrder)
+        xLabelOverride = try container.decodeIfPresent(String.self, forKey: .xLabelOverride)
+        yLabelOverride = try container.decodeIfPresent(String.self, forKey: .yLabelOverride)
+        baseline = try container.decodeIfPresent(String.self, forKey: .baseline)
+        showColorbar = try container.decodeIfPresent(Bool.self, forKey: .showColorbar)
+        stylePreset = try container.decodeIfPresent(String.self, forKey: .stylePreset) ?? "nature"
+        palettePreset = try container.decodeIfPresent(String.self, forKey: .palettePreset) ?? "colorblind_safe"
+        useSidecar = try container.decodeIfPresent(Bool.self, forKey: .useSidecar)
+        visualThemeID = try container.decodeIfPresent(String.self, forKey: .visualThemeID)
+        extraXAxis = try container.decodeIfPresent(ExtraAxisPayload.self, forKey: .extraXAxis)
+        extraYAxis = try container.decodeIfPresent(ExtraAxisPayload.self, forKey: .extraYAxis)
+        xAxisBreaks = try container.decodeIfPresent([AxisBreakPayload].self, forKey: .xAxisBreaks)
+        yAxisBreaks = try container.decodeIfPresent([AxisBreakPayload].self, forKey: .yAxisBreaks)
+        referenceGuides = try container.decodeIfPresent([ReferenceGuidePayload].self, forKey: .referenceGuides)
+        if referenceGuides == nil {
+            var legacyGuides: [ReferenceGuidePayload] = []
+            if let legacyLine = try container.decodeIfPresent(ReferenceLinePayload.self, forKey: .referenceLine) {
+                legacyGuides.append(
+                    ReferenceGuidePayload(
+                        id: "reference-line-1",
+                        enabled: legacyLine.enabled,
+                        kind: "line",
+                        axisTarget: legacyLine.axis == "x" ? "x" : "y_primary",
+                        value: legacyLine.value,
+                        label: legacyLine.label
+                    )
+                )
+            }
+            if let legacyBand = try container.decodeIfPresent(ReferenceBandPayload.self, forKey: .referenceBand) {
+                legacyGuides.append(
+                    ReferenceGuidePayload(
+                        id: "reference-band-1",
+                        enabled: legacyBand.enabled,
+                        kind: "band",
+                        axisTarget: legacyBand.axis == "x" ? "x" : "y_primary",
+                        value: nil,
+                        start: legacyBand.start,
+                        end: legacyBand.end,
+                        label: legacyBand.label
+                    )
+                )
+            }
+            referenceGuides = legacyGuides.isEmpty ? nil : legacyGuides
+        }
+        textAnnotations = try container.decodeIfPresent([TextAnnotationPayload].self, forKey: .textAnnotations)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(size, forKey: .size)
+        try container.encodeIfPresent(xscale, forKey: .xscale)
+        try container.encodeIfPresent(yscale, forKey: .yscale)
+        try container.encode(reverseX, forKey: .reverseX)
+        try container.encodeIfPresent(xMin, forKey: .xMin)
+        try container.encodeIfPresent(xMax, forKey: .xMax)
+        try container.encodeIfPresent(yMin, forKey: .yMin)
+        try container.encodeIfPresent(yMax, forKey: .yMax)
+        try container.encodeIfPresent(xTickDensity, forKey: .xTickDensity)
+        try container.encodeIfPresent(yTickDensity, forKey: .yTickDensity)
+        try container.encodeIfPresent(xTickEdgeLabels, forKey: .xTickEdgeLabels)
+        try container.encodeIfPresent(yTickEdgeLabels, forKey: .yTickEdgeLabels)
+        try container.encodeIfPresent(seriesOrder, forKey: .seriesOrder)
+        try container.encodeIfPresent(xLabelOverride, forKey: .xLabelOverride)
+        try container.encodeIfPresent(yLabelOverride, forKey: .yLabelOverride)
+        try container.encodeIfPresent(baseline, forKey: .baseline)
+        try container.encodeIfPresent(showColorbar, forKey: .showColorbar)
+        try container.encode(stylePreset, forKey: .stylePreset)
+        try container.encode(palettePreset, forKey: .palettePreset)
+        try container.encodeIfPresent(useSidecar, forKey: .useSidecar)
+        try container.encodeIfPresent(visualThemeID, forKey: .visualThemeID)
+        try container.encodeIfPresent(extraXAxis, forKey: .extraXAxis)
+        try container.encodeIfPresent(extraYAxis, forKey: .extraYAxis)
+        try container.encodeIfPresent(xAxisBreaks, forKey: .xAxisBreaks)
+        try container.encodeIfPresent(yAxisBreaks, forKey: .yAxisBreaks)
+        try container.encodeIfPresent(referenceGuides, forKey: .referenceGuides)
+        try container.encodeIfPresent(textAnnotations, forKey: .textAnnotations)
     }
 }
 
@@ -393,6 +783,7 @@ struct PlotProjectPayload: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let selectedTemplateID: String
     let renderOptions: RenderOptionsPayload
+    let fitOptions: FitOptionsPayload
     let projectDisplayName: String?
     let sourceProvenance: PlotProjectSourceProvenancePayload
 
@@ -405,6 +796,7 @@ struct PlotProjectPayload: Codable, Equatable, Sendable {
         case sheet
         case selectedTemplateID
         case renderOptions
+        case fitOptions
         case projectDisplayName
         case sourceProvenance
     }
@@ -736,6 +1128,19 @@ struct MetaStyleResponse: Codable, Equatable, Sendable, Identifiable {
     let description: String
     let hardConstraints: Bool
     let presetNote: String
+    let recommendedPalettePreset: String
+    let recommendedVisualThemeID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case `public`
+        case description
+        case hardConstraints
+        case presetNote
+        case recommendedPalettePreset
+        case recommendedVisualThemeID = "recommendedVisualThemeId"
+    }
 }
 
 struct MetaPaletteResponse: Codable, Equatable, Sendable, Identifiable {

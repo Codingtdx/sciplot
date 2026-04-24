@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 from src import plot_style
 from src.plot_contract import (
     default_options_for_template,
     size_preset_contract,
+    style_contract,
     template_contract,
 )
+from src.rendering.axis_breaks import normalize_axis_breaks_payload
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HINTS, TEMPLATE_CHOICES
+from src.rendering.extra_axes import normalize_extra_axis_payload
 from src.rendering.models import RenderOptions
+from src.rendering.reference_guides import normalize_reference_guides_payload
 from src.rendering.template_lifecycle import is_supported_template_id, resolve_template_id
+from src.rendering.text_annotations import normalize_text_annotations_payload
 from src.rendering.themes import visual_theme_ids
 
 _VALID_TICK_DENSITIES = frozenset({"auto", "sparse", "dense"})
@@ -123,6 +129,19 @@ def _normalize_enumerated_option(
     return cleaned
 
 
+def _has_enabled_axis_breaks(value: tuple[Mapping[str, object], ...] | None) -> bool:
+    if value is None:
+        return False
+    return any(bool(item.get("enabled", True)) for item in value)
+
+
+def _axis_break_display_modes(value: tuple[Mapping[str, object], ...] | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    modes = {str(item.get("display_mode", "compress")).strip().lower() or "compress" for item in value}
+    return tuple(sorted(modes))
+
+
 def resolve_render_options(
     *,
     template: str,
@@ -147,6 +166,14 @@ def resolve_render_options(
     palette_preset: str | None = None,
     use_sidecar: bool | None = None,
     visual_theme_id: str | None = None,
+    extra_x_axis: object | None = None,
+    extra_y_axis: object | None = None,
+    x_axis_breaks: object | None = None,
+    y_axis_breaks: object | None = None,
+    reference_guides: object | None = None,
+    reference_line: object | None = None,
+    reference_band: object | None = None,
+    text_annotations: object | None = None,
     resolved_template_id: str | None = None,
 ) -> RenderOptions:
     contract_template = resolved_template_id or resolve_template_id(template)
@@ -159,26 +186,82 @@ def resolve_render_options(
             f"Template `{template}` does not support style `{normalized_style}`. "
             f"Supported styles: {', '.join(spec.available_styles)}"
         )
-    resolved_palette = palette_preset or defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)
+    style_defaults = style_contract(normalized_style)
+    resolved_palette = palette_preset
+    if resolved_palette is None and style_preset is not None:
+        recommended_palette = style_defaults.recommended_palette_preset
+        if recommended_palette in spec.available_palettes:
+            resolved_palette = recommended_palette
+    if resolved_palette is None:
+        resolved_palette = defaults.get("palette_preset", plot_style.DEFAULT_PALETTE_PRESET)
     if resolved_palette not in spec.available_palettes:
         raise ValueError(
             f"Template `{template}` does not support palette `{resolved_palette}`. "
             f"Supported palettes: {', '.join(spec.available_palettes)}"
         )
-    resolved_theme = (
-        visual_theme_id.strip()
-        if isinstance(visual_theme_id, str)
-        else (str(defaults.get("visual_theme_id")).strip() if defaults.get("visual_theme_id") is not None else None)
-    )
+    resolved_theme: str | None
+    if isinstance(visual_theme_id, str):
+        resolved_theme = visual_theme_id.strip()
+    elif style_preset is not None and style_defaults.recommended_visual_theme_id is not None:
+        resolved_theme = str(style_defaults.recommended_visual_theme_id).strip()
+    else:
+        default_theme = defaults.get("visual_theme_id")
+        resolved_theme = str(default_theme).strip() if default_theme is not None else None
     if resolved_theme and resolved_theme not in visual_theme_ids():
         raise ValueError(
             f"Unknown visual theme: {resolved_theme}. Supported themes: {', '.join(visual_theme_ids())}"
         )
+    resolved_xscale = xscale or defaults.get("xscale", "linear")
+    resolved_yscale = yscale or defaults.get("yscale", "linear")
+    resolved_extra_x_axis = normalize_extra_axis_payload(extra_x_axis, axis_name="x")
+    if resolved_extra_x_axis is not None and "extra_x_axis" not in spec.editable_options:
+        raise ValueError(f"Template `{template}` does not support option `extra_x_axis`.")
+    resolved_extra_y_axis = normalize_extra_axis_payload(extra_y_axis, axis_name="y")
+    if resolved_extra_y_axis is not None and "extra_y_axis" not in spec.editable_options:
+        raise ValueError(f"Template `{template}` does not support option `extra_y_axis`.")
+    if (
+        resolved_extra_y_axis is not None
+        and resolved_extra_y_axis["binding_mode"] == "series_assignment"
+        and contract_template not in {"curve", "point_line", "scatter"}
+    ):
+        raise ValueError(
+            f"Template `{template}` does not support extra_y_axis.binding_mode `series_assignment`."
+        )
+    resolved_x_axis_breaks = normalize_axis_breaks_payload(x_axis_breaks, axis_name="x")
+    if resolved_x_axis_breaks is not None and "x_axis_breaks" not in spec.editable_options:
+        raise ValueError(f"Template `{template}` does not support option `x_axis_breaks`.")
+    resolved_y_axis_breaks = normalize_axis_breaks_payload(y_axis_breaks, axis_name="y")
+    if resolved_y_axis_breaks is not None and "y_axis_breaks" not in spec.editable_options:
+        raise ValueError(f"Template `{template}` does not support option `y_axis_breaks`.")
+    x_break_modes = _axis_break_display_modes(resolved_x_axis_breaks)
+    y_break_modes = _axis_break_display_modes(resolved_y_axis_breaks)
+    if len(x_break_modes) > 1:
+        raise ValueError("`x_axis_breaks` must share a single `display_mode`.")
+    if len(y_break_modes) > 1:
+        raise ValueError("`y_axis_breaks` must share a single `display_mode`.")
+    if _has_enabled_axis_breaks(resolved_x_axis_breaks) and resolved_xscale != "linear":
+        raise ValueError("`x_axis_breaks` are available on linear X axes only.")
+    if _has_enabled_axis_breaks(resolved_y_axis_breaks) and resolved_yscale != "linear":
+        raise ValueError("`y_axis_breaks` are available on linear Y axes only.")
+    has_split_x_breaks = _has_enabled_axis_breaks(resolved_x_axis_breaks) and x_break_modes == ("split",)
+    has_split_y_breaks = _has_enabled_axis_breaks(resolved_y_axis_breaks) and y_break_modes == ("split",)
+    if has_split_x_breaks and _has_enabled_axis_breaks(resolved_y_axis_breaks):
+        raise ValueError("Split broken X axes cannot be combined with active broken Y axes in this release.")
+    if has_split_y_breaks and _has_enabled_axis_breaks(resolved_x_axis_breaks):
+        raise ValueError("Split broken Y axes cannot be combined with active broken X axes in this release.")
+    if (
+        _has_enabled_axis_breaks(resolved_x_axis_breaks)
+        or _has_enabled_axis_breaks(resolved_y_axis_breaks)
+    ) and (
+        bool(resolved_extra_x_axis and resolved_extra_x_axis.get("enabled", False))
+        or bool(resolved_extra_y_axis and resolved_extra_y_axis.get("enabled", False))
+    ):
+        raise ValueError("Axis breaks cannot be combined with extra axes in this release.")
     return RenderOptions(
         width_mm=width_mm,
         height_mm=height_mm,
-        xscale=xscale or defaults.get("xscale", "linear"),
-        yscale=yscale or defaults.get("yscale", "linear"),
+        xscale=resolved_xscale,
+        yscale=resolved_yscale,
         reverse_x=bool(defaults.get("reverse_x", False)) if reverse_x is None else reverse_x,
         baseline=baseline or defaults.get("baseline", "none"),
         show_colorbar=defaults.get("show_colorbar", True) if show_colorbar is None else show_colorbar,
@@ -225,6 +308,16 @@ def resolve_render_options(
         y_label_override=_normalize_label_override(y_label_override),
         use_sidecar=use_sidecar,
         visual_theme_id=resolved_theme or None,
+        extra_x_axis=resolved_extra_x_axis,
+        extra_y_axis=resolved_extra_y_axis,
+        x_axis_breaks=resolved_x_axis_breaks,
+        y_axis_breaks=resolved_y_axis_breaks,
+        reference_guides=normalize_reference_guides_payload(
+            reference_guides,
+            legacy_line=reference_line,
+            legacy_band=reference_band,
+        ),
+        text_annotations=normalize_text_annotations_payload(text_annotations),
     )
 
 

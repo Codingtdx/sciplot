@@ -9,6 +9,7 @@ import pytest
 
 from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup, load_curve_table, load_replicate_table
 from src.plotting import plot_bar, plot_box, plot_curves, plot_heatmap, plot_tensile_curve, plot_wide_nmr
+from src.text_normalization import normalize_unit
 from src.wide_nmr import WideNMRConfig, WideNMRHighlightRegion, WideNMRSegment
 
 
@@ -221,6 +222,31 @@ def test_plot_curve_log_axis_keeps_decade_labels_but_can_extend_display_range() 
         assert y_high > 19000.0
         assert float(y_ticks[-1]) == pytest.approx(10000.0)
         assert float(y_ticks[-1]) < y_high
+    finally:
+        plt.close(fig)
+
+
+def test_normalize_unit_formats_generic_exponents_with_mathtext() -> None:
+    assert normalize_unit("kJ/m2") == r"kJ/m$^{2}$"
+    assert normalize_unit("J g-1 K-1") == r"J g$^{-1}$ K$^{-1}$"
+
+
+def test_plot_curve_axis_labels_restore_unit_superscripts() -> None:
+    series = [
+        _curve_series(
+            "Sample A",
+            [0.0, 1.0, 2.0],
+            [0.0, 2.0, 4.0],
+            x_label="Time",
+            y_label="Energy density",
+            x_unit="s",
+            y_unit="kJ/m2",
+        )
+    ]
+
+    fig, ax = plot_curves(series, legend_mode="none")
+    try:
+        assert ax.get_ylabel() == r"Energy Density (kJ/m$^{2}$)"
     finally:
         plt.close(fig)
 

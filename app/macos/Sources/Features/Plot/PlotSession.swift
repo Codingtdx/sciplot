@@ -14,6 +14,7 @@ final class PlotSession {
         let selectedSheet: SheetValue
         let selectedTemplateID: String?
         let renderOptions: RenderOptionsPayload
+        let fitOptions: FitOptionsPayload
     }
 
     struct ProjectSnapshot: Equatable {
@@ -21,6 +22,7 @@ final class PlotSession {
         let selectedSheet: SheetValue
         let selectedTemplateID: String
         let renderOptions: RenderOptionsPayload
+        let fitOptions: FitOptionsPayload
     }
 
     struct RuntimeState {
@@ -82,6 +84,7 @@ final class PlotSession {
     var isLoadingFitAnalysis = false
     var sourceTableOffset = 0
     var fitAnalysisOffset = 0
+    var fitAnalysisSelectedSeriesID: String?
     var sourceProvenance = PlotProjectSourceProvenancePayload(
         originalInputPath: nil,
         savedInputMtimeNs: nil,

@@ -17,7 +17,8 @@ extension PlotSession {
             inputURL: restoredSourceURL,
             sheet: plotPayload.sheet,
             preferredTemplateID: plotPayload.selectedTemplateID,
-            preferredOptions: plotPayload.renderOptions
+            preferredOptions: plotPayload.renderOptions,
+            preferredFitOptions: plotPayload.fitOptions
         )
         await finishLoadingStagedExternalFigure(
             preferredTemplateID: plotPayload.selectedTemplateID,
@@ -45,8 +46,10 @@ extension PlotSession {
         selectedSheet = plotPayload.sheet
         selectedTemplateID = migrateLegacyTemplateID(plotPayload.selectedTemplateID)
         renderOptions = plotPayload.renderOptions
+        fitOptions = plotPayload.fitOptions
         sourceProvenance = plotPayload.sourceProvenance
         notifyRenderOptionsDidChange()
+        notifyFitOptionsDidChange()
         runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
 
         guard scheduleRefresh, previousSnapshot != currentProjectSnapshot else {
@@ -168,17 +171,17 @@ extension PlotSession {
             return
         }
 
-        var resolved = options
+        var resolved = normalizedRenderOptionsForCurrentTemplate(options)
         resolved.size = template.allowedSizes.contains(options.size ?? "") ? options.size : template.defaultSize
         if !template.availableStyles.contains(resolved.stylePreset) {
             resolved.stylePreset = defaultStyle(for: template)
         }
         if !template.availablePalettes.contains(resolved.palettePreset) {
-            resolved.palettePreset = defaultPalette(for: template)
+            resolved.palettePreset = defaultPalette(for: template, styleID: resolved.stylePreset)
         }
         let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
         if resolved.visualThemeID == nil || !validThemeIDs.contains(resolved.visualThemeID ?? "") {
-            resolved.visualThemeID = defaultThemeID(for: template)
+            resolved.visualThemeID = defaultThemeID(for: template, styleID: resolved.stylePreset)
         }
         renderOptions = resolved
         notifyRenderOptionsDidChange()
@@ -191,7 +194,8 @@ extension PlotSession {
         UndoSnapshot(
             selectedSheet: selectedSheet,
             selectedTemplateID: selectedTemplateID,
-            renderOptions: renderOptions
+            renderOptions: renderOptions,
+            fitOptions: fitOptions
         )
     }
 
@@ -221,7 +225,9 @@ extension PlotSession {
         selectedSheet = snapshot.selectedSheet
         selectedTemplateID = migrateLegacyTemplateID(snapshot.selectedTemplateID)
         renderOptions = snapshot.renderOptions
+        fitOptions = snapshot.fitOptions
         notifyRenderOptionsDidChange()
+        notifyFitOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
 

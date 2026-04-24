@@ -45,8 +45,63 @@ def _project_payload(source_path: Path) -> dict[str, object]:
             "selected_template_id": "scatter_with_fit",
             "render_options": {
                 "style_preset": "default",
-                "palette_preset": "roma",
-                "visual_theme_id": "roma",
+                "palette_preset": "colorblind_safe",
+                "visual_theme_id": "clean_light",
+                "extra_x_axis": {
+                    "enabled": True,
+                    "position": "top",
+                    "title": "Gallons",
+                    "data_value": 3.78541,
+                    "display_value": 1.0,
+                },
+                "extra_y_axis": {
+                    "enabled": True,
+                    "position": "right",
+                    "title": "Half Stress",
+                    "data_value": 2.0,
+                    "display_value": 1.0,
+                },
+                "reference_guides": [
+                    {
+                        "id": "target-line",
+                        "enabled": True,
+                        "kind": "line",
+                        "axis_target": "y_primary",
+                        "value": 2.5,
+                        "label": "Target",
+                    },
+                    {
+                        "id": "window-region",
+                        "enabled": True,
+                        "kind": "band",
+                        "axis_target": "x",
+                        "start": 0.5,
+                        "end": 1.5,
+                        "label": "Window",
+                    },
+                ],
+                "text_annotations": [
+                    {
+                        "id": "note-1",
+                        "enabled": True,
+                        "text": "Peak",
+                        "coordinate_space": "data",
+                        "x": 1.5,
+                        "y": 3.2,
+                        "y_axis_target": "y_primary",
+                        "horizontal_alignment": "right",
+                        "vertical_alignment": "bottom",
+                        "display_style": "callout",
+                        "connector_enabled": True,
+                        "target_x": 1.0,
+                        "target_y": 2.8,
+                        "target_y_axis_target": "y_primary",
+                    }
+                ],
+            },
+            "fit_options": {
+                "enabled": True,
+                "model_id": "polynomial_2",
             },
             "project_display_name": "Curve Study",
             "source_provenance": {
@@ -134,6 +189,70 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
     payload = open_response.json()
     assert payload["payload"]["plot"]["selected_template_id"] == "scatter_fit"
     assert payload["payload"]["plot"]["render_options"]["style_preset"] == "nature"
+    assert payload["payload"]["plot"]["render_options"]["palette_preset"] == "colorblind_safe"
+    assert payload["payload"]["plot"]["render_options"]["visual_theme_id"] == "clean_light"
+    assert payload["payload"]["plot"]["render_options"]["extra_x_axis"] == {
+        "enabled": True,
+        "position": "top",
+        "binding_mode": "conversion",
+        "series_ids": [],
+        "title": "Gallons",
+        "display_unit": None,
+        "data_value": 3.78541,
+        "display_value": 1.0,
+    }
+    assert payload["payload"]["plot"]["render_options"]["extra_y_axis"] == {
+        "enabled": True,
+        "position": "right",
+        "binding_mode": "conversion",
+        "series_ids": [],
+        "title": "Half Stress",
+        "display_unit": None,
+        "data_value": 2.0,
+        "display_value": 1.0,
+    }
+    assert payload["payload"]["plot"]["render_options"]["reference_guides"] == [
+        {
+            "id": "target-line",
+            "enabled": True,
+            "kind": "line",
+            "axis_target": "y_primary",
+            "value": 2.5,
+            "start": None,
+            "end": None,
+            "label": "Target",
+        },
+        {
+            "id": "window-region",
+            "enabled": True,
+            "kind": "band",
+            "axis_target": "x",
+            "value": None,
+            "start": 0.5,
+            "end": 1.5,
+            "label": "Window",
+        },
+    ]
+    assert payload["payload"]["plot"]["render_options"]["text_annotations"] == [
+        {
+            "id": "note-1",
+            "enabled": True,
+            "text": "Peak",
+            "coordinate_space": "data",
+            "x": 1.5,
+            "y": 3.2,
+            "y_axis_target": "y_primary",
+            "horizontal_alignment": "right",
+            "vertical_alignment": "bottom",
+            "display_style": "callout",
+            "connector_enabled": True,
+            "target_x": 1.0,
+            "target_y": 2.8,
+            "target_y_axis_target": "y_primary",
+        }
+    ]
+    assert payload["payload"]["plot"]["fit_options"]["enabled"] is True
+    assert payload["payload"]["plot"]["fit_options"]["model_id"] == "polynomial_2"
     restored_source_path = Path(payload["restored_source_path"])
     assert restored_source_path.exists()
     assert restored_source_path.read_bytes() == original_bytes
@@ -169,6 +288,119 @@ def test_open_project_reports_checksum_mismatch(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert "checksum" in response.json()["detail"].lower()
+
+
+def test_save_open_project_roundtrip_preserves_extra_y_series_assignment(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve-series-axis.sciplotgod"
+    _curve_csv(source_path)
+
+    payload = _project_payload(source_path)
+    assert payload["plot"] is not None
+    plot_payload = payload["plot"]
+    assert isinstance(plot_payload, dict)
+    plot_payload["selected_template_id"] = "scatter"
+    render_options = plot_payload["render_options"]
+    assert isinstance(render_options, dict)
+    render_options["extra_y_axis"] = {
+        "enabled": True,
+        "position": "right",
+        "binding_mode": "series_assignment",
+        "series_ids": ["Sample B"],
+        "title": "Secondary Stress",
+        "data_value": 1.0,
+        "display_value": 1.0,
+    }
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": payload,
+        },
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+    assert open_response.status_code == 200
+    restored_axis = open_response.json()["payload"]["plot"]["render_options"]["extra_y_axis"]
+    assert restored_axis == {
+        "enabled": True,
+        "position": "right",
+        "binding_mode": "series_assignment",
+        "series_ids": ["Sample B"],
+        "title": "Secondary Stress",
+        "display_unit": None,
+        "data_value": 1.0,
+        "display_value": 1.0,
+    }
+
+
+def test_save_open_project_roundtrip_preserves_axis_breaks(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve-axis-breaks.sciplotgod"
+    _curve_csv(source_path)
+
+    payload = _project_payload(source_path)
+    assert payload["plot"] is not None
+    plot_payload = payload["plot"]
+    assert isinstance(plot_payload, dict)
+    plot_payload["selected_template_id"] = "curve"
+    render_options = plot_payload["render_options"]
+    assert isinstance(render_options, dict)
+    render_options.pop("extra_x_axis", None)
+    render_options.pop("extra_y_axis", None)
+    render_options["x_axis_breaks"] = [
+        {
+            "id": "x-gap",
+            "enabled": True,
+            "start": 0.8,
+            "end": 1.2,
+            "display_mode": "split",
+        }
+    ]
+    render_options["y_axis_breaks"] = [
+        {
+            "id": "y-gap",
+            "enabled": False,
+            "start": 1.4,
+            "end": 2.2,
+            "display_mode": "compress",
+        }
+    ]
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": payload,
+        },
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+    assert open_response.status_code == 200
+    render_options_payload = open_response.json()["payload"]["plot"]["render_options"]
+    assert render_options_payload["x_axis_breaks"] == [
+        {
+            "id": "x-gap",
+            "enabled": True,
+            "start": 0.8,
+            "end": 1.2,
+            "display_mode": "split",
+        }
+    ]
+    assert render_options_payload["y_axis_breaks"] == [
+        {
+            "id": "y-gap",
+            "enabled": False,
+            "start": 1.4,
+            "end": 2.2,
+            "display_mode": "compress",
+        }
+    ]
 
 
 def test_fit_analysis_matches_scatter_fit_equation_label(tmp_path: Path) -> None:

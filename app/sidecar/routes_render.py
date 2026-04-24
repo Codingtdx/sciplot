@@ -311,7 +311,37 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
                 visual_theme_id=payload_options.visual_theme_id,
+                extra_x_axis=(
+                    payload_options.extra_x_axis.model_dump(mode="json")
+                    if payload_options.extra_x_axis
+                    else None
+                ),
+                extra_y_axis=(
+                    payload_options.extra_y_axis.model_dump(mode="json")
+                    if payload_options.extra_y_axis
+                    else None
+                ),
+                x_axis_breaks=(
+                    [item.model_dump(mode="json") for item in payload_options.x_axis_breaks]
+                    if payload_options.x_axis_breaks
+                    else None
+                ),
+                y_axis_breaks=(
+                    [item.model_dump(mode="json") for item in payload_options.y_axis_breaks]
+                    if payload_options.y_axis_breaks
+                    else None
+                ),
                 fit_options=fit_options_payload,
+                reference_guides=(
+                    [item.model_dump(mode="json") for item in payload_options.reference_guides]
+                    if payload_options.reference_guides
+                    else None
+                ),
+                text_annotations=(
+                    [item.model_dump(mode="json") for item in payload_options.text_annotations]
+                    if payload_options.text_annotations
+                    else None
+                ),
             )
             try:
                 previews = rendered_plots_to_preview_payload(rendered_plots)
@@ -402,7 +432,37 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 palette_preset=payload_options.palette_preset,
                 use_sidecar=payload_options.use_sidecar,
                 visual_theme_id=payload_options.visual_theme_id,
+                extra_x_axis=(
+                    payload_options.extra_x_axis.model_dump(mode="json")
+                    if payload_options.extra_x_axis
+                    else None
+                ),
+                extra_y_axis=(
+                    payload_options.extra_y_axis.model_dump(mode="json")
+                    if payload_options.extra_y_axis
+                    else None
+                ),
+                x_axis_breaks=(
+                    [item.model_dump(mode="json") for item in payload_options.x_axis_breaks]
+                    if payload_options.x_axis_breaks
+                    else None
+                ),
+                y_axis_breaks=(
+                    [item.model_dump(mode="json") for item in payload_options.y_axis_breaks]
+                    if payload_options.y_axis_breaks
+                    else None
+                ),
                 fit_options=request.fit_options.model_dump(mode="json"),
+                reference_guides=(
+                    [item.model_dump(mode="json") for item in payload_options.reference_guides]
+                    if payload_options.reference_guides
+                    else None
+                ),
+                text_annotations=(
+                    [item.model_dump(mode="json") for item in payload_options.text_annotations]
+                    if payload_options.text_annotations
+                    else None
+                ),
             )
             try:
                 outputs = export_rendered_plots(rendered_plots, output_dir, close=False)

@@ -2451,4 +2451,623 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`54 tests`)
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`151 tests`)
+- `git diff --check`: passed
+
+### 2026-04-22 (Round AS): Plot fit overlay productization and project persistence
+
+- Scope:
+  - Productized the existing Plot fit path instead of adding a new advanced-layer framework in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - Plot now exposes one typed fit state (`FitOptionsPayload`) through the whole durable path in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - Save/open project now preserves Plot fit state through `.sciplotgod` normalization and restore, rather than treating fit as a transient workbook-only utility.
+  - Plot tests and fixtures were extended in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - Refreshed `/Users/dongxutian/Documents/codegod/README.md` and `/Users/dongxutian/Documents/codegod/AGENTS.md` so Plot guidance matches the shipped behavior.
+- User-visible impact:
+  - Plot inspector now shows an `Advanced Plot` section for `curve`, `point_line`, and `scatter`.
+  - Users can enable a fit overlay and choose `Linear`, `Polynomial 2`, or `Polynomial 3` from the inspector without leaving the main Plot workflow.
+  - `Data Workbook -> Fit` now uses the same selected model, exposes the same multi-model fit surface, and allows series selection when multiple series are present.
+  - Saving and reopening a Plot `.sciplotgod` project now restores the selected fit model and whether the overlay is enabled.
+- Risks:
+  - Plot overlay and workbook fit are now coupled through shared `fit_options`; if a future caller bypasses this typed path, overlay state and workbook analysis can drift again.
+  - `Advanced Plot` availability is intentionally limited to `curve`, `point_line`, and `scatter`; adding new curve-like templates later must update the same availability seam instead of sprinkling local exceptions.
+  - Multi-series selection remains a workbook-analysis viewing state, not durable project state; if that ever needs persistence, it should be added explicitly rather than inferred from the last response.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: Plot already had the important pieces of an advanced fitting capability, but they lived as partly separate affordances. The fastest low-risk way to move toward DataGraph-style refinement was to make fit one typed, durable capability that is shared by overlay, workbook analysis, undo/redo, export, and project restore.
+  - Chose typed `fit_options` productization over a new generic advanced-layer schema:
+    - accepted because it reuses the existing shared backend fit helper and keeps Plot on one source of truth
+    - rejected a new free-form advanced-layer stack in this round because it would add schema/UI complexity before we had even shipped the first durable advanced control
+  - Boundary:
+    - this round only productizes fit
+    - no new contract surface in `src/plot_contract.json`
+    - no changes to frozen `nature` metrics, fonts, line widths, spacing, or export specs
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 35 source files`)
+- `.venv/bin/python -m pytest tests/test_plot_project_routes.py`: passed (`5 passed, 5 warnings`)
+- `.venv/bin/python -m pytest tests`: passed (`191 passed, 5 warnings`)
+- `.venv/bin/python scripts/smoke_check.py`: passed
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests`: passed (`31 tests`)
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`152 tests`)
+
+### 2026-04-22 (Round AT): Plot reference guides as typed advanced overlays
+
+- Scope:
+  - Added typed Plot reference-guide payloads in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    so `reference_line` and `reference_band` now travel through the same explicit schema path as other Plot render options.
+  - Added normalized reference-guide rendering in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    so preview/export/project restore all apply the same line/band overlay semantics, including log-axis positive-value validation.
+  - Wired the typed payloads through sidecar/project persistence in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/comparison.py`
+  - Extended Plot macOS state and inspector wiring in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so `Advanced Plot` now edits line/band overlays through durable `render_options` instead of ad hoc local view state.
+  - Updated regression coverage and fixtures in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - Refreshed `/Users/dongxutian/Documents/codegod/README.md` and `/Users/dongxutian/Documents/codegod/AGENTS.md` so `Advanced Plot` docs now include the typed reference-guide path.
+- User-visible impact:
+  - Plot inspector `Advanced Plot` now includes a `Reference Guides` disclosure with `Line` and `Band` controls.
+  - Reference guides render in preview/export and are restored from saved `.sciplotgod` projects together with the rest of Plot render options.
+  - Fit remains curve-only, but reference guides are available whenever Plot has an imported source and resolved template.
+  - Non-positive line/band values are rejected on log axes before rendering instead of silently drawing invalid overlays.
+- Risks:
+  - Reference guides now live inside durable `render_options`; if a future caller stores guide state outside this typed path, preview/export/project restore can drift.
+  - Guides intentionally reuse current palette/style/theme semantics and introduce no new styling constants; future per-guide styling must not be added as frontend-local knobs.
+  - Log-axis validation only enforces positive values in this round; any future clipping or coercion behavior should be explicit and shared, not silently improvised by one caller.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/comparison.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: after fit overlay productization, the next DataGraph-style capability should be another durable refinement control that improves plotting power without introducing a free-form advanced-layer state machine.
+  - Chose typed `reference_line` / `reference_band` overlays over a generic command stack:
+    - accepted because they reuse the current render pipeline, save/open schema, and inspector model with low migration risk
+    - rejected a generic advanced-layer stack in this round because it would widen schema/UI complexity before there is a proven bounded tool set
+  - Boundary:
+    - no `src/plot_contract.json` changes
+    - no new style/theme/axis constants
+    - no drift to frozen `nature` fonts, line widths, spacing, or export metrics
+    - fit remains shared through `fit_options`, while guides remain shared through `render_options`
+- Troubleshooting note:
+  - When testing log-axis reference-guide validation, use fixtures whose underlying axis data is already strictly positive.
+  - Otherwise core dataset log-axis validation fires first and masks the intended guide-validation assertion.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 36 source files`)
+  - `.venv/bin/python -m pytest tests/test_plot_project_routes.py tests/test_rendering_services.py`: passed (`69 passed, 5 warnings`)
+  - `.venv/bin/python -m pytest tests`: passed (`193 passed, 5 warnings`)
+- `.venv/bin/python scripts/smoke_check.py`: passed
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests`: passed (`32 tests`)
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`153 tests`)
+
+### 2026-04-22 (Round AU): Style-led visual defaults, typed text annotations, and unit superscript recovery
+
+- Scope:
+  - Extended the plotting contract in:
+    - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+    - `/Users/dongxutian/Documents/codegod/src/plot_contract.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_meta.py`
+    so every public style now declares `recommended_palette_preset` and `recommended_visual_theme_id`, and `/meta` plus `/plot-contract` expose those style-level recommendations as first-class data.
+  - Strengthened soft visual-theme differentiation in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/themes.py`
+    so `nature` keeps a plain white publication surface, while `editorial`, `presentation`, and `poster` now present visibly different background/grid/legend moods without touching frozen `nature` hard metrics.
+  - Updated backend render-option resolution in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    so an explicit style change now seeds that style’s recommended palette/theme pair when palette/theme were not explicitly overridden.
+  - Reworked Plot macOS style semantics in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so the inspector now treats style as the primary visual direction, applies the style-recommended palette/background on selection, and still preserves later independent palette/background edits.
+  - Added typed Plot text-annotation overlays in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    so `render_options.text_annotations` is now the single durable path for preview, export, save project, and open project.
+  - Restored shared unit superscript formatting in:
+    - `/Users/dongxutian/Documents/codegod/src/text_normalization.py`
+    so unit-like inputs such as `kJ/m2` and `J g-1 K-1` once again normalize to mathtext exponent labels before plotting.
+  - Updated regression coverage and fixtures in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_contract.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plotting.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_schema_contract.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+  - Refreshed:
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    - `/Users/dongxutian/Documents/codegod/docs/plot_contract.md`
+    so the shipped behavior, contract docs, and handoff guidance all match.
+- User-visible impact:
+  - Plot style selection now has a clearer product meaning: `nature` lands on a colorblind-safe palette with a plain white background, while `editorial`, `presentation`, and `poster` switch to visibly different visual moods instead of feeling interchangeable.
+  - Palette and background remain independently editable after style selection, but changing style now gives a coherent recommended starting point instead of leaving users with three unrelated knobs.
+  - Plot `Advanced Plot` now includes durable `Text Annotations`, so users can place figure notes that survive preview refreshes, export, and `.sciplotgod` save/open.
+  - Axis labels once again render unit exponents as superscripts for common spreadsheet inputs such as `kJ/m2`.
+- Risks:
+  - Style-level recommendations now exist alongside template `default_options`; if future contract edits change one without the other, style selection and template reset semantics can drift.
+  - Visual themes are still intentionally soft-only. Any future attempt to make a theme also change font size, stroke width, spacing, axis frame, or export metrics would violate the current contract model.
+  - `text_annotations` intentionally ships without a second style system. If later rounds add per-annotation typography/color controls, they must be added through the same typed payload and shared renderer rather than local SwiftUI-only state.
+  - Generic unit exponent recovery uses a unit-shaped heuristic; if callers start feeding free-form prose into `normalize_unit`, non-unit text could be over-formatted.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/themes.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/src/text_normalization.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_meta.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plotting.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: DataGraph’s useful lesson here is not its exact UI, but that choosing a plotting “mode” should immediately put the figure in a coherent visual regime and that advanced refinements should be durable layers, not transient inspector state. Our product still keeps style, palette, and background independently editable, but the style control now owns the initial recommendation instead of acting like a cosmetic label.
+  - Chose style-led recommendations with independent overrides over fully coupling the three controls:
+    - accepted because it gives the user a clear visual jump when switching style while preserving the repo’s explicit requirement that palette/theme remain separately editable
+    - rejected hard-coupled preset bundles because they would erase the independent-control model the product already committed to
+  - Chose typed `text_annotations` overlays over a generic annotation command stack:
+    - accepted because it keeps preview/export/project persistence on one explicit schema path and matches the bounded-advanced-tool approach used for fit and reference guides
+    - rejected a free-form command/recipe layer in this round because it would widen schema/UI complexity before we had shipped the next concrete advanced capability
+  - Boundary:
+    - `nature` hard metrics remain frozen
+    - style controls only seed palette/theme recommendations; later user overrides still win
+    - text annotations currently cover placement and visibility only, not a second typography/styling subsystem
+    - unit superscript repair is limited to shared label normalization and does not introduce frontend-local formatting fallbacks
+- Troubleshooting note:
+  - Swift payload decoding with `JSONDecoder.KeyDecodingStrategy.convertFromSnakeCase` does not reliably map new snake-case fields that end in `..._id` onto Swift properties spelled with a trailing `ID`.
+  - The concrete fix for this round was to add explicit `CodingKeys` in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift` and map `recommendedVisualThemeID` to `recommendedVisualThemeId`; otherwise `/meta` decoding fails even when the JSON payload is correct.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 37 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`198 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`155 tests`)
+
+### 2026-04-22 (Round AV): DataGraph-inspired extra axes with durable conversion semantics
+
+- Scope:
+  - Extended the plotting contract in:
+    - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+    - `/Users/dongxutian/Documents/codegod/src/plot_contract.py`
+    - `/Users/dongxutian/Documents/codegod/docs/plot_contract.md`
+    so numeric public templates now explicitly advertise `extra_x_axis` / `extra_y_axis` as editable options through the same contract surface consumed by sidecar and macOS.
+  - Added typed extra-axis normalization and rendering in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    so a figure can carry one extra X axis and one extra Y axis with `data_value -> display_value` conversion, optional label/unit text, and support for both linear and log parent axes.
+  - Wired sidecar schema, preview/export, and project persistence through:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    so `render_options.extra_x_axis` and `render_options.extra_y_axis` are now durable request/project fields instead of view-local state.
+  - Extended macOS render payloads and Plot session plumbing in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so Plot inspector now exposes `Extra Axes` editing under `Axis -> Advanced`, with availability/help driven by contract editable options and with save/open/undo/redo semantics preserved.
+  - Hardened regression coverage in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_contract.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    and refreshed:
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    so docs, smoke guardrails, project round-trip tests, and macOS schema decoding all reflect the new advanced capability.
+- User-visible impact:
+  - Plot inspector `Advanced Plot` now includes durable `Extra Axes`, so users can add a converted top/bottom X axis and/or a left/right Y axis without leaving the existing quick-plot workflow.
+  - Secondary-axis edits survive preview refreshes, export, and `.sciplotgod` save/open because they ride the same typed render-options path as fit, guides, and annotations.
+  - Converted secondary axes also work when the parent X axis is log-scaled.
+  - `Split Axis` is still not shipped; this round intentionally stops at DataGraph-style secondary axes rather than introducing multi-panel split/join layout semantics.
+- Risks:
+  - Current conversion semantics are scale-only (`display = data * ratio`). If a future use case needs affine or nonlinear transforms, this payload will need a versioned extension instead of ad hoc frontend math.
+  - Contract exposure is intentionally limited to numeric templates. If more templates should support extra axes later, update the same contract editable-option path and the same macOS availability seam instead of adding local exceptions.
+  - Matplotlib secondary axes are attached as `child_axes`, not extra entries in `figure.axes`; future tests and QA helpers must not assume otherwise.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: among DataGraph’s advanced plotting ideas, `Extra Axis` is the highest-value feature that fits our existing one-figure quick-plot architecture. It materially improves refinement power without forcing us to redesign layout, template ownership, or export geometry.
+  - Chose typed `extra_x_axis` / `extra_y_axis` payloads over a generic advanced-command stack:
+    - accepted because it keeps preview/export/project persistence on one explicit schema path and matches the bounded-advanced-tool approach already established by fit, reference guides, and text annotations
+    - rejected a free-form recipe layer in this round because it would widen UI/schema complexity before we had shipped the next concrete plotting capability
+  - Chose DataGraph-style secondary axes over `Split Axis` for this round:
+    - accepted because secondary axes map cleanly onto one existing figure, one axis frame, and one export surface
+    - rejected `Split Axis` because it would require multi-axis layout partitioning, join/split semantics, gap controls, and per-series axis ownership that the current Plot pipeline does not model
+  - Boundary:
+    - one extra X axis and one extra Y axis per figure
+    - conversion is scale-only, not arbitrary formula evaluation
+    - no change to frozen `nature` fonts, line widths, spacing, axis frame, or export metrics
+    - no split-axis or multi-figure advanced layout in this round
+- Troubleshooting note:
+  - Matplotlib `secondary_xaxis` / `secondary_yaxis` do not append ordinary axes into `Figure.axes`; they materialize as `SecondaryAxis` children under the primary axis’s `child_axes`.
+  - The concrete test/smoke fix for this round was to assert against `figure.axes[0].child_axes` and collect labels from primary plus child axes, otherwise the overlay renders correctly but regression checks still fail.
+  - Swift-side render option decoding also needed an explicit defaulting path in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`.
+  - Without `decodeIfPresent(... ) ?? default` in `RenderOptionsPayload.init(from:)`, schema tests that intentionally send partial snake-case `options` payloads fail on omitted legacy fields such as `reverse_x` even though the new extra-axis fields are correct.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 38 source files`)
+  - `.venv/bin/python -m pytest tests/test_plot_contract.py tests/test_sidecar_schema_contract.py tests/test_plot_project_routes.py tests/test_rendering_services.py`: passed (`82 passed, 5 warnings`)
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests`: passed (`41 tests`)
+  - `.venv/bin/python -m pytest tests`: passed (`202 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`157 tests`)
+
+### 2026-04-22 (Round AW): DataGraph-inspired double-Y series ownership on top of typed extra axes
+
+- Scope:
+  - Extended typed extra-axis payload normalization in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    so `extra_x_axis / extra_y_axis` now carry `binding_mode` plus `series_ids`, with `extra_x_axis` explicitly pinned to `conversion` and `extra_y_axis` allowed to express DataGraph-style double-Y series ownership.
+  - Implemented secondary-Y series ownership in the curve renderer in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+    so `curve`, `point_line`, and `scatter` can move a selected subset of series onto an independent left/right secondary Y axis instead of only creating a scaled conversion axis.
+  - Kept preview/export/project persistence on the same durable path through:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so double-Y selection survives preview refresh, export, save/open project, and template sanitization without adding a GUI-local advanced-plot state machine.
+  - Routed fit overlay onto the correct physical axis by extending the shared curve-fit overlay path in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+    so a series assigned to the secondary Y axis receives its fit line on that same axis instead of on the primary axis.
+  - Hardened regressions and smoke coverage in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+    and refreshed:
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    so the new DataGraph-inspired capability is covered across Python rendering, project round-trip, Swift decoding, Plot session persistence, and public docs.
+- User-visible impact:
+  - Plot inspector `Axis -> Advanced -> Extra Axes` now lets users switch `extra y axis` between `Conversion` and `Double Y`.
+  - In `Double Y`, users can select which series move onto the secondary Y axis for `curve`, `point_line`, and `scatter`, choose left/right placement, and keep that state through preview/export and `.sciplotgod` save/open.
+  - Fit overlays now follow the assigned Y axis, so the visual analysis layer stays numerically and visually aligned with the actual series axis ownership.
+  - `extra x axis` remains a conversion-only axis; this round does not expose split-axis layout, matrix split/join, or free-form command replay.
+- Risks:
+  - Secondary-Y routing currently rebuilds the moved series as new matplotlib artists after the primary figure is rendered, so future curve-only embellishments that attach extra per-series artists must update the same rebinding seam or they will stay on the primary axis.
+  - `Double Y` is intentionally bounded to `curve / point_line / scatter`; `area_curve`, `step_line`, `stacked_*`, `heatmap`, and other templates still only support conversion-style extra axes.
+  - `reference line / band` and `text annotations` still target the primary axis semantics from the existing typed overlay path; they are not yet axis-addressable overlays.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: DataGraph’s biggest next-step lesson for our product was not full `Split Axis` layout, but the much more common and immediately useful ability to give different series independent Y-axis ownership on one figure. That increases analytical range without forcing a redesign of template selection, export geometry, or the single-figure quick-plot workflow that is already a product strength here.
+  - Chose typed `binding_mode=series_assignment` on `extra_y_axis` over introducing a new advanced-plot command family:
+    - accepted because it extends an already durable request/project field and keeps preview/export/save-open behavior on one schema path
+    - rejected a new standalone “axis assignment” subsystem because it would duplicate state with `extra_y_axis` and reopen the exact front-end/local-logic drift we have been removing
+  - Chose double-Y series ownership before `Split Axis`:
+    - accepted because it captures the most valuable DataGraph refinement move while staying inside one axis frame and one figure export surface
+    - rejected full split/join layout because it would require per-command axis ownership, panel partitioning, gap controls, and new persistence semantics that the current Plot pipeline still does not model
+  - Boundary:
+    - `extra_x_axis` remains conversion-only
+    - `extra_y_axis.binding_mode=series_assignment` is only valid on `curve`, `point_line`, and `scatter`
+    - at least one series must remain on the primary axis; selecting all series falls back to the existing single-axis render path
+    - `nature` metrics remain frozen
+- Troubleshooting note:
+  - Do not run `xcodebuild ... build` and `xcodebuild ... test` in parallel against the same `-derivedDataPath`.
+  - The concrete failure here was `unable to attach DB ... build.db: database is locked`; the fix was simply to rerun `test` after `build` finished instead of debugging code that was already correct.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 38 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`206 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`157 tests`)
+  - `git diff --check`: passed
+
+### 2026-04-22 (Round AX): DataGraph-inspired stacked guides and callout annotations while preserving recommendation-led workflow
+
+- Scope:
+  - Reworked advanced plot overlays into a durable typed layer in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/advanced_plot_axes.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    so Plot now supports stacked DataGraph-style `line / region` guides, note/callout annotations with connectors, and secondary-axis-aware placement without introducing a second recommendation system.
+  - Normalized the sidecar schema and project path in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/comparison.py`
+    so `reference_guides` and richer `text_annotations` travel through preview, export, Data Studio compare, and `.sciplotgod` save/open on one typed payload.
+  - Updated macOS consumers in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so Plot inspector now exposes stacked guide editing plus `note / callout` creation while keeping template recommendation and quick-plot flow as the primary workflow.
+  - Refreshed regressions and docs in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    and corrected the malformed `SchemaDecodingTests` fixture that had made the full macOS suite look hung even though the product code path was correct.
+- User-visible impact:
+  - Plot inspector `Advanced Plot` now supports multiple guides instead of a single line/band toggle.
+  - Each guide can be a `Line` or `Region`, can target `x`, `primary y`, or `secondary y`, and persists through preview/export/project reopen.
+  - Text annotations now support both plain notes and DataGraph-style callouts with optional connectors and secondary-Y-aware placement.
+  - Template recommendation, recommended defaults, and quick-plot dominance stay unchanged; advanced overlays remain a refinement layer rather than becoming the primary authoring model.
+- Risks:
+  - Conversion-style secondary Y guides are rendered onto the primary matplotlib axis after value conversion because `SecondaryAxis` does not support `axhline` / `axhspan`; future overlay code must preserve that seam.
+  - This round still does not introduce split-axis layout, generic command replay, or a second GUI-local recommendation engine.
+  - The new advanced layer is intentionally Plot-first; further Data Studio or Composer adoption should reuse the same typed overlay path instead of forking semantics.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/advanced_plot_axes.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/extra_axes.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_curve.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+- Decision:
+  - First-principles motivation: the most useful DataGraph borrowing for this product was not a full recipe engine, but a durable stack of advanced refinement layers that can sit underneath our stronger recommendation-led quick-plot workflow.
+  - Chose typed stacked overlays over a generic advanced-command interpreter:
+    - accepted because it preserves one explicit render/project schema path and keeps backend truth in Python/sidecar rather than recreating command semantics in Swift
+    - rejected a free-form recipe interpreter in this round because it would reduce the current product’s recommendation authority and widen persistence/UI complexity too early
+  - Chose to keep recommendation dominance explicit:
+    - template selection, default style/palette/theme, and quick-plot remain recommendation-first
+    - advanced guides/callouts are opt-in refinement tools after template choice, not a replacement workflow
+- Troubleshooting note:
+  - A malformed JSON fixture in `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift` closed `text_annotations` with `}` instead of `]`.
+  - The observable symptom was full `xcodebuild ... test` appearing to hang inside the host app after `SchemaDecodingTests`.
+  - The durable debugging path was:
+    - narrow the scope with `-only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderRequestWithExtraAxes`
+    - temporarily print the decode error instead of letting XCTest symbolicate it
+    - fix the fixture and rerun the focused case before returning to the full suite
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 39 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`207 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderRequestWithExtraAxes`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`157 tests`)
+
+### 2026-04-23 (Round AY): DataGraph-inspired broken-axis overlays inside the recommendation-first Plot pipeline
+
+- Scope:
+  - Added typed broken-axis payloads in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/axis_breaks.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    so Plot now has durable `x_axis_breaks / y_axis_breaks` render options instead of view-local state or ad hoc matplotlib edits.
+  - Extended contract, sidecar schema, and project round-trip in:
+    - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    so preview, export, and `.sciplotgod` save/open all consume the same broken-axis payload and sanitization path.
+  - Reused the same broken-axis coordinate transform inside advanced overlays in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+    so guides, bands, notes, and callouts automatically skip hidden spans or remap into compressed visible space instead of drifting out of alignment.
+  - Added macOS durable editing and sanitization in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so `Axis -> Advanced -> Broken Axes` edits survive preview refresh, export, save/open project, and undo/redo without introducing a second frontend-only state machine.
+  - Hardened coverage and public docs in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_contract.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    so the new capability is covered across contract surface, rendering, project persistence, Swift decoding, session sanitization, smoke guardrails, and handoff docs.
+- User-visible impact:
+  - Plot inspector `Axis -> Advanced` now supports durable `Broken Axes` on selected numeric templates (`curve`, `point_line`, `step_line`, `scatter`, `bubble_scatter`, `scatter_fit`).
+  - Broken-axis edits survive preview refreshes, export, and `.sciplotgod` save/open because they travel through the same typed render-options payload as fit overlays, extra axes, guides, and annotations.
+  - Reference guides, guide bands, notes, and callouts now stay aligned with broken axes instead of rendering into hidden regions.
+  - Recommendation-first template selection, style/theme/palette recommendations, and frozen `nature` metrics remain unchanged; broken axes ship strictly as an advanced refinement layer.
+- Risks:
+  - Current broken-axis semantics are compressed overlays inside one physical axis frame, not true split/join multi-panel layout. If a future requirement needs independent panel bounds, joined legends, or per-panel series routing, that should be a new capability instead of stretching this payload ad hoc.
+  - Broken axes are intentionally limited to linear axes and cannot coexist with enabled extra axes in this release. If later rounds need DataGraph-style mixed extra-axis plus broken-axis authoring, the normalization and inspector availability logic must be versioned together.
+  - Artist remapping currently covers standard line/scatter/text plus our existing guide/annotation overlay paths. Future renderers that add new data-space artists must opt into the same axis-break transform seam or they will render against the uncompressed coordinate space.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/axis_breaks.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/src/plot_contract.json`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionRestore.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: among DataGraph’s remaining advanced plot ideas, broken axes add meaningful refinement power while still fitting our strongest product constraint, namely one recommendation-led quick-plot flow that keeps the main authoring path simple and opinionated.
+  - Chose typed compressed broken-axis overlays over full split/join layout:
+    - accepted because it keeps preview/export/project persistence on one explicit payload path and preserves the existing one-figure export geometry
+    - rejected multi-panel split layout in this round because it would require new panel ownership, legend/join semantics, export geometry rules, and likely a second UI model
+  - Chose to make guides and annotations reuse the same transform:
+    - accepted because otherwise broken axes would immediately desynchronize the rest of the advanced plot stack
+    - rejected leaving overlay paths untouched because “axis breaks work but annotation/guide placement is wrong” would be a visible regression against the durability standard we already established
+  - Boundary:
+    - only linear axes
+    - no coexistence with enabled extra axes
+    - no change to frozen `nature` typography, line width, spacing, axis frame, or export metrics
+    - no new recommendation engine or template-selection path in macOS
+- Troubleshooting note:
+  - `scripts/smoke_check.py` can fail even when rendering is correct if a validation payload includes `numpy.bool_` or other numpy scalar types and the smoke report is written directly with `json.dumps(...)`.
+  - The concrete symptom this round was every PDF rendering successfully, followed by `TypeError: Object of type bool is not JSON serializable` while writing `/Users/dongxutian/Documents/codegod/figures/debug_outputs/smoke_report.json`.
+  - The durable fix was to coerce validation `passed` values to native `bool` and add a small `_json_safe(...)` normalization step before report serialization, rather than weakening the new broken-axis smoke coverage.
+  - Swift build also needed one access-control correction: `PlotAxisSelection` could no longer stay `private` once the new broken-axis mutators in `PlotSessionImportInspect.swift` reused the same axis enum across files.
+- Validation (executed):
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 40 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`212 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
   - `git diff --check`: passed

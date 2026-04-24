@@ -50,6 +50,28 @@ def options_from_payload(
         palette_preset=payload.palette_preset,
         use_sidecar=payload.use_sidecar,
         visual_theme_id=payload.visual_theme_id,
+        extra_x_axis=payload.extra_x_axis.model_dump(mode="json") if payload.extra_x_axis else None,
+        extra_y_axis=payload.extra_y_axis.model_dump(mode="json") if payload.extra_y_axis else None,
+        x_axis_breaks=(
+            [item.model_dump(mode="json") for item in payload.x_axis_breaks]
+            if payload.x_axis_breaks
+            else None
+        ),
+        y_axis_breaks=(
+            [item.model_dump(mode="json") for item in payload.y_axis_breaks]
+            if payload.y_axis_breaks
+            else None
+        ),
+        reference_guides=(
+            [item.model_dump(mode="json") for item in payload.reference_guides]
+            if payload.reference_guides
+            else None
+        ),
+        text_annotations=(
+            [item.model_dump(mode="json") for item in payload.text_annotations]
+            if payload.text_annotations
+            else None
+        ),
         resolved_template_id=resolved_template,
     )
 

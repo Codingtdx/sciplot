@@ -27,6 +27,8 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert meta.template_ids
     assert meta.visual_themes
     assert {item.id for item in meta.styles} == {"nature", "editorial", "presentation", "poster"}
+    assert meta.styles[0].recommended_palette_preset
+    assert any(item.recommended_visual_theme_id == "clean_light" for item in meta.styles if item.id == "nature")
     assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.palettes})
     assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.visual_themes})
     assert removed_template_ids.isdisjoint(meta.template_ids)

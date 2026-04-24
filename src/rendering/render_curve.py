@@ -1,17 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
 
 from src import plot_style
 from src.plotting_curve_support import compute_shared_curve_x_layout
 from src.plotting_families.curve_family import plot_curves, plot_scatter
 from src.plotting_families.spectral_family import plot_wide_nmr
-from src.plotting_primitives import _format_axis_label
+from src.plotting_primitives import (
+    MAX_VISIBLE_Y_MAJOR_TICKS,
+    _apply_major_ticks_with_override,
+    _apply_numeric_axis_tick_preferences,
+    _format_axis_label,
+    compute_axis_limits,
+)
+from src.rendering.advanced_plot_axes import mark_extra_axis, mark_primary_axis
 from src.rendering.cache import load_curve_table_cached
 from src.rendering.common import (
     aligned_replicate_band,
@@ -25,6 +34,12 @@ from src.rendering.common import (
     validate_series_scales,
 )
 from src.rendering.dataset_models import build_normalized_dataset
+from src.rendering.extra_axes import (
+    extra_axis_binding_mode,
+    extra_axis_label,
+    extra_axis_series_ids,
+    normalize_series_selection_ids,
+)
 from src.rendering.fit_analysis import fit_linear_series_list, fit_options_from_payload, fit_series_list
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName
 from src.rendering.qa import apply_curve_autofix
@@ -44,6 +59,58 @@ from src.rendering.render_support import _rendered_plot_with_qa
 from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
 
 
+@dataclass(frozen=True)
+class SecondaryYAxisBinding:
+    position: str
+    series_ids: tuple[str, ...]
+    axis_label: str
+
+
+def _series_ids_for_series_list(series_list) -> tuple[str, ...]:
+    return normalize_series_selection_ids(series.sample for series in series_list)
+
+
+def _resolve_secondary_y_axis_binding(
+    *,
+    template: str,
+    series_list,
+    options: RenderOptions,
+    preserve_stress_label: bool,
+) -> SecondaryYAxisBinding | None:
+    if template not in {"curve", "point_line", "scatter"}:
+        return None
+    payload = cast(Mapping[str, Any] | None, options.extra_y_axis)
+    if payload is None or not bool(payload.get("enabled", False)):
+        return None
+    if extra_axis_binding_mode(payload) != "series_assignment":
+        return None
+
+    available_ids = _series_ids_for_series_list(series_list)
+    requested_ids = set(extra_axis_series_ids(payload))
+    assigned_ids = tuple(series_id for series_id in available_ids if series_id in requested_ids)
+    if not assigned_ids or len(assigned_ids) >= len(available_ids):
+        return None
+
+    secondary_label = extra_axis_label(payload)
+    if secondary_label:
+        return SecondaryYAxisBinding(
+            position=str(payload.get("position", "right")),
+            series_ids=assigned_ids,
+            axis_label=secondary_label,
+        )
+
+    first_secondary = series_list[available_ids.index(assigned_ids[0])]
+    return SecondaryYAxisBinding(
+        position=str(payload.get("position", "right")),
+        series_ids=assigned_ids,
+        axis_label=_format_axis_label(
+            first_secondary.y_label,
+            first_secondary.y_unit,
+            preserve_stress_label=preserve_stress_label,
+        ),
+    )
+
+
 def _apply_curve_axis_labels(ax, first, options: RenderOptions, *, preserve_stress_label: bool) -> None:
     ax.set_xlabel(
         _format_axis_label(
@@ -60,6 +127,285 @@ def _apply_curve_axis_labels(ax, first, options: RenderOptions, *, preserve_stre
             override_label=options.y_label_override,
         )
     )
+
+
+def _curve_artist_color(artist, *, scatter: bool) -> object:
+    if scatter:
+        colors = artist.get_facecolors()
+        if len(colors):
+            return tuple(colors[0])
+    return artist.get_color()
+
+
+def _configure_secondary_y_axis(primary_ax: Axes, secondary_ax: Axes, *, position: str) -> None:
+    if position == "left":
+        primary_ax.yaxis.set_label_position("right")
+        primary_ax.yaxis.tick_right()
+        primary_ax.spines["right"].set_visible(True)
+        primary_ax.spines["left"].set_visible(False)
+
+        secondary_ax.yaxis.set_label_position("left")
+        secondary_ax.yaxis.tick_left()
+        secondary_ax.spines["left"].set_position(("axes", 0.0))
+        secondary_ax.spines["left"].set_visible(True)
+        secondary_ax.spines["right"].set_visible(False)
+        return
+
+    primary_ax.yaxis.set_label_position("left")
+    primary_ax.yaxis.tick_left()
+    primary_ax.spines["left"].set_visible(True)
+    primary_ax.spines["right"].set_visible(False)
+
+    secondary_ax.yaxis.set_label_position("right")
+    secondary_ax.yaxis.tick_right()
+    secondary_ax.spines["right"].set_visible(True)
+    secondary_ax.spines["left"].set_visible(False)
+
+
+def _apply_secondary_y_axis_limits(
+    ax: Axes,
+    *,
+    series_list,
+    options: RenderOptions,
+    axis_mode: str,
+    scatter: bool,
+    y_padding_top: float,
+    y_padding_bottom: float,
+) -> None:
+    limits = compute_axis_limits(
+        [series.data["y"].to_numpy() for series in series_list],
+        kind="line",
+        axis_mode=axis_mode,
+        legend_mode="none",
+        x_values=[series.data["x"].to_numpy() for series in series_list],
+        xscale=options.xscale,
+        yscale=options.yscale,
+        y_padding_top=y_padding_top,
+        y_padding_bottom=y_padding_bottom,
+    )
+    ax.set_yscale(options.yscale)
+    ax.set_ylim(*limits.ylim)
+    _apply_major_ticks_with_override(
+        ax.yaxis,
+        policy_ticks=limits.y_tick_policy.major_ticks if limits.y_tick_policy is not None else None,
+        override=None,
+        scale=options.yscale,
+        max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+    )
+    _apply_numeric_axis_tick_preferences(
+        ax.yaxis,
+        scale=options.yscale,
+        tick_density=options.y_tick_density,
+        tick_edge_labels=options.y_tick_edge_labels,
+        max_major_ticks=MAX_VISIBLE_Y_MAJOR_TICKS,
+    )
+
+
+def _rebind_secondary_y_axis_series(
+    rendered: RenderedPlot,
+    *,
+    template: str,
+    series_list,
+    options: RenderOptions,
+    scatter: bool,
+    base_kwargs: dict[str, object],
+    secondary_binding: SecondaryYAxisBinding,
+) -> tuple[RenderedPlot, Mapping[str, Axes], Mapping[str, object]]:
+    primary_ax = rendered.figure.axes[0]
+    mark_primary_axis(primary_ax)
+    series_ids = _series_ids_for_series_list(series_list)
+    assigned_ids = set(secondary_binding.series_ids)
+    artist_sequence = (
+        [collection for collection in primary_ax.collections if np.asarray(collection.get_offsets()).size]
+        if scatter
+        else list(primary_ax.lines)
+    )
+    if len(artist_sequence) < len(series_list):
+        return rendered, {}, {}
+
+    secondary_ax = primary_ax.twinx()
+    mark_extra_axis(secondary_ax, axis_name="y")
+    secondary_ax.set_zorder(primary_ax.get_zorder() + 0.1)
+    secondary_ax.patch.set_alpha(0.0)
+    secondary_ax.set_xscale(primary_ax.get_xscale())
+    secondary_ax.set_xlim(primary_ax.get_xlim())
+    if primary_ax.xaxis_inverted():
+        secondary_ax.invert_xaxis()
+
+    axis_mode = str(base_kwargs.get("axis_mode", "auto"))
+    y_padding_top = _float_plot_kw(base_kwargs, "y_padding_top", 0.12 if scatter else 0.18)
+    y_padding_bottom = _float_plot_kw(base_kwargs, "y_padding_bottom", 0.06)
+    preserve_stress_label = bool(base_kwargs.get("preserve_stress_label", False))
+
+    series_axes: dict[str, Axes] = {}
+    series_colors: dict[str, object] = {}
+    primary_handles: list[object] = []
+    secondary_handles: list[object] = []
+    primary_series = []
+    secondary_series = []
+
+    for series_id, series, artist in zip(series_ids, series_list, artist_sequence, strict=False):
+        color = _curve_artist_color(artist, scatter=scatter)
+        if series_id in assigned_ids:
+            if scatter:
+                offsets = np.asarray(artist.get_offsets())
+                sizes = artist.get_sizes()
+                secondary_artist = secondary_ax.scatter(
+                    offsets[:, 0],
+                    offsets[:, 1],
+                    label=artist.get_label(),
+                    color=color,
+                    s=float(sizes[0]) if len(sizes) else 14.0,
+                    alpha=artist.get_alpha(),
+                    linewidths=artist.get_linewidths(),
+                    zorder=artist.get_zorder(),
+                )
+            else:
+                secondary_artist = secondary_ax.plot(
+                    artist.get_xdata(),
+                    artist.get_ydata(),
+                    label=artist.get_label(),
+                    color=color,
+                    linewidth=artist.get_linewidth(),
+                    linestyle=artist.get_linestyle(),
+                    alpha=artist.get_alpha(),
+                    drawstyle=artist.get_drawstyle(),
+                    marker=artist.get_marker(),
+                    markersize=artist.get_markersize(),
+                    markerfacecolor=artist.get_markerfacecolor(),
+                    markeredgecolor=artist.get_markeredgecolor(),
+                    markeredgewidth=artist.get_markeredgewidth(),
+                    markevery=artist.get_markevery(),
+                    zorder=artist.get_zorder(),
+                )[0]
+            secondary_handles.append(secondary_artist)
+            secondary_series.append(series)
+            series_axes[series_id] = secondary_ax
+            series_colors[series_id] = color
+            artist.remove()
+        else:
+            primary_handles.append(artist)
+            primary_series.append(series)
+            series_axes[series_id] = primary_ax
+            series_colors[series_id] = color
+
+    legend = primary_ax.get_legend()
+    if legend is not None:
+        legend.remove()
+
+    if not primary_series or not secondary_series:
+        secondary_ax.remove()
+        return rendered, {}, {}
+
+    _configure_secondary_y_axis(primary_ax, secondary_ax, position=secondary_binding.position)
+    _apply_curve_axis_labels(
+        primary_ax,
+        primary_series[0],
+        options,
+        preserve_stress_label=preserve_stress_label,
+    )
+    _apply_secondary_y_axis_limits(
+        primary_ax,
+        series_list=primary_series,
+        options=options,
+        axis_mode=axis_mode,
+        scatter=scatter,
+        y_padding_top=y_padding_top,
+        y_padding_bottom=y_padding_bottom,
+    )
+    _apply_secondary_y_axis_limits(
+        secondary_ax,
+        series_list=secondary_series,
+        options=options,
+        axis_mode=axis_mode,
+        scatter=scatter,
+        y_padding_top=y_padding_top,
+        y_padding_bottom=y_padding_bottom,
+    )
+    secondary_ax.set_ylabel(secondary_binding.axis_label)
+
+    combined_handles: list[Any] = []
+    combined_labels = []
+    primary_map: dict[str, Any] = {
+        series_id: handle
+        for series_id, handle in zip(
+            [series_id for series_id in series_ids if series_id not in assigned_ids],
+            primary_handles,
+            strict=True,
+        )
+    }
+    secondary_map: dict[str, Any] = {
+        series_id: handle
+        for series_id, handle in zip(secondary_binding.series_ids, secondary_handles, strict=True)
+    }
+    for series_id in series_ids:
+        handle = secondary_map.get(series_id) if series_id in assigned_ids else primary_map.get(series_id)
+        if handle is None:
+            continue
+        combined_handles.append(handle)
+        combined_labels.append(handle.get_label())
+    if combined_handles:
+        primary_ax.legend(combined_handles, combined_labels, loc="upper right")
+
+    return (
+        _rendered_plot_with_qa(
+            filename=rendered.filename,
+            figure=rendered.figure,
+            template=template,
+            options=options,
+            autofixes_applied=(
+                tuple(rendered.qa_report.autofixes_applied) if rendered.qa_report is not None else ()
+            )
+            + ("extra_axis_series_assignment",),
+        ),
+        series_axes,
+        series_colors,
+    )
+
+
+def _fit_overlay_axis_bindings(
+    rendered: RenderedPlot,
+    *,
+    series_list,
+    scatter: bool,
+    secondary_binding: SecondaryYAxisBinding | None,
+) -> tuple[Mapping[str, Axes], Mapping[str, object]]:
+    if secondary_binding is None or len(rendered.figure.axes) < 2:
+        return {}, {}
+
+    series_ids = _series_ids_for_series_list(series_list)
+    assigned_ids = set(secondary_binding.series_ids)
+    primary_ax = rendered.figure.axes[0]
+    secondary_ax = rendered.figure.axes[1]
+    primary_artists = (
+        [collection for collection in primary_ax.collections if np.asarray(collection.get_offsets()).size]
+        if scatter
+        else list(primary_ax.lines)
+    )
+    secondary_artists = (
+        [collection for collection in secondary_ax.collections if np.asarray(collection.get_offsets()).size]
+        if scatter
+        else list(secondary_ax.lines)
+    )
+
+    series_axes: dict[str, Axes] = {}
+    series_colors: dict[str, object] = {}
+    primary_iter = iter(primary_artists)
+    secondary_iter = iter(secondary_artists)
+    for series_id in series_ids:
+        if series_id in assigned_ids:
+            artist = next(secondary_iter, None)
+            if artist is None:
+                continue
+            series_axes[series_id] = secondary_ax
+            series_colors[series_id] = _curve_artist_color(artist, scatter=scatter)
+            continue
+        artist = next(primary_iter, None)
+        if artist is None:
+            continue
+        series_axes[series_id] = primary_ax
+        series_colors[series_id] = _curve_artist_color(artist, scatter=scatter)
+    return series_axes, series_colors
 
 
 def _render_curve_candidate(
@@ -259,31 +605,41 @@ def _apply_curve_fit_overlay(
     series_list,
     options: RenderOptions,
     scatter: bool,
+    series_axes: Mapping[str, Axes] | None = None,
+    series_colors: Mapping[str, object] | None = None,
 ) -> RenderedPlot:
     fit_options = fit_options_from_payload(options.fit_options)
     if not fit_options.enabled:
         return rendered
     results = fit_series_list(series_list, model_id=fit_options.model_id)
-    ax = rendered.figure.axes[0]
+    primary_ax = rendered.figure.axes[0]
     stroke = plot_style.current_stroke()
+    equation_ax = primary_ax
     for series_index, result in enumerate(results.series_results):
-        ax.plot(
+        target_ax = series_axes.get(result.series_id, primary_ax) if series_axes is not None else primary_ax
+        color = (
+            series_colors.get(result.series_id)
+            if series_colors is not None and result.series_id in series_colors
+            else _fit_overlay_color(primary_ax, series_index=series_index, scatter=scatter)
+        )
+        target_ax.plot(
             result.x_line,
             result.y_line,
-            color=_fit_overlay_color(ax, series_index=series_index, scatter=scatter),
+            color=color,
             linewidth=max(0.8, stroke.line_width_pt * 0.95),
             alpha=min(0.88, stroke.line_alpha),
             linestyle="--",
             label="_nolegend_",
             zorder=3.2,
         )
+        equation_ax = target_ax
     if len(results.series_results) == 1:
         equation = results.series_results[0].equation_display
-        ax.text(
+        equation_ax.text(
             0.03,
             0.97,
             equation,
-            transform=ax.transAxes,
+            transform=equation_ax.transAxes,
             ha="left",
             va="top",
             fontsize=plot_style.current_typography().legend_font_size_pt,
@@ -314,7 +670,13 @@ def _render_curve_like_plot(
 ) -> RenderedPlot:
     resolved_kwargs = _with_manual_axis_overrides(dict(base_kwargs or {}), options)
     preserve_stress_label = bool(resolved_kwargs.get("preserve_stress_label", False))
-    supports_direct_labels = not (preserve_stress_label and len(series_list) >= 4)
+    secondary_binding = _resolve_secondary_y_axis_binding(
+        template=template,
+        series_list=series_list,
+        options=options,
+        preserve_stress_label=preserve_stress_label,
+    )
+    supports_direct_labels = secondary_binding is None and not (preserve_stress_label and len(series_list) >= 4)
     candidates = [
         _render_curve_candidate(
             filename=filename,
@@ -328,7 +690,7 @@ def _render_curve_like_plot(
             base_kwargs=resolved_kwargs,
         )
     ]
-    if _prefer_compact_legend(options, len(series_list)):
+    if secondary_binding is None and _prefer_compact_legend(options, len(series_list)):
         candidates.append(
             _render_curve_candidate(
                 filename=filename,
@@ -363,6 +725,17 @@ def _render_curve_like_plot(
         if rendered is best_rendered and strategy == best_strategy:
             continue
         plt.close(rendered.figure)
+    if secondary_binding is not None:
+        rebound, _, _ = _rebind_secondary_y_axis_series(
+            best_rendered,
+            template=template,
+            series_list=series_list,
+            options=options,
+            scatter=scatter,
+            base_kwargs=resolved_kwargs,
+            secondary_binding=secondary_binding,
+        )
+        return rebound
     return best_rendered
 
 def _render_rheology_bundle(
@@ -467,6 +840,18 @@ def _render_standard_curve_template(
             **(extra_curve_kwargs or {}),
         },
     )
+    secondary_binding = _resolve_secondary_y_axis_binding(
+        template=template,
+        series_list=series_list,
+        options=options,
+        preserve_stress_label=is_tensile_curve,
+    )
+    series_axes, series_colors = _fit_overlay_axis_bindings(
+        rendered,
+        series_list=series_list,
+        scatter=False,
+        secondary_binding=secondary_binding,
+    )
     if template in {"curve", "point_line"}:
         rendered = _apply_curve_fit_overlay(
             rendered,
@@ -474,6 +859,8 @@ def _render_standard_curve_template(
             series_list=series_list,
             options=options,
             scatter=False,
+            series_axes=series_axes,
+            series_colors=series_colors,
         )
     return [rendered]
 
@@ -626,12 +1013,26 @@ def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) 
             "preserve_stress_label": is_tensile_curve,
         },
     )
+    secondary_binding = _resolve_secondary_y_axis_binding(
+        template="scatter",
+        series_list=series_list,
+        options=options,
+        preserve_stress_label=is_tensile_curve,
+    )
+    series_axes, series_colors = _fit_overlay_axis_bindings(
+        rendered,
+        series_list=series_list,
+        scatter=True,
+        secondary_binding=secondary_binding,
+    )
     rendered = _apply_curve_fit_overlay(
         rendered,
         template="scatter",
         series_list=series_list,
         options=options,
         scatter=True,
+        series_axes=series_axes,
+        series_colors=series_colors,
     )
     return [rendered]
 

@@ -35,6 +35,8 @@ class MetaStyleResponse(StrictModel):
     description: str
     hard_constraints: bool
     preset_note: str
+    recommended_palette_preset: str
+    recommended_visual_theme_id: str | None = None
 
 
 class MetaPaletteResponse(StrictModel):

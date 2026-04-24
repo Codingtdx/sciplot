@@ -4,7 +4,7 @@ from base64 import b64encode
 from io import BytesIO
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.sidecar.schemas_common import (
     PreviewItemResponse,
@@ -13,6 +13,53 @@ from app.sidecar.schemas_common import (
     serialize_dataclass,
 )
 from src import plot_style
+
+
+class TextAnnotationPayload(StrictModel):
+    id: str
+    enabled: bool = True
+    text: str = ""
+    coordinate_space: str = "axes_fraction"
+    x: float = 0.5
+    y: float = 0.95
+    y_axis_target: str = "y_primary"
+    horizontal_alignment: str = "center"
+    vertical_alignment: str = "top"
+    display_style: str = "plain"
+    connector_enabled: bool = False
+    target_x: float = 0.5
+    target_y: float = 0.5
+    target_y_axis_target: str = "y_primary"
+
+
+class ReferenceGuidePayload(StrictModel):
+    id: str
+    enabled: bool = True
+    kind: str = "line"
+    axis_target: str = "y_primary"
+    value: float | None = None
+    start: float | None = None
+    end: float | None = None
+    label: str | None = None
+
+
+class AxisBreakPayload(StrictModel):
+    id: str
+    enabled: bool = True
+    start: float = 0.0
+    end: float = 1.0
+    display_mode: str = "compress"
+
+
+class ExtraAxisPayload(StrictModel):
+    enabled: bool = False
+    position: str = "top"
+    binding_mode: str = "conversion"
+    series_ids: list[str] = Field(default_factory=list)
+    title: str | None = None
+    display_unit: str | None = None
+    data_value: float = 1.0
+    display_value: float = 1.0
 
 
 class RenderOptionsPayload(StrictModel):
@@ -37,6 +84,69 @@ class RenderOptionsPayload(StrictModel):
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
+    extra_x_axis: ExtraAxisPayload | None = None
+    extra_y_axis: ExtraAxisPayload | None = None
+    x_axis_breaks: list[AxisBreakPayload] | None = None
+    y_axis_breaks: list[AxisBreakPayload] | None = None
+    reference_guides: list[ReferenceGuidePayload] | None = None
+    text_annotations: list[TextAnnotationPayload] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_reference_guides(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        if data.get("reference_guides") is None:
+            guides: list[dict[str, Any]] = []
+            line = data.pop("reference_line", None)
+            if isinstance(line, dict):
+                axis = str(line.get("axis", "y")).strip().lower()
+                guides.append(
+                    {
+                        "id": "reference-line-1",
+                        "enabled": line.get("enabled", False),
+                        "kind": "line",
+                        "axis_target": "x" if axis == "x" else "y_primary",
+                        "value": line.get("value"),
+                        "label": line.get("label"),
+                    }
+                )
+            band = data.pop("reference_band", None)
+            if isinstance(band, dict):
+                axis = str(band.get("axis", "y")).strip().lower()
+                guides.append(
+                    {
+                        "id": "reference-band-1",
+                        "enabled": band.get("enabled", False),
+                        "kind": "band",
+                        "axis_target": "x" if axis == "x" else "y_primary",
+                        "start": band.get("start"),
+                        "end": band.get("end"),
+                        "label": band.get("label"),
+                    }
+                )
+            if guides:
+                data["reference_guides"] = guides
+            return data
+        data.pop("reference_line", None)
+        data.pop("reference_band", None)
+        return data
+
+
+class ReferenceLinePayload(StrictModel):
+    enabled: bool = False
+    axis: str = "y"
+    value: float = 0.0
+    label: str | None = None
+
+
+class ReferenceBandPayload(StrictModel):
+    enabled: bool = False
+    axis: str = "y"
+    start: float = 0.0
+    end: float = 1.0
+    label: str | None = None
 
 
 class FitOptionsPayload(StrictModel):
@@ -269,6 +379,7 @@ class PlotProjectPayload(StrictModel):
     sheet: str | int
     selected_template_id: str
     render_options: RenderOptionsPayload
+    fit_options: FitOptionsPayload = Field(default_factory=FitOptionsPayload)
     project_display_name: str | None = None
     source_provenance: PlotProjectSourceProvenancePayload = Field(
         default_factory=PlotProjectSourceProvenancePayload
@@ -362,6 +473,7 @@ def rendered_plots_to_preview_payload(
     return previews
 
 
+RenderOptionsPayload.model_rebuild()
 SourceTablePreviewResponse.model_rebuild()
 
 
@@ -388,6 +500,9 @@ __all__ = [
     "PreflightRenderResponse",
     "PreflightResultResponse",
     "ProjectBundlePayload",
+    "ReferenceGuidePayload",
+    "ReferenceBandPayload",
+    "ReferenceLinePayload",
     "RenderOptionsPayload",
     "RenderPreviewResponse",
     "RenderRequest",
@@ -396,5 +511,6 @@ __all__ = [
     "SourceTablePreviewRequest",
     "SourceTablePreviewResponse",
     "TemplateRecommendationResponse",
+    "TextAnnotationPayload",
     "rendered_plots_to_preview_payload",
 ]

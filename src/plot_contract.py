@@ -104,6 +104,8 @@ class StyleContract:
     description: str
     hard_constraints: bool
     preset_note: str
+    recommended_palette_preset: str
+    recommended_visual_theme_id: str | None
     typography: TypographyContract
     stroke: StrokeContract
     spacing: SpacingContract
@@ -209,6 +211,8 @@ def load_plot_contract() -> PlotContract:
                 description=value["description"],
                 hard_constraints=bool(value["hard_constraints"]),
                 preset_note=value["preset_note"],
+                recommended_palette_preset=value["recommended_palette_preset"],
+                recommended_visual_theme_id=value.get("recommended_visual_theme_id"),
                 typography=TypographyContract(
                     font_family=_tuple_of_strings(value["typography"]["font_family"]),
                     font_size_pt=float(value["typography"]["font_size_pt"]),
@@ -371,6 +375,15 @@ def default_options_for_template(template: str) -> dict[str, Any]:
     return dict(template_contract(template).default_options)
 
 
+def style_contract(style_name: str) -> StyleContract:
+    contract = load_plot_contract()
+    normalized = normalize_style_alias(style_name)
+    try:
+        return contract.styles[normalized]
+    except KeyError as exc:
+        raise ValueError(f"Unknown style contract: {style_name}") from exc
+
+
 def lint_public_template_contract(contract: PlotContract | None = None) -> tuple[str, ...]:
     resolved = contract or load_plot_contract()
     valid_styles = set(public_style_names())
@@ -445,6 +458,8 @@ def meta_payload() -> dict[str, Any]:
                 "description": value.description,
                 "hard_constraints": value.hard_constraints,
                 "preset_note": value.preset_note,
+                "recommended_palette_preset": value.recommended_palette_preset,
+                "recommended_visual_theme_id": value.recommended_visual_theme_id,
             }
             for key, value in contract.styles.items()
         ],
@@ -532,9 +547,33 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
             f"`{resolved.axis_policy.stacked_x_use_standard_endpoint_policy}`"
         ),
         "",
-        "## Templates",
+        "## Styles",
         "",
     ]
+
+    for name, style_spec in resolved.styles.items():
+        lines.extend(
+            [
+                f"### `{name}` / {style_spec.label}",
+                "",
+                f"- Description: {style_spec.description}",
+                f"- Hard constraints: `{style_spec.hard_constraints}`",
+                f"- Recommended palette: `{style_spec.recommended_palette_preset}`",
+                (
+                    f"- Recommended visual theme: "
+                    f"`{style_spec.recommended_visual_theme_id or 'None'}`"
+                ),
+                f"- Preset note: {style_spec.preset_note}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+        "## Templates",
+        "",
+        ]
+    )
 
     if resolved.qa_profiles:
         lines.extend(["## QA Profiles", ""])

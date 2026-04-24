@@ -6,10 +6,80 @@ import unicodedata
 
 _SUBSCRIPT_MAP = str.maketrans("₀₁₂₃₄₅₆₇₈₉₊₋₍₎", "0123456789+-()")
 _SUPERSCRIPT_MAP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾", "0123456789+-()")
+_UNIT_BASE_TOKENS = frozenset(
+    {
+        "%",
+        "a",
+        "bar",
+        "c",
+        "cd",
+        "ev",
+        "f",
+        "g",
+        "gy",
+        "h",
+        "hz",
+        "j",
+        "k",
+        "kat",
+        "l",
+        "lx",
+        "m",
+        "min",
+        "mol",
+        "n",
+        "ohm",
+        "pa",
+        "rad",
+        "s",
+        "sv",
+        "t",
+        "v",
+        "w",
+        "wb",
+    }
+)
+_SI_PREFIXES = ("da", "y", "z", "a", "f", "p", "n", "u", "µ", "m", "c", "d", "h", "k", "M", "G", "T")
 
 
 def _clean_text(text: str) -> str:
     return " ".join(text.strip().split())
+
+
+def _unit_mathtext_source(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text or "")
+    normalized = normalized.translate(_SUBSCRIPT_MAP).translate(_SUPERSCRIPT_MAP)
+    normalized = normalized.replace("−", "-").replace("–", "-").replace("—", "-")
+    return _clean_text(normalized)
+
+
+def _looks_like_unit_symbol(token: str) -> bool:
+    lowered = token.replace("μ", "µ").lower()
+    if lowered in _UNIT_BASE_TOKENS:
+        return True
+    for prefix in _SI_PREFIXES:
+        candidate_prefix = prefix.lower()
+        if lowered.startswith(candidate_prefix) and lowered[len(candidate_prefix) :] in _UNIT_BASE_TOKENS:
+            return True
+    return False
+
+
+def _format_unit_token_mathtext(token: str) -> str:
+    match = re.fullmatch(r"(?P<base>[A-Za-zµμΩ°%]+)(?P<exp>(?:\^-?\d+)|(?:-?\d+))", token)
+    if match is None:
+        return token
+    base = match.group("base")
+    exponent = match.group("exp").lstrip("^")
+    if not _looks_like_unit_symbol(base):
+        return token
+    return f"{base}$^{{{exponent}}}$"
+
+
+def _format_generic_unit_mathtext(text: str) -> str:
+    source = _unit_mathtext_source(text)
+    tokens = re.split(r"([/.\s]+)", source)
+    formatted = [_format_unit_token_mathtext(token) if token else token for token in tokens]
+    return "".join(formatted)
 
 
 def canonicalize_token(text: str) -> str:
@@ -160,8 +230,8 @@ def normalize_unit(text: str) -> str:
         return UNIT_ALIASES[canonical]
     # Preserve bracketed unknown units like [N] -> N when safe.
     if cleaned.startswith("[") and cleaned.endswith("]") and len(cleaned) > 2:
-        return _clean_text(cleaned[1:-1])
-    return cleaned
+        cleaned = _clean_text(cleaned[1:-1])
+    return _format_generic_unit_mathtext(cleaned)
 
 
 def slugify_label(text: str) -> str:

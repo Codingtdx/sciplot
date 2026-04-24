@@ -46,6 +46,48 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.xscale, "log")
         undoManager.undo()
         XCTAssertEqual(session.renderOptions.xscale, originalXScale)
+
+        session.updateFitModel("polynomial_2")
+        XCTAssertEqual(session.fitOptions.modelID, "polynomial_2")
+        undoManager.undo()
+        XCTAssertEqual(session.fitOptions.modelID, "linear")
+    }
+
+    func testAxisBreaksRoundTripThroughSessionSanitization() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.applyExternalRenderOptions(
+            RenderOptionsPayload(
+                stylePreset: "nature",
+                palettePreset: "colorblind_safe",
+                visualThemeID: "clean_light",
+                xAxisBreaks: [AxisBreakPayload(id: "x-gap", enabled: true, start: 0.8, end: 1.2, displayMode: "split")],
+                yAxisBreaks: [AxisBreakPayload(id: "y-gap", enabled: true, start: 1.4, end: 2.2, displayMode: "compress")]
+            )
+        )
+
+        XCTAssertEqual(session.renderOptions.xAxisBreaks?.first?.id, "x-gap")
+        XCTAssertEqual(session.renderOptions.xAxisBreaks?.first?.displayMode, "split")
+        XCTAssertNil(session.renderOptions.yAxisBreaks)
+
+        session.updateRenderOptions(policy: .immediate) { $0.xscale = "log" }
+        session.sanitizeRenderOptionsForCurrentTemplateIfNeeded()
+
+        XCTAssertNil(session.renderOptions.xAxisBreaks)
+        XCTAssertNil(session.renderOptions.yAxisBreaks)
+
+        session.updateRenderOptions(policy: .immediate) {
+            $0.extraYAxis = ExtraAxisPayload(enabled: true, position: "right", title: "Secondary")
+        }
+        session.sanitizeRenderOptionsForCurrentTemplateIfNeeded()
+
+        XCTAssertNil(session.renderOptions.yAxisBreaks)
+        XCTAssertEqual(session.renderOptions.extraYAxis?.title, "Secondary")
     }
 
     func testImportAutomaticallyInspectsSelectsTemplateAndRendersPreview() async throws {
@@ -98,6 +140,12 @@ final class PlotSessionTests: XCTestCase {
         session.updateRenderOptions(policy: .immediate) { $0.xMin = 1.0 }
 
         XCTAssertTrue(session.isProjectDirty)
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplotgod"))
+        XCTAssertFalse(session.isProjectDirty)
+
+        session.updateFitEnabled(true)
+        XCTAssertTrue(session.isProjectDirty)
     }
 
     func testOpenProjectRestoresPlotStateAndClearsDirty() async throws {
@@ -107,11 +155,66 @@ final class PlotSessionTests: XCTestCase {
             projectName: "Curve Study",
             templateID: "area_curve",
             sheet: .name("RestoredSheet"),
+            fitOptions: FitOptionsPayload(enabled: true, modelID: "polynomial_2"),
             renderOptions: RenderOptionsPayload(
                 size: "single_panel",
                 stylePreset: "presentation",
                 palettePreset: "shine",
-                visualThemeID: "shine"
+                visualThemeID: "shine",
+                extraXAxis: ExtraAxisPayload(
+                    enabled: true,
+                    position: "top",
+                    title: "Gallons",
+                    dataValue: 3.78541,
+                    displayValue: 1.0
+                ),
+                extraYAxis: ExtraAxisPayload(
+                    enabled: true,
+                    position: "right",
+                    bindingMode: "series_assignment",
+                    seriesIDs: ["Sample B"],
+                    title: "Half Stress",
+                    dataValue: 2.0,
+                    displayValue: 1.0
+                ),
+                referenceGuides: [
+                    ReferenceGuidePayload(
+                        id: "target-line",
+                        enabled: true,
+                        kind: "line",
+                        axisTarget: "y_primary",
+                        value: 2.5,
+                        label: "Target"
+                    ),
+                    ReferenceGuidePayload(
+                        id: "window-region",
+                        enabled: true,
+                        kind: "band",
+                        axisTarget: "x",
+                        value: nil,
+                        start: 0.5,
+                        end: 1.5,
+                        label: "Window"
+                    )
+                ],
+                textAnnotations: [
+                    TextAnnotationPayload(
+                        id: "note-1",
+                        enabled: true,
+                        text: "Peak",
+                        coordinateSpace: "data",
+                        x: 1.5,
+                        y: 2.2,
+                        yAxisTarget: "y_primary",
+                        horizontalAlignment: "right",
+                        verticalAlignment: "bottom",
+                        displayStyle: "callout",
+                        connectorEnabled: true,
+                        targetX: 1.0,
+                        targetY: 2.0,
+                        targetYAxisTarget: "y_primary"
+                    )
+                ]
             )
         )
         client.openProjectResponse = TestPayloads.openProjectResponse(
@@ -157,6 +260,48 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
         XCTAssertEqual(session.renderOptions.palettePreset, "shine")
         XCTAssertEqual(session.renderOptions.visualThemeID, "shine")
+        XCTAssertEqual(
+            session.renderOptions.extraXAxis,
+            ExtraAxisPayload(enabled: true, position: "top", title: "Gallons", dataValue: 3.78541, displayValue: 1.0)
+        )
+        XCTAssertEqual(
+            session.renderOptions.extraYAxis,
+            ExtraAxisPayload(
+                enabled: true,
+                position: "right",
+                bindingMode: "series_assignment",
+                seriesIDs: ["Sample B"],
+                title: "Half Stress",
+                dataValue: 2.0,
+                displayValue: 1.0
+            )
+        )
+        XCTAssertEqual(
+            session.renderOptions.referenceGuides,
+            [
+                ReferenceGuidePayload(
+                    id: "target-line",
+                    enabled: true,
+                    kind: "line",
+                    axisTarget: "y_primary",
+                    value: 2.5,
+                    label: "Target"
+                ),
+                ReferenceGuidePayload(
+                    id: "window-region",
+                    enabled: true,
+                    kind: "band",
+                    axisTarget: "x",
+                    value: nil,
+                    start: 0.5,
+                    end: 1.5,
+                    label: "Window"
+                )
+            ]
+        )
+        XCTAssertEqual(session.renderOptions.textAnnotations?.first?.text, "Peak")
+        XCTAssertEqual(session.renderOptions.textAnnotations?.first?.coordinateSpace, "data")
+        XCTAssertEqual(session.fitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
         XCTAssertFalse(session.isProjectDirty)
     }
 
@@ -179,6 +324,233 @@ final class PlotSessionTests: XCTestCase {
 
         XCTAssertEqual(client.fitAnalysisRequests.count, 1)
         XCTAssertEqual(session.fitAnalysisResponse?.equationDisplay, TestPayloads.fitAnalysis().equationDisplay)
+
+        session.updateFitModel("polynomial_2")
+        await waitUntil({ client.fitAnalysisRequests.last?.modelID == "polynomial_2" }, timeout: 2.0)
+    }
+
+    func testFitOverlayEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+
+        session.updateFitEnabled(true)
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 2.0)
+        XCTAssertEqual(client.renderRequests.last?.fitOptions, FitOptionsPayload(enabled: true, modelID: "linear"))
+
+        session.updateFitModel("polynomial_3")
+        await waitUntil({ client.renderRequests.last?.fitOptions.modelID == "polynomial_3" }, timeout: 2.0)
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/fit.sciplotgod"))
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.plot?.fitOptions,
+            FitOptionsPayload(enabled: true, modelID: "polynomial_3")
+        )
+    }
+
+    func testReferenceGuideEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addReferenceGuide(kind: "line")
+        guard let lineID = session.renderOptions.referenceGuides?.first?.id else {
+            XCTFail("Expected a reference guide to be created.")
+            return
+        }
+        session.updateReferenceGuide(id: lineID) {
+            $0.enabled = true
+            $0.kind = "line"
+            $0.axisTarget = "y_primary"
+            $0.value = 2.5
+            $0.label = "Target"
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.referenceGuides?.first?.label == "Target"
+            },
+            timeout: 2.0
+        )
+
+        session.addReferenceGuide(kind: "band")
+        guard let bandID = session.renderOptions.referenceGuides?.last?.id else {
+            XCTFail("Expected a second reference guide to be created.")
+            return
+        }
+        session.updateReferenceGuide(id: bandID) {
+            $0.enabled = true
+            $0.kind = "band"
+            $0.axisTarget = "x"
+            $0.start = 0.5
+            $0.end = 1.5
+            $0.label = "Window"
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.referenceGuides?.count == 2
+            },
+            timeout: 2.0
+        )
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/guides.sciplotgod"))
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.plot?.renderOptions.referenceGuides,
+            [
+                ReferenceGuidePayload(
+                    id: lineID,
+                    enabled: true,
+                    kind: "line",
+                    axisTarget: "y_primary",
+                    value: 2.5,
+                    label: "Target"
+                ),
+                ReferenceGuidePayload(
+                    id: bandID,
+                    enabled: true,
+                    kind: "band",
+                    axisTarget: "x",
+                    value: nil,
+                    start: 0.5,
+                    end: 1.5,
+                    label: "Window"
+                )
+            ]
+        )
+    }
+
+    func testExtraAxisEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.updateExtraXAxis {
+            $0.enabled = true
+            $0.position = "top"
+            $0.title = "Gallons"
+            $0.dataValue = 3.78541
+            $0.displayValue = 1.0
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.extraXAxis
+                    == ExtraAxisPayload(enabled: true, position: "top", title: "Gallons", dataValue: 3.78541, displayValue: 1.0)
+            },
+            timeout: 2.0
+        )
+
+        session.updateExtraYAxis {
+            $0.enabled = true
+            $0.position = "right"
+            $0.bindingMode = "series_assignment"
+            $0.seriesIDs = ["Sample B"]
+            $0.title = "Half Stress"
+            $0.dataValue = 2.0
+            $0.displayValue = 1.0
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.extraYAxis
+                    == ExtraAxisPayload(
+                        enabled: true,
+                        position: "right",
+                        bindingMode: "series_assignment",
+                        seriesIDs: ["Sample B"],
+                        title: "Half Stress",
+                        dataValue: 2.0,
+                        displayValue: 1.0
+                    )
+            },
+            timeout: 2.0
+        )
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/extra-axes.sciplotgod"))
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.plot?.renderOptions.extraXAxis,
+            ExtraAxisPayload(enabled: true, position: "top", title: "Gallons", dataValue: 3.78541, displayValue: 1.0)
+        )
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.plot?.renderOptions.extraYAxis,
+            ExtraAxisPayload(
+                enabled: true,
+                position: "right",
+                bindingMode: "series_assignment",
+                seriesIDs: ["Sample B"],
+                title: "Half Stress",
+                dataValue: 2.0,
+                displayValue: 1.0
+            )
+        )
+    }
+
+    func testTextAnnotationEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addTextAnnotation(displayStyle: "callout", connectorEnabled: true)
+        guard let annotationID = session.renderOptions.textAnnotations?.first?.id else {
+            XCTFail("Expected a text annotation to be created.")
+            return
+        }
+
+        session.updateTextAnnotation(id: annotationID) {
+            $0.text = "Peak"
+            $0.coordinateSpace = "data"
+            $0.x = 1.5
+            $0.y = 2.2
+            $0.yAxisTarget = "y_primary"
+            $0.horizontalAlignment = "right"
+            $0.verticalAlignment = "bottom"
+            $0.targetX = 1.0
+            $0.targetY = 1.8
+            $0.targetYAxisTarget = "y_primary"
+        }
+
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.textAnnotations?.first?.text == "Peak" &&
+                    client.renderRequests.last?.options.textAnnotations?.first?.coordinateSpace == "data"
+            },
+            timeout: 2.0
+        )
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/annotations.sciplotgod"))
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.count, 1)
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.text, "Peak")
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.x, 1.5)
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.y, 2.2)
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.displayStyle, "callout")
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.connectorEnabled, true)
     }
 
     func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {
@@ -531,7 +903,9 @@ final class PlotSessionTests: XCTestCase {
                     public: true,
                     description: "Nature style.",
                     hardConstraints: true,
-                    presetNote: "Nature preset"
+                    presetNote: "Nature preset",
+                    recommendedPalettePreset: "colorblind_safe",
+                    recommendedVisualThemeID: "clean_light"
                 ),
             ],
             palettes: [
@@ -595,13 +969,13 @@ final class PlotSessionTests: XCTestCase {
 
         XCTAssertEqual(session.selectedTemplateID, "curve")
         XCTAssertEqual(session.renderOptions.stylePreset, "nature")
-        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
 
         session.updateRenderOptions(policy: .immediate) {
             $0.visualThemeID = "macarons"
         }
-        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
         XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
 
         session.updateRenderOptions(policy: .immediate) {
@@ -613,8 +987,8 @@ final class PlotSessionTests: XCTestCase {
         session.chooseTemplate("box")
         XCTAssertEqual(session.selectedTemplateID, "box")
         XCTAssertEqual(session.renderOptions.stylePreset, "nature")
-        XCTAssertEqual(session.renderOptions.palettePreset, "macarons")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
     }
 
     func testTemplateResetAppliesIndependentStylePaletteAndThemeDefaultsForNewCurveTemplates() async throws {
@@ -629,17 +1003,17 @@ final class PlotSessionTests: XCTestCase {
         session.chooseTemplate("area_curve")
         XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
         XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
 
         session.chooseTemplate("stacked_area")
         XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "vintage")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "vintage")
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
 
         session.chooseTemplate("step_line")
         XCTAssertEqual(session.renderOptions.stylePreset, "editorial")
-        XCTAssertEqual(session.renderOptions.palettePreset, "shine")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "shine")
+        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
     }
 
     func testTemplateResetAppliesIndependentDefaultsForNewDensityAreaTemplate() async throws {
@@ -654,8 +1028,36 @@ final class PlotSessionTests: XCTestCase {
         session.chooseTemplate("density_area")
 
         XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "macarons")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "macarons")
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+    }
+
+    func testThemeSelectionAppliesRecommendedPaletteAndBackgroundWhileAllowingIndependentOverrides() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.selectStylePreset("presentation")
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+
+        session.updateRenderOptions(policy: .immediate) {
+            $0.palettePreset = "vintage"
+            $0.visualThemeID = "roma"
+        }
+        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.palettePreset, "vintage")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+
+        session.selectStylePreset("editorial")
+        XCTAssertEqual(session.renderOptions.stylePreset, "editorial")
+        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
     }
 
     func testInspectionCancellationDoesNotSurfaceError() async {
@@ -710,7 +1112,7 @@ final class PlotSessionTests: XCTestCase {
         )
 
         XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
 
         session.applyExternalRenderOptions(
             RenderOptionsPayload(

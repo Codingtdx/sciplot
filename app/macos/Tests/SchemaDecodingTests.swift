@@ -139,6 +139,103 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(comparison.comparisonSet.workbookLabels.count, 2)
     }
 
+    func testDecodeRenderRequestWithExtraAxes() throws {
+        let payload = """
+        {
+          "input_path": "/tmp/sample.csv",
+          "sheet": 0,
+          "template": "curve",
+          "options": {
+            "style_preset": "nature",
+            "palette_preset": "colorblind_safe",
+            "extra_x_axis": {
+              "enabled": true,
+              "position": "top",
+              "title": "Gallons",
+              "data_value": 3.78541,
+              "display_value": 1.0
+            },
+            "extra_y_axis": {
+              "enabled": true,
+              "position": "right",
+              "title": "Half Stress",
+              "data_value": 2.0,
+              "display_value": 1.0
+            },
+            "x_axis_breaks": [
+              {
+                "id": "x-gap",
+                "enabled": true,
+                "start": 0.8,
+                "end": 1.2,
+                "display_mode": "split"
+              }
+            ],
+            "y_axis_breaks": [
+              {
+                "id": "y-gap",
+                "enabled": true,
+                "start": 1.4,
+                "end": 2.2
+              }
+            ],
+            "reference_guides": [
+              {
+                "id": "target-line",
+                "enabled": true,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 2.5,
+                "label": "Target"
+              }
+            ],
+            "text_annotations": [
+              {
+                "id": "note-1",
+                "enabled": true,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 1.5,
+                "y": 2.2,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+                "display_style": "callout",
+                "connector_enabled": true,
+                "target_x": 1.0,
+                "target_y": 1.8,
+                "target_y_axis_target": "y_primary"
+              }
+            ]
+          },
+          "fit_options": {
+            "enabled": false,
+            "model_id": "linear"
+          }
+        }
+        """
+
+        let request = try decoder.decode(RenderRequest.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(request.options.extraXAxis?.position, "top")
+        XCTAssertEqual(request.options.extraXAxis?.title, "Gallons")
+        XCTAssertEqual(request.options.extraXAxis?.bindingMode, "conversion")
+        XCTAssertEqual(request.options.extraXAxis?.seriesIDs, [])
+        XCTAssertEqual(request.options.extraYAxis?.position, "right")
+        XCTAssertEqual(request.options.extraYAxis?.bindingMode, "conversion")
+        XCTAssertEqual(request.options.extraYAxis?.seriesIDs, [])
+        XCTAssertEqual(request.options.extraYAxis?.displayValue, 1.0)
+        XCTAssertEqual(request.options.xAxisBreaks?.first?.id, "x-gap")
+        XCTAssertEqual(request.options.xAxisBreaks?.first?.start, 0.8)
+        XCTAssertEqual(request.options.xAxisBreaks?.first?.displayMode, "split")
+        XCTAssertEqual(request.options.yAxisBreaks?.first?.end, 2.2)
+        XCTAssertEqual(request.options.yAxisBreaks?.first?.displayMode, "compress")
+        XCTAssertEqual(request.options.referenceGuides?.first?.kind, "line")
+        XCTAssertEqual(request.options.referenceGuides?.first?.axisTarget, "y_primary")
+        XCTAssertEqual(request.options.textAnnotations?.first?.displayStyle, "callout")
+        XCTAssertEqual(request.options.textAnnotations?.first?.connectorEnabled, true)
+    }
+
     func testDecodePlotContractSizePresetsWithoutIDField() throws {
         let payload = """
         {
@@ -204,7 +301,9 @@ final class SchemaDecodingTests: XCTestCase {
               "public": true,
               "description": "Nature style",
               "hard_constraints": true,
-              "preset_note": "Repo nature"
+              "preset_note": "Repo nature",
+              "recommended_palette_preset": "colorblind_safe",
+              "recommended_visual_theme_id": "clean_light"
             },
             {
               "id": "editorial",
@@ -212,7 +311,9 @@ final class SchemaDecodingTests: XCTestCase {
               "public": true,
               "description": "Editorial style",
               "hard_constraints": false,
-              "preset_note": "Relaxed preset"
+              "preset_note": "Relaxed preset",
+              "recommended_palette_preset": "roma",
+              "recommended_visual_theme_id": "roma"
             }
           ],
           "palettes": [
@@ -286,6 +387,8 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.templates.first?.defaultOptions["style_preset"]?.stringValue, "presentation")
         XCTAssertEqual(response.templates.first?.defaultOptions["palette_preset"]?.stringValue, "roma")
         XCTAssertEqual(response.templates.first?.defaultOptions["visual_theme_id"]?.stringValue, "roma")
+        XCTAssertEqual(response.styles.first?.recommendedPalettePreset, "colorblind_safe")
+        XCTAssertEqual(response.styles.first?.recommendedVisualThemeID, "clean_light")
     }
 
     func testDecodeComposerPreviewPayload() throws {

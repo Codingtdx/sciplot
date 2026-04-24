@@ -280,6 +280,10 @@ extension PlotSession {
     func resetRenderOptions(for templateID: String) {
         let template = metadata?.templates.first { $0.id == templateID }
         let recommendationSummary = recommendedPreviewConfigSummary(for: templateID)
+        let resolvedStyle = defaultStyle(
+            for: template,
+            recommendedStyleID: recommendationSummary["style_preset"]?.stringValue
+        )
 
         renderOptions = RenderOptionsPayload(
             size: recommendationSummary["size"]?.stringValue ?? template?.defaultSize,
@@ -291,18 +295,17 @@ extension PlotSession {
             yLabelOverride: nil,
             baseline: recommendationSummary["baseline"]?.stringValue,
             showColorbar: recommendationSummary["show_colorbar"]?.boolValue,
-            stylePreset: defaultStyle(
-                for: template,
-                recommendedStyleID: recommendationSummary["style_preset"]?.stringValue
-            ),
+            stylePreset: resolvedStyle,
             palettePreset: defaultPalette(
                 for: template,
-                recommendedPaletteID: recommendationSummary["palette_preset"]?.stringValue
+                recommendedPaletteID: recommendationSummary["palette_preset"]?.stringValue,
+                styleID: resolvedStyle
             ),
             useSidecar: recommendationSummary["use_sidecar"]?.boolValue ?? true,
             visualThemeID: defaultThemeID(
                 for: template,
-                recommendedThemeID: recommendationSummary["visual_theme_id"]?.stringValue
+                recommendedThemeID: recommendationSummary["visual_theme_id"]?.stringValue,
+                styleID: resolvedStyle
             )
         )
         notifyRenderOptionsDidChange()
@@ -314,6 +317,10 @@ extension PlotSession {
             ?? inspectionResponse?.inspection.recommendations.first
             ?? inspectionResponse?.inspection.primaryRecommendation.first
         return selected?.previewConfigSummary ?? [:]
+    }
+
+    func styleSummary(for styleID: String) -> MetaStyleResponse? {
+        metadata?.styles.first { $0.id == styleID }
     }
 
     func defaultStyle(for template: MetaTemplateSummary?, recommendedStyleID: String? = nil) -> String {
@@ -338,12 +345,34 @@ extension PlotSession {
         return template?.availableStyles.first ?? metadata?.defaults.stylePreset ?? "nature"
     }
 
-    func defaultPalette(for template: MetaTemplateSummary?, recommendedPaletteID: String? = nil) -> String {
+    func recommendedPalette(for styleID: String, template: MetaTemplateSummary? = nil) -> String {
+        let fallback = template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "colorblind_safe"
+        guard let recommendedPaletteID = styleSummary(for: styleID)?.recommendedPalettePreset else {
+            return fallback
+        }
+        if let template, template.availablePalettes.contains(recommendedPaletteID) {
+            return recommendedPaletteID
+        }
+        guard let metadata, metadata.palettes.contains(where: { $0.id == recommendedPaletteID }) else {
+            return fallback
+        }
+        return recommendedPaletteID
+    }
+
+    func defaultPalette(
+        for template: MetaTemplateSummary?,
+        recommendedPaletteID: String? = nil,
+        styleID: String? = nil
+    ) -> String {
         if let template,
            let recommendedPaletteID,
            template.availablePalettes.contains(recommendedPaletteID)
         {
             return recommendedPaletteID
+        }
+
+        if let styleID {
+            return recommendedPalette(for: styleID, template: template)
         }
 
         if let template,
@@ -360,9 +389,24 @@ extension PlotSession {
         return template?.availablePalettes.first ?? metadata?.defaults.palettePreset ?? "colorblind_safe"
     }
 
-    func defaultThemeID(for template: MetaTemplateSummary?, recommendedThemeID: String? = nil) -> String? {
+    func styleRecommendedThemeID(for styleID: String) -> String? {
+        let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
+        guard let themeID = styleSummary(for: styleID)?.recommendedVisualThemeID else {
+            return metadata?.visualThemes.first?.id
+        }
+        return validThemeIDs.contains(themeID) ? themeID : metadata?.visualThemes.first?.id
+    }
+
+    func defaultThemeID(
+        for template: MetaTemplateSummary?,
+        recommendedThemeID: String? = nil,
+        styleID: String? = nil
+    ) -> String? {
         let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
         if let recommendedThemeID, validThemeIDs.contains(recommendedThemeID) {
+            return recommendedThemeID
+        }
+        if let styleID, let recommendedThemeID = styleRecommendedThemeID(for: styleID), validThemeIDs.contains(recommendedThemeID) {
             return recommendedThemeID
         }
         if let template,
@@ -374,19 +418,61 @@ extension PlotSession {
         return metadata?.visualThemes.first?.id
     }
 
-    func sanitizeRenderOptionsForCurrentTemplateIfNeeded() {
-        var resolved = renderOptions
+    func selectStylePreset(_ styleID: String) {
+        let template = selectedTemplateSummary
+        updateRenderOptions(policy: .immediate) { options in
+            options.stylePreset = styleID
+            options.palettePreset = recommendedPalette(for: styleID, template: template)
+            options.visualThemeID = styleRecommendedThemeID(for: styleID)
+        }
+    }
+
+    func normalizedRenderOptionsForCurrentTemplate(_ options: RenderOptionsPayload) -> RenderOptionsPayload {
+        var resolved = options
+        resolved.xAxisBreaks = normalizedAxisBreaks(resolved.xAxisBreaks)
+        resolved.yAxisBreaks = normalizedAxisBreaks(resolved.yAxisBreaks)
 
         if let template = selectedTemplateSummary {
             if !template.availableStyles.contains(resolved.stylePreset) {
                 resolved.stylePreset = defaultStyle(for: template)
             }
             if !template.availablePalettes.contains(resolved.palettePreset) {
-                resolved.palettePreset = defaultPalette(for: template)
+                resolved.palettePreset = defaultPalette(for: template, styleID: resolved.stylePreset)
             }
             let validThemeIDs = Set(metadata?.visualThemes.map(\.id) ?? [])
             if resolved.visualThemeID == nil || !validThemeIDs.contains(resolved.visualThemeID ?? "") {
-                resolved.visualThemeID = defaultThemeID(for: template)
+                resolved.visualThemeID = defaultThemeID(for: template, styleID: resolved.stylePreset)
+            }
+            if !template.editableOptions.contains("extra_x_axis") {
+                resolved.extraXAxis = nil
+            } else {
+                resolved.extraXAxis?.bindingMode = "conversion"
+                resolved.extraXAxis?.seriesIDs = []
+            }
+            if !template.editableOptions.contains("extra_y_axis") {
+                resolved.extraYAxis = nil
+            } else {
+                let supportsSeriesBinding = Set(["curve", "point_line", "scatter"]).contains(template.id)
+                if var extraYAxis = resolved.extraYAxis {
+                    if !supportsSeriesBinding {
+                        extraYAxis.bindingMode = "conversion"
+                    }
+                    if extraYAxis.bindingMode != "series_assignment" {
+                        extraYAxis.seriesIDs = []
+                    } else {
+                        let validSeriesIDs = Set(seriesAssignmentCandidateIDs)
+                        if !validSeriesIDs.isEmpty {
+                            extraYAxis.seriesIDs = extraYAxis.seriesIDs.filter { validSeriesIDs.contains($0) }
+                        }
+                    }
+                    resolved.extraYAxis = extraYAxis
+                }
+            }
+            if !template.editableOptions.contains("x_axis_breaks") || (resolved.xscale ?? "linear") != "linear" {
+                resolved.xAxisBreaks = nil
+            }
+            if !template.editableOptions.contains("y_axis_breaks") || (resolved.yscale ?? "linear") != "linear" {
+                resolved.yAxisBreaks = nil
             }
         } else if let metadata {
             let validStyles = Set(metadata.styles.map(\.id))
@@ -403,16 +489,61 @@ extension PlotSession {
                     ? metadata.defaults.palettePreset
                     : (metadata.palettes.first?.id ?? "colorblind_safe")
             }
-            if let themeID = resolved.visualThemeID, !validThemes.contains(themeID) {
-                resolved.visualThemeID = metadata.visualThemes.first?.id
+            if resolved.visualThemeID == nil || !validThemes.contains(resolved.visualThemeID ?? "") {
+                resolved.visualThemeID = styleRecommendedThemeID(for: resolved.stylePreset)
             }
+            resolved.extraXAxis?.bindingMode = "conversion"
+            resolved.extraXAxis?.seriesIDs = []
+            resolved.extraYAxis?.bindingMode = "conversion"
+            resolved.extraYAxis?.seriesIDs = []
+            resolved.xAxisBreaks = nil
+            resolved.yAxisBreaks = nil
         }
+
+        if hasEnabledExtraAxes(in: resolved) {
+            resolved.xAxisBreaks = nil
+            resolved.yAxisBreaks = nil
+        }
+        if hasEnabledSplitAxisBreaks(in: resolved.xAxisBreaks) {
+            resolved.yAxisBreaks = nil
+        } else if hasEnabledSplitAxisBreaks(in: resolved.yAxisBreaks) {
+            resolved.xAxisBreaks = nil
+        }
+
+        return resolved
+    }
+
+    func sanitizeRenderOptionsForCurrentTemplateIfNeeded() {
+        let resolved = normalizedRenderOptionsForCurrentTemplate(renderOptions)
 
         guard resolved != renderOptions else {
             return
         }
         renderOptions = resolved
         notifyRenderOptionsDidChange()
+    }
+
+    private func hasEnabledExtraAxes(in options: RenderOptionsPayload) -> Bool {
+        (options.extraXAxis?.enabled ?? false) || (options.extraYAxis?.enabled ?? false)
+    }
+
+    private func normalizedAxisBreaks(_ breaks: [AxisBreakPayload]?) -> [AxisBreakPayload]? {
+        guard let breaks, !breaks.isEmpty else {
+            return nil
+        }
+        let displayMode = breaks.first(where: { $0.displayMode == "split" }) != nil ? "split" : "compress"
+        return breaks.map { axisBreak in
+            var normalized = axisBreak
+            normalized.displayMode = displayMode
+            return normalized
+        }
+    }
+
+    private func hasEnabledSplitAxisBreaks(in breaks: [AxisBreakPayload]?) -> Bool {
+        guard let breaks else {
+            return false
+        }
+        return breaks.contains { $0.enabled && $0.displayMode == "split" }
     }
 
     func suggestedPlotExportFilename(
@@ -502,6 +633,7 @@ extension PlotSession {
                 sheet: selectedSheet,
                 selectedTemplateID: selectedTemplateID,
                 renderOptions: renderOptions,
+                fitOptions: fitOptions,
                 projectDisplayName: projectURL?.deletingPathExtension().lastPathComponent ?? selectedFileURL.deletingPathExtension().lastPathComponent,
                 sourceProvenance: PlotProjectSourceProvenancePayload(
                     originalInputPath: sourceProvenance.originalInputPath ?? selectedFileURL.path,
@@ -547,6 +679,7 @@ extension PlotSession {
         isLoadingFitAnalysis = false
         sourceTableOffset = 0
         fitAnalysisOffset = 0
+        fitAnalysisSelectedSeriesID = nil
         dataWorkbookTab = .sourceData
     }
 
@@ -604,7 +737,8 @@ extension PlotSession {
                     .init(
                         inputPath: selectedFileURL.path,
                         sheet: selectedSheet,
-                        modelID: "linear",
+                        modelID: fitOptions.modelID,
+                        seriesID: fitAnalysisSelectedSeriesID,
                         offset: resolvedOffset,
                         limit: fitAnalysisPageLimit
                     )
@@ -625,6 +759,11 @@ extension PlotSession {
     func pageFitAnalysis(by delta: Int) {
         let nextOffset = max(0, (fitAnalysisResponse?.offset ?? fitAnalysisOffset) + delta * fitAnalysisPageLimit)
         loadFitAnalysis(offset: nextOffset)
+    }
+
+    func selectFitAnalysisSeries(id: String?) {
+        fitAnalysisSelectedSeriesID = id
+        loadFitAnalysis(offset: 0)
     }
 
     func sourceProvenanceForCurrentURL(_ url: URL) -> PlotProjectSourceProvenancePayload {

@@ -811,8 +811,8 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(session.currentFigureTemplateID, "box")
         XCTAssertEqual(session.plotSession.renderOptions.stylePreset, "nature")
-        XCTAssertEqual(session.plotSession.renderOptions.palettePreset, "macarons")
-        XCTAssertEqual(session.plotSession.renderOptions.visualThemeID, "macarons")
+        XCTAssertEqual(session.plotSession.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.plotSession.renderOptions.visualThemeID, "clean_light")
     }
 
     func testRestoreSessionMigratesLegacyGroupedBarSelections() async {

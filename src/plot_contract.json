@@ -203,6 +203,8 @@
       "description": "Nature: a compact research-figure style that prioritizes official constraints.",
       "hard_constraints": true,
       "preset_note": "Built around the current public Nature image constraints.",
+      "recommended_palette_preset": "colorblind_safe",
+      "recommended_visual_theme_id": "clean_light",
       "typography": {
         "font_family": [
           "Arial",
@@ -255,6 +257,8 @@
       "description": "Balanced research style with slightly larger text and a lighter stroke hierarchy than Nature.",
       "hard_constraints": false,
       "preset_note": "A balanced paper-first preset with relaxed typography and stroke sizing.",
+      "recommended_palette_preset": "roma",
+      "recommended_visual_theme_id": "roma",
       "typography": {
         "font_family": [
           "Arial",
@@ -307,6 +311,8 @@
       "description": "Slide-friendly figure style with larger labels, longer ticks, and bolder data strokes.",
       "hard_constraints": false,
       "preset_note": "Optimized for talk-friendly readability while keeping the same physical panel frame.",
+      "recommended_palette_preset": "infographic",
+      "recommended_visual_theme_id": "presentation_like",
       "typography": {
         "font_family": [
           "Arial",
@@ -359,6 +365,8 @@
       "description": "Large-format display style with the strongest type and stroke hierarchy in the public catalog.",
       "hard_constraints": false,
       "preset_note": "The loosest public preset, intended for display contexts rather than Nature-tight print metrics.",
+      "recommended_palette_preset": "shine",
+      "recommended_visual_theme_id": "shine",
       "typography": {
         "font_family": [
           "Arial",
@@ -663,6 +671,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -673,8 +685,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -722,6 +734,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -732,8 +748,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -783,6 +799,8 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -794,7 +812,7 @@
         "reverse_x": false,
         "style_preset": "presentation",
         "palette_preset": "infographic",
-        "visual_theme_id": "infographic"
+        "visual_theme_id": "presentation_like"
       },
       "available_styles": [
         "nature",
@@ -842,6 +860,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -852,8 +874,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "editorial",
-        "palette_preset": "shine",
-        "visual_theme_id": "shine"
+        "palette_preset": "roma",
+        "visual_theme_id": "roma"
       },
       "available_styles": [
         "nature",
@@ -901,8 +923,8 @@
         "reverse_x": false,
         "baseline": "none",
         "style_preset": "nature",
-        "palette_preset": "vintage",
-        "visual_theme_id": "vintage"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -949,8 +971,8 @@
         "reverse_x": false,
         "baseline": "none",
         "style_preset": "presentation",
-        "palette_preset": "vintage",
-        "visual_theme_id": "vintage"
+        "palette_preset": "infographic",
+        "visual_theme_id": "presentation_like"
       },
       "available_styles": [
         "nature",
@@ -997,8 +1019,8 @@
         "reverse_x": true,
         "baseline": "linear_endpoints",
         "style_preset": "nature",
-        "palette_preset": "vintage",
-        "visual_theme_id": "vintage",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light",
         "use_sidecar": true
       },
       "available_styles": [
@@ -1048,8 +1070,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1098,8 +1120,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1149,8 +1171,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1199,8 +1221,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1250,8 +1272,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1301,8 +1323,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1352,8 +1374,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1400,6 +1422,8 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1407,8 +1431,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "nature",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1455,6 +1479,8 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1462,8 +1488,8 @@
       "default_options": {
         "size": "60x55",
         "style_preset": "presentation",
-        "palette_preset": "macarons",
-        "visual_theme_id": "macarons"
+        "palette_preset": "infographic",
+        "visual_theme_id": "presentation_like"
       },
       "available_styles": [
         "nature",
@@ -1513,6 +1539,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1523,8 +1553,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "shine",
-        "visual_theme_id": "shine"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1572,6 +1602,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1582,8 +1616,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "shine",
-        "visual_theme_id": "shine"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1631,6 +1665,10 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "x_axis_breaks",
+        "y_axis_breaks",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1641,8 +1679,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "shine",
-        "visual_theme_id": "shine"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1690,6 +1728,8 @@
         "x_tick_edge_labels",
         "y_tick_density",
         "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
         "series_order",
         "style_preset",
         "palette_preset"
@@ -1700,8 +1740,8 @@
         "yscale": "linear",
         "reverse_x": false,
         "style_preset": "nature",
-        "palette_preset": "shine",
-        "visual_theme_id": "shine"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1746,8 +1786,8 @@
         "size": "60x55",
         "show_colorbar": true,
         "style_preset": "nature",
-        "palette_preset": "infographic",
-        "visual_theme_id": "infographic"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
@@ -1795,8 +1835,8 @@
         "size": "60x55",
         "show_colorbar": true,
         "style_preset": "nature",
-        "palette_preset": "infographic",
-        "visual_theme_id": "infographic"
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",

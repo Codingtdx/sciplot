@@ -96,12 +96,24 @@ def _validation_result(rule_name: str, *, passed: bool, details: dict[str, objec
         "id": rule_name,
         "label": rule.label,
         "severity": rule.severity,
-        "passed": passed,
+        "passed": bool(passed),
         "details": details,
     }
     if rule.tolerance_mm is not None:
         payload["tolerance_mm"] = rule.tolerance_mm
     return payload
+
+
+def _json_safe(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 def _repo_relative_path(path: Path) -> str:
@@ -1172,6 +1184,7 @@ def _assert_major_tick_skip_every_other() -> None:
 def _assert_style_palette_presets(
     *,
     replicate_path: Path,
+    tensile_path: Path,
     ftir_path: Path,
     wide_nmr_path: Path,
     heatmap_path: Path,
@@ -1241,6 +1254,72 @@ def _assert_style_palette_presets(
         finally:
             for item in rendered:
                 plt.close(item.figure)
+
+    rendered = build_rendered_plots(
+        "point_line",
+        temp_path,
+        0,
+        yscale="log",
+        style_preset="nature",
+        palette_preset="colorblind_safe",
+        visual_theme_id="clean_light",
+        extra_x_axis={
+            "enabled": True,
+            "position": "top",
+            "title": "Scaled Frequency",
+            "data_value": 10.0,
+            "display_value": 1.0,
+        },
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "title": "Scaled Modulus",
+            "data_value": 1000.0,
+            "display_value": 1.0,
+        },
+    )
+    try:
+        if not rendered:
+            raise AssertionError("Extra-axis smoke case should render at least one figure.")
+        qa_report = rendered[0].qa_report
+        if qa_report is None or "extra_axis_overlay" not in qa_report.autofixes_applied:
+            raise AssertionError("Extra-axis smoke case should report the extra-axis overlay autofix.")
+        if len(rendered[0].figure.axes[0].child_axes) < 2:
+            raise AssertionError("Extra-axis smoke case should materialize secondary axes.")
+    finally:
+        close_rendered_plots(rendered)
+
+    rendered = build_rendered_plots(
+        "curve",
+        tensile_path,
+        0,
+        style_preset="nature",
+        palette_preset="colorblind_safe",
+        visual_theme_id="clean_light",
+        fit_options={"enabled": True, "model_id": "linear"},
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "binding_mode": "series_assignment",
+            "series_ids": ["Sample B"],
+            "title": "Secondary Stress",
+        },
+    )
+    try:
+        if not rendered:
+            raise AssertionError("Double-Y smoke case should render at least one figure.")
+        qa_report = rendered[0].qa_report
+        if qa_report is None or "extra_axis_series_assignment" not in qa_report.autofixes_applied:
+            raise AssertionError("Double-Y smoke case should report the series-assignment autofix.")
+        if len(rendered[0].figure.axes) < 2:
+            raise AssertionError("Double-Y smoke case should materialize a secondary Y axis.")
+        primary_ax, secondary_ax = rendered[0].figure.axes[0], rendered[0].figure.axes[1]
+        if [line.get_label() for line in primary_ax.lines if line.get_label() != "_nolegend_"] != ["Sample A"]:
+            raise AssertionError("Double-Y smoke case should keep Sample A on the primary axis.")
+        if [line.get_label() for line in secondary_ax.lines if line.get_label() != "_nolegend_"] != ["Sample B"]:
+            raise AssertionError("Double-Y smoke case should move Sample B onto the secondary axis.")
+    finally:
+        close_rendered_plots(rendered)
 
     groups = load_replicate_table(replicate_path)
     plot_style.apply_style("nature", "mono")
@@ -1317,32 +1396,48 @@ def _style_theme_template_matrix(
     heatmap_path: Path,
 ) -> list[dict[str, object]]:
     cases = [
-        ("curve", tensile_path, {"style_preset": "nature", "palette_preset": "roma", "visual_theme_id": "roma"}),
         (
             "curve",
             tensile_path,
-            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
+        ),
+        (
+            "curve",
+            tensile_path,
+            {
+                "style_preset": "presentation",
+                "palette_preset": "infographic",
+                "visual_theme_id": "presentation_like",
+            },
         ),
         (
             "area_curve",
             tensile_path,
-            {"style_preset": "nature", "palette_preset": "macarons", "visual_theme_id": "macarons"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
         ),
         (
             "area_curve",
             tensile_path,
-            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+            {
+                "style_preset": "presentation",
+                "palette_preset": "infographic",
+                "visual_theme_id": "presentation_like",
+            },
         ),
-        ("step_line", tensile_path, {"style_preset": "nature", "palette_preset": "shine", "visual_theme_id": "shine"}),
         (
             "step_line",
             tensile_path,
-            {"style_preset": "editorial", "palette_preset": "vintage", "visual_theme_id": "vintage"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
+        ),
+        (
+            "step_line",
+            tensile_path,
+            {"style_preset": "editorial", "palette_preset": "roma", "visual_theme_id": "roma"},
         ),
         (
             "bar",
             replicate_path,
-            {"style_preset": "nature", "palette_preset": "macarons", "visual_theme_id": "macarons"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
         ),
         (
             "bar",
@@ -1352,22 +1447,26 @@ def _style_theme_template_matrix(
         (
             "scatter",
             tensile_path,
-            {"style_preset": "nature", "palette_preset": "shine", "visual_theme_id": "shine"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
         ),
         (
             "scatter",
             tensile_path,
-            {"style_preset": "presentation", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+            {
+                "style_preset": "presentation",
+                "palette_preset": "infographic",
+                "visual_theme_id": "presentation_like",
+            },
         ),
         (
             "heatmap",
             heatmap_path,
-            {"style_preset": "nature", "palette_preset": "infographic", "visual_theme_id": "infographic"},
+            {"style_preset": "nature", "palette_preset": "colorblind_safe", "visual_theme_id": "clean_light"},
         ),
         (
             "heatmap",
             heatmap_path,
-            {"style_preset": "poster", "palette_preset": "vintage", "visual_theme_id": "vintage"},
+            {"style_preset": "poster", "palette_preset": "shine", "visual_theme_id": "shine"},
         ),
     ]
 
@@ -1407,6 +1506,148 @@ def _style_theme_template_matrix(
             raise AssertionError(f"{template} matrix must include at least two palette/theme combinations.")
 
     return manifest
+
+
+def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
+    reports: list[dict[str, object]] = []
+
+    curve = build_rendered_plots(
+        "curve",
+        tensile_path,
+        0,
+        x_axis_breaks=[{"id": "x-gap", "enabled": True, "start": 4.0, "end": 6.0}],
+        y_axis_breaks=[{"id": "y-gap", "enabled": True, "start": 2.2, "end": 2.8}],
+        reference_guides=[
+            {
+                "id": "target-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 3.0,
+                "label": "Target",
+            }
+        ],
+        text_annotations=[
+            {
+                "id": "note-1",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 8.0,
+                "y": 3.1,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+            }
+        ],
+    )
+    try:
+        plot = curve[0]
+        ax = plot.figure.axes[0]
+        reports.append(
+            _validation_result(
+                "non_blank_pdf",
+                passed=(
+                    plot.qa_report is not None
+                    and "axis_break_overlay" in plot.qa_report.autofixes_applied
+                    and ax.get_xlim()[1] < 10.0
+                    and ax.get_ylim()[1] < 3.2
+                    and any(text.get_text() == "Peak" for text in ax.texts)
+                ),
+                details={
+                    "template": "curve",
+                    "autofixes": list(plot.qa_report.autofixes_applied) if plot.qa_report is not None else [],
+                    "xlim": [float(value) for value in ax.get_xlim()],
+                    "ylim": [float(value) for value in ax.get_ylim()],
+                },
+            )
+        )
+    finally:
+        close_rendered_plots(curve)
+
+    split_curve = build_rendered_plots(
+        "curve",
+        tensile_path,
+        0,
+        x_axis_breaks=[{"id": "x-gap", "enabled": True, "start": 4.0, "end": 6.0, "display_mode": "split"}],
+        reference_guides=[
+            {
+                "id": "target-line",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 3.0,
+                "label": "Target",
+            }
+        ],
+        text_annotations=[
+            {
+                "id": "note-1",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 8.0,
+                "y": 3.1,
+                "y_axis_target": "y_primary",
+                "horizontal_alignment": "right",
+                "vertical_alignment": "bottom",
+            }
+        ],
+    )
+    try:
+        plot = split_curve[0]
+        visible_texts = {
+            text.get_text()
+            for axis in plot.figure.axes
+            for text in axis.texts
+            if text.get_visible()
+        }
+        reports.append(
+            _validation_result(
+                "non_blank_pdf",
+                passed=(
+                    plot.qa_report is not None
+                    and "axis_break_split_layout" in plot.qa_report.autofixes_applied
+                    and len(plot.figure.axes) >= 2
+                    and "Peak" in visible_texts
+                ),
+                details={
+                    "template": "curve_split",
+                    "autofixes": list(plot.qa_report.autofixes_applied) if plot.qa_report is not None else [],
+                    "axis_count": len(plot.figure.axes),
+                },
+            )
+        )
+    finally:
+        close_rendered_plots(split_curve)
+
+    scatter = build_rendered_plots(
+        "scatter",
+        tensile_path,
+        0,
+        x_axis_breaks=[{"id": "x-gap", "enabled": True, "start": 4.0, "end": 6.0}],
+    )
+    try:
+        ax = scatter[0].figure.axes[0]
+        visible_points = 0
+        for collection in ax.collections:
+            offsets = np.asarray(collection.get_offsets())
+            if offsets.ndim == 2:
+                visible_points += int(offsets.shape[0])
+        reports.append(
+            _validation_result(
+                "non_blank_pdf",
+                passed=visible_points > 0 and visible_points < 160,
+                details={
+                    "template": "scatter",
+                    "visible_points": visible_points,
+                },
+            )
+        )
+    finally:
+        close_rendered_plots(scatter)
+
+    return reports
 
 
 def _assert_frequency_batch_sync(freq_path: Path) -> None:
@@ -2042,7 +2283,7 @@ def _write_smoke_report(
     }
     SMOKE_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     SMOKE_REPORT_PATH.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
+        json.dumps(_json_safe(payload), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     return SMOKE_REPORT_PATH
@@ -2149,6 +2390,7 @@ def _run_smoke_workspace(base: Path) -> Path:
     _assert_stacked_series_clearance(plot_dsc, dsc_path)
     _assert_style_palette_presets(
         replicate_path=replicate_path,
+        tensile_path=tensile_path,
         ftir_path=ftir_path,
         wide_nmr_path=wide_nmr_path,
         heatmap_path=heatmap_path,
@@ -2176,6 +2418,7 @@ def _run_smoke_workspace(base: Path) -> Path:
         heatmap_path=heatmap_path,
         wide_nmr_path=wide_nmr_path,
     )
+    validation_reports.extend(_assert_axis_break_overlays(tensile_path))
     validation_reports.extend(_assert_wide_nmr_layout(wide_nmr_path))
     _assert_frequency_batch_sync(freq_path)
     _assert_legend_candidate_insets()
