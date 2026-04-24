@@ -6,7 +6,7 @@ protocol SidecarClienting: AnyObject {
     func fetchMeta() async throws -> SidecarMetaResponse
     func fetchPlotContract() async throws -> PlotContractResponse
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse
-    func previewDataStudioSource(_ request: DataStudioSourcePreviewRequest) async throws -> DataStudioSourcePreviewResponse
+    func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse
     func createDataStudioTemplate(_ request: DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse
     func updateDataStudioTemplate(templateID: String, request: DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse
     func deleteDataStudioTemplate(templateID: String) async throws
@@ -71,8 +71,8 @@ final class SidecarClient: SidecarClienting {
         try await get("data-studio/templates")
     }
 
-    func previewDataStudioSource(_ request: DataStudioSourcePreviewRequest) async throws -> DataStudioSourcePreviewResponse {
-        try await post("data-studio/source-preview", body: request)
+    func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse {
+        try await post("data-studio/template-preview", body: request)
     }
 
     func createDataStudioTemplate(_ request: DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse {

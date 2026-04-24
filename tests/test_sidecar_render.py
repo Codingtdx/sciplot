@@ -42,9 +42,9 @@ def test_render_preview_uses_cache_and_invalidates_when_options_change(
     first_payload = first.json()
 
     def fail_render(*args, **kwargs):
-        raise AssertionError("cache hit should skip build_rendered_plots")
+        raise AssertionError("cache hit should skip build_rendered_plots_from_options")
 
-    monkeypatch.setattr("app.sidecar.routes_render.build_rendered_plots", fail_render)
+    monkeypatch.setattr("app.sidecar.routes_render.build_rendered_plots_from_options", fail_render)
 
     cached = client.post("/render-preview", json=base_request)
     assert cached.status_code == 200, cached.text

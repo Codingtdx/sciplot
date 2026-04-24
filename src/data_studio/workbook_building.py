@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.data_studio.builtin import tensile as tensile_builtin
+from src.data_studio.import_templates_v2 import V2_PARSE_STRATEGY, build_workbook_from_template
 from src.data_studio.ingest import read_preview_source
 from src.data_studio.models import (
     DataStudioWorkbook,
@@ -41,6 +42,13 @@ def build_workbook(
     template = load_template(template_id)
     if template.parse_strategy == "builtin:tensile":
         return tensile_builtin.export_tensile_replicate_workbook(file_paths, output_path, group_name=group_name)
+    if template.parse_strategy == V2_PARSE_STRATEGY:
+        return build_workbook_from_template(
+            file_paths=list(file_paths),
+            output_path=output_path,
+            template=template,
+            group_name=group_name,
+        )
     if template.parse_strategy != GENERIC_TEMPLATE_PARSE_STRATEGY:
         raise ValueError(f"Unsupported Data Studio parse strategy: {template.parse_strategy}")
 

@@ -192,7 +192,7 @@ private struct DataStudioImportResolverSheet: View {
                 .font(.headline)
 
             if let preview = session.sourcePreview {
-                Text(URL(fileURLWithPath: preview.sourcePath).lastPathComponent)
+                Text(URL(fileURLWithPath: preview.inputPath).lastPathComponent)
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
             }

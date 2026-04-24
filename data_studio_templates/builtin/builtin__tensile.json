@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "id": "builtin/tensile",
   "label": "Tensile",
   "family": "tensile",
@@ -68,6 +68,14 @@
   ],
   "default_group_name_strategy": "common_prefix",
   "preferred_sheet_name": "Representative_Curve",
+  "output_kind": "curve_metrics",
+  "source_format": {
+    "encoding": null,
+    "delimiter": null,
+    "sheet_name": null
+  },
+  "segment_policy": "single_table",
+  "segment_selectors": [],
   "metadata": {
     "legacy_family": "tensile",
     "migrated_from": "src/tensile_replicates.py"

@@ -25,7 +25,7 @@ CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/code-console/run"),
     ("POST", "/compose-preview"),
     ("GET", "/data-studio/templates"),
-    ("POST", "/data-studio/source-preview"),
+    ("POST", "/data-studio/template-preview"),
     ("POST", "/data-studio/build-workbook"),
 )
 

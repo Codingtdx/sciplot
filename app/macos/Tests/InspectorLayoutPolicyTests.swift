@@ -130,10 +130,6 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         importedPlotSession.fitAnalysisResponse = TestPayloads.fitAnalysis(path: "/tmp/imported-curve.csv")
 
         let dataStudioClient = MockSidecarClient()
-        dataStudioClient.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let dataStudioSession = DataStudioSession()
         dataStudioSession.configure(client: dataStudioClient)
         dataStudioSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -431,9 +427,9 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         nonWhiteFraction: 0.5139
     ),
     "Data Studio template editor": SnapshotFingerprint(
-        differenceHash: 0x700108090c0c0c0c,
-        averageLuma: 0.9591,
-        nonWhiteFraction: 0.5417
+        differenceHash: 0x7001010909190900,
+        averageLuma: 0.9779,
+        nonWhiteFraction: 0.1944
     ),
     "Data Studio specimen filter": SnapshotFingerprint(
         differenceHash: 0x8ec0c8c8c8c8c880,

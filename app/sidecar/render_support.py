@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -13,6 +14,8 @@ from src.core.application.render import (
     resolve_render_options,
     resolve_template_id,
 )
+from src.rendering.fit_analysis import fit_options_from_payload
+from src.rendering.models import RenderOptions
 
 
 def normalize_path(path_text: str) -> Path:
@@ -81,6 +84,18 @@ def options_from_payload(
     )
 
 
+def render_options_from_payload(
+    template: str,
+    payload: RenderOptionsPayload,
+    *,
+    input_path: Path | None = None,
+    sheet: str | int = 0,
+    fit_options: object = None,
+) -> RenderOptions:
+    options = options_from_payload(template, payload, input_path=input_path, sheet=sheet)
+    return replace(options, fit_options=fit_options_from_payload(fit_options).__dict__)
+
+
 def contextual_error_message(context: str, exc: Exception) -> str:
     message = str(exc).strip() or "Unexpected error."
     lower = message.lower()
@@ -103,7 +118,7 @@ def contextual_error_message(context: str, exc: Exception) -> str:
         "save-project": "Could not save this project file.",
         "open-project": "Could not open this project file.",
         "data_studio_templates": "Could not load Data Studio templates.",
-        "data_studio_source_preview": "Could not inspect this Data Studio source file.",
+        "data_studio_template_preview": "Could not preview the Data Studio import template.",
         "data_studio_template_create": "Could not create the Data Studio template.",
         "data_studio_template_update": "Could not update the Data Studio template.",
         "data_studio_template_delete": "Could not delete the Data Studio template.",
@@ -137,4 +152,5 @@ __all__ = [
     "http_bad_request",
     "normalize_path",
     "options_from_payload",
+    "render_options_from_payload",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from app.sidecar.schemas_common import PreviewItemResponse, StrictModel, serialize_dataclass
 from app.sidecar.schemas_render import FitOptionsPayload, RenderOptionsPayload
@@ -106,6 +106,27 @@ class DataStudioTemplateConditionResponse(StrictModel):
     minimum_score: float = 0.0
 
 
+class DataStudioTemplateSourceFormatResponse(StrictModel):
+    encoding: str | None = None
+    delimiter: str | None = None
+    sheet_name: str | None = None
+
+
+class DataStudioTemplateSegmentSelectorResponse(StrictModel):
+    id: str
+    label: str
+    result_label: str | None = None
+    interval_index: int | None = None
+    header_row_index: int | None = Field(default=None, validation_alias=AliasChoices("header_row_index", "header_row"))
+    unit_row_index: int | None = Field(default=None, validation_alias=AliasChoices("unit_row_index", "unit_row"))
+    data_start_row_index: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("data_start_row_index", "data_start_row"),
+    )
+    start_row: int | None = None
+    end_row: int | None = None
+
+
 class DataStudioTemplateResponse(StrictModel):
     version: int
     id: str
@@ -120,6 +141,12 @@ class DataStudioTemplateResponse(StrictModel):
     workbook_metric_ids: list[str] = Field(default_factory=list)
     default_group_name_strategy: str = "common_prefix"
     preferred_sheet_name: str = "Representative_Curve"
+    output_kind: str = "curve_metrics"
+    source_format: DataStudioTemplateSourceFormatResponse = Field(
+        default_factory=DataStudioTemplateSourceFormatResponse
+    )
+    segment_policy: str = "single_table"
+    segment_selectors: list[DataStudioTemplateSegmentSelectorResponse] = Field(default_factory=list)
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
@@ -298,16 +325,18 @@ class DataStudioSessionResponse(StrictModel):
     template_draft_path: str | None = None
 
 
-class DataStudioSourcePreviewRequest(StrictModel):
-    input_path: str
-
-
 class DataStudioCreateTemplateRequest(StrictModel):
-    source_path: str
     label: str
-    accepted_candidate_ids: list[str] = Field(default_factory=list)
     template_id: str | None = None
     description: str = ""
+    output_kind: str = "curve_metrics"
+    source_format: DataStudioTemplateSourceFormatResponse = Field(
+        default_factory=DataStudioTemplateSourceFormatResponse
+    )
+    segment_policy: str = "single_table"
+    segment_selectors: list[DataStudioTemplateSegmentSelectorResponse] = Field(default_factory=list)
+    field_bindings: list[DataStudioTemplateFieldBindingResponse] = Field(default_factory=list)
+    match_conditions: list[DataStudioTemplateConditionResponse] = Field(default_factory=list)
 
 
 class DataStudioUpdateTemplateRequest(StrictModel):
@@ -329,6 +358,33 @@ class DataStudioImportWorkbookRequest(StrictModel):
 class DataStudioWorkbookPreviewRequest(StrictModel):
     workbook_path: str
     specimen_states: list[DataStudioSpecimenStateRequest] = Field(default_factory=list)
+
+
+class DataStudioTemplatePreviewSegmentResponse(StrictModel):
+    id: str
+    label: str
+    curve_count: int = 0
+    metric_count: int = 0
+    row_count: int = 0
+
+
+class DataStudioTemplatePreviewRequest(StrictModel):
+    source_path: str
+    template: DataStudioCreateTemplateRequest
+
+
+class DataStudioTemplatePreviewResponse(StrictModel):
+    template_id: str
+    output_kind: str
+    parsed_sample_count: int
+    failed_sample_count: int
+    series_count: int
+    metric_count: int
+    matrix_row_count: int
+    missing_roles: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    segments: list[DataStudioTemplatePreviewSegmentResponse] = Field(default_factory=list)
 
 
 class DataStudioComparisonRequest(StrictModel):
@@ -356,11 +412,6 @@ class DataStudioExportComparisonRequest(StrictModel):
 
 class DataStudioSessionNormalizeRequest(StrictModel):
     payload: dict[str, object]
-
-
-class DataStudioSourcePreviewResponse(StrictModel):
-    preview: DataStudioRawFilePreviewResponse
-    matches: list[DataStudioTemplateMatchResponse] = Field(default_factory=list)
 
 
 class DataStudioTemplateListResponse(StrictModel):
@@ -413,8 +464,6 @@ __all__ = [
     "DataStudioSessionNormalizeRequest",
     "DataStudioSessionResponse",
     "DataStudioSheetBlockResponse",
-    "DataStudioSourcePreviewRequest",
-    "DataStudioSourcePreviewResponse",
     "DataStudioSpecimenPreviewResponse",
     "DataStudioSpecimenStateRequest",
     "DataStudioSpecimenStateResponse",
@@ -422,7 +471,12 @@ __all__ = [
     "DataStudioTemplateFieldBindingResponse",
     "DataStudioTemplateListResponse",
     "DataStudioTemplateMatchResponse",
+    "DataStudioTemplatePreviewRequest",
+    "DataStudioTemplatePreviewResponse",
+    "DataStudioTemplatePreviewSegmentResponse",
     "DataStudioTemplateResponse",
+    "DataStudioTemplateSegmentSelectorResponse",
+    "DataStudioTemplateSourceFormatResponse",
     "DataStudioUpdateTemplateRequest",
     "DataStudioWorkbookResponse",
     "DataStudioWorkbookPreviewRequest",

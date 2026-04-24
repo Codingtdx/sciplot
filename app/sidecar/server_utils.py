@@ -6,6 +6,7 @@ from app.sidecar.render_support import (
     http_bad_request,
     normalize_path,
     options_from_payload,
+    render_options_from_payload,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "normalize_path",
     "options_from_payload",
     "preview_artifact_path",
+    "render_options_from_payload",
     "write_json_artifact",
 ]

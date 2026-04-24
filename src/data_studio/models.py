@@ -103,7 +103,20 @@ class RawFilePreview:
     warnings: tuple[str, ...] = ()
 
 
-TemplateFieldRole = Literal["curve_x", "curve_y", "metadata", "metric", "summary_metric", "header", "unit"]
+TemplateFieldRole = Literal[
+    "curve_x",
+    "curve_y",
+    "metadata",
+    "metric",
+    "summary_metric",
+    "header",
+    "unit",
+    "group",
+    "sample",
+    "matrix_x",
+    "matrix_y",
+    "matrix_z",
+]
 
 
 @dataclass(frozen=True)
@@ -130,6 +143,26 @@ class TemplateMatchCondition:
 
 
 @dataclass(frozen=True)
+class TemplateSourceFormat:
+    encoding: str | None = None
+    delimiter: str | None = None
+    sheet_name: str | None = None
+
+
+@dataclass(frozen=True)
+class TemplateSegmentSelector:
+    id: str
+    label: str
+    result_label: str | None = None
+    interval_index: int | None = None
+    header_row_index: int | None = None
+    unit_row_index: int | None = None
+    data_start_row_index: int | None = None
+    start_row: int | None = None
+    end_row: int | None = None
+
+
+@dataclass(frozen=True)
 class TemplateDefinition:
     version: int
     id: str
@@ -144,6 +177,10 @@ class TemplateDefinition:
     workbook_metric_ids: tuple[str, ...] = ()
     default_group_name_strategy: str = "common_prefix"
     preferred_sheet_name: str = "Representative_Curve"
+    output_kind: str = "curve_metrics"
+    source_format: TemplateSourceFormat = field(default_factory=TemplateSourceFormat)
+    segment_policy: str = "single_table"
+    segment_selectors: tuple[TemplateSegmentSelector, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -157,6 +194,30 @@ class TemplateMatch:
     warnings: tuple[str, ...] = ()
     matched_sheet_names: tuple[str, ...] = ()
     auto_selected: bool = False
+
+
+@dataclass(frozen=True)
+class TemplatePreviewSegment:
+    id: str
+    label: str
+    curve_count: int = 0
+    metric_count: int = 0
+    row_count: int = 0
+
+
+@dataclass(frozen=True)
+class TemplateApplyPreview:
+    template_id: str
+    output_kind: str
+    parsed_sample_count: int
+    failed_sample_count: int
+    series_count: int
+    metric_count: int
+    matrix_row_count: int
+    missing_roles: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    segments: tuple[TemplatePreviewSegment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -343,9 +404,13 @@ __all__ = [
     "RawSheetPreview",
     "SheetBlock",
     "TemplateDefinition",
+    "TemplateApplyPreview",
     "TemplateFieldBinding",
     "TemplateMatch",
     "TemplateMatchCondition",
+    "TemplatePreviewSegment",
+    "TemplateSegmentSelector",
+    "TemplateSourceFormat",
     "WorkbookMetricSummary",
     "WorkbookSample",
     "serialize_model",

@@ -579,6 +579,64 @@ struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
     let sheet: SheetValue
     let offset: Int
     let limit: Int
+    let encoding: String?
+    let delimiter: String?
+    let segmentID: String?
+    let headerRowIndex: Int?
+    let unitRowIndex: Int?
+    let dataStartRowIndex: Int?
+
+    init(
+        inputPath: String,
+        sheet: SheetValue = .index(0),
+        offset: Int = 0,
+        limit: Int = 50,
+        encoding: String? = nil,
+        delimiter: String? = nil,
+        segmentID: String? = nil,
+        headerRowIndex: Int? = nil,
+        unitRowIndex: Int? = nil,
+        dataStartRowIndex: Int? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.offset = offset
+        self.limit = limit
+        self.encoding = encoding
+        self.delimiter = delimiter
+        self.segmentID = segmentID
+        self.headerRowIndex = headerRowIndex
+        self.unitRowIndex = unitRowIndex
+        self.dataStartRowIndex = dataStartRowIndex
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case sheet
+        case offset
+        case limit
+        case encoding
+        case delimiter
+        case segmentID = "segment_id"
+        case headerRowIndex = "header_row_index"
+        case unitRowIndex = "unit_row_index"
+        case dataStartRowIndex = "data_start_row_index"
+    }
+}
+
+struct SourceTableSegmentResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let sheetName: String
+    let label: String
+    let resultLabel: String?
+    let intervalIndex: Int?
+    let startRow: Int
+    let endRow: Int
+    let headerRowIndex: Int?
+    let unitRowIndex: Int?
+    let dataStartRowIndex: Int?
+    let columnCount: Int
+    let rowCount: Int
 }
 
 struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
@@ -593,6 +651,66 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
     let candidateRoles: PlotCandidateRolesResponse
     let detectedXLabel: String?
     let detectedYLabel: String?
+    let columnProfiles: [PlotColumnProfileResponse]
+    let segments: [SourceTableSegmentResponse]
+    let selectedSegmentID: String?
+    let encoding: String?
+    let delimiter: String?
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case sheet
+        case offset
+        case limit
+        case totalRows
+        case totalCols
+        case columnHeaders
+        case rows
+        case candidateRoles
+        case detectedXLabel
+        case detectedYLabel
+        case columnProfiles
+        case segments
+        case selectedSegmentID = "selectedSegmentId"
+        case encoding
+        case delimiter
+    }
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        offset: Int,
+        limit: Int,
+        totalRows: Int,
+        totalCols: Int,
+        columnHeaders: [String],
+        rows: [[JSONValue]],
+        candidateRoles: PlotCandidateRolesResponse,
+        detectedXLabel: String?,
+        detectedYLabel: String?,
+        columnProfiles: [PlotColumnProfileResponse] = [],
+        segments: [SourceTableSegmentResponse] = [],
+        selectedSegmentID: String? = nil,
+        encoding: String? = nil,
+        delimiter: String? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.offset = offset
+        self.limit = limit
+        self.totalRows = totalRows
+        self.totalCols = totalCols
+        self.columnHeaders = columnHeaders
+        self.rows = rows
+        self.candidateRoles = candidateRoles
+        self.detectedXLabel = detectedXLabel
+        self.detectedYLabel = detectedYLabel
+        self.columnProfiles = columnProfiles
+        self.segments = segments
+        self.selectedSegmentID = selectedSegmentID
+        self.encoding = encoding
+        self.delimiter = delimiter
+    }
 }
 
 struct FitAnalysisRequest: Codable, Equatable, Sendable {

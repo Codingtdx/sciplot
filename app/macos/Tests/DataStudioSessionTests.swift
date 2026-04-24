@@ -162,10 +162,6 @@ final class DataStudioSessionTests: XCTestCase {
 
     func testDismissingImportStepsClearsTransientImportErrors() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
 
         let session = DataStudioSession()
         session.configure(client: client)
@@ -330,7 +326,13 @@ final class DataStudioSessionTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/raw_b.csv"),
         ])
 
-        XCTAssertEqual(client.dataStudioSourcePreviewRequests.count, 1)
+        XCTAssertEqual(client.sourceTablePreviewRequests.count, 1)
+        XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 0)
+        XCTAssertEqual(session.selectedTemplateID, "builtin/tensile")
+        assertImportFlow(session, equals: .wizard(step: .resolver))
+
+        await session.importWithSelectedTemplate()
+
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "builtin/tensile")
         XCTAssertEqual(session.orderedGroups.count, 1)
@@ -362,6 +364,8 @@ final class DataStudioSessionTests: XCTestCase {
             URL(fileURLWithPath: "/tmp/raw_a.csv"),
             URL(fileURLWithPath: "/tmp/raw_b.csv"),
         ])
+        session.selectedTemplateID = "builtin/tensile"
+        await session.importWithSelectedTemplate()
 
         XCTAssertEqual(session.orderedGroups.first?.state.displayName, "E3")
         XCTAssertEqual(session.focusTitle, "E3")
@@ -399,34 +403,6 @@ final class DataStudioSessionTests: XCTestCase {
 
     func testUnresolvedRawImportPresentsResolverWithoutOpeningTemplateEditor() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(
-                preview: preview.preview,
-                matches: [
-                    .init(
-                        templateID: "builtin/tensile",
-                        label: "Tensile",
-                        family: "tensile",
-                        confidence: 0.74,
-                        reasons: ["Matched tensile-style headers, but summary metrics were incomplete."],
-                        warnings: [],
-                        matchedSheetNames: ["Sheet1"],
-                        autoSelected: false
-                    ),
-                    .init(
-                        templateID: "user/custom_curve",
-                        label: "Custom Curve Template",
-                        family: "curve",
-                        confidence: 0.58,
-                        reasons: ["Detected a compatible curve block, but units were ambiguous."],
-                        warnings: ["Manual review recommended."],
-                        matchedSheetNames: ["Sheet1"],
-                        autoSelected: false
-                    ),
-                ]
-            )
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -440,10 +416,6 @@ final class DataStudioSessionTests: XCTestCase {
 
     func testCreateTemplateEditorOpensFromResolverAndCancelReturnsToResolver() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -469,10 +441,6 @@ final class DataStudioSessionTests: XCTestCase {
 
     func testCreateTemplateEditorStartsWithSuggestionSelectionsAndHoverPreview() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -481,22 +449,15 @@ final class DataStudioSessionTests: XCTestCase {
         session.beginCreateTemplateEditor()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertFalse(session.selectedSuggestionIDs.isEmpty)
-        XCTAssertEqual(session.createTemplatePrimaryCurveSuggestion?.title, "Recommended Curve")
-        XCTAssertEqual(session.selectedTemplateSummaryItems.first?.title, "Curve")
-
-        session.setHoveredSuggestion(id: "sheet1:block0::curve_pair")
-        XCTAssertEqual(Set(session.hoveredPreviewRanges.map(\.role)), Set(["x", "y"]))
-        XCTAssertEqual(session.selectedPreviewBlockID, "sheet1:block0")
-        XCTAssertEqual(session.createTemplatePreviewCaption, "Previewing Recommended Curve in Sheet1 / Primary Data Block")
+        XCTAssertEqual(session.templateDraftXColumnName, "Strain")
+        XCTAssertEqual(session.templateDraftYColumnNames, ["Stress"])
+        let summary = Dictionary(uniqueKeysWithValues: session.selectedTemplateSummaryItems.map { ($0.title, $0.value) })
+        XCTAssertEqual(summary["X"], "Strain")
+        XCTAssertEqual(summary["Y"], "Stress")
     }
 
     func testResolverPresentationExplainsMissingTemplateSelection() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -513,10 +474,6 @@ final class DataStudioSessionTests: XCTestCase {
 
     func testTemplateEditorPresentationUsesSingleSourceValuesLocationsAndSaveReasons() async throws {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -525,10 +482,9 @@ final class DataStudioSessionTests: XCTestCase {
         session.beginCreateTemplateEditor()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        let curvePresentation = try XCTUnwrap(session.templateEditorPresentation.primaryCurveSuggestion)
-        XCTAssertEqual(curvePresentation.values, ["X: Strain (%)", "Y: Stress (MPa)"])
-        XCTAssertEqual(curvePresentation.location, "Sheet1 / Primary Data Block")
-        XCTAssertEqual(session.templateEditorPresentation.previewCaption, session.createTemplatePreviewCaption)
+        let summary = Dictionary(uniqueKeysWithValues: session.templateEditorPresentation.selectedSummaryItems.map { ($0.title, $0.value) })
+        XCTAssertEqual(summary["X"], "Strain")
+        XCTAssertEqual(summary["Y"], "Stress")
 
         session.templateDraftLabel = ""
         XCTAssertFalse(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
@@ -538,20 +494,16 @@ final class DataStudioSessionTests: XCTestCase {
         )
 
         session.templateDraftLabel = "New Template"
-        session.selectedCandidateIDs = []
+        session.templateDraftYColumnNames = []
         XCTAssertFalse(session.templateEditorPresentation.saveTemplateAndContinueAvailability.isEnabled)
         XCTAssertEqual(
             session.templateEditorPresentation.saveTemplateAndContinueAvailability.reason,
-            "Select at least one suggested or manual field before saving the parse template."
+            "Choose at least one Y column."
         )
     }
 
     func testTogglingSuggestionAndManualCandidateSelectionStayInSync() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -560,26 +512,18 @@ final class DataStudioSessionTests: XCTestCase {
         session.beginCreateTemplateEditor()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
-        XCTAssertTrue(session.selectedSuggestionIDs.contains("sheet1:block0::curve_pair"))
-        XCTAssertTrue(session.selectedCandidateIDs.contains("candidate:strain"))
-        XCTAssertTrue(session.selectedCandidateIDs.contains("candidate:stress"))
+        XCTAssertEqual(session.templateDraftXColumnName, "Strain")
+        XCTAssertTrue(session.templateDraftYColumnNames.contains("Stress"))
 
-        session.toggleSuggestion(id: "sheet1:block0::curve_pair")
-        XCTAssertFalse(session.selectedSuggestionIDs.contains("sheet1:block0::curve_pair"))
-        XCTAssertFalse(session.selectedCandidateIDs.contains("candidate:strain"))
-        XCTAssertFalse(session.selectedCandidateIDs.contains("candidate:stress"))
+        session.setDraftYColumn("Stress", isSelected: false)
+        XCTAssertFalse(session.templateDraftYColumnNames.contains("Stress"))
 
-        session.setCandidateSelection(id: "candidate:strain", isSelected: true)
-        session.setCandidateSelection(id: "candidate:stress", isSelected: true)
-        XCTAssertTrue(session.selectedSuggestionIDs.contains("sheet1:block0::curve_pair"))
+        session.setDraftYColumn("Stress", isSelected: true)
+        XCTAssertTrue(session.templateDraftYColumnNames.contains("Stress"))
     }
 
     func testSelectedTemplateSummaryItemsStayHumanReadable() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession()
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -589,17 +533,15 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 20_000_000)
 
         let summary = Dictionary(uniqueKeysWithValues: session.selectedTemplateSummaryItems.map { ($0.title, $0.value) })
-        XCTAssertEqual(summary["Curve"], "X = Strain (%), Y = Stress (MPa)")
-        XCTAssertEqual(summary["Metrics"], "Strength")
-        XCTAssertEqual(summary["Structure"], "Header Row 2 · Unit Row 3")
+        XCTAssertEqual(summary["Source"], "sample.csv")
+        XCTAssertEqual(summary["Encoding"], "utf-8")
+        XCTAssertEqual(summary["Delimiter"], ",")
+        XCTAssertEqual(summary["X"], "Strain")
+        XCTAssertEqual(summary["Y"], "Stress")
     }
 
     func testSaveTemplateReturnsToResolverWithoutBuildingWorkbook() async {
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         client.dataStudioTemplateResponse = TestPayloads.dataStudioTemplate(
             id: "user/new_template",
             label: "My Template"
@@ -626,10 +568,6 @@ final class DataStudioSessionTests: XCTestCase {
     func testSaveTemplateAndContinueImportBuildsWorkbook() async {
         let outputWorkbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         client.dataStudioTemplateResponse = TestPayloads.dataStudioTemplate(
             id: "user/new_template",
             label: "My Template"
@@ -657,10 +595,6 @@ final class DataStudioSessionTests: XCTestCase {
     func testUsingSelectedTemplateFromResolverBuildsWorkbook() async {
         let outputWorkbookURL = URL(fileURLWithPath: "/tmp/prepared.xlsx")
         let client = MockSidecarClient()
-        client.dataStudioSourcePreviewHandler = { request in
-            let preview = TestPayloads.dataStudioSourcePreview(path: request.inputPath)
-            return DataStudioSourcePreviewResponse(preview: preview.preview, matches: [])
-        }
         let session = DataStudioSession(
             chooseWorkbookSaveLocation: { _ in outputWorkbookURL }
         )

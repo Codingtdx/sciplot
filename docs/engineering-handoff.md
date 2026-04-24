@@ -3071,6 +3071,7 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
   - `git diff --check`: passed
+  - `git diff --check`: passed
 
 ### 2026-04-24 (Round AZ): DataGraph-inspired shape annotations as durable region/bracket overlays
 
@@ -3152,6 +3153,139 @@ Use this block for every new round:
   - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
   - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 41 source files`)
   - `.venv/bin/python -m pytest tests`: passed (`216 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
+
+## 2026-04-24 - DataGraph-Inspired Cleanup Refactor
+
+- Scope:
+  - Cleaned generated artifacts with `/Users/dongxutian/Documents/codegod/scripts/clean_repo.py` before regression, reclaiming about `230.2 MB` from caches and derived data without touching source.
+  - Consolidated Plot preview/export request rendering through a single normalized `RenderOptions` path:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    - `/Users/dongxutian/Documents/codegod/src/core/application/render.py`
+  - Added `/Users/dongxutian/Documents/codegod/src/rendering/overlay_coordinates.py` as the shared coordinate helper for broken-axis panels, interval clipping, mapped anchors, pixel offsets, and secondary-Y conversion scale.
+  - Updated reference guide, text annotation, and shape annotation overlays to reuse the shared coordinate helper instead of carrying duplicate mapping snippets:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/shape_annotations.py`
+  - Split Plot shape annotation controls out of the oversized inspector into `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`, and added it to the macOS Xcode target.
+  - Updated `/Users/dongxutian/Documents/codegod/tests/test_sidecar_render.py` so the preview cache guard patches the new `build_rendered_plots_from_options` route seam instead of the removed route-local old render symbol.
+- User-visible impact:
+  - No intentional UI or plotting behavior change.
+  - Shape annotation controls remain in `Advanced Plot -> Shape Annotations`; the same `PlotSession` durable state, undo/redo path, preview/export path, and project persistence semantics are preserved.
+  - Preview/export normalized artifacts may now carry the normalized fit-options payload in the same render options object used for actual rendering.
+- Performance and structure note:
+  - Target: remove avoidable per-preview/per-export payload explosion and duplicate overlay normalization while keeping render output stable.
+  - Protective coverage: route preview cache test, full rendering/project route pytest suite, `scripts/smoke_check.py`, and macOS Plot session tests.
+  - This is a structural efficiency cleanup, not a benchmarked rendering-speed claim.
+- Risks:
+  - `build_rendered_plots_from_options` is now the lower-level render seam; any future sidecar render route should pass already-normalized `RenderOptions` through this path instead of re-expanding payload fields.
+  - `overlay_coordinates.py` owns reusable geometry helpers only; overlay-specific drawing style, labels, and QA autofix markers remain in their respective modules.
+  - The new Swift subview duplicates a small amount of inspector binding boilerplate to keep shape annotation ownership local. Further inspector cleanup should extract common binding helpers deliberately instead of adding another large all-purpose view.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/server_utils.py`
+  - `/Users/dongxutian/Documents/codegod/src/core/application/render.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/overlay_coordinates.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/reference_guides.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/text_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/shape_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_render.py`
+- Decision Record:
+  - Motivation: the current DataGraph-inspired overlay feature set was functionally in place, but the implementation was starting to thicken around repeated render-option normalization and repeated broken-axis coordinate math. The cleanup keeps the product model typed and contract-first while reducing future overlay/refinement debt.
+  - Accepted: introduce `build_rendered_plots_from_options` as the low-level render entry once a request has been normalized; keep `build_rendered_plots` as the public compatibility entry for CLI, tests, smoke, and Data Studio callers that still pass keyword options.
+  - Rejected: preserve route-local `build_rendered_plots` aliases just to satisfy old tests. The route test now patches the new route seam directly, so no dead compatibility symbol remains in the route module.
+  - Accepted: centralize overlay coordinate helpers in Python rendering, where preview/export/project reopen already converge.
+  - Rejected: moving geometry into Swift or adding a generic DataGraph command interpreter in this cleanup. That would create a second drawing semantics source and weaken the current typed payload boundary.
+  - Boundaries: no change to frozen `nature` typography, line width, spacing, axis frame, or export metrics; no new public template/style/palette contract surface; no restored legacy sidecar route.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed, reclaimed approx `230.2 MB`
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 42 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`216 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
+  - `git diff --check`: passed
+
+## 2026-04-24 - Data Studio Import Template v2 With Rheology Fixtures
+
+- Scope:
+  - Rebuilt Data Studio user import templates as v2 no-code table mappings in:
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/template_store.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/import_templates_v2.py`
+    - `/Users/dongxutian/Documents/codegod/src/data_studio/workbook_building.py`
+  - Added segment-aware raw table preview in `/Users/dongxutian/Documents/codegod/src/rendering/source_table_preview.py` and wired `POST /source-table-preview` to accept encoding, delimiter, header/unit/data-start row, and segment parameters.
+  - Removed the legacy `POST /data-studio/source-preview` route and added `POST /data-studio/template-preview` for unsaved draft parsing.
+  - Updated sidecar request/response models, critical route compatibility checks, and macOS client models in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarClient.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarRuntime.swift`
+  - Reworked the macOS staged import sheet in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+  - Added fixture copies for rheology and tensile samples under `/Users/dongxutian/Documents/codegod/tests/fixtures/data_studio_import_v2/`.
+  - Added and updated backend/sidecar/macOS regression coverage, including route removal assertions, v2 save/load, template preview errors, rheology role defaults, all output shapes, unsupported compare recipes, and import wizard state tests.
+- User-visible impact:
+  - Data Studio import now previews metadata-heavy UTF-16 tab-delimited rheology files correctly instead of collapsing them into one column.
+  - The create-template stage shows source segments, paged table rows, encoding/delimiter, and X/Y/metric role mapping before saving.
+  - Rheology `Result` / `Interval data` blocks can be treated as one series source by default.
+  - Saved v2 templates can output curve+metric workbooks, metric-only workbooks, or matrix/heatmap workbooks.
+  - Builtin tensile behavior is preserved as the regression baseline.
+  - Unsupported compare figure entries are disabled with reasons when a workbook lacks the required curve or metric shape.
+- Risks:
+  - v2 intentionally does not preserve the old user-template parser or the old source-preview candidate workflow. Existing user templates need to be recreated through the new mapper.
+  - The first macOS UI pass covers segment selection and column role mapping; richer row-role editing can extend the same `source_format` / `segment_selectors` payload instead of adding another endpoint.
+  - Matrix/heatmap output is supported at workbook-shape level, but downstream figure families should stay gated by explicit compare recipe support.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/source_table_preview.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/models.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/template_store.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/service.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/workbook_building.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/comparison.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_data_studio_import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/tests/fixtures/data_studio_import_v2/`
+- Decision Record:
+  - Motivation: the broken behavior came from treating every CSV-like file as a simple table. The user-provided rheology files showed the actual first-principles requirement: import must first identify file encoding, delimiter, metadata rows, table segments, and column roles before applying a saved parser.
+  - Accepted: make `/source-table-preview` the shared raw-table preview and extend it with source-format and segment controls.
+  - Rejected: restoring `/data-studio/source-preview`, because that would create a second raw-preview route and keep the old candidate parser alive.
+  - Accepted: add `/data-studio/template-preview` for draft templates so the wizard can validate real normalized output before saving.
+  - Rejected: letting `build-workbook` consume arbitrary draft payloads, because saved template ids remain the durable workbook provenance boundary.
+  - Accepted: model output shape explicitly as `curve_metrics`, `metric_table`, and `matrix_heatmap`.
+  - Rejected: silently forcing unsupported workbooks through tensile-style compare recipes, because compare/export should disable unavailable figures with explicit reasons.
+  - Boundaries: no second template manager in this round, no legacy user parser, no front-end-only parsing semantics, and no change to Plot style/theme/palette contract behavior.
+- Troubleshooting note:
+  - When an XCTest assertion fails inside the macOS app-hosted test process, Xcode can spend a long time symbolizing before printing the failure message.
+  - Sampling the app process with `sample <pid> 2 -file /tmp/sciplot_sample.txt` quickly identified the exact failing Swift test line while the `xcodebuild` stream was silent.
+  - The concrete failures this round were expected test drift from the new Data Studio template editor summary and snapshot fingerprint, not runtime deadlocks.
+- Validation (executed):
+  - `.venv/bin/python scripts/clean_repo.py`: passed, reclaimed approx `290.2 MB`
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 43 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`225 passed, 5 warnings`)
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)

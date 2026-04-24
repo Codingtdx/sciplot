@@ -11,7 +11,7 @@ final class MockSidecarClient: SidecarClienting {
     var metaResponse = TestPayloads.meta()
     var contractResponse = TestPayloads.contract()
     var dataStudioTemplatesResponse = TestPayloads.dataStudioTemplateList()
-    var dataStudioSourcePreviewResponse = TestPayloads.dataStudioSourcePreview()
+    var dataStudioTemplatePreviewResponse = TestPayloads.dataStudioTemplatePreview()
     var dataStudioTemplateResponse = TestPayloads.dataStudioTemplate()
     var dataStudioWorkbookResponse = TestPayloads.dataStudioWorkbook()
     var dataStudioImportWorkbookResponse = TestPayloads.dataStudioImportWorkbook()
@@ -37,7 +37,7 @@ final class MockSidecarClient: SidecarClienting {
     var metaHandler: (() async throws -> SidecarMetaResponse)?
     var plotContractHandler: (() async throws -> PlotContractResponse)?
     var dataStudioTemplateListHandler: (() async throws -> DataStudioTemplateListResponse)?
-    var dataStudioSourcePreviewHandler: ((DataStudioSourcePreviewRequest) async throws -> DataStudioSourcePreviewResponse)?
+    var dataStudioTemplatePreviewHandler: ((DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse)?
     var dataStudioCreateTemplateHandler: ((DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioUpdateTemplateHandler: ((String, DataStudioUpdateTemplateRequest) async throws -> DataStudioTemplateResponse)?
     var dataStudioBuildWorkbookHandler: ((DataStudioBuildWorkbookRequest) async throws -> DataStudioWorkbookResponse)?
@@ -59,7 +59,7 @@ final class MockSidecarClient: SidecarClienting {
     var exportHandler: ((ExportRenderRequest) async throws -> ExportRenderResponse)?
 
     private(set) var inspectRequests: [FileRequest] = []
-    private(set) var dataStudioSourcePreviewRequests: [DataStudioSourcePreviewRequest] = []
+    private(set) var dataStudioTemplatePreviewRequests: [DataStudioTemplatePreviewRequest] = []
     private(set) var dataStudioCreateTemplateRequests: [DataStudioCreateTemplateRequest] = []
     private(set) var dataStudioUpdateTemplateRequests: [(String, DataStudioUpdateTemplateRequest)] = []
     private(set) var dataStudioDeleteTemplateIDs: [String] = []
@@ -109,12 +109,12 @@ final class MockSidecarClient: SidecarClienting {
         return dataStudioTemplatesResponse
     }
 
-    func previewDataStudioSource(_ request: DataStudioSourcePreviewRequest) async throws -> DataStudioSourcePreviewResponse {
-        dataStudioSourcePreviewRequests.append(request)
-        if let dataStudioSourcePreviewHandler {
-            return try await dataStudioSourcePreviewHandler(request)
+    func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse {
+        dataStudioTemplatePreviewRequests.append(request)
+        if let dataStudioTemplatePreviewHandler {
+            return try await dataStudioTemplatePreviewHandler(request)
         }
-        return dataStudioSourcePreviewResponse
+        return dataStudioTemplatePreviewResponse
     }
 
     func createDataStudioTemplate(_ request: DataStudioCreateTemplateRequest) async throws -> DataStudioTemplateResponse {

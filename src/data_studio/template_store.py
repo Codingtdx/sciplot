@@ -7,6 +7,8 @@ from src.data_studio.models import (
     TemplateDefinition,
     TemplateFieldBinding,
     TemplateMatchCondition,
+    TemplateSegmentSelector,
+    TemplateSourceFormat,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,6 +62,31 @@ def _binding_from_payload(payload: dict[str, object]) -> TemplateFieldBinding:
     )
 
 
+def _source_format_from_payload(payload: dict[str, object] | None) -> TemplateSourceFormat:
+    payload = payload or {}
+    return TemplateSourceFormat(
+        encoding=str(payload["encoding"]) if payload.get("encoding") is not None else None,
+        delimiter=str(payload["delimiter"]) if payload.get("delimiter") is not None else None,
+        sheet_name=str(payload["sheet_name"]) if payload.get("sheet_name") is not None else None,
+    )
+
+
+def _segment_selector_from_payload(payload: dict[str, object]) -> TemplateSegmentSelector:
+    return TemplateSegmentSelector(
+        id=str(payload["id"]),
+        label=str(payload.get("label", payload["id"])),
+        result_label=str(payload["result_label"]) if payload.get("result_label") is not None else None,
+        interval_index=int(payload["interval_index"]) if payload.get("interval_index") is not None else None,
+        header_row_index=int(payload["header_row_index"]) if payload.get("header_row_index") is not None else None,
+        unit_row_index=int(payload["unit_row_index"]) if payload.get("unit_row_index") is not None else None,
+        data_start_row_index=(
+            int(payload["data_start_row_index"]) if payload.get("data_start_row_index") is not None else None
+        ),
+        start_row=int(payload["start_row"]) if payload.get("start_row") is not None else None,
+        end_row=int(payload["end_row"]) if payload.get("end_row") is not None else None,
+    )
+
+
 def template_from_payload(payload: dict[str, object]) -> TemplateDefinition:
     return TemplateDefinition(
         version=int(payload.get("version", 1)),
@@ -77,6 +104,12 @@ def template_from_payload(payload: dict[str, object]) -> TemplateDefinition:
         workbook_metric_ids=tuple(str(item) for item in payload.get("workbook_metric_ids", ()) or ()),
         default_group_name_strategy=str(payload.get("default_group_name_strategy", "common_prefix")),
         preferred_sheet_name=str(payload.get("preferred_sheet_name", "Representative_Curve")),
+        output_kind=str(payload.get("output_kind", "curve_metrics")),
+        source_format=_source_format_from_payload(dict(payload.get("source_format", {}) or {})),
+        segment_policy=str(payload.get("segment_policy", "single_table")),
+        segment_selectors=tuple(
+            _segment_selector_from_payload(item) for item in payload.get("segment_selectors", ()) or ()
+        ),
         metadata=dict(payload.get("metadata", {}) or {}),
     )
 
@@ -119,6 +152,27 @@ def template_to_payload(template: TemplateDefinition) -> dict[str, object]:
         "workbook_metric_ids": list(template.workbook_metric_ids),
         "default_group_name_strategy": template.default_group_name_strategy,
         "preferred_sheet_name": template.preferred_sheet_name,
+        "output_kind": template.output_kind,
+        "source_format": {
+            "encoding": template.source_format.encoding,
+            "delimiter": template.source_format.delimiter,
+            "sheet_name": template.source_format.sheet_name,
+        },
+        "segment_policy": template.segment_policy,
+        "segment_selectors": [
+            {
+                "id": selector.id,
+                "label": selector.label,
+                "result_label": selector.result_label,
+                "interval_index": selector.interval_index,
+                "header_row_index": selector.header_row_index,
+                "unit_row_index": selector.unit_row_index,
+                "data_start_row_index": selector.data_start_row_index,
+                "start_row": selector.start_row,
+                "end_row": selector.end_row,
+            }
+            for selector in template.segment_selectors
+        ],
         "metadata": template.metadata,
     }
 
@@ -174,6 +228,10 @@ def rename_template(template_id: str, *, new_id: str | None = None, new_label: s
         workbook_metric_ids=template.workbook_metric_ids,
         default_group_name_strategy=template.default_group_name_strategy,
         preferred_sheet_name=template.preferred_sheet_name,
+        output_kind=template.output_kind,
+        source_format=template.source_format,
+        segment_policy=template.segment_policy,
+        segment_selectors=template.segment_selectors,
         metadata=template.metadata,
     )
     delete_template(template_id)

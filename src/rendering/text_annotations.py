@@ -10,14 +10,10 @@ from matplotlib.axes import Axes
 
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
-from src.rendering.axis_breaks import (
-    axis_break_panel_axes,
-    axis_break_panel_for_value,
-    transform_axis_break_value,
-    value_hidden_by_axis_break,
-)
+from src.rendering.axis_breaks import axis_break_panel_axes
 from src.rendering.extra_axes import extra_axis_binding_mode
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
+from src.rendering.overlay_coordinates import mapped_axis_value_anchor, secondary_y_conversion_scale
 
 _VALID_COORDINATE_SPACES = frozenset({"axes_fraction", "data"})
 _VALID_HORIZONTAL_ALIGNMENTS = frozenset({"left", "center", "right"})
@@ -245,19 +241,6 @@ def _annotation_target_axis(
     return _y_axis_for_target(annotation, rendered=rendered, target=annotation.y_axis_target)
 
 
-def _secondary_y_conversion_scale(options: RenderOptions) -> float | None:
-    payload = options.extra_y_axis
-    if not isinstance(payload, Mapping) or not bool(payload.get("enabled", False)):
-        return None
-    if extra_axis_binding_mode(payload) != "conversion":
-        return None
-    data_value = float(payload.get("data_value", 1.0))
-    display_value = float(payload.get("display_value", 1.0))
-    if data_value <= 0.0 or display_value <= 0.0:
-        return None
-    return display_value / data_value
-
-
 def _annotation_bbox(annotation: TextAnnotationOptions) -> dict[str, object] | None:
     if annotation.display_style != "callout":
         return None
@@ -305,25 +288,17 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
                 y=annotation.y,
                 options=options,
             )
-            if x_split_active:
-                panel_axis = axis_break_panel_for_value(rendered, axis_name="x", value=annotation.x)
-                if panel_axis is None:
-                    continue
-                text_axis = panel_axis
-                text_transform = panel_axis.transData
-                text_x = annotation.x
-            else:
-                if value_hidden_by_axis_break(primary, axis_name="x", value=annotation.x):
-                    continue
-                mapped_x = transform_axis_break_value(primary, axis_name="x", value=annotation.x)
-                if mapped_x is None:
-                    continue
-                text_x = mapped_x
+            x_anchor = mapped_axis_value_anchor(rendered, axis_name="x", value=annotation.x)
+            if x_anchor is None:
+                continue
+            text_x = x_anchor[1]
+            text_axis = x_anchor[0] if x_split_active else target_axis
+            text_transform = text_axis.transData
             if (
                 annotation.y_axis_target == "y_secondary"
                 and extra_axis_binding_mode(options.extra_y_axis) == "conversion"
             ):
-                conversion_scale = _secondary_y_conversion_scale(options)
+                conversion_scale = secondary_y_conversion_scale(options)
                 if conversion_scale is None:
                     continue
                 if not x_split_active:
@@ -331,23 +306,13 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
                     text_transform = primary.transData
                 text_y = annotation.y / conversion_scale
             elif annotation.y_axis_target == "y_primary":
-                if y_split_active:
-                    panel_axis = axis_break_panel_for_value(rendered, axis_name="y", value=annotation.y)
-                    if panel_axis is None:
-                        continue
-                    text_axis = panel_axis
-                    text_transform = panel_axis.transData
-                    text_y = annotation.y
-                else:
-                    if value_hidden_by_axis_break(primary, axis_name="y", value=annotation.y):
-                        continue
-                    mapped_y = transform_axis_break_value(primary, axis_name="y", value=annotation.y)
-                    if mapped_y is None:
-                        continue
-                    if not x_split_active:
-                        text_axis = primary
-                        text_transform = primary.transData
-                    text_y = mapped_y
+                y_anchor = mapped_axis_value_anchor(rendered, axis_name="y", value=annotation.y)
+                if y_anchor is None:
+                    continue
+                y_axis, text_y = y_anchor
+                if y_split_active or not x_split_active:
+                    text_axis = y_axis
+                    text_transform = y_axis.transData
             else:
                 text_axis = target_axis
                 text_transform = target_axis.transData
@@ -367,52 +332,32 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
                 y=annotation.target_y,
                 options=options,
             )
+            x_anchor = mapped_axis_value_anchor(rendered, axis_name="x", value=annotation.target_x)
+            if x_anchor is None:
+                continue
+            connector_x = x_anchor[1]
             if x_split_active:
-                panel_axis = axis_break_panel_for_value(rendered, axis_name="x", value=annotation.target_x)
-                if panel_axis is None:
-                    continue
-                connector_axis = panel_axis
-                connector_x = annotation.target_x
-            else:
-                if value_hidden_by_axis_break(primary, axis_name="x", value=annotation.target_x):
-                    continue
-                mapped_connector_x = transform_axis_break_value(
-                    primary,
-                    axis_name="x",
-                    value=annotation.target_x,
-                )
-                if mapped_connector_x is None:
-                    continue
-                connector_x = mapped_connector_x
+                connector_axis = x_anchor[0]
             connector_y = annotation.target_y
             connector_xycoords = connector_axis.transData
             if (
                 annotation.target_y_axis_target == "y_secondary"
                 and extra_axis_binding_mode(options.extra_y_axis) == "conversion"
             ):
-                conversion_scale = _secondary_y_conversion_scale(options)
+                conversion_scale = secondary_y_conversion_scale(options)
                 if conversion_scale is None:
                     continue
                 connector_axis = primary
                 connector_y = annotation.target_y / conversion_scale
                 connector_xycoords = primary.transData
             elif annotation.target_y_axis_target == "y_primary":
-                if y_split_active:
-                    panel_axis = axis_break_panel_for_value(rendered, axis_name="y", value=annotation.target_y)
-                    if panel_axis is None:
-                        continue
-                    connector_axis = panel_axis
-                    connector_y = annotation.target_y
-                    connector_xycoords = panel_axis.transData
-                else:
-                    if value_hidden_by_axis_break(primary, axis_name="y", value=annotation.target_y):
-                        continue
-                    mapped_connector_y = transform_axis_break_value(primary, axis_name="y", value=annotation.target_y)
-                    if mapped_connector_y is None:
-                        continue
-                    connector_axis = primary
-                    connector_y = mapped_connector_y
-                    connector_xycoords = primary.transData
+                y_anchor = mapped_axis_value_anchor(rendered, axis_name="y", value=annotation.target_y)
+                if y_anchor is None:
+                    continue
+                y_axis, connector_y = y_anchor
+                if y_split_active or not x_split_active:
+                    connector_axis = y_axis
+                    connector_xycoords = y_axis.transData
             text_axis.annotate(
                 annotation.text,
                 xy=(connector_x, connector_y),

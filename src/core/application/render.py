@@ -35,6 +35,7 @@ from src.rendering.recommender_models import TemplateRecommendation
 from src.rendering.render_registry import TEMPLATE_RENDERERS
 from src.rendering.render_service import (
     build_rendered_plots,
+    build_rendered_plots_from_options,
     close_rendered_plots,
     export_rendered_plots,
     render_template,
@@ -60,6 +61,7 @@ __all__ = [
     "build_normalized_dataset",
     "build_render_submission_report",
     "build_rendered_plots",
+    "build_rendered_plots_from_options",
     "close_rendered_plots",
     "coerce_sheet",
     "dataframe_sample_rows",

@@ -7,17 +7,17 @@ import matplotlib.pyplot as plt
 
 from src import plot_style
 from src.plot_style import save_pdf
-from src.rendering.axis_breaks import apply_axis_breaks, normalize_axis_breaks_payload
-from src.rendering.extra_axes import apply_extra_axes, normalize_extra_axis_payload
+from src.rendering.axis_breaks import apply_axis_breaks
+from src.rendering.extra_axes import apply_extra_axes
 from src.rendering.fit_analysis import fit_options_from_payload
-from src.rendering.models import RenderedPlot, TemplateName
+from src.rendering.models import RenderedPlot, RenderOptions, TemplateName
 from src.rendering.options import resolve_render_options, validate_template_name
-from src.rendering.reference_guides import apply_reference_guides, normalize_reference_guides_payload
+from src.rendering.reference_guides import apply_reference_guides
 from src.rendering.render_registry import TEMPLATE_RENDERERS
-from src.rendering.shape_annotations import apply_shape_annotations, normalize_shape_annotations_payload
+from src.rendering.shape_annotations import apply_shape_annotations
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.template_lifecycle import resolve_template_id
-from src.rendering.text_annotations import apply_text_annotations, normalize_text_annotations_payload
+from src.rendering.text_annotations import apply_text_annotations
 
 
 def close_rendered_plots(rendered_plots: list[RenderedPlot]) -> None:
@@ -36,6 +36,46 @@ def export_rendered_plots(
     if close:
         close_rendered_plots(rendered_plots)
     return outputs
+
+
+def build_rendered_plots_from_options(
+    template: TemplateName,
+    input_path: Path,
+    sheet: str | int,
+    options: RenderOptions,
+    *,
+    resolved_template_id: str | None = None,
+) -> list[RenderedPlot]:
+    requested_template = validate_template_name(template)
+    resolved_template = resolved_template_id or resolve_template_id(
+        requested_template,
+        input_path=input_path,
+        sheet=sheet,
+    )
+    style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
+    plot_style.apply_style(
+        style_bundle.publication_profile_id,
+        options.palette_preset,
+        soft_overrides=style_bundle.resolved_soft,
+    )
+    renderer = TEMPLATE_RENDERERS[resolved_template]
+    rendered_plots = renderer.render(input_path, sheet, options)
+    return [
+        apply_text_annotations(
+            apply_shape_annotations(
+                apply_reference_guides(
+                    apply_extra_axes(
+                        apply_axis_breaks(rendered, options=options),
+                        options=options,
+                    ),
+                    options=options,
+                ),
+                options=options,
+            ),
+            options=options,
+        )
+        for rendered in rendered_plots
+    ]
 
 
 def build_rendered_plots(
@@ -114,42 +154,14 @@ def build_rendered_plots(
     options = replace(
         options,
         fit_options=fit_options_from_payload(fit_options).__dict__,
-        extra_x_axis=normalize_extra_axis_payload(extra_x_axis, axis_name="x"),
-        extra_y_axis=normalize_extra_axis_payload(extra_y_axis, axis_name="y"),
-        x_axis_breaks=normalize_axis_breaks_payload(x_axis_breaks, axis_name="x"),
-        y_axis_breaks=normalize_axis_breaks_payload(y_axis_breaks, axis_name="y"),
-        reference_guides=normalize_reference_guides_payload(
-            reference_guides,
-            legacy_line=reference_line,
-            legacy_band=reference_band,
-        ),
-        text_annotations=normalize_text_annotations_payload(text_annotations),
-        shape_annotations=normalize_shape_annotations_payload(shape_annotations),
     )
-    style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
-    plot_style.apply_style(
-        style_bundle.publication_profile_id,
-        options.palette_preset,
-        soft_overrides=style_bundle.resolved_soft,
+    return build_rendered_plots_from_options(
+        requested_template,
+        input_path,
+        sheet,
+        options,
+        resolved_template_id=resolved_template,
     )
-    renderer = TEMPLATE_RENDERERS[resolved_template]
-    rendered_plots = renderer.render(input_path, sheet, options)
-    return [
-        apply_text_annotations(
-            apply_shape_annotations(
-                apply_reference_guides(
-                    apply_extra_axes(
-                        apply_axis_breaks(rendered, options=options),
-                        options=options,
-                    ),
-                    options=options,
-                ),
-                options=options,
-            ),
-            options=options,
-        )
-        for rendered in rendered_plots
-    ]
 
 
 def render_template(
@@ -232,6 +244,7 @@ def render_template(
 __all__ = [
     "TEMPLATE_RENDERERS",
     "build_rendered_plots",
+    "build_rendered_plots_from_options",
     "close_rendered_plots",
     "export_rendered_plots",
     "render_template",

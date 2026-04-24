@@ -50,7 +50,7 @@ class LoadedComparisonWorkbook:
     workbook_path: Path
     label: str
     sheet_names: tuple[str, ...]
-    representative_curve: CurveSeries
+    representative_curve: CurveSeries | None
     metric_summaries: tuple[WorkbookMetricSummary, ...]
     replicate_groups: dict[str, ReplicateGroup]
 
@@ -87,6 +87,17 @@ def _comparison_preview_pdf_cache_key(
         separators=(",", ":"),
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _empty_curve() -> CurveSeries:
+    return CurveSeries(
+        sample="",
+        x_label="X",
+        y_label="Y",
+        x_unit="",
+        y_unit="",
+        data=pd.DataFrame({"x": [], "y": []}),
+    )
 
 
 def _context_manifest_path(context_root: Path) -> Path:
@@ -199,15 +210,18 @@ def load_comparison_workbook(
         )
 
     workbook_sheet_names = tuple(list_sheet_names(workbook.workbook_path))
-    representative_curves = load_curve_table(
-        workbook.workbook_path,
-        sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
-    )
-    if len(representative_curves) != 1:
-        raise ValueError(
-            f"{workbook.workbook_path.name} must contain exactly one representative curve in "
-            f"{tensile_builtin.REPRESENTATIVE_CURVE_SHEET}."
+    representative_curve: CurveSeries | None = None
+    if tensile_builtin.REPRESENTATIVE_CURVE_SHEET in workbook_sheet_names:
+        representative_curves = load_curve_table(
+            workbook.workbook_path,
+            sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
         )
+        if len(representative_curves) != 1:
+            raise ValueError(
+                f"{workbook.workbook_path.name} must contain exactly one representative curve in "
+                f"{tensile_builtin.REPRESENTATIVE_CURVE_SHEET}."
+            )
+        representative_curve = representative_curves[0]
     replicate_groups: dict[str, ReplicateGroup] = {}
     for sheet_name in workbook_sheet_names:
         if not sheet_name.endswith("_Replicates"):
@@ -221,7 +235,7 @@ def load_comparison_workbook(
         workbook_path=workbook.workbook_path,
         label=workbook.label,
         sheet_names=workbook_sheet_names,
-        representative_curve=representative_curves[0],
+        representative_curve=representative_curve,
         metric_summaries=workbook.metrics,
         replicate_groups=replicate_groups,
     )
@@ -247,23 +261,38 @@ def _comparison_recipes_for_loaded_workbooks(
     if not loaded:
         raise ValueError("Data Studio needs at least one included workbook group.")
     metric_ids = [metric.label for metric in loaded[0].metric_summaries]
-    recipes: list[ComparisonRecipe] = [
-        ComparisonRecipe(
-            id="representative_curve",
-            label="Representative Curve Compare",
-            category="curve",
-            template_id="curve",
-            sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
-        )
-    ]
-    for template_id in _CURVE_COMPARISON_TEMPLATE_IDS[1:]:
+    recipes: list[ComparisonRecipe] = []
+    if all(workbook.representative_curve is not None for workbook in loaded):
         recipes.append(
             ComparisonRecipe(
-                id=f"representative_{template_id}",
-                label=f"Representative {template_contract(template_id).label} Compare",
+                id="representative_curve",
+                label="Representative Curve Compare",
                 category="curve",
-                template_id=template_id,
+                template_id="curve",
                 sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+            )
+        )
+        for template_id in _CURVE_COMPARISON_TEMPLATE_IDS[1:]:
+            recipes.append(
+                ComparisonRecipe(
+                    id=f"representative_{template_id}",
+                    label=f"Representative {template_contract(template_id).label} Compare",
+                    category="curve",
+                    template_id=template_id,
+                    sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+                )
+            )
+    else:
+        recipes.append(
+            ComparisonRecipe(
+                id="representative_curve",
+                label="Representative Curve Compare",
+                category="curve",
+                template_id="curve",
+                sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET,
+                enabled_by_default=False,
+                supported=False,
+                support_reason="The selected workbook shape does not include representative curves.",
             )
         )
     for metric_id in metric_ids:
@@ -278,6 +307,19 @@ def _comparison_recipes_for_loaded_workbooks(
                     metric_id=metric_id,
                 )
             )
+    if not metric_ids:
+        recipes.append(
+            ComparisonRecipe(
+                id="metric_bar",
+                label="Metric Compare",
+                category="metric",
+                template_id="bar",
+                sheet_name="Metric_Replicates",
+                enabled_by_default=False,
+                supported=False,
+                support_reason="The selected workbook shape does not include comparable metric replicate tables.",
+            )
+        )
     return tuple(recipes)
 
 
@@ -302,32 +344,35 @@ def build_comparison_set(
     bundle_dir.mkdir(parents=True, exist_ok=True)
     comparison_workbook_path = bundle_dir / f"{bundle_dir.name}.xlsx"
     with pd.ExcelWriter(comparison_workbook_path) as writer:
-        tensile_builtin.representative_curve_dataframe(
-            [
-                tensile_builtin.LoadedTensileWorkbookData(
-                    workbook_path=workbook.workbook_path,
-                    base_label=workbook.label,
-                    sheet_names=workbook.sheet_names,
-                    sample_count=0,
-                    representative_filename=workbook.representative_curve.sample,
-                    representative_curve=workbook.representative_curve,
-                    metrics=tuple(
-                        tensile_builtin.TensileMetricSummary(
-                            label=metric.label,
-                            unit=metric.unit,
-                            mean=metric.mean,
-                            std=metric.std,
-                        )
-                        for metric in workbook.metric_summaries
-                    ),
-                    replicate_groups=workbook.replicate_groups,
-                    warnings=(),
-                    source_files=(),
-                )
-                for workbook in loaded
-            ],
-            labels,
-        ).to_excel(writer, sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET, header=False, index=False)
+        curve_loaded = [workbook for workbook in loaded if workbook.representative_curve is not None]
+        if len(curve_loaded) == len(loaded):
+            tensile_builtin.representative_curve_dataframe(
+                [
+                    tensile_builtin.LoadedTensileWorkbookData(
+                        workbook_path=workbook.workbook_path,
+                        base_label=workbook.label,
+                        sheet_names=workbook.sheet_names,
+                        sample_count=0,
+                        representative_filename=workbook.representative_curve.sample,
+                        representative_curve=workbook.representative_curve,
+                        metrics=tuple(
+                            tensile_builtin.TensileMetricSummary(
+                                label=metric.label,
+                                unit=metric.unit,
+                                mean=metric.mean,
+                                std=metric.std,
+                            )
+                            for metric in workbook.metric_summaries
+                        ),
+                        replicate_groups=workbook.replicate_groups,
+                        warnings=(),
+                        source_files=(),
+                    )
+                    for workbook in curve_loaded
+                    if workbook.representative_curve is not None
+                ],
+                labels,
+            ).to_excel(writer, sheet_name=tensile_builtin.REPRESENTATIVE_CURVE_SHEET, header=False, index=False)
         for metric_id in [metric.label for metric in loaded[0].metric_summaries]:
             unit = _metric_unit(loaded, metric_id)
             tensile_builtin.comparison_replicate_dataframe(
@@ -339,8 +384,10 @@ def build_comparison_set(
                         base_label=workbook.label,
                         sheet_names=workbook.sheet_names,
                         sample_count=0,
-                        representative_filename=workbook.representative_curve.sample,
-                        representative_curve=workbook.representative_curve,
+                        representative_filename=(
+                            workbook.representative_curve.sample if workbook.representative_curve is not None else ""
+                        ),
+                        representative_curve=workbook.representative_curve or _empty_curve(),
                         metrics=tuple(
                             tensile_builtin.TensileMetricSummary(
                                 label=metric.label,
@@ -549,10 +596,13 @@ def _export_filtered_workbooks(
     file_stems = _dedupe_export_file_stems(labels)
     exported: list[DataStudioFilteredWorkbookOutput] = []
     for group, label, file_stem in zip(resolved_groups, labels, file_stems, strict=True):
-        filtered = load_filtered_workbook_context(
-            group.workbook_path,
-            specimen_states=specimen_states,
-        )
+        try:
+            filtered = load_filtered_workbook_context(
+                group.workbook_path,
+                specimen_states=specimen_states,
+            )
+        except ValueError:
+            continue
         workbook = export_filtered_workbook_from_context(
             filtered,
             filtered_dir / f"{file_stem}.xlsx",
@@ -636,13 +686,16 @@ def _validate_loaded_workbooks(loaded: list[LoadedComparisonWorkbook]) -> None:
     first_metric_ids = {metric.label: metric.unit for metric in loaded[0].metric_summaries}
     for workbook in loaded[1:]:
         curve = workbook.representative_curve
-        if (
-            curve.x_label != first_curve.x_label
-            or curve.y_label != first_curve.y_label
-            or curve.x_unit != first_curve.x_unit
-            or curve.y_unit != first_curve.y_unit
-        ):
-            raise ValueError("Representative curve axes do not match across the selected workbooks.")
+        if first_curve is not None or curve is not None:
+            if first_curve is None or curve is None:
+                raise ValueError("All compared workbooks must either provide representative curves or omit them.")
+            if (
+                curve.x_label != first_curve.x_label
+                or curve.y_label != first_curve.y_label
+                or curve.x_unit != first_curve.x_unit
+                or curve.y_unit != first_curve.y_unit
+            ):
+                raise ValueError("Representative curve axes do not match across the selected workbooks.")
         metric_map = {metric.label: metric.unit for metric in workbook.metric_summaries}
         if metric_map != first_metric_ids:
             raise ValueError("Workbook metric labels or units do not match across the comparison set.")
@@ -659,7 +712,8 @@ def _comparison_summary_dataframe(
         unit = _metric_unit(loaded, metric_id)
         header_row.extend([f"{metric_id} Mean ({unit})", f"{metric_id} Std ({unit})"])
     for label, workbook in zip(labels, loaded, strict=True):
-        row: list[object] = [label, str(workbook.workbook_path), workbook.representative_curve.sample]
+        representative = workbook.representative_curve.sample if workbook.representative_curve is not None else ""
+        row: list[object] = [label, str(workbook.workbook_path), representative]
         metric_map = {metric.label: metric for metric in workbook.metric_summaries}
         for metric_id in metric_ids:
             metric = metric_map[metric_id]

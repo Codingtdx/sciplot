@@ -44,7 +44,6 @@ _LAZY_EXPORTS = {
     "preview_data_studio_workbook": ("src.data_studio.service", "preview_data_studio_workbook"),
     "preview_data_studio_comparison": ("src.data_studio.service", "preview_data_studio_comparison"),
     "preview_data_studio_comparison_context": ("src.data_studio.service", "preview_data_studio_comparison_context"),
-    "preview_data_studio_source": ("src.data_studio.service", "preview_data_studio_source"),
     "preview_raw_file": ("src.data_studio.ingest", "preview_raw_file"),
     "update_data_studio_template": ("src.data_studio.service", "update_data_studio_template"),
     "load_template": ("src.data_studio.template_store", "load_template"),

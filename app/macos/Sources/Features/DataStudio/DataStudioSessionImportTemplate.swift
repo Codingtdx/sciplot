@@ -2,126 +2,38 @@ import Foundation
 
 extension DataStudioSession {
     var resolverPresentation: DataStudioResolverPresentation {
-        let recommendedMatches = sourceMatches.sorted { lhs, rhs in
-            if lhs.confidence == rhs.confidence {
-                return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
-            }
-            return lhs.confidence > rhs.confidence
+        let sortedTemplates = templates.sorted { lhs, rhs in
+            lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
         }
-        let matchedIDs = Set(recommendedMatches.map(\.templateID))
-        let otherTemplates = templates
-            .filter { !matchedIDs.contains($0.id) }
-            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
-        let useSelectedTemplateAvailability: ActionAvailability
-        if selectedTemplateID == nil {
-            useSelectedTemplateAvailability = .disabled("Choose a parse template before continuing.")
-        } else {
-            useSelectedTemplateAvailability = .enabled()
-        }
+        let useSelectedTemplateAvailability: ActionAvailability = selectedTemplateID == nil
+            ? .disabled("Choose a parse template before continuing.")
+            : .enabled()
         return DataStudioResolverPresentation(
-            recommendedMatches: recommendedMatches,
-            otherTemplates: otherTemplates,
+            recommendedMatches: [],
+            otherTemplates: sortedTemplates,
             useSelectedTemplateAvailability: useSelectedTemplateAvailability
         )
     }
 
-    var createTemplateSuggestions: [DataStudioBindingSuggestionResponse] {
-        sourcePreview?.bindingSuggestions ?? []
-    }
-
-    var createTemplatePrimaryCurveSuggestion: DataStudioBindingSuggestionResponse? {
-        preferredCreateTemplateSuggestion(kind: "curve_pair")
-    }
-
-    var createTemplatePrimaryMetricSuggestion: DataStudioBindingSuggestionResponse? {
-        preferredCreateTemplateSuggestion(
-            kind: "metric_group",
-            preferredBlockID: createTemplatePrimaryCurveSuggestion?.blockID
-        )
-    }
-
-    var createTemplatePrimaryMetadataSuggestion: DataStudioBindingSuggestionResponse? {
-        preferredCreateTemplateSuggestion(
-            kind: "metadata_group",
-            preferredBlockID: createTemplatePrimaryCurveSuggestion?.blockID
-        )
-    }
-
-    var createTemplatePrimaryStructureSuggestion: DataStudioBindingSuggestionResponse? {
-        preferredCreateTemplateSuggestion(
-            kind: "structure_rows",
-            preferredBlockID: createTemplatePrimaryCurveSuggestion?.blockID
-        )
-    }
-
-    var createTemplateSecondaryCurveSuggestions: [DataStudioBindingSuggestionResponse] {
-        let primaryID = createTemplatePrimaryCurveSuggestion?.id
-        return createTemplateSuggestions.filter { suggestion in
-            suggestion.kind == "curve_pair" && suggestion.id != primaryID
-        }
-    }
-
-    var createTemplateFocusedSuggestion: DataStudioBindingSuggestionResponse? {
-        if let hoveredSuggestionID,
-           let suggestion = suggestion(for: hoveredSuggestionID)
-        {
-            return suggestion
-        }
-        let preferredKinds = ["curve_pair", "metric_group", "metadata_group", "structure_rows"]
-        for kind in preferredKinds {
-            if let suggestion = selectedSuggestion(for: kind) {
-                return suggestion
-            }
-        }
-        return createTemplatePrimaryCurveSuggestion
-            ?? createTemplatePrimaryMetricSuggestion
-            ?? createTemplatePrimaryMetadataSuggestion
-            ?? createTemplatePrimaryStructureSuggestion
-            ?? createTemplateSuggestions.first
-    }
-
-    var createTemplatePreviewCaption: String? {
-        guard let suggestion = createTemplateFocusedSuggestion else {
-            return nil
-        }
-        switch suggestion.kind {
-        case "curve_pair":
-            return "Previewing Recommended Curve in \(previewLocation(for: suggestion))"
-        case "metric_group":
-            return "Previewing Recommended Metrics"
-        case "metadata_group":
-            return "Previewing Recommended Metadata"
-        case "structure_rows":
-            return "Previewing Detected Structure"
-        default:
-            return "Previewing Suggested Binding"
-        }
-    }
+    var createTemplateSuggestions: [DataStudioBindingSuggestionResponse] { [] }
+    var createTemplatePrimaryCurveSuggestion: DataStudioBindingSuggestionResponse? { nil }
+    var createTemplatePrimaryMetricSuggestion: DataStudioBindingSuggestionResponse? { nil }
+    var createTemplatePrimaryMetadataSuggestion: DataStudioBindingSuggestionResponse? { nil }
+    var createTemplatePrimaryStructureSuggestion: DataStudioBindingSuggestionResponse? { nil }
+    var createTemplateSecondaryCurveSuggestions: [DataStudioBindingSuggestionResponse] { [] }
+    var createTemplateFocusedSuggestion: DataStudioBindingSuggestionResponse? { nil }
+    var createTemplatePreviewCaption: String? { nil }
+    var activePreviewRanges: [DataStudioPreviewRangeResponse] { [] }
 
     var templateEditorPresentation: DataStudioTemplateEditorPresentation {
-        let suggestedCandidateIDs = Set(createTemplateSuggestions.flatMap(\.candidateIDs))
-        let advancedCandidates = (sourcePreview?.fieldCandidates ?? [])
-            .filter { !suggestedCandidateIDs.contains($0.id) }
-            .sorted(by: candidateComparator)
-
-        return DataStudioTemplateEditorPresentation(
-            previewCaption: createTemplatePreviewCaption,
-            primaryCurveSuggestion: createTemplatePrimaryCurveSuggestion.map {
-                suggestionCardPresentation(for: $0, kind: .curve)
-            },
-            primaryMetricSuggestion: createTemplatePrimaryMetricSuggestion.map {
-                suggestionCardPresentation(for: $0, kind: .metric)
-            },
-            primaryMetadataSuggestion: createTemplatePrimaryMetadataSuggestion.map {
-                suggestionCardPresentation(for: $0, kind: .metadata)
-            },
-            primaryStructureSuggestion: createTemplatePrimaryStructureSuggestion.map {
-                suggestionCardPresentation(for: $0, kind: .structure)
-            },
-            secondaryCurveSuggestions: createTemplateSecondaryCurveSuggestions.map {
-                suggestionCardPresentation(for: $0, kind: .curve)
-            },
-            advancedCandidates: advancedCandidates,
+        DataStudioTemplateEditorPresentation(
+            previewCaption: templatePreviewSummary,
+            primaryCurveSuggestion: nil,
+            primaryMetricSuggestion: nil,
+            primaryMetadataSuggestion: nil,
+            primaryStructureSuggestion: nil,
+            secondaryCurveSuggestions: [],
+            advancedCandidates: [],
             selectedSummaryItems: selectedTemplateSummaryItems,
             saveTemplateAvailability: createTemplateSaveAvailability,
             saveTemplateAndContinueAvailability: createTemplateSaveAndContinueAvailability
@@ -130,23 +42,41 @@ extension DataStudioSession {
 
     var selectedTemplateSummaryItems: [DataStudioTemplateSummaryItem] {
         var items: [DataStudioTemplateSummaryItem] = []
-        if let value = selectedCurveSummary {
-            items.append(.init(id: "curve", title: "Curve", value: value))
+        if let sourcePreview {
+            items.append(
+                .init(
+                    id: "source",
+                    title: "Source",
+                    value: URL(fileURLWithPath: sourcePreview.inputPath).lastPathComponent
+                )
+            )
+            if let encoding = sourcePreview.encoding, !encoding.isEmpty {
+                items.append(.init(id: "encoding", title: "Encoding", value: encoding))
+            }
+            if let delimiter = sourcePreview.delimiter, !delimiter.isEmpty {
+                let label = delimiter == "\t" ? "Tab" : delimiter
+                items.append(.init(id: "delimiter", title: "Delimiter", value: label))
+            }
         }
-        if let value = selectedMetricSummary {
-            items.append(.init(id: "metrics", title: "Metrics", value: value))
+        if let selectedSegment {
+            items.append(.init(id: "segment", title: "Segment", value: selectedSegment.label))
         }
-        if let value = selectedMetadataSummary {
-            items.append(.init(id: "metadata", title: "Metadata", value: value))
+        if let x = templateDraftXColumnName, !x.isEmpty {
+            items.append(.init(id: "x", title: "X", value: x))
         }
-        if let value = selectedStructureSummary {
-            items.append(.init(id: "structure", title: "Structure", value: value))
+        if !templateDraftYColumnNames.isEmpty {
+            items.append(.init(id: "y", title: "Y", value: templateDraftYColumnNames.joined(separator: ", ")))
+        }
+        if !templateDraftMetricColumnNames.isEmpty {
+            items.append(
+                .init(
+                    id: "metrics",
+                    title: "Metrics",
+                    value: templateDraftMetricColumnNames.joined(separator: ", ")
+                )
+            )
         }
         return items
-    }
-
-    var activePreviewRanges: [DataStudioPreviewRangeResponse] {
-        hoveredPreviewRanges.isEmpty ? pinnedPreviewRanges : hoveredPreviewRanges
     }
 
     var selectedTemplate: DataStudioTemplateResponse? {
@@ -154,6 +84,33 @@ extension DataStudioSession {
             return nil
         }
         return templates.first(where: { $0.id == selectedTemplateID })
+    }
+
+    var selectedSegment: SourceTableSegmentResponse? {
+        guard let selectedPreviewSegmentID else {
+            return nil
+        }
+        return sourcePreview?.segments.first(where: { $0.id == selectedPreviewSegmentID })
+    }
+
+    var templatePreviewSummary: String? {
+        guard let templatePreview else {
+            return nil
+        }
+        if !templatePreview.errors.isEmpty {
+            return templatePreview.errors.joined(separator: " ")
+        }
+        if !templatePreview.missingRoles.isEmpty {
+            return "Missing roles: \(templatePreview.missingRoles.joined(separator: ", "))."
+        }
+        switch templatePreview.outputKind {
+        case "metric_table":
+            return "\(templatePreview.metricCount) metric fields resolved."
+        case "matrix_heatmap":
+            return "\(templatePreview.matrixRowCount) matrix rows resolved."
+        default:
+            return "\(templatePreview.seriesCount) curves resolved."
+        }
     }
 
     var canGoBackInImportWizard: Bool {
@@ -293,31 +250,36 @@ extension DataStudioSession {
                     $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
                 }
             }
-            let response = try await client.previewDataStudioSource(.init(inputPath: sampleURL.path))
-            sourcePreview = response.preview
-            sourceMatches = response.matches
-            selectedSuggestionIDs = defaultSuggestionSelection(from: response.preview)
-            selectedCandidateIDs = flattenedCandidateSelection(
-                fromSuggestionIDs: selectedSuggestionIDs,
-                preview: response.preview
+            let basePreview = try await client.sourceTablePreview(
+                .init(inputPath: sampleURL.path, sheet: .index(0), offset: 0, limit: 50)
             )
-            templateDraftLabel = inferGroupName(from: importedSourceURLs)
-            templateDraftDescription = "Template created from \(sampleURL.lastPathComponent)."
-            selectInitialPreviewContext(from: response.preview)
-            hoveredSuggestionID = nil
-            hoveredPreviewRanges = []
-            syncPinnedPreviewRanges()
-            showAdvancedCandidates = false
-
-            let directMatches = response.matches.filter(\.autoSelected)
-            if directMatches.count == 1, let match = directMatches.first {
-                selectedTemplateID = match.templateID
-                await buildWorkbookFromPendingRawFiles(templateID: match.templateID)
+            let resolvedPreview: SourceTablePreviewResponse
+            if let firstSegment = basePreview.segments.first {
+                resolvedPreview = try await client.sourceTablePreview(
+                    .init(
+                        inputPath: sampleURL.path,
+                        sheet: basePreview.sheet,
+                        offset: 0,
+                        limit: 50,
+                        encoding: basePreview.encoding,
+                        delimiter: basePreview.delimiter,
+                        segmentID: firstSegment.id
+                    )
+                )
             } else {
-                selectedTemplateID = response.matches.first?.templateID ?? templates.first?.id
-                importFlow = .wizard(step: .resolver)
+                resolvedPreview = basePreview
             }
+            sourcePreview = resolvedPreview
+            selectedPreviewSegmentID = resolvedPreview.selectedSegmentID ?? resolvedPreview.segments.first?.id
+            selectedPreviewSheetName = resolvedPreview.sheet.displayString
+            selectedPreviewBlockID = selectedPreviewSegmentID
+            configureDraftDefaults(from: resolvedPreview, sampleURL: sampleURL)
+            selectedTemplateID = templates.first(where: \.builtin)?.id ?? templates.first?.id
+            importFlow = .wizard(step: .resolver)
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -333,18 +295,11 @@ extension DataStudioSession {
     }
 
     func beginCreateTemplateEditor() {
-        guard let sourcePreview else {
+        guard sourcePreview != nil else {
             errorMessage = "Import a sample source file before creating a parse template."
             return
         }
-        if selectedPreviewBlockID == nil {
-            selectInitialPreviewContext(from: sourcePreview)
-        }
-        hoveredSuggestionID = nil
-        hoveredPreviewRanges = []
-        reconcileSuggestionSelection()
-        syncPinnedPreviewRanges()
-        showAdvancedCandidates = false
+        templatePreview = nil
         importFlow = .wizard(step: .createTemplate)
     }
 
@@ -382,58 +337,90 @@ extension DataStudioSession {
     }
 
     func selectPreviewSheet(name: String) {
-        guard let preview = sourcePreview else {
-            return
-        }
         selectedPreviewSheetName = name
-        let blocks = preview.sheets.first(where: { $0.sheetName == name })?.blocks ?? []
-        if let selectedPreviewBlockID,
-           blocks.contains(where: { $0.id == selectedPreviewBlockID })
-        {
-            return
-        }
-        selectedPreviewBlockID = blocks.first?.id
     }
 
     func selectPreviewBlock(id: String) {
-        guard let preview = sourcePreview else {
+        selectedPreviewBlockID = id
+        selectPreviewSegment(id: id)
+    }
+
+    func selectPreviewSegment(id: String?) {
+        guard selectedPreviewSegmentID != id else {
             return
         }
-        for sheet in preview.sheets where sheet.blocks.contains(where: { $0.id == id }) {
-            selectedPreviewSheetName = sheet.sheetName
-            selectedPreviewBlockID = id
+        selectedPreviewSegmentID = id
+        selectedPreviewBlockID = id
+        guard let sourcePreview, let client else {
             return
         }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let response = try await client.sourceTablePreview(
+                    .init(
+                        inputPath: sourcePreview.inputPath,
+                        sheet: sourcePreview.sheet,
+                        offset: 0,
+                        limit: sourcePreview.limit,
+                        encoding: sourcePreview.encoding,
+                        delimiter: sourcePreview.delimiter,
+                        segmentID: id
+                    )
+                )
+                self.sourcePreview = response
+                self.configureDraftDefaults(from: response, sampleURL: URL(fileURLWithPath: response.inputPath))
+            } catch {
+                if isUserCancelled(error) {
+                    return
+                }
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func setTemplateOutputKind(_ outputKind: String) {
+        templateDraftOutputKind = outputKind
+        templatePreview = nil
+    }
+
+    func setDraftXColumn(_ columnName: String?) {
+        templateDraftXColumnName = columnName
+        templatePreview = nil
+    }
+
+    func setDraftYColumn(_ columnName: String, isSelected: Bool) {
+        if isSelected {
+            if !templateDraftYColumnNames.contains(columnName) {
+                templateDraftYColumnNames.append(columnName)
+            }
+        } else {
+            templateDraftYColumnNames.removeAll { $0 == columnName }
+        }
+        templatePreview = nil
+    }
+
+    func setDraftMetricColumn(_ columnName: String, isSelected: Bool) {
+        if isSelected {
+            if !templateDraftMetricColumnNames.contains(columnName) {
+                templateDraftMetricColumnNames.append(columnName)
+            }
+        } else {
+            templateDraftMetricColumnNames.removeAll { $0 == columnName }
+        }
+        templatePreview = nil
     }
 
     func setHoveredSuggestion(id: String?) {
         hoveredSuggestionID = id
-        guard let id, let suggestion = suggestion(for: id) else {
-            hoveredPreviewRanges = []
-            return
-        }
-        hoveredPreviewRanges = suggestion.previewRanges
-        focusPreview(onSuggestion: suggestion)
+        hoveredPreviewRanges = []
     }
 
     func toggleSuggestion(id: String) {
         if selectedSuggestionIDs.contains(id) {
-            if let suggestion = suggestion(for: id) {
-                selectedCandidateIDs.removeAll { suggestion.candidateIDs.contains($0) }
-            }
             selectedSuggestionIDs.removeAll { $0 == id }
         } else {
             selectedSuggestionIDs.append(id)
-            if let suggestion = suggestion(for: id) {
-                for candidateID in suggestion.candidateIDs where !selectedCandidateIDs.contains(candidateID) {
-                    selectedCandidateIDs.append(candidateID)
-                }
-            }
-        }
-        reconcileSuggestionSelection()
-        syncPinnedPreviewRanges()
-        if let suggestion = suggestion(for: id) {
-            focusPreview(onSuggestion: suggestion)
         }
     }
 
@@ -445,32 +432,16 @@ extension DataStudioSession {
         } else {
             selectedCandidateIDs.removeAll { $0 == id }
         }
-        reconcileSuggestionSelection()
-        syncPinnedPreviewRanges()
-        if let candidate = sourcePreview?.fieldCandidates.first(where: { $0.id == id }) {
-            focusPreview(on: candidate)
-        }
     }
 
     func focusPreview(on candidate: DataStudioFieldCandidateResponse) {
         selectedPreviewSheetName = candidate.sheetName
-        if let blockID = candidate.blockID {
-            selectedPreviewBlockID = blockID
-        } else if let firstBlock = sourcePreview?
-            .sheets
-            .first(where: { $0.sheetName == candidate.sheetName })?
-            .blocks
-            .first
-        {
-            selectedPreviewBlockID = firstBlock.id
-        }
+        selectedPreviewBlockID = candidate.blockID
     }
 
     func focusPreview(onSuggestion suggestion: DataStudioBindingSuggestionResponse) {
         selectedPreviewSheetName = suggestion.sheetName
-        if let blockID = suggestion.blockID {
-            selectedPreviewBlockID = blockID
-        }
+        selectedPreviewBlockID = suggestion.blockID
     }
 
     func handleImportedWorkbooks(_ urls: [URL], refreshContext: Bool = true) async {
@@ -512,12 +483,15 @@ extension DataStudioSession {
             resetImportPresentationState()
             discardPendingSourcePreview()
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
 
     func renameSelectedTemplate(to newLabel: String) async {
-        guard let client, let selectedTemplate = selectedTemplate else {
+        guard let client, let selectedTemplate else {
             return
         }
         guard !selectedTemplate.builtin else {
@@ -541,6 +515,9 @@ extension DataStudioSession {
             selectedTemplateID = response.id
             templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -561,6 +538,9 @@ extension DataStudioSession {
                 selectedTemplateID = templates.first?.id
             }
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -570,57 +550,31 @@ extension DataStudioSession {
         if trimmedLabel.isEmpty {
             return .disabled("Provide a parse template name before saving it.")
         }
-        if selectedCandidateIDs.isEmpty {
-            return .disabled("Select at least one suggested or manual field before saving the parse template.")
+        guard sourcePreview != nil else {
+            return .disabled("Import a source file before saving the parse template.")
+        }
+        switch templateDraftOutputKind {
+        case "metric_table":
+            if templateDraftMetricColumnNames.isEmpty {
+                return .disabled("Choose at least one metric column.")
+            }
+        case "matrix_heatmap":
+            if templateDraftXColumnName == nil || templateDraftYColumnNames.isEmpty || templateDraftMetricColumnNames.isEmpty {
+                return .disabled("Choose X, Y, and value columns.")
+            }
+        default:
+            if templateDraftXColumnName == nil {
+                return .disabled("Choose an X column.")
+            }
+            if templateDraftYColumnNames.isEmpty {
+                return .disabled("Choose at least one Y column.")
+            }
         }
         return .enabled()
     }
 
     private var createTemplateSaveAndContinueAvailability: ActionAvailability {
         createTemplateSaveAvailability
-    }
-
-    private func candidateComparator(_ lhs: DataStudioFieldCandidateResponse, _ rhs: DataStudioFieldCandidateResponse) -> Bool {
-        if lhs.confidence == rhs.confidence {
-            return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
-        }
-        return lhs.confidence > rhs.confidence
-    }
-
-    private func suggestionCardPresentation(
-        for suggestion: DataStudioBindingSuggestionResponse,
-        kind: DataStudioSuggestionCardKind
-    ) -> DataStudioSuggestionCardPresentation {
-        let values: [String]
-        switch kind {
-        case .curve:
-            let xLabel = suggestion.candidateIDs
-                .compactMap { id -> String? in
-                    guard candidate(for: id)?.kind == "curve_x" else { return nil }
-                    return displayLabel(forCandidateID: id, includeUnit: true)
-                }
-                .first ?? "X Column"
-            let yLabel = suggestion.candidateIDs
-                .compactMap { id -> String? in
-                    guard candidate(for: id)?.kind == "curve_y" else { return nil }
-                    return displayLabel(forCandidateID: id, includeUnit: true)
-                }
-                .first ?? "Y Column"
-            values = ["X: \(xLabel)", "Y: \(yLabel)"]
-        case .metric:
-            values = displayValues(for: suggestion, kinds: ["metric"], includeUnits: false, limit: 4)
-        case .metadata:
-            values = displayValues(for: suggestion, kinds: ["metadata"], includeUnits: false, limit: 3)
-        case .structure:
-            values = structureValues(for: suggestion)
-        }
-
-        return DataStudioSuggestionCardPresentation(
-            id: suggestion.id,
-            kind: kind,
-            values: values,
-            location: previewLocation(for: suggestion)
-        )
     }
 
     private func createTemplateFromDraft() async -> DataStudioTemplateResponse? {
@@ -633,19 +587,26 @@ extension DataStudioSession {
             errorMessage = "Provide a parse template name before saving it."
             return nil
         }
+        guard let request = draftTemplateRequest(label: label) else {
+            return nil
+        }
         currentActivity = .creatingTemplate
         errorMessage = nil
         defer { currentActivity = .idle }
         do {
-            let template = try await client.createDataStudioTemplate(
-                .init(
-                    sourcePath: sourceURL.path,
-                    label: label,
-                    acceptedCandidateIDs: selectedCandidateIDs,
-                    templateID: nil,
-                    description: templateDraftDescription
-                )
+            let preview = try await client.previewDataStudioTemplate(
+                .init(sourcePath: sourceURL.path, template: request)
             )
+            templatePreview = preview
+            if !preview.errors.isEmpty {
+                errorMessage = preview.errors.joined(separator: " ")
+                return nil
+            }
+            if !preview.missingRoles.isEmpty {
+                errorMessage = "Missing required roles: \(preview.missingRoles.joined(separator: ", "))."
+                return nil
+            }
+            let template = try await client.createDataStudioTemplate(request)
             if let index = templates.firstIndex(where: { $0.id == template.id }) {
                 templates[index] = template
             } else {
@@ -654,9 +615,139 @@ extension DataStudioSession {
             templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
             return template
         } catch {
+            if isUserCancelled(error) {
+                return nil
+            }
             errorMessage = error.localizedDescription
             return nil
         }
+    }
+
+    private func draftTemplateRequest(label: String) -> DataStudioCreateTemplateRequest? {
+        guard let sourcePreview else {
+            errorMessage = "Import a source file before saving the parse template."
+            return nil
+        }
+        var bindings: [DataStudioTemplateFieldBindingResponse] = []
+        let segmentSelectors = draftSegmentSelectors(from: sourcePreview)
+        switch templateDraftOutputKind {
+        case "metric_table":
+            for columnName in templateDraftMetricColumnNames {
+                bindings.append(fieldBinding(idPrefix: "metric", role: "metric", label: columnName, columnName: columnName))
+            }
+        case "matrix_heatmap":
+            guard let xColumn = templateDraftXColumnName,
+                  let yColumn = templateDraftYColumnNames.first,
+                  let zColumn = templateDraftMetricColumnNames.first
+            else {
+                errorMessage = "Choose X, Y, and value columns."
+                return nil
+            }
+            bindings.append(fieldBinding(idPrefix: "matrix_x", role: "matrix_x", label: xColumn, columnName: xColumn))
+            bindings.append(fieldBinding(idPrefix: "matrix_y", role: "matrix_y", label: yColumn, columnName: yColumn))
+            bindings.append(fieldBinding(idPrefix: "matrix_z", role: "matrix_z", label: zColumn, columnName: zColumn))
+        default:
+            guard let xColumn = templateDraftXColumnName else {
+                errorMessage = "Choose an X column."
+                return nil
+            }
+            bindings.append(fieldBinding(idPrefix: "x", role: "curve_x", label: xColumn, columnName: xColumn))
+            for columnName in templateDraftYColumnNames {
+                bindings.append(fieldBinding(idPrefix: "y", role: "curve_y", label: columnName, columnName: columnName))
+            }
+            for columnName in templateDraftMetricColumnNames {
+                bindings.append(fieldBinding(idPrefix: "metric", role: "metric", label: columnName, columnName: columnName, optional: true))
+            }
+        }
+        return DataStudioCreateTemplateRequest(
+            label: label,
+            templateID: nil,
+            description: templateDraftDescription,
+            outputKind: templateDraftOutputKind,
+            sourceFormat: .init(
+                encoding: sourcePreview.encoding,
+                delimiter: sourcePreview.delimiter,
+                sheetName: sourcePreview.sheet.displayString
+            ),
+            segmentPolicy: segmentSelectors.isEmpty ? "single_table" : "series_per_segment",
+            segmentSelectors: segmentSelectors,
+            fieldBindings: bindings,
+            matchConditions: []
+        )
+    }
+
+    private func draftSegmentSelectors(from preview: SourceTablePreviewResponse) -> [DataStudioTemplateSegmentSelectorResponse] {
+        if let selectedPreviewSegmentID,
+           let segment = preview.segments.first(where: { $0.id == selectedPreviewSegmentID })
+        {
+            return [selector(from: segment)]
+        }
+        if preview.segments.isEmpty {
+            return []
+        }
+        return preview.segments.map(selector(from:))
+    }
+
+    private func selector(from segment: SourceTableSegmentResponse) -> DataStudioTemplateSegmentSelectorResponse {
+        DataStudioTemplateSegmentSelectorResponse(
+            id: segment.id,
+            label: segment.label,
+            resultLabel: segment.resultLabel,
+            intervalIndex: segment.intervalIndex,
+            headerRowIndex: segment.headerRowIndex,
+            unitRowIndex: segment.unitRowIndex,
+            dataStartRowIndex: segment.dataStartRowIndex,
+            startRow: segment.startRow,
+            endRow: segment.endRow
+        )
+    }
+
+    private func fieldBinding(
+        idPrefix: String,
+        role: String,
+        label: String,
+        columnName: String,
+        optional: Bool = false
+    ) -> DataStudioTemplateFieldBindingResponse {
+        DataStudioTemplateFieldBindingResponse(
+            id: "\(idPrefix)_\(stableColumnToken(columnName))",
+            role: role,
+            label: label,
+            sheetName: sourcePreview?.sheet.displayString,
+            blockID: selectedPreviewSegmentID,
+            columnName: columnName,
+            columnIndex: nil,
+            rowLabelContains: nil,
+            cellValueContains: [],
+            unitHint: unitHint(for: columnName),
+            optional: optional
+        )
+    }
+
+    private func unitHint(for columnName: String) -> String? {
+        guard let profile = sourcePreview?.columnProfiles.first(where: { $0.name == columnName }) else {
+            return nil
+        }
+        guard profile.headerPreview.count > 1 else {
+            return nil
+        }
+        return profile.headerPreview[1]
+    }
+
+    private func configureDraftDefaults(from preview: SourceTablePreviewResponse, sampleURL: URL) {
+        templatePreview = nil
+        templateDraftLabel = inferGroupName(from: importedSourceURLs.isEmpty ? [sampleURL] : importedSourceURLs)
+        templateDraftDescription = "Template created from \(sampleURL.lastPathComponent)."
+        templateDraftOutputKind = "curve_metrics"
+        let availableNames = preview.columnHeaders.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        templateDraftXColumnName = preview.detectedXLabel ?? preview.candidateRoles.x.first ?? availableNames.first
+        let xName = templateDraftXColumnName
+        let recommendedY = preview.candidateRoles.y.filter { $0 != xName }
+        templateDraftYColumnNames = Array(recommendedY.prefix(3))
+        if templateDraftYColumnNames.isEmpty {
+            templateDraftYColumnNames = Array(availableNames.filter { $0 != xName }.prefix(1))
+        }
+        templateDraftMetricColumnNames = Array(preview.candidateRoles.metric.prefix(4))
     }
 
     private func buildWorkbookFromPendingRawFiles(templateID: String) async {
@@ -696,6 +787,9 @@ extension DataStudioSession {
             resetImportPresentationState()
             discardPendingSourcePreview()
         } catch {
+            if isUserCancelled(error) {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -726,7 +820,7 @@ extension DataStudioSession {
     private func discardPendingSourcePreview() {
         importedSourceURLs = []
         sourcePreview = nil
-        sourceMatches = []
+        templatePreview = nil
         hoveredSuggestionID = nil
         selectedSuggestionIDs = []
         hoveredPreviewRanges = []
@@ -734,290 +828,25 @@ extension DataStudioSession {
         selectedCandidateIDs = []
         templateDraftLabel = ""
         templateDraftDescription = ""
+        templateDraftOutputKind = "curve_metrics"
+        templateDraftXColumnName = nil
+        templateDraftYColumnNames = []
+        templateDraftMetricColumnNames = []
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil
+        selectedPreviewSegmentID = nil
         showAdvancedCandidates = false
         if case .wizard(step: .createTemplate) = importFlow {
             importFlow = .wizard(step: .resolver)
         }
     }
 
-    private func selectInitialPreviewContext(from preview: DataStudioRawFilePreviewResponse) {
-        if let suggestion = preview.bindingSuggestions.first(where: \.defaultSelected) ?? preview.bindingSuggestions.first {
-            selectedPreviewSheetName = suggestion.sheetName
-            selectedPreviewBlockID = suggestion.blockID
-            return
+    private func stableColumnToken(_ value: String) -> String {
+        let pieces = value.lowercased().unicodeScalars.map { scalar -> String in
+            CharacterSet.alphanumerics.contains(scalar) ? String(scalar) : "_"
         }
-        selectedPreviewSheetName = preview.sheets.first?.sheetName
-        selectedPreviewBlockID = preview.sheets.first?.blocks.first?.id
-    }
-
-    private func defaultSuggestionSelection(from preview: DataStudioRawFilePreviewResponse) -> [String] {
-        let primaryCurve = preferredCreateTemplateSuggestion(in: preview.bindingSuggestions, kind: "curve_pair")
-        let preferredBlockID = primaryCurve?.blockID
-        var selection: [String] = []
-        if let primaryCurve {
-            selection.append(primaryCurve.id)
-        }
-
-        for kind in ["metric_group", "metadata_group", "structure_rows"] {
-            let suggestion = preferredCreateTemplateSuggestion(
-                in: preview.bindingSuggestions,
-                kind: kind,
-                preferredBlockID: preferredBlockID
-            )
-            if let suggestion, !selection.contains(suggestion.id) {
-                selection.append(suggestion.id)
-            }
-        }
-
-        if selection.isEmpty {
-            selection = preview.bindingSuggestions
-                .filter(\.defaultSelected)
-                .map(\.id)
-        }
-        return selection
-    }
-
-    private func flattenedCandidateSelection(
-        fromSuggestionIDs suggestionIDs: [String],
-        preview: DataStudioRawFilePreviewResponse?
-    ) -> [String] {
-        guard let preview else {
-            return []
-        }
-        let selectedSet = Set(suggestionIDs)
-        var flattened: [String] = []
-        for suggestion in preview.bindingSuggestions where selectedSet.contains(suggestion.id) {
-            for candidateID in suggestion.candidateIDs where !flattened.contains(candidateID) {
-                flattened.append(candidateID)
-            }
-        }
-        return flattened
-    }
-
-    private func reconcileSuggestionSelection() {
-        guard let preview = sourcePreview else {
-            selectedSuggestionIDs = []
-            return
-        }
-        let selectedSet = Set(selectedCandidateIDs)
-        selectedSuggestionIDs = preview.bindingSuggestions
-            .filter { !$0.candidateIDs.isEmpty && Set($0.candidateIDs).isSubset(of: selectedSet) }
-            .map(\.id)
-    }
-
-    private func syncPinnedPreviewRanges() {
-        guard let preview = sourcePreview else {
-            pinnedPreviewRanges = []
-            return
-        }
-        let selectedSet = Set(selectedSuggestionIDs)
-        pinnedPreviewRanges = preview.bindingSuggestions
-            .filter { selectedSet.contains($0.id) }
-            .flatMap(\.previewRanges)
-    }
-
-    private func suggestion(for id: String) -> DataStudioBindingSuggestionResponse? {
-        sourcePreview?.bindingSuggestions.first(where: { $0.id == id })
-    }
-
-    private func preferredCreateTemplateSuggestion(
-        kind: String,
-        preferredBlockID: String? = nil
-    ) -> DataStudioBindingSuggestionResponse? {
-        preferredCreateTemplateSuggestion(
-            in: createTemplateSuggestions,
-            kind: kind,
-            preferredBlockID: preferredBlockID
-        )
-    }
-
-    private func preferredCreateTemplateSuggestion(
-        in suggestions: [DataStudioBindingSuggestionResponse],
-        kind: String,
-        preferredBlockID: String? = nil
-    ) -> DataStudioBindingSuggestionResponse? {
-        let matching = suggestions.filter { $0.kind == kind }
-        if let preferredBlockID,
-           let preferred = matching.first(where: { $0.blockID == preferredBlockID })
-        {
-            return preferred
-        }
-        return matching.first
-    }
-
-    private func selectedSuggestion(for kind: String) -> DataStudioBindingSuggestionResponse? {
-        let selected = createTemplateSuggestions.filter { suggestion in
-            suggestion.kind == kind && selectedSuggestionIDs.contains(suggestion.id)
-        }
-        if let preferredBlockID = createTemplatePrimaryCurveSuggestion?.blockID,
-           let preferred = selected.first(where: { $0.blockID == preferredBlockID })
-        {
-            return preferred
-        }
-        return selected.first
-    }
-
-    private func candidate(for id: String) -> DataStudioFieldCandidateResponse? {
-        sourcePreview?.fieldCandidates.first(where: { $0.id == id })
-    }
-
-    private func displayLabel(
-        forCandidateID id: String,
-        includeUnit: Bool = false
-    ) -> String? {
-        guard let candidate = candidate(for: id) else {
-            return nil
-        }
-        if includeUnit,
-           let unitHint = candidate.unitHint,
-           !unitHint.isEmpty,
-           !candidate.label.localizedCaseInsensitiveContains(unitHint)
-        {
-            return "\(candidate.label) (\(unitHint))"
-        }
-        return candidate.label
-    }
-
-    private func selectedLabels(for kind: String, includeUnit: Bool = false) -> [String] {
-        let selectedIDs = Set(selectedCandidateIDs)
-        var labels: [String] = []
-        for candidate in sourcePreview?.fieldCandidates ?? [] where candidate.kind == kind && selectedIDs.contains(candidate.id) {
-            let label = displayLabel(forCandidateID: candidate.id, includeUnit: includeUnit) ?? candidate.label
-            if !labels.contains(label) {
-                labels.append(label)
-            }
-        }
-        return labels
-    }
-
-    private func displayValues(
-        for suggestion: DataStudioBindingSuggestionResponse,
-        kinds: Set<String>,
-        includeUnits: Bool,
-        limit: Int
-    ) -> [String] {
-        let candidateIDs = Set(suggestion.candidateIDs)
-        let labels = (sourcePreview?.fieldCandidates ?? [])
-            .filter { candidateIDs.contains($0.id) && kinds.contains($0.kind) }
-            .map { candidate in
-                if includeUnits,
-                   let unitHint = candidate.unitHint,
-                   !unitHint.isEmpty,
-                   !candidate.label.localizedCaseInsensitiveContains(unitHint)
-                {
-                    return "\(candidate.label) (\(unitHint))"
-                }
-                return candidate.label
-            }
-        guard labels.count > limit else {
-            return labels
-        }
-        return Array(labels.prefix(limit)) + ["+\(labels.count - limit) more"]
-    }
-
-    private var selectedCurveSummary: String? {
-        if let suggestion = selectedSuggestion(for: "curve_pair") {
-            let xLabel = suggestion.candidateIDs
-                .compactMap { id -> String? in
-                    guard candidate(for: id)?.kind == "curve_x" else { return nil }
-                    return displayLabel(forCandidateID: id, includeUnit: true)
-                }
-                .first
-            let yLabel = suggestion.candidateIDs
-                .compactMap { id -> String? in
-                    guard candidate(for: id)?.kind == "curve_y" else { return nil }
-                    return displayLabel(forCandidateID: id, includeUnit: true)
-                }
-                .first
-            if let xLabel, let yLabel {
-                return "X = \(xLabel), Y = \(yLabel)"
-            }
-        }
-
-        let xLabels = selectedLabels(for: "curve_x", includeUnit: true)
-        let yLabels = selectedLabels(for: "curve_y", includeUnit: true)
-        guard let xLabel = xLabels.first, let yLabel = yLabels.first else {
-            return nil
-        }
-        return "X = \(xLabel), Y = \(yLabel)"
-    }
-
-    private var selectedMetricSummary: String? {
-        let labels = selectedLabels(for: "metric")
-        guard !labels.isEmpty else {
-            return nil
-        }
-        return labels.joined(separator: ", ")
-    }
-
-    private var selectedMetadataSummary: String? {
-        let labels = selectedLabels(for: "metadata")
-        guard !labels.isEmpty else {
-            return nil
-        }
-        return labels.joined(separator: ", ")
-    }
-
-    private var selectedStructureSummary: String? {
-        if let suggestion = selectedSuggestion(for: "structure_rows"), !suggestion.summary.isEmpty {
-            return suggestion.summary
-        }
-        let selectedIDs = Set(selectedCandidateIDs)
-        var parts: [String] = []
-        for candidate in sourcePreview?.fieldCandidates ?? [] where selectedIDs.contains(candidate.id) {
-            guard let range = candidate.range else {
-                continue
-            }
-            switch candidate.kind {
-            case "header_row":
-                parts.append("Header Row \(range.startRow + 1)")
-            case "unit_row":
-                parts.append("Unit Row \(range.startRow + 1)")
-            default:
-                break
-            }
-        }
-        guard !parts.isEmpty else {
-            return nil
-        }
-        return parts.joined(separator: ", ")
-    }
-
-    private func structureValues(for suggestion: DataStudioBindingSuggestionResponse) -> [String] {
-        let ranges = suggestion.previewRanges.sorted { lhs, rhs in
-            if lhs.startRow == rhs.startRow {
-                return lhs.role < rhs.role
-            }
-            return lhs.startRow < rhs.startRow
-        }
-        var values: [String] = []
-        for range in ranges {
-            switch range.role {
-            case "header_row":
-                values.append("Header Row \(range.startRow + 1)")
-            case "unit_row":
-                values.append("Unit Row \(range.startRow + 1)")
-            default:
-                continue
-            }
-        }
-        return values
-    }
-
-    private func previewLocation(for suggestion: DataStudioBindingSuggestionResponse) -> String {
-        guard let preview = sourcePreview else {
-            return suggestion.sheetName
-        }
-        if let blockID = suggestion.blockID {
-            for sheet in preview.sheets where sheet.sheetName == suggestion.sheetName {
-                if let block = sheet.blocks.first(where: { $0.id == blockID }) {
-                    return "\(sheet.sheetName) / \(block.label)"
-                }
-            }
-        }
-        return suggestion.sheetName
+        let token = pieces.joined().split(separator: "_").joined(separator: "_")
+        return token.isEmpty ? UUID().uuidString : token
     }
 
     private func inferGroupName(from urls: [URL]) -> String {
@@ -1025,5 +854,16 @@ extension DataStudioSession {
             return "DataStudio_Group"
         }
         return first.deletingPathExtension().lastPathComponent
+    }
+}
+
+private extension SheetValue {
+    var displayString: String {
+        switch self {
+        case let .index(value):
+            return String(value)
+        case let .name(value):
+            return value
+        }
     }
 }

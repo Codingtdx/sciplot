@@ -56,9 +56,36 @@ def test_delete_data_studio_template_returns_status_response() -> None:
     create_response = client.post(
         "/data-studio/templates",
         json={
-            "source_path": str(FIXTURE_DIR / "BlendSet_A.csv"),
             "label": "Schema Delete Test",
             "template_id": template_id,
+            "output_kind": "curve_metrics",
+            "source_format": {"encoding": "utf-8", "delimiter": ","},
+            "segment_policy": "single_table",
+            "segment_selectors": [
+                {
+                    "id": "result-table-2",
+                    "label": "Result Table 2",
+                    "header_row_index": 6,
+                    "unit_row_index": 7,
+                    "data_start_row_index": 8,
+                },
+            ],
+            "field_bindings": [
+                {
+                    "id": "strain",
+                    "role": "curve_x",
+                    "label": "Tensile Strain",
+                    "column_name": "Tensile Strain (Displacement)",
+                    "unit_hint": "%",
+                },
+                {
+                    "id": "stress",
+                    "role": "curve_y",
+                    "label": "Tensile Stress",
+                    "column_name": "Tensile Stress",
+                    "unit_hint": "MPa",
+                },
+            ],
         },
     )
     assert create_response.status_code == 200, create_response.text

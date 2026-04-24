@@ -148,25 +148,46 @@ def test_create_template_from_candidates_persists_user_template(
     user_template_dir = tmp_path / "templates" / "user"
     monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", user_template_dir)
 
-    preview, _ = preview_and_recommend(FIXTURE_DIR / "BlendSet_A.csv")
-    curve_suggestion = next(
-        suggestion
-        for suggestion in preview.binding_suggestions
-        if suggestion.kind == "curve_pair"
-    )
-    candidate_ids = list(curve_suggestion.candidate_ids)
-    expected_curve_labels = [
-        candidate.label
-        for candidate in preview.field_candidates
-        if candidate.id in set(candidate_ids) and candidate.kind in {"curve_x", "curve_y"}
-    ]
-
     template = create_data_studio_template(
-        source_path=FIXTURE_DIR / "BlendSet_A.csv",
         label="Fixture Template",
-        accepted_candidate_ids=candidate_ids,
         template_id="user/fixture-template",
         description="Saved from tensile fixture preview.",
+        output_kind="curve_metrics",
+        source_format={"encoding": "utf-8", "delimiter": ","},
+        segment_policy="single_table",
+        segment_selectors=[
+            {
+                "id": "result-table-2",
+                "label": "Result Table 2",
+                "header_row_index": 6,
+                "unit_row_index": 7,
+                "data_start_row_index": 8,
+            },
+        ],
+        field_bindings=[
+            {
+                "id": "strain",
+                "role": "curve_x",
+                "label": "Tensile Strain",
+                "column_name": "Tensile Strain (Displacement)",
+                "unit_hint": "%",
+            },
+            {
+                "id": "stress",
+                "role": "curve_y",
+                "label": "Tensile Stress",
+                "column_name": "Tensile Stress",
+                "unit_hint": "MPa",
+            },
+            {
+                "id": "strength",
+                "role": "metric",
+                "label": "Strength",
+                "column_name": "Tensile Stress",
+                "unit_hint": "MPa",
+                "optional": True,
+            },
+        ],
     )
 
     saved_path = template_store.template_path(template.id, builtin=False)
@@ -178,7 +199,7 @@ def test_create_template_from_candidates_persists_user_template(
         binding.label
         for binding in template.field_bindings
         if binding.role in {"curve_x", "curve_y"}
-    ] == expected_curve_labels
+    ] == ["Tensile Strain", "Tensile Stress"]
 
 
 def test_build_and_import_data_studio_workbook_keeps_tensile_behavior(tmp_path: Path) -> None:

@@ -5,18 +5,22 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from typing import TypedDict
 
-from matplotlib.axes import Axes
-
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
 from src.rendering.axis_breaks import (
     axis_break_panel_axes,
-    axis_break_panel_range,
     transform_axis_break_interval_segments,
     transform_axis_break_value,
     value_hidden_by_axis_break,
 )
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
+from src.rendering.overlay_coordinates import (
+    anchor_axis_for_band,
+    anchor_axis_for_value,
+    panel_contains_value,
+    panel_overlap,
+    secondary_y_conversion_scale,
+)
 
 _VALID_GUIDE_KINDS = frozenset({"line", "band"})
 _VALID_GUIDE_AXIS_TARGETS = frozenset({"x", "y_primary", "y_secondary"})
@@ -240,19 +244,6 @@ def _guide_scale(axis_target: str, *, options: RenderOptions) -> tuple[str, str]
     return options.yscale, "Y"
 
 
-def _secondary_y_conversion_scale(options: RenderOptions) -> float | None:
-    payload = options.extra_y_axis
-    if not isinstance(payload, Mapping) or not bool(payload.get("enabled", False)):
-        return None
-    if str(payload.get("binding_mode", "conversion")).strip().lower() != "conversion":
-        return None
-    data_value = float(payload.get("data_value", 1.0))
-    display_value = float(payload.get("display_value", 1.0))
-    if data_value <= 0.0 or display_value <= 0.0:
-        return None
-    return display_value / data_value
-
-
 def _secondary_label_anchor(options: RenderOptions) -> tuple[float, str]:
     payload = options.extra_y_axis
     if not isinstance(payload, Mapping):
@@ -275,67 +266,6 @@ def _band_label_center(segments: tuple[tuple[float, float], ...]) -> float | Non
     if not segments:
         return None
     return (segments[0][0] + segments[-1][1]) / 2.0
-
-
-def _panel_contains_value(axis: Axes, *, axis_name: str, value: float) -> bool:
-    visible_range = axis_break_panel_range(axis, axis_name=axis_name)
-    if visible_range is None:
-        return True
-    lower, upper = visible_range
-    return lower <= value <= upper
-
-
-def _panel_overlap(
-    axis: Axes,
-    *,
-    axis_name: str,
-    start: float,
-    end: float,
-) -> tuple[float, float] | None:
-    visible_range = axis_break_panel_range(axis, axis_name=axis_name)
-    if visible_range is None:
-        return (start, end)
-    lower = max(min(start, end), visible_range[0])
-    upper = min(max(start, end), visible_range[1])
-    if upper <= lower:
-        return None
-    return lower, upper
-
-
-def _anchor_axis_for_value(
-    axes: tuple[Axes, ...],
-    *,
-    axis_name: str,
-    value: float,
-) -> Axes | None:
-    if not axes:
-        return None
-    for axis in axes:
-        if _panel_contains_value(axis, axis_name=axis_name, value=value):
-            return axis
-    return axes[0]
-
-
-def _anchor_axis_for_band(
-    axes: tuple[Axes, ...],
-    *,
-    axis_name: str,
-    start: float,
-    end: float,
-) -> tuple[Axes | None, tuple[float, float] | None]:
-    if not axes:
-        return None, None
-    best_axis = axes[0]
-    best_overlap = _panel_overlap(best_axis, axis_name=axis_name, start=start, end=end)
-    best_size = -1.0 if best_overlap is None else best_overlap[1] - best_overlap[0]
-    for axis in axes[1:]:
-        overlap = _panel_overlap(axis, axis_name=axis_name, start=start, end=end)
-        size = -1.0 if overlap is None else overlap[1] - overlap[0]
-        if size > best_size:
-            best_axis = axis
-            best_overlap = overlap
-            best_size = size
-    return best_axis, best_overlap
 
 
 def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) -> RenderedPlot:
@@ -366,7 +296,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
         scale, axis_label = _guide_scale(guide.axis_target, options=options)
         color = palette[index % len(palette)] if palette else "#111827"
         secondary_conversion = guide.axis_target == "y_secondary" and not hasattr(base_axis, "axhline")
-        conversion_scale = _secondary_y_conversion_scale(options) if secondary_conversion else None
+        conversion_scale = secondary_y_conversion_scale(options) if secondary_conversion else None
         label_x, label_ha = (
             _secondary_label_anchor(options)
             if guide.axis_target == "y_secondary"
@@ -407,7 +337,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
             )
             if guide.axis_target == "x":
                 if len(x_panels) > 1:
-                    anchor_axis, anchor_overlap = _anchor_axis_for_band(
+                    anchor_axis, anchor_overlap = anchor_axis_for_band(
                         target_axes,
                         axis_name="x",
                         start=guide.start,
@@ -415,7 +345,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     )
                     drawn = False
                     for draw_axis in target_axes:
-                        overlap = _panel_overlap(
+                        overlap = panel_overlap(
                             draw_axis,
                             axis_name="x",
                             start=guide.start,
@@ -526,7 +456,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 draw_start = guide.start if conversion_scale is None else guide.start / conversion_scale
                 draw_end = guide.end if conversion_scale is None else guide.end / conversion_scale
                 if len(y_panels) > 1 and guide.axis_target == "y_primary":
-                    anchor_axis, anchor_overlap = _anchor_axis_for_band(
+                    anchor_axis, anchor_overlap = anchor_axis_for_band(
                         target_axes,
                         axis_name="y",
                         start=draw_start,
@@ -534,7 +464,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     )
                     drawn = False
                     for draw_axis in target_axes:
-                        overlap = _panel_overlap(
+                        overlap = panel_overlap(
                             draw_axis,
                             axis_name="y",
                             start=draw_start,
@@ -661,7 +591,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 target_axes = tuple(
                     draw_axis
                     for draw_axis in target_axes
-                    if _panel_contains_value(draw_axis, axis_name="x", value=guide.value)
+                    if panel_contains_value(draw_axis, axis_name="x", value=guide.value)
                 )
                 if not target_axes:
                     continue
@@ -676,7 +606,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         zorder=3.6,
                     )
                 if guide.label:
-                    anchor_axis = _anchor_axis_for_value(target_axes, axis_name="x", value=guide.value)
+                    anchor_axis = anchor_axis_for_value(target_axes, axis_name="x", value=guide.value)
                     if anchor_axis is None:
                         continue
                     anchor_axis.text(
@@ -764,7 +694,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 target_axes = tuple(
                     draw_axis
                     for draw_axis in target_axes
-                    if _panel_contains_value(draw_axis, axis_name="y", value=draw_value)
+                    if panel_contains_value(draw_axis, axis_name="y", value=draw_value)
                 )
                 if not target_axes:
                     continue
@@ -779,7 +709,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         zorder=3.6,
                     )
                 if guide.label:
-                    anchor_axis = _anchor_axis_for_value(target_axes, axis_name="y", value=draw_value)
+                    anchor_axis = anchor_axis_for_value(target_axes, axis_name="y", value=draw_value)
                     if anchor_axis is None:
                         continue
                     anchor_axis.text(

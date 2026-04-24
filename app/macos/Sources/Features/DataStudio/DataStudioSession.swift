@@ -34,8 +34,8 @@ final class DataStudioSession {
 
     var templates: [DataStudioTemplateResponse] = []
     var selectedTemplateID: String?
-    var sourcePreview: DataStudioRawFilePreviewResponse?
-    var sourceMatches: [DataStudioTemplateMatchResponse] = []
+    var sourcePreview: SourceTablePreviewResponse?
+    var templatePreview: DataStudioTemplatePreviewResponse?
     var hoveredSuggestionID: String?
     var selectedSuggestionIDs: [String] = []
     var hoveredPreviewRanges: [DataStudioPreviewRangeResponse] = []
@@ -43,6 +43,11 @@ final class DataStudioSession {
     var selectedCandidateIDs: [String] = []
     var templateDraftLabel = ""
     var templateDraftDescription = ""
+    var templateDraftOutputKind = "curve_metrics"
+    var templateDraftXColumnName: String?
+    var templateDraftYColumnNames: [String] = []
+    var templateDraftMetricColumnNames: [String] = []
+    var selectedPreviewSegmentID: String?
 
     var importFlow: DataStudioImportFlowState = .idle
     var pendingImportDisposition: DataStudioImportDisposition = .addToCurrentSession
@@ -265,7 +270,7 @@ final class DataStudioSession {
         projectURL = nil
         importedSourceURLs = []
         sourcePreview = nil
-        sourceMatches = []
+        templatePreview = nil
         hoveredSuggestionID = nil
         selectedSuggestionIDs = []
         hoveredPreviewRanges = []
@@ -273,6 +278,11 @@ final class DataStudioSession {
         selectedCandidateIDs = []
         templateDraftLabel = ""
         templateDraftDescription = ""
+        templateDraftOutputKind = "curve_metrics"
+        templateDraftXColumnName = nil
+        templateDraftYColumnNames = []
+        templateDraftMetricColumnNames = []
+        selectedPreviewSegmentID = nil
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil
         showAdvancedCandidates = false

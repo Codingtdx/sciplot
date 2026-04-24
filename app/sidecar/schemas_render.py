@@ -4,7 +4,7 @@ from base64 import b64encode
 from io import BytesIO
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 
 from app.sidecar.schemas_common import (
     PreviewItemResponse,
@@ -186,6 +186,30 @@ class ExportRenderRequest(RenderRequest):
 class SourceTablePreviewRequest(FileRequest):
     offset: int = 0
     limit: int = 50
+    encoding: str | None = None
+    delimiter: str | None = None
+    segment_id: str | None = None
+    header_row_index: int | None = Field(default=None, validation_alias=AliasChoices("header_row_index", "header_row"))
+    unit_row_index: int | None = Field(default=None, validation_alias=AliasChoices("unit_row_index", "unit_row"))
+    data_start_row_index: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("data_start_row_index", "data_start_row"),
+    )
+
+
+class SourceTableSegmentResponse(StrictModel):
+    id: str
+    sheet_name: str
+    label: str
+    result_label: str | None = None
+    interval_index: int | None = None
+    start_row: int
+    end_row: int
+    header_row_index: int | None = None
+    unit_row_index: int | None = None
+    data_start_row_index: int | None = None
+    column_count: int
+    row_count: int
 
 
 class SourceTablePreviewResponse(StrictModel):
@@ -200,6 +224,11 @@ class SourceTablePreviewResponse(StrictModel):
     candidate_roles: PlotCandidateRolesResponse = Field(default_factory=lambda: PlotCandidateRolesResponse())
     detected_x_label: str | None = None
     detected_y_label: str | None = None
+    column_profiles: list[PlotColumnProfileResponse] = Field(default_factory=list)
+    segments: list[SourceTableSegmentResponse] = Field(default_factory=list)
+    selected_segment_id: str | None = None
+    encoding: str | None = None
+    delimiter: str | None = None
 
 
 class FitAnalysisRequest(FileRequest):
@@ -524,6 +553,7 @@ __all__ = [
     "SaveProjectResponse",
     "SourceTablePreviewRequest",
     "SourceTablePreviewResponse",
+    "SourceTableSegmentResponse",
     "TemplateRecommendationResponse",
     "TextAnnotationPayload",
     "rendered_plots_to_preview_payload",

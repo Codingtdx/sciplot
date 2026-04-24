@@ -10,15 +10,12 @@ from matplotlib.patches import Ellipse, Rectangle
 
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
-from src.rendering.axis_breaks import (
-    axis_break_panel_axes,
-    axis_break_panel_for_value,
-    axis_break_panel_range,
-    transform_axis_break_interval_segments,
-    transform_axis_break_value,
-    value_hidden_by_axis_break,
-)
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
+from src.rendering.overlay_coordinates import (
+    axis_intervals,
+    mapped_axis_value_anchor,
+    pixel_offset_point,
+)
 
 _VALID_SHAPE_KINDS = frozenset({"rectangle", "ellipse", "bracket"})
 _VALID_BRACKET_ORIENTATIONS = frozenset({"horizontal", "vertical"})
@@ -50,13 +47,6 @@ class ShapeAnnotationOptions:
     y_end: float = 1.0
     y_axis_target: str = "y_primary"
     label: str | None = None
-
-
-@dataclass(frozen=True)
-class _AxisInterval:
-    axis: Axes
-    start: float
-    end: float
 
 
 def _string(value: object, *, field_name: str, default: str) -> str:
@@ -226,118 +216,6 @@ def _validate_shape_annotation(annotation: ShapeAnnotationOptions, *, options: R
     _validate_log_coordinate(axis_label="Y", value=annotation.y_end, scale=options.yscale, kind=kind_label)
 
 
-def _pixel_offset_point(ax: Axes, *, x: float, y: float, dx: float = 0.0, dy: float = 0.0) -> tuple[float, float]:
-    display_x, display_y = ax.transData.transform((x, y))
-    mapped_x, mapped_y = ax.transData.inverted().transform((display_x + dx, display_y + dy))
-    return float(mapped_x), float(mapped_y)
-
-
-def _x_intervals(
-    rendered: RenderedPlot,
-    *,
-    start: float,
-    end: float,
-) -> tuple[_AxisInterval, ...]:
-    primary = primary_axis(rendered)
-    if primary is None:
-        return ()
-    panel_axes = axis_break_panel_axes(rendered, axis_name="x")
-    if len(panel_axes) > 1:
-        intervals: list[_AxisInterval] = []
-        for axis in panel_axes:
-            visible_range = axis_break_panel_range(axis, axis_name="x")
-            if visible_range is None:
-                continue
-            overlap_start = max(start, visible_range[0])
-            overlap_end = min(end, visible_range[1])
-            if overlap_end <= overlap_start:
-                continue
-            intervals.append(_AxisInterval(axis=axis, start=overlap_start, end=overlap_end))
-        return tuple(intervals)
-    segments = transform_axis_break_interval_segments(primary, axis_name="x", start=start, end=end)
-    return tuple(
-        _AxisInterval(axis=primary, start=segment[0], end=segment[1])
-        for segment in segments
-        if segment[1] > segment[0]
-    )
-
-
-def _y_intervals(
-    rendered: RenderedPlot,
-    *,
-    axis: Axes,
-    start: float,
-    end: float,
-) -> tuple[_AxisInterval, ...]:
-    primary = primary_axis(rendered)
-    if primary is None:
-        return ()
-    if axis is not primary:
-        return (_AxisInterval(axis=axis, start=start, end=end),) if end > start else ()
-    panel_axes = axis_break_panel_axes(rendered, axis_name="y")
-    if len(panel_axes) > 1:
-        intervals: list[_AxisInterval] = []
-        for panel_axis in panel_axes:
-            visible_range = axis_break_panel_range(panel_axis, axis_name="y")
-            if visible_range is None:
-                continue
-            overlap_start = max(start, visible_range[0])
-            overlap_end = min(end, visible_range[1])
-            if overlap_end <= overlap_start:
-                continue
-            intervals.append(_AxisInterval(axis=panel_axis, start=overlap_start, end=overlap_end))
-        return tuple(intervals)
-    segments = transform_axis_break_interval_segments(primary, axis_name="y", start=start, end=end)
-    return tuple(
-        _AxisInterval(axis=primary, start=segment[0], end=segment[1])
-        for segment in segments
-        if segment[1] > segment[0]
-    )
-
-
-def _mapped_x_anchor(rendered: RenderedPlot, *, value: float) -> tuple[Axes, float] | None:
-    primary = primary_axis(rendered)
-    if primary is None:
-        return None
-    panel_axes = axis_break_panel_axes(rendered, axis_name="x")
-    if len(panel_axes) > 1:
-        panel_axis = axis_break_panel_for_value(rendered, axis_name="x", value=value)
-        if panel_axis is None:
-            return None
-        return panel_axis, value
-    if value_hidden_by_axis_break(primary, axis_name="x", value=value):
-        return None
-    mapped = transform_axis_break_value(primary, axis_name="x", value=value)
-    if mapped is None:
-        return None
-    return primary, float(mapped)
-
-
-def _mapped_y_anchor(
-    rendered: RenderedPlot,
-    *,
-    axis: Axes,
-    value: float,
-) -> tuple[Axes, float] | None:
-    primary = primary_axis(rendered)
-    if primary is None:
-        return None
-    if axis is not primary:
-        return axis, value
-    panel_axes = axis_break_panel_axes(rendered, axis_name="y")
-    if len(panel_axes) > 1:
-        panel_axis = axis_break_panel_for_value(rendered, axis_name="y", value=value)
-        if panel_axis is None:
-            return None
-        return panel_axis, value
-    if value_hidden_by_axis_break(primary, axis_name="y", value=value):
-        return None
-    mapped = transform_axis_break_value(primary, axis_name="y", value=value)
-    if mapped is None:
-        return None
-    return primary, float(mapped)
-
-
 def _patch_label_target(
     drawn_regions: tuple[tuple[Axes, float, float, float, float], ...]
 ) -> tuple[Axes, float, float] | None:
@@ -361,8 +239,19 @@ def _draw_region_shape(
     target_axis = _annotation_y_axis(annotation, rendered=rendered)
     if target_axis is None:
         return False
-    x_intervals = _x_intervals(rendered, start=annotation.x_start, end=annotation.x_end)
-    y_intervals = _y_intervals(rendered, axis=target_axis, start=annotation.y_start, end=annotation.y_end)
+    x_intervals = axis_intervals(
+        rendered,
+        axis_name="x",
+        start=annotation.x_start,
+        end=annotation.x_end,
+    )
+    y_intervals = axis_intervals(
+        rendered,
+        axis_name="y",
+        start=annotation.y_start,
+        end=annotation.y_end,
+        target_axis=target_axis,
+    )
     if not x_intervals or not y_intervals:
         return False
 
@@ -426,7 +315,12 @@ def _draw_horizontal_bracket(
     line_width: float,
     font_size: float,
 ) -> bool:
-    x_intervals = _x_intervals(rendered, start=annotation.x_start, end=annotation.x_end)
+    x_intervals = axis_intervals(
+        rendered,
+        axis_name="x",
+        start=annotation.x_start,
+        end=annotation.x_end,
+    )
     if not x_intervals:
         return False
 
@@ -438,7 +332,7 @@ def _draw_horizontal_bracket(
         x0, x1 = interval.start, interval.end
         if x1 <= x0:
             continue
-        _, arm_y = _pixel_offset_point(draw_axis, x=x0, y=anchor_y, dy=12.0)
+        _, arm_y = pixel_offset_point(draw_axis, x=x0, y=anchor_y, dy=12.0)
         draw_axis.plot(
             [x0, x0, x1, x1],
             [anchor_y, arm_y, arm_y, anchor_y],
@@ -452,7 +346,7 @@ def _draw_horizontal_bracket(
         if span > label_span:
             label_span = span
             label_x = (x0 + x1) / 2.0
-            _, label_y = _pixel_offset_point(draw_axis, x=label_x, y=arm_y, dy=5.0)
+            _, label_y = pixel_offset_point(draw_axis, x=label_x, y=arm_y, dy=5.0)
             label_target = (draw_axis, label_x, label_y)
 
     if annotation.label and label_target is not None:
@@ -480,7 +374,13 @@ def _draw_vertical_bracket(
     line_width: float,
     font_size: float,
 ) -> bool:
-    y_intervals = _y_intervals(rendered, axis=anchor_axis, start=annotation.y_start, end=annotation.y_end)
+    y_intervals = axis_intervals(
+        rendered,
+        axis_name="y",
+        start=annotation.y_start,
+        end=annotation.y_end,
+        target_axis=anchor_axis,
+    )
     if not y_intervals:
         return False
 
@@ -492,7 +392,7 @@ def _draw_vertical_bracket(
         y0, y1 = interval.start, interval.end
         if y1 <= y0:
             continue
-        arm_x, _ = _pixel_offset_point(draw_axis, x=anchor_x, y=y0, dx=12.0)
+        arm_x, _ = pixel_offset_point(draw_axis, x=anchor_x, y=y0, dx=12.0)
         draw_axis.plot(
             [anchor_x, arm_x, arm_x, anchor_x],
             [y0, y0, y1, y1],
@@ -506,7 +406,7 @@ def _draw_vertical_bracket(
         if span > label_span:
             label_span = span
             label_y = (y0 + y1) / 2.0
-            label_x, _ = _pixel_offset_point(draw_axis, x=arm_x, y=label_y, dx=5.0)
+            label_x, _ = pixel_offset_point(draw_axis, x=arm_x, y=label_y, dx=5.0)
             label_target = (draw_axis, label_x, label_y)
 
     if annotation.label and label_target is not None:
@@ -536,7 +436,7 @@ def _draw_bracket_shape(
     if target_axis is None:
         return False
     if annotation.bracket_orientation == "vertical":
-        anchor = _mapped_x_anchor(rendered, value=annotation.x_start)
+        anchor = mapped_axis_value_anchor(rendered, axis_name="x", value=annotation.x_start)
         if anchor is None:
             return False
         anchor_axis, anchor_x = anchor
@@ -550,7 +450,12 @@ def _draw_bracket_shape(
             font_size=font_size,
         )
 
-    anchor = _mapped_y_anchor(rendered, axis=target_axis, value=annotation.y_start)
+    anchor = mapped_axis_value_anchor(
+        rendered,
+        axis_name="y",
+        value=annotation.y_start,
+        target_axis=target_axis,
+    )
     if anchor is None:
         return False
     anchor_axis, anchor_y = anchor

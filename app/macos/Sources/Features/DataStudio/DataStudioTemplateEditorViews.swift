@@ -3,7 +3,7 @@ import SwiftUI
 struct DataStudioCreateTemplateEditorSheet: View {
     @Bindable var session: DataStudioSession
 
-    private var preview: DataStudioRawFilePreviewResponse? {
+    private var preview: SourceTablePreviewResponse? {
         session.sourcePreview
     }
 
@@ -11,18 +11,8 @@ struct DataStudioCreateTemplateEditorSheet: View {
         session.templateEditorPresentation
     }
 
-    private var selectedBlock: DataStudioSheetBlockResponse? {
-        guard let preview else {
-            return nil
-        }
-        for sheet in preview.sheets {
-            if let explicitID = session.selectedPreviewBlockID,
-               let block = sheet.blocks.first(where: { $0.id == explicitID })
-            {
-                return block
-            }
-        }
-        return preview.sheets.first?.blocks.first
+    private var columns: [String] {
+        preview?.columnHeaders.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? []
     }
 
     var body: some View {
@@ -32,11 +22,11 @@ struct DataStudioCreateTemplateEditorSheet: View {
             Divider()
 
             HSplitView {
-                previewColumn
-                    .frame(minWidth: 340, idealWidth: 380, maxWidth: 430, maxHeight: .infinity)
+                sourceColumn
+                    .frame(minWidth: 380, idealWidth: 430, maxWidth: 500, maxHeight: .infinity)
 
                 editorColumn
-                    .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 470, maxWidth: .infinity, maxHeight: .infinity)
             }
 
             Divider()
@@ -57,33 +47,26 @@ struct DataStudioCreateTemplateEditorSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(!editorPresentation.saveTemplateAvailability.isEnabled)
-                .help(
-                    editorPresentation.saveTemplateAvailability.reason
-                        ?? "Save this parse template and return to the resolver."
-                )
+                .help(editorPresentation.saveTemplateAvailability.reason ?? "Save this import template.")
 
                 Button("Save Template and Continue Import") {
                     Task { await session.saveTemplateAndContinueImport() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!editorPresentation.saveTemplateAndContinueAvailability.isEnabled)
-                .help(
-                    editorPresentation.saveTemplateAndContinueAvailability.reason
-                        ?? "Save this parse template and immediately build the workbook."
-                )
+                .help(editorPresentation.saveTemplateAndContinueAvailability.reason ?? "Save and build the workbook.")
             }
         }
-        .frame(minWidth: 1000, idealWidth: 1040, minHeight: 660, idealHeight: 720)
+        .frame(minWidth: 980, idealWidth: 1060, minHeight: 660, idealHeight: 720)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var editorHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Create Parse Template")
+            Text("Create Import Template")
                 .font(.headline)
-
             if let preview {
-                Text(URL(fileURLWithPath: preview.sourcePath).lastPathComponent)
+                Text(URL(fileURLWithPath: preview.inputPath).lastPathComponent)
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
             }
@@ -91,65 +74,43 @@ struct DataStudioCreateTemplateEditorSheet: View {
         .padding(20)
     }
 
-    private var previewColumn: some View {
+    private var sourceColumn: some View {
         VStack(alignment: .leading, spacing: 14) {
-            GroupBox("Blocks") {
-                if let preview {
-                    List(selection: selectedBlockBinding) {
-                        ForEach(preview.sheets, id: \.sheetName) { sheet in
-                            Section(sheet.sheetName) {
-                                ForEach(sheet.blocks, id: \.id) { block in
-                                    DataStudioPreviewBlockRow(block: block)
-                                        .tag(Optional(block.id))
-                                }
+            if let preview {
+                if !preview.segments.isEmpty {
+                    GroupBox("Segments") {
+                        List(selection: segmentSelectionBinding) {
+                            ForEach(preview.segments) { segment in
+                                DataStudioSegmentRow(segment: segment)
+                                    .tag(Optional(segment.id))
                             }
                         }
+                        .listStyle(.inset)
+                        .frame(minHeight: 150, maxHeight: 230)
                     }
-                    .listStyle(.inset)
-                    .frame(minHeight: 180, maxHeight: 240)
-                } else {
-                    Text("No blocks")
-                        .foregroundStyle(.secondary)
                 }
-            }
 
-            GroupBox("Table Preview") {
-                if let block = selectedBlock {
+                GroupBox("Table") {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(block.label)
-                                .font(.subheadline.weight(.semibold))
+                        HStack(spacing: 12) {
+                            if let encoding = preview.encoding {
+                                Label(encoding, systemImage: "character.cursor.ibeam")
+                            }
+                            if let delimiter = preview.delimiter {
+                                Label(delimiter == "\t" ? "Tab" : delimiter, systemImage: "tablecells")
+                            }
                             Spacer()
-                            Text("\(block.rowCount) × \(block.colCount)")
-                                .foregroundStyle(.secondary)
                         }
-
-                        if let previewCaption = editorPresentation.previewCaption {
-                            Label(previewCaption, systemImage: "eye")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        KeyValueGrid(values: [
-                            ("Sheet", block.sheetName),
-                            ("Header Row", block.headerRowIndex.map { String($0 + 1) } ?? "Not detected"),
-                            ("Unit Row", block.unitRowIndex.map { String($0 + 1) } ?? "Not detected"),
-                            ("Data Starts", block.dataStartRowIndex.map { String($0 + 1) } ?? "Not detected"),
-                        ])
-
-                        DataStudioBlockTablePreview(
-                            block: block,
-                            hoveredRanges: session.hoveredPreviewRanges,
-                            selectedRanges: session.pinnedPreviewRanges
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("Select a detected block to preview the sample table.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+
+                        DataStudioSourceTablePreview(session: session, preview: preview)
+                    }
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
+            } else {
+                ContentUnavailableView("No Source", systemImage: "tablecells")
             }
-            .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(18)
     }
@@ -161,628 +122,322 @@ struct DataStudioCreateTemplateEditorSheet: View {
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("Template Name", text: $session.templateDraftLabel)
                             .textFieldStyle(.roundedBorder)
-                        TextField("Template Description", text: $session.templateDraftDescription, axis: .vertical)
+                        TextField("Description", text: $session.templateDraftDescription, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if let suggestion = editorPresentation.primaryCurveSuggestion {
-                    GroupBox("Recommended Curve") {
-                        DataStudioSuggestionCard(session: session, presentation: suggestion)
-                    }
-                }
-
-                if let suggestion = editorPresentation.primaryMetricSuggestion {
-                    GroupBox("Recommended Metrics") {
-                        DataStudioSuggestionCard(session: session, presentation: suggestion)
+                        Picker("Output", selection: outputKindBinding) {
+                            Text("Curve + Metrics").tag("curve_metrics")
+                            Text("Metric Table").tag("metric_table")
+                            Text("Matrix / Heatmap").tag("matrix_heatmap")
+                        }
+                        .pickerStyle(.segmented)
                     }
                 }
 
-                if let suggestion = editorPresentation.primaryMetadataSuggestion {
-                    GroupBox("Recommended Metadata") {
-                        DataStudioSuggestionCard(session: session, presentation: suggestion)
+                GroupBox("Roles") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if session.templateDraftOutputKind != "metric_table" {
+                            Picker("X", selection: xColumnBinding) {
+                                ForEach(columns, id: \.self) { column in
+                                    Text(column).tag(column)
+                                }
+                            }
+                        }
+
+                        if session.templateDraftOutputKind == "matrix_heatmap" {
+                            DataStudioSingleColumnSelector(
+                                title: "Y",
+                                columns: columns,
+                                selected: session.templateDraftYColumnNames.first,
+                                action: { column in
+                                    session.templateDraftYColumnNames = [column]
+                                    session.templatePreview = nil
+                                }
+                            )
+                            DataStudioSingleColumnSelector(
+                                title: "Value",
+                                columns: columns,
+                                selected: session.templateDraftMetricColumnNames.first,
+                                action: { column in
+                                    session.templateDraftMetricColumnNames = [column]
+                                    session.templatePreview = nil
+                                }
+                            )
+                        } else {
+                            DataStudioColumnToggleList(
+                                title: session.templateDraftOutputKind == "metric_table" ? "Metrics" : "Y",
+                                columns: selectableYColumns,
+                                selectedColumns: session.templateDraftOutputKind == "metric_table"
+                                    ? session.templateDraftMetricColumnNames
+                                    : session.templateDraftYColumnNames,
+                                toggle: { column, isSelected in
+                                    if session.templateDraftOutputKind == "metric_table" {
+                                        session.setDraftMetricColumn(column, isSelected: isSelected)
+                                    } else {
+                                        session.setDraftYColumn(column, isSelected: isSelected)
+                                    }
+                                }
+                            )
+
+                            if session.templateDraftOutputKind == "curve_metrics" {
+                                DisclosureGroup("Metrics", isExpanded: $session.showAdvancedCandidates) {
+                                    DataStudioColumnToggleList(
+                                        title: "",
+                                        columns: selectableMetricColumns,
+                                        selectedColumns: session.templateDraftMetricColumnNames,
+                                        toggle: { column, isSelected in
+                                            session.setDraftMetricColumn(column, isSelected: isSelected)
+                                        }
+                                    )
+                                    .padding(.top, 8)
+                                }
+                            }
+                        }
                     }
                 }
 
-                if let suggestion = editorPresentation.primaryStructureSuggestion {
-                    GroupBox("Detected Structure") {
-                        DataStudioSuggestionCard(session: session, presentation: suggestion)
-                    }
-                }
-
-                GroupBox("Selected for Template") {
-                    if editorPresentation.selectedSummaryItems.isEmpty && session.selectedCandidateIDs.isEmpty {
-                        Text("Nothing selected")
+                GroupBox("Selected") {
+                    if editorPresentation.selectedSummaryItems.isEmpty {
+                        Text("No roles selected")
                             .foregroundStyle(.secondary)
                     } else {
-                        VStack(alignment: .leading, spacing: 10) {
-                            if !editorPresentation.selectedSummaryItems.isEmpty {
-                                ForEach(editorPresentation.selectedSummaryItems) { item in
-                                    LabeledContent(item.title) {
-                                        Text(item.value)
-                                            .font(.footnote)
-                                            .multilineTextAlignment(.trailing)
-                                            .foregroundStyle(.primary)
-                                    }
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(editorPresentation.selectedSummaryItems) { item in
+                                LabeledContent(item.title) {
+                                    Text(item.value)
+                                        .multilineTextAlignment(.trailing)
                                 }
-                            }
-
-                            let advancedSelections = editorPresentation.advancedCandidates.filter {
-                                session.selectedCandidateIDs.contains($0.id)
-                            }
-                            if !advancedSelections.isEmpty {
-                                Divider()
-                                Text("Additional Advanced Fields")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                DataStudioCandidateSectionList(
-                                    session: session,
-                                    candidates: advancedSelections,
-                                    compact: true
-                                )
                             }
                         }
                     }
                 }
 
-                if !editorPresentation.secondaryCurveSuggestions.isEmpty
-                    || !editorPresentation.advancedCandidates.isEmpty
-                    || preview != nil
-                {
-                    GroupBox {
-                        DisclosureGroup("Advanced", isExpanded: $session.showAdvancedCandidates) {
-                            VStack(alignment: .leading, spacing: 14) {
-                                if !editorPresentation.secondaryCurveSuggestions.isEmpty {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Other Possible Curves")
-                                            .font(.footnote.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                        ForEach(editorPresentation.secondaryCurveSuggestions) { suggestion in
-                                            DataStudioSuggestionCard(
-                                                session: session,
-                                                presentation: suggestion,
-                                                compact: true
-                                            )
-                                        }
-                                    }
-                                }
-
-                                if !editorPresentation.advancedCandidates.isEmpty {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Manual Candidate Overrides")
-                                            .font(.footnote.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                        DataStudioCandidateSectionList(
-                                            session: session,
-                                            candidates: editorPresentation.advancedCandidates
-                                        )
-                                    }
-                                }
-
-                                if let preview {
-                                    DataStudioTechnicalDetailsDisclosure(preview: preview)
-                                }
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
+                if let summary = editorPresentation.previewCaption {
+                    Label(summary, systemImage: session.templatePreview?.errors.isEmpty == false ? "exclamationmark.triangle" : "checkmark.circle")
+                        .foregroundStyle(session.templatePreview?.errors.isEmpty == false ? .orange : .secondary)
                 }
             }
             .padding(18)
         }
     }
 
-    private var selectedBlockBinding: Binding<String?> {
+    private var segmentSelectionBinding: Binding<String?> {
         Binding(
-            get: { session.selectedPreviewBlockID ?? selectedBlock?.id },
-            set: { newValue in
-                guard let newValue else {
-                    return
-                }
-                session.selectPreviewBlock(id: newValue)
-            }
+            get: { session.selectedPreviewSegmentID },
+            set: { session.selectPreviewSegment(id: $0) }
         )
+    }
+
+    private var outputKindBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftOutputKind },
+            set: { session.setTemplateOutputKind($0) }
+        )
+    }
+
+    private var xColumnBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftXColumnName ?? columns.first ?? "" },
+            set: { session.setDraftXColumn($0.isEmpty ? nil : $0) }
+        )
+    }
+
+    private var selectableYColumns: [String] {
+        columns.filter { $0 != session.templateDraftXColumnName }
+    }
+
+    private var selectableMetricColumns: [String] {
+        columns.filter { column in
+            column != session.templateDraftXColumnName && !session.templateDraftYColumnNames.contains(column)
+        }
     }
 }
 
-private struct DataStudioPreviewBlockRow: View {
-    let block: DataStudioSheetBlockResponse
+private struct DataStudioSegmentRow: View {
+    let segment: SourceTableSegmentResponse
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(block.label)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(segment.label)
                     .font(.body)
-                Text("\(block.rowCount) × \(block.colCount)")
+                Text("\(segment.rowCount) rows · \(segment.columnCount) columns")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if block.headerRowIndex != nil {
-                Image(systemName: "tablecells.badge.ellipsis")
+            if let intervalIndex = segment.intervalIndex {
+                Text("#\(intervalIndex)")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 3)
     }
 }
 
-private struct DataStudioSuggestionCard: View {
+private struct DataStudioColumnToggleList: View {
+    let title: String
+    let columns: [String]
+    let selectedColumns: [String]
+    let toggle: (String, Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !title.isEmpty {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+            ForEach(columns, id: \.self) { column in
+                Toggle(column, isOn: Binding(
+                    get: { selectedColumns.contains(column) },
+                    set: { toggle(column, $0) }
+                ))
+                .toggleStyle(.checkbox)
+            }
+        }
+    }
+}
+
+private struct DataStudioSingleColumnSelector: View {
+    let title: String
+    let columns: [String]
+    let selected: String?
+    let action: (String) -> Void
+
+    var body: some View {
+        Picker(title, selection: Binding(
+            get: { selected ?? columns.first ?? "" },
+            set: { action($0) }
+        )) {
+            ForEach(columns, id: \.self) { column in
+                Text(column).tag(column)
+            }
+        }
+    }
+}
+
+private struct DataStudioSourceTablePreview: View {
     @Bindable var session: DataStudioSession
-    let presentation: DataStudioSuggestionCardPresentation
-    var compact = false
+    let preview: SourceTablePreviewResponse
 
-    private var isSelected: Bool {
-        session.selectedSuggestionIDs.contains(presentation.id)
+    private var columnCount: Int {
+        max(preview.totalCols, preview.columnHeaders.count, preview.rows.map(\.count).max() ?? 0)
     }
-
-    private var isPreviewing: Bool {
-        session.hoveredSuggestionID == presentation.id
-    }
-
-    var body: some View {
-        Button {
-            session.toggleSuggestion(id: presentation.id)
-        } label: {
-            DataStudioSuggestionCardChrome(
-                accentColor: accentColor,
-                borderColor: borderColor,
-                backgroundColor: backgroundColor,
-                borderWidth: borderWidth,
-                compact: compact
-            ) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: iconName)
-                        .foregroundStyle(accentColor)
-                        .frame(width: 16)
-
-                    VStack(alignment: .leading, spacing: compact ? 6 : 8) {
-                        ForEach(Array(presentation.values.enumerated()), id: \.offset) { _, value in
-                            HStack(alignment: .top, spacing: 8) {
-                                Circle()
-                                    .fill(accentColor.opacity(0.85))
-                                    .frame(width: 6, height: 6)
-                                    .padding(.top, 6)
-                                Text(value)
-                                    .font(compact ? .footnote : .callout)
-                                    .foregroundStyle(.primary)
-                                    .multilineTextAlignment(.leading)
-                            }
-                        }
-
-                        if let location = presentation.location, !location.isEmpty {
-                            Label(location, systemImage: "mappin.and.ellipse")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering in
-            session.setHoveredSuggestion(id: isHovering ? presentation.id : nil)
-        }
-    }
-
-    private var iconName: String {
-        switch presentation.kind {
-        case .curve:
-            return "waveform.path.ecg"
-        case .metric:
-            return "chart.bar.xaxis"
-        case .metadata:
-            return "tag"
-        case .structure:
-            return "tablecells"
-        }
-    }
-
-    private var accentColor: Color {
-        switch presentation.kind {
-        case .curve:
-            return .blue
-        case .metric:
-            return .green
-        case .metadata:
-            return .cyan
-        case .structure:
-            return .orange
-        }
-    }
-
-    private var backgroundColor: Color {
-        if isPreviewing {
-            return accentColor.opacity(0.14)
-        }
-        return isSelected ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor)
-    }
-
-    private var borderColor: Color {
-        if isPreviewing {
-            return accentColor.opacity(0.9)
-        }
-        if isSelected {
-            return Color.accentColor.opacity(0.75)
-        }
-        return Color(nsColor: .separatorColor).opacity(0.45)
-    }
-
-    private var borderWidth: CGFloat {
-        if isPreviewing {
-            return 2
-        }
-        return isSelected ? 1.4 : 1
-    }
-}
-
-private struct DataStudioSuggestionCardChrome<Content: View>: View {
-    let accentColor: Color
-    let borderColor: Color
-    let backgroundColor: Color
-    let borderWidth: CGFloat
-    let compact: Bool
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(compact ? 12 : 14)
-            .background(backgroundColor, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(borderColor, lineWidth: borderWidth)
-            )
-    }
-}
-
-private struct DataStudioTechnicalDetailsDisclosure: View {
-    let preview: DataStudioRawFilePreviewResponse
-
-    var body: some View {
-        DisclosureGroup("Technical Details") {
-            VStack(alignment: .leading, spacing: 6) {
-                LabeledContent("File Type", value: preview.fileType.uppercased())
-                LabeledContent("Sheets", value: "\(preview.sheets.count)")
-                if let encoding = preview.encoding, !encoding.isEmpty {
-                    LabeledContent("Encoding", value: encoding)
-                }
-                if let delimiter = preview.delimiter, !delimiter.isEmpty {
-                    LabeledContent("Delimiter", value: delimiter)
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .padding(.top, 6)
-        }
-    }
-}
-
-private struct DataStudioCandidateSectionList: View {
-    @Bindable var session: DataStudioSession
-    let candidates: [DataStudioFieldCandidateResponse]
-    var compact = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
-                if index > 0 {
-                    Divider()
-                }
-                DataStudioCandidateRow(
-                    session: session,
-                    candidate: candidate,
-                    compact: compact
-                )
-                .padding(.vertical, compact ? 6 : 8)
-            }
-        }
-    }
-}
-
-private struct DataStudioCandidateRow: View {
-    @Bindable var session: DataStudioSession
-    let candidate: DataStudioFieldCandidateResponse
-    var compact: Bool
-
-    var body: some View {
-        Toggle(isOn: candidateSelectionBinding) {
-            VStack(alignment: .leading, spacing: compact ? 4 : 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(candidate.label)
-                        .font(.body.weight(.semibold))
-                    Text(candidate.kindLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .toggleStyle(.checkbox)
-    }
-
-    private var candidateSelectionBinding: Binding<Bool> {
-        Binding(
-            get: { session.selectedCandidateIDs.contains(candidate.id) },
-            set: { newValue in
-                session.setCandidateSelection(id: candidate.id, isSelected: newValue)
-            }
-        )
-    }
-}
-
-private struct DataStudioBlockTablePreview: View {
-    let block: DataStudioSheetBlockResponse
-    let hoveredRanges: [DataStudioPreviewRangeResponse]
-    let selectedRanges: [DataStudioPreviewRangeResponse]
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 0) {
-                    tableHeaderCell("", hoveredRoles: [], selectedRoles: [])
+                    tableHeaderCell("#", columnName: nil)
                         .frame(width: 44)
                     ForEach(0 ..< columnCount, id: \.self) { column in
-                        tableHeaderCell(
-                            columnLabel(for: column),
-                            hoveredRoles: columnRoles(for: column, in: hoveredRanges),
-                            selectedRoles: columnRoles(for: column, in: selectedRanges)
-                        )
-                        .frame(minWidth: 110, maxWidth: 140)
+                        tableHeaderCell(header(for: column), columnName: header(for: column))
+                            .frame(minWidth: 124, maxWidth: 170, minHeight: 48)
                     }
                 }
 
-                ForEach(Array(block.sampleRows.enumerated()), id: \.offset) { rowOffset, row in
-                    HStack(spacing: 0) {
-                        tableRowIndexCell(
-                            rowNumber(for: rowOffset),
-                            hoveredRoles: rowRoles(for: rowOffset, in: hoveredRanges),
-                            selectedRoles: rowRoles(for: rowOffset, in: selectedRanges)
-                        )
-                        .frame(width: 44)
-                        ForEach(0 ..< columnCount, id: \.self) { column in
-                            tableDataCell(
-                                value: column < row.count ? row[column].displayString : "",
-                                rowOffset: rowOffset,
-                                columnOffset: column
-                            )
-                            .frame(minWidth: 110, maxWidth: 140, minHeight: 30, alignment: .leading)
-                        }
-                    }
+                ForEach(Array(preview.rows.enumerated()), id: \.offset) { rowOffset, row in
+                    DataStudioSourceTableRow(
+                        session: session,
+                        preview: preview,
+                        rowOffset: rowOffset,
+                        row: row,
+                        columnCount: columnCount
+                    )
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.22))
-            )
         }
         .frame(minHeight: 320)
     }
 
-    private var columnCount: Int {
-        max(block.colCount, block.sampleRows.map(\.count).max() ?? 0)
-    }
-
-    private func tableHeaderCell(
-        _ text: String,
-        hoveredRoles: [String],
-        selectedRoles: [String]
-    ) -> some View {
-        let highlight = highlightState(hoveredRoles: hoveredRoles, selectedRoles: selectedRoles)
-        return VStack(spacing: 4) {
-            Text(text)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            if let badgeRole = preferredBadgeRole(from: highlight.roles) {
-                roleBadge(for: badgeRole, compact: true)
-            } else {
-                Spacer()
-                    .frame(height: 16)
+    private func tableHeaderCell(_ text: String, columnName: String?) -> some View {
+        Menu {
+            if let columnName {
+                Button {
+                    session.setDraftXColumn(columnName)
+                } label: {
+                    Label("Use as X", systemImage: "arrow.right")
+                }
+                Button {
+                    session.setDraftYColumn(columnName, isSelected: !session.templateDraftYColumnNames.contains(columnName))
+                } label: {
+                    Label(
+                        session.templateDraftYColumnNames.contains(columnName) ? "Remove Y" : "Use as Y",
+                        systemImage: "waveform.path"
+                    )
+                }
+                Button {
+                    session.setDraftMetricColumn(columnName, isSelected: !session.templateDraftMetricColumnNames.contains(columnName))
+                } label: {
+                    Label(
+                        session.templateDraftMetricColumnNames.contains(columnName) ? "Remove Metric" : "Use as Metric",
+                        systemImage: "number"
+                    )
+                }
             }
-        }
-        .frame(maxWidth: .infinity, minHeight: 42)
-        .background(highlight.fill)
-        .overlay(Rectangle().stroke(highlight.stroke, lineWidth: highlight.lineWidth))
-    }
-
-    private func tableRowIndexCell(
-        _ text: String,
-        hoveredRoles: [String],
-        selectedRoles: [String]
-    ) -> some View {
-        let highlight = highlightState(hoveredRoles: hoveredRoles, selectedRoles: selectedRoles)
-        return VStack(spacing: 3) {
-            Text(text)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            if let badgeRole = preferredBadgeRole(from: highlight.roles) {
-                roleBadge(for: badgeRole, compact: true)
-            } else {
-                Spacer()
-                    .frame(height: 16)
+        } label: {
+            VStack(spacing: 4) {
+                Text(text)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 4) {
+                    ForEach(roleLabels(for: columnName), id: \.self) { role in
+                        roleBadge(role)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(roleFill(for: columnName ?? ""))
+            .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5))
         }
-        .frame(maxWidth: .infinity, minHeight: 42)
-        .background(highlight.fill)
-        .overlay(Rectangle().stroke(highlight.stroke, lineWidth: highlight.lineWidth))
+        .menuStyle(.borderlessButton)
     }
 
-    private func tableDataCell(value: String, rowOffset: Int, columnOffset: Int) -> some View {
-        let hoveredRoles = matchingRoles(rowOffset: rowOffset, columnOffset: columnOffset, in: hoveredRanges)
-        let selectedRoles = matchingRoles(rowOffset: rowOffset, columnOffset: columnOffset, in: selectedRanges)
-        let highlight = highlightState(hoveredRoles: hoveredRoles, selectedRoles: selectedRoles)
-        return Text(value)
-            .font(.caption)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(highlight.fill)
-            .overlay(
-                Rectangle()
-                    .stroke(highlight.stroke, lineWidth: highlight.lineWidth)
-            )
+    private func header(for column: Int) -> String {
+        guard column < preview.columnHeaders.count else {
+            return spreadsheetColumnLabel(for: column)
+        }
+        return preview.columnHeaders[column]
     }
 
-    private func matchingRoles(
-        rowOffset: Int,
-        columnOffset: Int,
-        in ranges: [DataStudioPreviewRangeResponse]
-    ) -> [String] {
-        let absoluteRow = block.range.startRow + rowOffset
-        let absoluteColumn = block.range.startCol + columnOffset
-        let ordered = ranges.filter { range in
-            range.sheetName == block.sheetName &&
-            (range.blockID == nil || range.blockID == block.id) &&
-            absoluteRow >= range.startRow &&
-            absoluteRow <= range.endRow &&
-            absoluteColumn >= range.startCol &&
-            absoluteColumn <= range.endCol
+    private func roleLabels(for columnName: String?) -> [String] {
+        guard let columnName else {
+            return []
         }
-        return ordered
-            .map(\.role)
-            .sorted { rolePriority($0) < rolePriority($1) }
+        var roles: [String] = []
+        if session.templateDraftXColumnName == columnName {
+            roles.append("X")
+        }
+        if session.templateDraftYColumnNames.contains(columnName) {
+            roles.append("Y")
+        }
+        if session.templateDraftMetricColumnNames.contains(columnName) {
+            roles.append("M")
+        }
+        return roles
     }
 
-    private func columnRoles(for columnOffset: Int, in ranges: [DataStudioPreviewRangeResponse]) -> [String] {
-        let absoluteColumn = block.range.startCol + columnOffset
-        return ranges
-            .filter { range in
-                range.sheetName == block.sheetName &&
-                (range.blockID == nil || range.blockID == block.id) &&
-                !["header_row", "unit_row"].contains(range.role) &&
-                absoluteColumn >= range.startCol &&
-                absoluteColumn <= range.endCol
-            }
-            .map(\.role)
-            .sorted { rolePriority($0) < rolePriority($1) }
+    private func roleFill(for columnName: String) -> Color {
+        if session.templateDraftXColumnName == columnName {
+            return .blue.opacity(0.10)
+        }
+        if session.templateDraftYColumnNames.contains(columnName) {
+            return .orange.opacity(0.11)
+        }
+        if session.templateDraftMetricColumnNames.contains(columnName) {
+            return .green.opacity(0.11)
+        }
+        return Color(nsColor: .windowBackgroundColor)
     }
 
-    private func rowRoles(for rowOffset: Int, in ranges: [DataStudioPreviewRangeResponse]) -> [String] {
-        let absoluteRow = block.range.startRow + rowOffset
-        return ranges
-            .filter { range in
-                range.sheetName == block.sheetName &&
-                (range.blockID == nil || range.blockID == block.id) &&
-                ["header_row", "unit_row"].contains(range.role) &&
-                absoluteRow >= range.startRow &&
-                absoluteRow <= range.endRow
-            }
-            .map(\.role)
-            .sorted { rolePriority($0) < rolePriority($1) }
-    }
-
-    private func highlightState(
-        hoveredRoles: [String],
-        selectedRoles: [String]
-    ) -> (roles: [String], fill: Color, stroke: Color, lineWidth: CGFloat) {
-        if let role = hoveredRoles.first {
-            let accent = color(forRole: role)
-            return (hoveredRoles, accent.opacity(0.24), accent.opacity(0.98), 2)
-        }
-        if let role = selectedRoles.first {
-            let accent = color(forRole: role)
-            return (selectedRoles, accent.opacity(0.14), accent.opacity(0.74), 1.35)
-        }
-        return ([], Color(nsColor: .windowBackgroundColor), Color(nsColor: .separatorColor).opacity(0.35), 0.5)
-    }
-
-    private func preferredBadgeRole(from roles: [String]) -> String? {
-        if roles.contains("x") {
-            return "x"
-        }
-        if roles.contains("y") {
-            return "y"
-        }
-        if roles.contains("metric") {
-            return "metric"
-        }
-        if roles.contains("metadata") {
-            return "metadata"
-        }
-        if roles.contains("header_row") {
-            return "header_row"
-        }
-        if roles.contains("unit_row") {
-            return "unit_row"
-        }
-        return nil
-    }
-
-    private func rolePriority(_ role: String) -> Int {
-        switch role {
-        case "x":
-            return 0
-        case "y":
-            return 1
-        case "metric":
-            return 2
-        case "metadata":
-            return 3
-        case "header_row":
-            return 4
-        case "unit_row":
-            return 5
-        default:
-            return 9
-        }
-    }
-
-    private func roleBadge(for role: String, compact: Bool) -> some View {
-        Text(roleBadgeLabel(for: role))
-            .font(compact ? .caption2.weight(.bold) : .caption.weight(.bold))
+    private func roleBadge(_ role: String) -> some View {
+        Text(role)
+            .font(.caption2.weight(.bold))
             .foregroundStyle(.white)
-            .padding(.horizontal, compact ? 5 : 7)
-            .padding(.vertical, compact ? 2 : 4)
-            .background(color(forRole: role), in: Capsule())
-    }
-
-    private func roleBadgeLabel(for role: String) -> String {
-        switch role {
-        case "x":
-            return "X"
-        case "y":
-            return "Y"
-        case "metric":
-            return "Metric"
-        case "metadata":
-            return "Meta"
-        case "header_row":
-            return "Header"
-        case "unit_row":
-            return "Unit"
-        default:
-            return role
-        }
-    }
-
-    private func color(forRole role: String) -> Color {
-        switch role {
-        case "x":
-            return .blue
-        case "y":
-            return .orange
-        case "metric":
-            return .green
-        case "metadata":
-            return .cyan
-        case "header_row", "unit_row":
-            return .orange
-        default:
-            return .secondary
-        }
-    }
-
-    private func rowNumber(for rowOffset: Int) -> String {
-        String(block.range.startRow + rowOffset + 1)
-    }
-
-    private func columnLabel(for offset: Int) -> String {
-        let absolute = block.range.startCol + offset
-        return spreadsheetColumnLabel(for: absolute)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(role == "X" ? .blue : role == "Y" ? .orange : .green, in: Capsule())
     }
 
     private func spreadsheetColumnLabel(for zeroBasedIndex: Int) -> String {
@@ -797,10 +452,61 @@ private struct DataStudioBlockTablePreview: View {
     }
 }
 
-private extension DataStudioFieldCandidateResponse {
-    var kindLabel: String {
-        kind
-            .replacingOccurrences(of: "_", with: " ")
-            .capitalized
+private struct DataStudioSourceTableRow: View {
+    @Bindable var session: DataStudioSession
+    let preview: SourceTablePreviewResponse
+    let rowOffset: Int
+    let row: [JSONValue]
+    let columnCount: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text(rowNumber)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 30)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.5))
+
+            ForEach(0 ..< columnCount, id: \.self) { column in
+                Text(cellValue(for: column))
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(minWidth: 124, maxWidth: 170, minHeight: 30, alignment: .leading)
+                    .background(roleFill(for: header(for: column)))
+                    .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.5))
+            }
+        }
+    }
+
+    private var rowNumber: String {
+        String(preview.offset + rowOffset + 1)
+    }
+
+    private func cellValue(for column: Int) -> String {
+        column < row.count ? row[column].displayString : ""
+    }
+
+    private func header(for column: Int) -> String {
+        guard column < preview.columnHeaders.count else {
+            return ""
+        }
+        return preview.columnHeaders[column]
+    }
+
+    private func roleFill(for columnName: String) -> Color {
+        if session.templateDraftXColumnName == columnName {
+            return .blue.opacity(0.10)
+        }
+        if session.templateDraftYColumnNames.contains(columnName) {
+            return .orange.opacity(0.11)
+        }
+        if session.templateDraftMetricColumnNames.contains(columnName) {
+            return .green.opacity(0.11)
+        }
+        return Color(nsColor: .windowBackgroundColor)
     }
 }

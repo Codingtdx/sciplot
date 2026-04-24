@@ -121,29 +121,70 @@ def _write_specimen_filter_workbook(path: Path, *, label: str = "Sidecar Filter"
     return path
 
 
-def test_data_studio_template_routes_and_source_preview_stay_live(tmp_path: Path) -> None:
+def test_data_studio_template_routes_and_template_preview_stay_live(tmp_path: Path) -> None:
     templates = client.get("/data-studio/templates")
     assert templates.status_code == 200
     template_payload = templates.json()
     assert any(item["id"] == "builtin/tensile" for item in template_payload["templates"])
 
     source_preview = client.post(
-        "/data-studio/source-preview",
-        json={"input_path": str(FIXTURE_DIR / "BlendSet_A.csv")},
+        "/source-table-preview",
+        json={
+            "input_path": str(FIXTURE_DIR / "BlendSet_A.csv"),
+            "sheet": 0,
+            "offset": 0,
+            "limit": 8,
+            "header_row": 6,
+            "unit_row": 7,
+            "data_start_row": 8,
+        },
     )
     assert source_preview.status_code == 200, source_preview.text
     payload = source_preview.json()
-    assert payload["preview"]["file_type"] == "csv"
-    assert any(candidate["kind"] == "curve_x" for candidate in payload["preview"]["field_candidates"])
-    curve_suggestion = next(
-        suggestion
-        for suggestion in payload["preview"]["binding_suggestions"]
-        if suggestion["kind"] == "curve_pair"
+    assert payload["encoding"] is not None
+    assert payload["candidate_roles"]["x"]
+    assert payload["candidate_roles"]["y"]
+
+    template_preview = client.post(
+        "/data-studio/template-preview",
+        json={
+            "source_path": str(FIXTURE_DIR / "BlendSet_A.csv"),
+            "template": {
+                "label": "Draft Tensile Curve",
+                "template_id": "user/draft_tensile_curve",
+                "description": "",
+                "output_kind": "curve_metrics",
+                "source_format": {"encoding": "utf-8", "delimiter": ","},
+                "segment_policy": "single_table",
+                "segment_selectors": [
+                    {
+                        "id": "Sheet1::table",
+                        "label": "Result Table 2",
+                        "start_row": 5,
+                        "header_row": 6,
+                        "unit_row": 7,
+                        "data_start_row": 8,
+                    }
+                ],
+                "field_bindings": [
+                    {
+                        "id": "strain",
+                        "role": "curve_x",
+                        "label": "Strain",
+                        "column_name": "Tensile Strain",
+                    },
+                    {
+                        "id": "stress",
+                        "role": "curve_y",
+                        "label": "Stress",
+                        "column_name": "Tensile Stress",
+                    },
+                ],
+            },
+        },
     )
-    assert curve_suggestion["title"] == "Recommended Curve"
-    assert "X:" in curve_suggestion["summary"]
-    assert "Y:" in curve_suggestion["summary"]
-    assert payload["matches"][0]["template_id"] == "builtin/tensile"
+    assert template_preview.status_code == 200, template_preview.text
+    assert template_preview.json()["series_count"] >= 1
 
     normalize = client.post(
         "/data-studio/session/normalize",

@@ -166,7 +166,7 @@ def test_source_table_preview_returns_headers_and_rows(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["total_rows"] == 7
     assert payload["total_cols"] == 2
-    assert payload["column_headers"] == ["X | s | Sample A", "Y | MPa | Sample A"]
+    assert payload["column_headers"] == ["X", "Y"]
     assert payload["rows"] == [["0.0", "1.0"], ["1.0", "3.0"]]
     assert payload["candidate_roles"]["x"]
     assert payload["candidate_roles"]["y"]

@@ -1061,7 +1061,31 @@ enum TestPayloads {
                 series: []
             ),
             detectedXLabel: "Strain",
-            detectedYLabel: "Stress"
+            detectedYLabel: "Stress",
+            columnProfiles: [
+                .init(
+                    name: "Strain",
+                    headerPreview: ["Strain", "%"],
+                    inferredType: "numeric",
+                    nonEmptyCount: 3,
+                    missingCount: 0,
+                    minValue: 0.0,
+                    maxValue: 0.2
+                ),
+                .init(
+                    name: "Stress",
+                    headerPreview: ["Stress", "MPa"],
+                    inferredType: "numeric",
+                    nonEmptyCount: 3,
+                    missingCount: 0,
+                    minValue: 0.0,
+                    maxValue: 12.0
+                ),
+            ],
+            segments: [],
+            selectedSegmentID: nil,
+            encoding: "utf-8",
+            delimiter: ","
         )
     }
 
@@ -1219,7 +1243,35 @@ enum TestPayloads {
             workbookMetricIDs: ["Strength", "Modulus", "Elongation"],
             defaultGroupNameStrategy: "common_prefix",
             preferredSheetName: "Representative_Curve",
+            outputKind: "curve_metrics",
+            sourceFormat: .init(encoding: nil, delimiter: nil, sheetName: nil),
+            segmentPolicy: "single_table",
+            segmentSelectors: [],
             metadata: ["builtin_family": .string("tensile")]
+        )
+    }
+
+    static func dataStudioTemplatePreview() -> DataStudioTemplatePreviewResponse {
+        DataStudioTemplatePreviewResponse(
+            templateID: "user/new_template",
+            outputKind: "curve_metrics",
+            parsedSampleCount: 1,
+            failedSampleCount: 0,
+            seriesCount: 1,
+            metricCount: 0,
+            matrixRowCount: 0,
+            missingRoles: [],
+            warnings: [],
+            errors: [],
+            segments: [
+                .init(
+                    id: "Sheet1::table",
+                    label: "Sheet1",
+                    curveCount: 1,
+                    metricCount: 0,
+                    rowCount: 3
+                ),
+            ]
         )
     }
 
@@ -1228,174 +1280,6 @@ enum TestPayloads {
             templates: [
                 dataStudioTemplate(),
                 dataStudioTemplate(id: "user/custom_curve", label: "Custom Curve Template"),
-            ]
-        )
-    }
-
-    static func dataStudioSourcePreview(path: String = "/tmp/raw_a.csv") -> DataStudioSourcePreviewResponse {
-        DataStudioSourcePreviewResponse(
-            preview: .init(
-                sourcePath: path,
-                fileType: "csv",
-                encoding: "utf-8",
-                delimiter: ",",
-                sheetNames: ["Sheet1"],
-                sheets: [
-                    .init(
-                        sheetName: "Sheet1",
-                        rowCount: 8,
-                        colCount: 4,
-                        sampleRows: [
-                            [.string("Strain"), .string("Stress"), .string("Strength"), .string("Modulus")],
-                            [.string("%"), .string("MPa"), .string("MPa"), .string("MPa")],
-                        ],
-                        blocks: [
-                            .init(
-                                id: "sheet1:block0",
-                                sheetName: "Sheet1",
-                                label: "Primary Data Block",
-                                rowCount: 6,
-                                colCount: 4,
-                                range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 1, endCol: 4),
-                                headerRowIndex: 0,
-                                unitRowIndex: 1,
-                                dataStartRowIndex: 2,
-                                sampleRows: [
-                                    [.string("Strain"), .string("Stress"), .string("Strength"), .string("Modulus")],
-                                    [.string("%"), .string("MPa"), .string("MPa"), .string("MPa")],
-                                    [.number(0), .number(0), .number(12.4), .number(2.1)],
-                                    [.number(0.1), .number(5.1), .number(12.7), .number(2.2)],
-                                    [.number(0.2), .number(12.4), .number(12.8), .number(2.3)],
-                                ]
-                            ),
-                        ]
-                    ),
-                ],
-                fieldCandidates: [
-                    .init(
-                        id: "candidate:strain",
-                        kind: "curve_x",
-                        label: "Strain",
-                        confidence: 0.98,
-                        rationale: "Detected percentage strain values with tensile-style headers.",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 1, endCol: 1),
-                        sampleValues: ["0", "0.1", "0.2"],
-                        unitHint: "%"
-                    ),
-                    .init(
-                        id: "candidate:stress",
-                        kind: "curve_y",
-                        label: "Stress",
-                        confidence: 0.97,
-                        rationale: "Detected stress column adjacent to strain with MPa units.",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 2, endCol: 2),
-                        sampleValues: ["0", "5.1", "12.4"],
-                        unitHint: "MPa"
-                    ),
-                    .init(
-                        id: "candidate:strength",
-                        kind: "metric",
-                        label: "Strength",
-                        confidence: 0.92,
-                        rationale: "Summary metric column detected in the same block.",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 6, startCol: 3, endCol: 3),
-                        sampleValues: ["12.4", "12.7"],
-                        unitHint: "MPa"
-                    ),
-                    .init(
-                        id: "candidate:header_row",
-                        kind: "header_row",
-                        label: "Sheet1 header row",
-                        confidence: 0.7,
-                        rationale: "Likely header row for this data block.",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        range: .init(sheetName: "Sheet1", startRow: 1, endRow: 1, startCol: 1, endCol: 4),
-                        sampleValues: [],
-                        unitHint: nil
-                    ),
-                    .init(
-                        id: "candidate:unit_row",
-                        kind: "unit_row",
-                        label: "Sheet1 unit row",
-                        confidence: 0.64,
-                        rationale: "Likely unit row for this data block.",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        range: .init(sheetName: "Sheet1", startRow: 2, endRow: 2, startCol: 1, endCol: 4),
-                        sampleValues: [],
-                        unitHint: nil
-                    ),
-                ],
-                bindingSuggestions: [
-                    .init(
-                        id: "sheet1:block0::curve_pair",
-                        kind: "curve_pair",
-                        title: "Recommended Curve",
-                        summary: "X: Strain (%) · Y: Stress (MPa)",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        candidateIDs: ["candidate:strain", "candidate:stress"],
-                        previewRanges: [
-                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 1, endCol: 1, role: "x"),
-                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 2, endCol: 2, role: "y"),
-                        ],
-                        defaultSelected: true,
-                        rationale: "Recommended X/Y pair comes from the same numeric block.",
-                        confidence: 0.96
-                    ),
-                    .init(
-                        id: "sheet1:block0::metric_group",
-                        kind: "metric_group",
-                        title: "Recommended Metrics",
-                        summary: "Strength (MPa)",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        candidateIDs: ["candidate:strength"],
-                        previewRanges: [
-                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 6, startCol: 3, endCol: 3, role: "metric"),
-                        ],
-                        defaultSelected: true,
-                        rationale: "Metric column detected in the same block.",
-                        confidence: 0.92
-                    ),
-                    .init(
-                        id: "sheet1:block0::structure_rows",
-                        kind: "structure_rows",
-                        title: "Detected Structure",
-                        summary: "Header Row 2 · Unit Row 3",
-                        sheetName: "Sheet1",
-                        blockID: "sheet1:block0",
-                        candidateIDs: ["candidate:header_row", "candidate:unit_row"],
-                        previewRanges: [
-                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 1, endRow: 1, startCol: 1, endCol: 4, role: "header_row"),
-                            .init(sheetName: "Sheet1", blockID: "sheet1:block0", startRow: 2, endRow: 2, startCol: 1, endCol: 4, role: "unit_row"),
-                        ],
-                        defaultSelected: true,
-                        rationale: "Detected header and unit rows for this block.",
-                        confidence: 0.8
-                    ),
-                ],
-                recommendedTemplateIDs: ["builtin/tensile"],
-                warnings: []
-            ),
-            matches: [
-                .init(
-                    templateID: "builtin/tensile",
-                    label: "Tensile",
-                    family: "tensile",
-                    confidence: 0.99,
-                    reasons: ["Tensile headers and metrics matched the built-in template family."],
-                    warnings: [],
-                    matchedSheetNames: ["Sheet1"],
-                    autoSelected: true
-                ),
             ]
         )
     }

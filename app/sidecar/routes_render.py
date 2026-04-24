@@ -38,12 +38,13 @@ from app.sidecar.server_utils import (
     normalize_path,
     options_from_payload,
     preview_artifact_path,
+    render_options_from_payload,
     write_json_artifact,
 )
 from src.core.application.render import (
     build_normalized_dataset,
     build_render_submission_report,
-    build_rendered_plots,
+    build_rendered_plots_from_options,
     close_rendered_plots,
     coerce_sheet,
     dataframe_sample_rows,
@@ -61,6 +62,7 @@ from src.infrastructure.persistence.plot_exports import prepare_managed_plot_exp
 from src.infrastructure.runtime_cache import LRUCache
 from src.rendering.cache import load_curve_table_cached
 from src.rendering.fit_analysis import fit_series_list
+from src.rendering.source_table_preview import source_table_preview as build_source_table_preview
 
 _RENDER_PREVIEW_CACHE = LRUCache[str, RenderPreviewResponse](maxsize=64)
 
@@ -131,28 +133,36 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             offset, limit = _bounded_page(request.offset, request.limit)
-            inspection = inspect_input_file(input_path, sheet)
-            dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
-            raw = read_raw_table_cached(input_path, sheet).dropna(axis=1, how="all")
-            recommendation = inspection.recommendations[0] if inspection.recommendations else None
-            page = raw.iloc[offset : offset + limit]
+            preview = build_source_table_preview(
+                input_path,
+                sheet=sheet,
+                offset=offset,
+                limit=limit,
+                encoding=request.encoding,
+                delimiter=request.delimiter,
+                segment_id=request.segment_id,
+                header_row_index=request.header_row_index,
+                unit_row_index=request.unit_row_index,
+                data_start_row_index=request.data_start_row_index,
+            )
             return SourceTablePreviewResponse.model_validate(
                 {
-                    "input_path": str(input_path),
-                    "sheet": sheet,
-                    "offset": offset,
-                    "limit": limit,
-                    "total_rows": int(raw.shape[0]),
-                    "total_cols": int(raw.shape[1]),
-                    "column_headers": [profile.name for profile in dataset.column_profiles],
-                    "rows": dataframe_sample_rows(page, limit=limit),
-                    "candidate_roles": serialize_dataclass(dataset.candidate_roles),
-                    "detected_x_label": (
-                        recommendation.inferred_mapping.get("x") if recommendation is not None else None
-                    ),
-                    "detected_y_label": (
-                        recommendation.inferred_mapping.get("y") if recommendation is not None else None
-                    ),
+                    "input_path": str(preview.input_path),
+                    "sheet": preview.sheet,
+                    "offset": preview.offset,
+                    "limit": preview.limit,
+                    "total_rows": preview.total_rows,
+                    "total_cols": preview.total_cols,
+                    "column_headers": list(preview.column_headers),
+                    "rows": [list(row) for row in preview.rows],
+                    "candidate_roles": serialize_dataclass(preview.candidate_roles),
+                    "detected_x_label": preview.detected_x_label,
+                    "detected_y_label": preview.detected_y_label,
+                    "column_profiles": [serialize_dataclass(profile) for profile in preview.column_profiles],
+                    "segments": [serialize_dataclass(segment) for segment in preview.segments],
+                    "selected_segment_id": preview.selected_segment_id,
+                    "encoding": preview.encoding,
+                    "delimiter": preview.delimiter,
                 }
             )
         except Exception as exc:
@@ -280,73 +290,19 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             cached = _RENDER_PREVIEW_CACHE.get(cache_key)
             if cached is not None:
                 return cached.model_copy(deep=True)
-            resolved_options = options_from_payload(
+            resolved_options = render_options_from_payload(
                 requested_template,
                 payload_options,
                 input_path=input_path,
                 sheet=sheet,
+                fit_options=fit_options_payload,
             )
-            rendered_plots = build_rendered_plots(
+            rendered_plots = build_rendered_plots_from_options(
                 requested_template,
                 input_path,
                 sheet,
-                size=payload_options.size,
-                xscale=payload_options.xscale,
-                yscale=payload_options.yscale,
-                reverse_x=payload_options.reverse_x,
-                x_min=payload_options.x_min,
-                x_max=payload_options.x_max,
-                y_min=payload_options.y_min,
-                y_max=payload_options.y_max,
-                x_tick_density=payload_options.x_tick_density,
-                y_tick_density=payload_options.y_tick_density,
-                x_tick_edge_labels=payload_options.x_tick_edge_labels,
-                y_tick_edge_labels=payload_options.y_tick_edge_labels,
-                series_order=payload_options.series_order,
-                x_label_override=payload_options.x_label_override,
-                y_label_override=payload_options.y_label_override,
-                baseline=payload_options.baseline,
-                show_colorbar=payload_options.show_colorbar,
-                style_preset=payload_options.style_preset,
-                palette_preset=payload_options.palette_preset,
-                use_sidecar=payload_options.use_sidecar,
-                visual_theme_id=payload_options.visual_theme_id,
-                extra_x_axis=(
-                    payload_options.extra_x_axis.model_dump(mode="json")
-                    if payload_options.extra_x_axis
-                    else None
-                ),
-                extra_y_axis=(
-                    payload_options.extra_y_axis.model_dump(mode="json")
-                    if payload_options.extra_y_axis
-                    else None
-                ),
-                x_axis_breaks=(
-                    [item.model_dump(mode="json") for item in payload_options.x_axis_breaks]
-                    if payload_options.x_axis_breaks
-                    else None
-                ),
-                y_axis_breaks=(
-                    [item.model_dump(mode="json") for item in payload_options.y_axis_breaks]
-                    if payload_options.y_axis_breaks
-                    else None
-                ),
-                fit_options=fit_options_payload,
-                reference_guides=(
-                    [item.model_dump(mode="json") for item in payload_options.reference_guides]
-                    if payload_options.reference_guides
-                    else None
-                ),
-                text_annotations=(
-                    [item.model_dump(mode="json") for item in payload_options.text_annotations]
-                    if payload_options.text_annotations
-                    else None
-                ),
-                shape_annotations=(
-                    [item.model_dump(mode="json") for item in payload_options.shape_annotations]
-                    if payload_options.shape_annotations
-                    else None
-                ),
+                resolved_options,
+                resolved_template_id=resolved_template,
             )
             try:
                 previews = rendered_plots_to_preview_payload(rendered_plots)
@@ -397,11 +353,12 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 else managed_output_dir_fn(input_path, sheet=sheet, template=resolved_template)
             )
             output_dir.mkdir(parents=True, exist_ok=True)
-            resolved_options = options_from_payload(
+            resolved_options = render_options_from_payload(
                 requested_template,
                 payload_options,
                 input_path=input_path,
                 sheet=sheet,
+                fit_options=request.fit_options.model_dump(mode="json"),
             )
             inspection = inspect_input_file(input_path, sheet)
             preflight = preflight_render_request(requested_template, input_path, sheet, resolved_options)
@@ -412,67 +369,12 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 output_dir / filename: (output_dir / filename).exists()
                 for filename in preflight.output_filenames
             }
-            rendered_plots = build_rendered_plots(
+            rendered_plots = build_rendered_plots_from_options(
                 requested_template,
                 input_path,
                 sheet,
-                size=payload_options.size,
-                xscale=payload_options.xscale,
-                yscale=payload_options.yscale,
-                reverse_x=payload_options.reverse_x,
-                x_min=payload_options.x_min,
-                x_max=payload_options.x_max,
-                y_min=payload_options.y_min,
-                y_max=payload_options.y_max,
-                x_tick_density=payload_options.x_tick_density,
-                y_tick_density=payload_options.y_tick_density,
-                x_tick_edge_labels=payload_options.x_tick_edge_labels,
-                y_tick_edge_labels=payload_options.y_tick_edge_labels,
-                series_order=payload_options.series_order,
-                x_label_override=payload_options.x_label_override,
-                y_label_override=payload_options.y_label_override,
-                baseline=payload_options.baseline,
-                show_colorbar=payload_options.show_colorbar,
-                style_preset=payload_options.style_preset,
-                palette_preset=payload_options.palette_preset,
-                use_sidecar=payload_options.use_sidecar,
-                visual_theme_id=payload_options.visual_theme_id,
-                extra_x_axis=(
-                    payload_options.extra_x_axis.model_dump(mode="json")
-                    if payload_options.extra_x_axis
-                    else None
-                ),
-                extra_y_axis=(
-                    payload_options.extra_y_axis.model_dump(mode="json")
-                    if payload_options.extra_y_axis
-                    else None
-                ),
-                x_axis_breaks=(
-                    [item.model_dump(mode="json") for item in payload_options.x_axis_breaks]
-                    if payload_options.x_axis_breaks
-                    else None
-                ),
-                y_axis_breaks=(
-                    [item.model_dump(mode="json") for item in payload_options.y_axis_breaks]
-                    if payload_options.y_axis_breaks
-                    else None
-                ),
-                fit_options=request.fit_options.model_dump(mode="json"),
-                reference_guides=(
-                    [item.model_dump(mode="json") for item in payload_options.reference_guides]
-                    if payload_options.reference_guides
-                    else None
-                ),
-                text_annotations=(
-                    [item.model_dump(mode="json") for item in payload_options.text_annotations]
-                    if payload_options.text_annotations
-                    else None
-                ),
-                shape_annotations=(
-                    [item.model_dump(mode="json") for item in payload_options.shape_annotations]
-                    if payload_options.shape_annotations
-                    else None
-                ),
+                resolved_options,
+                resolved_template_id=resolved_template,
             )
             try:
                 outputs = export_rendered_plots(rendered_plots, output_dir, close=False)

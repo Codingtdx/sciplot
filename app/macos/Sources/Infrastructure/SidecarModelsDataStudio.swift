@@ -140,6 +140,52 @@ struct DataStudioTemplateConditionResponse: Codable, Equatable, Sendable {
     let minimumScore: Double
 }
 
+struct DataStudioTemplateSourceFormatResponse: Codable, Equatable, Sendable {
+    let encoding: String?
+    let delimiter: String?
+    let sheetName: String?
+
+    init(encoding: String? = nil, delimiter: String? = nil, sheetName: String? = nil) {
+        self.encoding = encoding
+        self.delimiter = delimiter
+        self.sheetName = sheetName
+    }
+}
+
+struct DataStudioTemplateSegmentSelectorResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let resultLabel: String?
+    let intervalIndex: Int?
+    let headerRowIndex: Int?
+    let unitRowIndex: Int?
+    let dataStartRowIndex: Int?
+    let startRow: Int?
+    let endRow: Int?
+
+    init(
+        id: String,
+        label: String,
+        resultLabel: String? = nil,
+        intervalIndex: Int? = nil,
+        headerRowIndex: Int? = nil,
+        unitRowIndex: Int? = nil,
+        dataStartRowIndex: Int? = nil,
+        startRow: Int? = nil,
+        endRow: Int? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.resultLabel = resultLabel
+        self.intervalIndex = intervalIndex
+        self.headerRowIndex = headerRowIndex
+        self.unitRowIndex = unitRowIndex
+        self.dataStartRowIndex = dataStartRowIndex
+        self.startRow = startRow
+        self.endRow = endRow
+    }
+}
+
 struct DataStudioTemplateFieldBindingResponse: Codable, Equatable, Sendable {
     let id: String
     let role: String
@@ -182,6 +228,10 @@ struct DataStudioTemplateResponse: Codable, Equatable, Sendable, Identifiable {
     let workbookMetricIDs: [String]
     let defaultGroupNameStrategy: String
     let preferredSheetName: String
+    let outputKind: String
+    let sourceFormat: DataStudioTemplateSourceFormatResponse
+    let segmentPolicy: String
+    let segmentSelectors: [DataStudioTemplateSegmentSelectorResponse]
     let metadata: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
@@ -198,6 +248,10 @@ struct DataStudioTemplateResponse: Codable, Equatable, Sendable, Identifiable {
         case workbookMetricIDs = "workbookMetricIds"
         case defaultGroupNameStrategy
         case preferredSheetName
+        case outputKind
+        case sourceFormat
+        case segmentPolicy
+        case segmentSelectors
         case metadata
     }
 }
@@ -450,11 +504,6 @@ struct DataStudioFilteredWorkbookResponse: Codable, Equatable, Sendable, Identif
     var id: String { path }
 }
 
-struct DataStudioSourcePreviewResponse: Codable, Equatable, Sendable {
-    let preview: DataStudioRawFilePreviewResponse
-    let matches: [DataStudioTemplateMatchResponse]
-}
-
 struct DataStudioComparisonPreviewResponse: Codable, Equatable, Sendable {
     let comparisonSet: DataStudioComparisonSetResponse
     let recipe: DataStudioComparisonRecipeResponse
@@ -539,24 +588,77 @@ struct DataStudioSessionResponse: Codable, Equatable, Sendable {
     }
 }
 
-struct DataStudioSourcePreviewRequest: Codable, Equatable, Sendable {
-    let inputPath: String
-}
-
 struct DataStudioCreateTemplateRequest: Codable, Equatable, Sendable {
-    let sourcePath: String
     let label: String
-    let acceptedCandidateIDs: [String]
     let templateID: String?
     let description: String
+    let outputKind: String
+    let sourceFormat: DataStudioTemplateSourceFormatResponse
+    let segmentPolicy: String
+    let segmentSelectors: [DataStudioTemplateSegmentSelectorResponse]
+    let fieldBindings: [DataStudioTemplateFieldBindingResponse]
+    let matchConditions: [DataStudioTemplateConditionResponse]
+
+    init(
+        label: String,
+        templateID: String? = nil,
+        description: String = "",
+        outputKind: String = "curve_metrics",
+        sourceFormat: DataStudioTemplateSourceFormatResponse = .init(),
+        segmentPolicy: String = "single_table",
+        segmentSelectors: [DataStudioTemplateSegmentSelectorResponse] = [],
+        fieldBindings: [DataStudioTemplateFieldBindingResponse] = [],
+        matchConditions: [DataStudioTemplateConditionResponse] = []
+    ) {
+        self.label = label
+        self.templateID = templateID
+        self.description = description
+        self.outputKind = outputKind
+        self.sourceFormat = sourceFormat
+        self.segmentPolicy = segmentPolicy
+        self.segmentSelectors = segmentSelectors
+        self.fieldBindings = fieldBindings
+        self.matchConditions = matchConditions
+    }
 
     enum CodingKeys: String, CodingKey {
-        case sourcePath
         case label
-        case acceptedCandidateIDs = "acceptedCandidateIds"
         case templateID = "templateId"
         case description
+        case outputKind
+        case sourceFormat
+        case segmentPolicy
+        case segmentSelectors
+        case fieldBindings
+        case matchConditions
     }
+}
+
+struct DataStudioTemplatePreviewSegmentResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let curveCount: Int
+    let metricCount: Int
+    let rowCount: Int
+}
+
+struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
+    let sourcePath: String
+    let template: DataStudioCreateTemplateRequest
+}
+
+struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
+    let templateID: String
+    let outputKind: String
+    let parsedSampleCount: Int
+    let failedSampleCount: Int
+    let seriesCount: Int
+    let metricCount: Int
+    let matrixRowCount: Int
+    let missingRoles: [String]
+    let warnings: [String]
+    let errors: [String]
+    let segments: [DataStudioTemplatePreviewSegmentResponse]
 }
 
 struct DataStudioUpdateTemplateRequest: Codable, Equatable, Sendable {

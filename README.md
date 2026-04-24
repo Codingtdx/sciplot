@@ -40,7 +40,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - Plot inspector `Advanced Plot` also exposes typed `Text Annotations` as notes or callouts. Annotation placement, optional connector targets, and secondary-Y targeting travel through the same preview/export/project payloads as other render options, so annotation edits are durable rather than view-local.
 - Plot inspector `Advanced Plot` also exposes typed `Shape Annotations` (`rectangle`, `ellipse`, `bracket`). These DataGraph-inspired region/bracket overlays share the same preview/export/project payload path, reuse broken-axis and secondary-Y coordinate mapping, and stay an opt-in refinement layer under the recommendation-first workflow instead of becoming a second free-form authoring model.
 - Data Studio can also save/open `.sciplotgod` project bundles. Data Studio projects embed the current workbook file(s) together with durable compare/filter/figure session state, and reopening routes directly back to Data Studio instead of falling through Plot.
-- Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create template`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Data Studio import uses one staged native wizard sheet (`scope -> kind -> resolver -> create/edit template -> preview normalized output -> import`), not chained modal sheets; selecting import kind dismisses the wizard before presenting the native file picker.
+- Data Studio user templates are v2 no-code table mappings. The import sheet previews encoding, delimiter, detected segments, row roles, and per-column roles before saving a template; rheology-style UTF-16 tab files can map one `Result` / `Interval data` block per series, while builtin tensile remains the regression baseline.
 - Data Studio exposes an `Analysis` utility sheet with `Focused Workbook` and `Current Figure` scopes. `Source Data` shows paged workbook rows; `Fit` supports `linear`, `polynomial_2`, and `polynomial_3`. Current-figure fitting is limited to curve-like templates (`curve`, `point_line`, `scatter`).
 - Export UX is unified around the Data Studio inspector pattern: toolbar `Export` remains the global entrypoint, while workbench inspectors expose `Section("Actions")` with a primary export action and an `Advanced` disclosure for `Reveal Output` plus `Latest Export`.
 - Plot / Composer / Code Console figure exports always choose `PDF` or `300 dpi TIFF` first, then choose the destination. Single-output exports keep an editable filename; multi-output exports choose one base filename and append deterministic suffixes per figure.
@@ -59,7 +60,8 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 ## Backend/API Boundaries
 
 - `POST /inspect-file` is the single inspection/recommendation entry.
-- `POST /source-table-preview` returns paged raw source-table rows plus detected role/x/y hints for Plot `Data Workbook` and Data Studio `Analysis`.
+- `POST /source-table-preview` returns paged raw source-table rows plus detected encoding, delimiter, segments, column profiles, candidate roles, and x/y hints for Plot `Data Workbook`, Data Studio `Analysis`, and the Data Studio import wizard. Callers may pass `encoding`, `delimiter`, `header_row` / `header_row_index`, `unit_row` / `unit_row_index`, `data_start_row` / `data_start_row_index`, and `segment_id` preview parameters.
+- `POST /data-studio/template-preview` validates an unsaved v2 Data Studio template draft against a source file and returns normalized output counts, missing required roles, segment summaries, and warnings before a template is saved.
 - `POST /fit-analysis` is the shared Plot/Data Studio fit-analysis route. It returns typed summaries plus paged derived rows for `linear`, `polynomial_2`, and `polynomial_3`, and renderer overlays must use the same backend coefficients/equation helper.
 - `POST /save-project` and `POST /open-project` are the only supported app-level project-file persistence routes. `.sciplotgod` bundles are zip-based single files with schema validation/normalization at ingress and may embed Plot raw sources and/or Data Studio workbook files depending on the active workbench.
 - `POST /data-studio/workbook-preview` serves both baseline specimen-filter analysis (no `specimen_states`) and committed applied preview refreshes (with `specimen_states`); there is no separate auto-filter endpoint.
@@ -69,6 +71,7 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - `POST /code-console/context` returns a stable `context_id` (input signature + mtime).
 - `POST /code-console/run` accepts `context_id` fast path and still supports legacy `context`.
 - `GET /meta`, `GET /plot-contract`, and `DELETE /data-studio/templates/{id}` use explicit response schemas.
+- `POST /data-studio/source-preview` has been removed; Data Studio raw preview must go through `/source-table-preview` and draft parsing must go through `/data-studio/template-preview`.
 - Ranked recommendation fields are canonical:
   - `recommendations`
   - `primary_recommendation`
@@ -92,6 +95,10 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
   - `app/sidecar/schemas_render.py`
   - `app/sidecar/schemas_data_studio.py`
   - `app/sidecar/schemas_code_console.py`
+- Data Studio v2 import-template schema and workbook generation:
+  - `src/data_studio/models.py`
+  - `src/data_studio/import_templates_v2.py`
+  - `src/rendering/source_table_preview.py`
 
 When behavior is a contract change, update contract first, regenerate docs, then update Python/sidecar/macOS consumers.
 

@@ -15,9 +15,9 @@ from app.sidecar.schemas import (
     DataStudioPreviewComparisonRequest,
     DataStudioSessionNormalizeRequest,
     DataStudioSessionResponse,
-    DataStudioSourcePreviewRequest,
-    DataStudioSourcePreviewResponse,
     DataStudioTemplateListResponse,
+    DataStudioTemplatePreviewRequest,
+    DataStudioTemplatePreviewResponse,
     DataStudioTemplateResponse,
     DataStudioUpdateTemplateRequest,
     DataStudioWorkbookPreviewRequest,
@@ -38,7 +38,7 @@ from src.data_studio.service import (
     normalize_session_payload,
     preview_data_studio_comparison,
     preview_data_studio_comparison_context,
-    preview_data_studio_source,
+    preview_data_studio_template,
     preview_data_studio_workbook,
     update_data_studio_template,
 )
@@ -57,32 +57,34 @@ def create_data_studio_router() -> APIRouter:
         except Exception as exc:
             raise http_bad_request("data_studio_templates", exc) from exc
 
-    @router.post("/data-studio/source-preview", response_model=DataStudioSourcePreviewResponse)
-    def preview_source(request: DataStudioSourcePreviewRequest) -> DataStudioSourcePreviewResponse:
-        try:
-            preview, matches = preview_data_studio_source(request.input_path)
-            return DataStudioSourcePreviewResponse.model_validate(
-                {
-                    "preview": serialize_dataclass(preview),
-                    "matches": [serialize_dataclass(match) for match in matches],
-                }
-            )
-        except Exception as exc:
-            raise http_bad_request("data_studio_source_preview", exc) from exc
-
     @router.post("/data-studio/templates", response_model=DataStudioTemplateResponse)
     def create_template(request: DataStudioCreateTemplateRequest) -> DataStudioTemplateResponse:
         try:
             template = create_data_studio_template(
-                source_path=request.source_path,
                 label=request.label,
-                accepted_candidate_ids=request.accepted_candidate_ids,
                 template_id=request.template_id,
                 description=request.description,
+                output_kind=request.output_kind,
+                source_format=request.source_format.model_dump(),
+                segment_policy=request.segment_policy,
+                segment_selectors=[item.model_dump() for item in request.segment_selectors],
+                field_bindings=[item.model_dump() for item in request.field_bindings],
+                match_conditions=[item.model_dump() for item in request.match_conditions],
             )
             return DataStudioTemplateResponse.model_validate(serialize_dataclass(template))
         except Exception as exc:
             raise http_bad_request("data_studio_template_create", exc) from exc
+
+    @router.post("/data-studio/template-preview", response_model=DataStudioTemplatePreviewResponse)
+    def preview_template(request: DataStudioTemplatePreviewRequest) -> DataStudioTemplatePreviewResponse:
+        try:
+            preview = preview_data_studio_template(
+                request.source_path,
+                template_payload=request.template.model_dump(),
+            )
+            return DataStudioTemplatePreviewResponse.model_validate(serialize_dataclass(preview))
+        except Exception as exc:
+            raise http_bad_request("data_studio_template_preview", exc) from exc
 
     @router.put("/data-studio/templates/{template_id:path}", response_model=DataStudioTemplateResponse)
     def update_template(template_id: str, request: DataStudioUpdateTemplateRequest) -> DataStudioTemplateResponse:
