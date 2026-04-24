@@ -233,6 +233,8 @@
 5. 代码完成后先清理：
    - `.venv/bin/python scripts/clean_repo.py`
 6. 再跑回归，不得跳过 smoke/build/test/check。
+   - 推荐直接跑：`.venv/bin/python scripts/blocking_gate.py`
+   - 每轮还要补 1 次手工关键流（Plot 导入出图、Data Studio 导入转 Plot、Overlay 拖拽/保存重开一致）
 7. 任何影响职责、边界、流程、验证矩阵的改动，必须同轮更新 `AGENTS.md` 与 `README.md`。
 
 ## 交接硬要求（每轮必做）
@@ -263,6 +265,8 @@
 
 ## 验证命令
 
+- `.venv/bin/python scripts/blocking_gate.py`
+- `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
 - `.venv/bin/python scripts/clean_repo.py`
 - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`

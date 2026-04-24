@@ -140,6 +140,9 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 ## Validation
 
+- Blocking gate (recommended one-command entry):
+  - `.venv/bin/python scripts/blocking_gate.py`
+  - Use `--require-manual --manual-check ...` to enforce all three manual smoke checks in the same run.
 - Clean:
   - `.venv/bin/python scripts/clean_repo.py`
 - Ruff:
@@ -173,12 +176,12 @@ If you are taking over development, use this order:
 2. Read `docs/maintenance-governance.md` for maintenance method, change taxonomy, review gates, and rollback duties.
 3. Read `docs/engineering-handoff.md` for latest change history, risk points, and troubleshooting.
 4. Run the full validation matrix once in your machine:
-   - clean
-   - ruff
-   - mypy
-   - pytest
-   - smoke_check
-   - xcodebuild build/test
+   - `.venv/bin/python scripts/blocking_gate.py`
+   - plus one manual smoke round for:
+     - Plot import -> preview -> export
+     - Data Studio import -> open in Plot
+     - Overlay add/select/drag(or nudge) -> save/reopen consistency
+   - if you prefer explicit commands, run clean/ruff/mypy/pytest/smoke_check/xcodebuild build/test in order
 5. Confirm you can execute one complete end-to-end flow in each workbench:
    - Plot
    - Data Studio

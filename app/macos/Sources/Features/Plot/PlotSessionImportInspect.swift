@@ -79,6 +79,9 @@ extension PlotSession {
             savedInputMtimeNs: nil,
             savedAt: nil
         )
+        selectedReferenceGuideID = nil
+        selectedTextAnnotationID = nil
+        selectedShapeAnnotationID = nil
         resetDataWorkbookState()
         if !preserveRenderOptions {
             let defaultStyle = metadata?.defaults.stylePreset ?? "nature"
@@ -277,6 +280,7 @@ extension PlotSession {
             )
             guides.append(guide)
             options.referenceGuides = guides
+            selectedReferenceGuideID = guide.id
         }
     }
 
@@ -302,6 +306,9 @@ extension PlotSession {
             var guides = options.referenceGuides ?? []
             guides.removeAll { $0.id == id }
             options.referenceGuides = guides.isEmpty ? nil : guides
+            if selectedReferenceGuideID == id {
+                selectedReferenceGuideID = guides.first?.id
+            }
         }
     }
 
@@ -311,14 +318,14 @@ extension PlotSession {
     ) {
         updateRenderOptions(policy: .immediate) { options in
             var annotations = options.textAnnotations ?? []
-            annotations.append(
-                TextAnnotationPayload(
-                    coordinateSpace: "axes_fraction",
-                    displayStyle: displayStyle,
-                    connectorEnabled: connectorEnabled
-                )
+            let annotation = TextAnnotationPayload(
+                coordinateSpace: "axes_fraction",
+                displayStyle: displayStyle,
+                connectorEnabled: connectorEnabled
             )
+            annotations.append(annotation)
             options.textAnnotations = annotations
+            selectedTextAnnotationID = annotation.id
         }
     }
 
@@ -344,23 +351,26 @@ extension PlotSession {
             var annotations = options.textAnnotations ?? []
             annotations.removeAll { $0.id == id }
             options.textAnnotations = annotations.isEmpty ? nil : annotations
+            if selectedTextAnnotationID == id {
+                selectedTextAnnotationID = annotations.first?.id
+            }
         }
     }
 
     func addShapeAnnotation(kind: String) {
         updateRenderOptions(policy: .immediate) { options in
             var annotations = options.shapeAnnotations ?? []
-            annotations.append(
-                ShapeAnnotationPayload(
-                    kind: kind,
-                    bracketOrientation: kind == "bracket" ? "horizontal" : "horizontal",
-                    xStart: 0.2,
-                    xEnd: 0.8,
-                    yStart: kind == "bracket" ? 0.75 : 0.2,
-                    yEnd: kind == "bracket" ? 0.75 : 0.8
-                )
+            let annotation = ShapeAnnotationPayload(
+                kind: kind,
+                bracketOrientation: kind == "bracket" ? "horizontal" : "horizontal",
+                xStart: 0.2,
+                xEnd: 0.8,
+                yStart: kind == "bracket" ? 0.75 : 0.2,
+                yEnd: kind == "bracket" ? 0.75 : 0.8
             )
+            annotations.append(annotation)
             options.shapeAnnotations = annotations
+            selectedShapeAnnotationID = annotation.id
         }
     }
 
@@ -386,6 +396,98 @@ extension PlotSession {
             var annotations = options.shapeAnnotations ?? []
             annotations.removeAll { $0.id == id }
             options.shapeAnnotations = annotations.isEmpty ? nil : annotations
+            if selectedShapeAnnotationID == id {
+                selectedShapeAnnotationID = annotations.first?.id
+            }
+        }
+    }
+
+    func selectReferenceGuide(id: String?) {
+        selectedReferenceGuideID = selectedReferenceGuideID == id ? nil : id
+    }
+
+    func selectTextAnnotation(id: String?) {
+        selectedTextAnnotationID = selectedTextAnnotationID == id ? nil : id
+    }
+
+    func selectShapeAnnotation(id: String?) {
+        selectedShapeAnnotationID = selectedShapeAnnotationID == id ? nil : id
+    }
+
+    func nudgeReferenceGuide(
+        id: String,
+        deltaX: Double,
+        deltaY: Double,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        updateReferenceGuide(id: id, policy: policy) { guide in
+            if guide.kind == "line" {
+                if guide.axisTarget == "x" {
+                    guide.value = (guide.value ?? 0.0) + deltaX
+                } else {
+                    guide.value = (guide.value ?? 0.0) + deltaY
+                }
+            } else if guide.axisTarget == "x" {
+                guide.start = (guide.start ?? 0.0) + deltaX
+                guide.end = (guide.end ?? 1.0) + deltaX
+            } else {
+                guide.start = (guide.start ?? 0.0) + deltaY
+                guide.end = (guide.end ?? 1.0) + deltaY
+            }
+        }
+    }
+
+    func nudgeTextAnnotationPosition(
+        id: String,
+        deltaX: Double,
+        deltaY: Double,
+        includeTarget: Bool = false,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        updateTextAnnotation(id: id, policy: policy) { annotation in
+            annotation.x += deltaX
+            annotation.y += deltaY
+            if annotation.coordinateSpace == "axes_fraction" {
+                annotation.x = min(max(annotation.x, 0.0), 1.0)
+                annotation.y = min(max(annotation.y, 0.0), 1.0)
+            }
+            if includeTarget {
+                annotation.targetX += deltaX
+                annotation.targetY += deltaY
+                if annotation.coordinateSpace == "axes_fraction" {
+                    annotation.targetX = min(max(annotation.targetX, 0.0), 1.0)
+                    annotation.targetY = min(max(annotation.targetY, 0.0), 1.0)
+                }
+            }
+        }
+    }
+
+    func nudgeShapeAnnotation(
+        id: String,
+        deltaX: Double,
+        deltaY: Double,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        updateShapeAnnotation(id: id, policy: policy) { annotation in
+            if annotation.kind == "bracket" {
+                if annotation.bracketOrientation == "horizontal" {
+                    annotation.xStart += deltaX
+                    annotation.xEnd += deltaX
+                    annotation.yStart += deltaY
+                    annotation.yEnd = annotation.yStart
+                } else {
+                    annotation.yStart += deltaY
+                    annotation.yEnd += deltaY
+                    annotation.xStart += deltaX
+                    annotation.xEnd = annotation.xStart
+                }
+                return
+            }
+
+            annotation.xStart += deltaX
+            annotation.xEnd += deltaX
+            annotation.yStart += deltaY
+            annotation.yEnd += deltaY
         }
     }
 

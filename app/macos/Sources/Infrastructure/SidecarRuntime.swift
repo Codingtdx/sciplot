@@ -56,28 +56,33 @@ final class SidecarRuntime {
     }
 
     func ensureRunning() async throws {
-        if case .running = status {
-            if hasFreshHealthProbeCache {
-                return
+        do {
+            if case .running = status {
+                if hasFreshHealthProbeCache {
+                    return
+                }
+                if await probeHealthOnly() {
+                    return
+                }
+                if try await probeCompatibility() {
+                    return
+                }
+                appendLog("[runtime] Active sidecar failed compatibility checks; restarting managed sidecar.")
             }
-            if await probeHealthOnly() {
-                return
-            }
-            if try await probeCompatibility() {
-                return
-            }
-            appendLog("[runtime] Active sidecar failed compatibility checks; restarting managed sidecar.")
+
+            status = .starting
+            let repoRoot = try locator.locateRepositoryRoot()
+            repoRootURL = repoRoot
+
+            try await terminateIncompatibleListeners()
+            try startSidecarProcess(repoRoot: repoRoot)
+            try await waitForCompatibility(timeoutNanoseconds: startupTimeoutNanoseconds)
+            status = .running
+            markCompatibilitySuccess()
+        } catch {
+            status = .failed(error.localizedDescription)
+            throw error
         }
-
-        status = .starting
-        let repoRoot = try locator.locateRepositoryRoot()
-        repoRootURL = repoRoot
-
-        try await terminateIncompatibleListeners()
-        try startSidecarProcess(repoRoot: repoRoot)
-        try await waitForCompatibility(timeoutNanoseconds: startupTimeoutNanoseconds)
-        status = .running
-        markCompatibilitySuccess()
     }
 
     private func probeCompatibility() async throws -> Bool {
@@ -90,7 +95,10 @@ final class SidecarRuntime {
                     .map { "\($0.method) \($0.path)" }
                     .sorted()
                     .joined(separator: ", ")
-                reportCompatibilityFailure("Missing required routes: \(missingText).")
+                reportCompatibilityFailure(
+                    "Missing required routes: \(missingText).",
+                    stage: "openapi.routes"
+                )
                 return false
             }
 
@@ -100,7 +108,7 @@ final class SidecarRuntime {
             }
             return payloadCompatible
         } catch {
-            reportCompatibilityFailure(error.localizedDescription)
+            reportCompatibilityFailure(error.localizedDescription, stage: "compatibility.probe")
             return false
         }
     }
@@ -112,7 +120,7 @@ final class SidecarRuntime {
             lastCompatibilityFailure = nil
             return true
         } catch {
-            reportCompatibilityFailure(error.localizedDescription)
+            reportCompatibilityFailure(error.localizedDescription, stage: "health.probe")
             return false
         }
     }
@@ -138,41 +146,50 @@ final class SidecarRuntime {
         do {
             let (metaData, metaResponse) = try await session.data(from: baseURL.appendingPathComponent("meta"))
             guard let metaHTTP = metaResponse as? HTTPURLResponse, 200 ..< 300 ~= metaHTTP.statusCode else {
-                reportCompatibilityFailure("/meta returned a non-2xx status.")
+                reportCompatibilityFailure("/meta returned a non-2xx status.", stage: "payload.meta.status")
                 return false
             }
             let meta: SidecarMetaResponse
             do {
                 meta = try decoder.decode(SidecarMetaResponse.self, from: metaData)
             } catch {
-                reportCompatibilityFailure("/meta decode failed: \(error.localizedDescription)")
+                reportCompatibilityFailure(
+                    "/meta decode failed: \(error.localizedDescription)",
+                    stage: "payload.meta.decode"
+                )
                 return false
             }
             guard !meta.templates.isEmpty else {
-                reportCompatibilityFailure("/meta contains no templates.")
+                reportCompatibilityFailure("/meta contains no templates.", stage: "payload.meta.empty")
                 return false
             }
 
             let (contractData, contractResponse) = try await session.data(from: baseURL.appendingPathComponent("plot-contract"))
             guard let contractHTTP = contractResponse as? HTTPURLResponse, 200 ..< 300 ~= contractHTTP.statusCode else {
-                reportCompatibilityFailure("/plot-contract returned a non-2xx status.")
+                reportCompatibilityFailure(
+                    "/plot-contract returned a non-2xx status.",
+                    stage: "payload.contract.status"
+                )
                 return false
             }
             let contract: PlotContractResponse
             do {
                 contract = try decoder.decode(PlotContractResponse.self, from: contractData)
             } catch {
-                reportCompatibilityFailure("/plot-contract decode failed: \(error.localizedDescription)")
+                reportCompatibilityFailure(
+                    "/plot-contract decode failed: \(error.localizedDescription)",
+                    stage: "payload.contract.decode"
+                )
                 return false
             }
             guard !contract.templates.isEmpty else {
-                reportCompatibilityFailure("/plot-contract contains no templates.")
+                reportCompatibilityFailure("/plot-contract contains no templates.", stage: "payload.contract.empty")
                 return false
             }
 
             return true
         } catch {
-            reportCompatibilityFailure(error.localizedDescription)
+            reportCompatibilityFailure(error.localizedDescription, stage: "payload.probe")
             return false
         }
     }
@@ -220,13 +237,16 @@ final class SidecarRuntime {
             }
 
             if let childProcess, !childProcess.isRunning {
-                throw SidecarError.startupFailed(logs.suffix(20).joined(separator: "\n"))
+                let detail = logs.suffix(20).joined(separator: "\n")
+                status = .failed(detail)
+                throw SidecarError.startupFailed(detail)
             }
 
             try await Task.sleep(nanoseconds: probeIntervalNanoseconds)
         }
 
         let detail = lastCompatibilityFailure ?? "No additional probe detail captured."
+        status = .failed(detail)
         throw SidecarError.startupFailed("Timed out waiting for compatible sidecar payloads. Last probe failure: \(detail)")
     }
 
@@ -368,11 +388,12 @@ final class SidecarRuntime {
         }
     }
 
-    private func reportCompatibilityFailure(_ reason: String) {
-        guard lastCompatibilityFailure != reason else {
+    private func reportCompatibilityFailure(_ reason: String, stage: String) {
+        let message = "\(stage): \(reason)"
+        guard lastCompatibilityFailure != message else {
             return
         }
-        lastCompatibilityFailure = reason
-        appendLog("[runtime] Compatibility probe failed: \(reason)")
+        lastCompatibilityFailure = message
+        appendLog("[runtime] Compatibility probe failed [\(stage)]: \(reason)")
     }
 }

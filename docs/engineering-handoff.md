@@ -3493,3 +3493,66 @@ Use this block for every new round:
 
 - Validation (executed):
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`63 tests`)
+
+### 2026-04-24 (Round BF): Runtime/Overlay 稳定性守门与阻断门禁脚本
+
+- Scope:
+  - Runtime 可观测性补强（保持现有产品语义）：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarRuntime.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - Data Studio -> Plot 自动分流防回归测试补强（有 supported recipe 时禁止误切）：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+  - Plot Overlay 编辑流升级为统一“可选中 + 拖拽/微调（nudge）”：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotOverlayTransformControls.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - Runtime 失败可见性回归测试补强：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SidecarRuntimeTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+  - 阻断门禁落地（自动化矩阵 + 手工 smoke 清单）：
+    - `/Users/dongxutian/Documents/codegod/scripts/blocking_gate.py`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+
+- User-visible impact:
+  - sidecar 启动/探针失败时，runtime 错误卡片会附带最近 runtime log tail，定位更直接，不再只有笼统失败提示。
+  - Plot 的 `reference_guides / text_annotations / shape_annotations` 现在支持统一选中态与拖拽/箭头微调，且仍走同一 typed payload 保存/重开链路。
+  - Data Studio 导入后在“有可用 compare recipe”的场景保持停留 Data Studio，不会被误切到 Plot。
+
+- Risks:
+  - Overlay 微调步长目前按坐标空间和控件默认值设定；极端数据尺度下可能需要后续再调节步长策略。
+  - runtime log tail 直接拼入诊断详情，若未来日志量增大，可能需要再引入裁剪/格式策略。
+  - `scripts/blocking_gate.py` 默认不强制手工 smoke；若团队希望强制，需统一改用 `--require-manual`。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarRuntime.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/scripts/blocking_gate.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把“运行时阻断问题”定位成本降到最低，同时保证 Overlay 迭代继续沿单一 typed payload 真相源前进，不新增 GUI 本地语义分叉。
+  - Rejected alternatives:
+    - 只在失败时显示一句通用错误，不附 runtime 日志：被拒绝，因为重复排查时缺关键上下文。
+    - 先做前端局部拖拽状态再异步映射回 payload：被拒绝，因为会产生第二套几何语义并破坏 save/open/export 一致性。
+    - 继续依赖人工逐条执行验证命令：被拒绝，因为门禁不稳定、漏项概率高。
+  - Boundaries:
+    - 不引入 legacy route/fallback，不改变 `nature` 冻结指标，不在前端重建 style/palette/theme 默认值系统。
+    - overlay 编辑仅复用 `render_options.reference_guides / text_annotations / shape_annotations` 现有链路。
+
+- Validation (executed):
+  - `.venv/bin/python scripts/blocking_gate.py`: passed（自动化矩阵全通过；脚本输出的手工 smoke 清单为 pending，未启用 `--require-manual`）
+  - `.venv/bin/python scripts/clean_repo.py`: passed（reclaimed approx `295.7 MB`）
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed（`Success: no issues found in 43 source files`）
+  - `.venv/bin/python -m pytest tests`: passed（`230 passed, 5 warnings`）
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed（`173 tests`）

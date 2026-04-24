@@ -176,6 +176,14 @@ final class SidecarRuntimeTests: XCTestCase {
                 return
             }
         }
+        if case .failed = runtime.status {
+        } else {
+            XCTFail("Runtime should transition to failed status when startup probe times out.")
+        }
+        XCTAssertTrue(
+            runtime.logs.contains(where: { $0.contains("Compatibility probe failed [compatibility.probe]") }),
+            "Expected runtime logs to include staged probe failure diagnostics."
+        )
     }
 
     @MainActor

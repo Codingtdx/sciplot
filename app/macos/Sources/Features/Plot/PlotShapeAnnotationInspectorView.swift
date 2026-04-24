@@ -33,6 +33,11 @@ struct PlotShapeAnnotationInspectorView: View {
 
                         Spacer(minLength: 12)
 
+                        Button(isShapeAnnotationSelected(annotation.id) ? "Selected" : "Select") {
+                            session.selectShapeAnnotation(id: annotation.id)
+                        }
+                        .buttonStyle(.bordered)
+
                         Button("Remove") {
                             session.removeShapeAnnotation(id: annotation.id)
                         }
@@ -121,7 +126,14 @@ struct PlotShapeAnnotationInspectorView: View {
                             upperBinding: shapeAnnotationYEndBinding(id: annotation.id)
                         )
                     }
+
+                    if isShapeAnnotationSelected(annotation.id) {
+                        shapeAnnotationTransformControls(for: annotation)
+                    }
                 }
+                .padding(10)
+                .background(isShapeAnnotationSelected(annotation.id) ? Color.accentColor.opacity(0.08) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.top, 6)
             }
         }
@@ -144,6 +156,10 @@ struct PlotShapeAnnotationInspectorView: View {
         default:
             return "Rectangle"
         }
+    }
+
+    private func isShapeAnnotationSelected(_ id: String) -> Bool {
+        session.selectedShapeAnnotationID == id
     }
 
     private func shapeAnnotationEnabledBinding(id: String) -> Binding<Bool> {
@@ -314,6 +330,28 @@ struct PlotShapeAnnotationInspectorView: View {
                 labeledField(label: lowerTitle, binding: lowerBinding)
                 labeledField(label: upperTitle, binding: upperBinding)
             }
+        }
+    }
+
+    private func shapeAnnotationTransformControls(for annotation: ShapeAnnotationPayload) -> some View {
+        let centerX = (annotation.xStart + annotation.xEnd) / 2.0
+        let centerY = (annotation.yStart + annotation.yEnd) / 2.0
+
+        return PlotOverlayTransformControls(
+            title: "Move Shape",
+            xLabel: "X",
+            yLabel: "Y",
+            xValue: centerX,
+            yValue: centerY,
+            stepX: 0.05,
+            stepY: 0.05
+        ) { deltaX, deltaY in
+            session.nudgeShapeAnnotation(
+                id: annotation.id,
+                deltaX: deltaX,
+                deltaY: deltaY,
+                policy: .debounced
+            )
         }
     }
 

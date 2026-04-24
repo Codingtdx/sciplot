@@ -449,6 +449,33 @@ final class PlotSessionTests: XCTestCase {
         )
     }
 
+    func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addReferenceGuide(kind: "line")
+        guard let guideID = session.renderOptions.referenceGuides?.first?.id else {
+            XCTFail("Expected a reference guide to be created.")
+            return
+        }
+        XCTAssertEqual(session.selectedReferenceGuideID, guideID)
+
+        session.nudgeReferenceGuide(id: guideID, deltaX: 0, deltaY: 0.25, policy: .immediate)
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.referenceGuides?.first?.value == 0.25
+            },
+            timeout: 2.0
+        )
+
+        session.removeReferenceGuide(id: guideID)
+        XCTAssertNil(session.selectedReferenceGuideID)
+    }
+
     func testExtraAxisEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
         let client = MockSidecarClient()
         client.saveProjectHandler = { request in
@@ -566,6 +593,73 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.y, 2.2)
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.displayStyle, "callout")
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.connectorEnabled, true)
+    }
+
+    func testTextAnnotationSelectionAndNudgeClampsAxesFraction() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addTextAnnotation()
+        guard let annotationID = session.renderOptions.textAnnotations?.first?.id else {
+            XCTFail("Expected a text annotation to be created.")
+            return
+        }
+        XCTAssertEqual(session.selectedTextAnnotationID, annotationID)
+
+        session.nudgeTextAnnotationPosition(
+            id: annotationID,
+            deltaX: 0.8,
+            deltaY: 0.2,
+            includeTarget: false,
+            policy: .immediate
+        )
+        await waitUntil(
+            {
+                let item = client.renderRequests.last?.options.textAnnotations?.first
+                return item?.x == 1.0 && item?.y == 1.0
+            },
+            timeout: 2.0
+        )
+
+        session.removeTextAnnotation(id: annotationID)
+        XCTAssertNil(session.selectedTextAnnotationID)
+    }
+
+    func testShapeAnnotationSelectionAndNudgeRefreshPreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addShapeAnnotation(kind: "rectangle")
+        guard let annotationID = session.renderOptions.shapeAnnotations?.first?.id else {
+            XCTFail("Expected a shape annotation to be created.")
+            return
+        }
+        XCTAssertEqual(session.selectedShapeAnnotationID, annotationID)
+
+        session.nudgeShapeAnnotation(id: annotationID, deltaX: 0.1, deltaY: -0.1, policy: .immediate)
+        await waitUntil(
+            {
+                guard let item = client.renderRequests.last?.options.shapeAnnotations?.first else {
+                    return false
+                }
+                return abs(item.xStart - 0.3) < 0.0001 &&
+                    abs(item.xEnd - 0.9) < 0.0001 &&
+                    abs(item.yStart - 0.1) < 0.0001 &&
+                    abs(item.yEnd - 0.7) < 0.0001
+            },
+            timeout: 2.0
+        )
+
+        session.removeShapeAnnotation(id: annotationID)
+        XCTAssertNil(session.selectedShapeAnnotationID)
     }
 
     func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {

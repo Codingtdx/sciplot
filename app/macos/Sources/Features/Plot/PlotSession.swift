@@ -85,6 +85,9 @@ final class PlotSession {
     var sourceTableOffset = 0
     var fitAnalysisOffset = 0
     var fitAnalysisSelectedSeriesID: String?
+    var selectedReferenceGuideID: String?
+    var selectedTextAnnotationID: String?
+    var selectedShapeAnnotationID: String?
     var sourceProvenance = PlotProjectSourceProvenancePayload(
         originalInputPath: nil,
         savedInputMtimeNs: nil,

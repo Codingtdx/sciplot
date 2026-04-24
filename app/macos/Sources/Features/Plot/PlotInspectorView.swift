@@ -344,6 +344,11 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
 
                             Spacer(minLength: 12)
 
+                            Button(isReferenceGuideSelected(guide.id) ? "Selected" : "Select") {
+                                session.selectReferenceGuide(id: guide.id)
+                            }
+                            .buttonStyle(.bordered)
+
                             Button("Remove") {
                                 session.removeReferenceGuide(id: guide.id)
                             }
@@ -391,7 +396,14 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                             TextField("Optional", text: referenceGuideLabelBinding(id: guide.id))
                                 .textFieldStyle(.roundedBorder)
                         }
+
+                        if isReferenceGuideSelected(guide.id) {
+                            referenceGuideTransformControls(for: guide)
+                        }
                     }
+                    .padding(10)
+                    .background(isReferenceGuideSelected(guide.id) ? Color.accentColor.opacity(0.08) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.top, 6)
                 }
             }
@@ -419,6 +431,11 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                                 .lineLimit(1)
 
                             Spacer(minLength: 12)
+
+                            Button(isTextAnnotationSelected(annotation.id) ? "Selected" : "Select") {
+                                session.selectTextAnnotation(id: annotation.id)
+                            }
+                            .buttonStyle(.bordered)
 
                             Button("Remove") {
                                 session.removeTextAnnotation(id: annotation.id)
@@ -508,7 +525,14 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                                 upperBinding: textAnnotationTargetYBinding(id: annotation.id)
                             )
                         }
+
+                        if isTextAnnotationSelected(annotation.id) {
+                            textAnnotationTransformControls(for: annotation)
+                        }
                     }
+                    .padding(10)
+                    .background(isTextAnnotationSelected(annotation.id) ? Color.accentColor.opacity(0.08) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.top, 6)
                 }
             }
@@ -605,6 +629,14 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
 
     private func referenceGuide(_ id: String) -> ReferenceGuidePayload {
         session.referenceGuides.first(where: { $0.id == id }) ?? ReferenceGuidePayload(id: id)
+    }
+
+    private func isReferenceGuideSelected(_ id: String) -> Bool {
+        session.selectedReferenceGuideID == id
+    }
+
+    private func isTextAnnotationSelected(_ id: String) -> Bool {
+        session.selectedTextAnnotationID == id
     }
 
     private func referenceGuideTitle(_ guide: ReferenceGuidePayload) -> String {
@@ -1256,6 +1288,76 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             lowerBinding: textAnnotationXBinding(id: annotationID),
             upperBinding: textAnnotationYBinding(id: annotationID)
         )
+    }
+
+    private func referenceGuideTransformControls(for guide: ReferenceGuidePayload) -> some View {
+        let value = guide.kind == "line"
+            ? (guide.value ?? 0.0)
+            : ((guide.start ?? 0.0) + (guide.end ?? 1.0)) / 2.0
+        let xValue = guide.axisTarget == "x" ? value : 0.0
+        let yValue = guide.axisTarget == "x" ? 0.0 : value
+        let step = guide.kind == "line" ? 0.1 : 0.05
+
+        return PlotOverlayTransformControls(
+            title: guide.kind == "line" ? "Adjust Guide" : "Move Region",
+            xLabel: "X",
+            yLabel: "Y",
+            xValue: xValue,
+            yValue: yValue,
+            stepX: step,
+            stepY: step
+        ) { deltaX, deltaY in
+            session.nudgeReferenceGuide(
+                id: guide.id,
+                deltaX: deltaX,
+                deltaY: deltaY,
+                policy: .debounced
+            )
+        }
+    }
+
+    private func textAnnotationTransformControls(for annotation: TextAnnotationPayload) -> some View {
+        let step = annotation.coordinateSpace == "axes_fraction" ? 0.02 : 0.1
+        return VStack(alignment: .leading, spacing: 8) {
+            PlotOverlayTransformControls(
+                title: "Move Annotation",
+                xLabel: "X",
+                yLabel: "Y",
+                xValue: annotation.x,
+                yValue: annotation.y,
+                stepX: step,
+                stepY: step
+            ) { deltaX, deltaY in
+                session.nudgeTextAnnotationPosition(
+                    id: annotation.id,
+                    deltaX: deltaX,
+                    deltaY: deltaY,
+                    includeTarget: false,
+                    policy: .debounced
+                )
+            }
+
+            if annotation.connectorEnabled {
+                PlotOverlayTransformControls(
+                    title: "Move Callout Target",
+                    xLabel: "TX",
+                    yLabel: "TY",
+                    xValue: annotation.targetX,
+                    yValue: annotation.targetY,
+                    stepX: step,
+                    stepY: step
+                ) { deltaX, deltaY in
+                    session.updateTextAnnotation(id: annotation.id, policy: .debounced) { item in
+                        item.targetX += deltaX
+                        item.targetY += deltaY
+                        if item.coordinateSpace == "axes_fraction" {
+                            item.targetX = min(max(item.targetX, 0.0), 1.0)
+                            item.targetY = min(max(item.targetY, 0.0), 1.0)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func axisTickLabelControls(title: String, axis: PlotAxisSelection) -> some View {

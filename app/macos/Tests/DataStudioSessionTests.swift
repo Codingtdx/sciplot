@@ -491,6 +491,35 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(openedSheet, .name("All_Curves"))
     }
 
+    func testSupportedComparisonImportDoesNotAutoOpenPlot() async {
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            DataStudioImportWorkbookResponse(
+                workbooks: [Self.makeCurveOnlyWorkbook(path: request.workbookPath, label: "Frequency Sweep")]
+            )
+        }
+        client.dataStudioComparisonContextHandler = { request in
+            DataStudioComparisonContextResponse(
+                comparisonSet: Self.makeSupportedComparisonSet(for: request.workbookPaths),
+                cacheKey: "supported-compare-cache",
+                materializedAt: "2026-04-24T12:00:00Z"
+            )
+        }
+
+        var openInPlotCallCount = 0
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.openInPlotHandler = { _, _, _, _, _ in
+            openInPlotCallCount += 1
+        }
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/frequency.xlsx")])
+
+        XCTAssertEqual(openInPlotCallCount, 0)
+        XCTAssertFalse(session.selectedExportRecipeIDs.isEmpty)
+    }
+
     func testUnresolvedRawImportPresentsResolverWithoutOpeningTemplateEditor() async {
         let client = MockSidecarClient()
         let session = DataStudioSession()
@@ -2246,6 +2275,29 @@ final class DataStudioSessionTests: XCTestCase {
                     enabledByDefault: true,
                     supported: false,
                     supportReason: "Representative curve requires Representative_Curve sheet."
+                ),
+            ]
+        )
+    }
+
+    private static func makeSupportedComparisonSet(for workbookPaths: [String]) -> DataStudioComparisonSetResponse {
+        DataStudioComparisonSetResponse(
+            id: "curve-ready",
+            label: "Curve Ready",
+            workbookPaths: workbookPaths,
+            workbookLabels: workbookPaths.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent },
+            comparisonWorkbookPath: "/tmp/curve_ready_compare.xlsx",
+            recipes: [
+                .init(
+                    id: "representative_curve",
+                    label: "Representative Curve Compare",
+                    category: "curve",
+                    templateID: "curve",
+                    sheetName: "Representative_Curve",
+                    metricID: nil,
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
                 ),
             ]
         )

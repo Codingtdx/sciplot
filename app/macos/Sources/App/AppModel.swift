@@ -98,7 +98,19 @@ final class AppModel {
         guard let bootstrapErrorMessage else {
             return nil
         }
-        return DiagnosticMessage(summary: "Runtime unavailable", detail: bootstrapErrorMessage)
+        let recentRuntimeLogs = runtime.logs.suffix(8)
+        let detail: String
+        if recentRuntimeLogs.isEmpty {
+            detail = bootstrapErrorMessage
+        } else {
+            detail = """
+            \(bootstrapErrorMessage)
+
+            Recent runtime logs:
+            \(recentRuntimeLogs.joined(separator: "\n"))
+            """
+        }
+        return DiagnosticMessage(summary: "Runtime unavailable", detail: detail)
     }
 
     @ObservationIgnored private var pendingPlotReplacementAction: PendingPlotReplacementAction?

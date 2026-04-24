@@ -157,6 +157,22 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.runtimeIssueMessage?.detail, "Sidecar failed to start.")
     }
 
+    func testRuntimeIssueMessageIncludesRecentRuntimeLogsWhenAvailable() {
+        let runtime = SidecarRuntime()
+        runtime.logs = [
+            "[runtime] Started sidecar process",
+            "[runtime] Compatibility probe failed [payload.meta.decode]: bad payload",
+        ]
+        let model = AppModel(runtime: runtime, client: MockSidecarClient())
+
+        model.bootstrapErrorMessage = "The sidecar failed to start."
+
+        let detail = model.runtimeIssueMessage?.detail ?? ""
+        XCTAssertTrue(detail.contains("The sidecar failed to start."))
+        XCTAssertTrue(detail.contains("Recent runtime logs:"))
+        XCTAssertTrue(detail.contains("payload.meta.decode"))
+    }
+
     func testBootstrapCancellationDoesNotSurfaceRuntimeIssue() async throws {
         let fixture = try makeRuntimeFixture()
         let client = MockSidecarClient()
