@@ -423,6 +423,74 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioComparisonContextRequests.last?.groupStates.first?.displayName, "E3")
     }
 
+    func testCurveOnlyWorkbookImportAutoOpensFocusedWorkbookInPlot() async {
+        let client = MockSidecarClient()
+        client.dataStudioImportWorkbookHandler = { request in
+            DataStudioImportWorkbookResponse(
+                workbooks: [Self.makeCurveOnlyWorkbook(path: request.workbookPath, label: "Frequency Sweep")]
+            )
+        }
+        client.dataStudioComparisonContextHandler = { request in
+            DataStudioComparisonContextResponse(
+                comparisonSet: Self.makeNoComparisonSet(for: request.workbookPaths),
+                cacheKey: "curve-only-cache",
+                materializedAt: "2026-04-24T12:00:00Z"
+            )
+        }
+
+        var openedURL: URL?
+        var openedSheet: SheetValue?
+        var openedTemplateID: String?
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.openInPlotHandler = { url, sheet, templateID, _, _ in
+            openedURL = url
+            openedSheet = sheet
+            openedTemplateID = templateID
+        }
+
+        await session.handleImportedWorkbooks([URL(fileURLWithPath: "/tmp/frequency.xlsx")])
+
+        XCTAssertEqual(openedURL?.path, "/tmp/frequency.xlsx")
+        XCTAssertEqual(openedSheet, .name("All_Curves"))
+        XCTAssertNil(openedTemplateID)
+    }
+
+    func testCurveOnlyRawWorkbookBuildAutoOpensInPlot() async {
+        let outputWorkbookURL = URL(fileURLWithPath: "/tmp/E0.xlsx")
+        let client = MockSidecarClient()
+        client.dataStudioBuildWorkbookHandler = { request in
+            Self.makeCurveOnlyWorkbook(path: request.outputPath, label: "E0")
+        }
+        client.dataStudioComparisonContextHandler = { request in
+            DataStudioComparisonContextResponse(
+                comparisonSet: Self.makeNoComparisonSet(for: request.workbookPaths),
+                cacheKey: "curve-only-cache",
+                materializedAt: "2026-04-24T12:00:00Z"
+            )
+        }
+
+        var openedURL: URL?
+        var openedSheet: SheetValue?
+        let session = DataStudioSession(
+            chooseWorkbookSaveLocation: { _ in outputWorkbookURL }
+        )
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.openInPlotHandler = { url, sheet, _, _, _ in
+            openedURL = url
+            openedSheet = sheet
+        }
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/E0.csv")])
+        session.selectedTemplateID = "user/freq"
+        await session.importWithSelectedTemplate()
+
+        XCTAssertEqual(openedURL?.path, outputWorkbookURL.path)
+        XCTAssertEqual(openedSheet, .name("All_Curves"))
+    }
+
     func testUnresolvedRawImportPresentsResolverWithoutOpeningTemplateEditor() async {
         let client = MockSidecarClient()
         let session = DataStudioSession()
@@ -611,6 +679,10 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
         XCTAssertFalse(client.dataStudioCreateTemplateRequests[0].comparisonEnabled)
+        XCTAssertEqual(
+            client.dataStudioCreateTemplateRequests[0].fieldBindings.first(where: { $0.role == "curve_y" })?.sampleName,
+            "raw_a"
+        )
         XCTAssertFalse(client.dataStudioCreateTemplateRequests[0].fieldBindings.contains(where: { $0.role == "metric" }))
     }
 
@@ -634,6 +706,27 @@ final class DataStudioSessionTests: XCTestCase {
 
         session.templateDraftMetricColumnNames = ["Stress"]
         XCTAssertTrue(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+    }
+
+    func testTemplateEditorAllowsEditingSampleNamePerYColumn() async {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.beginCreateTemplateEditor()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        session.templateDraftLabel = "Custom Sample Name Template"
+        session.setDraftSampleName("E0", forYColumn: "Stress")
+
+        await session.saveTemplateDraft()
+
+        XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
+        XCTAssertEqual(
+            client.dataStudioCreateTemplateRequests[0].fieldBindings.first(where: { $0.role == "curve_y" })?.sampleName,
+            "E0"
+        )
     }
 
     func testTogglingSuggestionAndManualCandidateSelectionStayInSync() async {
@@ -2104,6 +2197,57 @@ final class DataStudioSessionTests: XCTestCase {
             label: "Prepared Group",
             excludedSpecimenIDs: excluded,
             selectedRepresentativeSpecimenID: selectedRepresentativeSpecimenID
+        )
+    }
+
+    private static func makeCurveOnlyWorkbook(path: String, label: String) -> DataStudioWorkbookResponse {
+        DataStudioWorkbookResponse(
+            workbookID: "curve-only-\(path)",
+            workbookPath: path,
+            label: label,
+            templateMatch: .init(
+                templateID: "user/freq",
+                label: "Frequency Sweep",
+                family: "rheology",
+                confidence: 0.98,
+                reasons: ["Built with the selected Data Studio template."],
+                warnings: [],
+                matchedSheetNames: ["All_Curves"],
+                autoSelected: true
+            ),
+            sourceFiles: ["/tmp/E0.csv"],
+            sheetNames: ["All_Curves"],
+            preferredSheet: "All_Curves",
+            parsedSampleCount: 1,
+            failedSampleCount: 0,
+            representativeFilename: "E0",
+            metrics: [],
+            warnings: [],
+            exclusions: [],
+            samples: []
+        )
+    }
+
+    private static func makeNoComparisonSet(for workbookPaths: [String]) -> DataStudioComparisonSetResponse {
+        DataStudioComparisonSetResponse(
+            id: "curve-only",
+            label: "Curve Only",
+            workbookPaths: workbookPaths,
+            workbookLabels: workbookPaths.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent },
+            comparisonWorkbookPath: "/tmp/curve_only_compare.xlsx",
+            recipes: [
+                .init(
+                    id: "representative_curve",
+                    label: "Representative Curve Compare",
+                    category: "curve",
+                    templateID: "curve",
+                    sheetName: "Representative_Curve",
+                    metricID: nil,
+                    enabledByDefault: true,
+                    supported: false,
+                    supportReason: "Representative curve requires Representative_Curve sheet."
+                ),
+            ]
         )
     }
 }

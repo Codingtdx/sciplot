@@ -96,6 +96,7 @@ class DataStudioTemplateFieldBindingResponse(StrictModel):
     row_label_contains: str | None = None
     cell_value_contains: list[str] = Field(default_factory=list)
     unit_hint: str | None = None
+    sample_name: str | None = None
     optional: bool = False
 
 

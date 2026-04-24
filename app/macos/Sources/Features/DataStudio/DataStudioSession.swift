@@ -49,6 +49,7 @@ final class DataStudioSession {
     var templateDraftXColumnName: String?
     var templateDraftYColumnNames: [String] = []
     var templateDraftMetricColumnNames: [String] = []
+    var templateDraftSampleNameByYColumn: [String: String] = [:]
     var selectedPreviewSegmentID: String?
 
     var importFlow: DataStudioImportFlowState = .idle
@@ -286,6 +287,7 @@ final class DataStudioSession {
         templateDraftXColumnName = nil
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []
+        templateDraftSampleNameByYColumn = [:]
         selectedPreviewSegmentID = nil
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil

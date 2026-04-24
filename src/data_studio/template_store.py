@@ -58,6 +58,7 @@ def _binding_from_payload(payload: dict[str, object]) -> TemplateFieldBinding:
         ),
         cell_value_contains=tuple(str(item) for item in payload.get("cell_value_contains", ()) or ()),
         unit_hint=str(payload["unit_hint"]) if payload.get("unit_hint") is not None else None,
+        sample_name=str(payload["sample_name"]) if payload.get("sample_name") is not None else None,
         optional=bool(payload.get("optional", False)),
     )
 
@@ -154,6 +155,7 @@ def template_to_payload(template: TemplateDefinition) -> dict[str, object]:
                 "row_label_contains": binding.row_label_contains,
                 "cell_value_contains": list(binding.cell_value_contains),
                 "unit_hint": binding.unit_hint,
+                "sample_name": binding.sample_name,
                 "optional": binding.optional,
             }
             for binding in template.field_bindings

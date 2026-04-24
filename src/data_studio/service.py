@@ -167,6 +167,7 @@ def _field_binding_from_payload(payload: dict[str, object]) -> TemplateFieldBind
         ),
         cell_value_contains=tuple(str(item) for item in payload.get("cell_value_contains", ()) or ()),
         unit_hint=str(payload["unit_hint"]) if payload.get("unit_hint") is not None else None,
+        sample_name=str(payload["sample_name"]) if payload.get("sample_name") is not None else None,
         optional=bool(payload.get("optional", False)),
     )
 

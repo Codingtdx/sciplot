@@ -196,6 +196,29 @@ struct DataStudioCreateTemplateEditorSheet: View {
                                     .padding(.top, 8)
                                 }
                             }
+
+                            if session.templateDraftOutputKind == "curve_metrics", !session.templateDraftYColumnNames.isEmpty {
+                                GroupBox("Sample Names") {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        ForEach(session.templateDraftYColumnNames, id: \.self) { column in
+                                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                                Text(column)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .frame(width: 180, alignment: .leading)
+                                                TextField(
+                                                    "Sample Name",
+                                                    text: Binding(
+                                                        get: { session.templateDraftSampleNameByYColumn[column] ?? "" },
+                                                        set: { session.setDraftSampleName($0, forYColumn: column) }
+                                                    )
+                                                )
+                                                .textFieldStyle(.roundedBorder)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -3422,14 +3422,16 @@ Use this block for every new round:
     - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_data_studio.py`
     - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_data_studio.py`
   - `curve_metrics` 工作簿输出改为可切换：
-    - `comparison_enabled=false`：只写 `DataStudio_Metadata + All_Curves`
+    - `comparison_enabled=false`：只写 `All_Curves`
     - `comparison_enabled=true`：保持 representative + metrics compare 结构
+    - 两种模式都不再写 `DataStudio_Metadata` sheet
   - 旧模板兼容：
     - 历史 payload 缺省 `comparison_enabled` 且 `output_kind=curve_metrics` 时默认按 `true` 读取。
   - macOS 模板创建 UI：
     - `Output` 文案改为 `Curves`
     - 新增 `Enable Comparison` 开关（默认关闭）
     - 仅开启后显示 metrics 选择，并在无 metric 时 `Save/Save and Continue` 禁用并解释
+    - 新增按已选 Y 列逐项确认样品名输入框，默认值为源文件名（可编辑）
     - 模板请求显式发送 `comparison_enabled`
   - workbook import 偏好页修正：
     - 无 `Representative_Curve` 时优先回落到 `All_Curves`，避免再次导入时落到不存在 sheet。
@@ -3440,6 +3442,8 @@ Use this block for every new round:
 - User-visible impact:
   - Data Studio 创建 `Curves` 模板时，默认行为是“整理原始列直接用于画曲线”，不再默认进入 Tensile 风格指标/代表曲线链路。
   - 只有用户主动勾选 `Enable Comparison` 才生成 compare 所需 workbook 结构，且缺 metric 列会直接阻止保存并给原因。
+  - 模板编辑页可逐项确认/修改曲线样品名；默认不再拼 segment 文案，直接使用源文件名。
+  - 通过 v2 模板生成的 workbook 不再出现 `DataStudio_Metadata` sheet。
   - 仅曲线工作簿在 compare recipe 中继续以“禁用并解释”方式处理 metric/representative recipe。
 
 - Risks:
@@ -3458,3 +3462,34 @@ Use this block for every new round:
   - `.venv/bin/python -m ruff check src/data_studio/import_templates_v2.py src/data_studio/service.py src/data_studio/workbooks.py app/sidecar/routes_data_studio.py app/sidecar/schemas_data_studio.py tests/test_data_studio_import_templates_v2.py tests/test_data_studio.py tests/test_sidecar_data_studio.py tests/test_sidecar_schema_contract.py`: passed
   - `.venv/bin/python -m pytest tests/test_data_studio_import_templates_v2.py tests/test_data_studio.py tests/test_sidecar_data_studio.py tests/test_sidecar_schema_contract.py`: passed (`44 passed, 5 warnings`)
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/SidecarRuntimeTests -only-testing:SciPlotGodMacTests/AppModelTests`: passed (`84 tests`)
+
+### 2026-04-24 (Round BE): 无对比 Data Studio 导入自动切到 Plot
+
+- Scope:
+  - 在 Data Studio 导入链路（现有 workbook 导入 + raw build workbook）补自动分流：
+    - comparison context 重建后，若没有任何 `supported` recipe，则自动调用既有 `openInPlotHandler`。
+    - 打开对象使用当前 focused workbook，sheet 使用该 workbook 的 `preferredSheet`，template/options/fitOptions 由 Plot 侧常规 inspect/recommend 链路处理。
+  - 具体代码：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - 回归测试新增：
+    - `testCurveOnlyWorkbookImportAutoOpensFocusedWorkbookInPlot`
+    - `testCurveOnlyRawWorkbookBuildAutoOpensInPlot`
+    - 文件：`/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+  - 文档同步：
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+
+- User-visible impact:
+  - 对于“无对比可做”的 Data Studio 结果（如 curve-only rheology workbook），导入完成后会自动切到 Plot，不再停在 Data Studio 无法继续绘图的状态。
+  - 若 compare 可用（存在 supported recipe），保持当前 Data Studio compare 工作流不变。
+
+- Risks:
+  - 自动切换会复用现有 `Open in Plot` 行为；当 Plot 已有内容时，仍可能触发替换确认弹窗（符合当前全局策略）。
+  - 触发条件依赖 comparison context 的 `supported` 标记；若后端未来改变 supported 语义，需要同步校准此分流条件。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed (`63 tests`)

@@ -160,7 +160,9 @@ def test_v2_template_builds_curve_workbook_from_rheology_fixture(
 
     assert workbook.template_match.template_id == template.id
     assert workbook.parsed_sample_count == 1
+    assert "DataStudio_Metadata" not in workbook.sheet_names
     curves = load_curve_table(workbook.workbook_path, sheet_name="Representative_Curve")
+    assert curves[0].sample == "PA_240"
     assert curves[0].x_label == "ω"
     assert curves[0].y_label == "G'"
     assert curves[0].x_unit == r"rad$\cdot$s$^{-1}$"
@@ -192,6 +194,7 @@ def test_v2_template_builds_curve_only_workbook_when_comparison_disabled(
     )
 
     assert workbook.preferred_sheet == "All_Curves"
+    assert "DataStudio_Metadata" not in workbook.sheet_names
     assert "All_Curves" in workbook.sheet_names
     assert "Representative_Curve" not in workbook.sheet_names
     assert "All_Specimens" not in workbook.sheet_names
@@ -252,6 +255,7 @@ def test_v2_template_builds_metric_only_workbook(
 
     assert "Representative_Curve" not in workbook.sheet_names
     assert "Complex Viscosity_Replicates" in workbook.sheet_names
+    assert "DataStudio_Metadata" not in workbook.sheet_names
     replicate = load_replicate_table(workbook.workbook_path, sheet_name="Complex Viscosity_Replicates")[0]
     assert replicate.value_label == "|η*|"
     assert replicate.value_unit == r"mPa$\cdot$s"
@@ -317,6 +321,7 @@ def test_v2_template_builds_matrix_heatmap_workbook_with_disabled_compare_recipe
 
     assert workbook.preferred_sheet == "Heatmap"
     assert "Heatmap" in workbook.sheet_names
+    assert "DataStudio_Metadata" not in workbook.sheet_names
     recipes = comparison_recipes_for_workbooks([workbook.workbook_path])
     unsupported = {recipe.id: recipe for recipe in recipes if not recipe.supported}
     assert unsupported["representative_curve"].support_reason

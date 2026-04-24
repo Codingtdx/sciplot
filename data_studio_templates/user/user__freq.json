@@ -23,8 +23,7 @@
         "Frequency sweep 1",
         "Angular Frequency",
         "Storage Modulus",
-        "Loss Modulus",
-        "Complex Viscosity"
+        "Loss Modulus"
       ],
       "field_kinds": [
         "curve_x",
@@ -98,27 +97,13 @@
       "cell_value_contains": [],
       "unit_hint": "1",
       "optional": false
-    },
-    {
-      "id": "metric_complex_viscosity",
-      "role": "metric",
-      "label": "Complex Viscosity",
-      "sheet_name": "Sheet1",
-      "block_id": "Sheet1::segment1",
-      "column_name": "Complex Viscosity",
-      "column_index": null,
-      "row_label_contains": null,
-      "cell_value_contains": [],
-      "unit_hint": "mPa·s",
-      "optional": true
     }
   ],
-  "workbook_metric_ids": [
-    "Complex Viscosity"
-  ],
+  "workbook_metric_ids": [],
   "default_group_name_strategy": "common_prefix",
-  "preferred_sheet_name": "Representative_Curve",
+  "preferred_sheet_name": "All_Curves",
   "output_kind": "curve_metrics",
+  "comparison_enabled": false,
   "source_format": {
     "encoding": "utf-16",
     "delimiter": "\t",

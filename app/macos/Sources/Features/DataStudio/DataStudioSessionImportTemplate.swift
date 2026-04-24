@@ -74,6 +74,18 @@ extension DataStudioSession {
         if !templateDraftYColumnNames.isEmpty {
             items.append(.init(id: "y", title: "Y", value: templateDraftYColumnNames.joined(separator: ", ")))
         }
+        if !templateDraftSampleNameByYColumn.isEmpty {
+            let sampleValues = templateDraftYColumnNames.compactMap { column -> String? in
+                let value = templateDraftSampleNameByYColumn[column]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !value.isEmpty else {
+                    return nil
+                }
+                return value
+            }
+            if !sampleValues.isEmpty {
+                items.append(.init(id: "sample_names", title: "Sample Names", value: sampleValues.joined(separator: ", ")))
+            }
+        }
         if !templateDraftMetricColumnNames.isEmpty,
            templateDraftOutputKind == "metric_table"
            || templateDraftOutputKind == "matrix_heatmap"
@@ -441,9 +453,18 @@ extension DataStudioSession {
             if !templateDraftYColumnNames.contains(columnName) {
                 templateDraftYColumnNames.append(columnName)
             }
+            if templateDraftSampleNameByYColumn[columnName] == nil {
+                templateDraftSampleNameByYColumn[columnName] = defaultSampleNameDraftValue()
+            }
         } else {
             templateDraftYColumnNames.removeAll { $0 == columnName }
+            templateDraftSampleNameByYColumn.removeValue(forKey: columnName)
         }
+        templatePreview = nil
+    }
+
+    func setDraftSampleName(_ value: String, forYColumn columnName: String) {
+        templateDraftSampleNameByYColumn[columnName] = value
         templatePreview = nil
     }
 
@@ -526,6 +547,7 @@ extension DataStudioSession {
             }
             if refreshContext {
                 await rebuildComparisonContext(refreshWorkbookPreviews: true)
+                autoOpenFocusedWorkbookInPlotIfComparisonUnavailable()
             }
             resetImportPresentationState()
             discardPendingSourcePreview()
@@ -726,7 +748,17 @@ extension DataStudioSession {
             }
             bindings.append(fieldBinding(idPrefix: "x", role: "curve_x", label: xColumn, columnName: xColumn))
             for columnName in templateDraftYColumnNames {
-                bindings.append(fieldBinding(idPrefix: "y", role: "curve_y", label: columnName, columnName: columnName))
+                bindings.append(
+                    fieldBinding(
+                        idPrefix: "y",
+                        role: "curve_y",
+                        label: columnName,
+                        columnName: columnName,
+                        sampleName: templateDraftSampleNameByYColumn[columnName]?.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                    )
+                )
             }
             if templateDraftComparisonEnabled {
                 for columnName in templateDraftMetricColumnNames {
@@ -791,6 +823,7 @@ extension DataStudioSession {
         role: String,
         label: String,
         columnName: String,
+        sampleName: String? = nil,
         optional: Bool = false
     ) -> DataStudioTemplateFieldBindingResponse {
         DataStudioTemplateFieldBindingResponse(
@@ -804,8 +837,22 @@ extension DataStudioSession {
             rowLabelContains: nil,
             cellValueContains: [],
             unitHint: unitHint(for: columnName),
+            sampleName: {
+                let trimmed = sampleName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return trimmed.isEmpty ? nil : trimmed
+            }(),
             optional: optional
         )
+    }
+
+    private func defaultSampleNameDraftValue() -> String {
+        if let sourcePreview {
+            return URL(fileURLWithPath: sourcePreview.inputPath).deletingPathExtension().lastPathComponent
+        }
+        if let first = importedSourceURLs.first {
+            return first.deletingPathExtension().lastPathComponent
+        }
+        return "Sample"
     }
 
     private func unitHint(for columnName: String) -> String? {
@@ -833,6 +880,10 @@ extension DataStudioSession {
         if templateDraftYColumnNames.isEmpty {
             templateDraftYColumnNames = Array(availableNames.filter { $0 != xName }.prefix(1))
         }
+        let defaultSampleName = sampleURL.deletingPathExtension().lastPathComponent
+        templateDraftSampleNameByYColumn = Dictionary(
+            uniqueKeysWithValues: templateDraftYColumnNames.map { ($0, defaultSampleName) }
+        )
         templateDraftMetricColumnNames = Array(preview.candidateRoles.metric.prefix(4))
     }
 
@@ -947,6 +998,7 @@ extension DataStudioSession {
             )
             upsertWorkbook(workbook, shouldFocus: true)
             await rebuildComparisonContext(refreshWorkbookPreviews: true)
+            autoOpenFocusedWorkbookInPlotIfComparisonUnavailable()
             resetImportPresentationState()
             discardPendingSourcePreview()
         } catch {
@@ -997,6 +1049,7 @@ extension DataStudioSession {
         templateDraftXColumnName = nil
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []
+        templateDraftSampleNameByYColumn = [:]
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil
         selectedPreviewSegmentID = nil
@@ -1019,6 +1072,25 @@ extension DataStudioSession {
             return "DataStudio_Group"
         }
         return first.deletingPathExtension().lastPathComponent
+    }
+
+    private func autoOpenFocusedWorkbookInPlotIfComparisonUnavailable() {
+        guard comparisonSet != nil else {
+            return
+        }
+        guard selectedExportRecipeIDs.isEmpty else {
+            return
+        }
+        guard let focusedWorkbook else {
+            return
+        }
+        openInPlotHandler?(
+            focusedWorkbook.workbookURL,
+            .name(focusedWorkbook.response.preferredSheet),
+            nil,
+            nil,
+            nil
+        )
     }
 }
 

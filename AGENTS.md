@@ -71,7 +71,9 @@
 - Plot 检查与推荐统一走 `POST /inspect-file`。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`。不要把全量 workbook 表格塞回 inspect/session payload。
 - Data Studio 用户导入模板统一是 v2 no-code table mapping：`output_kind`、`source_format`、`segment_policy`、`segment_selectors`、`field_bindings`、`match_conditions` 是唯一模板结构；旧用户模板 parser 不保留，不要恢复 `POST /data-studio/source-preview` 或 `source_path + accepted_candidate_ids` 创建路径。
-- Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`DataStudio_Metadata + All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
+- Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
+- Data Studio `output_kind=curve_metrics` 导出的 workbook 不再写 `DataStudio_Metadata` sheet；样品名默认取源文件名（不拼 segment 文案），并允许在模板编辑页按曲线逐项确认/改名。
+- Data Studio 导入/建表完成后，如果 compare context 没有任何 `supported` recipe（即“无对比可做”），必须自动走既有 `Open in Plot` 链路切到 Plot，并以 focused workbook 的 `preferred_sheet` 作为打开 sheet。
 - Data Studio 未保存模板草稿必须先走 `POST /data-studio/template-preview` 做真实解析，返回 normalized output preview、missing required roles、segment 曲线/指标数量；`build-workbook` 只消费保存后的 v2 template id。
 - Data Studio 模板自动采用统一走 `POST /data-studio/template-recommendations`：resolver 只可按 ranked matches 自动预选第一项；当推荐为空时必须保持未选择状态并要求用户手动选择，禁止回退到 builtin/tensile 之类的“瞎猜默认”。
 - Data Studio workbook 输出允许多形态：曲线+指标、纯指标表、矩阵/heatmap；compare recipes 必须按 workbook shape 暴露可用 figure，unsupported 入口要禁用并解释。

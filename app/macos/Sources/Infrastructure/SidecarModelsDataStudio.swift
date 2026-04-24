@@ -197,7 +197,36 @@ struct DataStudioTemplateFieldBindingResponse: Codable, Equatable, Sendable {
     let rowLabelContains: String?
     let cellValueContains: [String]
     let unitHint: String?
+    let sampleName: String?
     let optional: Bool
+
+    init(
+        id: String,
+        role: String,
+        label: String,
+        sheetName: String? = nil,
+        blockID: String? = nil,
+        columnName: String? = nil,
+        columnIndex: Int? = nil,
+        rowLabelContains: String? = nil,
+        cellValueContains: [String] = [],
+        unitHint: String? = nil,
+        sampleName: String? = nil,
+        optional: Bool = false
+    ) {
+        self.id = id
+        self.role = role
+        self.label = label
+        self.sheetName = sheetName
+        self.blockID = blockID
+        self.columnName = columnName
+        self.columnIndex = columnIndex
+        self.rowLabelContains = rowLabelContains
+        self.cellValueContains = cellValueContains
+        self.unitHint = unitHint
+        self.sampleName = sampleName
+        self.optional = optional
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -210,6 +239,7 @@ struct DataStudioTemplateFieldBindingResponse: Codable, Equatable, Sendable {
         case rowLabelContains
         case cellValueContains
         case unitHint
+        case sampleName
         case optional
     }
 }

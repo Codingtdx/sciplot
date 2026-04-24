@@ -242,14 +242,6 @@ def build_workbook_from_template(
     representative_curve = curves[0] if curves and comparison_enabled else None
 
     with pd.ExcelWriter(workbook_path) as writer:
-        _metadata_dataframe(
-            label=label,
-            template=template,
-            source_files=paths,
-            warnings=warnings,
-            sample_count=len(parsed_files),
-            representative_filename=representative_curve.sample if representative_curve is not None else "",
-        ).to_excel(writer, sheet_name=tensile_builtin.METADATA_SHEET, header=False, index=False)
         if curves:
             _curve_table_dataframe(curves).to_excel(
                 writer,
@@ -463,7 +455,7 @@ def _parse_curve_segment(
             raise ValueError(f"Curve binding {y_binding.label!r} did not contain numeric X/Y data.")
         x_label = x_binding.label or _cell(frame, segment.header_row_index, x_column) or "X"
         y_label = y_binding.label or _cell(frame, segment.header_row_index, y_column) or "Y"
-        sample = f"{source_path.stem} {segment.label} {y_label}".strip()
+        sample = (y_binding.sample_name or "").strip() or source_path.stem
         curves.append(
             ParsedCurve(
                 sample=sample,
@@ -650,30 +642,6 @@ def _summary_dataframe(
     rows.append([])
     rows.append(["Specimens", len(summary_df.index), "", "", ""])
     return pd.DataFrame(rows)
-
-
-def _metadata_dataframe(
-    *,
-    label: str,
-    template: TemplateDefinition,
-    source_files: list[Path],
-    warnings: list[str],
-    sample_count: int,
-    representative_filename: str,
-) -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            ["label", label],
-            ["template_id", template.id],
-            ["template_version", template.version],
-            ["output_kind", template.output_kind],
-            ["comparison_enabled", "true" if template.comparison_enabled else "false"],
-            ["source_files", " | ".join(str(path) for path in source_files)],
-            ["warnings", " | ".join(warnings)],
-            ["sample_count", sample_count],
-            ["representative_filename", representative_filename],
-        ]
-    )
 
 
 def _infer_group_name(paths: list[Path]) -> str:
