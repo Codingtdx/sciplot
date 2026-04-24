@@ -342,6 +342,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                     if payload_options.text_annotations
                     else None
                 ),
+                shape_annotations=(
+                    [item.model_dump(mode="json") for item in payload_options.shape_annotations]
+                    if payload_options.shape_annotations
+                    else None
+                ),
             )
             try:
                 previews = rendered_plots_to_preview_payload(rendered_plots)
@@ -461,6 +466,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 text_annotations=(
                     [item.model_dump(mode="json") for item in payload_options.text_annotations]
                     if payload_options.text_annotations
+                    else None
+                ),
+                shape_annotations=(
+                    [item.model_dump(mode="json") for item in payload_options.shape_annotations]
+                    if payload_options.shape_annotations
                     else None
                 ),
             )

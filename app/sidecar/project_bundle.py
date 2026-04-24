@@ -22,6 +22,7 @@ from app.sidecar.schemas_render import (
     ReferenceGuidePayload,
     RenderOptionsPayload,
     SaveProjectResponse,
+    ShapeAnnotationPayload,
     TextAnnotationPayload,
 )
 from app.sidecar.server_utils import normalize_path, options_from_payload
@@ -189,6 +190,11 @@ def _normalize_render_options(
         text_annotations=(
             [TextAnnotationPayload.model_validate(item) for item in resolved_options.text_annotations]
             if resolved_options.text_annotations is not None
+            else None
+        ),
+        shape_annotations=(
+            [ShapeAnnotationPayload.model_validate(item) for item in resolved_options.shape_annotations]
+            if resolved_options.shape_annotations is not None
             else None
         ),
     )

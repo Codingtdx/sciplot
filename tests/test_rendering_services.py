@@ -626,6 +626,41 @@ def test_resolve_render_options_accepts_axis_break_payloads() -> None:
     assert options.y_axis_breaks[0]["display_mode"] == "compress"
 
 
+def test_resolve_render_options_accepts_shape_annotations_payloads() -> None:
+    options = resolve_render_options(
+        template="curve",
+        shape_annotations=[
+            {
+                "id": "focus-window",
+                "enabled": True,
+                "kind": "rectangle",
+                "x_start": 0.5,
+                "x_end": 1.5,
+                "y_start": 2.0,
+                "y_end": 3.0,
+                "label": "Window",
+            },
+            {
+                "id": "significance",
+                "enabled": True,
+                "kind": "bracket",
+                "bracket_orientation": "horizontal",
+                "x_start": 0.8,
+                "x_end": 1.4,
+                "y_start": 3.2,
+                "y_end": 3.2,
+                "label": "p < 0.05",
+            },
+        ],
+    )
+
+    assert options.shape_annotations is not None
+    assert options.shape_annotations[0]["kind"] == "rectangle"
+    assert options.shape_annotations[0]["label"] == "Window"
+    assert options.shape_annotations[1]["kind"] == "bracket"
+    assert options.shape_annotations[1]["bracket_orientation"] == "horizontal"
+
+
 def test_resolve_render_options_rejects_axis_breaks_on_log_axes_or_with_extra_axes() -> None:
     with pytest.raises(ValueError, match="linear X axes only"):
         resolve_render_options(
@@ -1297,6 +1332,59 @@ def test_text_annotations_overlay_can_place_multiple_labels_and_callouts(tmp_pat
         close_rendered_plots(rendered)
 
 
+def test_shape_annotations_overlay_regions_and_secondary_y_brackets(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        extra_y_axis={
+            "enabled": True,
+            "position": "right",
+            "title": "Half Stress",
+            "data_value": 2.0,
+            "display_value": 1.0,
+        },
+        shape_annotations=[
+            {
+                "id": "focus-window",
+                "enabled": True,
+                "kind": "rectangle",
+                "x_start": 0.5,
+                "x_end": 1.5,
+                "y_start": 2.0,
+                "y_end": 3.0,
+                "label": "Window",
+            },
+            {
+                "id": "secondary-bracket",
+                "enabled": True,
+                "kind": "bracket",
+                "bracket_orientation": "horizontal",
+                "x_start": 1.2,
+                "x_end": 2.6,
+                "y_start": 1.1,
+                "y_end": 1.1,
+                "y_axis_target": "y_secondary",
+                "label": "Half target",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "shape_annotation_overlay" in plot.qa_report.autofixes_applied
+        axes = _primary_and_secondary_axes(plot)
+        assert any(ax.patches for ax in axes)
+        assert {"Window", "Half target"} <= {
+            text.get_text()
+            for axis in axes
+            for text in axis.texts
+        }
+    finally:
+        close_rendered_plots(rendered)
+
+
 def test_text_annotation_rejects_non_positive_data_coordinate_on_log_axis(tmp_path: Path) -> None:
     input_path = _write_dense_curve_table(tmp_path / "curve.csv")
 
@@ -1651,6 +1739,64 @@ def test_axis_breaks_split_layout_reuses_guides_and_annotations(tmp_path: Path) 
         assert "Target" in visible_texts
         assert "Window" in visible_texts
         assert sum(len(axis.patches) for axis in plot.figure.axes) >= 2
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_shape_annotations_reuse_split_axis_panel_mapping(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        x_axis_breaks=[
+            {
+                "id": "x-gap",
+                "enabled": True,
+                "start": 0.8,
+                "end": 1.2,
+                "display_mode": "split",
+            }
+        ],
+        shape_annotations=[
+            {
+                "id": "focus-window",
+                "enabled": True,
+                "kind": "ellipse",
+                "x_start": 0.5,
+                "x_end": 1.8,
+                "y_start": 2.0,
+                "y_end": 3.2,
+                "label": "Window",
+            },
+            {
+                "id": "significance",
+                "enabled": True,
+                "kind": "bracket",
+                "bracket_orientation": "horizontal",
+                "x_start": 1.4,
+                "x_end": 2.4,
+                "y_start": 3.4,
+                "y_end": 3.4,
+                "label": "p < 0.05",
+            },
+        ],
+    )
+    try:
+        plot = rendered[0]
+        assert plot.qa_report is not None
+        assert "axis_break_overlay" in plot.qa_report.autofixes_applied
+        assert "shape_annotation_overlay" in plot.qa_report.autofixes_applied
+        assert len(plot.figure.axes) >= 2
+        assert sum(len(axis.patches) for axis in plot.figure.axes) >= 1
+        visible_texts = {
+            text.get_text()
+            for axis in plot.figure.axes
+            for text in axis.texts
+            if text.get_visible()
+        }
+        assert "Window" in visible_texts
+        assert "p < 0.05" in visible_texts
     finally:
         close_rendered_plots(rendered)
 

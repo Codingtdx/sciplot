@@ -1540,6 +1540,18 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
                 "vertical_alignment": "bottom",
             }
         ],
+        shape_annotations=[
+            {
+                "id": "focus-window",
+                "enabled": True,
+                "kind": "rectangle",
+                "x_start": 2.0,
+                "x_end": 7.5,
+                "y_start": 2.4,
+                "y_end": 3.3,
+                "label": "Window",
+            }
+        ],
     )
     try:
         plot = curve[0]
@@ -1550,9 +1562,11 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
                 passed=(
                     plot.qa_report is not None
                     and "axis_break_overlay" in plot.qa_report.autofixes_applied
+                    and "shape_annotation_overlay" in plot.qa_report.autofixes_applied
                     and ax.get_xlim()[1] < 10.0
                     and ax.get_ylim()[1] < 3.2
                     and any(text.get_text() == "Peak" for text in ax.texts)
+                    and any(text.get_text() == "Window" for text in ax.texts)
                 ),
                 details={
                     "template": "curve",
@@ -1593,6 +1607,29 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
                 "vertical_alignment": "bottom",
             }
         ],
+        shape_annotations=[
+            {
+                "id": "focus-window",
+                "enabled": True,
+                "kind": "ellipse",
+                "x_start": 2.0,
+                "x_end": 8.0,
+                "y_start": 2.4,
+                "y_end": 3.3,
+                "label": "Window",
+            },
+            {
+                "id": "significance",
+                "enabled": True,
+                "kind": "bracket",
+                "bracket_orientation": "horizontal",
+                "x_start": 6.5,
+                "x_end": 8.5,
+                "y_start": 3.35,
+                "y_end": 3.35,
+                "label": "p < 0.05",
+            }
+        ],
     )
     try:
         plot = split_curve[0]
@@ -1608,8 +1645,11 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
                 passed=(
                     plot.qa_report is not None
                     and "axis_break_split_layout" in plot.qa_report.autofixes_applied
+                    and "shape_annotation_overlay" in plot.qa_report.autofixes_applied
                     and len(plot.figure.axes) >= 2
                     and "Peak" in visible_texts
+                    and "Window" in visible_texts
+                    and "p < 0.05" in visible_texts
                 ),
                 details={
                     "template": "curve_split",

@@ -74,6 +74,7 @@
 - Plot 高级 broken axis 统一走 `render_options.x_axis_breaks / y_axis_breaks` 这条 typed payload 链路；preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 broken-axis 状态或重算坐标语义。当前支持 `display_mode=compress|split`：`compress` 是单图内压缩式 break overlay，`split` 是 joined multi-panel 布局；只允许在线性轴上启用，当前版本不能与 enabled `extra_x_axis / extra_y_axis` 共存，并且同一时刻只允许一个轴处于 active split 布局。
 - Plot 高级 guide overlay 统一走 `render_options.reference_guides` 这条 typed payload 链路；它是 DataGraph 风格的可堆叠 guide/region 命令层，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 reference guide 状态或重算 overlay 语义。
 - Plot 高级 text annotation overlay 统一走 `render_options.text_annotations` 这条 typed payload 链路；当前支持普通 note 与带 connector 的 callout，并允许绑定 `primary y / secondary y`，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 annotation 状态或重算坐标语义。
+- Plot 高级 shape annotation overlay 统一走 `render_options.shape_annotations` 这条 typed payload 链路；当前支持 `rectangle / ellipse / bracket`，并允许绑定 `primary y / secondary y`、复用 broken-axis panel/坐标映射，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 shape overlay 状态或重算几何语义。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -151,6 +152,7 @@
   - Plot inspector `Axis -> Advanced` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
   - Plot inspector `Advanced Plot` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
   - Plot inspector `Advanced Plot` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
+  - Plot inspector `Advanced Plot` 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`

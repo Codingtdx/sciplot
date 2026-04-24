@@ -512,6 +512,128 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     .padding(.top, 6)
                 }
             }
+
+            DisclosureGroup("Shape Annotations") {
+                HStack(spacing: 10) {
+                    Button("Add Rectangle") {
+                        session.addShapeAnnotation(kind: "rectangle")
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Add Ellipse") {
+                        session.addShapeAnnotation(kind: "ellipse")
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Add Bracket") {
+                        session.addShapeAnnotation(kind: "bracket")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .disabled(!session.shapeAnnotationAvailability.isEnabled)
+                .help(session.shapeAnnotationAvailability.reason ?? "Overlay regions and bracket callouts on the current figure.")
+
+                ForEach(session.shapeAnnotations) { annotation in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            Text(shapeAnnotationTitle(annotation))
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+
+                            Spacer(minLength: 12)
+
+                            Button("Remove") {
+                                session.removeShapeAnnotation(id: annotation.id)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        AdaptiveInspectorControlRow(title: "Visible") {
+                            Toggle("", isOn: shapeAnnotationEnabledBinding(id: annotation.id))
+                                .labelsHidden()
+                        }
+
+                        AdaptiveInspectorControlRow(title: "Kind") {
+                            Picker("", selection: shapeAnnotationKindBinding(id: annotation.id)) {
+                                Text("Rectangle").tag("rectangle")
+                                Text("Ellipse").tag("ellipse")
+                                Text("Bracket").tag("bracket")
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                        }
+
+                        AdaptiveInspectorControlRow(title: "Label") {
+                            TextField("Optional", text: shapeAnnotationLabelBinding(id: annotation.id))
+                                .textFieldStyle(.roundedBorder)
+                        }
+
+                        AdaptiveInspectorControlRow(title: "Y Axis") {
+                            Picker("", selection: shapeAnnotationYAxisTargetBinding(id: annotation.id)) {
+                                annotationYAxisOptions(currentValue: shapeAnnotation(annotation.id).yAxisTarget)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+
+                        if shapeAnnotation(annotation.id).kind == "bracket" {
+                            AdaptiveInspectorControlRow(title: "Direction") {
+                                Picker("", selection: shapeAnnotationBracketOrientationBinding(id: annotation.id)) {
+                                    Text("Horizontal").tag("horizontal")
+                                    Text("Vertical").tag("vertical")
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.segmented)
+                            }
+
+                            if shapeAnnotation(annotation.id).bracketOrientation == "horizontal" {
+                                axisRangeRow(
+                                    title: "Span X",
+                                    lowerTitle: "From",
+                                    upperTitle: "To",
+                                    lowerBinding: shapeAnnotationXStartBinding(id: annotation.id),
+                                    upperBinding: shapeAnnotationXEndBinding(id: annotation.id)
+                                )
+
+                                AdaptiveInspectorControlRow(title: "Anchor Y") {
+                                    TextField("Y", text: shapeAnnotationYStartBinding(id: annotation.id))
+                                        .textFieldStyle(.roundedBorder)
+                                }
+                            } else {
+                                axisRangeRow(
+                                    title: "Span Y",
+                                    lowerTitle: "From",
+                                    upperTitle: "To",
+                                    lowerBinding: shapeAnnotationYStartBinding(id: annotation.id),
+                                    upperBinding: shapeAnnotationYEndBinding(id: annotation.id)
+                                )
+
+                                AdaptiveInspectorControlRow(title: "Anchor X") {
+                                    TextField("X", text: shapeAnnotationXStartBinding(id: annotation.id))
+                                        .textFieldStyle(.roundedBorder)
+                                }
+                            }
+                        } else {
+                            axisRangeRow(
+                                title: "X range",
+                                lowerTitle: "Start",
+                                upperTitle: "End",
+                                lowerBinding: shapeAnnotationXStartBinding(id: annotation.id),
+                                upperBinding: shapeAnnotationXEndBinding(id: annotation.id)
+                            )
+
+                            axisRangeRow(
+                                title: "Y range",
+                                lowerTitle: "Start",
+                                upperTitle: "End",
+                                lowerBinding: shapeAnnotationYStartBinding(id: annotation.id),
+                                upperBinding: shapeAnnotationYEndBinding(id: annotation.id)
+                            )
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+            }
         }
     }
 
@@ -692,6 +814,112 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             get: { referenceGuide(id).label ?? "" },
             set: { label in
                 session.updateReferenceGuide(id: id, policy: .debounced) { $0.label = label.isEmpty ? nil : label }
+            }
+        )
+    }
+
+    private func shapeAnnotation(_ id: String) -> ShapeAnnotationPayload {
+        session.shapeAnnotations.first(where: { $0.id == id }) ?? ShapeAnnotationPayload(id: id)
+    }
+
+    private func shapeAnnotationTitle(_ annotation: ShapeAnnotationPayload) -> String {
+        let label = annotation.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !label.isEmpty {
+            return label
+        }
+        switch annotation.kind {
+        case "ellipse":
+            return "Ellipse"
+        case "bracket":
+            return "Bracket"
+        default:
+            return "Rectangle"
+        }
+    }
+
+    private func shapeAnnotationEnabledBinding(id: String) -> Binding<Bool> {
+        boolBinding(
+            get: { shapeAnnotation(id).enabled },
+            set: { enabled in
+                session.updateShapeAnnotation(id: id) { $0.enabled = enabled }
+            }
+        )
+    }
+
+    private func shapeAnnotationKindBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { shapeAnnotation(id).kind },
+            set: { kind in
+                session.updateShapeAnnotation(id: id) { annotation in
+                    annotation.kind = kind
+                    if kind == "bracket" {
+                        annotation.bracketOrientation = "horizontal"
+                        annotation.yEnd = annotation.yStart
+                    }
+                }
+            }
+        )
+    }
+
+    private func shapeAnnotationBracketOrientationBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { shapeAnnotation(id).bracketOrientation },
+            set: { value in
+                session.updateShapeAnnotation(id: id) { $0.bracketOrientation = value }
+            }
+        )
+    }
+
+    private func shapeAnnotationLabelBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { shapeAnnotation(id).label ?? "" },
+            set: { value in
+                session.updateShapeAnnotation(id: id, policy: .debounced) { $0.label = value.isEmpty ? nil : value }
+            }
+        )
+    }
+
+    private func shapeAnnotationYAxisTargetBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { shapeAnnotation(id).yAxisTarget },
+            set: { value in
+                session.updateShapeAnnotation(id: id) { $0.yAxisTarget = value }
+            }
+        )
+    }
+
+    private func shapeAnnotationXStartBinding(id: String) -> Binding<String> {
+        numericValueBinding(
+            get: { shapeAnnotation(id).xStart },
+            set: { value in
+                session.updateShapeAnnotation(id: id, policy: .debounced) { $0.xStart = value }
+            }
+        )
+    }
+
+    private func shapeAnnotationXEndBinding(id: String) -> Binding<String> {
+        numericValueBinding(
+            get: { shapeAnnotation(id).xEnd },
+            set: { value in
+                session.updateShapeAnnotation(id: id, policy: .debounced) { $0.xEnd = value }
+            }
+        )
+    }
+
+    private func shapeAnnotationYStartBinding(id: String) -> Binding<String> {
+        numericValueBinding(
+            get: { shapeAnnotation(id).yStart },
+            set: { value in
+                session.updateShapeAnnotation(id: id, policy: .debounced) { $0.yStart = value }
+            }
+        )
+    }
+
+    private func shapeAnnotationYEndBinding(id: String) -> Binding<String> {
+        numericValueBinding(
+            get: { shapeAnnotation(id).yEnd },
+            set: { value in
+                session.updateShapeAnnotation(id: id, policy: .debounced) { $0.yEnd = value }
             }
         )
     }

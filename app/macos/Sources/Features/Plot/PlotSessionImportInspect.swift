@@ -347,6 +347,48 @@ extension PlotSession {
         }
     }
 
+    func addShapeAnnotation(kind: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.shapeAnnotations ?? []
+            annotations.append(
+                ShapeAnnotationPayload(
+                    kind: kind,
+                    bracketOrientation: kind == "bracket" ? "horizontal" : "horizontal",
+                    xStart: 0.2,
+                    xEnd: 0.8,
+                    yStart: kind == "bracket" ? 0.75 : 0.2,
+                    yEnd: kind == "bracket" ? 0.75 : 0.8
+                )
+            )
+            options.shapeAnnotations = annotations
+        }
+    }
+
+    func updateShapeAnnotation(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout ShapeAnnotationPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var annotations = options.shapeAnnotations ?? []
+            guard let index = annotations.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var annotation = annotations[index]
+            mutate(&annotation)
+            annotations[index] = annotation
+            options.shapeAnnotations = annotations
+        }
+    }
+
+    func removeShapeAnnotation(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.shapeAnnotations ?? []
+            annotations.removeAll { $0.id == id }
+            options.shapeAnnotations = annotations.isEmpty ? nil : annotations
+        }
+    }
+
     func cancelInspectionTask() {
         asyncCoordination.inspection.cancel()
     }

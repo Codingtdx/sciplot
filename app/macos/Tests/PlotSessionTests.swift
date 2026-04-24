@@ -214,6 +214,20 @@ final class PlotSessionTests: XCTestCase {
                         targetY: 2.0,
                         targetYAxisTarget: "y_primary"
                     )
+                ],
+                shapeAnnotations: [
+                    ShapeAnnotationPayload(
+                        id: "focus-window",
+                        enabled: true,
+                        kind: "rectangle",
+                        bracketOrientation: "horizontal",
+                        xStart: 0.5,
+                        xEnd: 1.5,
+                        yStart: 2.0,
+                        yEnd: 3.0,
+                        yAxisTarget: "y_primary",
+                        label: "Window"
+                    )
                 ]
             )
         )
@@ -301,6 +315,7 @@ final class PlotSessionTests: XCTestCase {
         )
         XCTAssertEqual(session.renderOptions.textAnnotations?.first?.text, "Peak")
         XCTAssertEqual(session.renderOptions.textAnnotations?.first?.coordinateSpace, "data")
+        XCTAssertEqual(session.renderOptions.shapeAnnotations?.first?.label, "Window")
         XCTAssertEqual(session.fitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
         XCTAssertFalse(session.isProjectDirty)
     }

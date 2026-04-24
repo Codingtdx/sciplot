@@ -32,6 +32,19 @@ class TextAnnotationPayload(StrictModel):
     target_y_axis_target: str = "y_primary"
 
 
+class ShapeAnnotationPayload(StrictModel):
+    id: str
+    enabled: bool = True
+    kind: str = "rectangle"
+    bracket_orientation: str = "horizontal"
+    x_start: float = 0.0
+    x_end: float = 1.0
+    y_start: float = 0.0
+    y_end: float = 1.0
+    y_axis_target: str = "y_primary"
+    label: str | None = None
+
+
 class ReferenceGuidePayload(StrictModel):
     id: str
     enabled: bool = True
@@ -90,6 +103,7 @@ class RenderOptionsPayload(StrictModel):
     y_axis_breaks: list[AxisBreakPayload] | None = None
     reference_guides: list[ReferenceGuidePayload] | None = None
     text_annotations: list[TextAnnotationPayload] | None = None
+    shape_annotations: list[ShapeAnnotationPayload] | None = None
 
     @model_validator(mode="before")
     @classmethod

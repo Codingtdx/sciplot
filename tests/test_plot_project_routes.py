@@ -98,6 +98,20 @@ def _project_payload(source_path: Path) -> dict[str, object]:
                         "target_y_axis_target": "y_primary",
                     }
                 ],
+                "shape_annotations": [
+                    {
+                        "id": "focus-window",
+                        "enabled": True,
+                        "kind": "rectangle",
+                        "bracket_orientation": "horizontal",
+                        "x_start": 0.5,
+                        "x_end": 1.5,
+                        "y_start": 2.2,
+                        "y_end": 3.4,
+                        "y_axis_target": "y_primary",
+                        "label": "Window",
+                    }
+                ],
             },
             "fit_options": {
                 "enabled": True,
@@ -249,6 +263,20 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
             "target_x": 1.0,
             "target_y": 2.8,
             "target_y_axis_target": "y_primary",
+        }
+    ]
+    assert payload["payload"]["plot"]["render_options"]["shape_annotations"] == [
+        {
+            "id": "focus-window",
+            "enabled": True,
+            "kind": "rectangle",
+            "bracket_orientation": "horizontal",
+            "x_start": 0.5,
+            "x_end": 1.5,
+            "y_start": 2.2,
+            "y_end": 3.4,
+            "y_axis_target": "y_primary",
+            "label": "Window",
         }
     ]
     assert payload["payload"]["plot"]["fit_options"]["enabled"] is True

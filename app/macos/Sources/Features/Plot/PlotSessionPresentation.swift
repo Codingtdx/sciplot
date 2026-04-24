@@ -78,6 +78,19 @@ extension PlotSession {
         return .enabled()
     }
 
+    var shapeAnnotationAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding shape annotations.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding shape annotations.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Shape annotations become available after inspect finishes.")
+        }
+        return .enabled()
+    }
+
     var extraXAxisAvailability: ActionAvailability {
         extraAxisAvailability(optionID: "extra_x_axis", axisLabel: "X")
     }
@@ -470,6 +483,10 @@ extension PlotSession {
 
     var referenceGuides: [ReferenceGuidePayload] {
         renderOptions.referenceGuides ?? []
+    }
+
+    var shapeAnnotations: [ShapeAnnotationPayload] {
+        renderOptions.shapeAnnotations ?? []
     }
 
     var xAxisBreaks: [AxisBreakPayload] {

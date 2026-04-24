@@ -175,7 +175,7 @@ struct AxisBreakPayload: Codable, Equatable, Sendable, Identifiable {
         case enabled
         case start
         case end
-        case displayMode = "display_mode"
+        case displayMode
     }
 
     init(from decoder: Decoder) throws {
@@ -272,6 +272,70 @@ struct TextAnnotationPayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct ShapeAnnotationPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var kind: String
+    var bracketOrientation: String
+    var xStart: Double
+    var xEnd: Double
+    var yStart: Double
+    var yEnd: Double
+    var yAxisTarget: String
+    var label: String?
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        kind: String = "rectangle",
+        bracketOrientation: String = "horizontal",
+        xStart: Double = 0.0,
+        xEnd: Double = 1.0,
+        yStart: Double = 0.0,
+        yEnd: Double = 1.0,
+        yAxisTarget: String = "y_primary",
+        label: String? = nil
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.kind = kind
+        self.bracketOrientation = bracketOrientation
+        self.xStart = xStart
+        self.xEnd = xEnd
+        self.yStart = yStart
+        self.yEnd = yEnd
+        self.yAxisTarget = yAxisTarget
+        self.label = label
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case enabled
+        case kind
+        case bracketOrientation
+        case xStart
+        case xEnd
+        case yStart
+        case yEnd
+        case yAxisTarget
+        case label
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? "rectangle"
+        bracketOrientation = try container.decodeIfPresent(String.self, forKey: .bracketOrientation) ?? "horizontal"
+        xStart = try container.decodeIfPresent(Double.self, forKey: .xStart) ?? 0.0
+        xEnd = try container.decodeIfPresent(Double.self, forKey: .xEnd) ?? 1.0
+        yStart = try container.decodeIfPresent(Double.self, forKey: .yStart) ?? 0.0
+        yEnd = try container.decodeIfPresent(Double.self, forKey: .yEnd) ?? 1.0
+        yAxisTarget = try container.decodeIfPresent(String.self, forKey: .yAxisTarget) ?? "y_primary"
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+    }
+}
+
 struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var size: String?
     var xscale: String?
@@ -300,6 +364,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var yAxisBreaks: [AxisBreakPayload]?
     var referenceGuides: [ReferenceGuidePayload]?
     var textAnnotations: [TextAnnotationPayload]?
+    var shapeAnnotations: [ShapeAnnotationPayload]?
 
     init(
         size: String? = nil,
@@ -328,7 +393,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         xAxisBreaks: [AxisBreakPayload]? = nil,
         yAxisBreaks: [AxisBreakPayload]? = nil,
         referenceGuides: [ReferenceGuidePayload]? = nil,
-        textAnnotations: [TextAnnotationPayload]? = nil
+        textAnnotations: [TextAnnotationPayload]? = nil,
+        shapeAnnotations: [ShapeAnnotationPayload]? = nil
     ) {
         self.size = size
         self.xscale = xscale
@@ -357,6 +423,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.yAxisBreaks = yAxisBreaks
         self.referenceGuides = referenceGuides
         self.textAnnotations = textAnnotations
+        self.shapeAnnotations = shapeAnnotations
     }
 
     enum CodingKeys: String, CodingKey {
@@ -389,6 +456,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case referenceLine
         case referenceBand
         case textAnnotations
+        case shapeAnnotations
     }
 
     init(from decoder: Decoder) throws {
@@ -450,6 +518,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
             referenceGuides = legacyGuides.isEmpty ? nil : legacyGuides
         }
         textAnnotations = try container.decodeIfPresent([TextAnnotationPayload].self, forKey: .textAnnotations)
+        shapeAnnotations = try container.decodeIfPresent([ShapeAnnotationPayload].self, forKey: .shapeAnnotations)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -481,6 +550,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(yAxisBreaks, forKey: .yAxisBreaks)
         try container.encodeIfPresent(referenceGuides, forKey: .referenceGuides)
         try container.encodeIfPresent(textAnnotations, forKey: .textAnnotations)
+        try container.encodeIfPresent(shapeAnnotations, forKey: .shapeAnnotations)
     }
 }
 

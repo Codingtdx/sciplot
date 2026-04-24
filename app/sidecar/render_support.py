@@ -72,6 +72,11 @@ def options_from_payload(
             if payload.text_annotations
             else None
         ),
+        shape_annotations=(
+            [item.model_dump(mode="json") for item in payload.shape_annotations]
+            if payload.shape_annotations
+            else None
+        ),
         resolved_template_id=resolved_template,
     )
 

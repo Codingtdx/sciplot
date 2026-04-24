@@ -46,6 +46,7 @@ class RenderOptions:
     y_axis_breaks: tuple[Mapping[str, Any], ...] | None = None
     reference_guides: tuple[Mapping[str, Any], ...] | None = None
     text_annotations: tuple[Mapping[str, Any], ...] | None = None
+    shape_annotations: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True)

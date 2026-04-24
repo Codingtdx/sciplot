@@ -3071,3 +3071,87 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)
   - `git diff --check`: passed
+
+### 2026-04-24 (Round AZ): DataGraph-inspired shape annotations as durable region/bracket overlays
+
+- Scope:
+  - Added a new durable advanced-plot overlay layer in:
+    - `/Users/dongxutian/Documents/codegod/src/rendering/shape_annotations.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+    - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+    so Plot now supports typed `shape_annotations` instead of ad hoc local drawing state.
+  - Wired sidecar schema and project round-trip in:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+    so `shape_annotations` flow through preview, export, and `.sciplotgod` save/open on the same typed render-options path as fit overlays, extra axes, broken axes, guides, and text annotations.
+  - Updated macOS durable editing in:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    so Plot inspector `Advanced Plot` now exposes `Shape Annotations` as durable UI state rather than view-local overlays.
+  - Extended regression coverage and docs in:
+    - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    so the new DataGraph-inspired capability is covered across Python rendering, Swift decoding, project persistence, smoke guardrails, and handoff docs.
+- User-visible impact:
+  - Plot inspector `Advanced Plot` now includes `Shape Annotations` with `Rectangle`, `Ellipse`, and `Bracket`.
+  - These overlays survive preview refreshes, export, undo/redo, and `.sciplotgod` save/open because they travel through durable `render_options.shape_annotations`.
+  - Shape annotations reuse the same broken-axis and split-panel coordinate mapping as existing guides/annotations, and can target `primary y` or `secondary y`.
+  - Recommendation-first template selection, style/theme/palette defaults, and frozen `nature` metrics remain unchanged; shape annotations ship strictly as an advanced refinement layer.
+- Risks:
+  - This is intentionally not a generic free-form command engine. The current payload only supports `rectangle / ellipse / bracket`, one optional label, and bounded axis-aware geometry.
+  - Shape annotations are Plot-only in this round. If Data Studio or Composer later need similar overlays, they should reuse this typed payload instead of forking a second overlay model.
+  - Brackets are axis-aligned overlays, not arbitrary rotated or bezier callouts. Future requests for richer authoring should extend the same typed layer carefully rather than bypassing it in Swift.
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/src/rendering/shape_annotations.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/models.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/options.py`
+  - `/Users/dongxutian/Documents/codegod/src/rendering/render_service.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/render_support.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/project_bundle.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_rendering_services.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+- Decision:
+  - First-principles motivation: DataGraph’s useful lesson here was not “copy the whole app,” but to make visual refinement tools durable, typed, and replayable underneath the primary quick-plot workflow. `Region` and `Bracket` were the highest-value next borrow that fit our current architecture.
+  - Chose typed `shape_annotations` over a generic advanced-command interpreter:
+    - accepted because it keeps preview/export/project persistence on one explicit schema path and preserves backend ownership of geometry semantics
+    - rejected a free-form command stack because it would immediately weaken recommendation authority, expand persistence complexity, and reopen GUI-local business logic drift
+  - Chose to reuse the existing broken-axis and secondary-Y mapping seams:
+    - accepted because it keeps all advanced overlays aligned when axis transforms are active
+    - rejected view-local drawing or duplicate transform helpers because that would cause the same figure state to render differently across preview/export/project reopen
+  - Boundary:
+    - no change to frozen `nature` typography, line width, spacing, axis frame, or export metrics
+    - no second recommendation engine
+    - no new front-end-local geometry constants
+- Troubleshooting note:
+  - When Swift payload types are decoded with `.convertFromSnakeCase`, hand-written snake_case `CodingKeys` can silently defeat the decoder and make values fall back to defaults.
+  - The concrete symptom here was `AxisBreakPayload.displayMode` decoding to `"compress"` even when the JSON fixture said `"split"`, which made `SchemaDecodingTests` look like a rendering regression instead of a key-mapping bug.
+  - The durable fix was to keep `CodingKeys` in camelCase for `AxisBreakPayload` and `ShapeAnnotationPayload`, then verify with focused `SchemaDecodingTests` before rerunning the full suite.
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/PlotSessionTests`: passed (`42 tests`)
+  - `.venv/bin/python -m pytest tests/test_rendering_services.py tests/test_plot_project_routes.py -q`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed (`Success: no issues found in 41 source files`)
+  - `.venv/bin/python -m pytest tests`: passed (`216 passed, 5 warnings`)
+  - `.venv/bin/python scripts/smoke_check.py`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`158 tests`)

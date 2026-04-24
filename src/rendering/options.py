@@ -15,6 +15,7 @@ from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HI
 from src.rendering.extra_axes import normalize_extra_axis_payload
 from src.rendering.models import RenderOptions
 from src.rendering.reference_guides import normalize_reference_guides_payload
+from src.rendering.shape_annotations import normalize_shape_annotations_payload
 from src.rendering.template_lifecycle import is_supported_template_id, resolve_template_id
 from src.rendering.text_annotations import normalize_text_annotations_payload
 from src.rendering.themes import visual_theme_ids
@@ -174,6 +175,7 @@ def resolve_render_options(
     reference_line: object | None = None,
     reference_band: object | None = None,
     text_annotations: object | None = None,
+    shape_annotations: object | None = None,
     resolved_template_id: str | None = None,
 ) -> RenderOptions:
     contract_template = resolved_template_id or resolve_template_id(template)
@@ -318,6 +320,7 @@ def resolve_render_options(
             legacy_band=reference_band,
         ),
         text_annotations=normalize_text_annotations_payload(text_annotations),
+        shape_annotations=normalize_shape_annotations_payload(shape_annotations),
     )
 
 

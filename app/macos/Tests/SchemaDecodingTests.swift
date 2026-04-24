@@ -206,6 +206,20 @@ final class SchemaDecodingTests: XCTestCase {
                 "target_y": 1.8,
                 "target_y_axis_target": "y_primary"
               }
+            ],
+            "shape_annotations": [
+              {
+                "id": "focus-window",
+                "enabled": true,
+                "kind": "rectangle",
+                "bracket_orientation": "horizontal",
+                "x_start": 0.5,
+                "x_end": 1.5,
+                "y_start": 1.8,
+                "y_end": 2.6,
+                "y_axis_target": "y_primary",
+                "label": "Window"
+              }
             ]
           },
           "fit_options": {
@@ -234,6 +248,8 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(request.options.referenceGuides?.first?.axisTarget, "y_primary")
         XCTAssertEqual(request.options.textAnnotations?.first?.displayStyle, "callout")
         XCTAssertEqual(request.options.textAnnotations?.first?.connectorEnabled, true)
+        XCTAssertEqual(request.options.shapeAnnotations?.first?.kind, "rectangle")
+        XCTAssertEqual(request.options.shapeAnnotations?.first?.label, "Window")
     }
 
     func testDecodePlotContractSizePresetsWithoutIDField() throws {
