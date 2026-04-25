@@ -12,6 +12,12 @@ from src.rendering.render_curve import (
     _render_stacked_curve,
     _render_step_line,
 )
+from src.rendering.render_datagraph import (
+    _render_contour_field,
+    _render_function_curve,
+    _render_polar_curve,
+    _render_table_figure,
+)
 from src.rendering.render_heatmap import _render_annotated_heatmap, _render_heatmap
 from src.rendering.render_stats import (
     _render_bar,
@@ -27,6 +33,7 @@ from src.rendering.render_stats import (
 
 TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "curve": TemplateRenderer(render=_render_curve),
+    "function_curve": TemplateRenderer(render=_render_function_curve),
     "point_line": TemplateRenderer(render=_render_point_line),
     "area_curve": TemplateRenderer(render=_render_area_curve),
     "step_line": TemplateRenderer(render=_render_step_line),
@@ -48,4 +55,7 @@ TEMPLATE_RENDERERS: dict[TemplateName, TemplateRenderer] = {
     "mean_band": TemplateRenderer(render=_render_mean_band),
     "heatmap": TemplateRenderer(render=_render_heatmap),
     "annotated_heatmap": TemplateRenderer(render=_render_annotated_heatmap),
+    "contour_field": TemplateRenderer(render=_render_contour_field),
+    "polar_curve": TemplateRenderer(render=_render_polar_curve),
+    "table_figure": TemplateRenderer(render=_render_table_figure),
 }

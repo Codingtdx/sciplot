@@ -40,6 +40,10 @@ class PlotContractTests(unittest.TestCase):
         self.assertIn("step_line", contract.templates)
         self.assertIn("stacked_area", contract.templates)
         self.assertIn("density_area", contract.templates)
+        self.assertIn("function_curve", contract.templates)
+        self.assertIn("contour_field", contract.templates)
+        self.assertIn("polar_curve", contract.templates)
+        self.assertIn("table_figure", contract.templates)
         self.assertEqual(
             {item["id"] for item in meta["templates"]},
             set(contract.templates.keys()),
@@ -129,6 +133,9 @@ class PlotContractTests(unittest.TestCase):
         self.assertNotIn("extra_y_axis", box_options)
         self.assertNotIn("x_axis_breaks", box_options)
         self.assertNotIn("y_axis_breaks", box_options)
+
+        function_options = set(contract.templates["function_curve"].editable_options)
+        self.assertIn("analytical_layers", function_options)
 
 
 if __name__ == "__main__":

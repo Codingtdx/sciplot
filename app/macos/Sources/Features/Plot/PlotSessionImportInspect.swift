@@ -402,6 +402,46 @@ extension PlotSession {
         }
     }
 
+    func addAnalyticalFunctionLayer() {
+        updateRenderOptions(policy: .immediate) { options in
+            var layers = options.analyticalLayers ?? []
+            let layer = AnalyticalLayerPayload(
+                expression: "sin(x)",
+                xStart: 0.0,
+                xEnd: 1.0,
+                sampleCount: 200,
+                label: "Function"
+            )
+            layers.append(layer)
+            options.analyticalLayers = layers
+        }
+    }
+
+    func updateAnalyticalLayer(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .debounced,
+        mutate: (inout AnalyticalLayerPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var layers = options.analyticalLayers ?? []
+            guard let index = layers.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var layer = layers[index]
+            mutate(&layer)
+            layers[index] = layer
+            options.analyticalLayers = layers
+        }
+    }
+
+    func removeAnalyticalLayer(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var layers = options.analyticalLayers ?? []
+            layers.removeAll { $0.id == id }
+            options.analyticalLayers = layers.isEmpty ? nil : layers
+        }
+    }
+
     func selectReferenceGuide(id: String?) {
         selectedReferenceGuideID = selectedReferenceGuideID == id ? nil : id
     }

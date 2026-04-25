@@ -45,6 +45,18 @@ class ShapeAnnotationPayload(StrictModel):
     label: str | None = None
 
 
+class AnalyticalLayerPayload(StrictModel):
+    id: str
+    enabled: bool = True
+    kind: str = "function"
+    expression: str
+    x_start: float = 0.0
+    x_end: float = 1.0
+    sample_count: int = 200
+    y_axis_target: str = "y_primary"
+    label: str | None = None
+
+
 class ReferenceGuidePayload(StrictModel):
     id: str
     enabled: bool = True
@@ -104,6 +116,7 @@ class RenderOptionsPayload(StrictModel):
     reference_guides: list[ReferenceGuidePayload] | None = None
     text_annotations: list[TextAnnotationPayload] | None = None
     shape_annotations: list[ShapeAnnotationPayload] | None = None
+    analytical_layers: list[AnalyticalLayerPayload] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -389,6 +402,7 @@ class RenderPreviewResponse(StrictModel):
     lifecycle_policy: str
     implementation_id: str
     sheet: str | int
+    preview: PreviewItemResponse | None = None
     previews: list[PreviewItemResponse]
     submission_report: SubmissionReportResponse | None = None
 
@@ -543,6 +557,7 @@ __all__ = [
     "PreflightRenderResponse",
     "PreflightResultResponse",
     "ProjectBundlePayload",
+    "AnalyticalLayerPayload",
     "ReferenceGuidePayload",
     "ReferenceBandPayload",
     "ReferenceLinePayload",

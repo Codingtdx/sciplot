@@ -412,6 +412,8 @@ def preview_output_filenames(
         return (f"{input_path.stem}_point_line.pdf",)
     if template == "curve":
         return (f"{input_path.stem}_curve.pdf",)
+    if template == "function_curve":
+        return (f"{input_path.stem}_function_curve.pdf",)
     if template == "area_curve":
         return (f"{input_path.stem}_area_curve.pdf",)
     if template == "step_line":
@@ -434,6 +436,12 @@ def preview_output_filenames(
         return (f"{input_path.stem}_heatmap.pdf",)
     if template == "annotated_heatmap":
         return (f"{input_path.stem}_annotated_heatmap.pdf",)
+    if template == "contour_field":
+        return (f"{input_path.stem}_contour_field.pdf",)
+    if template == "polar_curve":
+        return (f"{input_path.stem}_polar_curve.pdf",)
+    if template == "table_figure":
+        return (f"{input_path.stem}_table_figure.pdf",)
     if template in {"bar", "box", "box_strip", "violin", "violin_box"}:
         groups = load_replicate_table_cached(input_path, sheet)
         slug = predict_bar_box_slug(groups)

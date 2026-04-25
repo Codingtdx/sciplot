@@ -449,6 +449,57 @@ final class PlotSessionTests: XCTestCase {
         )
     }
 
+    func testAnalyticalFunctionLayerEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addAnalyticalFunctionLayer()
+        guard let layerID = session.renderOptions.analyticalLayers?.first?.id else {
+            XCTFail("Expected an analytical function layer to be created.")
+            return
+        }
+        session.updateAnalyticalLayer(id: layerID, policy: .immediate) {
+            $0.expression = "sin(x) + 1"
+            $0.xStart = 0.0
+            $0.xEnd = 3.0
+            $0.sampleCount = 120
+            $0.yAxisTarget = "y_primary"
+            $0.label = "Model"
+        }
+        await waitUntil(
+            {
+                client.renderRequests.last?.options.analyticalLayers?.first?.expression == "sin(x) + 1"
+            },
+            timeout: 2.0
+        )
+
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/functions.sciplotgod"))
+        XCTAssertEqual(
+            client.saveProjectRequests.last?.payload.plot?.renderOptions.analyticalLayers,
+            [
+                AnalyticalLayerPayload(
+                    id: layerID,
+                    enabled: true,
+                    kind: "function",
+                    expression: "sin(x) + 1",
+                    xStart: 0.0,
+                    xEnd: 3.0,
+                    sampleCount: 120,
+                    yAxisTarget: "y_primary",
+                    label: "Model"
+                )
+            ]
+        )
+    }
+
     func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

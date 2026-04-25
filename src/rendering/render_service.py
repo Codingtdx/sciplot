@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from src import plot_style
 from src.plot_style import save_pdf
+from src.rendering.analytical_layers import apply_analytical_layers
 from src.rendering.axis_breaks import apply_axis_breaks
 from src.rendering.extra_axes import apply_extra_axes
 from src.rendering.fit_analysis import fit_options_from_payload
@@ -64,8 +65,11 @@ def build_rendered_plots_from_options(
         apply_text_annotations(
             apply_shape_annotations(
                 apply_reference_guides(
-                    apply_extra_axes(
-                        apply_axis_breaks(rendered, options=options),
+                    apply_analytical_layers(
+                        apply_extra_axes(
+                            apply_axis_breaks(rendered, options=options),
+                            options=options,
+                        ),
                         options=options,
                     ),
                     options=options,
@@ -114,6 +118,7 @@ def build_rendered_plots(
     reference_band: dict[str, object] | None = None,
     text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     shape_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    analytical_layers: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[RenderedPlot]:
     requested_template = validate_template_name(template)
     resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
@@ -149,6 +154,7 @@ def build_rendered_plots(
         reference_band=reference_band,
         text_annotations=text_annotations,
         shape_annotations=shape_annotations,
+        analytical_layers=analytical_layers,
         resolved_template_id=resolved_template,
     )
     options = replace(
@@ -201,6 +207,7 @@ def render_template(
     reference_band: dict[str, object] | None = None,
     text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     shape_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    analytical_layers: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
         template,
@@ -237,6 +244,7 @@ def render_template(
         reference_band=reference_band,
         text_annotations=text_annotations,
         shape_annotations=shape_annotations,
+        analytical_layers=analytical_layers,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
 

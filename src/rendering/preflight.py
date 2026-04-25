@@ -7,6 +7,7 @@ from src.rendering.cache import (
     load_curve_table_cached,
     load_heatmap_table_cached,
     load_replicate_table_cached,
+    read_raw_table_cached,
 )
 from src.rendering.common import (
     aligned_replicate_band,
@@ -30,7 +31,7 @@ from src.submission import build_render_submission_report
 _FIT_SCATTER_TEMPLATES = set(template_family_ids("scatter_fit"))
 _BUBBLE_SCATTER_TEMPLATES = set(template_family_ids("bubble_scatter"))
 _MEAN_BAND_TEMPLATES = set(template_family_ids("mean_band"))
-_STANDARD_CURVE_TEMPLATES = {"point_line", "curve", "area_curve", "step_line"}
+_STANDARD_CURVE_TEMPLATES = {"point_line", "curve", "area_curve", "step_line", "function_curve"}
 
 
 def preflight_render_request(
@@ -209,6 +210,21 @@ def preflight_render_request(
                         "Annotated heatmap may become dense at this matrix size; "
                         "consider plain heatmap for readability."
                     )
+        elif resolved_template == "contour_field":
+            table = load_heatmap_table_cached(input_path, sheet)
+            finite_count = int(table.data.dropna(subset=["x", "y", "z"]).shape[0])
+            if finite_count < 3:
+                raise ValueError("Contour field requires at least three finite X/Y/Z points.")
+            validate_manual_axis_overrides(options, template=resolved_template)
+        elif resolved_template == "polar_curve":
+            curve_series = load_curve_table_cached(input_path, sheet)
+            if not curve_series:
+                raise ValueError("No valid theta/r series found.")
+            validate_manual_axis_overrides(options, template=resolved_template)
+        elif resolved_template == "table_figure":
+            raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
+            if raw.empty:
+                raise ValueError("Table figure requires at least one visible row and column.")
         else:
             raise ValueError(f"Unsupported template in preflight: {resolved_template}")
     except Exception as exc:

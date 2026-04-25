@@ -80,6 +80,11 @@ def options_from_payload(
             if payload.shape_annotations
             else None
         ),
+        analytical_layers=(
+            [item.model_dump(mode="json") for item in payload.analytical_layers]
+            if payload.analytical_layers
+            else None
+        ),
         resolved_template_id=resolved_template,
     )
 

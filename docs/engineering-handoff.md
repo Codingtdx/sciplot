@@ -33,6 +33,41 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: DataGraph-inspired typed analytical layers and advanced templates
+
+- Change:
+  - Added explicit public templates in `src/plot_contract.json`: `function_curve`, `contour_field`, `polar_curve`, and `table_figure`; regenerated `docs/plot_contract.md`.
+  - Added backend-owned `render_options.analytical_layers` with a bounded `function` v1 payload (`expression`, domain, sample count, target y-axis, label, enabled).
+  - Implemented safe AST expression parsing/sampling in `src/rendering/analytical_layers.py`; no frontend math execution and no free-form command interpreter.
+  - Wired the payload through render option normalization, render preview/export, sidecar schemas, `.sciplotgod` save/open normalization, macOS Codable models, PlotSession undo/redo path, and a basic `Advanced Plot -> Functions` inspector.
+  - Added DataGraph-inspired renderers for function overlays, contour fields, polar curves, and compact table figures through `render_registry` and explicit preflight/output naming.
+- User-visible impact:
+  - Plot can now render safe analytic function overlays through a typed function layer on `function_curve`.
+  - New public templates appear through contract/meta surfaces for contour, polar, and table figures.
+  - Basic macOS inspector controls can add/edit/remove function layers; final GUI polish is intentionally left for a later UI-focused pass.
+- Risks and rollback points:
+  - Roll back `src/plot_contract.json` plus generated `docs/plot_contract.md` to remove the new public templates.
+  - Roll back `src/rendering/analytical_layers.py`, `src/rendering/render_datagraph.py`, and registry/schema/project wiring if function/template rendering regresses.
+  - Contour/polar/table renderers are intentionally v1 implementations; future GUI work may need richer role mapping without changing the typed backend contract.
+  - Manual GUI smoke was not enforced in this terminal run; automated macOS build/test and session tests passed.
+- Actual regression results:
+  - `.venv/bin/python scripts/generate_plot_contract_docs.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_plot_contract.py tests/test_rendering_services.py::test_function_curve_preflight_and_render_with_analytical_layer tests/test_rendering_services.py::test_new_datagraph_templates_preflight_and_render tests/test_sidecar_render.py::test_render_preview_accepts_analytical_function_layers tests/test_plot_project_routes.py::test_save_open_project_roundtrip_preserves_analytical_layers -q`: passed (`8 passed`).
+  - `xcodebuild ... test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/PlotSessionTests/testAnalyticalFunctionLayerEditsRefreshPreviewAndPersistIntoProjectPayload`: passed (`8 tests, 0 failures`).
+  - `.venv/bin/python scripts/clean_repo.py`: passed.
+  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`: passed.
+  - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed.
+  - `.venv/bin/python -m pytest tests`: passed (`234 passed, 5 warnings`).
+  - `.venv/bin/python scripts/smoke_check.py`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix; manual checklist remained informational because `--require-manual` was not used.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed inside blocking gate.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed inside blocking gate (`175 tests, 0 failures`).
+  - `git diff --check`: passed.
+- Decision:
+  - First principles: DataGraph's transferable value here is durable table/graph state and replayable drawing semantics, not a second free-form scripting surface.
+  - Rejected alternative: a DataGraph-like arbitrary command stack or frontend expression evaluator, because it would duplicate backend semantics and weaken project durability.
+  - Current boundary: `analytical_layers` supports only safe sampled functions; expression columns, masks, pivot transforms, and animation remain future explicit typed capabilities.
+
 ### 2026-04-08: Single runtime + compatibility-layer removal
 
 - Change:

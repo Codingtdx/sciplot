@@ -33,6 +33,7 @@ class TemplateCatalog(Protocol):
 def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
     if template_id in {
         "curve",
+        "function_curve",
         "point_line",
         "area_curve",
         "step_line",
@@ -60,12 +61,19 @@ def _supported_shapes(template_id: str) -> tuple[DataShape, ...]:
         return ("replicate_table", "distribution")
     if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix",)
+    if template_id == "contour_field":
+        return ("matrix", "scalar_field")
+    if template_id == "polar_curve":
+        return ("curve_like", "polar")
+    if template_id == "table_figure":
+        return ("table",)
     return ()
 
 
 def _scientific_tags(template_id: str) -> tuple[str, ...]:
     if template_id in {
         "curve",
+        "function_curve",
         "point_line",
         "area_curve",
         "step_line",
@@ -92,12 +100,19 @@ def _scientific_tags(template_id: str) -> tuple[str, ...]:
         return ("distribution", "statistics")
     if template_id in {"heatmap", "annotated_heatmap"}:
         return ("matrix", "heatmap")
+    if template_id == "contour_field":
+        return ("matrix", "contour")
+    if template_id == "polar_curve":
+        return ("curve", "polar")
+    if template_id == "table_figure":
+        return ("table",)
     return ()
 
 
 def _family(template_id: str) -> str:
     if template_id in {
         "curve",
+        "function_curve",
         "point_line",
         "area_curve",
         "step_line",
@@ -124,12 +139,20 @@ def _family(template_id: str) -> str:
         return "statistics"
     if template_id in {"heatmap", "annotated_heatmap"}:
         return "heatmap"
+    if template_id == "contour_field":
+        return "heatmap"
+    if template_id == "polar_curve":
+        return "curve"
+    if template_id == "table_figure":
+        return "table"
     return "other"
 
 
 def _preview_priority(template_id: str) -> int:
     if template_id == "curve":
         return 100
+    if template_id == "function_curve":
+        return 76
     if template_id == "area_curve":
         return 94
     if template_id == "point_line":
@@ -150,6 +173,12 @@ def _preview_priority(template_id: str) -> int:
         return 91
     if template_id == "heatmap":
         return 90
+    if template_id == "contour_field":
+        return 86
+    if template_id == "polar_curve":
+        return 75
+    if template_id == "table_figure":
+        return 65
     if template_id == "box_strip":
         return 84
     if template_id == "violin_box":

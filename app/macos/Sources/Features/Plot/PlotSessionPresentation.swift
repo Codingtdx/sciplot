@@ -91,6 +91,22 @@ extension PlotSession {
         return .enabled()
     }
 
+    var analyticalLayerAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding function layers.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding function layers.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Function layers become available after inspect finishes.")
+        }
+        guard editableOptionIDs.contains("analytical_layers") else {
+            return .disabled("This plot does not expose function layers.")
+        }
+        return .enabled()
+    }
+
     var extraXAxisAvailability: ActionAvailability {
         extraAxisAvailability(optionID: "extra_x_axis", axisLabel: "X")
     }
@@ -487,6 +503,10 @@ extension PlotSession {
 
     var shapeAnnotations: [ShapeAnnotationPayload] {
         renderOptions.shapeAnnotations ?? []
+    }
+
+    var analyticalLayers: [AnalyticalLayerPayload] {
+        renderOptions.analyticalLayers ?? []
     }
 
     var xAxisBreaks: [AxisBreakPayload] {

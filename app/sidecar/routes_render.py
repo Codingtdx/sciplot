@@ -323,6 +323,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 lifecycle_policy=identity.lifecycle_policy,
                 implementation_id=identity.implementation_id,
                 sheet=sheet,
+                preview=previews[0] if previews else None,
                 previews=previews,
                 submission_report=serialize_dataclass(submission_report),
             )

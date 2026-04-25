@@ -279,6 +279,7 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
             "label": "Window",
         }
     ]
+    assert payload["payload"]["plot"]["render_options"]["analytical_layers"] is None
     assert payload["payload"]["plot"]["fit_options"]["enabled"] is True
     assert payload["payload"]["plot"]["fit_options"]["model_id"] == "polynomial_2"
     restored_source_path = Path(payload["restored_source_path"])
@@ -427,6 +428,58 @@ def test_save_open_project_roundtrip_preserves_axis_breaks(tmp_path: Path) -> No
             "start": 1.4,
             "end": 2.2,
             "display_mode": "compress",
+        }
+    ]
+
+
+def test_save_open_project_roundtrip_preserves_analytical_layers(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve-function.sciplotgod"
+    _curve_csv(source_path)
+
+    payload = _project_payload(source_path)
+    plot_payload = payload["plot"]
+    assert isinstance(plot_payload, dict)
+    plot_payload["selected_template_id"] = "function_curve"
+    render_options = plot_payload["render_options"]
+    assert isinstance(render_options, dict)
+    render_options["analytical_layers"] = [
+        {
+            "id": "function-1",
+            "enabled": True,
+            "kind": "function",
+            "expression": "sin(x) + 1",
+            "x_start": 0,
+            "x_end": 3,
+            "sample_count": 120,
+            "y_axis_target": "y_primary",
+            "label": "Model",
+        }
+    ]
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": payload,
+        },
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+    assert open_response.status_code == 200
+    assert open_response.json()["payload"]["plot"]["render_options"]["analytical_layers"] == [
+        {
+            "id": "function-1",
+            "enabled": True,
+            "kind": "function",
+            "expression": "sin(x) + 1",
+            "x_start": 0.0,
+            "x_end": 3.0,
+            "sample_count": 120,
+            "y_axis_target": "y_primary",
+            "label": "Model",
         }
     ]
 

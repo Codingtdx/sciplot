@@ -25,7 +25,16 @@ from src.rheology_loader import RheologySeries
 from src.text_normalization import canonicalize_token, normalize_label
 from src.wide_nmr import wide_nmr_sidecar_path
 
-DataShape = Literal["curve_like", "replicate_table", "matrix", "distribution", "grouped"]
+DataShape = Literal[
+    "curve_like",
+    "replicate_table",
+    "matrix",
+    "distribution",
+    "grouped",
+    "scalar_field",
+    "polar",
+    "table",
+]
 RoleKey = str
 
 

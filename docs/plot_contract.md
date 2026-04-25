@@ -77,6 +77,17 @@
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
 
+### `function_curve` / Function curve
+
+- Category: `single_panel`
+- Presentation kind: `function_curve`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `analytical_layers`, `style_preset`, `palette_preset`
+- Description: Curve plot with bounded analytic function layers sampled from safe math expressions.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: None
+
 ### `point_line` / Point line
 
 - Category: `single_panel`
@@ -295,6 +306,39 @@
 - Editable options: `size`, `show_colorbar`, `style_preset`, `palette_preset`
 - Description: Heatmap with the main frame aligned to standard single-panel plots and an independent top colorbar.
 - Hard rules: `single_panel_axis_frame`, `heatmap_main_frame`, `heatmap_horizontal_colorbar`, `heatmap_colorbar_inside_canvas`, `non_blank_pdf`
+- Soft rules: None
+
+### `contour_field` / Contour field
+
+- Category: `heatmap`
+- Presentation kind: `contour_field`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `show_colorbar`, `x_min`, `x_max`, `y_min`, `y_max`, `style_preset`, `palette_preset`
+- Description: Scalar field rendered as filled contours from matrix or XYZ-long data.
+- Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
+- Soft rules: None
+
+### `polar_curve` / Polar curve
+
+- Category: `single_panel`
+- Presentation kind: `polar_curve`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
+- Description: Theta-radius data rendered on a polar axis for radial curves and scatter-like traces.
+- Hard rules: `non_blank_pdf`
+- Soft rules: None
+
+### `table_figure` / Table figure
+
+- Category: `table`
+- Presentation kind: `table`
+- Default size: `60x55`
+- Allowed sizes: `60x55`, `120x55`
+- Editable options: `size`, `style_preset`, `palette_preset`
+- Description: Compact table output for small data tables and summary command-style figures.
+- Hard rules: `non_blank_pdf`
 - Soft rules: None
 
 ### `annotated_heatmap` / Annotated heatmap

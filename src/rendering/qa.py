@@ -14,6 +14,7 @@ from src.wide_nmr import WIDE_NMR_STRUCTURE_RESERVED_MM
 
 _CURVE_QA_TEMPLATES = {
     "curve",
+    "function_curve",
     "point_line",
     "area_curve",
     "step_line",

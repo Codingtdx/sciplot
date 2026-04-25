@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.sidecar.schemas_render import (
+    AnalyticalLayerPayload,
     AxisBreakPayload,
     DataStudioProjectPayload,
     DataStudioProjectWorkbookPayload,
@@ -195,6 +196,11 @@ def _normalize_render_options(
         shape_annotations=(
             [ShapeAnnotationPayload.model_validate(item) for item in resolved_options.shape_annotations]
             if resolved_options.shape_annotations is not None
+            else None
+        ),
+        analytical_layers=(
+            [AnalyticalLayerPayload.model_validate(item) for item in resolved_options.analytical_layers]
+            if resolved_options.analytical_layers is not None
             else None
         ),
     )

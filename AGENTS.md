@@ -62,7 +62,7 @@
   - 不要因为新增模板或 catalog 扩面而删弱这组 matrix。
 - 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
-- 当前 public template 扩面已包含 `area_curve`、`step_line`、`stacked_area`、`density_area`；它们必须继续走显式 contract/catalog/recommendation/render/output-naming 路径，不能退化成隐藏 alias。
+- 当前 public template 扩面已包含 `area_curve`、`step_line`、`stacked_area`、`density_area`、`function_curve`、`contour_field`、`polar_curve`、`table_figure`；它们必须继续走显式 contract/catalog/recommendation/render/output-naming 路径，不能退化成隐藏 alias。
 - 模板的展示元数据（例如 macOS gallery thumbnail kind）必须由 contract `/meta` 提供并由前端直接消费；禁止再按 template id 字符串做本地猜测。
 - `distribution_compare` 只能在兼容迁移层被解析为显式模板：优先按当前数据解析成 `violin` / `box_strip` / `box`，拿不到源数据时保守回退到 `box`。
 
@@ -83,6 +83,7 @@
 - Plot 高级 guide overlay 统一走 `render_options.reference_guides` 这条 typed payload 链路；它是 DataGraph 风格的可堆叠 guide/region 命令层，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 reference guide 状态或重算 overlay 语义。
 - Plot 高级 text annotation overlay 统一走 `render_options.text_annotations` 这条 typed payload 链路；当前支持普通 note 与带 connector 的 callout，并允许绑定 `primary y / secondary y`，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 annotation 状态或重算坐标语义。
 - Plot 高级 shape annotation overlay 统一走 `render_options.shape_annotations` 这条 typed payload 链路；当前支持 `rectangle / ellipse / bracket`，并允许绑定 `primary y / secondary y`、复用 broken-axis panel/坐标映射，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 shape overlay 状态或重算几何语义。
+- Plot 高级 analytic/function layer 统一走 `render_options.analytical_layers` 这条 typed payload 链路；当前只支持 bounded `function` layer（`expression / x_start / x_end / sample_count / y_axis_target / label / enabled`），表达式必须由后端安全 AST 白名单解析采样，preview、export、save/open project 必须共用同一份归一化结果，禁止引入 DataGraph 式自由命令解释器或前端重算表达式语义。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -165,6 +166,7 @@
   - Plot inspector `Advanced Plot` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
   - Plot inspector `Advanced Plot` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
   - Plot inspector `Advanced Plot` 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
+  - Plot inspector `Advanced Plot` 里的 `function layers` 通过 `render_options.analytical_layers` 持久化；当前只对 `function_curve` 开放基础编辑，表达式安全解析和采样归后端负责，不能借此引入自由脚本/命令栈或前端第二套数学执行器
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`

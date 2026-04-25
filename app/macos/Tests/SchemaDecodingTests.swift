@@ -252,6 +252,19 @@ final class SchemaDecodingTests: XCTestCase {
                 "y_axis_target": "y_primary",
                 "label": "Window"
               }
+            ],
+            "analytical_layers": [
+              {
+                "id": "function-1",
+                "enabled": true,
+                "kind": "function",
+                "expression": "sin(x) + 1",
+                "x_start": 0,
+                "x_end": 3,
+                "sample_count": 120,
+                "y_axis_target": "y_primary",
+                "label": "Model"
+              }
             ]
           },
           "fit_options": {
@@ -282,6 +295,9 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(request.options.textAnnotations?.first?.connectorEnabled, true)
         XCTAssertEqual(request.options.shapeAnnotations?.first?.kind, "rectangle")
         XCTAssertEqual(request.options.shapeAnnotations?.first?.label, "Window")
+        XCTAssertEqual(request.options.analyticalLayers?.first?.expression, "sin(x) + 1")
+        XCTAssertEqual(request.options.analyticalLayers?.first?.sampleCount, 120)
+        XCTAssertEqual(request.options.analyticalLayers?.first?.yAxisTarget, "y_primary")
     }
 
     func testDecodePlotContractSizePresetsWithoutIDField() throws {

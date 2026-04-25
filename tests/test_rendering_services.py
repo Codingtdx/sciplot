@@ -216,6 +216,35 @@ def _write_heatmap_table(path: Path) -> Path:
     return path
 
 
+def _write_contour_field_table(path: Path) -> Path:
+    rows = [["X", "Y", "Z"], ["mm", "mm", "a.u."], ["field", "field", "field"]]
+    for x_value in np.linspace(-1.0, 1.0, 5):
+        for y_value in np.linspace(-1.0, 1.0, 5):
+            rows.append([x_value, y_value, x_value**2 + y_value**2])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_polar_curve_table(path: Path) -> Path:
+    rows = [["Theta", "Radius"], ["rad", "a.u."], ["rose", "rose"]]
+    for theta in np.linspace(0.0, 2 * np.pi, 32):
+        rows.append([theta, 1.0 + 0.35 * np.cos(3 * theta)])
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_small_table(path: Path) -> Path:
+    pd.DataFrame(
+        [
+            ["Metric", "Blend A", "Blend B"],
+            ["Strength", 42.1, 45.3],
+            ["Modulus", 510.2, 566.7],
+            ["Elongation", 9.5, 10.1],
+        ]
+    ).to_csv(path, header=False, index=False)
+    return path
+
+
 def _write_multi_tensile_curve_table(path: Path) -> Path:
     x = np.linspace(0.0, 60.0, 90)
     rows = [
@@ -1939,6 +1968,53 @@ def test_annotated_heatmap_preflight_warns_for_single_row_or_column_matrices(tmp
 
     assert preflight.errors == ()
     assert any("single-row/column matrices" in warning for warning in preflight.warnings)
+
+
+def test_function_curve_preflight_and_render_with_analytical_layer(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "function.csv")
+    layer = {
+        "id": "sin-layer",
+        "enabled": True,
+        "kind": "function",
+        "expression": "sin(x) + 1",
+        "x_start": 0.0,
+        "x_end": 2.0,
+        "sample_count": 80,
+        "label": "sin layer",
+    }
+    options = resolve_render_options(template="function_curve", analytical_layers=[layer])
+
+    preflight = preflight_render_request("function_curve", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("function_function_curve.pdf",)
+
+    rendered = build_rendered_plots("function_curve", input_path, analytical_layers=[layer])
+    try:
+        labels = [line.get_label() for line in rendered[0].figure.axes[0].lines]
+        assert "sin layer" in labels
+        assert rendered[0].qa_report is not None
+        assert "analytical_function_layer" in rendered[0].qa_report.autofixes_applied
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_new_datagraph_templates_preflight_and_render(tmp_path: Path) -> None:
+    cases = [
+        ("contour_field", _write_contour_field_table(tmp_path / "field.csv"), "field_contour_field.pdf"),
+        ("polar_curve", _write_polar_curve_table(tmp_path / "polar.csv"), "polar_polar_curve.pdf"),
+        ("table_figure", _write_small_table(tmp_path / "summary.csv"), "summary_table_figure.pdf"),
+    ]
+    for template, input_path, filename in cases:
+        options = resolve_render_options(template=template)
+        preflight = preflight_render_request(template, input_path, 0, options)
+        assert preflight.errors == ()
+        assert preflight.output_filenames == (filename,)
+        rendered = build_rendered_plots(template, input_path)
+        try:
+            assert rendered[0].filename == filename
+            assert rendered[0].figure.axes
+        finally:
+            close_rendered_plots(rendered)
 
 
 def test_annotated_heatmap_dense_matrix_can_fallback_to_non_default_label_strategy(tmp_path: Path) -> None:

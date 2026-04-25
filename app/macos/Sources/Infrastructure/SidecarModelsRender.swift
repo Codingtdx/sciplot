@@ -336,6 +336,40 @@ struct ShapeAnnotationPayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct AnalyticalLayerPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var kind: String
+    var expression: String
+    var xStart: Double
+    var xEnd: Double
+    var sampleCount: Int
+    var yAxisTarget: String
+    var label: String?
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        kind: String = "function",
+        expression: String = "sin(x)",
+        xStart: Double = 0.0,
+        xEnd: Double = 1.0,
+        sampleCount: Int = 200,
+        yAxisTarget: String = "y_primary",
+        label: String? = nil
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.kind = kind
+        self.expression = expression
+        self.xStart = xStart
+        self.xEnd = xEnd
+        self.sampleCount = sampleCount
+        self.yAxisTarget = yAxisTarget
+        self.label = label
+    }
+}
+
 struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var size: String?
     var xscale: String?
@@ -365,6 +399,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var referenceGuides: [ReferenceGuidePayload]?
     var textAnnotations: [TextAnnotationPayload]?
     var shapeAnnotations: [ShapeAnnotationPayload]?
+    var analyticalLayers: [AnalyticalLayerPayload]?
 
     init(
         size: String? = nil,
@@ -394,7 +429,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         yAxisBreaks: [AxisBreakPayload]? = nil,
         referenceGuides: [ReferenceGuidePayload]? = nil,
         textAnnotations: [TextAnnotationPayload]? = nil,
-        shapeAnnotations: [ShapeAnnotationPayload]? = nil
+        shapeAnnotations: [ShapeAnnotationPayload]? = nil,
+        analyticalLayers: [AnalyticalLayerPayload]? = nil
     ) {
         self.size = size
         self.xscale = xscale
@@ -424,6 +460,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.referenceGuides = referenceGuides
         self.textAnnotations = textAnnotations
         self.shapeAnnotations = shapeAnnotations
+        self.analyticalLayers = analyticalLayers
     }
 
     enum CodingKeys: String, CodingKey {
@@ -457,6 +494,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case referenceBand
         case textAnnotations
         case shapeAnnotations
+        case analyticalLayers
     }
 
     init(from decoder: Decoder) throws {
@@ -519,6 +557,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         }
         textAnnotations = try container.decodeIfPresent([TextAnnotationPayload].self, forKey: .textAnnotations)
         shapeAnnotations = try container.decodeIfPresent([ShapeAnnotationPayload].self, forKey: .shapeAnnotations)
+        analyticalLayers = try container.decodeIfPresent([AnalyticalLayerPayload].self, forKey: .analyticalLayers)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -551,6 +590,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(referenceGuides, forKey: .referenceGuides)
         try container.encodeIfPresent(textAnnotations, forKey: .textAnnotations)
         try container.encodeIfPresent(shapeAnnotations, forKey: .shapeAnnotations)
+        try container.encodeIfPresent(analyticalLayers, forKey: .analyticalLayers)
     }
 }
 

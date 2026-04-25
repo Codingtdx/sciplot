@@ -47,6 +47,7 @@ class RenderOptions:
     reference_guides: tuple[Mapping[str, Any], ...] | None = None
     text_annotations: tuple[Mapping[str, Any], ...] | None = None
     shape_annotations: tuple[Mapping[str, Any], ...] | None = None
+    analytical_layers: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True)

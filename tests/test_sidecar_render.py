@@ -58,3 +58,35 @@ def test_render_preview_uses_cache_and_invalidates_when_options_change(
         },
     )
     assert invalidated.status_code == 400
+
+
+def test_render_preview_accepts_analytical_function_layers(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    response = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "function_curve",
+            "options": {
+                "analytical_layers": [
+                    {
+                        "id": "overlay",
+                        "kind": "function",
+                        "expression": "x * 0.5 + 1",
+                        "x_start": 0,
+                        "x_end": 2,
+                        "sample_count": 40,
+                        "label": "overlay",
+                    }
+                ]
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["preview"]["filename"] == "curve_function_curve.pdf"
+    assert payload["submission_report"]["template"] == "function_curve"

@@ -712,6 +712,68 @@
       "soft_rules": [],
       "presentation_kind": "curve"
     },
+    "function_curve": {
+      "label": "Function curve",
+      "description": "Curve plot with bounded analytic function layers sampled from safe math expressions.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "xscale",
+        "yscale",
+        "reverse_x",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "x_tick_density",
+        "x_tick_edge_labels",
+        "y_tick_density",
+        "y_tick_edge_labels",
+        "extra_x_axis",
+        "extra_y_axis",
+        "series_order",
+        "analytical_layers",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "xscale": "linear",
+        "yscale": "linear",
+        "reverse_x": false,
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "function_curve"
+    },
     "point_line": {
       "label": "Point line",
       "description": "Standard single-panel curve plot with markers.",
@@ -1815,6 +1877,145 @@
       ],
       "soft_rules": [],
       "presentation_kind": "heatmap"
+    },
+    "contour_field": {
+      "label": "Contour field",
+      "description": "Scalar field rendered as filled contours from matrix or XYZ-long data.",
+      "category": "heatmap",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "show_colorbar",
+        "x_min",
+        "x_max",
+        "y_min",
+        "y_max",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "show_colorbar": true,
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "single_panel_axis_frame",
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "contour_field"
+    },
+    "polar_curve": {
+      "label": "Polar curve",
+      "description": "Theta-radius data rendered on a polar axis for radial curves and scatter-like traces.",
+      "category": "single_panel",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "y_min",
+        "y_max",
+        "series_order",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "polar_curve"
+    },
+    "table_figure": {
+      "label": "Table figure",
+      "description": "Compact table output for small data tables and summary command-style figures.",
+      "category": "table",
+      "default_size": "60x55",
+      "allowed_sizes": [
+        "60x55",
+        "120x55"
+      ],
+      "editable_options": [
+        "size",
+        "style_preset",
+        "palette_preset"
+      ],
+      "default_options": {
+        "size": "60x55",
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
+      },
+      "available_styles": [
+        "nature",
+        "editorial",
+        "presentation",
+        "poster"
+      ],
+      "available_palettes": [
+        "colorblind_safe",
+        "deep",
+        "muted",
+        "mono",
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage"
+      ],
+      "hard_rules": [
+        "non_blank_pdf"
+      ],
+      "soft_rules": [],
+      "presentation_kind": "table"
     },
     "annotated_heatmap": {
       "label": "Annotated heatmap",
