@@ -11,6 +11,7 @@ from src.plotting_families.curve_family import plot_curves
 from src.plotting_primitives import _format_axis_label
 from src.rendering.cache import load_curve_table_cached, load_heatmap_table_cached, read_raw_table_cached
 from src.rendering.common import validate_manual_axis_overrides, validate_series_scales
+from src.rendering.datagraph_inputs import series_looks_polar, table_figure_size_error, theta_values_for_plot
 from src.rendering.models import RenderedPlot, RenderOptions
 from src.rendering.render_support import _rendered_plot_with_qa
 
@@ -154,6 +155,8 @@ def _render_contour_field(input_path: Path, sheet: str | int, options: RenderOpt
 def _render_polar_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
     series_list = load_curve_table_cached(input_path, sheet)
     validate_manual_axis_overrides(options, template="polar_curve")
+    if not series_looks_polar(series_list):
+        raise ValueError("Polar curve requires theta/radius columns with radian or degree theta units.")
     fig, ax = _polar_figure(options=options)
     colors = plot_style.get_categorical_palette(options.palette_preset, n_colors=len(series_list))
     for index, series in enumerate(series_list):
@@ -161,7 +164,7 @@ def _render_polar_curve(input_path: Path, sheet: str | int, options: RenderOptio
         if data.empty:
             continue
         ax.plot(
-            data["x"].to_numpy(dtype=float),
+            theta_values_for_plot(data["x"], unit=series.x_unit),
             data["y"].to_numpy(dtype=float),
             label=series.sample,
             color=colors[index],
@@ -199,6 +202,8 @@ def _render_table_figure(input_path: Path, sheet: str | int, options: RenderOpti
     raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
     if raw.empty:
         raise ValueError("Table figure requires at least one visible row and column.")
+    if size_error := table_figure_size_error(raw):
+        raise ValueError(size_error)
     preview = raw.iloc[:12, :8].copy()
     display = preview.map(_display_cell) if hasattr(preview, "map") else preview.applymap(_display_cell)
     fig, ax = _panel_figure(options=options)

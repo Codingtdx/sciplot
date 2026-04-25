@@ -24,6 +24,20 @@ def _make_curve_csv(path: Path) -> None:
     ).to_csv(path, header=False, index=False)
 
 
+def _make_xyz_csv(path: Path) -> None:
+    pd.DataFrame(
+        [
+            ["X", "Y", "Z"],
+            ["Temperature", "Time", "Intensity"],
+            ["degC", "min", "a.u."],
+            [25.0, 0.0, 0.18],
+            [25.0, 5.0, 0.31],
+            [40.0, 0.0, 0.46],
+            [40.0, 5.0, 0.63],
+        ]
+    ).to_csv(path, header=False, index=False)
+
+
 def test_render_preview_uses_cache_and_invalidates_when_options_change(
     tmp_path: Path,
     monkeypatch,
@@ -90,3 +104,16 @@ def test_render_preview_accepts_analytical_function_layers(tmp_path: Path) -> No
     payload = response.json()
     assert payload["preview"]["filename"] == "curve_function_curve.pdf"
     assert payload["submission_report"]["template"] == "function_curve"
+
+
+def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:
+    input_path = tmp_path / "field.csv"
+    _make_xyz_csv(input_path)
+
+    response = client.post("/source-table-preview", json={"input_path": str(input_path), "sheet": 0})
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["candidate_roles"]["x"] == ["Temperature"]
+    assert payload["candidate_roles"]["y"] == ["Time"]
+    assert payload["candidate_roles"]["z"] == ["Intensity"]

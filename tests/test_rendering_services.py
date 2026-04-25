@@ -414,7 +414,7 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
         (_write_tensile_curve_table, "tensile.csv", "tensile_curve", ("curve_like",)),
         (_write_replicate_table, "replicates.csv", "replicate_table", ("replicate_table", "distribution")),
         (_write_frequency_sweep_table, "frequency.xlsx", "frequency_sweep", ("curve_like",)),
-        (_write_heatmap_table, "heatmap.csv", "heatmap_table", ("matrix",)),
+        (_write_heatmap_table, "heatmap.csv", "heatmap_table", ("matrix", "scalar_field")),
     ],
 )
 def test_normalized_dataset_builder_reuses_model_and_shape_signals(
@@ -2015,6 +2015,37 @@ def test_new_datagraph_templates_preflight_and_render(tmp_path: Path) -> None:
             assert rendered[0].figure.axes
         finally:
             close_rendered_plots(rendered)
+
+
+def test_datagraph_template_preflight_reports_shape_specific_errors(tmp_path: Path) -> None:
+    missing_z = tmp_path / "missing_z.csv"
+    pd.DataFrame(
+        [
+            ["X", "Y", "Signal"],
+            ["mm", "mm", "a.u."],
+            ["field", "field", "field"],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 2.0],
+        ]
+    ).to_csv(missing_z, header=False, index=False)
+    non_polar = _write_curve_table(tmp_path / "curve.csv")
+    large_table = tmp_path / "large_table.csv"
+    pd.DataFrame([[f"C{index}" for index in range(10)], *[[row] * 10 for row in range(20)]]).to_csv(
+        large_table,
+        header=False,
+        index=False,
+    )
+
+    contour = preflight_render_request("contour_field", missing_z, 0, resolve_render_options(template="contour_field"))
+    polar = preflight_render_request("polar_curve", non_polar, 0, resolve_render_options(template="polar_curve"))
+    table = preflight_render_request("table_figure", large_table, 0, resolve_render_options(template="table_figure"))
+
+    assert contour.errors
+    assert "X, Y, and Z" in contour.errors[0]
+    assert polar.errors
+    assert "theta/radius" in polar.errors[0].lower()
+    assert table.errors
+    assert "small table" in table.errors[0].lower()
 
 
 def test_annotated_heatmap_dense_matrix_can_fallback_to_non_default_label_strategy(tmp_path: Path) -> None:

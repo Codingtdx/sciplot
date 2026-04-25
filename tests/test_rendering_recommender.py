@@ -99,6 +99,42 @@ def _write_heatmap_table(path: Path) -> Path:
     return path
 
 
+def _write_heatmap_matrix_table(path: Path) -> Path:
+    rows = [
+        ["Y/X", 0.0, 1.0, 2.0],
+        [0.0, 0.1, 0.2, 0.3],
+        [1.0, 0.4, 0.5, 0.6],
+        [2.0, 0.7, 0.8, 0.9],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_polar_curve_table(path: Path) -> Path:
+    rows = [
+        ["Theta", "Radius"],
+        ["rad", "a.u."],
+        ["rose", "rose"],
+        [0.0, 1.0],
+        [1.57, 1.3],
+        [3.14, 0.8],
+        [4.71, 1.1],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
+def _write_small_table(path: Path) -> Path:
+    rows = [
+        ["Metric", "Blend A", "Blend B"],
+        ["Strength", 42.1, 45.3],
+        ["Modulus", 510.2, 566.7],
+        ["Elongation", 9.5, 10.1],
+    ]
+    pd.DataFrame(rows).to_csv(path, header=False, index=False)
+    return path
+
+
 def test_curve_table_recommender_returns_five_ranked_choices(tmp_path: Path) -> None:
     dataset = build_normalized_dataset(_write_curve_table(tmp_path / "curve.csv"))
 
@@ -226,10 +262,44 @@ def test_heatmap_recommender_returns_annotated_heatmap_as_secondary_choice(tmp_p
 
     recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=5)
 
-    assert [item.template_id for item in recommendations] == ["heatmap", "annotated_heatmap"]
-    assert recommendations[0].score > recommendations[1].score
-    assert recommendations[1].why_hard_match
-    assert recommendations[1].why_soft_prior
+    assert [item.template_id for item in recommendations] == ["heatmap", "contour_field", "annotated_heatmap"]
+    assert recommendations[0].score > recommendations[1].score > recommendations[2].score
+    contour = recommendations[1]
+    assert contour.inferred_mapping == {"x": "Temperature", "y": "Time", "z": "Intensity"}
+    assert any("contour" in reason.lower() for reason in contour.why_soft_prior)
+
+
+def test_heatmap_matrix_recommender_exposes_contour_field(tmp_path: Path) -> None:
+    dataset = build_normalized_dataset(_write_heatmap_matrix_table(tmp_path / "matrix.csv"))
+
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=5)
+
+    assert dataset.model == "heatmap_table"
+    assert "scalar_field" in dataset.data_shapes
+    assert [item.template_id for item in recommendations] == ["heatmap", "contour_field", "annotated_heatmap"]
+
+
+def test_theta_radius_curve_promotes_polar_curve_without_affecting_plain_curves(tmp_path: Path) -> None:
+    polar_dataset = build_normalized_dataset(_write_polar_curve_table(tmp_path / "polar.csv"))
+    curve_dataset = build_normalized_dataset(_write_curve_table(tmp_path / "curve.csv"))
+
+    polar_recommendations = DEFAULT_RECOMMENDER.recommend(polar_dataset, limit=5)
+    curve_recommendations = DEFAULT_RECOMMENDER.recommend(curve_dataset, limit=10)
+
+    assert polar_recommendations[0].template_id == "polar_curve"
+    assert polar_recommendations[0].inferred_mapping == {"theta": "Theta", "r": "Radius"}
+    assert "polar_curve" not in [item.template_id for item in curve_recommendations]
+
+
+def test_small_mixed_table_recommender_promotes_table_figure(tmp_path: Path) -> None:
+    dataset = build_normalized_dataset(_write_small_table(tmp_path / "summary.csv"))
+
+    recommendations = DEFAULT_RECOMMENDER.recommend(dataset, limit=5)
+
+    assert dataset.model == "table_summary"
+    assert dataset.data_shapes == ("table",)
+    assert recommendations[0].template_id == "table_figure"
+    assert any("small table" in reason.lower() for reason in recommendations[0].why_hard_match)
 
 
 def test_wide_nmr_sidecar_promotes_segmented_stacked_curve(tmp_path: Path) -> None:

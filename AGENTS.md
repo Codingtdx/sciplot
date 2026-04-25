@@ -69,7 +69,8 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
-- Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`。不要把全量 workbook 表格塞回 inspect/session payload。
+- Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`。不要把全量 workbook 表格塞回 inspect/session payload。
+- Plot 推荐必须识别 DataGraph-inspired advanced input shapes：XYZ long table 或 matrix scalar field 可推荐 `contour_field`，theta/radius 曲线可推荐 `polar_curve`，小型 mixed table 可推荐 `table_figure`。这些推荐必须继续走 `POST /inspect-file` 的 ranked recommendation payload，不得在 macOS 侧按列名重建第二套高级模板判断。
 - Data Studio 用户导入模板统一是 v2 no-code table mapping：`output_kind`、`source_format`、`segment_policy`、`segment_selectors`、`field_bindings`、`match_conditions` 是唯一模板结构；旧用户模板 parser 不保留，不要恢复 `POST /data-studio/source-preview` 或 `source_path + accepted_candidate_ids` 创建路径。
 - Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
 - Data Studio `output_kind=curve_metrics` 导出的 workbook 不再写 `DataStudio_Metadata` sheet；样品名默认取源文件名（不拼 segment 文案），并允许在模板编辑页按曲线逐项确认/改名。

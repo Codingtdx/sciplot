@@ -61,6 +61,45 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.dataset?.sampleRows.count, 2)
     }
 
+    func testDecodeSourceTablePreviewKeepsScalarFieldRoles() throws {
+        let payload = """
+        {
+          "input_path": "/tmp/field.csv",
+          "sheet": 0,
+          "offset": 0,
+          "limit": 50,
+          "total_rows": 7,
+          "total_cols": 3,
+          "column_headers": ["X", "Y", "Z"],
+          "rows": [[25, 0, 0.18], [25, 5, 0.31]],
+          "candidate_roles": {
+            "x": ["Temperature"],
+            "y": ["Time"],
+            "z": ["Intensity"],
+            "group": [],
+            "sample": [],
+            "value": [],
+            "metric": [],
+            "label": [],
+            "series": []
+          },
+          "detected_x_label": "Temperature",
+          "detected_y_label": "Time",
+          "column_profiles": [],
+          "segments": [],
+          "selected_segment_id": null,
+          "encoding": "utf-8",
+          "delimiter": ","
+        }
+        """
+
+        let response = try decoder.decode(SourceTablePreviewResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.candidateRoles.x, ["Temperature"])
+        XCTAssertEqual(response.candidateRoles.y, ["Time"])
+        XCTAssertEqual(response.candidateRoles.z, ["Intensity"])
+    }
+
     func testDecodeDataStudioWorkbookAndComparisonPayloads() throws {
         let workbookPayload = """
         {

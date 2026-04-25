@@ -316,9 +316,14 @@ def detect_input_model(input_path: Path, sheet: str | int = 0) -> str:
         load_replicate_table_cached(input_path, sheet)
         return "replicate_table"
 
+    with suppress(Exception):
+        raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
+        if _looks_like_small_table_figure(raw):
+            return "table_summary"
+
     raise ValueError(
         "Could not recognize this file. Reformat it as a curve_table, replicate_table, "
-        "heatmap xyz_long_table, or one of the supported rheology export tables."
+        "heatmap xyz_long_table, small table figure, or one of the supported rheology export tables."
     )
 
 
@@ -328,8 +333,26 @@ def _data_shapes_for_model(model: str) -> tuple[DataShape, ...]:
     if model == "replicate_table":
         return ("replicate_table", "distribution")
     if model == "heatmap_table":
-        return ("matrix",)
+        return ("matrix", "scalar_field")
+    if model == "table_summary":
+        return ("table",)
     return ()
+
+
+def _looks_like_small_table_figure(raw: pd.DataFrame) -> bool:
+    if raw.empty or raw.shape[0] > 12 or raw.shape[1] > 8:
+        return False
+    mapped = raw.map(_string_or_none) if hasattr(raw, "map") else raw.applymap(_string_or_none)
+    non_empty_count = sum(value is not None for value in mapped.to_numpy().ravel())
+    if non_empty_count < 4:
+        return False
+    numeric_count = 0
+    for value in mapped.to_numpy().ravel():
+        if value is None:
+            continue
+        if _numeric_or_none(value) is not None:
+            numeric_count += 1
+    return numeric_count > 0 and numeric_count < non_empty_count
 
 
 def _quality_flags(raw: pd.DataFrame, *, working_raw: pd.DataFrame) -> tuple[str, ...]:
@@ -448,9 +471,22 @@ def _build_normalized_dataset_cached(
         table = load_heatmap_table_cached(input_path, sheet)
         candidate_roles = _candidate_roles_for_heatmap(table)
         semantic_signals = (
-            "Detected a heatmap long table.",
-            "Row 1 explicitly defines the X, Y, and Z role columns.",
-            "This input is best converted directly into a heatmap matrix.",
+            "Detected a scalar-field table.",
+            "The data contains X, Y, and Z roles that can be rendered as a matrix or contour field.",
+            "This input can be converted directly into heatmap or contour-style figures.",
+        )
+    elif resolved_model == "table_summary":
+        candidate_roles = CandidateRoles(
+            label=tuple(
+                value
+                for value in (_string_or_none(item) for item in raw.iloc[0].tolist())
+                if value is not None
+            ),
+        )
+        semantic_signals = (
+            "Detected a small table figure input.",
+            "The table is compact enough to render as a figure output.",
+            "This path is for presentation tables, not full workbook export.",
         )
     else:
         series_list = load_curve_table_cached(input_path, sheet)

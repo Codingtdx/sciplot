@@ -500,6 +500,34 @@ final class PlotSessionTests: XCTestCase {
         )
     }
 
+    func testAnalyticalFunctionLayerPreviewSurfacesBackendExpressionErrors() async throws {
+        let client = MockSidecarClient()
+        client.renderHandler = { request in
+            if request.options.analyticalLayers?.first?.expression == "foo(x)" {
+                throw SidecarError.httpStatus(400, "Function layer expression is not allowed: unknown name foo.")
+            }
+            return TestPayloads.renderPreview()
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addAnalyticalFunctionLayer()
+        guard let layerID = session.renderOptions.analyticalLayers?.first?.id else {
+            XCTFail("Expected an analytical function layer to be created.")
+            return
+        }
+        session.updateAnalyticalLayer(id: layerID, policy: .immediate) {
+            $0.expression = "foo(x)"
+        }
+
+        await waitUntil({ session.errorMessage?.contains("unknown name foo") == true }, timeout: 2.0)
+        XCTAssertEqual(client.renderRequests.last?.options.analyticalLayers?.first?.expression, "foo(x)")
+    }
+
     func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

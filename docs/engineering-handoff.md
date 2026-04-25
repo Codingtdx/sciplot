@@ -33,6 +33,39 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: Advanced template discovery and recommendation closure
+
+- Change:
+  - Extended backend source/dataset recognition so XYZ long tables and numeric matrix scalar fields are treated as `heatmap_table` with `matrix + scalar_field` shapes.
+  - Added ranked recommendation coverage for `contour_field`, `polar_curve`, and `table_figure` without adding routes, legacy ids, or macOS-local template heuristics.
+  - `POST /source-table-preview` now preserves `z` candidate roles for XYZ scalar inputs while still paginating source rows.
+  - Tightened preflight/render guardrails: `polar_curve` requires theta/radius semantics, `contour_field` requires finite X/Y/Z with at least two distinct X and Y coordinates, and `table_figure` is bounded to compact tables.
+  - Added `src/rendering/datagraph_inputs.py` so polar/table input semantics are shared by preflight and render instead of duplicated.
+  - Added macOS tests proving scalar-field role decoding and backend-owned function expression errors are surfaced rather than recomputed in Swift.
+- User-visible impact:
+  - Importing scalar-field data now naturally offers contour output alongside heatmap output.
+  - Importing theta/radius curve tables now promotes polar output.
+  - Compact mixed tables now get a table-figure path; large sheets remain Data Workbook/source-table material instead of being forced into a figure.
+- Risks and rollback points:
+  - Roll back `src/data_loader.py` matrix support if legacy heatmap parsing regresses.
+  - Roll back `src/rendering/dataset_models.py` / `src/rendering/recommender.py` if recommendation ranking becomes too aggressive for ordinary curve or replicate tables.
+  - Roll back `src/rendering/preflight.py` / `src/rendering/render_datagraph.py` if table-size or polar validation blocks valid user files too narrowly.
+- Actual regression results:
+  - Baseline `.venv/bin/python scripts/smoke_check.py`: passed before changes.
+  - `.venv/bin/python -m pytest tests/test_rendering_recommender.py -q`: passed (`13 passed`).
+  - `.venv/bin/python -m pytest tests/test_rendering_services.py::test_normalized_dataset_builder_reuses_model_and_shape_signals tests/test_rendering_services.py::test_new_datagraph_templates_preflight_and_render tests/test_rendering_services.py::test_datagraph_template_preflight_reports_shape_specific_errors tests/test_rendering_services.py::test_function_curve_preflight_and_render_with_analytical_layer -q`: passed (`8 passed`).
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py -q`: passed (`3 passed`, third-party SWIG deprecation warnings only).
+  - `.venv/bin/python -m ruff check src/data_loader.py src/rendering/dataset_models.py src/rendering/recommender.py src/rendering/render_datagraph.py src/rendering/preflight.py src/rendering/source_table_preview.py tests/test_rendering_recommender.py tests/test_rendering_services.py tests/test_sidecar_render.py`: passed.
+  - `.venv/bin/python -m mypy src/data_loader.py src/rendering/dataset_models.py src/rendering/recommender.py src/rendering/render_datagraph.py src/rendering/preflight.py src/rendering/source_table_preview.py`: passed.
+  - `xcodebuild ... test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeSourceTablePreviewKeepsScalarFieldRoles -only-testing:SciPlotGodMacTests/PlotSessionTests/testAnalyticalFunctionLayerPreviewSurfacesBackendExpressionErrors`: passed (`2 tests, 0 failures`; CoreSimulator out-of-date warnings only).
+  - `.venv/bin/python scripts/clean_repo.py`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`239 passed, 5 warnings`; macOS `177 tests, 0 failures`; manual checklist informational because `--require-manual` was not used).
+  - `git diff --check`: passed.
+- Decision:
+  - First principles: after v1 render capability existed, the missing product value was discoverability through the same ranked recommendation path that makes this app faster than DataGraph for first plots.
+  - Rejected alternative: macOS-side column-name sniffing for contour/polar/table affordances, because that would create a second recommendation source and drift from sidecar/contract truth.
+  - Current boundary: this round improves data-shape recognition and validation only; final DataGraph-style GUI authoring remains a separate UI pass.
+
 ### 2026-04-25: DataGraph-inspired typed analytical layers and advanced templates
 
 - Change:

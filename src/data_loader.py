@@ -117,6 +117,14 @@ def _coerce_axis_series(values: pd.Series) -> pd.Series:
     return values.map(_normalize_text)
 
 
+def _looks_numeric(value: Any) -> bool:
+    try:
+        float(_normalize_text(value))
+    except ValueError:
+        return False
+    return True
+
+
 def _read_delimited(path: Path, **kwargs: Any) -> pd.DataFrame:
     last_error: Exception | None = None
     for encoding in ENCODINGS_TO_TRY:
@@ -304,14 +312,20 @@ def load_heatmap_table(
     Row 2: display labels
     Row 3: units
     Row 4+: data rows
+
+    Matrix form is also accepted for DataGraph-style scalar fields:
+    Row 1: empty/corner label followed by X coordinates
+    Column 1: Y coordinates
+    Cells: Z values
     """
     raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    if raw.shape[1] != 3:
+        return _load_heatmap_matrix(raw)
+
     _ensure_minimum_rows(raw, start_row + 1, table_name="Heatmap table")
     _ensure_header_row_content(raw, 0, row_name="role row", table_name="Heatmap table")
     _ensure_header_row_content(raw, 1, row_name="label row", table_name="Heatmap table")
     _ensure_header_row_content(raw, 2, row_name="unit row", table_name="Heatmap table")
-    if raw.shape[1] != 3:
-        raise ValueError("Heatmap table must contain exactly three columns: X, Y, Z.")
 
     roles = [canonicalize_token(_normalize_text(value)) for value in raw.iloc[0].tolist()]
     role_index: dict[str, int] = {}
@@ -347,4 +361,39 @@ def load_heatmap_table(
         y_unit=normalize_unit(_normalize_text(unit_row.iloc[role_index["y"]])),
         z_unit=normalize_unit(_normalize_text(unit_row.iloc[role_index["z"]])),
         data=ordered,
+    )
+
+
+def _load_heatmap_matrix(raw: pd.DataFrame) -> HeatmapTable:
+    if raw.shape[0] < 2 or raw.shape[1] < 2:
+        raise ValueError("Heatmap matrix table must include at least two rows and two columns.")
+    x_cells = raw.iloc[0, 1:].tolist()
+    y_cells = raw.iloc[1:, 0].tolist()
+    if not all(_looks_numeric(value) for value in x_cells) or not all(_looks_numeric(value) for value in y_cells):
+        raise ValueError(
+            "Heatmap matrix table must use numeric X coordinates in row 1 and numeric Y coordinates in column 1."
+        )
+    value_block = raw.iloc[1:, 1:].apply(pd.to_numeric, errors="coerce")
+    if value_block.dropna(how="all").empty:
+        raise ValueError("Heatmap matrix table does not contain numeric Z values.")
+    x_values = [float(_normalize_text(value)) for value in x_cells]
+    y_values = [float(_normalize_text(value)) for value in y_cells]
+    rows: list[dict[str, float]] = []
+    for y_index, y_value in enumerate(y_values):
+        for x_index, x_value in enumerate(x_values):
+            z_value = value_block.iat[y_index, x_index]
+            if pd.isna(z_value):
+                continue
+            rows.append({"x": x_value, "y": y_value, "z": float(z_value)})
+    if not rows:
+        raise ValueError("Heatmap matrix table does not contain finite X/Y/Z cells.")
+    corner = _normalize_text(raw.iat[0, 0])
+    return HeatmapTable(
+        x_label="X",
+        y_label=normalize_label(corner) or "Y",
+        z_label="Z",
+        x_unit="",
+        y_unit="",
+        z_unit="",
+        data=pd.DataFrame(rows),
     )

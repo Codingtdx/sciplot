@@ -22,6 +22,7 @@ from src.rendering.common import (
     validate_rheology_bundle_scales,
     validate_series_scales,
 )
+from src.rendering.datagraph_inputs import series_looks_polar, table_figure_size_error
 from src.rendering.dataset_models import build_normalized_dataset
 from src.rendering.models import PreflightResult, RenderOptions, TemplateName
 from src.rendering.series_order import unknown_series_order_labels
@@ -215,16 +216,22 @@ def preflight_render_request(
             finite_count = int(table.data.dropna(subset=["x", "y", "z"]).shape[0])
             if finite_count < 3:
                 raise ValueError("Contour field requires at least three finite X/Y/Z points.")
+            if int(table.data["x"].nunique(dropna=True)) < 2 or int(table.data["y"].nunique(dropna=True)) < 2:
+                raise ValueError("Contour field requires at least two distinct X and Y coordinates.")
             validate_manual_axis_overrides(options, template=resolved_template)
         elif resolved_template == "polar_curve":
             curve_series = load_curve_table_cached(input_path, sheet)
             if not curve_series:
                 raise ValueError("No valid theta/r series found.")
+            if not series_looks_polar(curve_series):
+                raise ValueError("Polar curve requires theta/radius columns with radian or degree theta units.")
             validate_manual_axis_overrides(options, template=resolved_template)
         elif resolved_template == "table_figure":
             raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
             if raw.empty:
                 raise ValueError("Table figure requires at least one visible row and column.")
+            if size_error := table_figure_size_error(raw):
+                raise ValueError(size_error)
         else:
             raise ValueError(f"Unsupported template in preflight: {resolved_template}")
     except Exception as exc:

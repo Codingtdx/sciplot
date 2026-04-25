@@ -233,6 +233,20 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
     is_ftir_like = "wavenumber" in labels or "cm-1" in labels or "cm" in labels
     is_dsc_like = "heat flow" in labels
     is_xrd_like = "2theta" in labels or "2 theta" in labels or "count" in labels or "intensity" in labels
+    is_polar_like = bool(
+        dataset.candidate_roles.x
+        and dataset.candidate_roles.y
+        and (
+            _clean_token(dataset.candidate_roles.x[0]) in {"theta", "angle", "azimuth"}
+            or "theta" in labels
+            or "angle" in labels
+        )
+        and (
+            _clean_token(dataset.candidate_roles.y[0]) in {"radius", "radial distance", "r"}
+            or "radius" in labels
+            or "radial" in labels
+        )
+    )
 
     hard = (
         f"Normalized dataset model is {dataset.model} with curve_like shape.",
@@ -263,6 +277,8 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
     bubble_scatter_soft = [
         "Bubble scatter adds deterministic point-size encoding to emphasize relative response magnitude."
     ]
+    polar_score = 62.0
+    polar_soft = ["Polar projection remains available for explicit theta/radius data."]
 
     if is_tensile:
         curve_score += 10.0
@@ -387,6 +403,19 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
         bubble_scatter_soft.append("XRD-like traces usually prioritize line-shape comparison over bubble sizing.")
         scatter_fit_soft.append("XRD-like traces usually prioritize spectral shape over fitted trends.")
         mean_band_soft.append("XRD-like traces usually prioritize stacked readability over mean bands.")
+    elif is_polar_like:
+        polar_score = 91.0
+        curve_score -= 8.0
+        point_line_score -= 6.0
+        area_curve_score -= 10.0
+        stacked_score -= 10.0
+        stacked_area_score -= 10.0
+        segmented_score -= 10.0
+        scatter_fit_score -= 8.0
+        mean_band_score -= 8.0
+        polar_soft.append("Theta/radius labels are a direct match for polar rendering.")
+        curve_soft.append("Curve remains available if you need Cartesian theta/r inspection.")
+        point_line_soft.append("Point-line remains available for Cartesian theta/r inspection.")
     else:
         if series_count <= 2:
             curve_score += 4.0
@@ -424,7 +453,7 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             bubble_scatter_soft.append("Many traces can make bubble-size layers visually crowded.")
             scatter_fit_soft.append("Many traces can make fitted overlays visually crowded.")
 
-    candidates = (
+    candidates: tuple[_ScoredCandidate, ...] = (
         _build_candidate(
             template_id="curve",
             score=curve_score,
@@ -558,7 +587,26 @@ def _curve_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...
             optional_enhancements=["Use scatter when you want points without the fit overlay."],
             dataset=dataset,
         ),
+        _build_candidate(
+            template_id="polar_curve",
+            score=polar_score,
+            why_hard_match=(
+                "Normalized dataset model is curve_table with theta/radius roles.",
+                "Detected an angular x-axis and radial y-axis.",
+            )
+            if is_polar_like
+            else (),
+            why_soft_prior=polar_soft,
+            inferred_mapping={
+                "theta": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                "r": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+            },
+            optional_enhancements=["Use curve when the same data should stay in Cartesian coordinates."],
+            dataset=dataset,
+        ),
     )
+    if not is_polar_like:
+        candidates = tuple(candidate for candidate in candidates if candidate.template_id != "polar_curve")
     return tuple(sorted(candidates, key=lambda candidate: (-candidate.score, candidate.template_id)))
 
 
@@ -849,29 +897,47 @@ def _replicate_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate,
 
 def _heatmap_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...]:
     hard = (
-        "Normalized dataset shape includes matrix.",
-        "Detected explicit x / y / z roles in the long table.",
+        "Normalized dataset shape includes matrix and scalar_field.",
+        "Detected explicit x / y / z roles in the source table.",
     )
     return tuple(
         sorted(
             (
-        _build_candidate(
-            template_id="heatmap",
-            score=90.0,
-            why_hard_match=hard,
-            why_soft_prior=["Heatmap is the direct matrix view for x, y, and z input roles."],
-            inferred_mapping={
-                "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
-                "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
-                "z": dataset.candidate_roles.z[0] if dataset.candidate_roles.z else "",
-            },
-            optional_enhancements=["Show the colorbar when the z scale is part of the story."],
-            dataset=dataset,
-            show_colorbar=True,
-        ),
+                _build_candidate(
+                    template_id="heatmap",
+                    score=90.0,
+                    why_hard_match=hard,
+                    why_soft_prior=["Heatmap is the direct matrix view for x, y, and z input roles."],
+                    inferred_mapping={
+                        "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                        "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+                        "z": dataset.candidate_roles.z[0] if dataset.candidate_roles.z else "",
+                    },
+                    optional_enhancements=["Show the colorbar when the z scale is part of the story."],
+                    dataset=dataset,
+                    show_colorbar=True,
+                ),
+                _build_candidate(
+                    template_id="contour_field",
+                    score=88.0,
+                    why_hard_match=hard,
+                    why_soft_prior=[
+                        "Contour field shows the same scalar field as filled isolines for DataGraph-style refinement."
+                    ],
+                    inferred_mapping={
+                        "x": dataset.candidate_roles.x[0] if dataset.candidate_roles.x else "",
+                        "y": dataset.candidate_roles.y[0] if dataset.candidate_roles.y else "",
+                        "z": dataset.candidate_roles.z[0] if dataset.candidate_roles.z else "",
+                    },
+                    optional_enhancements=[
+                        "Use heatmap when cell-level rectangular structure matters more than isolines."
+                    ],
+                    dataset=dataset,
+                    show_colorbar=True,
+                ),
                 _build_candidate(
                     template_id="annotated_heatmap",
-                    score=86.0,
+                    score=84.0,
                     why_hard_match=hard,
                     why_soft_prior=[
                         "Annotated heatmap keeps the same matrix layout and adds deterministic cell labels."
@@ -891,6 +957,20 @@ def _heatmap_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, .
     )
 
 
+def _table_candidates(dataset: NormalizedDataset) -> tuple[_ScoredCandidate, ...]:
+    return (
+        _build_candidate(
+            template_id="table_figure",
+            score=92.0,
+            why_hard_match=("Detected a small table that fits the table_figure renderer.",),
+            why_soft_prior=["Table figure is the direct output when the imported object is already a compact table."],
+            inferred_mapping={"table": dataset.candidate_roles.label[0] if dataset.candidate_roles.label else ""},
+            optional_enhancements=["Use Data Workbook for full table inspection instead of rendering large sheets."],
+            dataset=dataset,
+        ),
+    )
+
+
 def _recommendations_for_dataset(dataset: NormalizedDataset) -> tuple[TemplateRecommendation, ...]:
     if dataset.model in _BUNDLE_MODELS:
         candidates = _bundle_candidates(dataset)
@@ -898,6 +978,8 @@ def _recommendations_for_dataset(dataset: NormalizedDataset) -> tuple[TemplateRe
         candidates = _replicate_candidates(dataset)
     elif dataset.model == "heatmap_table":
         candidates = _heatmap_candidates(dataset)
+    elif dataset.model == "table_summary":
+        candidates = _table_candidates(dataset)
     else:
         candidates = _curve_candidates(dataset)
     top_score = candidates[0].score if candidates else 0.0

@@ -74,6 +74,15 @@ METRIC_HINTS = (
     "伸长",
 )
 GROUP_HINTS = ("group", "sample", "specimen", "test", "status", "样品", "试样", "组")
+Z_HINTS = (
+    "intensity",
+    "signal",
+    "height",
+    "amplitude",
+    "response",
+    "强度",
+    "信号",
+)
 
 
 @dataclass(frozen=True)
@@ -426,21 +435,69 @@ def _column_profiles(
     return tuple(profiles)
 
 
-def _candidate_roles(headers: tuple[str, ...], profiles: tuple[ColumnProfile, ...]) -> CandidateRoles:
+def _role_label_from_xyz_header(
+    frame: pd.DataFrame,
+    *,
+    local_header: int | None,
+    local_data_start: int,
+    column_index: int,
+    fallback: str,
+) -> str:
+    if local_header is None or local_header < 0 or local_header >= frame.shape[0]:
+        return fallback
+    header_value = _cell_text(frame.iloc[local_header, column_index]).lower()
+    if header_value not in {"x", "y", "z"}:
+        return fallback
+    label_row = local_header + 1
+    if label_row < local_data_start and label_row < frame.shape[0]:
+        label = _cell_text(frame.iloc[label_row, column_index])
+        if label and label.lower() not in {"x", "y", "z"}:
+            return label
+    return fallback
+
+
+def _candidate_roles(
+    frame: pd.DataFrame,
+    *,
+    headers: tuple[str, ...],
+    profiles: tuple[ColumnProfile, ...],
+    local_header: int | None,
+    local_data_start: int,
+) -> CandidateRoles:
     x: list[str] = []
     y: list[str] = []
+    z: list[str] = []
     group: list[str] = []
     metric: list[str] = []
-    for header, profile in zip(headers, profiles, strict=False):
+    for column_index, (header, profile) in enumerate(zip(headers, profiles, strict=False)):
         hint_text = " ".join(str(item or "") for item in (header, *profile.header_preview))
+        display_header = _role_label_from_xyz_header(
+            frame,
+            local_header=local_header,
+            local_data_start=local_data_start,
+            column_index=column_index,
+            fallback=header,
+        )
+        header_token = header.strip().lower()
+        if profile.inferred_type == "numeric" and header_token == "x":
+            x.append(display_header)
+            continue
+        if profile.inferred_type == "numeric" and header_token == "y":
+            y.append(display_header)
+            continue
+        if profile.inferred_type == "numeric" and header_token == "z":
+            z.append(display_header)
+            continue
         if profile.inferred_type == "numeric" and _contains_hint(hint_text, X_HINTS):
-            x.append(header)
+            x.append(display_header)
         if profile.inferred_type == "numeric" and _contains_hint(hint_text, Y_HINTS):
-            y.append(header)
+            y.append(display_header)
+        if profile.inferred_type == "numeric" and _contains_hint(hint_text, Z_HINTS):
+            z.append(display_header)
         if profile.inferred_type == "numeric" and _contains_hint(hint_text, METRIC_HINTS):
-            metric.append(header)
+            metric.append(display_header)
         if _contains_hint(hint_text, GROUP_HINTS):
-            group.append(header)
+            group.append(display_header)
     if not x:
         numeric_headers = [profile.name for profile in profiles if profile.inferred_type == "numeric"]
         if numeric_headers:
@@ -451,6 +508,7 @@ def _candidate_roles(headers: tuple[str, ...], profiles: tuple[ColumnProfile, ..
     return CandidateRoles(
         x=tuple(dict.fromkeys(x)),
         y=tuple(dict.fromkeys(y)),
+        z=tuple(dict.fromkeys(z)),
         group=tuple(dict.fromkeys(group)),
         metric=tuple(dict.fromkeys(metric)),
         value=tuple(dict.fromkeys(metric or y)),
@@ -517,7 +575,13 @@ def source_table_preview(
         unit_row_index=local_unit,
         data_start_row_index=min(local_data_start, view.shape[0]),
     )
-    roles = _candidate_roles(headers, profiles)
+    roles = _candidate_roles(
+        view,
+        headers=headers,
+        profiles=profiles,
+        local_header=local_header,
+        local_data_start=local_data_start,
+    )
     bounded_offset = max(0, offset)
     bounded_limit = max(1, min(limit, 200))
     page = view.iloc[bounded_offset : bounded_offset + bounded_limit]
