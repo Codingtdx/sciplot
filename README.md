@@ -147,7 +147,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 - Blocking gate (recommended one-command entry):
   - `.venv/bin/python scripts/blocking_gate.py`
-  - Use `--require-manual --manual-check ...` to enforce all three manual smoke checks in the same run.
+  - Use `--require-manual --manual-check ...` to enforce all three manual smoke checks in the same run. Only pass a `--manual-check` after that desktop flow was actually completed; capture or save-panel failures should be recorded as blocked/pending in `docs/engineering-handoff.md`.
 - Clean:
   - `.venv/bin/python scripts/clean_repo.py`
 - Ruff:

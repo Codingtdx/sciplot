@@ -277,6 +277,7 @@
 
 - `.venv/bin/python scripts/blocking_gate.py`
 - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
+- `--manual-check` 只能在对应真实桌面流实际完成后使用；如果 Computer Use / 屏幕捕获 / 原生保存面板阻塞交互，必须在 `docs/engineering-handoff.md` 记录为 pending 或 blocked，不能为了让 gate 通过而标记完成。
 - `.venv/bin/python scripts/clean_repo.py`
 - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`

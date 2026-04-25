@@ -33,6 +33,37 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-26: Inner Beta Readiness Gate Attempt
+
+- Change:
+  - Closed the previous backend stability hardening package as commit `59d8dff` (`chore: harden inner beta backend gates`) on `codex/plot-data-boundary-hardening`, providing a clean rollback point before readiness evidence collection.
+  - Documented the manual-smoke rule in `README.md` and `AGENTS.md`: `--manual-check` may only be used after the corresponding real desktop flow is actually completed.
+
+- Readiness evidence:
+  - Automated gate before commit: `.venv/bin/python scripts/blocking_gate.py` passed (`pytest` `263 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `181 tests, 0 failures`; manual checks pending).
+  - Interactive Plot smoke partial: launched `app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`, imported `/tmp/sciplot_inner_beta_smoke/curve.csv`, observed Plot recommendation/preview render, and reached the native export-format dialog.
+  - Interactive export was not confirmed: Computer Use hit `SCStreamErrorDomain Code=-3811` and then timed out while the native save panel was open. No exported PDF was created in `/tmp/sciplot_inner_beta_smoke`, so `plot_import_preview_export` remains incomplete.
+  - Artifact fallback attempted: `xcodebuild ... test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSmokeRendersKeyWorkbenchViews` passed and produced xcresult attachments at `app/macos/.derivedData/Logs/Test/Test-SciPlotGodMac-2026.04.26_00-35-24-+0800.xcresult`, but this is snapshot evidence only, not a replacement for interactive manual smoke.
+  - Strict manual gate: `.venv/bin/python scripts/blocking_gate.py --require-manual` passed the automated matrix again (`pytest` `263 passed, 5 warnings`; `xcodebuild test` `181 tests, 0 failures`) and then correctly failed with exit code `2` because no manual checks were honestly marked complete.
+
+- Current beta status:
+  - Backend/rendering/macOS automated readiness is green.
+  - Inner-beta interactive readiness is not fully signed off yet because all three required real desktop flows are still pending or blocked.
+  - GUI redesign remains out of scope for this readiness gate.
+
+- Risks:
+  - Native macOS save/open panels can outlive or destabilize Computer Use capture in this environment; do not interpret that as a product export failure unless the same failure reproduces with direct human interaction.
+  - Passing GUI snapshot tests proves canonical views render, but does not prove file-picker, export destination, or save/reopen interactions.
+
+- Rollback points:
+  - Readiness documentation only: `/Users/dongxutian/Documents/codegod/docs/engineering-handoff.md`, `/Users/dongxutian/Documents/codegod/README.md`, `/Users/dongxutian/Documents/codegod/AGENTS.md`.
+  - Backend stability package rollback point: commit `59d8dff`.
+
+- Next action:
+  - Run the three manual smoke flows with a human at the Mac or a stable desktop automation session.
+  - Only after each flow is actually completed, rerun:
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
+
 ### 2026-04-25: Inner-beta backend stability gate hardening
 
 - Change:
