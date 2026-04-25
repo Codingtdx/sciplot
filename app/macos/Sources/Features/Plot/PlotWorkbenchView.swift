@@ -190,6 +190,7 @@ struct PlotDataWorkbookSheet: View {
         HStack(spacing: 10) {
             workbookTabButton(.sourceData, availability: ActionAvailability.enabled())
             workbookTabButton(.transformed, availability: session.dataTransformAvailability)
+            workbookTabButton(.variables, availability: session.dataTransformAvailability)
             workbookTabButton(.fit, availability: session.fitAnalysisAvailability)
         }
     }
@@ -199,8 +200,37 @@ struct PlotDataWorkbookSheet: View {
         switch session.dataWorkbookTab {
         case .sourceData, .transformed:
             sourceDataContent
+        case .variables:
+            variablesContent
         case .fit:
             fitContent
+        }
+    }
+
+    private var variablesContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if session.dataVariables.isEmpty {
+                EmptyStateCard(title: "No variables")
+            } else {
+                Table(session.dataVariables) {
+                    TableColumn("Name") { variable in
+                        Text(variable.id)
+                    }
+                    TableColumn("Kind") { variable in
+                        Text(variable.kind)
+                    }
+                    TableColumn("Value") { variable in
+                        if variable.kind == "expression" {
+                            Text(variable.expression ?? "")
+                        } else if let value = variable.value {
+                            Text(value.formatted(.number.precision(.fractionLength(4))))
+                        } else {
+                            Text("")
+                        }
+                    }
+                }
+                .frame(minHeight: 320)
+            }
         }
     }
 
@@ -331,6 +361,12 @@ struct PlotDataWorkbookSheet: View {
                         Text("Linear").tag("linear")
                         Text("Polynomial 2").tag("polynomial_2")
                         Text("Polynomial 3").tag("polynomial_3")
+                        Text("Exponential").tag("exponential")
+                        Text("Logarithmic").tag("logarithmic")
+                        Text("Power Law").tag("power_law")
+                        Text("Gaussian").tag("gaussian")
+                        Text("Logistic").tag("logistic")
+                        Text("Custom").tag("custom_function")
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)

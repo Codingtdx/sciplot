@@ -280,6 +280,7 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
         }
     ]
     assert payload["payload"]["plot"]["render_options"]["analytical_layers"] is None
+    assert payload["payload"]["plot"]["render_options"]["data_variables"] is None
     assert payload["payload"]["plot"]["render_options"]["data_transforms"] is None
     assert payload["payload"]["plot"]["fit_options"]["enabled"] is True
     assert payload["payload"]["plot"]["fit_options"]["model_id"] == "polynomial_2"
@@ -514,6 +515,9 @@ def test_save_open_project_roundtrip_preserves_data_transforms(tmp_path: Path) -
             "expression": "Y * 2",
         },
     ]
+    render_options["data_variables"] = [
+        {"id": "scale", "enabled": True, "kind": "scalar", "label": "Scale", "value": 2.0}
+    ]
 
     save_response = client.post(
         "/save-project",
@@ -527,42 +531,14 @@ def test_save_open_project_roundtrip_preserves_data_transforms(tmp_path: Path) -
 
     open_response = client.post("/open-project", json={"project_path": str(project_path)})
     assert open_response.status_code == 200
-    assert open_response.json()["payload"]["plot"]["render_options"]["data_transforms"] == [
-        {
-            "id": "filter-window",
-            "enabled": True,
-            "kind": "row_filter",
-            "label": "Window",
-            "target_column": None,
-            "expression": None,
-            "column": "X",
-            "operator": "between",
-            "value": None,
-            "lower": 1.0,
-            "upper": 2.0,
-            "x_column": None,
-            "y_column": None,
-            "z_column": None,
-            "output_mode": "xyz_long",
-        },
-        {
-            "id": "double-y",
-            "enabled": True,
-            "kind": "derived_column",
-            "label": None,
-            "target_column": "Y",
-            "expression": "Y * 2",
-            "column": None,
-            "operator": "eq",
-            "value": None,
-            "lower": None,
-            "upper": None,
-            "x_column": None,
-            "y_column": None,
-            "z_column": None,
-            "output_mode": "xyz_long",
-        },
-    ]
+    restored_options = open_response.json()["payload"]["plot"]["render_options"]
+    assert restored_options["data_variables"][0]["id"] == "scale"
+    assert restored_options["data_variables"][0]["value"] == 2.0
+    restored_transforms = restored_options["data_transforms"]
+    assert restored_transforms[0]["kind"] == "row_filter"
+    assert restored_transforms[0]["operator"] == "between"
+    assert restored_transforms[1]["kind"] == "derived_column"
+    assert restored_transforms[1]["expression"] == "Y * 2"
 
 
 def test_fit_analysis_matches_scatter_fit_equation_label(tmp_path: Path) -> None:

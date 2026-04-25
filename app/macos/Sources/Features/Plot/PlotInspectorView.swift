@@ -312,6 +312,12 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                         Text("Linear").tag("linear")
                         Text("Polynomial 2").tag("polynomial_2")
                         Text("Polynomial 3").tag("polynomial_3")
+                        Text("Exponential").tag("exponential")
+                        Text("Logarithmic").tag("logarithmic")
+                        Text("Power Law").tag("power_law")
+                        Text("Gaussian").tag("gaussian")
+                        Text("Logistic").tag("logistic")
+                        Text("Custom").tag("custom_function")
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)

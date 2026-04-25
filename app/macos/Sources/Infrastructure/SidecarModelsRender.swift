@@ -386,6 +386,15 @@ struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
     var yColumn: String?
     var zColumn: String?
     var outputMode: String
+    var columns: [String]?
+    var targetType: String?
+    var ascending: Bool
+    var bins: Int?
+    var window: Int?
+    var method: String?
+    var groupBy: [String]?
+    var valueColumns: [String]?
+    var statistics: [String]?
 
     init(
         id: String = UUID().uuidString,
@@ -402,7 +411,16 @@ struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
         xColumn: String? = nil,
         yColumn: String? = nil,
         zColumn: String? = nil,
-        outputMode: String = "xyz_long"
+        outputMode: String = "xyz_long",
+        columns: [String]? = nil,
+        targetType: String? = nil,
+        ascending: Bool = true,
+        bins: Int? = nil,
+        window: Int? = nil,
+        method: String? = nil,
+        groupBy: [String]? = nil,
+        valueColumns: [String]? = nil,
+        statistics: [String]? = nil
     ) {
         self.id = id
         self.enabled = enabled
@@ -419,6 +437,15 @@ struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
         self.yColumn = yColumn
         self.zColumn = zColumn
         self.outputMode = outputMode
+        self.columns = columns
+        self.targetType = targetType
+        self.ascending = ascending
+        self.bins = bins
+        self.window = window
+        self.method = method
+        self.groupBy = groupBy
+        self.valueColumns = valueColumns
+        self.statistics = statistics
     }
 
     enum CodingKeys: String, CodingKey {
@@ -437,6 +464,15 @@ struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
         case yColumn
         case zColumn
         case outputMode
+        case columns
+        case targetType
+        case ascending
+        case bins
+        case window
+        case method
+        case groupBy
+        case valueColumns
+        case statistics
     }
 
     init(from decoder: Decoder) throws {
@@ -456,6 +492,40 @@ struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
         yColumn = try container.decodeIfPresent(String.self, forKey: .yColumn)
         zColumn = try container.decodeIfPresent(String.self, forKey: .zColumn)
         outputMode = try container.decodeIfPresent(String.self, forKey: .outputMode) ?? "xyz_long"
+        columns = try container.decodeIfPresent([String].self, forKey: .columns)
+        targetType = try container.decodeIfPresent(String.self, forKey: .targetType)
+        ascending = try container.decodeIfPresent(Bool.self, forKey: .ascending) ?? true
+        bins = try container.decodeIfPresent(Int.self, forKey: .bins)
+        window = try container.decodeIfPresent(Int.self, forKey: .window)
+        method = try container.decodeIfPresent(String.self, forKey: .method)
+        groupBy = try container.decodeIfPresent([String].self, forKey: .groupBy)
+        valueColumns = try container.decodeIfPresent([String].self, forKey: .valueColumns)
+        statistics = try container.decodeIfPresent([String].self, forKey: .statistics)
+    }
+}
+
+struct DataVariablePayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var kind: String
+    var label: String?
+    var value: Double?
+    var expression: String?
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        kind: String = "scalar",
+        label: String? = nil,
+        value: Double? = 1.0,
+        expression: String? = nil
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.kind = kind
+        self.label = label
+        self.value = value
+        self.expression = expression
     }
 }
 
@@ -489,6 +559,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var textAnnotations: [TextAnnotationPayload]?
     var shapeAnnotations: [ShapeAnnotationPayload]?
     var analyticalLayers: [AnalyticalLayerPayload]?
+    var dataVariables: [DataVariablePayload]?
     var dataTransforms: [DataTransformPayload]?
 
     init(
@@ -521,6 +592,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         textAnnotations: [TextAnnotationPayload]? = nil,
         shapeAnnotations: [ShapeAnnotationPayload]? = nil,
         analyticalLayers: [AnalyticalLayerPayload]? = nil,
+        dataVariables: [DataVariablePayload]? = nil,
         dataTransforms: [DataTransformPayload]? = nil
     ) {
         self.size = size
@@ -552,6 +624,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.textAnnotations = textAnnotations
         self.shapeAnnotations = shapeAnnotations
         self.analyticalLayers = analyticalLayers
+        self.dataVariables = dataVariables
         self.dataTransforms = dataTransforms
     }
 
@@ -587,6 +660,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case textAnnotations
         case shapeAnnotations
         case analyticalLayers
+        case dataVariables
         case dataTransforms
     }
 
@@ -651,6 +725,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         textAnnotations = try container.decodeIfPresent([TextAnnotationPayload].self, forKey: .textAnnotations)
         shapeAnnotations = try container.decodeIfPresent([ShapeAnnotationPayload].self, forKey: .shapeAnnotations)
         analyticalLayers = try container.decodeIfPresent([AnalyticalLayerPayload].self, forKey: .analyticalLayers)
+        dataVariables = try container.decodeIfPresent([DataVariablePayload].self, forKey: .dataVariables)
         dataTransforms = try container.decodeIfPresent([DataTransformPayload].self, forKey: .dataTransforms)
     }
 
@@ -685,6 +760,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(textAnnotations, forKey: .textAnnotations)
         try container.encodeIfPresent(shapeAnnotations, forKey: .shapeAnnotations)
         try container.encodeIfPresent(analyticalLayers, forKey: .analyticalLayers)
+        try container.encodeIfPresent(dataVariables, forKey: .dataVariables)
         try container.encodeIfPresent(dataTransforms, forKey: .dataTransforms)
     }
 }
@@ -692,21 +768,42 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
 struct FitOptionsPayload: Codable, Equatable, Sendable {
     var enabled: Bool
     var modelID: String
+    var customFunction: FitCustomFunctionPayload?
 
-    init(enabled: Bool = false, modelID: String = "linear") {
+    init(enabled: Bool = false, modelID: String = "linear", customFunction: FitCustomFunctionPayload? = nil) {
         self.enabled = enabled
         self.modelID = modelID
+        self.customFunction = customFunction
     }
 
     enum CodingKeys: String, CodingKey {
         case enabled
         case modelID = "modelId"
+        case customFunction
     }
+}
+
+struct FitCustomParameterPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String { name }
+    var name: String
+    var initial: Double
+}
+
+struct FitCustomFunctionPayload: Codable, Equatable, Sendable {
+    var expression: String
+    var parameters: [FitCustomParameterPayload]
 }
 
 struct FileRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
+    let options: RenderOptionsPayload?
+
+    init(inputPath: String, sheet: SheetValue, options: RenderOptionsPayload? = nil) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.options = options
+    }
 }
 
 struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
@@ -860,6 +957,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
     let offset: Int
     let limit: Int
     let options: RenderOptionsPayload?
+    let customFunction: FitCustomFunctionPayload?
 
     init(
         inputPath: String,
@@ -868,7 +966,8 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         seriesID: String? = nil,
         offset: Int = 0,
         limit: Int = 50,
-        options: RenderOptionsPayload? = nil
+        options: RenderOptionsPayload? = nil,
+        customFunction: FitCustomFunctionPayload? = nil
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
@@ -877,6 +976,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         self.offset = offset
         self.limit = limit
         self.options = options
+        self.customFunction = customFunction
     }
 
     enum CodingKeys: String, CodingKey {
@@ -887,6 +987,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         case offset
         case limit
         case options
+        case customFunction
     }
 }
 

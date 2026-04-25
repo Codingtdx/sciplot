@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from src import plot_style
 from src.plot_contract import (
@@ -179,6 +179,7 @@ def resolve_render_options(
     text_annotations: object | None = None,
     shape_annotations: object | None = None,
     analytical_layers: object | None = None,
+    data_variables: object | None = None,
     data_transforms: object | None = None,
     resolved_template_id: str | None = None,
 ) -> RenderOptions:
@@ -266,6 +267,12 @@ def resolve_render_options(
     resolved_analytical_layers = normalize_analytical_layers_payload(analytical_layers)
     if resolved_analytical_layers is not None and "analytical_layers" not in spec.editable_options:
         raise ValueError(f"Template `{template}` does not support option `analytical_layers`.")
+    if data_variables is not None:
+        if not isinstance(data_variables, Sequence) or isinstance(data_variables, (str, bytes, bytearray)):
+            raise ValueError("`data_variables` must be a list of mappings.")
+        resolved_data_variables = tuple(dict(item) for item in data_variables)
+    else:
+        resolved_data_variables = None
     resolved_data_transforms = normalize_data_transforms_payload(data_transforms)
     return RenderOptions(
         width_mm=width_mm,
@@ -330,6 +337,7 @@ def resolve_render_options(
         text_annotations=normalize_text_annotations_payload(text_annotations),
         shape_annotations=normalize_shape_annotations_payload(shape_annotations),
         analytical_layers=resolved_analytical_layers,
+        data_variables=resolved_data_variables,
         data_transforms=resolved_data_transforms,
     )
 

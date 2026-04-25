@@ -148,14 +148,78 @@ struct PlotDataTransformInspectorView: View {
     var body: some View {
         DisclosureGroup("Data") {
             HStack(spacing: 8) {
+                Button("Variable") {
+                    session.addDataVariable(kind: "scalar")
+                }
+                Button("Expression Var") {
+                    session.addDataVariable(kind: "expression")
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(!session.dataTransformAvailability.isEnabled)
+
+            ForEach(session.dataVariables) { variable in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Text(variable.label?.isEmpty == false ? variable.label ?? variable.id : variable.id)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 12)
+                        Toggle("", isOn: variableEnabledBinding(id: variable.id))
+                            .labelsHidden()
+                        Button("Remove") {
+                            session.removeDataVariable(id: variable.id)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    AdaptiveInspectorControlRow(title: "Name") {
+                        TextField("baseline", text: variableTextBinding(id: variable.id, keyPath: \.id))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    AdaptiveInspectorControlRow(title: "Kind") {
+                        Picker("", selection: variableTextBinding(id: variable.id, keyPath: \.kind)) {
+                            Text("Scalar").tag("scalar")
+                            Text("Expression").tag("expression")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+                    if variable.kind == "expression" {
+                        AdaptiveInspectorControlRow(title: "Expression") {
+                            TextField("1 + 1", text: variableTextBinding(id: variable.id, keyPath: \.expression))
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    } else {
+                        AdaptiveInspectorControlRow(title: "Value") {
+                            TextField("1", text: variableNumberBinding(id: variable.id))
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+                }
+                .padding(.top, 6)
+            }
+
+            HStack(spacing: 8) {
                 Button("Derived") {
                     session.addDataTransform(kind: "derived_column")
+                }
+                Button("Mask") {
+                    session.addDataTransform(kind: "mask_filter")
                 }
                 Button("Filter") {
                     session.addDataTransform(kind: "row_filter")
                 }
                 Button("Pivot") {
                     session.addDataTransform(kind: "pivot_matrix")
+                }
+                Button("Bin") {
+                    session.addDataTransform(kind: "bin_column")
+                }
+                Button("Smooth") {
+                    session.addDataTransform(kind: "rolling_window")
+                }
+                Button("Aggregate") {
+                    session.addDataTransform(kind: "aggregate_summary")
                 }
             }
             .buttonStyle(.bordered)
@@ -186,10 +250,20 @@ struct PlotDataTransformInspectorView: View {
                     }
 
                     switch transform.kind {
+                    case "mask_filter":
+                        expressionOnlyControls(id: transform.id, placeholder: "col('x') > 0")
                     case "row_filter":
                         rowFilterControls(id: transform.id)
                     case "pivot_matrix":
                         pivotControls(id: transform.id)
+                    case "bin_column":
+                        binControls(id: transform.id)
+                    case "rolling_window":
+                        rollingControls(id: transform.id)
+                    case "aggregate_summary":
+                        aggregateControls(id: transform.id)
+                    case "sort_rows", "select_columns", "type_cast":
+                        columnListControls(id: transform.id)
                     default:
                         derivedColumnControls(id: transform.id)
                     }
@@ -201,6 +275,10 @@ struct PlotDataTransformInspectorView: View {
 
     private func dataTransform(_ id: String) -> DataTransformPayload {
         session.dataTransforms.first(where: { $0.id == id }) ?? DataTransformPayload(id: id)
+    }
+
+    private func dataVariable(_ id: String) -> DataVariablePayload {
+        session.dataVariables.first(where: { $0.id == id }) ?? DataVariablePayload(id: id)
     }
 
     private func derivedColumnControls(id: String) -> some View {
@@ -251,6 +329,13 @@ struct PlotDataTransformInspectorView: View {
         }
     }
 
+    private func expressionOnlyControls(id: String, placeholder: String) -> some View {
+        AdaptiveInspectorControlRow(title: "Expression") {
+            TextField(placeholder, text: textBinding(id: id, keyPath: \.expression))
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
     private func pivotControls(id: String) -> some View {
         Group {
             AdaptiveInspectorControlRow(title: "X/Y/Z") {
@@ -263,6 +348,72 @@ struct PlotDataTransformInspectorView: View {
                         .textFieldStyle(.roundedBorder)
                 }
             }
+            AdaptiveInspectorControlRow(title: "Mode") {
+                Picker("", selection: textBinding(id: id, keyPath: \.outputMode)) {
+                    Text("XYZ Long").tag("xyz_long")
+                    Text("Matrix").tag("matrix")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+        }
+    }
+
+    private func binControls(id: String) -> some View {
+        Group {
+            AdaptiveInspectorControlRow(title: "Column") {
+                TextField("Column", text: textBinding(id: id, keyPath: \.column))
+                    .textFieldStyle(.roundedBorder)
+            }
+            AdaptiveInspectorControlRow(title: "Target/Bins") {
+                HStack(spacing: 8) {
+                    TextField("bin", text: textBinding(id: id, keyPath: \.targetColumn))
+                        .textFieldStyle(.roundedBorder)
+                    TextField("10", text: intBinding(id: id, keyPath: \.bins))
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private func rollingControls(id: String) -> some View {
+        Group {
+            AdaptiveInspectorControlRow(title: "Column") {
+                TextField("Column", text: textBinding(id: id, keyPath: \.column))
+                    .textFieldStyle(.roundedBorder)
+            }
+            AdaptiveInspectorControlRow(title: "Target/Window") {
+                HStack(spacing: 8) {
+                    TextField("smoothed", text: textBinding(id: id, keyPath: \.targetColumn))
+                        .textFieldStyle(.roundedBorder)
+                    TextField("3", text: intBinding(id: id, keyPath: \.window))
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private func aggregateControls(id: String) -> some View {
+        Group {
+            AdaptiveInspectorControlRow(title: "Group By") {
+                TextField("group", text: stringListBinding(id: id, keyPath: \.groupBy))
+                    .textFieldStyle(.roundedBorder)
+            }
+            AdaptiveInspectorControlRow(title: "Values") {
+                TextField("signal", text: stringListBinding(id: id, keyPath: \.valueColumns))
+                    .textFieldStyle(.roundedBorder)
+            }
+            AdaptiveInspectorControlRow(title: "Stats") {
+                TextField("mean,sd,sem,count", text: stringListBinding(id: id, keyPath: \.statistics))
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+
+    private func columnListControls(id: String) -> some View {
+        AdaptiveInspectorControlRow(title: "Columns") {
+            TextField("x, y", text: stringListBinding(id: id, keyPath: \.columns))
+                .textFieldStyle(.roundedBorder)
         }
     }
 
@@ -288,6 +439,83 @@ struct PlotDataTransformInspectorView: View {
         } set: { newValue in
             session.updateDataTransform(id: id) { transform in
                 transform[keyPath: keyPath] = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newValue
+            }
+        }
+    }
+
+    private func textBinding(id: String, keyPath: WritableKeyPath<DataTransformPayload, String>) -> Binding<String> {
+        Binding {
+            dataTransform(id)[keyPath: keyPath]
+        } set: { newValue in
+            session.updateDataTransform(id: id) { transform in
+                transform[keyPath: keyPath] = newValue
+            }
+        }
+    }
+
+    private func intBinding(id: String, keyPath: WritableKeyPath<DataTransformPayload, Int?>) -> Binding<String> {
+        Binding {
+            dataTransform(id)[keyPath: keyPath]?.formatted() ?? ""
+        } set: { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            session.updateDataTransform(id: id) { transform in
+                transform[keyPath: keyPath] = trimmed.isEmpty ? nil : Int(trimmed)
+            }
+        }
+    }
+
+    private func stringListBinding(
+        id: String,
+        keyPath: WritableKeyPath<DataTransformPayload, [String]?>
+    ) -> Binding<String> {
+        Binding {
+            dataTransform(id)[keyPath: keyPath]?.joined(separator: ", ") ?? ""
+        } set: { newValue in
+            let items = newValue
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            session.updateDataTransform(id: id) { transform in
+                transform[keyPath: keyPath] = items.isEmpty ? nil : items
+            }
+        }
+    }
+
+    private func variableEnabledBinding(id: String) -> Binding<Bool> {
+        Binding {
+            dataVariable(id).enabled
+        } set: { newValue in
+            session.updateDataVariable(id: id, policy: .immediate) { $0.enabled = newValue }
+        }
+    }
+
+    private func variableTextBinding(id: String, keyPath: WritableKeyPath<DataVariablePayload, String>) -> Binding<String> {
+        Binding {
+            dataVariable(id)[keyPath: keyPath]
+        } set: { newValue in
+            session.updateDataVariable(id: id) { variable in
+                variable[keyPath: keyPath] = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+    }
+
+    private func variableTextBinding(id: String, keyPath: WritableKeyPath<DataVariablePayload, String?>) -> Binding<String> {
+        Binding {
+            dataVariable(id)[keyPath: keyPath] ?? ""
+        } set: { newValue in
+            session.updateDataVariable(id: id) { variable in
+                variable[keyPath: keyPath] = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newValue
+            }
+        }
+    }
+
+    private func variableNumberBinding(id: String) -> Binding<String> {
+        Binding {
+            dataVariable(id).value?.formatted(.number.precision(.fractionLength(4))) ?? ""
+        } set: { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            session.updateDataVariable(id: id) { variable in
+                variable.value = trimmed.isEmpty ? nil : Double(trimmed)
             }
         }
     }

@@ -33,6 +33,33 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: DataGraph-style typed data engine expansion
+
+- Change:
+  - Added shared backend expression kernel in `src/rendering/expression_engine.py` for function layers, typed data transforms, variables, and custom fit expressions.
+  - Expanded `render_options.data_variables` and `render_options.data_transforms` as the durable DataGraph-style data engine surface. Variables support enabled scalar and expression values; transforms now cover `derived_column`, `row_filter`, `mask_filter`, `sort_rows`, `select_columns`, `type_cast`, `bin_column`, `aggregate_summary`, `rolling_window`, and `pivot_matrix` with `xyz_long` or matrix output.
+  - Wired transform-aware data preparation through inspect/recommendation, source-table preview, render/preflight/export loaders, fit analysis, Data Workbook `Transformed`/`Variables`, and `.sciplotgod` project save/open normalization.
+  - Extended shared fit analysis to `exponential`, `logarithmic`, `power_law`, `gaussian`, `logistic`, and backend-only `custom_function` in addition to the existing linear/polynomial models.
+  - Added macOS Codable/schema coverage and basic Plot inspector controls for variables, masks, binning, aggregate, and smoothing without adding Swift math execution or a DataGraph command-stack UI.
+- User-visible impact:
+  - Plot can now keep reusable variables and richer table transforms with the figure state; transformed data can drive recommendations, preview/export, fitting, and project restore.
+  - Users can access more fit models from the same fit surface; custom functions remain backend-owned and typed.
+  - Data Workbook can inspect source, transformed data, variables, and fit output as separate read-only views.
+- Decision Record:
+  - First-principles motivation: DataGraph's transferable value is a durable data/variable layer underneath graph commands. This round makes that layer typed and replayable while preserving SciPlot God's recommendation-first Plot flow.
+  - Alternatives rejected: a free-form command interpreter, arbitrary Python, Swift-side expression evaluation, or renderer-local temporary table mutation. Each would create a second semantic source and make project replay less trustworthy.
+  - Current boundary: variables are scalar-only, custom fit is bounded by explicit expression and parameter payloads, transforms are single-table operations, and the GUI remains a basic typed-payload editor. Joins, full spreadsheet editing, animation, and a final DataGraph-style command UI remain out of scope.
+  - Failure conditions: if future renderers bypass the transform-aware preparation path, Data Workbook, fit, preview/export, and inspect recommendations can diverge. If future GUI code starts evaluating expressions locally, backend error semantics and saved project replay will drift.
+- Risk / rollback:
+  - Roll back `src/rendering/expression_engine.py`, expanded `src/rendering/data_transforms.py`, fit model additions, sidecar schema fields, and macOS data inspector additions if transform-aware rendering or project restore regresses.
+  - The no-options import path remains the containment point for ordinary quick-plot recommendation performance.
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_expression_engine.py tests/test_data_transforms.py tests/test_rendering_services.py tests/test_sidecar_render.py tests/test_plot_project_routes.py tests/test_rendering_recommender.py -q`: passed (`126 passed`, existing warnings only).
+  - `.venv/bin/python -m ruff check src/rendering/expression_engine.py src/rendering/data_transforms.py src/rendering/analytical_layers.py src/rendering/fit_analysis.py src/rendering/dataset_models.py src/rendering/cache.py src/rendering/options.py app/sidecar/routes_render.py app/sidecar/schemas_render.py app/sidecar/render_support.py app/sidecar/project_bundle.py tests/test_expression_engine.py tests/test_data_transforms.py tests/test_sidecar_render.py tests/test_plot_project_routes.py`: passed.
+  - `.venv/bin/python -m mypy src/rendering src/data_loader.py`: passed.
+  - `xcodebuild ... test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderRequestWithExtraAxes -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataTransformEditsRefreshPreviewUndoAndPersistIntoProjectPayload -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataWorkbookTransformedTabRequestsTransformAwarePreview`: passed (`3 tests, 0 failures`; CoreSimulator out-of-date warning only).
+  - Full gate results for this round are recorded after the complete validation sweep below.
+
 ### 2026-04-25: Typed Data Transform v1 backend path
 
 - Change:

@@ -201,6 +201,18 @@ extension PlotSession {
             return "Polynomial 2"
         case "polynomial_3":
             return "Polynomial 3"
+        case "exponential":
+            return "Exponential"
+        case "logarithmic":
+            return "Logarithmic"
+        case "power_law":
+            return "Power Law"
+        case "gaussian":
+            return "Gaussian"
+        case "logistic":
+            return "Logistic"
+        case "custom_function":
+            return "Custom"
         default:
             return "Linear"
         }
@@ -524,6 +536,10 @@ extension PlotSession {
 
     var dataTransforms: [DataTransformPayload] {
         renderOptions.dataTransforms ?? []
+    }
+
+    var dataVariables: [DataVariablePayload] {
+        renderOptions.dataVariables ?? []
     }
 
     var xAxisBreaks: [AxisBreakPayload] {

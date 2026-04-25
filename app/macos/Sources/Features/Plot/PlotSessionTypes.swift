@@ -9,6 +9,7 @@ enum PlotPreviewRefreshPolicy {
 enum PlotDataWorkbookTab: String, CaseIterable, Identifiable, Hashable {
     case sourceData
     case transformed
+    case variables
     case fit
 
     var id: String { rawValue }
@@ -19,6 +20,8 @@ enum PlotDataWorkbookTab: String, CaseIterable, Identifiable, Hashable {
             return "Source Data"
         case .transformed:
             return "Transformed"
+        case .variables:
+            return "Variables"
         case .fit:
             return "Fit"
         }
