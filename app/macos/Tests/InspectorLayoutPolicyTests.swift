@@ -111,6 +111,25 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         }
     }
 
+    func testPlotDataWorkbookSheetHasDedicatedFileAndPipelineSummary() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Features/Plot", isDirectory: true)
+        let workbenchSource = try String(
+            contentsOf: sourceRoot.appendingPathComponent("PlotWorkbenchView.swift"),
+            encoding: .utf8
+        )
+        let workbookSource = try String(
+            contentsOf: sourceRoot.appendingPathComponent("PlotDataWorkbookSheet.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(workbenchSource.contains("struct PlotDataWorkbookSheet"))
+        XCTAssertTrue(workbookSource.contains("struct PlotDataWorkbookSheet"))
+        XCTAssertTrue(workbookSource.contains("dataPipelineSummary"))
+    }
+
     private func canonicalWorkbenchSnapshots() async throws -> [(String, Data)] {
         let plotSession = PlotSession()
         plotSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -422,9 +441,9 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         nonWhiteFraction: 0.1806
     ),
     "Plot data workbook": SnapshotFingerprint(
-        differenceHash: 0x8080808080a48300,
-        averageLuma: 0.6247,
-        nonWhiteFraction: 0.5139
+        differenceHash: 0x8080808080a60300,
+        averageLuma: 0.5863,
+        nonWhiteFraction: 0.6111
     ),
     "Data Studio template editor": SnapshotFingerprint(
         differenceHash: 0x7001010909190900,

@@ -1,6 +1,12 @@
 import CoreGraphics
 import Foundation
 
+struct PlotDataPipelineSummary: Equatable {
+    let title: String
+    let detail: String
+    let hasPipeline: Bool
+}
+
 extension PlotSession {
     var currentProjectSnapshot: ProjectSnapshot? {
         guard let selectedFileURL else {
@@ -542,6 +548,36 @@ extension PlotSession {
         renderOptions.dataVariables ?? []
     }
 
+    var dataPipelineSummary: PlotDataPipelineSummary {
+        let variableCount = dataVariables.count
+        let transformCount = dataTransforms.count
+        guard variableCount > 0 || transformCount > 0 else {
+            return PlotDataPipelineSummary(
+                title: "No data edits",
+                detail: "Source data is used directly.",
+                hasPipeline: false
+            )
+        }
+
+        let titleParts = [
+            countLabel(variableCount, singular: "variable", plural: "variables"),
+            countLabel(transformCount, singular: "transform", plural: "transforms")
+        ].compactMap { $0 }
+
+        let activeTransformCount = dataTransforms.filter { $0.enabled }.count
+        let disabledTransformCount = transformCount - activeTransformCount
+        let detailParts = [
+            countLabel(activeTransformCount, singular: "active transform", plural: "active transforms"),
+            countLabel(disabledTransformCount, singular: "disabled", plural: "disabled")
+        ].compactMap { $0 }
+
+        return PlotDataPipelineSummary(
+            title: titleParts.joined(separator: ", "),
+            detail: detailParts.isEmpty ? "Variables are available to expressions." : detailParts.joined(separator: ", "),
+            hasPipeline: true
+        )
+    }
+
     var xAxisBreaks: [AxisBreakPayload] {
         renderOptions.xAxisBreaks ?? []
     }
@@ -768,4 +804,11 @@ extension PlotSession {
 
         return .enabled()
     }
+}
+
+private func countLabel(_ count: Int, singular: String, plural: String) -> String? {
+    guard count > 0 else {
+        return nil
+    }
+    return "\(count) \(count == 1 ? singular : plural)"
 }

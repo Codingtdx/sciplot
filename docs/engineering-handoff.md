@@ -33,6 +33,29 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: Plot DataGraph-style data inspector split and pipeline summary seam
+
+- Change:
+  - Split `PlotDataTransformInspectorView` out of `PlotFunctionLayerInspectorView.swift` into its own Plot feature file and added it to the macOS Xcode target.
+  - Added `PlotDataPipelineSummary` as a small presentation seam on `PlotSession` so the DataGraph-style variables/transforms pipeline can be summarized from one place instead of each UI surface recounting it.
+  - Added a compact Pipeline/Status row to the Plot inspector Data disclosure so the existing typed variables/transforms editor has a clearer state surface without changing the backend contract or `nature` metrics.
+  - Added macOS regression coverage for empty, active, and disabled data-pipeline summary states.
+- User-visible impact:
+  - Plot's Advanced Plot -> Data section now shows whether source data is used directly or how many variables/transforms are active.
+  - No route, contract, renderer, default-style, or project-file schema changes.
+- Decision Record:
+  - First-principles motivation: the DataGraph-style data engine should become a productized workflow through typed presentation seams, not more controls piled into a mixed function/data inspector file.
+  - Alternatives rejected: leaving the Data inspector embedded in the function-layer file, or adding UI-local recounting in each future Data Workbook pane. Both would keep structure debt in the path of the next Data Workbook v2 work.
+  - Current boundary: this is a macOS structure/presentation cleanup only. Variables and transforms remain backend-owned typed payloads, and Swift still does not evaluate expressions.
+  - Failure conditions: future Data Workbook or inspector panes can drift again if they compute their own variable/transform counts rather than using `dataPipelineSummary`.
+- Risk / rollback:
+  - Roll back `PlotDataTransformInspectorView.swift` and the Xcode project membership if target membership or SwiftUI compile behavior regresses.
+  - Roll back `PlotDataPipelineSummary` and the inspector summary rows independently if the state copy proves too noisy.
+- Actual regression results:
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataPipelineSummaryCountsVariablesAndActiveTransforms`: failed before implementation because `PlotSession` had no `dataPipelineSummary`, then passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`clean_repo` reclaimed approx `236.6 MB`; `ruff` passed; `mypy` passed; `pytest` `258 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `180 tests, 0 failures`). Manual smoke checklist remained pending because `--require-manual` was not used.
+  - Known environment noise: Xcode still reports the existing CoreSimulator out-of-date warning; macOS platform build/test passed.
+
 ### 2026-04-25: Plot/Data Studio boundary and transform-aware inspection hardening
 
 - Change:
@@ -3821,3 +3844,50 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed（`76 tests`）
   - `git diff --check`: passed
   - `xcodebuild ... test` full suite command in this round was attempted but timed out in this tool session; no failure signal was observed before timeout, and the changed areas are covered by the targeted suite above.
+
+### 2026-04-25 (Round BI): Plot Data Workbook sheet boundary + shared pipeline summary
+
+- Scope:
+  - 拆分 Plot 主工作台与 Data Workbook 子界面：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - Data Workbook header 复用 `PlotSession.dataPipelineSummary`，让 inspector `Data` section 与 workbook header 使用同一 presentation seam：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataTransformInspectorView.swift`
+  - 回归测试覆盖文件边界、pipeline summary 行为与 GUI fingerprint：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+
+- User-visible impact:
+  - Plot `Data Workbook` header 现在显示与 inspector 一致的数据管线短状态，例如变量/transform 数量与 active/disabled transform 计数。
+  - 主 Plot workbench 行为、导入、模板、预览、导出路径不变。
+
+- Risks:
+  - Data Workbook 子界面现在独立编译；后续新增 workbook 控件必须确保新文件已加入 `SciPlotGodMac` target membership。
+  - GUI snapshot 中 `Plot data workbook` 基线已因 header 新增 summary 更新；若后续布局微调，需要确认 drift 是否只来自 workbook 视图。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 Plot 主工作台布局与 Data Workbook 子工作面分层，避免继续把 variables/transforms/fit 的 V2 入口堆进 `PlotWorkbenchView.swift`。
+    - `dataPipelineSummary` 作为共享 presentation seam，避免 inspector 与 workbook 各自拼一套数据管线文案。
+  - Rejected alternatives:
+    - 继续把 workbook UI 留在 `PlotWorkbenchView.swift`：拒绝，因为主工作台文件会重新承担子界面细节，后续 V2 控件扩展会放大结构债。
+    - 在 Data Workbook header 单独计算变量/transform 文案：拒绝，因为会产生重复 presentation 状态。
+  - Boundaries:
+    - 不改 `src/plot_contract.json`、sidecar schema、public template、`nature` 冻结指标。
+    - Swift 仍只编辑 typed payload 与展示后端结果，不引入表达式执行器或第二套数据引擎。
+
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testPlotDataWorkbookSheetHasDedicatedFileAndPipelineSummary`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSnapshotFingerprintsStayStable`: passed（`Plot data workbook` fingerprint updated after intentional header change）
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataPipelineSummaryCountsVariablesAndActiveTransforms`: passed
+  - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest `258 passed`/smoke_check/xcodebuild build/xcodebuild test `181 tests`；manual checklist reported pending and was not enforced）
+  - `git diff --check`: passed
+  - Manual GUI smoke: pending by plan; `--require-manual` not run in this round.

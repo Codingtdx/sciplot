@@ -632,6 +632,31 @@ final class PlotSessionTests: XCTestCase {
         )
     }
 
+    func testDataPipelineSummaryCountsVariablesAndActiveTransforms() async throws {
+        let session = PlotSession()
+
+        XCTAssertFalse(session.dataPipelineSummary.hasPipeline)
+        XCTAssertEqual(session.dataPipelineSummary.title, "No data edits")
+        XCTAssertEqual(session.dataPipelineSummary.detail, "Source data is used directly.")
+
+        session.addDataVariable(kind: "scalar")
+        session.addDataVariable(kind: "expression")
+        session.addDataTransform(kind: "derived_column")
+        session.addDataTransform(kind: "row_filter")
+
+        guard let disabledTransformID = session.renderOptions.dataTransforms?.last?.id else {
+            XCTFail("Expected a data transform to disable.")
+            return
+        }
+        session.updateDataTransform(id: disabledTransformID, policy: .immediate) {
+            $0.enabled = false
+        }
+
+        XCTAssertTrue(session.dataPipelineSummary.hasPipeline)
+        XCTAssertEqual(session.dataPipelineSummary.title, "2 variables, 2 transforms")
+        XCTAssertEqual(session.dataPipelineSummary.detail, "1 active transform, 1 disabled")
+    }
+
     func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
