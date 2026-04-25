@@ -10,7 +10,14 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from src.data_loader import CurveSeries, HeatmapTable, ReplicateGroup
+from src.data_loader import (
+    CurveSeries,
+    HeatmapTable,
+    ReplicateGroup,
+    load_curve_table_from_frame,
+    load_heatmap_table_from_frame,
+    load_replicate_table_from_frame,
+)
 from src.rendering.cache import (
     load_curve_table_cached,
     load_frequency_sweep_metrics_cached,
@@ -19,6 +26,7 @@ from src.rendering.cache import (
     load_stress_relaxation_metric_cached,
     load_temperature_sweep_metrics_cached,
     read_raw_table_cached,
+    read_raw_table_for_options,
 )
 from src.rendering.common import looks_like_tensile_curve, summarize_replicate_distribution
 from src.rheology_loader import RheologySeries
@@ -327,6 +335,45 @@ def detect_input_model(input_path: Path, sheet: str | int = 0) -> str:
     )
 
 
+def _detect_input_model_from_raw(input_path: Path, raw: pd.DataFrame) -> str:
+    headers = tuple(_string_or_none(item) or "" for item in raw.iloc[0].tolist()) if not raw.empty else ()
+    cleaned_headers = {canonicalize_token(item) for item in headers}
+    if {"theta", "radius"}.issubset(cleaned_headers) or {"angle", "radius"}.issubset(cleaned_headers):
+        return "curve_table"
+    with suppress(Exception):
+        series_list = load_curve_table_from_frame(raw)
+        if looks_like_tensile_curve(series_list):
+            return "tensile_curve"
+        return "curve_table"
+    with suppress(Exception):
+        load_heatmap_table_from_frame(raw)
+        return "heatmap_table"
+    with suppress(Exception):
+        load_replicate_table_from_frame(raw)
+        return "replicate_table"
+    with suppress(Exception):
+        compact = raw.dropna(how="all").dropna(axis=1, how="all")
+        if _looks_like_small_table_figure(compact):
+            return "table_summary"
+    raise ValueError(
+        f"Could not recognize transformed data from `{input_path.name}`. "
+        "Adjust transforms so the result is a curve, replicate, scalar field, or compact table."
+    )
+
+
+def _candidate_roles_for_simple_curve_raw(raw: pd.DataFrame) -> CandidateRoles:
+    headers = tuple(_string_or_none(item) or "" for item in raw.iloc[0].tolist()) if not raw.empty else ()
+    polar_x = [value for value in headers if canonicalize_token(value) in {"theta", "angle", "azimuth"}]
+    polar_y = [value for value in headers if canonicalize_token(value) in {"radius", "radial distance", "r"}]
+    x_candidates = polar_x or [value for value in headers if canonicalize_token(value) == "x"]
+    y_candidates = polar_y or [value for value in headers if canonicalize_token(value) == "y"]
+    return CandidateRoles(
+        x=tuple(x_candidates[:1]),
+        y=tuple(y_candidates[:1]),
+        series=tuple(value for value in headers if value),
+    )
+
+
 def _data_shapes_for_model(model: str) -> tuple[DataShape, ...]:
     if model in {"curve_table", "tensile_curve", "frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         return ("curve_like",)
@@ -528,12 +575,104 @@ def _build_normalized_dataset_cached(
     )
 
 
+def _build_normalized_dataset_from_raw(
+    input_path: Path,
+    sheet: str | int,
+    raw: pd.DataFrame,
+    *,
+    model: str | None = None,
+) -> NormalizedDataset:
+    working_raw = raw.dropna(axis=1, how="all")
+    resolved_model = model or _detect_input_model_from_raw(input_path, working_raw)
+    extra_quality_flags: list[str] = []
+    if resolved_model == "replicate_table":
+        groups = load_replicate_table_from_frame(working_raw)
+        replicate_summary = summarize_replicate_distribution(groups)
+        candidate_roles = _candidate_roles_for_replicates(groups)
+        semantic_signals = (
+            "Detected a statistical replicate table.",
+            "Rows contain grouped replicate measurements.",
+            "The transformed input can be rendered as a distribution figure.",
+        )
+        if replicate_summary.total_points < 12 or replicate_summary.min_group_points < 4:
+            extra_quality_flags.append("replicate_sparse_replicates")
+        if replicate_summary.min_group_points < 2:
+            extra_quality_flags.append("replicate_singleton_groups")
+        if replicate_summary.total_points >= 8 and replicate_summary.pooled_unique_ratio <= 0.35:
+            extra_quality_flags.append("replicate_highly_discrete")
+    elif resolved_model == "heatmap_table":
+        table = load_heatmap_table_from_frame(working_raw)
+        candidate_roles = _candidate_roles_for_heatmap(table)
+        semantic_signals = (
+            "Detected a scalar-field table.",
+            "The transformed data contains X, Y, and Z roles.",
+            "This input can be rendered as heatmap or contour-style figures.",
+        )
+    elif resolved_model == "table_summary":
+        candidate_roles = CandidateRoles(
+            label=tuple(
+                value
+                for value in (_string_or_none(item) for item in raw.iloc[0].tolist())
+                if value is not None
+            ),
+        )
+        semantic_signals = (
+            "Detected a small table figure input.",
+            "The transformed table is compact enough to render as a figure output.",
+            "This path is for presentation tables, not full workbook export.",
+        )
+    else:
+        try:
+            series_list = load_curve_table_from_frame(working_raw)
+            candidate_roles = _candidate_roles_for_curve(series_list)
+        except Exception:
+            series_list = []
+            candidate_roles = _candidate_roles_for_simple_curve_raw(working_raw)
+        semantic_signals = (
+            "Detected a transformed paired curve table.",
+            "The transformed data is entering the same recommendation path as imported source data.",
+            "The default path is a standard curve plot.",
+        )
+        if series_list and looks_like_tensile_curve(series_list):
+            semantic_signals = (
+                "The x-axis label or unit matches strain / elongation / %.",
+                "The y-axis label or unit matches stress / MPa.",
+                "Tensile curves always stay on linear x/y axes by default.",
+            )
+    column_profiles = _summarize_raw_columns(working_raw)
+    quality_flags = tuple(dict.fromkeys(_quality_flags(raw, working_raw=working_raw) + tuple(extra_quality_flags)))
+    data_shapes = _data_shapes_for_model("curve_table" if resolved_model == "curve_table" else resolved_model)
+    return NormalizedDataset(
+        dataset_id=_dataset_id(
+            source_path=input_path,
+            sheet=sheet,
+            model=resolved_model,
+            raw_rows=int(raw.shape[0]),
+            raw_cols=int(raw.shape[1]),
+        ),
+        source_path=input_path,
+        sheet=sheet,
+        raw_rows=int(raw.shape[0]),
+        raw_cols=int(raw.shape[1]),
+        column_profiles=tuple(column_profiles),
+        candidate_roles=candidate_roles,
+        data_shapes=data_shapes,
+        semantic_signals=semantic_signals,
+        quality_flags=quality_flags,
+        model=resolved_model,
+    )
+
+
 def build_normalized_dataset(
     input_path: Path,
     sheet: str | int = 0,
     *,
     model: str | None = None,
+    options: object = None,
 ) -> NormalizedDataset:
+    if options is not None and getattr(options, "data_transforms", None) is not None:
+        raw = read_raw_table_for_options(input_path, sheet, options)
+        return _build_normalized_dataset_from_raw(input_path, sheet, raw, model=model)
     cache_key = _normalized_dataset_cache_key(
         input_path=input_path,
         sheet=sheet,

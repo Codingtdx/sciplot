@@ -46,7 +46,7 @@ def preflight_render_request(
     warnings: list[str] = list(style_preflight_warnings(options))
     errors: list[str] = []
     normalized_dataset = (
-        build_normalized_dataset(input_path, sheet)
+        build_normalized_dataset(input_path, sheet, options=options)
         if resolved_template
         in _STANDARD_CURVE_TEMPLATES
         | _FIT_SCATTER_TEMPLATES

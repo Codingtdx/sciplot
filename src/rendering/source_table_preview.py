@@ -531,6 +531,7 @@ def source_table_preview(
     unit_row_index: int | None = None,
     data_start_row_index: int | None = None,
     data_transforms: object = None,
+    data_variables: object = None,
 ) -> SourceTablePreview:
     source_path = Path(path).expanduser()
     sheets, resolved_encoding, resolved_delimiter = read_source_sheets(
@@ -541,7 +542,7 @@ def source_table_preview(
     resolved_sheet = _coerce_sheet(sheet)
     sheet_name, frame = _select_sheet(sheets, resolved_sheet)
     if data_transforms is not None:
-        frame = apply_data_transforms_to_frame(frame, data_transforms)
+        frame = apply_data_transforms_to_frame(frame, data_transforms, variables=data_variables)
     segments = detect_source_segments(sheet_name, frame)
     selected_segment = next((segment for segment in segments if segment.id == segment_id), None)
     if segment_id and selected_segment is None:

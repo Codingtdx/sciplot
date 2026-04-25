@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import ast
 import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from src.rendering.expression_engine import ExpressionError, evaluate_expression, evaluate_variables
 
 
 class DataTransformError(ValueError):
@@ -28,6 +29,18 @@ _ALLOWED_FUNCTIONS = {
     "max": np.maximum,
 }
 _ALLOWED_OPERATORS = {"eq", "ne", "lt", "lte", "gt", "gte", "between"}
+_SUPPORTED_KINDS = {
+    "derived_column",
+    "row_filter",
+    "mask_filter",
+    "pivot_matrix",
+    "sort_rows",
+    "select_columns",
+    "type_cast",
+    "bin_column",
+    "aggregate_summary",
+    "rolling_window",
+}
 
 
 def _cell_text(value: object) -> str:
@@ -102,6 +115,39 @@ def _series_by_column(frame: pd.DataFrame, *, headers: Sequence[str], data_start
     return columns
 
 
+def _data_frame_for_expression(frame: pd.DataFrame, *, headers: Sequence[str], data_start: int) -> pd.DataFrame:
+    data = frame.iloc[data_start:].reset_index(drop=True)
+    output = pd.DataFrame()
+    for index, header in enumerate(headers):
+        if index < data.shape[1]:
+            output[header] = data.iloc[:, index].reset_index(drop=True)
+    return output
+
+
+def _rebuild_raw_from_data(
+    *,
+    header: pd.DataFrame,
+    data: pd.DataFrame,
+    headers: Sequence[str],
+) -> pd.DataFrame:
+    rows: list[list[object]] = [list(headers)]
+    if header.shape[0] > 1:
+        for row_index in range(1, header.shape[0]):
+            existing = header.iloc[row_index].tolist()
+            rows.append([existing[index] if index < len(existing) else "" for index in range(len(headers))])
+    data_rows = data.loc[:, list(headers)].reset_index(drop=True)
+    data_rows.columns = range(len(headers))
+    return pd.concat([pd.DataFrame(rows), data_rows.reset_index(drop=True)], ignore_index=True)
+
+
+def _data_view(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    data_start = _infer_data_start(frame)
+    headers = _headers_for(frame)
+    header = frame.iloc[:data_start].reset_index(drop=True)
+    data = _data_frame_for_expression(frame, headers=headers, data_start=data_start)
+    return header, data, headers
+
+
 def _column_series(
     frame: pd.DataFrame,
     *,
@@ -125,72 +171,25 @@ def _safe_expression_result(
     columns: Mapping[str, pd.Series],
     row_count: int,
     transform_label: str,
+    variables: Mapping[str, float] | None = None,
 ) -> pd.Series:
-    expression_text = str(expression or "").strip()
-    if not expression_text:
-        raise DataTransformError(f"{transform_label}: expression must not be empty.")
+    frame = pd.DataFrame(
+        {key: value.reset_index(drop=True) for key, value in columns.items() if not key.startswith("Column ")}
+    )
     try:
-        tree = ast.parse(expression_text, mode="eval")
-    except SyntaxError as exc:
-        raise DataTransformError(f"{transform_label}: unsafe expression `{expression_text}`.") from exc
-
-    def evaluate(node: ast.AST) -> Any:
-        if isinstance(node, ast.Expression):
-            return evaluate(node.body)
-        if isinstance(node, ast.Constant) and isinstance(node.value, int | float):
-            return float(node.value)
-        if isinstance(node, ast.Name):
-            if node.id in columns:
-                return pd.to_numeric(columns[node.id], errors="coerce")
-            if node.id in _ALLOWED_FUNCTIONS:
-                return _ALLOWED_FUNCTIONS[node.id]
-            raise DataTransformError(f"{transform_label}: unknown column `{node.id}`.")
-        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
-            value = evaluate(node.operand)
-            return value if isinstance(node.op, ast.UAdd) else -value
-        if isinstance(node, ast.BinOp) and isinstance(
-            node.op,
-            (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod),
-        ):
-            left = evaluate(node.left)
-            right = evaluate(node.right)
-            if isinstance(node.op, ast.Add):
-                return left + right
-            if isinstance(node.op, ast.Sub):
-                return left - right
-            if isinstance(node.op, ast.Mult):
-                return left * right
-            if isinstance(node.op, ast.Div):
-                return left / right
-            if isinstance(node.op, ast.Pow):
-                return np.power(left, right)
-            return left % right
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            function = _ALLOWED_FUNCTIONS.get(node.func.id)
-            if function is None:
-                raise DataTransformError(f"{transform_label}: unsafe expression uses `{node.func.id}`.")
-            if node.keywords:
-                raise DataTransformError(f"{transform_label}: unsafe expression uses keyword arguments.")
-            args = [evaluate(arg) for arg in node.args]
-            return function(*args)
-        raise DataTransformError(f"{transform_label}: unsafe expression `{expression_text}`.")
-
-    result = evaluate(tree)
-    if isinstance(result, pd.Series):
-        numeric = pd.to_numeric(result, errors="coerce")
-    elif isinstance(result, np.ndarray):
-        if result.size != row_count:
-            raise DataTransformError(f"{transform_label}: expression result length does not match the table.")
-        numeric = pd.Series(result)
-    elif isinstance(result, int | float):
-        numeric = pd.Series([float(result)] * row_count)
-    else:
-        raise DataTransformError(f"{transform_label}: expression produced a nonnumeric result.")
-    if len(numeric) != row_count:
+        result = evaluate_expression(
+            str(expression or ""),
+            frame=frame,
+            variables=variables,
+            expect="numeric",
+            label=transform_label,
+        )
+    except ExpressionError as exc:
+        message = str(exc).replace("unknown column or variable", "unknown column")
+        raise DataTransformError(message) from exc
+    if len(result) != row_count:
         raise DataTransformError(f"{transform_label}: expression result length does not match the table.")
-    if numeric.isna().any():
-        raise DataTransformError(f"{transform_label}: expression produced a nonnumeric result.")
-    return numeric.reset_index(drop=True)
+    return result.reset_index(drop=True)
 
 
 def _target_column_index(headers: Sequence[str], target_column: str) -> int | None:
@@ -200,7 +199,13 @@ def _target_column_index(headers: Sequence[str], target_column: str) -> int | No
         return None
 
 
-def _apply_derived_column(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+def _apply_derived_column(
+    frame: pd.DataFrame,
+    transform: DataTransformPayload,
+    *,
+    index: int,
+    variables: Mapping[str, float] | None,
+) -> pd.DataFrame:
     label = _transform_label(transform, index)
     target = str(transform.get("target_column") or "").strip()
     if not target:
@@ -214,6 +219,7 @@ def _apply_derived_column(frame: pd.DataFrame, transform: DataTransformPayload, 
         columns=columns,
         row_count=row_count,
         transform_label=label,
+        variables=variables,
     )
     output = frame.copy(deep=True).astype(object)
     existing_index = _target_column_index(headers, target)
@@ -288,11 +294,36 @@ def _apply_row_filter(frame: pd.DataFrame, transform: DataTransformPayload, *, i
     return pd.concat([header, filtered], ignore_index=True)
 
 
+def _apply_mask_filter(
+    frame: pd.DataFrame,
+    transform: DataTransformPayload,
+    *,
+    index: int,
+    variables: Mapping[str, float] | None,
+) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, _headers = _data_view(frame)
+    try:
+        mask = evaluate_expression(
+            str(transform.get("expression") or ""),
+            frame=data,
+            variables=variables,
+            expect="boolean",
+            label=label,
+        )
+    except ExpressionError as exc:
+        raise DataTransformError(str(exc)) from exc
+    filtered = data.loc[mask.tolist()].reset_index(drop=True)
+    if filtered.empty:
+        raise DataTransformError(f"{label}: mask_filter removed every data row.")
+    return _rebuild_raw_from_data(header=header, data=filtered, headers=list(data.columns))
+
+
 def _apply_pivot_matrix(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
     label = _transform_label(transform, index)
     output_mode = str(transform.get("output_mode") or "xyz_long").strip().lower()
-    if output_mode != "xyz_long":
-        raise DataTransformError(f"{label}: pivot_matrix.output_mode currently supports only `xyz_long`.")
+    if output_mode not in {"xyz_long", "matrix"}:
+        raise DataTransformError(f"{label}: pivot_matrix.output_mode currently supports `xyz_long` or `matrix`.")
     data_start = _infer_data_start(frame)
     headers = _headers_for(frame)
     x_series = _column_series(
@@ -328,6 +359,12 @@ def _apply_pivot_matrix(frame: pd.DataFrame, transform: DataTransformPayload, *,
     duplicate_pairs = data.duplicated(subset=["x", "y"], keep=False)
     if duplicate_pairs.any():
         raise DataTransformError(f"{label}: invalid pivot roles; duplicate X/Y cells are not supported in v1.")
+    if output_mode == "matrix":
+        matrix = data.pivot(index="y", columns="x", values="z").sort_index(axis=0).sort_index(axis=1)
+        rows = [["y/x", *matrix.columns.tolist()]]
+        for y_value, row in matrix.iterrows():
+            rows.append([y_value, *row.tolist()])
+        return pd.DataFrame(rows)
     header_rows = pd.DataFrame(
         [
             ["x", "y", "z"],
@@ -342,6 +379,155 @@ def _apply_pivot_matrix(frame: pd.DataFrame, transform: DataTransformPayload, *,
     data_rows = data.reset_index(drop=True)
     data_rows.columns = [0, 1, 2]
     return pd.concat([header_rows, data_rows], ignore_index=True)
+
+
+def _list_field(value: object, *, label: str, field: str) -> list[str]:
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, Sequence):
+        items = [str(item) for item in value]
+    else:
+        raise DataTransformError(f"{label}: {field} must be a list.")
+    cleaned = [item.strip() for item in items if item.strip()]
+    if not cleaned:
+        raise DataTransformError(f"{label}: {field} must not be empty.")
+    return cleaned
+
+
+def _require_columns(data: pd.DataFrame, columns: Sequence[str], *, label: str) -> None:
+    missing = [column for column in columns if column not in data.columns]
+    if missing:
+        raise DataTransformError(f"{label}: unknown column `{missing[0]}`.")
+
+
+def _apply_type_cast(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, headers = _data_view(frame)
+    columns = _list_field(transform.get("columns") or transform.get("column"), label=label, field="columns")
+    _require_columns(data, columns, label=label)
+    target_type = str(transform.get("target_type") or "number").strip().lower()
+    for column in columns:
+        if target_type == "number":
+            converted = pd.to_numeric(data[column], errors="coerce")
+            if converted.isna().any():
+                raise DataTransformError(f"{label}: type_cast column `{column}` contains nonnumeric values.")
+            data[column] = converted
+        elif target_type == "string":
+            data[column] = data[column].map(_cell_text)
+        else:
+            raise DataTransformError(f"{label}: type_cast.target_type must be number or string.")
+    return _rebuild_raw_from_data(header=header, data=data, headers=headers)
+
+
+def _apply_sort_rows(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, headers = _data_view(frame)
+    columns = _list_field(transform.get("columns") or transform.get("column"), label=label, field="columns")
+    _require_columns(data, columns, label=label)
+    ascending = bool(transform.get("ascending", True))
+    sorted_data = data.sort_values(by=columns, ascending=ascending, kind="mergesort").reset_index(drop=True)
+    return _rebuild_raw_from_data(header=header, data=sorted_data, headers=headers)
+
+
+def _apply_select_columns(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, _headers = _data_view(frame)
+    columns = _list_field(transform.get("columns"), label=label, field="columns")
+    _require_columns(data, columns, label=label)
+    return _rebuild_raw_from_data(header=header, data=data.loc[:, columns].copy(), headers=columns)
+
+
+def _apply_bin_column(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, headers = _data_view(frame)
+    column = str(transform.get("column") or "").strip()
+    target = str(transform.get("target_column") or f"{column}_bin").strip()
+    _require_columns(data, [column], label=label)
+    try:
+        bins = int(transform.get("bins") or 10)
+    except (TypeError, ValueError) as exc:
+        raise DataTransformError(f"{label}: bins must be an integer.") from exc
+    if bins < 1:
+        raise DataTransformError(f"{label}: bins must be at least 1.")
+    numeric = pd.to_numeric(data[column], errors="coerce")
+    if numeric.isna().any():
+        raise DataTransformError(f"{label}: bin_column requires numeric column `{column}`.")
+    if math.isclose(float(numeric.min()), float(numeric.max())):
+        raise DataTransformError(f"{label}: bin_column requires a column with non-zero range.")
+    edges = np.linspace(float(numeric.min()), float(numeric.max()), bins + 1)
+    labels = [f"{edges[i]:g}-{edges[i + 1]:g}" for i in range(len(edges) - 1)]
+    data[target] = pd.cut(numeric, bins=edges, labels=labels, include_lowest=True).astype(str)
+    if target not in headers:
+        headers = [*headers, target]
+    return _rebuild_raw_from_data(header=header, data=data, headers=headers)
+
+
+def _apply_rolling_window(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    header, data, headers = _data_view(frame)
+    column = str(transform.get("column") or "").strip()
+    target = str(transform.get("target_column") or f"{column}_rolling").strip()
+    _require_columns(data, [column], label=label)
+    try:
+        window = int(transform.get("window") or 3)
+    except (TypeError, ValueError) as exc:
+        raise DataTransformError(f"{label}: rolling window must be an integer.") from exc
+    if window < 1:
+        raise DataTransformError(f"{label}: rolling window must be at least 1.")
+    method = str(transform.get("method") or "mean").strip().lower()
+    numeric = pd.to_numeric(data[column], errors="coerce")
+    if numeric.isna().any():
+        raise DataTransformError(f"{label}: rolling_window requires numeric column `{column}`.")
+    rolling = numeric.rolling(window=window, min_periods=1)
+    if method == "mean":
+        data[target] = rolling.mean()
+    elif method == "median":
+        data[target] = rolling.median()
+    else:
+        raise DataTransformError(f"{label}: rolling_window.method must be mean or median.")
+    if target not in headers:
+        headers = [*headers, target]
+    return _rebuild_raw_from_data(header=header, data=data, headers=headers)
+
+
+def _apply_aggregate_summary(frame: pd.DataFrame, transform: DataTransformPayload, *, index: int) -> pd.DataFrame:
+    label = _transform_label(transform, index)
+    _header, data, _headers = _data_view(frame)
+    group_by = _list_field(transform.get("group_by"), label=label, field="group_by")
+    value_columns = _list_field(transform.get("value_columns"), label=label, field="value_columns")
+    _require_columns(data, [*group_by, *value_columns], label=label)
+    stats = _list_field(transform.get("statistics") or ["mean"], label=label, field="statistics")
+    allowed = {"mean", "sd", "sem", "min", "max", "count"}
+    for stat in stats:
+        if stat not in allowed:
+            raise DataTransformError(f"{label}: aggregate statistic `{stat}` is not supported.")
+    rows: list[dict[str, object]] = []
+    grouped = data.groupby(group_by, dropna=False, sort=True)
+    group_key_names = group_by
+    for group_key, group_frame in grouped:
+        if not isinstance(group_key, tuple):
+            group_key = (group_key,)
+        row: dict[str, object] = {name: value for name, value in zip(group_key_names, group_key, strict=True)}
+        for value_column in value_columns:
+            numeric = pd.to_numeric(group_frame[value_column], errors="coerce")
+            if numeric.isna().any():
+                raise DataTransformError(f"{label}: aggregate column `{value_column}` must be numeric.")
+            if "mean" in stats:
+                row[f"{value_column}_mean"] = float(numeric.mean())
+            if "sd" in stats:
+                row[f"{value_column}_sd"] = float(numeric.std(ddof=1)) if len(numeric) > 1 else 0.0
+            if "sem" in stats:
+                row[f"{value_column}_sem"] = float(numeric.sem(ddof=1)) if len(numeric) > 1 else 0.0
+            if "min" in stats:
+                row[f"{value_column}_min"] = float(numeric.min())
+            if "max" in stats:
+                row[f"{value_column}_max"] = float(numeric.max())
+            if "count" in stats:
+                row[f"{value_column}_count"] = int(numeric.count())
+        rows.append(row)
+    output = pd.DataFrame(rows)
+    output_rows = [output.columns.tolist(), *output.values.tolist()]
+    return pd.DataFrame(output_rows)
 
 
 def _transform_label(transform: DataTransformPayload, index: int) -> str:
@@ -367,9 +553,9 @@ def normalize_data_transforms_payload(value: object) -> tuple[dict[str, Any], ..
             raise DataTransformError("`data_transforms` ids must be unique.")
         seen.add(transform_id)
         kind = str(transform.get("kind") or "").strip().lower()
-        if kind not in {"derived_column", "row_filter", "pivot_matrix"}:
+        if kind not in _SUPPORTED_KINDS:
             raise DataTransformError(
-                f"`data_transforms[{index}].kind` must be one of derived_column, row_filter, pivot_matrix."
+                f"`data_transforms[{index}].kind` must be one of {', '.join(sorted(_SUPPORTED_KINDS))}."
             )
         transform["id"] = transform_id
         transform["kind"] = kind
@@ -382,21 +568,44 @@ def normalize_data_transforms_payload(value: object) -> tuple[dict[str, Any], ..
 def apply_data_transforms_to_frame(
     frame: pd.DataFrame,
     transforms: object,
+    variables: object = None,
 ) -> pd.DataFrame:
     normalized = normalize_data_transforms_payload(transforms)
     if normalized is None:
         return frame.copy(deep=True)
+    try:
+        resolved_variables = evaluate_variables(variables, frame=_data_frame_for_expression(
+            frame,
+            headers=_headers_for(frame),
+            data_start=_infer_data_start(frame),
+        ))
+    except ExpressionError as exc:
+        raise DataTransformError(str(exc)) from exc
     output = frame.copy(deep=True).astype(object)
     for index, transform in enumerate(normalized):
         if not transform.get("enabled", True):
             continue
         kind = transform["kind"]
         if kind == "derived_column":
-            output = _apply_derived_column(output, transform, index=index)
+            output = _apply_derived_column(output, transform, index=index, variables=resolved_variables)
         elif kind == "row_filter":
             output = _apply_row_filter(output, transform, index=index)
+        elif kind == "mask_filter":
+            output = _apply_mask_filter(output, transform, index=index, variables=resolved_variables)
         elif kind == "pivot_matrix":
             output = _apply_pivot_matrix(output, transform, index=index)
+        elif kind == "type_cast":
+            output = _apply_type_cast(output, transform, index=index)
+        elif kind == "sort_rows":
+            output = _apply_sort_rows(output, transform, index=index)
+        elif kind == "select_columns":
+            output = _apply_select_columns(output, transform, index=index)
+        elif kind == "bin_column":
+            output = _apply_bin_column(output, transform, index=index)
+        elif kind == "rolling_window":
+            output = _apply_rolling_window(output, transform, index=index)
+        elif kind == "aggregate_summary":
+            output = _apply_aggregate_summary(output, transform, index=index)
         else:  # pragma: no cover - normalized above
             raise DataTransformError(f"{_transform_label(transform, index)}: unsupported transform kind `{kind}`.")
     return output

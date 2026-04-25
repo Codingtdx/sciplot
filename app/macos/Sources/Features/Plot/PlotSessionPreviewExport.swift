@@ -663,6 +663,8 @@ extension PlotSession {
         switch dataWorkbookTab {
         case .sourceData, .transformed:
             loadSourceTablePreview(offset: sourceTableOffset)
+        case .variables:
+            break
         case .fit:
             if fitAnalysisAvailability.isEnabled {
                 loadFitAnalysis(offset: fitAnalysisOffset)
@@ -742,7 +744,8 @@ extension PlotSession {
                         seriesID: fitAnalysisSelectedSeriesID,
                         offset: resolvedOffset,
                         limit: fitAnalysisPageLimit,
-                        options: renderOptions.dataTransforms?.isEmpty == false ? renderOptions : nil
+                        options: (renderOptions.dataTransforms?.isEmpty == false || renderOptions.dataVariables?.isEmpty == false) ? renderOptions : nil,
+                        customFunction: fitOptions.customFunction
                     )
                 )
                 fitAnalysisResponse = response

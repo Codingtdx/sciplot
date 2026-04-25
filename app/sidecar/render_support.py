@@ -85,6 +85,11 @@ def options_from_payload(
             if payload.analytical_layers
             else None
         ),
+        data_variables=(
+            [item.model_dump(mode="json") for item in payload.data_variables]
+            if payload.data_variables
+            else None
+        ),
         data_transforms=(
             [item.model_dump(mode="json") for item in payload.data_transforms]
             if payload.data_transforms

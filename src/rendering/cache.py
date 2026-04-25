@@ -102,12 +102,16 @@ def _options_data_transforms(options: object) -> object:
     return getattr(options, "data_transforms", None)
 
 
+def _options_data_variables(options: object) -> object:
+    return getattr(options, "data_variables", None)
+
+
 def read_raw_table_for_options(input_path: Path, sheet: str | int = 0, options: object = None) -> pd.DataFrame:
     raw = read_raw_table_cached(input_path, sheet)
     transforms = _options_data_transforms(options)
     if transforms is None:
         return raw
-    return apply_data_transforms_to_frame(raw, transforms)
+    return apply_data_transforms_to_frame(raw, transforms, variables=_options_data_variables(options))
 
 
 @lru_cache(maxsize=48)
@@ -128,7 +132,11 @@ def load_curve_table_for_options(input_path: Path, sheet: str | int = 0, options
     transforms = _options_data_transforms(options)
     if transforms is None:
         return load_curve_table_cached(input_path, sheet)
-    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    raw = apply_data_transforms_to_frame(
+        read_raw_table_cached(input_path, sheet),
+        transforms,
+        variables=_options_data_variables(options),
+    )
     return load_curve_table_from_frame(raw)
 
 
@@ -154,7 +162,11 @@ def load_replicate_table_for_options(
     transforms = _options_data_transforms(options)
     if transforms is None:
         return load_replicate_table_cached(input_path, sheet)
-    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    raw = apply_data_transforms_to_frame(
+        read_raw_table_cached(input_path, sheet),
+        transforms,
+        variables=_options_data_variables(options),
+    )
     return load_replicate_table_from_frame(raw)
 
 
@@ -176,7 +188,11 @@ def load_heatmap_table_for_options(input_path: Path, sheet: str | int = 0, optio
     transforms = _options_data_transforms(options)
     if transforms is None:
         return load_heatmap_table_cached(input_path, sheet)
-    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    raw = apply_data_transforms_to_frame(
+        read_raw_table_cached(input_path, sheet),
+        transforms,
+        variables=_options_data_variables(options),
+    )
     return load_heatmap_table_from_frame(raw)
 
 

@@ -543,6 +543,15 @@ final class PlotSessionTests: XCTestCase {
         await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
         let initialRenderCount = client.renderRequests.count
+        session.addDataVariable(kind: "scalar")
+        guard let variableID = session.renderOptions.dataVariables?.first?.id else {
+            XCTFail("Expected a data variable to be created.")
+            return
+        }
+        session.updateDataVariable(id: variableID, policy: .immediate) {
+            $0.id = "scale"
+            $0.value = 2.0
+        }
         session.addDataTransform(kind: "row_filter")
         guard let transformID = session.renderOptions.dataTransforms?.first?.id else {
             XCTFail("Expected a data transform to be created.")
@@ -557,6 +566,7 @@ final class PlotSessionTests: XCTestCase {
         await waitUntil(
             {
                 client.renderRequests.count > initialRenderCount &&
+                    client.renderRequests.last?.options.dataVariables?.first?.id == "scale" &&
                     client.renderRequests.last?.options.dataTransforms?.first?.column == "X"
             },
             timeout: 2.0
@@ -564,6 +574,18 @@ final class PlotSessionTests: XCTestCase {
 
         undoManager.undo()
         XCTAssertNotEqual(session.renderOptions.dataTransforms?.first?.column, "X")
+
+        let persistedVariableID: String
+        if session.renderOptions.dataVariables?.first == nil {
+            session.addDataVariable(kind: "scalar")
+            persistedVariableID = session.renderOptions.dataVariables?.first?.id ?? variableID
+        } else {
+            persistedVariableID = session.renderOptions.dataVariables?.first?.id ?? variableID
+        }
+        session.updateDataVariable(id: persistedVariableID, policy: .immediate) {
+            $0.id = "scale"
+            $0.value = 2.0
+        }
 
         let persistedTransformID: String
         if session.renderOptions.dataTransforms?.first == nil {
@@ -581,6 +603,7 @@ final class PlotSessionTests: XCTestCase {
         await session.saveProject(to: URL(fileURLWithPath: "/tmp/transforms.sciplotgod"))
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.column, "X")
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.filterOperator, "between")
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataVariables?.first?.id, "scale")
     }
 
     func testDataWorkbookTransformedTabRequestsTransformAwarePreview() async throws {

@@ -73,6 +73,24 @@ class DataTransformPayload(StrictModel):
     y_column: str | None = None
     z_column: str | None = None
     output_mode: str = "xyz_long"
+    columns: list[str] | None = None
+    target_type: str | None = None
+    ascending: bool = True
+    bins: int | None = None
+    window: int | None = None
+    method: str | None = None
+    group_by: list[str] | None = None
+    value_columns: list[str] | None = None
+    statistics: list[str] | None = None
+
+
+class DataVariablePayload(StrictModel):
+    id: str
+    enabled: bool = True
+    kind: str = "scalar"
+    label: str | None = None
+    value: float | None = None
+    expression: str | None = None
 
 
 class ReferenceGuidePayload(StrictModel):
@@ -135,6 +153,7 @@ class RenderOptionsPayload(StrictModel):
     text_annotations: list[TextAnnotationPayload] | None = None
     shape_annotations: list[ShapeAnnotationPayload] | None = None
     analytical_layers: list[AnalyticalLayerPayload] | None = None
+    data_variables: list[DataVariablePayload] | None = None
     data_transforms: list[DataTransformPayload] | None = None
 
     @model_validator(mode="before")
@@ -198,11 +217,13 @@ class ReferenceBandPayload(StrictModel):
 class FitOptionsPayload(StrictModel):
     enabled: bool = False
     model_id: str = "linear"
+    custom_function: dict[str, Any] | None = None
 
 
 class FileRequest(StrictModel):
     input_path: str
     sheet: str | int = 0
+    options: RenderOptionsPayload | None = None
 
 
 class RenderRequest(FileRequest):
@@ -269,7 +290,7 @@ class FitAnalysisRequest(FileRequest):
     series_id: str | None = None
     offset: int = 0
     limit: int = 50
-    options: RenderOptionsPayload | None = None
+    custom_function: dict[str, Any] | None = None
 
 
 class FitDerivedRowResponse(StrictModel):
@@ -567,6 +588,7 @@ __all__ = [
     "FitDerivedRowResponse",
     "FitOptionsPayload",
     "FitSeriesSummaryResponse",
+    "DataVariablePayload",
     "InputInspectionResponse",
     "InspectFileResponse",
     "OpenProjectRequest",

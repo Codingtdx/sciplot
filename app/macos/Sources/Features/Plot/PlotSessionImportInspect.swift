@@ -450,15 +450,62 @@ extension PlotSession {
             var transforms = options.dataTransforms ?? []
             let transform: DataTransformPayload
             switch kind {
+            case "mask_filter":
+                transform = DataTransformPayload(kind: "mask_filter", label: "Mask", expression: "col('x') > 0")
             case "row_filter":
                 transform = DataTransformPayload(kind: "row_filter", label: "Filter", column: "Column 1", filterOperator: "between", lower: 0.0, upper: 1.0)
             case "pivot_matrix":
                 transform = DataTransformPayload(kind: "pivot_matrix", label: "Pivot", xColumn: "x", yColumn: "y", zColumn: "z")
+            case "bin_column":
+                transform = DataTransformPayload(kind: "bin_column", label: "Bin", targetColumn: "x_bin", column: "x", bins: 10)
+            case "rolling_window":
+                transform = DataTransformPayload(kind: "rolling_window", label: "Smooth", targetColumn: "y_smooth", column: "y", window: 3, method: "mean")
+            case "aggregate_summary":
+                transform = DataTransformPayload(kind: "aggregate_summary", label: "Aggregate", groupBy: ["group"], valueColumns: ["value"], statistics: ["mean", "sd", "sem", "count"])
             default:
                 transform = DataTransformPayload(kind: "derived_column", label: "Derived", targetColumn: "derived", expression: "x + 1")
             }
             transforms.append(transform)
             options.dataTransforms = transforms
+        }
+    }
+
+    func addDataVariable(kind: String = "scalar") {
+        updateRenderOptions(policy: .immediate) { options in
+            var variables = options.dataVariables ?? []
+            let variable: DataVariablePayload
+            if kind == "expression" {
+                variable = DataVariablePayload(kind: "expression", label: "Variable", value: nil, expression: "1 + 1")
+            } else {
+                variable = DataVariablePayload(kind: "scalar", label: "Variable", value: 1.0, expression: nil)
+            }
+            variables.append(variable)
+            options.dataVariables = variables
+        }
+    }
+
+    func updateDataVariable(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .debounced,
+        mutate: (inout DataVariablePayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var variables = options.dataVariables ?? []
+            guard let index = variables.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var variable = variables[index]
+            mutate(&variable)
+            variables[index] = variable
+            options.dataVariables = variables
+        }
+    }
+
+    func removeDataVariable(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var variables = options.dataVariables ?? []
+            variables.removeAll { $0.id == id }
+            options.dataVariables = variables.isEmpty ? nil : variables
         }
     }
 

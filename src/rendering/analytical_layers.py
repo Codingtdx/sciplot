@@ -7,8 +7,10 @@ from dataclasses import replace
 from typing import Any, TypedDict, cast
 
 import numpy as np
+import pandas as pd
 
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+from src.rendering.expression_engine import ExpressionError, evaluate_expression, evaluate_variables
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
 from src.text_normalization import _clean_text
 
@@ -121,16 +123,18 @@ def compile_safe_function_expression(expression: str) -> Callable[[np.ndarray], 
     except SyntaxError as exc:
         raise ValueError("Function expression is not valid Python math syntax.") from exc
     _assert_safe_expression_node(tree, expression=cleaned)
-    code = compile(tree, "<analytical-layer>", "eval")
 
     def _evaluate(x_values: np.ndarray) -> np.ndarray:
-        namespace = {"x": x_values, **_ALLOWED_CONSTANTS, **_ALLOWED_FUNCTIONS}
-        result = eval(code, {"__builtins__": {}}, namespace)  # noqa: S307 - AST whitelist constrains input.
-        values = np.asarray(result, dtype=float)
-        if values.shape == ():
-            values = np.full_like(x_values, float(values), dtype=float)
-        if values.shape != x_values.shape:
-            values = np.broadcast_to(values, x_values.shape).astype(float)
+        frame = np.asarray(x_values, dtype=float)
+        try:
+            values = evaluate_expression(
+                cleaned,
+                frame=pd.DataFrame({"x": frame}),
+                expect="numeric",
+                label="Function expression",
+            ).to_numpy(dtype=float)
+        except ExpressionError as exc:
+            raise ValueError(str(exc)) from exc
         if not np.isfinite(values).any():
             raise ValueError("Function expression produced no finite y values.")
         return values
@@ -213,7 +217,17 @@ def apply_analytical_layers(rendered: RenderedPlot, *, options: RenderOptions) -
     applied = False
     for layer in layers:
         x_values = np.linspace(layer["x_start"], layer["x_end"], layer["sample_count"])
-        y_values = compile_safe_function_expression(layer["expression"])(x_values)
+        try:
+            variables = evaluate_variables(options.data_variables, frame=pd.DataFrame({"x": x_values}))
+            y_values = evaluate_expression(
+                layer["expression"],
+                frame=pd.DataFrame({"x": x_values}),
+                variables=variables,
+                expect="numeric",
+                label="Function expression",
+            ).to_numpy(dtype=float)
+        except ExpressionError as exc:
+            raise ValueError(str(exc)) from exc
         mask = np.isfinite(x_values) & np.isfinite(y_values)
         if not mask.any():
             continue

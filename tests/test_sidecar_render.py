@@ -181,3 +181,92 @@ def test_fit_analysis_accepts_data_transforms(tmp_path: Path) -> None:
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["point_count"] == 2
+
+
+def test_inspect_file_accepts_transform_options_for_recommendation(tmp_path: Path) -> None:
+    input_path = tmp_path / "polar_from_xy.csv"
+    pd.DataFrame([["x", "y"], [1, 0], [0, 1], [-1, 0]]).to_csv(input_path, header=False, index=False)
+
+    response = client.post(
+        "/inspect-file",
+        json={
+            "input_path": str(input_path),
+            "options": {
+                "data_transforms": [
+                    {
+                        "id": "theta",
+                        "kind": "derived_column",
+                        "target_column": "theta",
+                        "expression": "atan2(col('y'), col('x'))",
+                    },
+                    {
+                        "id": "radius",
+                        "kind": "derived_column",
+                        "target_column": "radius",
+                        "expression": "sqrt(col('x')*col('x') + col('y')*col('y'))",
+                    },
+                ]
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    templates = [item["template_id"] for item in response.json()["inspection"]["recommendations"]]
+    assert templates[0] == "polar_curve"
+
+
+def test_fit_analysis_supports_expanded_and_custom_models(tmp_path: Path) -> None:
+    input_path = tmp_path / "fit.csv"
+    pd.DataFrame([["x", "y"], ["s", "a.u."], ["Sample", "Sample"], [0, 2], [1, 5], [2, 8], [3, 11]]).to_csv(
+        input_path,
+        header=False,
+        index=False,
+    )
+
+    exponential = client.post(
+        "/fit-analysis",
+        json={"input_path": str(input_path), "model_id": "exponential"},
+    )
+    assert exponential.status_code == 200, exponential.text
+    assert exponential.json()["model_id"] == "exponential"
+    assert exponential.json()["point_count"] == 4
+
+    custom = client.post(
+        "/fit-analysis",
+        json={
+            "input_path": str(input_path),
+            "model_id": "custom_function",
+            "custom_function": {
+                "expression": "a*x + b",
+                "parameters": [
+                    {"name": "a", "initial": 1.0},
+                    {"name": "b", "initial": 0.0},
+                ],
+            },
+        },
+    )
+    assert custom.status_code == 200, custom.text
+    payload = custom.json()
+    assert payload["model_id"] == "custom_function"
+    assert payload["equation_display"].startswith("y =")
+    assert payload["r_squared"] > 0.99
+
+    preview = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "template": "curve",
+            "fit_options": {
+                "enabled": True,
+                "model_id": "custom_function",
+                "custom_function": {
+                    "expression": "a*x + b",
+                    "parameters": [
+                        {"name": "a", "initial": 1.0, "lower": 0.0},
+                        {"name": "b", "initial": 0.0},
+                    ],
+                },
+            },
+        },
+    )
+    assert preview.status_code == 200, preview.text

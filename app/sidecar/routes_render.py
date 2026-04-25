@@ -54,15 +54,17 @@ from src.core.application.render import (
     list_sheet_names,
     normalized_dataset_payload,
     preflight_render_request,
-    read_raw_table_cached,
     resolve_template_id,
     template_identity,
     validate_template_name,
 )
 from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
 from src.infrastructure.runtime_cache import LRUCache
-from src.rendering.cache import load_curve_table_for_options
+from src.rendering.cache import load_curve_table_for_options, read_raw_table_cached, read_raw_table_for_options
 from src.rendering.fit_analysis import fit_series_list
+from src.rendering.recommendation import model_label
+from src.rendering.recommendation_policy import build_recommendation_presentation
+from src.rendering.recommender import DEFAULT_RECOMMENDER
 from src.rendering.source_table_preview import source_table_preview as build_source_table_preview
 
 _RENDER_PREVIEW_CACHE = LRUCache[str, RenderPreviewResponse](maxsize=64)
@@ -111,14 +113,56 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             inspection = inspect_input_file(input_path, sheet)
-            normalized_dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
-            raw = read_raw_table_cached(input_path, sheet).dropna(axis=1, how="all")
+            transform_options = SimpleNamespace(
+                data_variables=(
+                    tuple(item.model_dump(mode="json") for item in request.options.data_variables)
+                    if request.options is not None and request.options.data_variables
+                    else None
+                ),
+                data_transforms=(
+                    tuple(item.model_dump(mode="json") for item in request.options.data_transforms)
+                    if request.options is not None and request.options.data_transforms
+                    else None
+                ),
+            )
+            normalized_dataset = build_normalized_dataset(
+                input_path,
+                sheet,
+                model=None if transform_options.data_transforms else inspection.model,
+                options=transform_options if transform_options.data_transforms else None,
+            )
+            if transform_options.data_transforms:
+                ranked = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=10)
+                presentation = build_recommendation_presentation(ranked)
+                inspection_payload = {
+                    "model": normalized_dataset.model,
+                    "model_label": model_label(normalized_dataset.model),
+                    "recommendations": [serialize_dataclass(item) for item in ranked],
+                    "primary_recommendation": [
+                        serialize_dataclass(item) for item in presentation.primary_recommendation
+                    ],
+                    "alternative_recommendations": [
+                        serialize_dataclass(item) for item in presentation.alternative_recommendations
+                    ],
+                    "advanced_templates": [serialize_dataclass(item) for item in presentation.advanced_templates],
+                    "recommendation_confidence": 0.8 if ranked else 0.0,
+                    "recommendation_summary": "Recommendations are based on transformed data.",
+                    "warnings": [],
+                    "signals": list(normalized_dataset.semantic_signals),
+                }
+            else:
+                inspection_payload = serialize_dataclass(inspection)
+            raw = (
+                read_raw_table_for_options(input_path, sheet, transform_options)
+                if transform_options.data_transforms
+                else read_raw_table_cached(input_path, sheet)
+            ).dropna(axis=1, how="all")
             return InspectFileResponse.model_validate(
                 {
                     "input_path": str(input_path),
                     "sheet": sheet,
                     "sheet_names": list_sheet_names(input_path),
-                    "inspection": serialize_dataclass(inspection),
+                    "inspection": inspection_payload,
                     "dataset": {
                         **normalized_dataset_payload(normalized_dataset),
                         "sample_rows": dataframe_sample_rows(raw),
@@ -148,6 +192,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 data_transforms=(
                     [item.model_dump(mode="json") for item in request.options.data_transforms]
                     if request.options is not None and request.options.data_transforms
+                    else None
+                ),
+                data_variables=(
+                    [item.model_dump(mode="json") for item in request.options.data_variables]
+                    if request.options is not None and request.options.data_variables
                     else None
                 ),
             )
@@ -181,6 +230,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             sheet = coerce_sheet(str(request.sheet))
             offset, limit = _bounded_page(request.offset, request.limit)
             transform_options = SimpleNamespace(
+                data_variables=(
+                    tuple(item.model_dump(mode="json") for item in request.options.data_variables)
+                    if request.options is not None and request.options.data_variables
+                    else None
+                ),
                 data_transforms=(
                     tuple(item.model_dump(mode="json") for item in request.options.data_transforms)
                     if request.options is not None and request.options.data_transforms
@@ -188,7 +242,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 )
             )
             series_list = load_curve_table_for_options(input_path, sheet, transform_options)
-            fit_result = fit_series_list(series_list, model_id=request.model_id)
+            fit_result = fit_series_list(
+                series_list,
+                model_id=request.model_id,
+                custom_function=request.custom_function,
+            )
             selected_series = fit_result.selected_series(request.series_id)
             rows = selected_series.derived_rows[offset : offset + limit]
             return FitAnalysisResponse.model_validate(

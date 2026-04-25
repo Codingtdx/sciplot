@@ -305,6 +305,15 @@ final class SchemaDecodingTests: XCTestCase {
                 "label": "Model"
               }
             ],
+            "data_variables": [
+              {
+                "id": "scale",
+                "enabled": true,
+                "kind": "scalar",
+                "label": "Scale",
+                "value": 2
+              }
+            ],
             "data_transforms": [
               {
                 "id": "filter-1",
@@ -314,7 +323,14 @@ final class SchemaDecodingTests: XCTestCase {
                 "column": "Time",
                 "operator": "between",
                 "lower": 1,
-                "upper": 2
+                "upper": 2,
+                "columns": ["Time"],
+                "target_type": "number",
+                "bins": 8,
+                "window": 3,
+                "group_by": ["Group"],
+                "value_columns": ["Stress"],
+                "statistics": ["mean", "sd"]
               }
             ]
           },
@@ -349,9 +365,14 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(request.options.analyticalLayers?.first?.expression, "sin(x) + 1")
         XCTAssertEqual(request.options.analyticalLayers?.first?.sampleCount, 120)
         XCTAssertEqual(request.options.analyticalLayers?.first?.yAxisTarget, "y_primary")
+        XCTAssertEqual(request.options.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(request.options.dataVariables?.first?.value, 2.0)
         XCTAssertEqual(request.options.dataTransforms?.first?.kind, "row_filter")
         XCTAssertEqual(request.options.dataTransforms?.first?.filterOperator, "between")
         XCTAssertEqual(request.options.dataTransforms?.first?.lower, 1.0)
+        XCTAssertEqual(request.options.dataTransforms?.first?.columns, ["Time"])
+        XCTAssertEqual(request.options.dataTransforms?.first?.bins, 8)
+        XCTAssertEqual(request.options.dataTransforms?.first?.groupBy, ["Group"])
     }
 
     func testDecodePlotContractSizePresetsWithoutIDField() throws {

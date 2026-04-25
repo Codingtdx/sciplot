@@ -611,7 +611,11 @@ def _apply_curve_fit_overlay(
     fit_options = fit_options_from_payload(options.fit_options)
     if not fit_options.enabled:
         return rendered
-    results = fit_series_list(series_list, model_id=fit_options.model_id)
+    results = fit_series_list(
+        series_list,
+        model_id=fit_options.model_id,
+        custom_function=fit_options.custom_function,
+    )
     primary_ax = rendered.figure.axes[0]
     stroke = plot_style.current_stroke()
     equation_ax = primary_ax
