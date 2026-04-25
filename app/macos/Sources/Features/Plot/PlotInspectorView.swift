@@ -963,7 +963,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .disabled(axisBreaks(for: axis).isEmpty || !axisBreakAvailability(for: axis).isEnabled)
-                .help("Compressed keeps one axis with a gap marker. Split separates visible ranges into joined panels.")
+                .help("Compressed keeps one axis with gap markers. Split uses joined panels.")
             }
 
             ForEach(axisBreaks(for: axis)) { axisBreak in

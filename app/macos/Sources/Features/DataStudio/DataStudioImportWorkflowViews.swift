@@ -173,7 +173,7 @@ private struct DataStudioImportResolverSheet: View {
                     session.beginCreateTemplateEditor()
                 }
                 .buttonStyle(.bordered)
-                .help("Open the parse template editor for the current source preview.")
+                .help("Open the template editor for this source preview.")
 
                 Button("Use Selected Template") {
                     Task { await session.importWithSelectedTemplate() }
@@ -182,7 +182,7 @@ private struct DataStudioImportResolverSheet: View {
                 .disabled(!presentation.useSelectedTemplateAvailability.isEnabled)
                 .help(
                     presentation.useSelectedTemplateAvailability.reason
-                        ?? "Build a workbook from the current raw files with the selected parse template."
+                        ?? "Build a workbook with the selected template."
                 )
             }
         }

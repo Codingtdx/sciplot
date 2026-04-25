@@ -25,7 +25,6 @@ struct DataStudioWorkbenchView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -43,9 +42,6 @@ struct DataStudioWorkbenchView: View {
         }
         .sheet(isPresented: importWizardBinding) {
             DataStudioImportWizardSheet(session: session)
-        }
-        .sheet(isPresented: guideBinding) {
-            DataStudioGuideSheet(session: session)
         }
         .sheet(isPresented: analysisBinding) {
             DataStudioAnalysisSheet(session: session)
@@ -117,13 +113,6 @@ struct DataStudioWorkbenchView: View {
                     session.dismissImportWizard()
                 }
             }
-        )
-    }
-
-    private var guideBinding: Binding<Bool> {
-        Binding(
-            get: { session.isGuidePresented },
-            set: { session.isGuidePresented = $0 }
         )
     }
 
@@ -398,42 +387,41 @@ private struct DataStudioFocusedWorkbookStrip: View {
     let workbook: DataStudioWorkbookItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Focused Group")
-                    .font(.headline)
-                Spacer()
-                DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
-            }
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Focused Group")
+                        .font(.headline)
+                    Spacer()
+                    DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
+                }
 
-            if !displayedMetrics.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
-                    ForEach(Array(displayedMetrics.prefix(3)), id: \.id) { metric in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(metric.unit.isEmpty ? metric.label : "\(metric.label) (\(metric.unit))")
-                                .font(.subheadline.weight(.semibold))
-                            Text(metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
-                                .font(.title3.weight(.semibold))
+                if !displayedMetrics.isEmpty {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
+                        ForEach(Array(displayedMetrics.prefix(3)), id: \.id) { metric in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(metric.unit.isEmpty ? metric.label : "\(metric.label) (\(metric.unit))")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
+                                    .font(.title3.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(.quinary.opacity(0.22), in: RoundedRectangle(cornerRadius: 16))
                     }
                 }
-            }
 
-            if !notices.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(notices.prefix(3))) { notice in
-                        Label(notice.message, systemImage: notice.style.systemImage)
-                            .font(.footnote)
-                            .foregroundStyle(notice.style == .warning ? .orange : .secondary)
+                if !notices.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(notices.prefix(3))) { notice in
+                            Label(notice.message, systemImage: notice.style.systemImage)
+                                .font(.footnote)
+                                .foregroundStyle(notice.style == .warning ? .orange : .secondary)
+                        }
                     }
                 }
             }
         }
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var displayedMetrics: [DataStudioMetricSummaryResponse] {
@@ -467,55 +455,6 @@ private struct DataStudioInlinePreviewBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background((stale ? Color.orange : Color.yellow).opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-private struct DataStudioGuideSheet: View {
-    @Bindable var session: DataStudioSession
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    guideSection(
-                        title: "Groups First",
-                        text: "Each workbook row is a sample group. Rename it, reorder it, and decide whether it participates in compare."
-                    )
-                    guideSection(
-                        title: "Import Lives in the Toolbar",
-                        text: "Raw file parsing and parse template creation are now part of the import flow, not the main workspace."
-                    )
-                    guideSection(
-                        title: "Preview Is the Main Work Surface",
-                        text: "Use the figure family switch above the canvas, then refine style and axes from the Plot-style inspector."
-                    )
-                }
-                .padding(24)
-            }
-            .navigationTitle("Data Studio Help")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                        session.dismissGuide()
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 520, minHeight: 420)
-    }
-
-    private func guideSection(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(text)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 }
 

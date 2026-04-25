@@ -33,7 +33,6 @@ struct CodeConsoleOutputsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func summaryGrid(run: CodeConsoleRunResponse) -> some View {
@@ -134,7 +133,7 @@ struct CodeConsoleOutputsView: View {
         if !FileManager.default.fileExists(atPath: url.path) {
             EmptyStateCard(
                 title: "Preview unavailable",
-                message: "The selected generated file could not be found on disk."
+                message: "Selected file is missing. Re-run or choose another output."
             )
         } else if file.fileType.caseInsensitiveCompare("pdf") == .orderedSame {
             let previewShape = RoundedRectangle(cornerRadius: 16, style: .continuous)

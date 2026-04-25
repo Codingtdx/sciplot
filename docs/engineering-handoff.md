@@ -3556,3 +3556,108 @@ Use this block for every new round:
   - `.venv/bin/python scripts/smoke_check.py`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed（`173 tests`）
+
+### 2026-04-25 (Round BG): macOS GUI 一阶段原生化升级（统一 Quick Help + 去噪收敛）
+
+- Scope:
+  - 四工作台帮助入口统一为 app-level `Quick Help`：
+    - 新增 `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+    - `AppModel` 改为统一持有 help sheet 状态（`isQuickHelpPresented` / `quickHelpWorkbench`），`showHelpForActiveWorkbench()` 打开统一 Quick Help：
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+    - `RootSplitView` 统一挂载 Quick Help sheet：
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - 删除各 feature 的 `GuideSheet` 与对应 session guide 状态/方法：
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerSession.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleSession.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - 共享状态文案去噪与原生化收敛：
+    - 新增短句化 copy 规则 `StatusCopy.short(...)`，统一作用于 `EmptyStateCard` / `ErrorStateCard` / `BusyStateCard` / `InspectorEmptyState`：
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+    - 清理大块装饰背景：移除部分主区 `.quinary.opacity` 包裹，保留状态强调最小必要样式：
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+      - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - 状态文案压缩（状态 + 下一步）：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/Base64PreviewImageView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/PDFPreviewView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+  - 文档边界同步（帮助面板与去噪约束）：
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+    - `/Users/dongxutian/Documents/codegod/README.md`
+
+- User-visible impact:
+  - toolbar `Help` 现在在四个 workbench 都打开统一的 `Quick Help`（短提示、动作导向），不再弹出长文 `GuideSheet`。
+  - 主要 empty/error/busy 状态文案变为更短的“状态 + 下一步”，减少解释性噪音。
+  - Data Studio `Focused Group` 与 Code Console 输出区视觉更接近系统容器样式，减少大块装饰卡片。
+  - 四个 workbench 根视图不再强制叠加自定义窗口背景，系统材质与容器层级更原生。
+
+- Risks:
+  - `StatusCopy.short(...)` 会截断超长错误文本首行；深度错误细节仍建议从日志/诊断渠道查看，不应依赖卡片正文承载全部上下文。
+  - `Quick Help` 文案改为统一入口后，若未来某 workbench 发生流程变化，必须同步更新 `QuickHelpCatalog`，否则帮助提示会过时。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把“帮助与状态反馈”收敛到单一入口与最小必要文案，减少 GUI 噪音并维持原生可发现性。
+  - Rejected alternatives:
+    - 保留各 workbench `GuideSheet` 仅做文案删减：拒绝，因为状态源依然分散，且会继续引入重复维护成本。
+    - 继续在主区保留大面积装饰卡片：拒绝，因为与“原生容器优先 + 信息密度收敛”目标冲突。
+  - Boundaries:
+    - 不改 sidecar/contract 语义，不新增 legacy 兼容层，不改 `nature` 冻结指标。
+    - `disabled + help(reason)` 保持不变；关键动作仍禁止 silent no-op。
+
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed（`173 tests`）
+  - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest/smoke_check/xcodebuild build/test 全通过；manual checklist 未强制）
+  - `git diff --check`: passed
+  - Computer Use 手工验收尝试：blocked
+    - `get_app_state` 多次返回 `cgWindowNotFound`
+    - Screen capture 返回 `SCStreamErrorDomain Code=-3811`
+    - 结论：当前环境下无法稳定拉起 Computer Use 可交互窗口流，本轮以自动化矩阵 + 源码审查完成验收闭环并记录阻塞原因。
+
+### 2026-04-25 (Round BH): GUI 文案二次压缩 + Quick Help 回归测试补强
+
+- Scope:
+  - 继续压缩四工作台相关长提示文案（不改业务语义）：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerSessionImportExport.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - 新增 app-level Quick Help 的 AppModel 回归测试：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+  - 同步更新 Data Studio specimen filter 文案断言：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+
+- User-visible impact:
+  - 关键禁用原因与提示文案进一步收敛为短句，减少解释性冗字。
+  - `Help` 入口新行为有独立回归测试兜底，降低后续回退风险。
+
+- Risks:
+  - 本轮是文案压缩，若未来新增自动化断言依赖旧字符串，需要同步更新测试基线。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionComparison.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/DataStudioSessionTests.swift`
+
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed（`76 tests`）
+  - `git diff --check`: passed
+  - `xcodebuild ... test` full suite command in this round was attempted but timed out in this tool session; no failure signal was observed before timeout, and the changed areas are covered by the targeted suite above.

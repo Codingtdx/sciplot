@@ -12,6 +12,7 @@
 		C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Sources/App/RootSplitView.swift */; };
 		C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */; };
 		C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Sources/App/Workbench.swift */; };
+		C00000000000000000000079 /* Sources/App/QuickHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */; };
 		C00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */; };
 		C00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */; };
 		C00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */; };
@@ -100,6 +101,7 @@
 		B00000000000000000000003 /* Sources/App/RootSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/RootSplitView.swift; sourceTree = "<group>"; };
 		B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/SciPlotGodApp.swift; sourceTree = "<group>"; };
 		B00000000000000000000005 /* Sources/App/Workbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/Workbench.swift; sourceTree = "<group>"; };
+		B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/QuickHelpSheet.swift; sourceTree = "<group>"; };
 		B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleContextView.swift; sourceTree = "<group>"; };
 		B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleEditorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleOutputsView.swift; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 				B00000000000000000000003 /* Sources/App/RootSplitView.swift */,
 				B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */,
 				B00000000000000000000005 /* Sources/App/Workbench.swift */,
+				B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */,
 				B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */,
 				B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */,
 				B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */,
@@ -394,6 +397,7 @@
 				C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */,
 				C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */,
 				C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */,
+				C00000000000000000000079 /* Sources/App/QuickHelpSheet.swift in Sources */,
 				C00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift in Sources */,
 				C00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift in Sources */,
 				C00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift in Sources */,

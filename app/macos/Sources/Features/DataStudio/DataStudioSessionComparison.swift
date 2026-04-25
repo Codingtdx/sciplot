@@ -126,12 +126,12 @@ extension DataStudioSession {
         if let comparisonSet {
             let workbookName = URL(fileURLWithPath: comparisonSet.comparisonWorkbookPath).lastPathComponent
             if isPreviewStale {
-                return "\(includedGroups.count) group(s) · \(currentRecipeLabel) · showing last successful preview from \(workbookName)"
+                return "\(includedGroups.count) groups · \(currentRecipeLabel) · last preview: \(workbookName)"
             }
-            return "\(includedGroups.count) group(s) · \(currentRecipeLabel) · \(workbookName)"
+            return "\(includedGroups.count) groups · \(currentRecipeLabel) · \(workbookName)"
         }
         if !workbooks.isEmpty {
-            return "\(includedGroups.count) group(s) in compare"
+            return "\(includedGroups.count) groups in compare"
         }
         return "No workbook groups loaded"
     }
@@ -349,23 +349,23 @@ extension DataStudioSession {
 
     func exportComparisonBundle() async {
         guard let client, comparisonSet != nil else {
-            errorMessage = "Import at least one workbook group before exporting a Data Studio figure bundle."
+            errorMessage = "Import at least one workbook group before export."
             return
         }
         let recipeIDs = selectedExportRecipeIDs
         guard !recipeIDs.isEmpty else {
-            errorMessage = "Choose at least one figure family before exporting the Data Studio bundle."
+            errorMessage = "Choose at least one figure family before export."
             return
         }
         guard let directoryURL = chooseDirectory(
             "Export Data Studio Bundle",
-            "Choose a destination folder for the comparison workbook, filtered workbooks, and figure outputs."
+            "Choose an output folder."
         ) else {
             return
         }
         guard let figureFormat = chooseComparisonFigureFormat(
             "Comparison Figure Format",
-            "Choose whether the exported Data Studio figures should stay as editable PDF or convert to 300 dpi TIFF."
+            "Export figures as PDF or 300 dpi TIFF."
         ) else {
             return
         }

@@ -23,6 +23,8 @@ final class AppModel {
 
     var selectedWorkbench: Workbench = .plot
     var inspectorPresented = true
+    var isQuickHelpPresented = false
+    var quickHelpWorkbench: Workbench?
     var bootstrapErrorMessage: String?
     var hasBootstrapped = false
     var isPlotReplacementConfirmationPresented = false
@@ -220,16 +222,13 @@ final class AppModel {
     }
 
     func showHelpForActiveWorkbench() {
-        switch selectedWorkbench {
-        case .plot:
-            plotSession.showGuide()
-        case .dataStudio:
-            dataStudioSession.showGuide()
-        case .composer:
-            composerSession.showGuide()
-        case .codeConsole:
-            codeConsoleSession.showGuide()
-        }
+        quickHelpWorkbench = selectedWorkbench
+        isQuickHelpPresented = true
+    }
+
+    func dismissQuickHelp() {
+        isQuickHelpPresented = false
+        quickHelpWorkbench = nil
     }
 
     func revealActiveOutput() {

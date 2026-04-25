@@ -16,7 +16,7 @@ struct CodeConsoleWorkbenchView: View {
             if session.availableBindings.isEmpty {
                 EmptyStateCard(
                     title: "No bound dataset",
-                    message: "Import a file directly in Code Console, or bring a Plot / Data Studio dataset here to generate the external-AI prompt and controlled runner context."
+                    message: "Import a file or bind an existing Plot/Data Studio dataset."
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -34,7 +34,6 @@ struct CodeConsoleWorkbenchView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
         .fileImporter(
             isPresented: bindingForImporter,
             allowedContentTypes: FileTypeCatalog.plotInputs,
@@ -48,9 +47,6 @@ struct CodeConsoleWorkbenchView: View {
             case let .failure(error):
                 session.errorMessage = error.localizedDescription
             }
-        }
-        .sheet(isPresented: bindingForGuide) {
-            CodeConsoleGuideSheet(session: session)
         }
     }
 
@@ -180,70 +176,10 @@ struct CodeConsoleWorkbenchView: View {
         )
     }
 
-    private var bindingForGuide: Binding<Bool> {
-        Binding(
-            get: { session.isGuidePresented },
-            set: { session.isGuidePresented = $0 }
-        )
-    }
-
     private var selectedSheetBinding: Binding<SheetValue> {
         Binding(
             get: { session.selectedSheet },
             set: { session.setSelectedSheet($0) }
         )
-    }
-}
-
-private struct CodeConsoleGuideSheet: View {
-    @Bindable var session: CodeConsoleSession
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    guideSection(
-                        title: "Bind Context",
-                        text: "Use Import or existing Plot/Data Studio context to bind a dataset before generating prompts."
-                    )
-                    guideSection(
-                        title: "Prompt And Code",
-                        text: "Copy the controlled prompt for external AI, then paste returned Python into the editor."
-                    )
-                    guideSection(
-                        title: "Run",
-                        text: "Run executes repo-native Python and captures logs, generated files, and previews."
-                    )
-                    guideSection(
-                        title: "Outputs",
-                        text: "Use the Outputs panel to inspect managed run artifacts. Use the inspector Actions section or toolbar Export to export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
-                    )
-                }
-                .padding(24)
-            }
-            .navigationTitle("Code Console Help")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                        session.dismissGuide()
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 520, minHeight: 420)
-    }
-
-    private func guideSection(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(text)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 }

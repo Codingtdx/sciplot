@@ -226,16 +226,16 @@ extension DataStudioSession {
 
         let applyDraftAvailability: ActionAvailability
         if isBusy {
-            applyDraftAvailability = .disabled("Wait for the current preview refresh to finish before applying draft specimen changes.")
+            applyDraftAvailability = .disabled("Wait for preview refresh to finish.")
         } else if hasPendingChanges {
             applyDraftAvailability = .enabled()
         } else {
-            applyDraftAvailability = .disabled("Change inclusion or representative selection in Advanced before applying it.")
+            applyDraftAvailability = .disabled("Update inclusion or representative first.")
         }
 
         let useAutoRepresentativeAvailability: ActionAvailability
         if isBusy {
-            useAutoRepresentativeAvailability = .disabled("Wait for the current preview refresh to finish before restoring the auto representative.")
+            useAutoRepresentativeAvailability = .disabled("Wait for preview refresh to finish.")
         } else if draftRepresentativeSpecimenID(for: workbookPath) == nil {
             useAutoRepresentativeAvailability = .disabled("The focused workbook is already using the auto representative.")
         } else {
@@ -1016,7 +1016,7 @@ extension DataStudioSession {
             let label = eligibleWorkbookPaths.count == 1 ? "1 group" : "\(eligibleWorkbookPaths.count) groups"
             help = "Apply Auto Keep 5 to \(label) in the current session."
         } else if loadingCount > 0 {
-            let reason = "Wait for workbook previews to finish loading before applying Auto Keep 5 to all groups."
+            let reason = "Wait for workbook previews to finish loading."
             availability = .disabled(reason)
             help = reason
         } else if skippedCount > 0 {
@@ -1024,7 +1024,7 @@ extension DataStudioSession {
             availability = .disabled(reason)
             help = reason
         } else {
-            let reason = "Add at least one included workbook group before applying Auto Keep 5 to all groups."
+            let reason = "Add an included workbook group first."
             availability = .disabled(reason)
             help = reason
         }

@@ -81,7 +81,6 @@ final class CodeConsoleSession {
     var selectedGeneratedFilePath: String?
     var errorMessage: String?
     var isImporterPresented = false
-    var isGuidePresented = false
     var isRefreshingContext = false
     var isRunning = false
     var userExportURLs: [URL] = []
@@ -327,14 +326,6 @@ final class CodeConsoleSession {
             return
         }
         scheduleContextRefresh()
-    }
-
-    func showGuide() {
-        isGuidePresented = true
-    }
-
-    func dismissGuide() {
-        isGuidePresented = false
     }
 
     func refreshCurrentContext() async {

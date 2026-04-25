@@ -1649,7 +1649,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertFalse(presentation.applyDraftAvailability.isEnabled)
         XCTAssertEqual(
             presentation.applyDraftAvailability.reason,
-            "Change inclusion or representative selection in Advanced before applying it."
+            "Update inclusion or representative first."
         )
         XCTAssertFalse(presentation.useAutoRepresentativeAvailability.isEnabled)
         XCTAssertEqual(

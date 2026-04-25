@@ -36,7 +36,6 @@ final class ComposerSession {
     var pendingImportKind: ComposerImportKind = .graph
     var isImportMenuPresented = false
     var isImportPresented = false
-    var isGuidePresented = false
     var isPreviewing = false
     var isExporting = false
     var activeDragPanelID: String?
@@ -108,11 +107,4 @@ final class ComposerSession {
         isImportPresented = true
     }
 
-    func showGuide() {
-        isGuidePresented = true
-    }
-
-    func dismissGuide() {
-        isGuidePresented = false
-    }
 }

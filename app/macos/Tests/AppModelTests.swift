@@ -26,6 +26,21 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.composerSession.isImportPresented)
     }
 
+    func testShowHelpForActiveWorkbenchPresentsQuickHelp() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.composer)
+        model.showHelpForActiveWorkbench()
+
+        XCTAssertTrue(model.isQuickHelpPresented)
+        XCTAssertEqual(model.quickHelpWorkbench, .composer)
+
+        model.dismissQuickHelp()
+
+        XCTAssertFalse(model.isQuickHelpPresented)
+        XCTAssertNil(model.quickHelpWorkbench)
+    }
+
     func testDataStudioImportTransitionsFromWizardToFileImporter() async {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 

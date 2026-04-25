@@ -22,7 +22,6 @@ struct ComposerWorkbenchView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -53,9 +52,6 @@ struct ComposerWorkbenchView: View {
         } message: {
             Text("Choose Graph PDF or Asset File for this Composer session.")
         }
-        .sheet(isPresented: bindingForGuide) {
-            ComposerGuideSheet(session: session)
-        }
     }
 
     private var allowedImportTypes: [UTType] {
@@ -81,67 +77,4 @@ struct ComposerWorkbenchView: View {
         )
     }
 
-    private var bindingForGuide: Binding<Bool> {
-        Binding(
-            get: { session.isGuidePresented },
-            set: { session.isGuidePresented = $0 }
-        )
-    }
-}
-
-private struct ComposerGuideSheet: View {
-    let session: ComposerSession
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    guideSection(
-                        title: "Grid",
-                        text: "Composer works on one fixed 3x3 figure grid. Select single cells for direct placement, or command-click adjacent cells to build a rectangular selection."
-                    )
-                    guideSection(
-                        title: "Merge And Unmerge",
-                        text: "Merge turns an empty rectangular selection into one free region. Unmerge removes that free region and leaves any assigned assets in place."
-                    )
-                    guideSection(
-                        title: "Placement",
-                        text: "Graphs stay tied to graph regions and must move into matching cell spans such as 1x1, 2x1, or 1x2. Assets can snap into single cells or merged free regions."
-                    )
-                    guideSection(
-                        title: "Labels",
-                        text: "Auto labels resolve to figure letters such as A, B, C, and D. Turn auto labels off in the inspector when you want to enter a manual panel label."
-                    )
-                    guideSection(
-                        title: "Export",
-                        text: "Preview stays in the inspector Preview section, while export lives in the Actions section and toolbar. Choose PDF or 300 dpi TIFF first, then choose the destination."
-                    )
-                }
-                .padding(24)
-            }
-            .navigationTitle("Composer Guide")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                        session.dismissGuide()
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 520, minHeight: 420)
-    }
-
-    private func guideSection(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(text)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
-    }
 }

@@ -55,7 +55,6 @@ final class DataStudioSession {
     var importFlow: DataStudioImportFlowState = .idle
     var pendingImportDisposition: DataStudioImportDisposition = .addToCurrentSession
     var pendingImportKind: DataStudioImportKind = .rawFiles
-    var isGuidePresented = false
     var selectedPreviewSheetName: String?
     var selectedPreviewBlockID: String?
     var showAdvancedCandidates = false
@@ -187,14 +186,6 @@ final class DataStudioSession {
             }
             errorMessage = error.localizedDescription
         }
-    }
-
-    func showGuide() {
-        isGuidePresented = true
-    }
-
-    func dismissGuide() {
-        isGuidePresented = false
     }
 
     var hasSessionContent: Bool {

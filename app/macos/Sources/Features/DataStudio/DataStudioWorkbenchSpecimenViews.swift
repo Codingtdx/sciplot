@@ -367,17 +367,17 @@ private struct DataStudioSpecimenFilterAdvancedSection: View {
 
     private var applyChangesHelp: String {
         presentation.applyDraftAvailability.reason
-            ?? "Commit the current draft inclusion and representative edits to the focused workbook group."
+            ?? "Apply current draft inclusion and representative edits."
     }
 
     private var useAutoRepresentativeHelp: String {
         presentation.useAutoRepresentativeAvailability.reason
-            ?? "Clear the manual representative override and fall back to the auto-selected specimen."
+            ?? "Clear manual representative override."
     }
 
     private var revertHelp: String {
         presentation.revertDraftAvailability.reason
-            ?? "Discard the current draft specimen edits and return to the committed filter state."
+            ?? "Discard draft specimen edits."
     }
 }
 

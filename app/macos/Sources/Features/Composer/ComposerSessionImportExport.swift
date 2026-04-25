@@ -24,8 +24,8 @@ extension ComposerSession {
                 hidePanels(withIDs: importedPanelIDs, in: &candidate)
                 _ = reflowVisiblePanels(in: &candidate)
                 errorMessage = importedPanelIDs.isEmpty
-                    ? "The current board layout cannot fit the requested panel sequence."
-                    : "Some imported panels could not fit the current board layout and were kept off the board."
+                    ? "Current layout cannot fit this panel sequence."
+                    : "Some imported panels did not fit and were kept off-board."
             } else {
                 errorMessage = nil
             }

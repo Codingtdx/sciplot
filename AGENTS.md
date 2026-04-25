@@ -123,6 +123,7 @@
 - Data Studio 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
 - Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
 - Data Studio `Save Project…` / `Save Project As…` 同样走命令菜单，不新增第二套 toolbar 主入口。
+- toolbar `Help` 是唯一帮助主入口，必须打开 app-level `Quick Help`（按 workbench 提供精简动作提示）；不得恢复各 workbench 长文 `GuideSheet` 或流程说明卡片。
 - `PlotSession` / `DataStudioSession` / `ComposerSession` / `CodeConsoleSession` 的异步编排必须复用共享内核（`AsyncLatestTaskCoordinator` / `KeyedAsyncLatestTaskCoordinator`），保持 revision gate + debounce + cancellation + latest-write-wins 语义一致。
 - 跨 workbench 的 async 失败处理必须统一把“用户取消 / 生命周期取消”视为控制流，而不是 GUI 错误：
   - 优先复用共享 helper（当前是 `app/macos/Sources/Shared/Utilities/UserCancellation.swift` 的 `isUserCancellationError`）；
@@ -150,6 +151,7 @@
 - 默认 popover 必须直接展示排序结果和 keep/out cutoff，不要再展示 representative、文件名、workbook 标签等低价值信息。
 - specimen 级别的文件名、距离表、手动 inclusion override、手动 representative curve 选择都只能放在 `Advanced` 折叠区；不要把 specimen 细节塞回默认主界面。
 - 关键动作必须“禁用并解释”（`disabled + help`），禁止 silent no-op。
+- 共享状态文案（`InspectorEmptyState` / `EmptyStateCard` / `ErrorStateCard`）统一保持“状态 + 下一步”的短句，不回退到长段解释文案。
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。

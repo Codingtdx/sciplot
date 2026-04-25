@@ -141,7 +141,7 @@ struct Base64PDFPreviewView: View {
         } else {
             EmptyStateCard(
                 title: "Preview unavailable",
-                message: "The sidecar returned preview data that could not be decoded as a PDF."
+                message: "Preview data is invalid. Re-run preview or choose another source."
             )
         }
     }

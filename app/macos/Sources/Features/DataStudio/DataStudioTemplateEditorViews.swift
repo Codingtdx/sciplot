@@ -133,7 +133,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                         if session.templateDraftOutputKind == "curve_metrics" {
                             Toggle("Enable Comparison", isOn: comparisonEnabledBinding)
                                 .toggleStyle(.switch)
-                                .help("Generate representative/metric compare sheets in addition to curves.")
+                                .help("Also generate representative and metric compare sheets.")
                         }
                     }
                 }

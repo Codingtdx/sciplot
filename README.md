@@ -48,6 +48,7 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - Data Studio resolver template adoption is recommendation-driven: the sheet requests ranked matches from sidecar and preselects the top recommendation when available. If no recommendation matches, the resolver keeps template selection empty and requires explicit manual selection (`disabled + help`), instead of silently defaulting to builtin tensile.
 - Data Studio exposes an `Analysis` utility sheet with `Focused Workbook` and `Current Figure` scopes. `Source Data` shows paged workbook rows; `Fit` supports `linear`, `polynomial_2`, and `polynomial_3`. Current-figure fitting is limited to curve-like templates (`curve`, `point_line`, `scatter`).
 - Export UX is unified around the Data Studio inspector pattern: toolbar `Export` remains the global entrypoint, while workbench inspectors expose `Section("Actions")` with a primary export action and an `Advanced` disclosure for `Reveal Output` plus `Latest Export`.
+- Toolbar `Help` opens one app-level `Quick Help` sheet that maps to the active workbench with concise action-oriented prompts. Per-workbench long-form guide sheets are no longer part of the supported UI surface.
 - Plot / Composer / Code Console figure exports always choose `PDF` or `300 dpi TIFF` first, then choose the destination. Single-output exports keep an editable filename; multi-output exports choose one base filename and append deterministic suffixes per figure.
 - Code Console export only covers the latest run's generated PDF figure files. Managed run artifacts remain browsable in the Outputs panel, and revealing the managed output folder stays separate from user export destinations.
 - Data Studio specimen filter uses one anchored popover entrypoint in the `Focused Group` strip. Do not restore a second left-rail trigger for the same control.
@@ -55,6 +56,7 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 - Specimen identity, manual inclusion overrides, and manual representative-curve selection are Advanced-only via disclosure, with a local draft that does not affect compare/export until explicitly applied.
 - `Workbook Groups` may expose one global `Auto Keep 5 All` action in the section header; it applies the committed auto-filter result to every eligible workbook group in the current session.
 - Critical actions follow `disabled + help` and must not silently no-op.
+- Shared empty/error states should stay concise (`status + next action`) rather than multi-paragraph workflow narration.
 - Workbench top bars prioritize document-state feedback: current source, current template/figure, latest output, latest failure.
 - Plot/Data Studio key edits support native Undo/Redo via `UndoManager`.
 - Inspector keeps high-frequency controls visible and moves low-frequency controls into `DisclosureGroup("Advanced")`.

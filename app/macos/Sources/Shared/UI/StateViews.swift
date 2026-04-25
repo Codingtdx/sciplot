@@ -16,6 +16,36 @@ enum MotionTokens {
     static let stateTransition: AnyTransition = .opacity.combined(with: .move(edge: .bottom))
 }
 
+private enum StatusCopy {
+    static func short(_ raw: String?) -> String? {
+        guard let raw else {
+            return nil
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let firstLine = trimmed
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init) ?? trimmed
+        let collapsed = firstLine
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !collapsed.isEmpty else {
+            return nil
+        }
+        guard collapsed.count > 120 else {
+            return collapsed
+        }
+
+        let cutoff = collapsed.index(collapsed.startIndex, offsetBy: 117)
+        return String(collapsed[..<cutoff]) + "..."
+    }
+}
+
 struct ActionAvailability: Equatable, Sendable {
     let isEnabled: Bool
     let reason: String?
@@ -98,12 +128,13 @@ struct EmptyStateCard: View {
     var message: String? = nil
 
     var body: some View {
+        let summary = StatusCopy.short(message)
         Group {
-            if let message, !message.isEmpty {
+            if let summary {
                 ContentUnavailableView {
                     Label(title, systemImage: "sparkles.rectangle.stack")
                 } description: {
-                    Text(message)
+                    Text(summary)
                 }
             } else {
                 ContentUnavailableView {
@@ -112,7 +143,6 @@ struct EmptyStateCard: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
-        .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
     }
 }
 
@@ -149,15 +179,19 @@ struct ErrorStateCard: View {
     let retryTitle: String?
     let retryAction: (() -> Void)?
 
+    private var summaryMessage: String {
+        StatusCopy.short(message) ?? "Operation failed. Try again."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
 
-            Text(message)
+            Text(summaryMessage)
                 .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+                .lineLimit(2)
 
             if let retryTitle, let retryAction {
                 Button(retryTitle, action: retryAction)
@@ -166,7 +200,7 @@ struct ErrorStateCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(.quinary.opacity(0.35), in: RoundedRectangle(cornerRadius: 18))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 }
 
@@ -250,18 +284,21 @@ struct BusyStateCard: View {
     var message: String? = nil
 
     var body: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.large)
-            Text(title)
-                .font(.headline)
-            if let message, !message.isEmpty {
-                Text(message)
-                    .foregroundStyle(.secondary)
+        let summary = StatusCopy.short(message)
+        return ContentUnavailableView {
+            Label {
+                Text(title)
+                    .font(.headline)
+            } icon: {
+                ProgressView()
+                    .controlSize(.large)
+            }
+        } description: {
+            if let summary {
+                Text(summary)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
-        .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
     }
 }
 
@@ -285,7 +322,7 @@ struct InspectorEmptyState: View {
     let message: String
 
     var body: some View {
-        Text(message)
+        Text(StatusCopy.short(message) ?? "No content")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

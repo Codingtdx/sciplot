@@ -24,7 +24,6 @@ struct PlotWorkbenchView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -45,9 +44,6 @@ struct PlotWorkbenchView: View {
                     session.errorMessage = error.localizedDescription
                 }
             }
-        }
-        .sheet(isPresented: bindingForGuide) {
-            PlotGuideSheet(session: session)
         }
         .sheet(isPresented: bindingForDataWorkbook) {
             PlotDataWorkbookSheet(session: session)
@@ -98,13 +94,6 @@ struct PlotWorkbenchView: View {
         )
     }
 
-    private var bindingForGuide: Binding<Bool> {
-        Binding(
-            get: { session.isGuidePresented },
-            set: { session.isGuidePresented = $0 }
-        )
-    }
-
     private var bindingForDataWorkbook: Binding<Bool> {
         Binding(
             get: { session.isDataWorkbookPresented },
@@ -116,175 +105,6 @@ struct PlotWorkbenchView: View {
         Binding(
             get: { session.selectedSheet },
             set: { session.setSelectedSheet($0) }
-        )
-    }
-}
-
-private struct PlotGuideSheet: View {
-    let session: PlotSession
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    guideSection(
-                        title: "Live Canvas",
-                        text: "Plot is state-driven. Importing a source immediately kicks off inspect, template recommendation, and preview rendering."
-                    )
-                    guideSection(
-                        title: "Sheets",
-                        text: "Switching sheets re-runs inspect and refreshes the preview automatically. The last successful preview stays visible until the new one is ready."
-                    )
-                    guideSection(
-                        title: "Templates",
-                        text: "Use the left rail to switch between the top compatible templates. Template changes immediately refresh the preview."
-                    )
-                    guideSection(
-                        title: "Inspector",
-                        text: "Use the inspector for compact plot options, axis controls, and legend ordering. Keep the canvas dominant and move secondary helpers into lightweight surfaces."
-                    )
-                    axisLabelOverridesSection
-                    dataTemplatesSection
-                    guideSection(
-                        title: "Export",
-                        text: "Export is available from both the toolbar and inspector Actions section. Choose PDF or 300 dpi TIFF first, then choose the destination for the current plot state."
-                    )
-                }
-                .padding(24)
-            }
-            .navigationTitle("Plot Guide")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                        session.dismissGuide()
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 520, minHeight: 420)
-    }
-
-    private var axisLabelOverridesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Axis Label Overrides")
-                .font(.headline)
-
-            Text("Auto normalization currently includes replacements like frequency -> ω, storage modulus -> G', shear strain -> γ, stress -> σ, and 2theta -> 2θ. Use overrides below when you want exact wording for the current Plot session.")
-                .foregroundStyle(.secondary)
-
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                GridRow {
-                    Text("X label")
-                        .foregroundStyle(.secondary)
-                    TextField(
-                        session.recommendedXAxisLabel ?? "Use recommended label",
-                        text: axisLabelBinding(
-                            get: { session.renderOptions.xLabelOverride },
-                            set: { newValue in
-                                session.updateRenderOptions(policy: .debounced) { $0.xLabelOverride = newValue }
-                            }
-                        )
-                    )
-                    .textFieldStyle(.roundedBorder)
-                }
-
-                GridRow {
-                    Text("Y label")
-                        .foregroundStyle(.secondary)
-                    TextField(
-                        session.recommendedYAxisLabel ?? "Use recommended label",
-                        text: axisLabelBinding(
-                            get: { session.renderOptions.yLabelOverride },
-                            set: { newValue in
-                                session.updateRenderOptions(policy: .debounced) { $0.yLabelOverride = newValue }
-                            }
-                        )
-                    )
-                    .textFieldStyle(.roundedBorder)
-                }
-            }
-
-            if session.recommendedXAxisLabel != nil || session.recommendedYAxisLabel != nil {
-                Text(
-                    "Recommended: X = \(session.recommendedXAxisLabel ?? "Auto"), Y = \(session.recommendedYAxisLabel ?? "Auto")"
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 10) {
-                Button("Reset Overrides") {
-                    session.updateRenderOptions(policy: .immediate) {
-                        $0.xLabelOverride = nil
-                        $0.yLabelOverride = nil
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                Text("Session-only. Preview and export both use these overrides.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    private var dataTemplatesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Data File Templates")
-                .font(.headline)
-
-            Text("Open the built-in example tables when you need a quick reference for supported input structure.")
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 10) {
-                Button("Open Curve Table") {
-                    session.openExampleDataTemplate(named: "curve_table.csv")
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Open Replicate Table") {
-                    session.openExampleDataTemplate(named: "replicate_table.csv")
-                }
-                .buttonStyle(.bordered)
-
-                Button("Reveal in Finder") {
-                    session.revealExampleDataTemplates()
-                }
-                .buttonStyle(.bordered)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    private func guideSection(title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(text)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    private func axisLabelBinding(
-        get: @escaping () -> String?,
-        set: @escaping (String?) -> Void
-    ) -> Binding<String> {
-        Binding(
-            get: { get() ?? "" },
-            set: { newValue in
-                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                set(trimmed.isEmpty ? nil : trimmed)
-            }
         )
     }
 }

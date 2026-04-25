@@ -38,6 +38,14 @@ struct RootSplitView: View {
         .onOpenURL { url in
             model.openPlotDocument(url)
         }
+        .sheet(isPresented: $model.isQuickHelpPresented, onDismiss: {
+            model.dismissQuickHelp()
+        }) {
+            QuickHelpSheet(
+                workbench: model.quickHelpWorkbench ?? model.selectedWorkbench,
+                dismiss: { model.dismissQuickHelp() }
+            )
+        }
         .confirmationDialog(
             "Replace the current Plot session?",
             isPresented: $model.isPlotReplacementConfirmationPresented

@@ -54,7 +54,6 @@ final class PlotSession {
     @ObservationIgnored var fitOptionsDidChange: ((FitOptionsPayload) -> Void)?
 
     var isImporterPresented = false
-    var isGuidePresented = false
     var isDataWorkbookPresented = false
     var selectedFileURL: URL?
     var projectURL: URL?
@@ -225,14 +224,6 @@ final class PlotSession {
             renderOptions.visualThemeID = nil
         }
         schedulePreviewRefresh(policy: .immediate)
-    }
-
-    func showGuide() {
-        isGuidePresented = true
-    }
-
-    func dismissGuide() {
-        isGuidePresented = false
     }
 
     func showDataWorkbook() {

@@ -22,7 +22,7 @@ struct Base64PreviewImageView: View {
         } else {
             EmptyStateCard(
                 title: "Preview unavailable",
-                message: "The sidecar returned preview data that could not be decoded as a PNG."
+                message: "Preview data is invalid. Re-run preview or choose another source."
             )
         }
     }
