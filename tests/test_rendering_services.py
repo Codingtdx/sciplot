@@ -2050,6 +2050,68 @@ def test_contour_field_preflight_and_render_with_pivot_transform(tmp_path: Path)
         close_rendered_plots(rendered)
 
 
+def test_curve_render_model_detection_uses_transform_options(tmp_path: Path, monkeypatch) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    transform = {
+        "id": "positive-window",
+        "kind": "row_filter",
+        "column": "Time",
+        "operator": "between",
+        "lower": 0.0,
+        "upper": 2.0,
+    }
+    from src.rendering import dataset_models
+    from src.rendering import render_curve as render_curve_module
+
+    observed_options: list[object] = []
+
+    def wrapped_build_normalized_dataset(input_path_arg, sheet=0, *, model=None, options=None):
+        observed_options.append(options)
+        assert options is not None
+        assert getattr(options, "data_transforms", None)
+        return dataset_models.build_normalized_dataset(input_path_arg, sheet, model=model, options=options)
+
+    monkeypatch.setattr(render_curve_module, "build_normalized_dataset", wrapped_build_normalized_dataset)
+
+    rendered = build_rendered_plots("curve", input_path, data_transforms=[transform])
+    try:
+        assert observed_options
+        assert rendered[0].filename == "curve_curve.pdf"
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_mean_band_render_model_detection_uses_transform_options(tmp_path: Path, monkeypatch) -> None:
+    input_path = _write_multi_curve_table(tmp_path / "multi_curve.csv")
+    transform = {
+        "id": "shared-window",
+        "kind": "row_filter",
+        "column": "Time",
+        "operator": "between",
+        "lower": 0.0,
+        "upper": 2.0,
+    }
+    from src.rendering import dataset_models
+    from src.rendering import render_curve as render_curve_module
+
+    observed_options: list[object] = []
+
+    def wrapped_build_normalized_dataset(input_path_arg, sheet=0, *, model=None, options=None):
+        observed_options.append(options)
+        assert options is not None
+        assert getattr(options, "data_transforms", None)
+        return dataset_models.build_normalized_dataset(input_path_arg, sheet, model=model, options=options)
+
+    monkeypatch.setattr(render_curve_module, "build_normalized_dataset", wrapped_build_normalized_dataset)
+
+    rendered = build_rendered_plots("mean_band", input_path, data_transforms=[transform])
+    try:
+        assert observed_options
+        assert rendered[0].filename == "multi_curve_mean_band.pdf"
+    finally:
+        close_rendered_plots(rendered)
+
+
 def test_datagraph_template_preflight_reports_shape_specific_errors(tmp_path: Path) -> None:
     missing_z = tmp_path / "missing_z.csv"
     pd.DataFrame(

@@ -29,7 +29,7 @@ Canonical workflow and user-visible UI workflow are different layers.
 Default user-visible workflow compression for future mock work:
 
 - `Plot`: `Import -> Template -> Refine & Export`
-- `Data Studio`: `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
+- `Data Studio`: `Import -> Group Review -> Compare Preview -> Export / Open in Plot`
 - `Composer`: `Assets -> Compose -> Review -> Export`
 - `Code Console`: `Context -> Code -> Run -> Outputs`
 
@@ -88,7 +88,16 @@ Normalization rules:
 
 Default user-visible UI flow:
 
-- `Choose Template -> Import -> Workbook Review -> Compare -> Export / Open in Plot`
+- `Import -> Group Review -> Compare Preview -> Export / Open in Plot`
+
+### Plot / Data Studio Boundary
+
+Plot and Data Studio share sidecar services, but they do not own the same product job.
+
+- Plot owns single-figure work: source inspect, ranked template recommendation, typed data variables/transforms, figure refinement, preflight, preview/export, and Plot project durability.
+- Data Studio owns intake and workbook work: raw-source template mapping, workbook creation/import, specimen filtering, comparison context, comparison figure export, and Data Studio project durability.
+- `Open in Plot` is the explicit boundary crossing. Data Studio passes a workbook URL, preferred sheet, selected template, render options, and fit options into Plot; Plot then resumes its normal inspect/preview path instead of using a Data Studio-only renderer.
+- Curve-only or no-compare Data Studio outputs may auto-open Plot. Compare-capable workbooks stay in Data Studio unless the user explicitly opens a figure in Plot.
 
 ### Composer
 
@@ -174,7 +183,8 @@ Do not assume without new evidence:
 Confirmed in current repo/docs/tests:
 
 - list, create, update, and delete reusable templates through `/data-studio/templates`
-- preview raw source structure and recommended fields through `/data-studio/source-preview`
+- preview raw source structure and recommended fields through `/source-table-preview`
+- validate unsaved template drafts through `/data-studio/template-preview`
 - build a workbook from raw files through `/data-studio/build-workbook`
 - import an existing workbook through `/data-studio/import-workbook`
 - preview comparison figures through `/data-studio/comparison-preview`

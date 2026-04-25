@@ -4,7 +4,6 @@ import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
-from types import SimpleNamespace
 from typing import cast
 
 from fastapi import APIRouter
@@ -35,6 +34,7 @@ from app.sidecar.schemas import (
 )
 from app.sidecar.server_utils import (
     bundle_manifest_payload,
+    data_engine_options_from_payload,
     http_bad_request,
     normalize_path,
     options_from_payload,
@@ -112,26 +112,9 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
         try:
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
-            inspection = inspect_input_file(input_path, sheet)
-            transform_options = SimpleNamespace(
-                data_variables=(
-                    tuple(item.model_dump(mode="json") for item in request.options.data_variables)
-                    if request.options is not None and request.options.data_variables
-                    else None
-                ),
-                data_transforms=(
-                    tuple(item.model_dump(mode="json") for item in request.options.data_transforms)
-                    if request.options is not None and request.options.data_transforms
-                    else None
-                ),
-            )
-            normalized_dataset = build_normalized_dataset(
-                input_path,
-                sheet,
-                model=None if transform_options.data_transforms else inspection.model,
-                options=transform_options if transform_options.data_transforms else None,
-            )
+            transform_options = data_engine_options_from_payload(request.options)
             if transform_options.data_transforms:
+                normalized_dataset = build_normalized_dataset(input_path, sheet, options=transform_options)
                 ranked = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=10)
                 presentation = build_recommendation_presentation(ranked)
                 inspection_payload = {
@@ -151,6 +134,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                     "signals": list(normalized_dataset.semantic_signals),
                 }
             else:
+                inspection = inspect_input_file(input_path, sheet)
+                normalized_dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
                 inspection_payload = serialize_dataclass(inspection)
             raw = (
                 read_raw_table_for_options(input_path, sheet, transform_options)
@@ -178,6 +163,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             offset, limit = _bounded_page(request.offset, request.limit)
+            transform_options = data_engine_options_from_payload(request.options)
             preview = build_source_table_preview(
                 input_path,
                 sheet=sheet,
@@ -189,16 +175,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 header_row_index=request.header_row_index,
                 unit_row_index=request.unit_row_index,
                 data_start_row_index=request.data_start_row_index,
-                data_transforms=(
-                    [item.model_dump(mode="json") for item in request.options.data_transforms]
-                    if request.options is not None and request.options.data_transforms
-                    else None
-                ),
-                data_variables=(
-                    [item.model_dump(mode="json") for item in request.options.data_variables]
-                    if request.options is not None and request.options.data_variables
-                    else None
-                ),
+                data_transforms=transform_options.data_transforms,
+                data_variables=transform_options.data_variables,
             )
             return SourceTablePreviewResponse.model_validate(
                 {
@@ -229,18 +207,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             offset, limit = _bounded_page(request.offset, request.limit)
-            transform_options = SimpleNamespace(
-                data_variables=(
-                    tuple(item.model_dump(mode="json") for item in request.options.data_variables)
-                    if request.options is not None and request.options.data_variables
-                    else None
-                ),
-                data_transforms=(
-                    tuple(item.model_dump(mode="json") for item in request.options.data_transforms)
-                    if request.options is not None and request.options.data_transforms
-                    else None
-                )
-            )
+            transform_options = data_engine_options_from_payload(request.options)
             series_list = load_curve_table_for_options(input_path, sheet, transform_options)
             fit_result = fit_series_list(
                 series_list,

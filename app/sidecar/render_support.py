@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import HTTPException
 
@@ -20,6 +21,21 @@ from src.rendering.models import RenderOptions
 
 def normalize_path(path_text: str) -> Path:
     return ensure_input_path(normalize_input_path_text(path_text))
+
+
+def data_engine_options_from_payload(payload: RenderOptionsPayload | None) -> SimpleNamespace:
+    return SimpleNamespace(
+        data_variables=(
+            tuple(item.model_dump(mode="json") for item in payload.data_variables)
+            if payload is not None and payload.data_variables
+            else None
+        ),
+        data_transforms=(
+            tuple(item.model_dump(mode="json") for item in payload.data_transforms)
+            if payload is not None and payload.data_transforms
+            else None
+        ),
+    )
 
 
 def options_from_payload(
@@ -164,6 +180,7 @@ def http_bad_request(context: str, exc: Exception) -> HTTPException:
 
 __all__ = [
     "contextual_error_message",
+    "data_engine_options_from_payload",
     "http_bad_request",
     "normalize_path",
     "options_from_payload",

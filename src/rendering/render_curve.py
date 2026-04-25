@@ -815,7 +815,7 @@ def _render_standard_curve_template(
     show_markers: bool,
     extra_curve_kwargs: dict[str, object] | None = None,
 ) -> list[RenderedPlot]:
-    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    normalized_dataset = build_normalized_dataset(input_path, sheet, options=options)
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         return _render_rheology_bundle(
             normalized_dataset.model,
@@ -1172,7 +1172,7 @@ def _render_replicate_band_like(
     template: str,
     filename_suffix: str,
 ) -> list[RenderedPlot]:
-    normalized_dataset = build_normalized_dataset(input_path, sheet)
+    normalized_dataset = build_normalized_dataset(input_path, sheet, options=options)
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         raise ValueError(f"{template} is not supported for rheology export bundles.")
 

@@ -215,6 +215,44 @@ def test_inspect_file_accepts_transform_options_for_recommendation(tmp_path: Pat
     assert templates[0] == "polar_curve"
 
 
+def test_inspect_file_recommends_table_figure_after_aggregate_transform(tmp_path: Path) -> None:
+    input_path = tmp_path / "long-summary.csv"
+    pd.DataFrame(
+        [
+            ["group", "value"],
+            ["A", 1.0],
+            ["A", 3.0],
+            ["B", 5.0],
+            ["B", 7.0],
+        ]
+    ).to_csv(input_path, header=False, index=False)
+
+    response = client.post(
+        "/inspect-file",
+        json={
+            "input_path": str(input_path),
+            "options": {
+                "data_transforms": [
+                    {
+                        "id": "summary",
+                        "kind": "aggregate_summary",
+                        "group_by": ["group"],
+                        "value_columns": ["value"],
+                        "statistics": ["mean", "sd", "count"],
+                    }
+                ]
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["inspection"]["model"] == "table_summary"
+    assert payload["inspection"]["recommendations"][0]["template_id"] == "table_figure"
+    assert payload["dataset"]["sample_rows"][0] == ["group", "value_mean", "value_sd", "value_count"]
+    assert payload["dataset"]["sample_rows"][1] == ["A", 2.0, 1.4142135623730951, 2]
+
+
 def test_fit_analysis_supports_expanded_and_custom_models(tmp_path: Path) -> None:
     input_path = tmp_path / "fit.csv"
     pd.DataFrame([["x", "y"], ["s", "a.u."], ["Sample", "Sample"], [0, 2], [1, 5], [2, 8], [3, 11]]).to_csv(

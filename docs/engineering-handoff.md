@@ -33,6 +33,37 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: Plot/Data Studio boundary and transform-aware inspection hardening
+
+- Change:
+  - Fixed transform-aware Plot inspection so `/inspect-file` can build recommendations from the transformed table without first requiring the original raw source to match a supported shape.
+  - Added a shared sidecar `data_engine_options_from_payload` helper so `/inspect-file`, `/source-table-preview`, and `/fit-analysis` consume `render_options.data_variables / data_transforms` through one payload conversion path.
+  - Fixed curve and mean-band render model detection so `src/rendering/render_curve.py` passes current render options into `build_normalized_dataset`, preventing transform-enabled renders from falling back to raw-source model detection.
+  - Updated `docs/product-architecture.md` to remove stale `/data-studio/source-preview` wording and add a Plot/Data Studio boundary note: Plot owns single-figure recommendation/refinement/render/export; Data Studio owns intake/workbook/comparison; `Open in Plot` is the explicit handoff.
+  - Updated `README.md` and `AGENTS.md` to document that transform-aware inspect/recommendation is based on the transformed table while no-options import remains the fast raw-source path.
+- User-visible impact:
+  - Data transformed into a compact aggregate table can now enter normal recommendation and surface `table_figure` even if the original long raw table is not directly recognized.
+  - Transform-enabled curve and mean-band rendering now use the same model-detection view as preview/fit/source-table paths.
+  - No GUI workflow change; existing Data Studio `Open in Plot` affordances and tests already cover render/fit handoff payloads.
+- Decision Record:
+  - First-principles motivation: DataGraph-style data preparation only works as a durable engine if inspect/recommend, render, fit, and source preview all observe the same transformed table. Raw-first inspection created a hidden precondition that contradicted the typed data-engine contract.
+  - Alternatives rejected: adding a new transform-inspect endpoint, letting macOS infer transformed shapes locally, or keeping renderer-specific fallbacks. Each would create a second recommendation/data semantic source.
+  - Current boundary: transforms are still opt-in. Without options, `/inspect-file` continues to use the raw-source fast path. Data Studio remains the workbook/comparison owner and only crosses into Plot via `Open in Plot`.
+  - Failure conditions: future renderers that call raw cached loaders for transform-enabled options can still diverge; add a regression near that renderer before extending it.
+- Risk / rollback:
+  - Roll back `app/sidecar/render_support.py` helper extraction and `app/sidecar/routes_render.py` inspect branching if transform-aware inspect errors regress ordinary imports.
+  - Roll back the two `src/rendering/render_curve.py` option-passing changes if rheology bundle routing regresses, then replace with a narrower transform-only condition.
+  - Documentation changes are safe to revert independently if product wording changes again.
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_rendering_services.py::test_curve_render_model_detection_uses_transform_options tests/test_rendering_services.py::test_mean_band_render_model_detection_uses_transform_options tests/test_sidecar_render.py::test_inspect_file_recommends_table_figure_after_aggregate_transform -q`: failed before implementation, then passed (`3 passed`, existing SWIG deprecation warnings only).
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py tests/test_rendering_services.py::test_contour_field_preflight_and_render_with_pivot_transform tests/test_rendering_services.py::test_new_datagraph_templates_preflight_and_render tests/test_rendering_services.py::test_curve_render_model_detection_uses_transform_options tests/test_rendering_services.py::test_mean_band_render_model_detection_uses_transform_options tests/test_sidecar_active_routes.py -q`: passed (`15 passed`, existing warnings only).
+  - `.venv/bin/python -m ruff check app/sidecar/routes_render.py app/sidecar/render_support.py app/sidecar/server_utils.py src/rendering/render_curve.py tests/test_rendering_services.py tests/test_sidecar_render.py`: passed.
+  - `.venv/bin/python -m mypy src/rendering/render_curve.py app/sidecar/routes_render.py app/sidecar/render_support.py app/sidecar/server_utils.py`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`pytest` `258 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `179 tests, 0 failures`; manual smoke checklist listed as pending but not enforced).
+  - `.venv/bin/python scripts/smoke_check.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed (CoreSimulator out-of-date warning only).
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`179 tests, 0 failures`; CoreSimulator out-of-date warning only).
+
 ### 2026-04-25: DataGraph-style typed data engine expansion
 
 - Change:
