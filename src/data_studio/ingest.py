@@ -864,7 +864,7 @@ def match_template(preview: RawFilePreview, template: TemplateDefinition) -> Tem
                 reasons.append(f"Matched field candidates: {', '.join(field_hits)}.")
         score += condition_score
     if not template.match_conditions:
-        score = 0.1
+        return None
     if score <= 0:
         return None
     confidence = min(0.99, max(score, 0.1))

@@ -104,6 +104,18 @@ def _validation_result(rule_name: str, *, passed: bool, details: dict[str, objec
     return payload
 
 
+def _assert_no_failed_error_validations(reports: list[dict[str, object]]) -> None:
+    failures = [
+        report
+        for report in reports
+        if report.get("severity") == "error" and report.get("passed") is False
+    ]
+    if not failures:
+        return
+    labels = ", ".join(str(report.get("id", "<unknown>")) for report in failures)
+    raise AssertionError(f"Smoke validation failed for error-level checks: {labels}")
+
+
 def _json_safe(value: object) -> object:
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
@@ -1556,26 +1568,16 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
     try:
         plot = curve[0]
         ax = plot.figure.axes[0]
-        reports.append(
-            _validation_result(
-                "non_blank_pdf",
-                passed=(
-                    plot.qa_report is not None
-                    and "axis_break_overlay" in plot.qa_report.autofixes_applied
-                    and "shape_annotation_overlay" in plot.qa_report.autofixes_applied
-                    and ax.get_xlim()[1] < 10.0
-                    and ax.get_ylim()[1] < 3.2
-                    and any(text.get_text() == "Peak" for text in ax.texts)
-                    and any(text.get_text() == "Window" for text in ax.texts)
-                ),
-                details={
-                    "template": "curve",
-                    "autofixes": list(plot.qa_report.autofixes_applied) if plot.qa_report is not None else [],
-                    "xlim": [float(value) for value in ax.get_xlim()],
-                    "ylim": [float(value) for value in ax.get_ylim()],
-                },
-            )
-        )
+        autofixes = set(plot.qa_report.autofixes_applied) if plot.qa_report is not None else set()
+        visible_texts = {text.get_text() for text in ax.texts if text.get_visible()}
+        if "axis_break_overlay" not in autofixes:
+            raise AssertionError(f"curve axis break overlay was not applied; autofixes={sorted(autofixes)}")
+        if "shape_annotation_overlay" not in autofixes:
+            raise AssertionError(f"curve shape annotation overlay was not applied; autofixes={sorted(autofixes)}")
+        if ax.get_xlim()[1] >= 10.0:
+            raise AssertionError(f"curve x axis break did not compress display limits: xlim={ax.get_xlim()}")
+        if not {"Peak", "Window"}.issubset(visible_texts):
+            raise AssertionError(f"curve overlay labels missing: visible_texts={sorted(visible_texts)}")
     finally:
         close_rendered_plots(curve)
 
@@ -1639,25 +1641,15 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
             for text in axis.texts
             if text.get_visible()
         }
-        reports.append(
-            _validation_result(
-                "non_blank_pdf",
-                passed=(
-                    plot.qa_report is not None
-                    and "axis_break_split_layout" in plot.qa_report.autofixes_applied
-                    and "shape_annotation_overlay" in plot.qa_report.autofixes_applied
-                    and len(plot.figure.axes) >= 2
-                    and "Peak" in visible_texts
-                    and "Window" in visible_texts
-                    and "p < 0.05" in visible_texts
-                ),
-                details={
-                    "template": "curve_split",
-                    "autofixes": list(plot.qa_report.autofixes_applied) if plot.qa_report is not None else [],
-                    "axis_count": len(plot.figure.axes),
-                },
-            )
-        )
+        autofixes = set(plot.qa_report.autofixes_applied) if plot.qa_report is not None else set()
+        if "axis_break_split_layout" not in autofixes:
+            raise AssertionError(f"split axis break layout was not applied; autofixes={sorted(autofixes)}")
+        if "shape_annotation_overlay" not in autofixes:
+            raise AssertionError(f"split shape annotation overlay was not applied; autofixes={sorted(autofixes)}")
+        if len(plot.figure.axes) < 2:
+            raise AssertionError(f"split axis break should render multiple axes; axis_count={len(plot.figure.axes)}")
+        if not {"Peak", "Window", "p < 0.05"}.issubset(visible_texts):
+            raise AssertionError(f"split overlay labels missing: visible_texts={sorted(visible_texts)}")
     finally:
         close_rendered_plots(split_curve)
 
@@ -1674,16 +1666,8 @@ def _assert_axis_break_overlays(tensile_path: Path) -> list[dict[str, object]]:
             offsets = np.asarray(collection.get_offsets())
             if offsets.ndim == 2:
                 visible_points += int(offsets.shape[0])
-        reports.append(
-            _validation_result(
-                "non_blank_pdf",
-                passed=visible_points > 0 and visible_points < 160,
-                details={
-                    "template": "scatter",
-                    "visible_points": visible_points,
-                },
-            )
-        )
+        if visible_points <= 0 or visible_points >= 160:
+            raise AssertionError(f"scatter axis break rendered unexpected visible points: {visible_points}")
     finally:
         close_rendered_plots(scatter)
 
@@ -2469,6 +2453,13 @@ def _run_smoke_workspace(base: Path) -> Path:
         replicate_path=replicate_path,
         heatmap_path=heatmap_path,
     )
+    nested_output_rules = [
+        rule
+        for output_report in output_reports
+        for rule in output_report.get("rules", [])
+        if isinstance(rule, dict)
+    ]
+    _assert_no_failed_error_validations([*nested_output_rules, *validation_reports, *contract_lint_reports])
     return _write_smoke_report(
         output_reports=output_reports,
         validation_reports=validation_reports,

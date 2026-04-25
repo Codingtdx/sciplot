@@ -95,6 +95,38 @@ def _render_preview_cache_key(
     )
 
 
+def _inspection_payload_and_preview_rows(
+    input_path: Path,
+    sheet: str | int,
+    options: object,
+) -> tuple[dict[str, object], object, object]:
+    if getattr(options, "data_transforms", None):
+        normalized_dataset = build_normalized_dataset(input_path, sheet, options=options)
+        ranked = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=10)
+        presentation = build_recommendation_presentation(ranked)
+        inspection_payload: dict[str, object] = {
+            "model": normalized_dataset.model,
+            "model_label": model_label(normalized_dataset.model),
+            "recommendations": [serialize_dataclass(item) for item in ranked],
+            "primary_recommendation": [serialize_dataclass(item) for item in presentation.primary_recommendation],
+            "alternative_recommendations": [
+                serialize_dataclass(item) for item in presentation.alternative_recommendations
+            ],
+            "advanced_templates": [serialize_dataclass(item) for item in presentation.advanced_templates],
+            "recommendation_confidence": 0.8 if ranked else 0.0,
+            "recommendation_summary": "Recommendations are based on transformed data.",
+            "warnings": [],
+            "signals": list(normalized_dataset.semantic_signals),
+        }
+        raw = read_raw_table_for_options(input_path, sheet, options).dropna(axis=1, how="all")
+        return inspection_payload, normalized_dataset, raw
+
+    inspection = inspect_input_file(input_path, sheet)
+    normalized_dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
+    raw = read_raw_table_cached(input_path, sheet).dropna(axis=1, how="all")
+    return serialize_dataclass(inspection), normalized_dataset, raw
+
+
 def _bounded_page(offset: int, limit: int, *, maximum: int = 200) -> tuple[int, int]:
     return max(0, offset), max(1, min(limit, maximum))
 
@@ -113,35 +145,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             transform_options = data_engine_options_from_payload(request.options)
-            if transform_options.data_transforms:
-                normalized_dataset = build_normalized_dataset(input_path, sheet, options=transform_options)
-                ranked = DEFAULT_RECOMMENDER.recommend(normalized_dataset, limit=10)
-                presentation = build_recommendation_presentation(ranked)
-                inspection_payload = {
-                    "model": normalized_dataset.model,
-                    "model_label": model_label(normalized_dataset.model),
-                    "recommendations": [serialize_dataclass(item) for item in ranked],
-                    "primary_recommendation": [
-                        serialize_dataclass(item) for item in presentation.primary_recommendation
-                    ],
-                    "alternative_recommendations": [
-                        serialize_dataclass(item) for item in presentation.alternative_recommendations
-                    ],
-                    "advanced_templates": [serialize_dataclass(item) for item in presentation.advanced_templates],
-                    "recommendation_confidence": 0.8 if ranked else 0.0,
-                    "recommendation_summary": "Recommendations are based on transformed data.",
-                    "warnings": [],
-                    "signals": list(normalized_dataset.semantic_signals),
-                }
-            else:
-                inspection = inspect_input_file(input_path, sheet)
-                normalized_dataset = build_normalized_dataset(input_path, sheet, model=inspection.model)
-                inspection_payload = serialize_dataclass(inspection)
-            raw = (
-                read_raw_table_for_options(input_path, sheet, transform_options)
-                if transform_options.data_transforms
-                else read_raw_table_cached(input_path, sheet)
-            ).dropna(axis=1, how="all")
+            inspection_payload, normalized_dataset, raw = _inspection_payload_and_preview_rows(
+                input_path,
+                sheet,
+                transform_options,
+            )
             return InspectFileResponse.model_validate(
                 {
                     "input_path": str(input_path),
@@ -399,7 +407,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 sheet=sheet,
                 fit_options=request.fit_options.model_dump(mode="json"),
             )
-            inspection = inspect_input_file(input_path, sheet)
+            inspection_payload, _, _ = _inspection_payload_and_preview_rows(input_path, sheet, resolved_options)
             preflight = preflight_render_request(requested_template, input_path, sheet, resolved_options)
             if preflight.errors:
                 raise ValueError("\n".join(preflight.errors))
@@ -445,7 +453,6 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                     warnings=preflight.warnings,
                 )
                 normalized_options_payload = serialize_dataclass(resolved_options)
-                inspection_payload = serialize_dataclass(inspection)
                 submission_payload = serialize_dataclass(submission_report)
                 artifact_paths: list[Path] = []
                 for filename, payload in (

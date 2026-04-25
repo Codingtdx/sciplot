@@ -127,7 +127,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 - Template presentation metadata such as gallery thumbnail kind must come from `src/plot_contract.json` and `/meta`, not from macOS-local template-id heuristics.
 - `distribution_compare` is compatibility-only and must never be emitted as a public template id; resolve it to `box`, `box_strip`, or `violin`, with `box` as the conservative fallback when source inspection is unavailable.
 - Shared axis/unit display normalization lives in `src/text_normalization.py`; callers must preserve mathtext exponents for unknown-but-unit-like inputs such as `kJ/m2` instead of leaving superscripts to frontend heuristics.
-- `scripts/smoke_check.py` is expected to enforce public-surface guardrails, including contract lint plus a fixed style/theme/template render matrix over representative templates. Do not weaken that matrix when adding new templates or visual catalogs.
+- `scripts/smoke_check.py` is expected to enforce public-surface guardrails, including contract lint plus a fixed style/theme/template render matrix over representative templates. Any error-level failed validation must fail the command, and `non_blank_pdf` is reserved for real PDF raster sanity checks. Do not weaken that matrix when adding new templates or visual catalogs.
 
 ## Engineering Principles
 

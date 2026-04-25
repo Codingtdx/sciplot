@@ -33,6 +33,55 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: Inner-beta backend stability gate hardening
+
+- Change:
+  - Hardened `scripts/smoke_check.py` so any error-level validation report with `passed=false` fails the smoke command instead of only appearing in `figures/debug_outputs/smoke_report.json`.
+  - Cleaned advanced overlay smoke semantics: PDF raster sanity remains `non_blank_pdf`; axis break / split / shape / annotation checks now use direct smoke assertions with explicit failure messages.
+  - Made Data Studio template recommendations refuse templates with no `match_conditions`, preventing unknown files from being auto-matched to manual-only user templates.
+  - Reused transform-aware inspect presentation for export artifacts, so `/inspect-file` and `/export-render` produce the same transformed recommendation summary when `data_variables/data_transforms` are active.
+  - Added backend regression coverage for Excel selected-sheet import, no-default template recommendation, curve+metric mixed workbook output, failed-smoke gating, and transform-aware render-route consistency.
+
+- User-visible impact:
+  - No public contract, template, `.sciplotgod`, or `nature` metric changes.
+  - Release/smoke automation is stricter: failed error-level validations now stop the run.
+  - Unknown Data Studio files stay unselected unless a template actually matches, preserving explicit manual resolution.
+
+- Risks:
+  - Smoke failures from advanced overlay checks now fail immediately with assertions instead of appearing as report rows; this is intentional but changes where the failure is surfaced.
+  - Templates intentionally meant for manual-only use need explicit selection in the UI; they will not appear as weak recommendations without match conditions.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/ingest.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_data_studio_import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_render.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是让内测前底层门禁表达真实失败，而不是把 error-level validation 写进报告后仍然返回成功。
+    - Data Studio 推荐器应只表达有证据的匹配；无条件模板是可手动选择的模板，不是自动推荐。
+    - Plot transform-aware routes must share one transformed-table semantic path across inspect, preview, fit, preflight, render, export artifacts, and later project restore.
+  - Rejected alternatives:
+    - 继续把 overlay 检查塞进 `non_blank_pdf`：拒绝，因为 PDF 非空和 overlay 语义是两类检查，会掩盖真实失败。
+    - 保留 no-condition template 的 0.1 弱匹配：拒绝，因为这等价于 unknown source fallback，和 v2 resolver “无推荐则显式选择”原则冲突。
+    - 只修 `/inspect-file` 不修 export artifact：拒绝，因为导出包会重新落回 raw inspection，形成同一图件不同元数据语义。
+  - Boundaries:
+    - 不改 `src/plot_contract.json`、sidecar public schema、public templates、`.sciplotgod` bundle 结构或 `nature` 冻结指标。
+    - 不引入 Swift/前端表达式执行器；transform 语义仍由后端 typed data engine 执行。
+
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_smoke_check.py::test_error_validation_fails_smoke_report_gate -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py::test_transform_options_stay_consistent_across_render_routes -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_data_studio_import_templates_v2.py::test_excel_multi_sheet_template_preview_builds_selected_sheet tests/test_data_studio_import_templates_v2.py::test_unknown_source_does_not_default_to_unmatched_user_template -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_smoke_check.py tests/test_sidecar_render.py tests/test_data_studio_import_templates_v2.py -q`: passed (`23 passed`).
+  - `.venv/bin/python scripts/smoke_check.py`: passed (`24` PDFs, `7` validations, `0` failed error-level validations).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`clean_repo` reclaimed approx `237.2 MB`; `ruff` passed; `mypy` passed; `pytest` `263 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `181 tests, 0 failures`). Manual smoke checklist remained pending because `--require-manual` was not used.
+  - `git diff --check`: passed.
+  - Manual GUI smoke: pending by plan; `--require-manual` not run in this round.
+
 ### 2026-04-25: Plot DataGraph-style data inspector split and pipeline summary seam
 
 - Change:

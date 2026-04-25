@@ -59,6 +59,8 @@
 - `scripts/smoke_check.py` 必须维护 public surface 的固定 guardrail：
   - contract lint，检查每个 public template 显式提供 `default_options.style_preset / palette_preset / visual_theme_id`；
   - style/theme/template 固定矩阵，至少覆盖代表性 `curve / area_curve / step_line / bar / scatter / heatmap`，并同时验证 `nature` 与至少一个非 `nature` style；
+  - 任何 `severity=error` 且 `passed=false` 的 validation 必须让 smoke 命令退出非零；
+  - `non_blank_pdf` 只用于真实 PDF 非空/可 rasterize 检查；axis break / guide / annotation / shape overlay 应用 smoke-local 直接断言或专属验证语义，不要复用 `non_blank_pdf`；
   - 不要因为新增模板或 catalog 扩面而删弱这组 matrix。
 - 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。

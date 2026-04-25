@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -251,6 +252,75 @@ def test_inspect_file_recommends_table_figure_after_aggregate_transform(tmp_path
     assert payload["inspection"]["recommendations"][0]["template_id"] == "table_figure"
     assert payload["dataset"]["sample_rows"][0] == ["group", "value_mean", "value_sd", "value_count"]
     assert payload["dataset"]["sample_rows"][1] == ["A", 2.0, 1.4142135623730951, 2]
+
+
+def test_transform_options_stay_consistent_across_render_routes(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+    options = {
+        "data_variables": [
+            {"id": "lower", "kind": "scalar", "value": 1.0},
+            {"id": "upper", "kind": "scalar", "value": 2.0},
+        ],
+        "data_transforms": [
+            {
+                "id": "analysis-window",
+                "kind": "mask_filter",
+                "expression": "col('Time') >= var('lower') and col('Time') <= var('upper')",
+            }
+        ],
+    }
+
+    inspect_response = client.post("/inspect-file", json={"input_path": str(input_path), "options": options})
+    assert inspect_response.status_code == 200, inspect_response.text
+    inspect_payload = inspect_response.json()
+    assert inspect_payload["inspection"]["recommendation_summary"] == "Recommendations are based on transformed data."
+    assert inspect_payload["dataset"]["sample_rows"] == [
+        ["Time", "Stress", "Column 3", "Column 4"],
+        ["s", "MPa", "s", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+        ["1", "1.2", "1", "2.3"],
+        ["2", "1.5", "2", "2.7"],
+    ]
+
+    source_response = client.post(
+        "/source-table-preview",
+        json={"input_path": str(input_path), "sheet": 0, "options": options},
+    )
+    assert source_response.status_code == 200, source_response.text
+    source_payload = source_response.json()
+    assert source_payload["column_headers"] == ["Time", "Stress", "Column 3", "Column 4"]
+    assert source_payload["rows"] == [
+        ["Time", "Stress", "Column 3", "Column 4"],
+        ["s", "MPa", "s", "MPa"],
+        ["Sample A", "Sample A", "Sample B", "Sample B"],
+        ["1", "1.2", "1", "2.3"],
+        ["2", "1.5", "2", "2.7"],
+    ]
+
+    fit_response = client.post(
+        "/fit-analysis",
+        json={"input_path": str(input_path), "sheet": 0, "model_id": "linear", "options": options},
+    )
+    assert fit_response.status_code == 200, fit_response.text
+    assert fit_response.json()["point_count"] == 2
+
+    render_request = {"input_path": str(input_path), "sheet": 0, "template": "curve", "options": options}
+    preflight_response = client.post("/preflight-render", json=render_request)
+    assert preflight_response.status_code == 200, preflight_response.text
+    assert preflight_response.json()["preflight"]["errors"] == []
+
+    preview_response = client.post("/render-preview", json=render_request)
+    assert preview_response.status_code == 200, preview_response.text
+    assert preview_response.json()["submission_report"]["template"] == "curve"
+
+    export_dir = tmp_path / "export"
+    export_response = client.post("/export-render", json={**render_request, "output_dir": str(export_dir)})
+    assert export_response.status_code == 200, export_response.text
+    inspection_artifact = export_dir / "codegod_inspection.json"
+    assert inspection_artifact.exists()
+    inspection_artifact_payload = json.loads(inspection_artifact.read_text(encoding="utf-8"))
+    assert inspection_artifact_payload["recommendation_summary"] == "Recommendations are based on transformed data."
 
 
 def test_fit_analysis_supports_expanded_and_custom_models(tmp_path: Path) -> None:
