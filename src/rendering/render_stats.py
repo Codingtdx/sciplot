@@ -8,7 +8,7 @@ import numpy as np
 from src import plot_style
 from src.plotting_families.stats_family import plot_bar, plot_box, plot_point_error, plot_violin
 from src.plotting_primitives import _apply_numeric_axis_tick_preferences, _format_axis_label
-from src.rendering.cache import load_replicate_table_cached
+from src.rendering.cache import load_replicate_table_for_options
 from src.rendering.common import (
     manual_axis_overrides,
     predict_bar_box_slug,
@@ -21,7 +21,10 @@ from src.rendering.series_order import reorder_replicate_groups, unknown_series_
 
 
 def _ordered_groups(input_path: Path, sheet: str | int, options: RenderOptions):
-    groups = reorder_replicate_groups(load_replicate_table_cached(input_path, sheet), options.series_order)
+    groups = reorder_replicate_groups(
+        load_replicate_table_for_options(input_path, sheet, options),
+        options.series_order,
+    )
     unknown_groups = unknown_series_order_labels([group.group for group in groups], options.series_order)
     if unknown_groups:
         raise ValueError("series_order contains unknown group labels: " + ", ".join(unknown_groups))

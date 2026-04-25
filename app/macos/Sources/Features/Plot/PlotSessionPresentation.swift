@@ -107,6 +107,19 @@ extension PlotSession {
         return .enabled()
     }
 
+    var dataTransformAvailability: ActionAvailability {
+        guard selectedFileURL != nil else {
+            return .disabled("Import a source file before adding data transforms.")
+        }
+        if isInspecting || needsInspection {
+            return .disabled("Wait for inspect to finish before adding data transforms.")
+        }
+        guard effectiveTemplateID != nil else {
+            return .disabled("Data transforms become available after inspect finishes.")
+        }
+        return .enabled()
+    }
+
     var extraXAxisAvailability: ActionAvailability {
         extraAxisAvailability(optionID: "extra_x_axis", axisLabel: "X")
     }
@@ -507,6 +520,10 @@ extension PlotSession {
 
     var analyticalLayers: [AnalyticalLayerPayload] {
         renderOptions.analyticalLayers ?? []
+    }
+
+    var dataTransforms: [DataTransformPayload] {
+        renderOptions.dataTransforms ?? []
     }
 
     var xAxisBreaks: [AxisBreakPayload] {

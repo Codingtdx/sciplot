@@ -304,6 +304,18 @@ final class SchemaDecodingTests: XCTestCase {
                 "y_axis_target": "y_primary",
                 "label": "Model"
               }
+            ],
+            "data_transforms": [
+              {
+                "id": "filter-1",
+                "enabled": true,
+                "kind": "row_filter",
+                "label": "Window",
+                "column": "Time",
+                "operator": "between",
+                "lower": 1,
+                "upper": 2
+              }
             ]
           },
           "fit_options": {
@@ -337,6 +349,9 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(request.options.analyticalLayers?.first?.expression, "sin(x) + 1")
         XCTAssertEqual(request.options.analyticalLayers?.first?.sampleCount, 120)
         XCTAssertEqual(request.options.analyticalLayers?.first?.yAxisTarget, "y_primary")
+        XCTAssertEqual(request.options.dataTransforms?.first?.kind, "row_filter")
+        XCTAssertEqual(request.options.dataTransforms?.first?.filterOperator, "between")
+        XCTAssertEqual(request.options.dataTransforms?.first?.lower, 1.0)
     }
 
     func testDecodePlotContractSizePresetsWithoutIDField() throws {

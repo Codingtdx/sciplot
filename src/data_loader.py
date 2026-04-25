@@ -156,6 +156,17 @@ def load_curve_table(
     start_row: int = 3,
     sheet_name: str | int = 0,
 ) -> list[CurveSeries]:
+    return load_curve_table_from_frame(
+        read_raw_table(path, sheet_name=sheet_name),
+        start_row=start_row,
+    )
+
+
+def load_curve_table_from_frame(
+    raw: pd.DataFrame,
+    *,
+    start_row: int = 3,
+) -> list[CurveSeries]:
     """
     Load an Origin-style curve table.
 
@@ -164,7 +175,7 @@ def load_curve_table(
     Row 3: sample names repeated twice per series
     Row 4+: numeric data
     """
-    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    raw = _drop_fully_empty_columns(raw)
     _ensure_minimum_rows(raw, start_row + 1, table_name="Curve table")
     _ensure_header_row_content(raw, 0, row_name="axis label row", table_name="Curve table")
     _ensure_header_row_content(raw, 1, row_name="unit row", table_name="Curve table")
@@ -229,6 +240,17 @@ def load_replicate_table(
     start_row: int = 3,
     sheet_name: str | int = 0,
 ) -> list[ReplicateGroup]:
+    return load_replicate_table_from_frame(
+        read_raw_table(path, sheet_name=sheet_name),
+        start_row=start_row,
+    )
+
+
+def load_replicate_table_from_frame(
+    raw: pd.DataFrame,
+    *,
+    start_row: int = 3,
+) -> list[ReplicateGroup]:
     """
     Load a wide replicate table for boxplots or bar charts.
 
@@ -246,7 +268,7 @@ def load_replicate_table(
     Row 3: group or sample name per column
     Row 4+: replicate values
     """
-    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    raw = _drop_fully_empty_columns(raw)
     _ensure_minimum_rows(raw, start_row + 1, table_name="Replicate table")
     _ensure_header_row_content(raw, 0, row_name="value label row", table_name="Replicate table")
     _ensure_header_row_content(raw, 1, row_name="group row", table_name="Replicate table")
@@ -305,6 +327,17 @@ def load_heatmap_table(
     start_row: int = 3,
     sheet_name: str | int = 0,
 ) -> HeatmapTable:
+    return load_heatmap_table_from_frame(
+        read_raw_table(path, sheet_name=sheet_name),
+        start_row=start_row,
+    )
+
+
+def load_heatmap_table_from_frame(
+    raw: pd.DataFrame,
+    *,
+    start_row: int = 3,
+) -> HeatmapTable:
     """
     Load an XYZ long-table heatmap input.
 
@@ -318,14 +351,13 @@ def load_heatmap_table(
     Column 1: Y coordinates
     Cells: Z values
     """
-    raw = _drop_fully_empty_columns(read_raw_table(path, sheet_name=sheet_name))
+    raw = _drop_fully_empty_columns(raw)
     if raw.shape[1] != 3:
         return _load_heatmap_matrix(raw)
 
     _ensure_minimum_rows(raw, start_row + 1, table_name="Heatmap table")
     _ensure_header_row_content(raw, 0, row_name="role row", table_name="Heatmap table")
     _ensure_header_row_content(raw, 1, row_name="label row", table_name="Heatmap table")
-    _ensure_header_row_content(raw, 2, row_name="unit row", table_name="Heatmap table")
 
     roles = [canonicalize_token(_normalize_text(value)) for value in raw.iloc[0].tolist()]
     role_index: dict[str, int] = {}

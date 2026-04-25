@@ -118,6 +118,9 @@ extension PlotSession {
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: policy)
+        if dataWorkbookTab == .transformed {
+            loadSourceTablePreview(offset: 0)
+        }
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Edit Plot Options")
     }
 
@@ -439,6 +442,48 @@ extension PlotSession {
             var layers = options.analyticalLayers ?? []
             layers.removeAll { $0.id == id }
             options.analyticalLayers = layers.isEmpty ? nil : layers
+        }
+    }
+
+    func addDataTransform(kind: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var transforms = options.dataTransforms ?? []
+            let transform: DataTransformPayload
+            switch kind {
+            case "row_filter":
+                transform = DataTransformPayload(kind: "row_filter", label: "Filter", column: "Column 1", filterOperator: "between", lower: 0.0, upper: 1.0)
+            case "pivot_matrix":
+                transform = DataTransformPayload(kind: "pivot_matrix", label: "Pivot", xColumn: "x", yColumn: "y", zColumn: "z")
+            default:
+                transform = DataTransformPayload(kind: "derived_column", label: "Derived", targetColumn: "derived", expression: "x + 1")
+            }
+            transforms.append(transform)
+            options.dataTransforms = transforms
+        }
+    }
+
+    func updateDataTransform(
+        id: String,
+        policy: PlotPreviewRefreshPolicy = .debounced,
+        mutate: (inout DataTransformPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var transforms = options.dataTransforms ?? []
+            guard let index = transforms.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            var transform = transforms[index]
+            mutate(&transform)
+            transforms[index] = transform
+            options.dataTransforms = transforms
+        }
+    }
+
+    func removeDataTransform(id: String) {
+        updateRenderOptions(policy: .immediate) { options in
+            var transforms = options.dataTransforms ?? []
+            transforms.removeAll { $0.id == id }
+            options.dataTransforms = transforms.isEmpty ? nil : transforms
         }
     }
 

@@ -370,6 +370,95 @@ struct AnalyticalLayerPayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct DataTransformPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var enabled: Bool
+    var kind: String
+    var label: String?
+    var targetColumn: String?
+    var expression: String?
+    var column: String?
+    var filterOperator: String
+    var value: JSONValue?
+    var lower: Double?
+    var upper: Double?
+    var xColumn: String?
+    var yColumn: String?
+    var zColumn: String?
+    var outputMode: String
+
+    init(
+        id: String = UUID().uuidString,
+        enabled: Bool = true,
+        kind: String = "derived_column",
+        label: String? = nil,
+        targetColumn: String? = nil,
+        expression: String? = nil,
+        column: String? = nil,
+        filterOperator: String = "eq",
+        value: JSONValue? = nil,
+        lower: Double? = nil,
+        upper: Double? = nil,
+        xColumn: String? = nil,
+        yColumn: String? = nil,
+        zColumn: String? = nil,
+        outputMode: String = "xyz_long"
+    ) {
+        self.id = id
+        self.enabled = enabled
+        self.kind = kind
+        self.label = label
+        self.targetColumn = targetColumn
+        self.expression = expression
+        self.column = column
+        self.filterOperator = filterOperator
+        self.value = value
+        self.lower = lower
+        self.upper = upper
+        self.xColumn = xColumn
+        self.yColumn = yColumn
+        self.zColumn = zColumn
+        self.outputMode = outputMode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case enabled
+        case kind
+        case label
+        case targetColumn
+        case expression
+        case column
+        case filterOperator = "operator"
+        case value
+        case lower
+        case upper
+        case xColumn
+        case yColumn
+        case zColumn
+        case outputMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? "derived_column"
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        targetColumn = try container.decodeIfPresent(String.self, forKey: .targetColumn)
+        expression = try container.decodeIfPresent(String.self, forKey: .expression)
+        column = try container.decodeIfPresent(String.self, forKey: .column)
+        filterOperator = try container.decodeIfPresent(String.self, forKey: .filterOperator) ?? "eq"
+        value = try container.decodeIfPresent(JSONValue.self, forKey: .value)
+        lower = try container.decodeIfPresent(Double.self, forKey: .lower)
+        upper = try container.decodeIfPresent(Double.self, forKey: .upper)
+        xColumn = try container.decodeIfPresent(String.self, forKey: .xColumn)
+        yColumn = try container.decodeIfPresent(String.self, forKey: .yColumn)
+        zColumn = try container.decodeIfPresent(String.self, forKey: .zColumn)
+        outputMode = try container.decodeIfPresent(String.self, forKey: .outputMode) ?? "xyz_long"
+    }
+}
+
 struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var size: String?
     var xscale: String?
@@ -400,6 +489,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var textAnnotations: [TextAnnotationPayload]?
     var shapeAnnotations: [ShapeAnnotationPayload]?
     var analyticalLayers: [AnalyticalLayerPayload]?
+    var dataTransforms: [DataTransformPayload]?
 
     init(
         size: String? = nil,
@@ -430,7 +520,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         referenceGuides: [ReferenceGuidePayload]? = nil,
         textAnnotations: [TextAnnotationPayload]? = nil,
         shapeAnnotations: [ShapeAnnotationPayload]? = nil,
-        analyticalLayers: [AnalyticalLayerPayload]? = nil
+        analyticalLayers: [AnalyticalLayerPayload]? = nil,
+        dataTransforms: [DataTransformPayload]? = nil
     ) {
         self.size = size
         self.xscale = xscale
@@ -461,6 +552,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.textAnnotations = textAnnotations
         self.shapeAnnotations = shapeAnnotations
         self.analyticalLayers = analyticalLayers
+        self.dataTransforms = dataTransforms
     }
 
     enum CodingKeys: String, CodingKey {
@@ -495,6 +587,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case textAnnotations
         case shapeAnnotations
         case analyticalLayers
+        case dataTransforms
     }
 
     init(from decoder: Decoder) throws {
@@ -558,6 +651,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         textAnnotations = try container.decodeIfPresent([TextAnnotationPayload].self, forKey: .textAnnotations)
         shapeAnnotations = try container.decodeIfPresent([ShapeAnnotationPayload].self, forKey: .shapeAnnotations)
         analyticalLayers = try container.decodeIfPresent([AnalyticalLayerPayload].self, forKey: .analyticalLayers)
+        dataTransforms = try container.decodeIfPresent([DataTransformPayload].self, forKey: .dataTransforms)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -591,6 +685,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(textAnnotations, forKey: .textAnnotations)
         try container.encodeIfPresent(shapeAnnotations, forKey: .shapeAnnotations)
         try container.encodeIfPresent(analyticalLayers, forKey: .analyticalLayers)
+        try container.encodeIfPresent(dataTransforms, forKey: .dataTransforms)
     }
 }
 
@@ -625,6 +720,7 @@ struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
     let headerRowIndex: Int?
     let unitRowIndex: Int?
     let dataStartRowIndex: Int?
+    let options: RenderOptionsPayload?
 
     init(
         inputPath: String,
@@ -636,7 +732,8 @@ struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
         segmentID: String? = nil,
         headerRowIndex: Int? = nil,
         unitRowIndex: Int? = nil,
-        dataStartRowIndex: Int? = nil
+        dataStartRowIndex: Int? = nil,
+        options: RenderOptionsPayload? = nil
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
@@ -648,6 +745,7 @@ struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
         self.headerRowIndex = headerRowIndex
         self.unitRowIndex = unitRowIndex
         self.dataStartRowIndex = dataStartRowIndex
+        self.options = options
     }
 
     enum CodingKeys: String, CodingKey {
@@ -661,6 +759,7 @@ struct SourceTablePreviewRequest: Codable, Equatable, Sendable {
         case headerRowIndex = "header_row_index"
         case unitRowIndex = "unit_row_index"
         case dataStartRowIndex = "data_start_row_index"
+        case options
     }
 }
 
@@ -760,6 +859,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
     let seriesID: String?
     let offset: Int
     let limit: Int
+    let options: RenderOptionsPayload?
 
     init(
         inputPath: String,
@@ -767,7 +867,8 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         modelID: String = "linear",
         seriesID: String? = nil,
         offset: Int = 0,
-        limit: Int = 50
+        limit: Int = 50,
+        options: RenderOptionsPayload? = nil
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
@@ -775,6 +876,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         self.seriesID = seriesID
         self.offset = offset
         self.limit = limit
+        self.options = options
     }
 
     enum CodingKeys: String, CodingKey {
@@ -784,6 +886,7 @@ struct FitAnalysisRequest: Codable, Equatable, Sendable {
         case seriesID = "seriesId"
         case offset
         case limit
+        case options
     }
 }
 

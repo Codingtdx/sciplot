@@ -17,7 +17,7 @@ from src.layout_policy import (
 )
 from src.plotting_families.heatmap_family import plot_heatmap
 from src.plotting_primitives import _format_axis_label
-from src.rendering.cache import load_heatmap_table_cached
+from src.rendering.cache import load_heatmap_table_for_options
 from src.rendering.models import RenderedPlot, RenderOptions
 from src.rendering.render_support import _heatmap_editorial_layout, _rendered_plot_with_qa
 
@@ -225,7 +225,7 @@ def _choose_annotated_heatmap_label_plan(
     return plan_cache.get(strategy_id, []), strategy_id
 
 def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    table = load_heatmap_table_cached(input_path, sheet)
+    table = load_heatmap_table_for_options(input_path, sheet, options)
     layout = _heatmap_editorial_layout()
     fig, _ = plot_heatmap(
         table,
@@ -270,7 +270,7 @@ def _render_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) 
     ]
 
 def _render_annotated_heatmap(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    table = load_heatmap_table_cached(input_path, sheet)
+    table = load_heatmap_table_for_options(input_path, sheet, options)
     layout = _heatmap_editorial_layout()
     fig, ax = plot_heatmap(
         table,

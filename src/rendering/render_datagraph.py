@@ -9,7 +9,11 @@ import pandas as pd
 from src import plot_style
 from src.plotting_families.curve_family import plot_curves
 from src.plotting_primitives import _format_axis_label
-from src.rendering.cache import load_curve_table_cached, load_heatmap_table_cached, read_raw_table_cached
+from src.rendering.cache import (
+    load_curve_table_for_options,
+    load_heatmap_table_for_options,
+    read_raw_table_for_options,
+)
 from src.rendering.common import validate_manual_axis_overrides, validate_series_scales
 from src.rendering.datagraph_inputs import series_looks_polar, table_figure_size_error, theta_values_for_plot
 from src.rendering.models import RenderedPlot, RenderOptions
@@ -62,7 +66,7 @@ def _polar_figure(*, options: RenderOptions) -> tuple[plt.Figure, plt.Axes]:
 
 
 def _render_function_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = load_curve_table_for_options(input_path, sheet, options)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     validate_manual_axis_overrides(options, template="function_curve")
     fig, ax = plot_curves(
@@ -107,7 +111,7 @@ def _render_function_curve(input_path: Path, sheet: str | int, options: RenderOp
 
 
 def _render_contour_field(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    table = load_heatmap_table_cached(input_path, sheet)
+    table = load_heatmap_table_for_options(input_path, sheet, options)
     validate_manual_axis_overrides(options, template="contour_field")
     fig, ax = _panel_figure(options=options)
     data = table.data.dropna(subset=["x", "y", "z"])
@@ -153,7 +157,7 @@ def _render_contour_field(input_path: Path, sheet: str | int, options: RenderOpt
 
 
 def _render_polar_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = load_curve_table_cached(input_path, sheet)
+    series_list = load_curve_table_for_options(input_path, sheet, options)
     validate_manual_axis_overrides(options, template="polar_curve")
     if not series_looks_polar(series_list):
         raise ValueError("Polar curve requires theta/radius columns with radian or degree theta units.")
@@ -199,7 +203,7 @@ def _render_polar_curve(input_path: Path, sheet: str | int, options: RenderOptio
 
 
 def _render_table_figure(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
+    raw = read_raw_table_for_options(input_path, sheet, options).dropna(how="all").dropna(axis=1, how="all")
     if raw.empty:
         raise ValueError("Table figure requires at least one visible row and column.")
     if size_error := table_figure_size_error(raw):

@@ -85,6 +85,11 @@ def options_from_payload(
             if payload.analytical_layers
             else None
         ),
+        data_transforms=(
+            [item.model_dump(mode="json") for item in payload.data_transforms]
+            if payload.data_transforms
+            else None
+        ),
         resolved_template_id=resolved_template,
     )
 

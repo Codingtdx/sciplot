@@ -69,7 +69,7 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
-- Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`。不要把全量 workbook 表格塞回 inspect/session payload。
+- Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`，Plot `Transformed` 预览可额外携带 typed `options.data_transforms`。不要把全量 workbook 表格塞回 inspect/session payload。
 - Plot 推荐必须识别 DataGraph-inspired advanced input shapes：XYZ long table 或 matrix scalar field 可推荐 `contour_field`，theta/radius 曲线可推荐 `polar_curve`，小型 mixed table 可推荐 `table_figure`。这些推荐必须继续走 `POST /inspect-file` 的 ranked recommendation payload，不得在 macOS 侧按列名重建第二套高级模板判断。
 - Data Studio 用户导入模板统一是 v2 no-code table mapping：`output_kind`、`source_format`、`segment_policy`、`segment_selectors`、`field_bindings`、`match_conditions` 是唯一模板结构；旧用户模板 parser 不保留，不要恢复 `POST /data-studio/source-preview` 或 `source_path + accepted_candidate_ids` 创建路径。
 - Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
@@ -85,6 +85,7 @@
 - Plot 高级 text annotation overlay 统一走 `render_options.text_annotations` 这条 typed payload 链路；当前支持普通 note 与带 connector 的 callout，并允许绑定 `primary y / secondary y`，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 annotation 状态或重算坐标语义。
 - Plot 高级 shape annotation overlay 统一走 `render_options.shape_annotations` 这条 typed payload 链路；当前支持 `rectangle / ellipse / bracket`，并允许绑定 `primary y / secondary y`、复用 broken-axis panel/坐标映射，preview、export、save/open project 必须共用同一份归一化结果，禁止前端本地维护第二套 shape overlay 状态或重算几何语义。
 - Plot 高级 analytic/function layer 统一走 `render_options.analytical_layers` 这条 typed payload 链路；当前只支持 bounded `function` layer（`expression / x_start / x_end / sample_count / y_axis_target / label / enabled`），表达式必须由后端安全 AST 白名单解析采样，preview、export、save/open project 必须共用同一份归一化结果，禁止引入 DataGraph 式自由命令解释器或前端重算表达式语义。
+- Plot 高级 typed data transform 统一走 `render_options.data_transforms` 这条 typed payload 链路；v1 只支持 `derived_column`、`row_filter`、`pivot_matrix`，其中表达式复用后端安全 AST 白名单，preview、export、preflight、fit、Data Workbook `Transformed`、save/open project 必须共用同一份 transform 后数据准备入口，禁止引入自由脚本、DataGraph command interpreter 或 Swift 数学执行器。
 - Code Console context 统一走 `POST /code-console/context`，返回稳定 `context_id`（输入签名 + mtime）。
 - Code Console run 优先走 `POST /code-console/run` 的 `context_id` 快速路径；`context` 字段仅作兼容兜底。
 - 模板选择与默认配置只消费 ranked recommendations：
@@ -159,7 +160,7 @@
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - v1 只读，不做 inline cell editing
-  - 页签固定为 `Source Data` 和 `Fit`
+  - 页签固定为 `Source Data`、`Transformed` 和 `Fit`
   - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`
   - Plot inspector `Advanced Plot` 里的 fit overlay 只开放给 `curve / point_line / scatter`
   - Plot inspector `Advanced Plot` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
@@ -168,6 +169,7 @@
   - Plot inspector `Advanced Plot` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
   - Plot inspector `Advanced Plot` 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
   - Plot inspector `Advanced Plot` 里的 `function layers` 通过 `render_options.analytical_layers` 持久化；当前只对 `function_curve` 开放基础编辑，表达式安全解析和采样归后端负责，不能借此引入自由脚本/命令栈或前端第二套数学执行器
+  - Plot inspector `Advanced Plot` 里的 `data transforms` 通过 `render_options.data_transforms` 持久化；当前只开放 `derived_column / row_filter / pivot_matrix` 基础编辑，变换和错误解释归后端负责，不能借此引入前端表达式执行器或第二套 loader 语义
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`

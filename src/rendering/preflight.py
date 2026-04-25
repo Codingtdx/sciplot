@@ -4,10 +4,10 @@ from pathlib import Path
 
 from src.plot_contract import validation_rule
 from src.rendering.cache import (
-    load_curve_table_cached,
-    load_heatmap_table_cached,
-    load_replicate_table_cached,
-    read_raw_table_cached,
+    load_curve_table_for_options,
+    load_heatmap_table_for_options,
+    load_replicate_table_for_options,
+    read_raw_table_for_options,
 )
 from src.rendering.common import (
     aligned_replicate_band,
@@ -81,7 +81,7 @@ def preflight_render_request(
                         "series_order contains unknown series labels: " + ", ".join(unknown_series)
                     )
             else:
-                curve_series = load_curve_table_cached(input_path, sheet)
+                curve_series = load_curve_table_for_options(input_path, sheet, options)
                 validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
                 validate_manual_axis_overrides(
                     options,
@@ -99,7 +99,7 @@ def preflight_render_request(
                 if resolved_template in _MEAN_BAND_TEMPLATES:
                     aligned_replicate_band(curve_series)
         elif resolved_template in {"stacked_curve", "stacked_area"}:
-            curve_series = load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_for_options(input_path, sheet, options)
             validate_manual_axis_overrides(options, template=resolved_template)
             unknown_series = unknown_series_order_labels(
                 [series.sample for series in curve_series],
@@ -108,7 +108,7 @@ def preflight_render_request(
             if unknown_series:
                 raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
         elif resolved_template == "segmented_stacked_curve":
-            curve_series = load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_for_options(input_path, sheet, options)
             validate_manual_axis_overrides(options, template=resolved_template)
             unknown_series = unknown_series_order_labels(
                 [series.sample for series in curve_series],
@@ -122,7 +122,7 @@ def preflight_render_request(
                 use_sidecar=True if options.use_sidecar is None else options.use_sidecar,
             )
         elif resolved_template in {"scatter"} | _BUBBLE_SCATTER_TEMPLATES:
-            curve_series = load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_for_options(input_path, sheet, options)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
             validate_manual_axis_overrides(
                 options,
@@ -136,7 +136,7 @@ def preflight_render_request(
             if unknown_series:
                 raise ValueError("series_order contains unknown series labels: " + ", ".join(unknown_series))
         elif resolved_template in _FIT_SCATTER_TEMPLATES:
-            curve_series = load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_for_options(input_path, sheet, options)
             validate_series_scales(curve_series, xscale=options.xscale, yscale=options.yscale)
             validate_manual_axis_overrides(
                 options,
@@ -172,7 +172,7 @@ def preflight_render_request(
             "histogram_density",
             "density_area",
         }:
-            groups = load_replicate_table_cached(input_path, sheet)
+            groups = load_replicate_table_for_options(input_path, sheet, options)
             if not groups:
                 raise ValueError("No valid groups were found in the replicate table.")
             validate_manual_axis_overrides(options, template=resolved_template)
@@ -196,7 +196,7 @@ def preflight_render_request(
             if len(groups) >= 6:
                 warnings.append(validation_rule("dense_group_label_warning").description)
         elif resolved_template in {"heatmap", "annotated_heatmap"}:
-            table = load_heatmap_table_cached(input_path, sheet)
+            table = load_heatmap_table_for_options(input_path, sheet, options)
             if resolved_template == "annotated_heatmap":
                 x_count = int(table.data["x"].nunique(dropna=True))
                 y_count = int(table.data["y"].nunique(dropna=True))
@@ -212,7 +212,7 @@ def preflight_render_request(
                         "consider plain heatmap for readability."
                     )
         elif resolved_template == "contour_field":
-            table = load_heatmap_table_cached(input_path, sheet)
+            table = load_heatmap_table_for_options(input_path, sheet, options)
             finite_count = int(table.data.dropna(subset=["x", "y", "z"]).shape[0])
             if finite_count < 3:
                 raise ValueError("Contour field requires at least three finite X/Y/Z points.")
@@ -220,14 +220,14 @@ def preflight_render_request(
                 raise ValueError("Contour field requires at least two distinct X and Y coordinates.")
             validate_manual_axis_overrides(options, template=resolved_template)
         elif resolved_template == "polar_curve":
-            curve_series = load_curve_table_cached(input_path, sheet)
+            curve_series = load_curve_table_for_options(input_path, sheet, options)
             if not curve_series:
                 raise ValueError("No valid theta/r series found.")
             if not series_looks_polar(curve_series):
                 raise ValueError("Polar curve requires theta/radius columns with radian or degree theta units.")
             validate_manual_axis_overrides(options, template=resolved_template)
         elif resolved_template == "table_figure":
-            raw = read_raw_table_cached(input_path, sheet).dropna(how="all").dropna(axis=1, how="all")
+            raw = read_raw_table_for_options(input_path, sheet, options).dropna(how="all").dropna(axis=1, how="all")
             if raw.empty:
                 raise ValueError("Table figure requires at least one visible row and column.")
             if size_error := table_figure_size_error(raw):

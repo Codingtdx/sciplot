@@ -2017,6 +2017,39 @@ def test_new_datagraph_templates_preflight_and_render(tmp_path: Path) -> None:
             close_rendered_plots(rendered)
 
 
+def test_contour_field_preflight_and_render_with_pivot_transform(tmp_path: Path) -> None:
+    input_path = tmp_path / "long-field.csv"
+    pd.DataFrame(
+        [
+            ["angle", "radius", "signal"],
+            [0.0, 1.0, 10.0],
+            [90.0, 1.0, 20.0],
+            [0.0, 2.0, 30.0],
+            [90.0, 2.0, 40.0],
+        ]
+    ).to_csv(input_path, header=False, index=False)
+    transform = {
+        "id": "field-pivot",
+        "kind": "pivot_matrix",
+        "x_column": "angle",
+        "y_column": "radius",
+        "z_column": "signal",
+        "output_mode": "xyz_long",
+    }
+
+    options = resolve_render_options(template="contour_field", data_transforms=[transform])
+    preflight = preflight_render_request("contour_field", input_path, 0, options)
+    assert preflight.errors == ()
+    assert preflight.output_filenames == ("long-field_contour_field.pdf",)
+
+    rendered = build_rendered_plots("contour_field", input_path, data_transforms=[transform])
+    try:
+        assert rendered[0].filename == "long-field_contour_field.pdf"
+        assert rendered[0].figure.axes
+    finally:
+        close_rendered_plots(rendered)
+
+
 def test_datagraph_template_preflight_reports_shape_specific_errors(tmp_path: Path) -> None:
     missing_z = tmp_path / "missing_z.csv"
     pd.DataFrame(

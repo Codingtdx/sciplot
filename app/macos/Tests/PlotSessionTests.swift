@@ -528,6 +528,87 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.last?.options.analyticalLayers?.first?.expression, "foo(x)")
     }
 
+    func testDataTransformEditsRefreshPreviewUndoAndPersistIntoProjectPayload() async throws {
+        let client = MockSidecarClient()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        let session = PlotSession()
+        let undoManager = UndoManager()
+        session.attachUndoManager(undoManager)
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.addDataTransform(kind: "row_filter")
+        guard let transformID = session.renderOptions.dataTransforms?.first?.id else {
+            XCTFail("Expected a data transform to be created.")
+            return
+        }
+        session.updateDataTransform(id: transformID, policy: .immediate) {
+            $0.column = "X"
+            $0.filterOperator = "between"
+            $0.lower = 1.0
+            $0.upper = 2.0
+        }
+        await waitUntil(
+            {
+                client.renderRequests.count > initialRenderCount &&
+                    client.renderRequests.last?.options.dataTransforms?.first?.column == "X"
+            },
+            timeout: 2.0
+        )
+
+        undoManager.undo()
+        XCTAssertNotEqual(session.renderOptions.dataTransforms?.first?.column, "X")
+
+        let persistedTransformID: String
+        if session.renderOptions.dataTransforms?.first == nil {
+            session.addDataTransform(kind: "row_filter")
+            persistedTransformID = session.renderOptions.dataTransforms?.first?.id ?? transformID
+        } else {
+            persistedTransformID = transformID
+        }
+        session.updateDataTransform(id: persistedTransformID, policy: .immediate) {
+            $0.column = "X"
+            $0.filterOperator = "between"
+            $0.lower = 1.0
+            $0.upper = 2.0
+        }
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/transforms.sciplotgod"))
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.column, "X")
+        XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.filterOperator, "between")
+    }
+
+    func testDataWorkbookTransformedTabRequestsTransformAwarePreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addDataTransform(kind: "derived_column")
+        guard let transformID = session.renderOptions.dataTransforms?.first?.id else {
+            XCTFail("Expected a data transform to be created.")
+            return
+        }
+        session.updateDataTransform(id: transformID, policy: .immediate) {
+            $0.targetColumn = "radius"
+            $0.expression = "sqrt(x*x + y*y)"
+        }
+        session.isDataWorkbookPresented = true
+        session.selectDataWorkbookTab(.transformed)
+
+        await waitUntil(
+            { client.sourceTablePreviewRequests.last?.options?.dataTransforms?.first?.targetColumn == "radius" },
+            timeout: 2.0
+        )
+    }
+
     func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

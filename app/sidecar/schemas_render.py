@@ -57,6 +57,24 @@ class AnalyticalLayerPayload(StrictModel):
     label: str | None = None
 
 
+class DataTransformPayload(StrictModel):
+    id: str
+    enabled: bool = True
+    kind: str
+    label: str | None = None
+    target_column: str | None = None
+    expression: str | None = None
+    column: str | None = None
+    operator: str = "eq"
+    value: float | str | None = None
+    lower: float | None = None
+    upper: float | None = None
+    x_column: str | None = None
+    y_column: str | None = None
+    z_column: str | None = None
+    output_mode: str = "xyz_long"
+
+
 class ReferenceGuidePayload(StrictModel):
     id: str
     enabled: bool = True
@@ -117,6 +135,7 @@ class RenderOptionsPayload(StrictModel):
     text_annotations: list[TextAnnotationPayload] | None = None
     shape_annotations: list[ShapeAnnotationPayload] | None = None
     analytical_layers: list[AnalyticalLayerPayload] | None = None
+    data_transforms: list[DataTransformPayload] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -208,6 +227,7 @@ class SourceTablePreviewRequest(FileRequest):
         default=None,
         validation_alias=AliasChoices("data_start_row_index", "data_start_row"),
     )
+    options: RenderOptionsPayload | None = None
 
 
 class SourceTableSegmentResponse(StrictModel):
@@ -249,6 +269,7 @@ class FitAnalysisRequest(FileRequest):
     series_id: str | None = None
     offset: int = 0
     limit: int = 50
+    options: RenderOptionsPayload | None = None
 
 
 class FitDerivedRowResponse(StrictModel):
@@ -537,6 +558,7 @@ SourceTablePreviewResponse.model_rebuild()
 __all__ = [
     "DataStudioProjectPayload",
     "DataStudioProjectWorkbookPayload",
+    "DataTransformPayload",
     "ExportRenderRequest",
     "ExportRenderResponse",
     "FileRequest",

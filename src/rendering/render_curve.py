@@ -21,7 +21,7 @@ from src.plotting_primitives import (
     compute_axis_limits,
 )
 from src.rendering.advanced_plot_axes import mark_extra_axis, mark_primary_axis
-from src.rendering.cache import load_curve_table_cached
+from src.rendering.cache import load_curve_table_for_options
 from src.rendering.common import (
     aligned_replicate_band,
     load_rheology_bundle_series,
@@ -822,7 +822,7 @@ def _render_standard_curve_template(
             show_markers=show_markers,
             extra_curve_kwargs=extra_curve_kwargs,
         )
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)
@@ -903,7 +903,7 @@ def _render_step_line(input_path: Path, sheet: str | int, options: RenderOptions
     )
 
 def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     validate_manual_axis_overrides(options, template="stacked_curve")
@@ -934,7 +934,7 @@ def _render_stacked_curve(input_path: Path, sheet: str | int, options: RenderOpt
 
 
 def _render_stacked_area(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     validate_manual_axis_overrides(options, template="stacked_area")
@@ -971,7 +971,7 @@ def _render_segmented_stacked_curve(
     sheet: str | int,
     options: RenderOptions,
 ) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_manual_axis_overrides(options, template="segmented_stacked_curve")
     config = load_segmented_config(input_path, series_list, use_sidecar=options.use_sidecar)
@@ -995,7 +995,7 @@ def _render_segmented_stacked_curve(
     ]
 
 def _render_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)
@@ -1057,7 +1057,7 @@ def _bubble_size_profile(values: np.ndarray) -> np.ndarray:
     return sizes
 
 def _render_bubble_scatter(input_path: Path, sheet: str | int, options: RenderOptions) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)
@@ -1106,7 +1106,7 @@ def _render_scatter_fit_like(
     template: str,
     filename_suffix: str,
 ) -> list[RenderedPlot]:
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)
@@ -1172,7 +1172,7 @@ def _render_replicate_band_like(
     if normalized_dataset.model in {"frequency_sweep", "temperature_sweep", "stress_relaxation"}:
         raise ValueError(f"{template} is not supported for rheology export bundles.")
 
-    series_list = reorder_curve_series(load_curve_table_cached(input_path, sheet), options.series_order)
+    series_list = reorder_curve_series(load_curve_table_for_options(input_path, sheet, options), options.series_order)
     _ensure_known_series_order(series_list, options.series_order)
     validate_series_scales(series_list, xscale=options.xscale, yscale=options.yscale)
     is_tensile_curve = looks_like_tensile_curve(series_list)

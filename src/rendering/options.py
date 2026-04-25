@@ -13,6 +13,7 @@ from src.plot_contract import (
 from src.rendering.analytical_layers import normalize_analytical_layers_payload
 from src.rendering.axis_breaks import normalize_axis_breaks_payload
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE, LEGACY_TEMPLATE_HINTS, TEMPLATE_CHOICES
+from src.rendering.data_transforms import normalize_data_transforms_payload
 from src.rendering.extra_axes import normalize_extra_axis_payload
 from src.rendering.models import RenderOptions
 from src.rendering.reference_guides import normalize_reference_guides_payload
@@ -178,6 +179,7 @@ def resolve_render_options(
     text_annotations: object | None = None,
     shape_annotations: object | None = None,
     analytical_layers: object | None = None,
+    data_transforms: object | None = None,
     resolved_template_id: str | None = None,
 ) -> RenderOptions:
     contract_template = resolved_template_id or resolve_template_id(template)
@@ -264,6 +266,7 @@ def resolve_render_options(
     resolved_analytical_layers = normalize_analytical_layers_payload(analytical_layers)
     if resolved_analytical_layers is not None and "analytical_layers" not in spec.editable_options:
         raise ValueError(f"Template `{template}` does not support option `analytical_layers`.")
+    resolved_data_transforms = normalize_data_transforms_payload(data_transforms)
     return RenderOptions(
         width_mm=width_mm,
         height_mm=height_mm,
@@ -327,6 +330,7 @@ def resolve_render_options(
         text_annotations=normalize_text_annotations_payload(text_annotations),
         shape_annotations=normalize_shape_annotations_payload(shape_annotations),
         analytical_layers=resolved_analytical_layers,
+        data_transforms=resolved_data_transforms,
     )
 
 

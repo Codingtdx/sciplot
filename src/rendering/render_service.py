@@ -119,6 +119,7 @@ def build_rendered_plots(
     text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     shape_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     analytical_layers: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    data_transforms: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[RenderedPlot]:
     requested_template = validate_template_name(template)
     resolved_template = resolve_template_id(requested_template, input_path=input_path, sheet=sheet)
@@ -155,6 +156,7 @@ def build_rendered_plots(
         text_annotations=text_annotations,
         shape_annotations=shape_annotations,
         analytical_layers=analytical_layers,
+        data_transforms=data_transforms,
         resolved_template_id=resolved_template,
     )
     options = replace(
@@ -208,6 +210,7 @@ def render_template(
     text_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     shape_annotations: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
     analytical_layers: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
+    data_transforms: list[dict[str, object]] | tuple[dict[str, object], ...] | None = None,
 ) -> list[Path]:
     rendered_plots = build_rendered_plots(
         template,
@@ -245,6 +248,7 @@ def render_template(
         text_annotations=text_annotations,
         shape_annotations=shape_annotations,
         analytical_layers=analytical_layers,
+        data_transforms=data_transforms,
     )
     return export_rendered_plots(rendered_plots, output_dir, close=True)
 

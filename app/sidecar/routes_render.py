@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 from fastapi import APIRouter
@@ -60,7 +61,7 @@ from src.core.application.render import (
 )
 from src.infrastructure.persistence.plot_exports import prepare_managed_plot_export_dir
 from src.infrastructure.runtime_cache import LRUCache
-from src.rendering.cache import load_curve_table_cached
+from src.rendering.cache import load_curve_table_for_options
 from src.rendering.fit_analysis import fit_series_list
 from src.rendering.source_table_preview import source_table_preview as build_source_table_preview
 
@@ -144,6 +145,11 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 header_row_index=request.header_row_index,
                 unit_row_index=request.unit_row_index,
                 data_start_row_index=request.data_start_row_index,
+                data_transforms=(
+                    [item.model_dump(mode="json") for item in request.options.data_transforms]
+                    if request.options is not None and request.options.data_transforms
+                    else None
+                ),
             )
             return SourceTablePreviewResponse.model_validate(
                 {
@@ -174,7 +180,14 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             input_path = normalize_path(request.input_path)
             sheet = coerce_sheet(str(request.sheet))
             offset, limit = _bounded_page(request.offset, request.limit)
-            series_list = load_curve_table_cached(input_path, sheet)
+            transform_options = SimpleNamespace(
+                data_transforms=(
+                    tuple(item.model_dump(mode="json") for item in request.options.data_transforms)
+                    if request.options is not None and request.options.data_transforms
+                    else None
+                )
+            )
+            series_list = load_curve_table_for_options(input_path, sheet, transform_options)
             fit_result = fit_series_list(series_list, model_id=request.model_id)
             selected_series = fit_result.selected_series(request.series_id)
             rows = selected_series.derived_rows[offset : offset + limit]

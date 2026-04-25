@@ -117,3 +117,67 @@ def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:
     assert payload["candidate_roles"]["x"] == ["Temperature"]
     assert payload["candidate_roles"]["y"] == ["Time"]
     assert payload["candidate_roles"]["z"] == ["Intensity"]
+
+
+def test_source_table_preview_accepts_data_transforms(tmp_path: Path) -> None:
+    input_path = tmp_path / "table.csv"
+    pd.DataFrame(
+        [
+            ["x", "y"],
+            [3.0, 4.0],
+            [5.0, 12.0],
+        ]
+    ).to_csv(input_path, header=False, index=False)
+
+    response = client.post(
+        "/source-table-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "options": {
+                "data_transforms": [
+                    {
+                        "id": "radius",
+                        "kind": "derived_column",
+                        "target_column": "radius",
+                        "expression": "sqrt(x*x + y*y)",
+                    }
+                ]
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["column_headers"] == ["x", "y", "radius"]
+    assert payload["rows"][1] == ["3.0", "4.0", 5.0]
+
+
+def test_fit_analysis_accepts_data_transforms(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    response = client.post(
+        "/fit-analysis",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "model_id": "linear",
+            "options": {
+                "data_transforms": [
+                    {
+                        "id": "window",
+                        "kind": "row_filter",
+                        "column": "Time",
+                        "operator": "between",
+                        "lower": 1.0,
+                        "upper": 2.0,
+                    }
+                ]
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["point_count"] == 2

@@ -10,10 +10,14 @@ from src.data_loader import (
     HeatmapTable,
     ReplicateGroup,
     load_curve_table,
+    load_curve_table_from_frame,
     load_heatmap_table,
+    load_heatmap_table_from_frame,
     load_replicate_table,
+    load_replicate_table_from_frame,
     read_raw_table,
 )
+from src.rendering.data_transforms import apply_data_transforms_to_frame
 from src.rheology_loader import (
     RheologySeries,
     load_frequency_sweep_metrics,
@@ -94,6 +98,18 @@ def read_raw_table_cached(input_path: Path, sheet: str | int = 0) -> pd.DataFram
     return _read_raw_table_cached(*cache_key).copy(deep=True)
 
 
+def _options_data_transforms(options: object) -> object:
+    return getattr(options, "data_transforms", None)
+
+
+def read_raw_table_for_options(input_path: Path, sheet: str | int = 0, options: object = None) -> pd.DataFrame:
+    raw = read_raw_table_cached(input_path, sheet)
+    transforms = _options_data_transforms(options)
+    if transforms is None:
+        return raw
+    return apply_data_transforms_to_frame(raw, transforms)
+
+
 @lru_cache(maxsize=48)
 def _load_curve_table_cached(
     resolved_path: str,
@@ -106,6 +122,14 @@ def _load_curve_table_cached(
 def load_curve_table_cached(input_path: Path, sheet: str | int = 0) -> list[CurveSeries]:
     cache_key = _path_cache_key(input_path, sheet)
     return clone_curve_series_list(_load_curve_table_cached(*cache_key))
+
+
+def load_curve_table_for_options(input_path: Path, sheet: str | int = 0, options: object = None) -> list[CurveSeries]:
+    transforms = _options_data_transforms(options)
+    if transforms is None:
+        return load_curve_table_cached(input_path, sheet)
+    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    return load_curve_table_from_frame(raw)
 
 
 @lru_cache(maxsize=48)
@@ -122,6 +146,18 @@ def load_replicate_table_cached(input_path: Path, sheet: str | int = 0) -> list[
     return clone_replicate_groups(_load_replicate_table_cached(*cache_key))
 
 
+def load_replicate_table_for_options(
+    input_path: Path,
+    sheet: str | int = 0,
+    options: object = None,
+) -> list[ReplicateGroup]:
+    transforms = _options_data_transforms(options)
+    if transforms is None:
+        return load_replicate_table_cached(input_path, sheet)
+    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    return load_replicate_table_from_frame(raw)
+
+
 @lru_cache(maxsize=48)
 def _load_heatmap_table_cached(
     resolved_path: str,
@@ -134,6 +170,14 @@ def _load_heatmap_table_cached(
 def load_heatmap_table_cached(input_path: Path, sheet: str | int = 0) -> HeatmapTable:
     cache_key = _path_cache_key(input_path, sheet)
     return clone_heatmap_table(_load_heatmap_table_cached(*cache_key))
+
+
+def load_heatmap_table_for_options(input_path: Path, sheet: str | int = 0, options: object = None) -> HeatmapTable:
+    transforms = _options_data_transforms(options)
+    if transforms is None:
+        return load_heatmap_table_cached(input_path, sheet)
+    raw = apply_data_transforms_to_frame(read_raw_table_cached(input_path, sheet), transforms)
+    return load_heatmap_table_from_frame(raw)
 
 
 @lru_cache(maxsize=48)

@@ -189,6 +189,7 @@ struct PlotDataWorkbookSheet: View {
     private var tabBar: some View {
         HStack(spacing: 10) {
             workbookTabButton(.sourceData, availability: ActionAvailability.enabled())
+            workbookTabButton(.transformed, availability: session.dataTransformAvailability)
             workbookTabButton(.fit, availability: session.fitAnalysisAvailability)
         }
     }
@@ -196,7 +197,7 @@ struct PlotDataWorkbookSheet: View {
     @ViewBuilder
     private var activeContent: some View {
         switch session.dataWorkbookTab {
-        case .sourceData:
+        case .sourceData, .transformed:
             sourceDataContent
         case .fit:
             fitContent
@@ -238,65 +239,47 @@ struct PlotDataWorkbookSheet: View {
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(0) {
                         TableColumn(sourceTableResponse.columnHeaders[0]) { row in
-                            Text(row.value(at: 0).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 0)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(1) {
                         TableColumn(sourceTableResponse.columnHeaders[1]) { row in
-                            Text(row.value(at: 1).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 1)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(2) {
                         TableColumn(sourceTableResponse.columnHeaders[2]) { row in
-                            Text(row.value(at: 2).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 2)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(3) {
                         TableColumn(sourceTableResponse.columnHeaders[3]) { row in
-                            Text(row.value(at: 3).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 3)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(4) {
                         TableColumn(sourceTableResponse.columnHeaders[4]) { row in
-                            Text(row.value(at: 4).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 4)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(5) {
                         TableColumn(sourceTableResponse.columnHeaders[5]) { row in
-                            Text(row.value(at: 5).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 5)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(6) {
                         TableColumn(sourceTableResponse.columnHeaders[6]) { row in
-                            Text(row.value(at: 6).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 6)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(7) {
                         TableColumn(sourceTableResponse.columnHeaders[7]) { row in
-                            Text(row.value(at: 7).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 7)
                         }
                     }
                     if sourceTableResponse.columnHeaders.indices.contains(8) {
                         TableColumn(sourceTableResponse.columnHeaders[8]) { row in
-                            Text(row.value(at: 8).displayString)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            sourceTableCell(row, at: 8)
                         }
                     }
                 }
@@ -329,6 +312,12 @@ struct PlotDataWorkbookSheet: View {
                 EmptyStateCard(title: "No source table")
             }
         }
+    }
+
+    private func sourceTableCell(_ row: PlotWorkbookTableRow, at index: Int) -> some View {
+        Text(row.value(at: index).displayString)
+            .lineLimit(1)
+            .truncationMode(.middle)
     }
 
     private var fitContent: some View {

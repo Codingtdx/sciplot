@@ -14,6 +14,7 @@ from app.sidecar.schemas_render import (
     AxisBreakPayload,
     DataStudioProjectPayload,
     DataStudioProjectWorkbookPayload,
+    DataTransformPayload,
     ExtraAxisPayload,
     FitOptionsPayload,
     OpenProjectResponse,
@@ -201,6 +202,11 @@ def _normalize_render_options(
         analytical_layers=(
             [AnalyticalLayerPayload.model_validate(item) for item in resolved_options.analytical_layers]
             if resolved_options.analytical_layers is not None
+            else None
+        ),
+        data_transforms=(
+            [DataTransformPayload.model_validate(item) for item in resolved_options.data_transforms]
+            if resolved_options.data_transforms is not None
             else None
         ),
     )

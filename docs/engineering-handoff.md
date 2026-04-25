@@ -33,6 +33,35 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-25: Typed Data Transform v1 backend path
+
+- Change:
+  - Added backend-owned `render_options.data_transforms` with typed v1 transform kinds: `derived_column`, `row_filter`, and `pivot_matrix`.
+  - Implemented `src/rendering/data_transforms.py` with safe column-expression evaluation, explicit user-facing transform errors, row filtering, and `pivot_matrix` output normalized to heatmap-compatible XYZ long-table raw rows.
+  - Added transform-aware raw/curve/replicate/heatmap loader seams in `src/rendering/cache.py`; no-transform requests keep the existing cached loader path.
+  - Wired transforms through `RenderOptions`, sidecar render schemas, `/render-preview`, `/export-render`, `/preflight-render`, `/fit-analysis`, `/source-table-preview`, and `.sciplotgod` save/open normalization.
+  - Added macOS `RenderOptionsPayload.dataTransforms`, basic `Advanced Plot -> Data` editing, undo/preview refresh persistence, and Data Workbook `Transformed` tab.
+  - Reduced repeated Data Workbook table cell rendering by sharing one cell helper while keeping SwiftUI `TableColumn` static columns required by the framework.
+- User-visible impact:
+  - Plot users can add simple backend-applied data transforms before rendering, fitting, exporting, and saving projects.
+  - Data Workbook can show the original source table or the transformed table without Swift executing math expressions.
+- Decision Record:
+  - First-principles motivation: DataGraph-style derived data should be a durable typed data-preparation layer, not renderer-local mutations or GUI-side spreadsheet logic.
+  - Alternatives rejected: a free-form command interpreter or Swift expression evaluator would duplicate backend semantics and break project reproducibility; writing transformed temporary files would create hidden state and cache ambiguity.
+  - Current boundary: v1 supports only single-table derivation/filter/pivot. No joins, groupby aggregation, arbitrary Python, spreadsheet editing, or animation. Column expressions are currently identifier-oriented; complex column names should be referenced through stable simple headers or column aliases in a later pass.
+  - Failure conditions: if future renderers call `load_*_table_cached` directly for transform-enabled options, preview/export/fit can diverge from Data Workbook `Transformed`.
+- Risk / rollback:
+  - Roll back `src/rendering/data_transforms.py`, transform-aware cache wrappers, sidecar schema fields, and macOS `Data` inspector additions if transformed preview/export causes loader regressions.
+  - The no-transform path remains on existing cached loaders, which is the main containment point.
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_data_transforms.py tests/test_rendering_services.py::test_contour_field_preflight_and_render_with_pivot_transform tests/test_sidecar_render.py::test_source_table_preview_accepts_data_transforms tests/test_sidecar_render.py::test_fit_analysis_accepts_data_transforms tests/test_plot_project_routes.py::test_save_open_project_roundtrip_preserves_data_transforms -q`: passed (`9 passed`, existing SWIG deprecation warnings).
+  - `.venv/bin/python -m ruff check app/sidecar src/rendering src/data_loader.py tests/test_data_transforms.py tests/test_rendering_services.py tests/test_sidecar_render.py tests/test_plot_project_routes.py`: passed.
+  - `.venv/bin/python -m mypy src/rendering src/data_loader.py`: passed.
+  - `xcodebuild ... test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderRequestWithExtraAxes -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataTransformEditsRefreshPreviewUndoAndPersistIntoProjectPayload -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataWorkbookTransformedTabRequestsTransformAwarePreview`: passed (`3 tests, 0 failures`; CoreSimulator out-of-date warning only).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed (`248 passed`, existing warnings only; `xcodebuild build` passed; `xcodebuild test` passed with `179 tests, 0 failures`; manual checks listed as pending but not enforced).
+  - `.venv/bin/python scripts/smoke_check.py`: passed.
+  - `git diff --check`: passed.
+
 ### 2026-04-25: Advanced template discovery and recommendation closure
 
 - Change:

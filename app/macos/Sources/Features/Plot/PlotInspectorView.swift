@@ -322,6 +322,8 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
 
             PlotFunctionLayerInspectorView(session: session)
 
+            PlotDataTransformInspectorView(session: session)
+
             DisclosureGroup("Reference Guides") {
                 HStack(spacing: 10) {
                     Button("Add Line") {

@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 
+from src.rendering.data_transforms import apply_data_transforms_to_frame
 from src.rendering.dataset_models import CandidateRoles, ColumnProfile
 
 try:
@@ -529,6 +530,7 @@ def source_table_preview(
     header_row_index: int | None = None,
     unit_row_index: int | None = None,
     data_start_row_index: int | None = None,
+    data_transforms: object = None,
 ) -> SourceTablePreview:
     source_path = Path(path).expanduser()
     sheets, resolved_encoding, resolved_delimiter = read_source_sheets(
@@ -538,6 +540,8 @@ def source_table_preview(
     )
     resolved_sheet = _coerce_sheet(sheet)
     sheet_name, frame = _select_sheet(sheets, resolved_sheet)
+    if data_transforms is not None:
+        frame = apply_data_transforms_to_frame(frame, data_transforms)
     segments = detect_source_segments(sheet_name, frame)
     selected_segment = next((segment for segment in segments if segment.id == segment_id), None)
     if segment_id and selected_segment is None:
