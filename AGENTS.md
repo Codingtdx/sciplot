@@ -59,6 +59,8 @@
 - `scripts/smoke_check.py` 必须维护 public surface 的固定 guardrail：
   - contract lint，检查每个 public template 显式提供 `default_options.style_preset / palette_preset / visual_theme_id`；
   - style/theme/template 固定矩阵，至少覆盖代表性 `curve / area_curve / step_line / bar / scatter / heatmap`，并同时验证 `nature` 与至少一个非 `nature` style；
+  - 任何 `severity=error` 且 `passed=false` 的 validation 必须让 smoke 命令退出非零；
+  - `non_blank_pdf` 只用于真实 PDF 非空/可 rasterize 检查；axis break / guide / annotation / shape overlay 应用 smoke-local 直接断言或专属验证语义，不要复用 `non_blank_pdf`；
   - 不要因为新增模板或 catalog 扩面而删弱这组 matrix。
 - 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
@@ -70,7 +72,7 @@
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`，Plot `Transformed` 预览可额外携带 typed `options.data_variables / options.data_transforms`。不要把全量 workbook 表格塞回 inspect/session payload。
-- Plot `POST /inspect-file` 可选携带 typed `options.data_variables / options.data_transforms` 以做 transform-aware inspect/recommendation；无 options 时必须保持快速原始导入推荐路径，不得把高级数据引擎变成普通导入的隐性成本。
+- Plot `POST /inspect-file` 可选携带 typed `options.data_variables / options.data_transforms` 以做 transform-aware inspect/recommendation；有 transforms 时识别必须基于变换后的表，因此 derived/pivot/aggregate 之后的数据可以直接进入同一 ranked recommendation payload，不要求原始 raw shape 先被识别；无 options 时必须保持快速原始导入推荐路径，不得把高级数据引擎变成普通导入的隐性成本。
 - Plot 推荐必须识别 DataGraph-inspired advanced input shapes：XYZ long table 或 matrix scalar field 可推荐 `contour_field`，theta/radius 曲线可推荐 `polar_curve`，小型 mixed table 可推荐 `table_figure`。这些推荐必须继续走 `POST /inspect-file` 的 ranked recommendation payload，不得在 macOS 侧按列名重建第二套高级模板判断。
 - Data Studio 用户导入模板统一是 v2 no-code table mapping：`output_kind`、`source_format`、`segment_policy`、`segment_selectors`、`field_bindings`、`match_conditions` 是唯一模板结构；旧用户模板 parser 不保留，不要恢复 `POST /data-studio/source-preview` 或 `source_path + accepted_candidate_ids` 创建路径。
 - Data Studio `output_kind=curve_metrics` 必须显式携带 `comparison_enabled`：默认 `false` 表示仅整理原始列为曲线（`All_Curves`）；只有 `comparison_enabled=true` 才输出 representative/metrics compare 所需 sheet。
@@ -274,7 +276,25 @@
 ## 验证命令
 
 - `.venv/bin/python scripts/blocking_gate.py`
+- `.venv/bin/python scripts/manual_smoke_evidence.py init --output /tmp/sciplot_inner_beta_evidence.json`
+- `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_evidence.json --require-all`
+- `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_evidence.json`
 - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
+- `--require-manual` 现在只接受完整 `--manual-evidence`；`--manual-check` 只保留为非 strict 的人工声明入口，不能单独让 inner beta gate 通过。
+- `--manual-check` 只能在对应真实桌面流实际完成后使用；如果 Computer Use / 屏幕捕获 / 原生保存面板阻塞交互，必须在 `docs/engineering-handoff.md` 记录为 pending 或 blocked，不能为了让 gate 通过而标记完成。
+- inner beta 准入推荐 evidence bundle 路径；只有 evidence 中三条 required checks 都是 `passed` 且证据文件实际存在时，`--manual-evidence` 才应视为通过。
+- `overlay_drag_save_reopen` 的 inner beta 默认样本应使用 richer Plot project（至少带 transform + fit + overlay），不要只用最小 overlay case。
+- 当前 inner beta Plot reopen hard gate 覆盖：
+  - `fit`
+  - `reference_guides`
+  - `text_annotations`
+  - `shape_annotations`
+  - `data_variables`
+  - `data_transforms`
+  - `extra_x_axis / extra_y_axis`
+  - `x_axis_breaks / y_axis_breaks`
+  - `analytical_layers`
+- 当前 inner beta Data Studio intake hardening 至少要求 heterogeneous fixtures 对 `template-recommendations`、`template-preview`、`build-workbook` 保持同一语义，并且 unknown source 必须允许“正确不推荐”。
 - `.venv/bin/python scripts/clean_repo.py`
 - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`

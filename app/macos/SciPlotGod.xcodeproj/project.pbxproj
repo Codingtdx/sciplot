@@ -30,6 +30,8 @@
 		C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */; };
 		C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */; };
 		C0000000000000000000007A /* Sources/Features/Plot/PlotFunctionLayerInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000007A /* Sources/Features/Plot/PlotFunctionLayerInspectorView.swift */; };
+		C00000000000000000000080 /* Sources/Features/Plot/PlotDataTransformInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000080 /* Sources/Features/Plot/PlotDataTransformInspectorView.swift */; };
+		C00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */; };
 		C00000000000000000000077 /* Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000077 /* Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift */; };
 		C00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */; };
 		C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */; };
@@ -120,6 +122,8 @@
 		B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotImportView.swift; sourceTree = "<group>"; };
 		B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorView.swift; sourceTree = "<group>"; };
 		B0000000000000000000007A /* Sources/Features/Plot/PlotFunctionLayerInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotFunctionLayerInspectorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000080 /* Sources/Features/Plot/PlotDataTransformInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotDataTransformInspectorView.swift; sourceTree = "<group>"; };
+		B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotDataWorkbookSheet.swift; sourceTree = "<group>"; };
 		B00000000000000000000077 /* Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotOverlayTransformControls.swift; sourceTree = "<group>"; };
 		B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotRefineView.swift; sourceTree = "<group>"; };
@@ -242,6 +246,8 @@
 				B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */,
 				B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */,
 				B0000000000000000000007A /* Sources/Features/Plot/PlotFunctionLayerInspectorView.swift */,
+				B00000000000000000000080 /* Sources/Features/Plot/PlotDataTransformInspectorView.swift */,
+				B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */,
 				B00000000000000000000077 /* Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift */,
 				B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */,
 				B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */,
@@ -429,6 +435,8 @@
 				C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */,
 				C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */,
 				C0000000000000000000007A /* Sources/Features/Plot/PlotFunctionLayerInspectorView.swift in Sources */,
+				C00000000000000000000080 /* Sources/Features/Plot/PlotDataTransformInspectorView.swift in Sources */,
+				C00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift in Sources */,
 				C00000000000000000000077 /* Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift in Sources */,
 				C00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift in Sources */,
 				C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */,

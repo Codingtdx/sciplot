@@ -33,6 +33,293 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-26: Merged `codex/plot-data-boundary-hardening` into `main`
+
+- Change:
+  - Realigned local `main` to `origin/main` and merged `codex/plot-data-boundary-hardening` with a non-squash merge so the boundary-hardening history stays intact.
+  - Resolved merge overlap by keeping the newer transform-aware inspect/recommendation path, Plot Data Workbook extraction, strict inner-beta gate tooling, and the existing `custom_function` fit/bounds payload support together on the merged `main`.
+  - Carried forward the branch-side updates to:
+    - Plot transform-aware inspect/source-preview/fit consistency
+    - Plot Data Workbook / data-pipeline presentation split
+    - inner-beta gate tooling and heterogeneous Data Studio regression coverage
+    - README / AGENTS / product architecture documentation
+
+- User-visible impact:
+  - No new GUI redesign in this round.
+  - `main` now contains the full boundary-hardening package that was previously only on `codex/plot-data-boundary-hardening`.
+
+- Risks:
+  - This round is an integration merge; the main risk was semantic drift between `origin/main` custom-fit work and branch-side transform/data-workbook/gate work.
+  - Future merge work touching `fit_analysis`, Plot session restore payloads, or gate scripts should continue to preserve both the typed transform path and the bounded `custom_function` path together.
+
+- Rollback points:
+  - Merge commit created from this round on `main`
+  - Prior branch tip: `codex/plot-data-boundary-hardening` at `6ea3406`
+  - Remote baseline used for `main`: `origin/main` at `39241bf` before merge
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是先把底层边界收敛到单一 `main` 线，再继续后续 GUI 重构，避免在 GUI 轮次里同时背负一条未合并的底层实现分叉。
+    - 保留普通 merge commit 而不是 squash，是为了留下这组边界加固工作的集成节点和回滚锚点。
+  - Rejected alternatives:
+    - 直接在未合并的功能分支上继续 GUI：拒绝，因为会把 GUI 重构和底层边界加固继续缠在一起。
+    - 保留本地旧 `main` 提交 `eff92c6` 作为基线：拒绝，因为本轮目标明确要求先对齐 `origin/main`。
+  - Boundaries:
+    - 本轮只做分支收敛与冲突整合，不新增 GUI 行为、不改 public contract surface、不改单独的 inner-beta evidence 语义。
+
+- Validation (executed):
+  - `git diff --check`: passed
+  - `.venv/bin/python scripts/clean_repo.py`: passed
+  - `.venv/bin/python scripts/blocking_gate.py`: passed
+    - `ruff`: passed
+    - `mypy`: passed
+    - `pytest tests`: passed (`272 passed, 5 warnings`)
+    - `scripts/smoke_check.py`: passed
+    - `xcodebuild ... build`: passed
+    - `xcodebuild ... test`: passed (`190 tests, 0 failures`)
+  - Manual checks remained informational because strict manual enforcement was not requested during this merge round.
+
+### 2026-04-26: Inner-beta manual smoke completed + project payload decode hardening
+
+- Change:
+  - Ran the three required interactive manual smoke flows and recorded an auditable evidence bundle at `/tmp/sciplot_inner_beta_manual/evidence.json` with attached screenshots/files.
+  - During `overlay_drag_save_reopen`, uncovered a real macOS decode bug after `Save Project`: the sidecar wrote the project successfully, but Swift failed to decode acronym/ID-heavy fields from the `/save-project` and `/open-project` JSON payload.
+  - Added real snake_case decoding regression coverage in `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift` for:
+    - `testDecodeSaveProjectResponsePreservesPlotSourceSHA256`
+    - `testDecodeOpenProjectResponsePreservesEmbeddedWorkbookSHA256`
+  - Fixed `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift` by giving explicit `CodingKeys` raw values to acronym/ID fields that do not round-trip cleanly under `.convertFromSnakeCase`:
+    - `sourceSHA256 -> sourceSha256`
+    - `selectedTemplateID -> selectedTemplateId`
+    - `workbookSHA256 -> workbookSha256`
+    - `comparisonRecipeIDs -> comparisonRecipeIds`
+
+- User-visible impact:
+  - Real manual smoke evidence now exists for:
+    - `plot_import_preview_export`
+    - `data_studio_import_open_plot`
+    - `overlay_drag_save_reopen`
+  - Plot `Save Project` / `Open Project` no longer surfaces the false decode error caused by acronym-key mismatch when the sidecar returns a valid saved project payload.
+  - No public contract, sidecar schema, `.sciplotgod` bundle structure, template surface, or `nature` metric changes.
+
+- Risks:
+  - The regression fix is intentionally scoped to Swift decoding of saved/opened project payloads; if future payload structs add new acronym-style fields, they need the same explicit-key review.
+  - The overlay manual evidence bundle proves the tested path works in this environment, but it should still be refreshed for future release-signoff rounds rather than treated as permanent proof.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/docs/engineering-handoff.md`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是让 inner beta 的“Save Project -> Reopen”证据反映真实产品行为，而不是被客户端 JSON 解码细节误报为失败。
+    - mock 直接构造 Swift model 的测试没有覆盖真实 snake_case payload，因此必须补一条实际 decode 路径的回归测试。
+  - Rejected alternatives:
+    - 只记录 manual smoke blocked 然后跳过：拒绝，因为 evidence 已经表明 sidecar 真正写出了 `.sciplotgod` 文件，阻断点在 macOS decode 层，应该当场修掉。
+    - 依赖 `.convertFromSnakeCase` 的隐式推导继续赌 acronym 字段：拒绝，因为 `SHA256` / `ID` 这类字段已经证明会在保存/打开项目链路上产生假失败。
+  - Boundaries:
+    - 只修 Swift payload decode，不改 Python 保存逻辑、不改 `.sciplotgod` 结构、不改 sidecar public schema。
+    - manual smoke evidence 继续按真实结果记录；若未来 Computer Use/native panel 再阻塞，仍应标记 `blocked` 或 `failed`，不能假装通过。
+
+- Validation (executed):
+  - RED:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeSaveProjectResponsePreservesPlotSourceSHA256 -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeOpenProjectResponsePreservesEmbeddedWorkbookSHA256`: failed before the fix with missing `sourceSHA256` / `comparisonRecipeIDs`.
+  - GREEN:
+    - same targeted `xcodebuild ... test -only-testing:...SchemaDecodingTests/...`: passed after the fix.
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - Manual evidence:
+    - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual/evidence.json --require-all`: passed.
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual/evidence.json`: passed.
+  - Evidence bundle:
+    - `/tmp/sciplot_inner_beta_manual/evidence.json`
+    - `/tmp/sciplot_inner_beta_manual/plot_preview.png`
+    - `/tmp/sciplot_inner_beta_manual/data_studio_open_in_plot.png`
+    - `/tmp/sciplot_inner_beta_manual/overlay_reopened_project.png`
+    - `/tmp/sciplot_inner_beta_manual/overlay_saved_no_error.png`
+
+### 2026-04-26: Inner-beta manual smoke evidence gate
+
+- Change:
+  - Added `/Users/dongxutian/Documents/codegod/scripts/manual_smoke_evidence.py` with:
+    - `init --output PATH` to create an empty evidence bundle
+    - `record --input PATH --check ... --status ... --note ... --evidence-file ...` to append structured smoke evidence
+    - `validate --input PATH --require-all` to enforce that all three required checks are `passed` and every evidence file exists
+  - Extended `/Users/dongxutian/Documents/codegod/scripts/blocking_gate.py` with `--manual-evidence PATH`, so strict manual gating can consume a structured evidence bundle instead of relying only on assertion flags.
+  - Updated `README.md` and `AGENTS.md` so inner-beta sign-off now points to the evidence path first, while keeping `--manual-check` as the explicit human-assertion fallback.
+
+- User-visible impact:
+  - No Plot/Data Studio/Composer/Code Console GUI changes.
+  - No public contract, sidecar schema, `.sciplotgod` bundle, template surface, or `nature` metric changes.
+  - Inner-beta manual readiness can now be audited from a JSON bundle plus attached files instead of a bare command-line flag.
+
+- Risks:
+  - This gate proves that evidence artifacts exist and were recorded consistently; it does not replace real human judgment about whether the desktop flow was acceptable.
+  - Computer Use or native save/open panels may still leave a check in `blocked`; that is expected and should be recorded honestly rather than overridden to `passed`.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/scripts/manual_smoke_evidence.py`
+  - `/Users/dongxutian/Documents/codegod/scripts/blocking_gate.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_manual_smoke_evidence.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_blocking_gate.py`
+  - `/Users/dongxutian/Documents/codegod/README.md`
+  - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 inner beta manual gate 从“口头确认”升级成“带结构化证据的准入凭证”，避免只靠 `--manual-check` 就宣称真实桌面流已通过。
+    - 三条关键流是产品级稳定性证据，不应该只存在于聊天记录、临时备注或一次性终端输出里。
+  - Rejected alternatives:
+    - 继续只靠 `--manual-check`：拒绝，因为它只能表达人工声称，不能留存可审计 artifact。
+    - 把 Computer Use 截图成功与否当成唯一通过条件：拒绝，因为原生 panel 和 ScreenCaptureKit 阻塞是环境问题，不应直接等同于产品失败。
+  - Boundaries:
+    - evidence gate 只加在流程工具层，不改产品 GUI、public contract、public schema、`.sciplotgod` 结构或 `nature` 指标。
+    - `--manual-check` 仍保留兼容，但 inner beta 推荐走 evidence bundle。
+
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_manual_smoke_evidence.py tests/test_blocking_gate.py -q`: passed (`6 passed`).
+  - `tmp evidence bundle` strict path:
+    - `.venv/bin/python scripts/manual_smoke_evidence.py init --output /tmp/sciplot_inner_beta_evidence.json`
+    - `.venv/bin/python scripts/manual_smoke_evidence.py record --input /tmp/sciplot_inner_beta_evidence.json --check plot_import_preview_export --status passed --note "test artifact" --evidence-file /tmp/sciplot_inner_beta_plot.txt`
+    - `.venv/bin/python scripts/manual_smoke_evidence.py record --input /tmp/sciplot_inner_beta_evidence.json --check data_studio_import_open_plot --status passed --note "test artifact" --evidence-file /tmp/sciplot_inner_beta_data_studio.txt`
+    - `.venv/bin/python scripts/manual_smoke_evidence.py record --input /tmp/sciplot_inner_beta_evidence.json --check overlay_drag_save_reopen --status passed --note "test artifact" --evidence-file /tmp/sciplot_inner_beta_overlay.txt`
+    - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_evidence.json --require-all`: passed.
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_evidence.json`: passed.
+  - `git diff --check`: passed.
+
+### 2026-04-26: Inner Beta Readiness Gate Attempt
+
+- Change:
+  - Closed the previous backend stability hardening package as commit `59d8dff` (`chore: harden inner beta backend gates`) on `codex/plot-data-boundary-hardening`, providing a clean rollback point before readiness evidence collection.
+  - Documented the manual-smoke rule in `README.md` and `AGENTS.md`: `--manual-check` may only be used after the corresponding real desktop flow is actually completed.
+
+- Readiness evidence:
+  - Automated gate before commit: `.venv/bin/python scripts/blocking_gate.py` passed (`pytest` `263 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `181 tests, 0 failures`; manual checks pending).
+  - Interactive Plot smoke partial: launched `app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`, imported `/tmp/sciplot_inner_beta_smoke/curve.csv`, observed Plot recommendation/preview render, and reached the native export-format dialog.
+  - Interactive export was not confirmed: Computer Use hit `SCStreamErrorDomain Code=-3811` and then timed out while the native save panel was open. No exported PDF was created in `/tmp/sciplot_inner_beta_smoke`, so `plot_import_preview_export` remains incomplete.
+  - Artifact fallback attempted: `xcodebuild ... test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSmokeRendersKeyWorkbenchViews` passed and produced xcresult attachments at `app/macos/.derivedData/Logs/Test/Test-SciPlotGodMac-2026.04.26_00-35-24-+0800.xcresult`, but this is snapshot evidence only, not a replacement for interactive manual smoke.
+  - Strict manual gate: `.venv/bin/python scripts/blocking_gate.py --require-manual` passed the automated matrix again (`pytest` `263 passed, 5 warnings`; `xcodebuild test` `181 tests, 0 failures`) and then correctly failed with exit code `2` because no manual checks were honestly marked complete.
+
+- Current beta status:
+  - Backend/rendering/macOS automated readiness is green.
+  - Inner-beta interactive readiness is not fully signed off yet because all three required real desktop flows are still pending or blocked.
+  - GUI redesign remains out of scope for this readiness gate.
+
+- Risks:
+  - Native macOS save/open panels can outlive or destabilize Computer Use capture in this environment; do not interpret that as a product export failure unless the same failure reproduces with direct human interaction.
+  - Passing GUI snapshot tests proves canonical views render, but does not prove file-picker, export destination, or save/reopen interactions.
+
+- Rollback points:
+  - Readiness documentation only: `/Users/dongxutian/Documents/codegod/docs/engineering-handoff.md`, `/Users/dongxutian/Documents/codegod/README.md`, `/Users/dongxutian/Documents/codegod/AGENTS.md`.
+  - Backend stability package rollback point: commit `59d8dff`.
+
+- Next action:
+  - Run the three manual smoke flows with a human at the Mac or a stable desktop automation session.
+  - Only after each flow is actually completed, rerun:
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
+
+### 2026-04-25: Inner-beta backend stability gate hardening
+
+- Change:
+  - Hardened `scripts/smoke_check.py` so any error-level validation report with `passed=false` fails the smoke command instead of only appearing in `figures/debug_outputs/smoke_report.json`.
+  - Cleaned advanced overlay smoke semantics: PDF raster sanity remains `non_blank_pdf`; axis break / split / shape / annotation checks now use direct smoke assertions with explicit failure messages.
+  - Made Data Studio template recommendations refuse templates with no `match_conditions`, preventing unknown files from being auto-matched to manual-only user templates.
+  - Reused transform-aware inspect presentation for export artifacts, so `/inspect-file` and `/export-render` produce the same transformed recommendation summary when `data_variables/data_transforms` are active.
+  - Added backend regression coverage for Excel selected-sheet import, no-default template recommendation, curve+metric mixed workbook output, failed-smoke gating, and transform-aware render-route consistency.
+
+- User-visible impact:
+  - No public contract, template, `.sciplotgod`, or `nature` metric changes.
+  - Release/smoke automation is stricter: failed error-level validations now stop the run.
+  - Unknown Data Studio files stay unselected unless a template actually matches, preserving explicit manual resolution.
+
+- Risks:
+  - Smoke failures from advanced overlay checks now fail immediately with assertions instead of appearing as report rows; this is intentional but changes where the failure is surfaced.
+  - Templates intentionally meant for manual-only use need explicit selection in the UI; they will not appear as weak recommendations without match conditions.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/scripts/smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/src/data_studio/ingest.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/routes_render.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_smoke_check.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_data_studio_import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_render.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是让内测前底层门禁表达真实失败，而不是把 error-level validation 写进报告后仍然返回成功。
+    - Data Studio 推荐器应只表达有证据的匹配；无条件模板是可手动选择的模板，不是自动推荐。
+    - Plot transform-aware routes must share one transformed-table semantic path across inspect, preview, fit, preflight, render, export artifacts, and later project restore.
+  - Rejected alternatives:
+    - 继续把 overlay 检查塞进 `non_blank_pdf`：拒绝，因为 PDF 非空和 overlay 语义是两类检查，会掩盖真实失败。
+    - 保留 no-condition template 的 0.1 弱匹配：拒绝，因为这等价于 unknown source fallback，和 v2 resolver “无推荐则显式选择”原则冲突。
+    - 只修 `/inspect-file` 不修 export artifact：拒绝，因为导出包会重新落回 raw inspection，形成同一图件不同元数据语义。
+  - Boundaries:
+    - 不改 `src/plot_contract.json`、sidecar public schema、public templates、`.sciplotgod` bundle 结构或 `nature` 冻结指标。
+    - 不引入 Swift/前端表达式执行器；transform 语义仍由后端 typed data engine 执行。
+
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_smoke_check.py::test_error_validation_fails_smoke_report_gate -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py::test_transform_options_stay_consistent_across_render_routes -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_data_studio_import_templates_v2.py::test_excel_multi_sheet_template_preview_builds_selected_sheet tests/test_data_studio_import_templates_v2.py::test_unknown_source_does_not_default_to_unmatched_user_template -q`: failed before implementation, then passed.
+  - `.venv/bin/python -m pytest tests/test_smoke_check.py tests/test_sidecar_render.py tests/test_data_studio_import_templates_v2.py -q`: passed (`23 passed`).
+  - `.venv/bin/python scripts/smoke_check.py`: passed (`24` PDFs, `7` validations, `0` failed error-level validations).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`clean_repo` reclaimed approx `237.2 MB`; `ruff` passed; `mypy` passed; `pytest` `263 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `181 tests, 0 failures`). Manual smoke checklist remained pending because `--require-manual` was not used.
+  - `git diff --check`: passed.
+  - Manual GUI smoke: pending by plan; `--require-manual` not run in this round.
+
+### 2026-04-25: Plot DataGraph-style data inspector split and pipeline summary seam
+
+- Change:
+  - Split `PlotDataTransformInspectorView` out of `PlotFunctionLayerInspectorView.swift` into its own Plot feature file and added it to the macOS Xcode target.
+  - Added `PlotDataPipelineSummary` as a small presentation seam on `PlotSession` so the DataGraph-style variables/transforms pipeline can be summarized from one place instead of each UI surface recounting it.
+  - Added a compact Pipeline/Status row to the Plot inspector Data disclosure so the existing typed variables/transforms editor has a clearer state surface without changing the backend contract or `nature` metrics.
+  - Added macOS regression coverage for empty, active, and disabled data-pipeline summary states.
+- User-visible impact:
+  - Plot's Advanced Plot -> Data section now shows whether source data is used directly or how many variables/transforms are active.
+  - No route, contract, renderer, default-style, or project-file schema changes.
+- Decision Record:
+  - First-principles motivation: the DataGraph-style data engine should become a productized workflow through typed presentation seams, not more controls piled into a mixed function/data inspector file.
+  - Alternatives rejected: leaving the Data inspector embedded in the function-layer file, or adding UI-local recounting in each future Data Workbook pane. Both would keep structure debt in the path of the next Data Workbook v2 work.
+  - Current boundary: this is a macOS structure/presentation cleanup only. Variables and transforms remain backend-owned typed payloads, and Swift still does not evaluate expressions.
+  - Failure conditions: future Data Workbook or inspector panes can drift again if they compute their own variable/transform counts rather than using `dataPipelineSummary`.
+- Risk / rollback:
+  - Roll back `PlotDataTransformInspectorView.swift` and the Xcode project membership if target membership or SwiftUI compile behavior regresses.
+  - Roll back `PlotDataPipelineSummary` and the inspector summary rows independently if the state copy proves too noisy.
+- Actual regression results:
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataPipelineSummaryCountsVariablesAndActiveTransforms`: failed before implementation because `PlotSession` had no `dataPipelineSummary`, then passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`clean_repo` reclaimed approx `236.6 MB`; `ruff` passed; `mypy` passed; `pytest` `258 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `180 tests, 0 failures`). Manual smoke checklist remained pending because `--require-manual` was not used.
+  - Known environment noise: Xcode still reports the existing CoreSimulator out-of-date warning; macOS platform build/test passed.
+
+### 2026-04-25: Plot/Data Studio boundary and transform-aware inspection hardening
+
+- Change:
+  - Fixed transform-aware Plot inspection so `/inspect-file` can build recommendations from the transformed table without first requiring the original raw source to match a supported shape.
+  - Added a shared sidecar `data_engine_options_from_payload` helper so `/inspect-file`, `/source-table-preview`, and `/fit-analysis` consume `render_options.data_variables / data_transforms` through one payload conversion path.
+  - Fixed curve and mean-band render model detection so `src/rendering/render_curve.py` passes current render options into `build_normalized_dataset`, preventing transform-enabled renders from falling back to raw-source model detection.
+  - Updated `docs/product-architecture.md` to remove stale `/data-studio/source-preview` wording and add a Plot/Data Studio boundary note: Plot owns single-figure recommendation/refinement/render/export; Data Studio owns intake/workbook/comparison; `Open in Plot` is the explicit handoff.
+  - Updated `README.md` and `AGENTS.md` to document that transform-aware inspect/recommendation is based on the transformed table while no-options import remains the fast raw-source path.
+- User-visible impact:
+  - Data transformed into a compact aggregate table can now enter normal recommendation and surface `table_figure` even if the original long raw table is not directly recognized.
+  - Transform-enabled curve and mean-band rendering now use the same model-detection view as preview/fit/source-table paths.
+  - No GUI workflow change; existing Data Studio `Open in Plot` affordances and tests already cover render/fit handoff payloads.
+- Decision Record:
+  - First-principles motivation: DataGraph-style data preparation only works as a durable engine if inspect/recommend, render, fit, and source preview all observe the same transformed table. Raw-first inspection created a hidden precondition that contradicted the typed data-engine contract.
+  - Alternatives rejected: adding a new transform-inspect endpoint, letting macOS infer transformed shapes locally, or keeping renderer-specific fallbacks. Each would create a second recommendation/data semantic source.
+  - Current boundary: transforms are still opt-in. Without options, `/inspect-file` continues to use the raw-source fast path. Data Studio remains the workbook/comparison owner and only crosses into Plot via `Open in Plot`.
+  - Failure conditions: future renderers that call raw cached loaders for transform-enabled options can still diverge; add a regression near that renderer before extending it.
+- Risk / rollback:
+  - Roll back `app/sidecar/render_support.py` helper extraction and `app/sidecar/routes_render.py` inspect branching if transform-aware inspect errors regress ordinary imports.
+  - Roll back the two `src/rendering/render_curve.py` option-passing changes if rheology bundle routing regresses, then replace with a narrower transform-only condition.
+  - Documentation changes are safe to revert independently if product wording changes again.
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_rendering_services.py::test_curve_render_model_detection_uses_transform_options tests/test_rendering_services.py::test_mean_band_render_model_detection_uses_transform_options tests/test_sidecar_render.py::test_inspect_file_recommends_table_figure_after_aggregate_transform -q`: failed before implementation, then passed (`3 passed`, existing SWIG deprecation warnings only).
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py tests/test_rendering_services.py::test_contour_field_preflight_and_render_with_pivot_transform tests/test_rendering_services.py::test_new_datagraph_templates_preflight_and_render tests/test_rendering_services.py::test_curve_render_model_detection_uses_transform_options tests/test_rendering_services.py::test_mean_band_render_model_detection_uses_transform_options tests/test_sidecar_active_routes.py -q`: passed (`15 passed`, existing warnings only).
+  - `.venv/bin/python -m ruff check app/sidecar/routes_render.py app/sidecar/render_support.py app/sidecar/server_utils.py src/rendering/render_curve.py tests/test_rendering_services.py tests/test_sidecar_render.py`: passed.
+  - `.venv/bin/python -m mypy src/rendering/render_curve.py app/sidecar/routes_render.py app/sidecar/render_support.py app/sidecar/server_utils.py`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`pytest` `258 passed, 5 warnings`; `smoke_check` passed; `xcodebuild build` passed; `xcodebuild test` `179 tests, 0 failures`; manual smoke checklist listed as pending but not enforced).
+  - `.venv/bin/python scripts/smoke_check.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed (CoreSimulator out-of-date warning only).
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`179 tests, 0 failures`; CoreSimulator out-of-date warning only).
+
 ### 2026-04-25: DataGraph-style typed data engine expansion
 
 - Change:
@@ -58,7 +345,12 @@ Every development round must update this file.
   - `.venv/bin/python -m ruff check src/rendering/expression_engine.py src/rendering/data_transforms.py src/rendering/analytical_layers.py src/rendering/fit_analysis.py src/rendering/dataset_models.py src/rendering/cache.py src/rendering/options.py app/sidecar/routes_render.py app/sidecar/schemas_render.py app/sidecar/render_support.py app/sidecar/project_bundle.py tests/test_expression_engine.py tests/test_data_transforms.py tests/test_sidecar_render.py tests/test_plot_project_routes.py`: passed.
   - `.venv/bin/python -m mypy src/rendering src/data_loader.py`: passed.
   - `xcodebuild ... test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderRequestWithExtraAxes -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataTransformEditsRefreshPreviewUndoAndPersistIntoProjectPayload -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataWorkbookTransformedTabRequestsTransformAwarePreview`: passed (`3 tests, 0 failures`; CoreSimulator out-of-date warning only).
-  - Full gate results for this round are recorded after the complete validation sweep below.
+  - `.venv/bin/python scripts/clean_repo.py`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix (`ruff` passed, `mypy` passed, `pytest` `255 passed, 5 warnings`, `smoke_check` passed, `xcodebuild build` passed, `xcodebuild test` `179 tests, 0 failures`; manual smoke checklist listed as pending but was not enforced).
+  - `.venv/bin/python scripts/smoke_check.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed (`179 tests, 0 failures`; CoreSimulator out-of-date warning only).
+  - `git diff --check`: passed.
 
 ### 2026-04-25: Typed Data Transform v1 backend path
 
@@ -3785,3 +4077,171 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed（`76 tests`）
   - `git diff --check`: passed
   - `xcodebuild ... test` full suite command in this round was attempted but timed out in this tool session; no failure signal was observed before timeout, and the changed areas are covered by the targeted suite above.
+
+### 2026-04-25 (Round BI): Plot Data Workbook sheet boundary + shared pipeline summary
+
+- Scope:
+  - 拆分 Plot 主工作台与 Data Workbook 子界面：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - Data Workbook header 复用 `PlotSession.dataPipelineSummary`，让 inspector `Data` section 与 workbook header 使用同一 presentation seam：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataTransformInspectorView.swift`
+  - 回归测试覆盖文件边界、pipeline summary 行为与 GUI fingerprint：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+
+- User-visible impact:
+  - Plot `Data Workbook` header 现在显示与 inspector 一致的数据管线短状态，例如变量/transform 数量与 active/disabled transform 计数。
+  - 主 Plot workbench 行为、导入、模板、预览、导出路径不变。
+
+- Risks:
+  - Data Workbook 子界面现在独立编译；后续新增 workbook 控件必须确保新文件已加入 `SciPlotGodMac` target membership。
+  - GUI snapshot 中 `Plot data workbook` 基线已因 header 新增 summary 更新；若后续布局微调，需要确认 drift 是否只来自 workbook 视图。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/SciPlotGod.xcodeproj/project.pbxproj`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 Plot 主工作台布局与 Data Workbook 子工作面分层，避免继续把 variables/transforms/fit 的 V2 入口堆进 `PlotWorkbenchView.swift`。
+    - `dataPipelineSummary` 作为共享 presentation seam，避免 inspector 与 workbook 各自拼一套数据管线文案。
+  - Rejected alternatives:
+    - 继续把 workbook UI 留在 `PlotWorkbenchView.swift`：拒绝，因为主工作台文件会重新承担子界面细节，后续 V2 控件扩展会放大结构债。
+    - 在 Data Workbook header 单独计算变量/transform 文案：拒绝，因为会产生重复 presentation 状态。
+  - Boundaries:
+    - 不改 `src/plot_contract.json`、sidecar schema、public template、`nature` 冻结指标。
+    - Swift 仍只编辑 typed payload 与展示后端结果，不引入表达式执行器或第二套数据引擎。
+
+- Validation (executed):
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testPlotDataWorkbookSheetHasDedicatedFileAndPipelineSummary`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSnapshotFingerprintsStayStable`: passed（`Plot data workbook` fingerprint updated after intentional header change）
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testDataPipelineSummaryCountsVariablesAndActiveTransforms`: passed
+  - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest `258 passed`/smoke_check/xcodebuild build/xcodebuild test `181 tests`；manual checklist reported pending and was not enforced）
+  - `git diff --check`: passed
+  - Manual GUI smoke: pending by plan; `--require-manual` not run in this round.
+
+### 2026-04-26 (Round BK): Plot core advanced persistence hard gate
+
+- Scope:
+  - 收紧 Plot `.sciplotgod` 高频高级状态的 round-trip hard gate：
+    - `fit_options`
+    - `render_options.reference_guides`
+    - `render_options.text_annotations`
+    - `render_options.shape_annotations`
+    - `render_options.data_variables`
+    - `render_options.data_transforms`
+  - Python sidecar save/open project 回归覆盖：
+    - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+  - macOS snake_case decode 与 restore-to-preview 链路覆盖：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - Plot reopen 后的 transform-aware inspect 修复：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+
+- User-visible impact:
+  - 无新的 GUI 入口或视觉改动。
+  - 用户保存再打开包含 fit、guide/annotation/shape overlay、data variables/transforms 的 Plot 项目后，恢复出的 Plot session 会继续沿用同一份高级状态驱动 inspect、preview、Data Workbook transformed preview 与 fit analysis，不再在 reopen 后静默退回 raw inspect 路径。
+
+- Risks:
+  - `currentInspectionRequest()` 现在会在存在 variables/transforms 时携带精简 `options` 到 `/inspect-file`；若未来有人把额外非数据引擎字段塞进这个 helper，可能把 reopen inspect 重新耦合到不必要的前端状态。
+  - 新的 `PlotSessionTests` 明确依赖 Data Workbook 页签语义：只有 `Transformed` 页签才发送 transform-aware source preview。后续若 workbook tab 载入策略改变，需要同步更新测试前提，而不是把 transform-aware 逻辑偷偷扩散到 `Source Data`。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SchemaDecodingTests.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_plot_project_routes.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 Plot 项目保存/重开后的“高级状态仍稳定出图”变成新的底层硬门，而不是只验证 JSON 能存进去。
+    - reopen 后的 inspect 是后续 template recommendation、preview 和 workbook/fit 工具面的起点；如果 transform-aware options 在这里丢失，就会出现“项目状态恢复了，但后续语义偷偷漂移”的假稳定。
+  - Rejected alternatives:
+    - 只补 save/open JSON round-trip 断言：拒绝，因为它证明不了 macOS decode、session restore、preview request 是否真的消费了恢复状态。
+    - 在 reopen 后直接让 `/inspect-file` 总是携带完整 `renderOptions`：拒绝，因为普通导入的 raw fast path 仍应保持轻量，只在存在 `data_variables / data_transforms` 时才附带最小必要选项。
+  - Boundaries:
+    - 不改 `src/plot_contract.json`、sidecar public schema、`.sciplotgod` bundle 结构、`nature` 指标。
+    - `extra axis`、`broken axis`、`function layer` 维持现有回归覆盖，但不升级为本轮 hard gate 主范围。
+
+- Validation (executed):
+  - `.venv/bin/python -m pytest tests/test_plot_project_routes.py -q`: passed（`10 passed`）
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testOpenProjectWithCoreAdvancedStateKeepsTransformAwareInspectAndWorkbookRequests`: passed
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/PlotSessionTests`: passed（`57 tests`；CoreSimulator out-of-date warning only, macOS tests succeeded）
+  - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest `270 passed`/smoke_check/xcodebuild build/xcodebuild test `186 tests`；manual checklist not enforced）
+  - `git diff --check`: passed
+  - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual/evidence.json --require-all`: passed
+  - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual/evidence.json`: passed（自动化矩阵再次通过，manual evidence 三条全部 confirmed）
+  - Manual evidence refresh:
+    - `overlay_drag_save_reopen` 已追加 richer project spot-check，补充 `/tmp/sciplot_inner_beta_manual/curve_core_advanced.sciplotgod` 的 reopen 证据，确认 fit overlay、transform pipeline summary 与 transformed workbook 列在 reopen 后仍可见。
+
+### 2026-04-26 (Round BL): Inner beta bottom-layer closeout bundle
+
+- Scope:
+  - 收口当前 inner beta hardening diff，不改 `src/plot_contract.json`、sidecar public schema、`.sciplotgod` 结构或 `nature` 指标。
+  - 把 Plot reopen hard gate 从 core advanced state 扩到剩余高频高级状态：
+    - `render_options.extra_x_axis / extra_y_axis`
+    - `render_options.x_axis_breaks / y_axis_breaks`
+    - `render_options.analytical_layers`
+  - 收紧 strict manual gate 语义：
+    - `--require-manual` 只接受 `--manual-evidence`
+    - `--manual-check` 只保留非 strict 人工声明用途
+  - 扩 Data Studio heterogeneous import 可信度回归：
+    - multi-segment curve-only build
+    - unknown-source empty recommendations
+    - preview/build 语义对齐断言
+  - 同步更新 `/Users/dongxutian/Documents/codegod/README.md`、`/Users/dongxutian/Documents/codegod/AGENTS.md` 的 inner beta 准入说明。
+
+- User-visible impact:
+  - 无 GUI 改版。
+  - Plot 保存/重开后，`extra axis`、`broken axis`、`function layer` 不再出现“JSON 里有、重开后请求链路偷偷降级”的假恢复。
+  - `blocking_gate.py --require-manual` 不再接受没有证据的 checklist 通过。
+  - Data Studio 面对 heterogeneous 原始文件时，unknown source 会保持空推荐而不是 fallback 瞎猜；multi-segment curve-only fixture 可稳定 build 成一致 workbook。
+
+- Risks:
+  - `ExtraAxisPayload` 现在显式维护 decode/encode 兼容键；后续如果再引入 acronym/ID/snake_case 混合字段，必须同样做真实 payload decode 回归，而不是只依赖 `.convertFromSnakeCase`。
+  - Plot session 的 axis-break sanitize 现在只会剔除 enabled 冲突项并保留 disabled state；如果未来 renderer 真正支持更多跨轴 break 组合，需要同时更新这层 sanitize 与回归断言。
+  - `function_curve` 已纳入 macOS 测试 payload 的真实模板集合；后续如果 contract/meta fixture 再精简，不能把它从 reopen hard gate 场景里漏掉。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/scripts/blocking_gate.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_blocking_gate.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPreviewExport.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionPresentation.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/TestPayloads.swift`
+  - `/Users/dongxutian/Documents/codegod/tests/test_data_studio_import_templates_v2.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_data_studio.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 inner beta 剩余底层不确定性一次收口成明确的 admission rule，而不是继续靠“上一轮已经差不多了”的口头判断。
+    - reopen hard gate 的意义不是 state 能 decode，而是 restore 后 inspect / preview / workbook / fit 继续沿用同一份语义；任何 silently downgraded advanced state 都应视为 blocker。
+    - strict manual gate 的意义不是让人多打一个 flag，而是让真实桌面流留下可审计 evidence bundle。
+  - Rejected alternatives:
+    - 保留 `--require-manual + --manual-check` 继续视为通过：拒绝，因为它会让 strict gate 退化回口头声明。
+    - 让 axis-break sanitize 继续整组清空冲突轴：拒绝，因为 disabled durable state 会在 reopen 后被静默抹掉，和 hard gate 目标冲突。
+    - 在测试里继续用不含 `function_curve` 的 meta/contract fixture：拒绝，因为这会让 reopen 测试落到“未知模板降级路径”，测不到真实产品语义。
+  - Boundaries:
+    - 这轮不扩 GUI，不引入新 route，不改 bundle layout，不把非高频高级能力升级成新的 admission blocker。
+    - Data Studio 仍不恢复 legacy `/data-studio/source-preview`，unknown source 继续允许“正确不推荐”。
+
+- Validation (executed):
+  - RED:
+    - `.venv/bin/python -m pytest tests/test_blocking_gate.py::test_require_manual_rejects_explicit_manual_checks_without_evidence -q`: failed before tightening strict gate（旧行为错误返回通过）。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeSaveProjectResponsePreservesFunctionCurveAxesAndAnalyticalLayers -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeOpenProjectResponsePreservesAxisBreaks -only-testing:SciPlotGodMacTests/PlotSessionTests/testOpenProjectWithFunctionCurveAxesAndAnalyticalLayerRestoresPreviewState -only-testing:SciPlotGodMacTests/PlotSessionTests/testOpenProjectWithAxisBreaksRestoresPreviewState`: 先后暴露了 `ExtraAxisPayload` encode/decode 漏洞、axis-break sanitize 误清空 disabled state、以及测试 meta fixture 缺少 `function_curve` 的降级路径问题。
+  - GREEN:
+    - `.venv/bin/python -m pytest tests/test_manual_smoke_evidence.py tests/test_blocking_gate.py tests/test_smoke_check.py tests/test_plot_project_routes.py tests/test_data_studio_import_templates_v2.py tests/test_sidecar_data_studio.py -q`: passed（`40 passed`）。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests -only-testing:SciPlotGodMacTests/PlotSessionTests`: passed（`61 tests`；CoreSimulator out-of-date warning only, macOS tests succeeded）。
+  - Full acceptance:
+    - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest `272 passed`/smoke_check/xcodebuild build/xcodebuild test `190 tests`；manual checklist remained pending because strict path was not requested）。
+    - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual/evidence.json --require-all`: passed。
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual/evidence.json`: passed（自动化矩阵再次通过，strict manual evidence 三条全部 confirmed）。
+    - `git diff --check`: passed。
+  - Inner beta admission semantics:
+    - strict manual gate 现在要求 `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all` 与 `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>` 双双通过。
+    - `overlay_drag_save_reopen` 默认 evidence 样本继续指向 richer Plot project，而不是最小 overlay-only case。

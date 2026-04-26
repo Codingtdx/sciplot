@@ -736,6 +736,25 @@ extension PlotSession {
         guard let selectedFileURL else {
             return nil
         }
-        return .init(inputPath: selectedFileURL.path, sheet: selectedSheet)
+        return .init(
+            inputPath: selectedFileURL.path,
+            sheet: selectedSheet,
+            options: inspectionDataEngineOptions()
+        )
+    }
+
+    func inspectionDataEngineOptions() -> RenderOptionsPayload? {
+        let hasVariables = renderOptions.dataVariables?.isEmpty == false
+        let hasTransforms = renderOptions.dataTransforms?.isEmpty == false
+        guard hasVariables || hasTransforms else {
+            return nil
+        }
+        return RenderOptionsPayload(
+            stylePreset: renderOptions.stylePreset,
+            palettePreset: renderOptions.palettePreset,
+            visualThemeID: renderOptions.visualThemeID,
+            dataVariables: renderOptions.dataVariables,
+            dataTransforms: renderOptions.dataTransforms
+        )
     }
 }

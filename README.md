@@ -68,7 +68,7 @@ Canonical internal steps can be richer than user-visible UI; only user decision 
 
 ## Backend/API Boundaries
 
-- `POST /inspect-file` is the single inspection/recommendation entry. Callers may pass optional `options.data_variables` / `options.data_transforms` when they need transform-aware recommendations; no-options import keeps the fast raw-source recommendation path.
+- `POST /inspect-file` is the single inspection/recommendation entry. Callers may pass optional `options.data_variables` / `options.data_transforms` when they need transform-aware recommendations; no-options import keeps the fast raw-source recommendation path. When transforms are supplied, recognition is based on the transformed table so derived/pivoted/aggregated data can enter the same ranked recommendation payload instead of requiring the original raw shape to be recognized first.
 - `POST /source-table-preview` returns paged raw source-table rows plus detected encoding, delimiter, segments, column profiles, candidate roles, and x/y hints for Plot `Data Workbook`, Data Studio `Analysis`, and the Data Studio import wizard. Callers may pass `encoding`, `delimiter`, `header_row` / `header_row_index`, `unit_row` / `unit_row_index`, `data_start_row` / `data_start_row_index`, `segment_id`, and optional typed `options.data_variables` / `options.data_transforms` preview parameters.
 - `POST /data-studio/template-preview` validates an unsaved v2 Data Studio template draft against a source file and returns normalized output counts, missing required roles, segment summaries, and warnings before a template is saved.
 - Data Studio v2 `curve_metrics` templates carry `comparison_enabled`. `false` means curve-only workbook output (`All_Curves`); `true` keeps representative/metric compare sheets.
@@ -127,7 +127,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 - Template presentation metadata such as gallery thumbnail kind must come from `src/plot_contract.json` and `/meta`, not from macOS-local template-id heuristics.
 - `distribution_compare` is compatibility-only and must never be emitted as a public template id; resolve it to `box`, `box_strip`, or `violin`, with `box` as the conservative fallback when source inspection is unavailable.
 - Shared axis/unit display normalization lives in `src/text_normalization.py`; callers must preserve mathtext exponents for unknown-but-unit-like inputs such as `kJ/m2` instead of leaving superscripts to frontend heuristics.
-- `scripts/smoke_check.py` is expected to enforce public-surface guardrails, including contract lint plus a fixed style/theme/template render matrix over representative templates. Do not weaken that matrix when adding new templates or visual catalogs.
+- `scripts/smoke_check.py` is expected to enforce public-surface guardrails, including contract lint plus a fixed style/theme/template render matrix over representative templates. Any error-level failed validation must fail the command, and `non_blank_pdf` is reserved for real PDF raster sanity checks. Do not weaken that matrix when adding new templates or visual catalogs.
 
 ## Engineering Principles
 
@@ -147,7 +147,12 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 - Blocking gate (recommended one-command entry):
   - `.venv/bin/python scripts/blocking_gate.py`
-  - Use `--require-manual --manual-check ...` to enforce all three manual smoke checks in the same run.
+  - Inner beta strict path:
+    - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all`
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>`
+  - `--manual-check` remains available as a non-strict human assertion path. Under `--require-manual`, checklist flags alone no longer satisfy the inner beta gate; use a complete evidence bundle instead.
+  - Only pass a `--manual-check` after that desktop flow was actually completed; capture or save-panel failures should be recorded as blocked/pending in `docs/engineering-handoff.md`.
+  - The default overlay evidence sample for inner beta should be a richer Plot project that includes transform + fit + overlay state, not a minimal overlay-only case.
 - Clean:
   - `.venv/bin/python scripts/clean_repo.py`
 - Ruff:
@@ -186,6 +191,17 @@ If you are taking over development, use this order:
      - Plot import -> preview -> export
      - Data Studio import -> open in Plot
      - Overlay add/select/drag(or nudge) -> save/reopen consistency
+   - for inner beta sign-off, record those three flows into an evidence bundle and run:
+     - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all`
+     - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>`
+   - the current hard-gated Plot reopen states for inner beta are:
+     - `fit`
+     - `reference/text/shape overlays`
+     - `data variables/transforms`
+     - `extra_x_axis / extra_y_axis`
+     - `x_axis_breaks / y_axis_breaks`
+     - `analytical_layers`
+   - Data Studio inner beta readiness also requires trustworthy heterogeneous import behavior: correct recommendation, correct no-recommendation, and consistent preview/build semantics for real raw fixtures.
    - if you prefer explicit commands, run clean/ruff/mypy/pytest/smoke_check/xcodebuild build/test in order
 5. Confirm you can execute one complete end-to-end flow in each workbench:
    - Plot

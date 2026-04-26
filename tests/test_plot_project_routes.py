@@ -541,6 +541,124 @@ def test_save_open_project_roundtrip_preserves_data_transforms(tmp_path: Path) -
     assert restored_transforms[1]["expression"] == "Y * 2"
 
 
+def test_save_open_project_roundtrip_preserves_core_advanced_plot_state(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve-core-advanced.sciplotgod"
+    _curve_csv(source_path)
+
+    payload = _project_payload(source_path)
+    plot_payload = payload["plot"]
+    assert isinstance(plot_payload, dict)
+    plot_payload["selected_template_id"] = "curve"
+    render_options = plot_payload["render_options"]
+    assert isinstance(render_options, dict)
+    render_options["data_variables"] = [
+        {"id": "scale", "enabled": True, "kind": "scalar", "label": "Scale", "value": 2.0}
+    ]
+    render_options["data_transforms"] = [
+        {
+            "id": "double-y",
+            "enabled": True,
+            "kind": "derived_column",
+            "target_column": "Y_scaled",
+            "expression": "col('Y') * var('scale')",
+        },
+        {
+            "id": "filter-window",
+            "enabled": True,
+            "kind": "row_filter",
+            "label": "Window",
+            "column": "X",
+            "operator": "between",
+            "lower": 1.0,
+            "upper": 2.0,
+        },
+    ]
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": payload,
+        },
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+    assert open_response.status_code == 200
+    restored_plot = open_response.json()["payload"]["plot"]
+    restored_options = restored_plot["render_options"]
+
+    assert restored_plot["source_sha256"]
+    assert restored_plot["selected_template_id"] == "curve"
+    assert restored_plot["fit_options"] == {
+        "enabled": True,
+        "model_id": "polynomial_2",
+        "custom_function": None,
+    }
+    assert restored_options["reference_guides"][0]["label"] == "Target"
+    assert restored_options["text_annotations"][0]["text"] == "Peak"
+    assert restored_options["shape_annotations"][0]["label"] == "Window"
+    assert restored_options["data_variables"] == [
+        {"id": "scale", "enabled": True, "kind": "scalar", "label": "Scale", "value": 2.0, "expression": None}
+    ]
+    assert restored_options["data_transforms"] == [
+        {
+            "id": "double-y",
+            "enabled": True,
+            "kind": "derived_column",
+            "label": None,
+            "target_column": "Y_scaled",
+            "expression": "col('Y') * var('scale')",
+            "column": None,
+            "operator": "eq",
+            "value": None,
+            "lower": None,
+            "upper": None,
+            "x_column": None,
+            "y_column": None,
+            "z_column": None,
+            "output_mode": "xyz_long",
+            "columns": None,
+            "target_type": None,
+            "ascending": True,
+            "bins": None,
+            "window": None,
+            "method": None,
+            "group_by": None,
+            "value_columns": None,
+            "statistics": None,
+        },
+        {
+            "id": "filter-window",
+            "enabled": True,
+            "kind": "row_filter",
+            "label": "Window",
+            "target_column": None,
+            "expression": None,
+            "column": "X",
+            "operator": "between",
+            "value": None,
+            "lower": 1.0,
+            "upper": 2.0,
+            "x_column": None,
+            "y_column": None,
+            "z_column": None,
+            "output_mode": "xyz_long",
+            "columns": None,
+            "target_type": None,
+            "ascending": True,
+            "bins": None,
+            "window": None,
+            "method": None,
+            "group_by": None,
+            "value_columns": None,
+            "statistics": None,
+        },
+    ]
+
+
 def test_fit_analysis_matches_scatter_fit_equation_label(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
     _curve_csv(source_path)

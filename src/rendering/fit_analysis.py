@@ -28,6 +28,7 @@ SUPPORTED_FIT_MODEL_IDS = (
 class FitOptions:
     enabled: bool = False
     model_id: str = "linear"
+    custom_function: object = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,8 @@ class FitSeriesResult:
     rmse: float
     point_count: int
     derived_rows: tuple[FitDerivedRow, ...]
+    custom_expression: str | None = None
+    custom_parameter_names: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
     @property
@@ -133,7 +136,13 @@ class FitSeriesResult:
             return slope * x_values + intercept
         if self.model_id in {"polynomial_2", "polynomial_3"}:
             return np.polyval(np.asarray(self.coefficients, dtype=float), x_values)
-        return _predict_model(self.model_id, x_values, self.coefficients)
+        return _predict_model(
+            self.model_id,
+            x_values,
+            self.coefficients,
+            expression=self.custom_expression,
+            parameter_names=self.custom_parameter_names,
+        )
 
     @property
     def x_line(self) -> np.ndarray:
@@ -168,14 +177,15 @@ class FitAnalysisResult:
 
 def normalize_fit_options_payload(value: object) -> dict[str, object]:
     if isinstance(value, FitOptions):
-        return {"enabled": value.enabled, "model_id": value.model_id}
+        return {"enabled": value.enabled, "model_id": value.model_id, "custom_function": value.custom_function}
     if not isinstance(value, dict):
         return {"enabled": False, "model_id": "linear"}
     enabled = bool(value.get("enabled", False))
     model_id = str(value.get("model_id", "linear")).strip() or "linear"
     if model_id not in SUPPORTED_FIT_MODEL_IDS:
         model_id = "linear"
-    return {"enabled": enabled, "model_id": model_id}
+    custom_function = value.get("custom_function") if isinstance(value.get("custom_function"), dict) else None
+    return {"enabled": enabled, "model_id": model_id, "custom_function": custom_function}
 
 
 def fit_options_from_payload(value: object) -> FitOptions:
@@ -183,6 +193,7 @@ def fit_options_from_payload(value: object) -> FitOptions:
     return FitOptions(
         enabled=bool(payload.get("enabled", False)),
         model_id=str(payload.get("model_id", "linear")),
+        custom_function=payload.get("custom_function"),
     )
 
 
@@ -319,7 +330,9 @@ def _nonlinear_fit(
     return tuple(float(value) for value in params), predicted, _r_squared(y_all, predicted)
 
 
-def _custom_function_details(custom_function: object) -> tuple[str, tuple[str, ...], tuple[float, ...]]:
+def _custom_function_details(
+    custom_function: object,
+) -> tuple[str, tuple[str, ...], tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
     if not isinstance(custom_function, dict):
         raise ValueError("custom_function fit requires an expression and parameter list.")
     expression = str(custom_function.get("expression") or "").strip()
@@ -330,6 +343,8 @@ def _custom_function_details(custom_function: object) -> tuple[str, tuple[str, .
         raise ValueError("custom_function.parameters must be a non-empty list.")
     names: list[str] = []
     initial: list[float] = []
+    lower_bounds: list[float] = []
+    upper_bounds: list[float] = []
     for index, item in enumerate(raw_parameters):
         if not isinstance(item, dict):
             raise ValueError(f"custom_function.parameters[{index}] must be a mapping.")
@@ -340,7 +355,15 @@ def _custom_function_details(custom_function: object) -> tuple[str, tuple[str, .
             raise ValueError(f"custom_function parameter `{name}` is reserved or duplicated.")
         names.append(name)
         initial.append(float(item.get("initial", 1.0)))
-    return expression, tuple(names), tuple(initial)
+        lower = item.get("lower", -np.inf)
+        upper = item.get("upper", np.inf)
+        lower_value = float(lower) if lower is not None else -np.inf
+        upper_value = float(upper) if upper is not None else np.inf
+        if lower_value > upper_value:
+            raise ValueError(f"custom_function parameter `{name}` lower bound exceeds upper bound.")
+        lower_bounds.append(lower_value)
+        upper_bounds.append(upper_value)
+    return expression, tuple(names), tuple(initial), (tuple(lower_bounds), tuple(upper_bounds))
 
 
 def _custom_fit(
@@ -348,8 +371,8 @@ def _custom_fit(
     y_all: np.ndarray,
     *,
     custom_function: object,
-) -> tuple[tuple[float, ...], np.ndarray, float, str]:
-    expression, parameter_names, initial = _custom_function_details(custom_function)
+) -> tuple[tuple[float, ...], np.ndarray, float, str, tuple[str, ...]]:
+    expression, parameter_names, initial, bounds = _custom_function_details(custom_function)
 
     def function(x_values: np.ndarray, *params: float) -> np.ndarray:
         names = {"x": x_values, **dict(zip(parameter_names, params, strict=True))}
@@ -365,18 +388,37 @@ def _custom_fit(
             raise ValueError(str(exc)) from exc
 
     try:
-        params, _covariance = curve_fit(function, x_all, y_all, p0=initial, maxfev=20000)
+        params, _covariance = curve_fit(function, x_all, y_all, p0=initial, bounds=bounds, maxfev=20000)
     except Exception as exc:
         raise ValueError("custom_function fit failed to converge.") from exc
     predicted = function(x_all, *params)
     if not np.isfinite(predicted).all():
         raise ValueError("custom_function fit produced non-finite predictions.")
-    return tuple(float(value) for value in params), predicted, _r_squared(y_all, predicted), expression
+    return tuple(float(value) for value in params), predicted, _r_squared(y_all, predicted), expression, parameter_names
 
 
-def _predict_model(model_id: str, x_values: np.ndarray, coefficients: tuple[float, ...]) -> np.ndarray:
+def _predict_model(
+    model_id: str,
+    x_values: np.ndarray,
+    coefficients: tuple[float, ...],
+    *,
+    expression: str | None = None,
+    parameter_names: tuple[str, ...] = (),
+) -> np.ndarray:
     if model_id == "custom_function":
-        return np.full_like(x_values, np.nan, dtype=float)
+        if not expression or not parameter_names:
+            raise ValueError("custom_function prediction requires the original expression and parameter names.")
+        names = {"x": x_values, **dict(zip(parameter_names, coefficients, strict=True))}
+        try:
+            return evaluate_expression(
+                expression,
+                frame=pd.DataFrame({"x": x_values}),
+                names=names,
+                expect="numeric",
+                label="custom_function",
+            ).to_numpy(dtype=float)
+        except ExpressionError as exc:
+            raise ValueError(str(exc)) from exc
     return _builtin_model_function(model_id)(x_values, *coefficients)
 
 
@@ -391,6 +433,8 @@ def fit_series(
     if model_id not in SUPPORTED_FIT_MODEL_IDS:
         raise ValueError(f"Unsupported fit model: {model_id}")
     x_all, y_all, x_label, y_label = _finite_points_for_series(series)
+    custom_expression = None
+    custom_parameter_names: tuple[str, ...] = ()
     if model_id == "linear":
         coefficients, predicted, r_squared = _linear_fit(x_all, y_all)
     elif model_id == "polynomial_2":
@@ -398,7 +442,7 @@ def fit_series(
     elif model_id == "polynomial_3":
         coefficients, predicted, r_squared = _polynomial_fit(x_all, y_all, degree=3)
     elif model_id == "custom_function":
-        coefficients, predicted, r_squared, _expression = _custom_fit(
+        coefficients, predicted, r_squared, custom_expression, custom_parameter_names = _custom_fit(
             x_all,
             y_all,
             custom_function=custom_function,
@@ -430,6 +474,8 @@ def fit_series(
         rmse=rmse,
         point_count=int(x_all.size),
         derived_rows=derived_rows,
+        custom_expression=custom_expression,
+        custom_parameter_names=custom_parameter_names,
     )
 
 

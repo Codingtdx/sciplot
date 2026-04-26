@@ -452,9 +452,8 @@ extension PlotSession {
             if !template.editableOptions.contains("extra_y_axis") {
                 resolved.extraYAxis = nil
             } else {
-                let supportsSeriesBinding = Set(["curve", "point_line", "scatter"]).contains(template.id)
                 if var extraYAxis = resolved.extraYAxis {
-                    if !supportsSeriesBinding {
+                    if !supportsExtraYAxisSeriesBinding {
                         extraYAxis.bindingMode = "conversion"
                     }
                     if extraYAxis.bindingMode != "series_assignment" {
@@ -501,13 +500,13 @@ extension PlotSession {
         }
 
         if hasEnabledExtraAxes(in: resolved) {
-            resolved.xAxisBreaks = nil
-            resolved.yAxisBreaks = nil
+            resolved.xAxisBreaks = breaksWithoutEnabledEntries(resolved.xAxisBreaks)
+            resolved.yAxisBreaks = breaksWithoutEnabledEntries(resolved.yAxisBreaks)
         }
         if hasEnabledSplitAxisBreaks(in: resolved.xAxisBreaks) {
-            resolved.yAxisBreaks = nil
+            resolved.yAxisBreaks = breaksWithoutEnabledEntries(resolved.yAxisBreaks)
         } else if hasEnabledSplitAxisBreaks(in: resolved.yAxisBreaks) {
-            resolved.xAxisBreaks = nil
+            resolved.xAxisBreaks = breaksWithoutEnabledEntries(resolved.xAxisBreaks)
         }
 
         return resolved
@@ -544,6 +543,14 @@ extension PlotSession {
             return false
         }
         return breaks.contains { $0.enabled && $0.displayMode == "split" }
+    }
+
+    private func breaksWithoutEnabledEntries(_ breaks: [AxisBreakPayload]?) -> [AxisBreakPayload]? {
+        guard let breaks else {
+            return nil
+        }
+        let disabledBreaks = breaks.filter { !$0.enabled }
+        return disabledBreaks.isEmpty ? nil : disabledBreaks
     }
 
     func suggestedPlotExportFilename(

@@ -320,6 +320,320 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertFalse(session.isProjectDirty)
     }
 
+    func testOpenProjectWithCoreAdvancedStateKeepsTransformAwareInspectAndWorkbookRequests() async throws {
+        let client = MockSidecarClient()
+        let restoredOptions = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "nature",
+            palettePreset: "colorblind_safe",
+            visualThemeID: "clean_light",
+            referenceGuides: [
+                ReferenceGuidePayload(
+                    id: "target-line",
+                    enabled: true,
+                    kind: "line",
+                    axisTarget: "y_primary",
+                    value: 2.5,
+                    label: "Target"
+                )
+            ],
+            textAnnotations: [
+                TextAnnotationPayload(
+                    id: "note-1",
+                    enabled: true,
+                    text: "Peak",
+                    coordinateSpace: "data",
+                    x: 1.5,
+                    y: 2.2,
+                    yAxisTarget: "y_primary",
+                    horizontalAlignment: "right",
+                    verticalAlignment: "bottom",
+                    displayStyle: "callout",
+                    connectorEnabled: true,
+                    targetX: 1.0,
+                    targetY: 2.0,
+                    targetYAxisTarget: "y_primary"
+                )
+            ],
+            shapeAnnotations: [
+                ShapeAnnotationPayload(
+                    id: "focus-window",
+                    enabled: true,
+                    kind: "rectangle",
+                    bracketOrientation: "horizontal",
+                    xStart: 0.5,
+                    xEnd: 1.5,
+                    yStart: 2.0,
+                    yEnd: 3.0,
+                    yAxisTarget: "y_primary",
+                    label: "Window"
+                )
+            ],
+            dataVariables: [
+                DataVariablePayload(
+                    id: "scale",
+                    enabled: true,
+                    kind: "scalar",
+                    label: "Scale",
+                    value: 2.0
+                )
+            ],
+            dataTransforms: [
+                DataTransformPayload(
+                    id: "double-y",
+                    enabled: true,
+                    kind: "derived_column",
+                    targetColumn: "Y_scaled",
+                    expression: "col('Y') * var('scale')"
+                ),
+                DataTransformPayload(
+                    id: "filter-window",
+                    enabled: true,
+                    kind: "row_filter",
+                    label: "Window",
+                    column: "X",
+                    filterOperator: "between",
+                    lower: 1.0,
+                    upper: 2.0
+                )
+            ]
+        )
+        let restoredPayload = TestPayloads.plotProjectPayload(
+            sourcePath: "/tmp/restored/core-advanced.csv",
+            projectName: "Core Advanced",
+            templateID: "curve",
+            sheet: .name("RestoredSheet"),
+            fitOptions: FitOptionsPayload(enabled: true, modelID: "polynomial_2"),
+            renderOptions: restoredOptions
+        )
+        client.openProjectResponse = TestPayloads.openProjectResponse(
+            projectPath: "/tmp/core-advanced.sciplotgod",
+            restoredSourcePath: "/tmp/restored/core-advanced.csv",
+            payload: restoredPayload
+        )
+        client.inspectHandler = { request in
+            InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["RestoredSheet"],
+                inspection: client.inspectResponse.inspection,
+                dataset: client.inspectResponse.dataset
+            )
+        }
+        client.renderHandler = { request in
+            RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [.init(filename: "core_advanced_preview.pdf", pdfBase64: TestPayloads.pdfBase64, qa: nil)],
+                submissionReport: TestPayloads.submissionReport()
+            )
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.openProject(URL(fileURLWithPath: "/tmp/core-advanced.sciplotgod"))
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "core_advanced_preview.pdf" }, timeout: 2.0)
+
+        XCTAssertEqual(client.inspectRequests.last?.inputPath, "/tmp/restored/core-advanced.csv")
+        XCTAssertEqual(client.inspectRequests.last?.sheet, .name("RestoredSheet"))
+        XCTAssertEqual(client.inspectRequests.last?.options?.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(client.inspectRequests.last?.options?.dataTransforms?.last?.filterOperator, "between")
+
+        XCTAssertEqual(client.renderRequests.last?.fitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
+        XCTAssertEqual(client.renderRequests.last?.options.referenceGuides?.first?.label, "Target")
+        XCTAssertEqual(client.renderRequests.last?.options.textAnnotations?.first?.text, "Peak")
+        XCTAssertEqual(client.renderRequests.last?.options.shapeAnnotations?.first?.label, "Window")
+        XCTAssertEqual(client.renderRequests.last?.options.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(client.renderRequests.last?.options.dataTransforms?.first?.targetColumn, "Y_scaled")
+
+        session.showDataWorkbook()
+        session.refreshDataWorkbookIfNeeded()
+        session.selectDataWorkbookTab(.transformed)
+        await waitUntil(
+            { client.sourceTablePreviewRequests.last?.options?.dataTransforms?.first?.targetColumn == "Y_scaled" },
+            timeout: 2.0
+        )
+
+        session.selectDataWorkbookTab(.fit)
+        await waitUntil(
+            {
+                client.fitAnalysisRequests.last?.options?.dataTransforms?.last?.filterOperator == "between" &&
+                    client.fitAnalysisRequests.last?.modelID == "polynomial_2"
+            },
+            timeout: 2.0
+        )
+
+        XCTAssertEqual(session.fitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
+        XCTAssertEqual(session.renderOptions.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(session.renderOptions.dataTransforms?.last?.filterOperator, "between")
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
+    func testOpenProjectWithFunctionCurveAxesAndAnalyticalLayerRestoresPreviewState() async throws {
+        let client = MockSidecarClient()
+        let restoredOptions = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "nature",
+            palettePreset: "colorblind_safe",
+            visualThemeID: "clean_light",
+            extraXAxis: ExtraAxisPayload(
+                enabled: true,
+                position: "top",
+                title: "Gallons",
+                dataValue: 3.78541,
+                displayValue: 1.0
+            ),
+            extraYAxis: ExtraAxisPayload(
+                enabled: true,
+                position: "right",
+                bindingMode: "series_assignment",
+                seriesIDs: ["Model"],
+                title: "Half Stress",
+                dataValue: 2.0,
+                displayValue: 1.0
+            ),
+            analyticalLayers: [
+                AnalyticalLayerPayload(
+                    id: "function-1",
+                    enabled: true,
+                    kind: "function",
+                    expression: "sin(x) + 1",
+                    xStart: 0.0,
+                    xEnd: 3.0,
+                    sampleCount: 120,
+                    yAxisTarget: "y_primary",
+                    label: "Model"
+                )
+            ]
+        )
+        let restoredPayload = TestPayloads.plotProjectPayload(
+            sourcePath: "/tmp/restored/function-advanced.csv",
+            projectName: "Function Advanced",
+            templateID: "function_curve",
+            sheet: .name("RestoredSheet"),
+            fitOptions: FitOptionsPayload(enabled: false, modelID: "linear"),
+            renderOptions: restoredOptions
+        )
+        client.openProjectResponse = TestPayloads.openProjectResponse(
+            projectPath: "/tmp/function-advanced.sciplotgod",
+            restoredSourcePath: "/tmp/restored/function-advanced.csv",
+            payload: restoredPayload
+        )
+        client.inspectHandler = { request in
+            InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["RestoredSheet"],
+                inspection: client.inspectResponse.inspection,
+                dataset: client.inspectResponse.dataset
+            )
+        }
+        client.renderHandler = { request in
+            RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [.init(filename: "function_advanced_preview.pdf", pdfBase64: TestPayloads.pdfBase64, qa: nil)],
+                submissionReport: TestPayloads.submissionReport()
+            )
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.openProject(URL(fileURLWithPath: "/tmp/function-advanced.sciplotgod"))
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "function_advanced_preview.pdf" }, timeout: 2.0)
+
+        XCTAssertEqual(session.selectedTemplateID, "function_curve")
+        XCTAssertEqual(client.renderRequests.last?.options.extraXAxis?.title, "Gallons")
+        XCTAssertEqual(client.renderRequests.last?.options.extraYAxis?.bindingMode, "series_assignment")
+        XCTAssertEqual(client.renderRequests.last?.options.extraYAxis?.seriesIDs, ["Model"])
+        XCTAssertEqual(client.renderRequests.last?.options.analyticalLayers?.first?.expression, "sin(x) + 1")
+        XCTAssertEqual(client.renderRequests.last?.options.analyticalLayers?.first?.sampleCount, 120)
+        XCTAssertEqual(session.renderOptions.extraXAxis?.title, "Gallons")
+        XCTAssertEqual(session.renderOptions.extraYAxis?.seriesIDs, ["Model"])
+        XCTAssertEqual(session.renderOptions.analyticalLayers?.first?.label, "Model")
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
+    func testOpenProjectWithAxisBreaksRestoresPreviewState() async throws {
+        let client = MockSidecarClient()
+        let restoredOptions = RenderOptionsPayload(
+            size: "single_panel",
+            stylePreset: "editorial",
+            palettePreset: "roma",
+            visualThemeID: "roma",
+            xAxisBreaks: [
+                AxisBreakPayload(id: "x-gap", enabled: true, start: 0.8, end: 1.2, displayMode: "split")
+            ],
+            yAxisBreaks: [
+                AxisBreakPayload(id: "y-gap", enabled: false, start: 1.4, end: 2.2, displayMode: "compress")
+            ]
+        )
+        let restoredPayload = TestPayloads.plotProjectPayload(
+            sourcePath: "/tmp/restored/axis-breaks.csv",
+            projectName: "Axis Breaks",
+            templateID: "step_line",
+            sheet: .name("RestoredSheet"),
+            fitOptions: FitOptionsPayload(enabled: false, modelID: "linear"),
+            renderOptions: restoredOptions
+        )
+        client.openProjectResponse = TestPayloads.openProjectResponse(
+            projectPath: "/tmp/axis-breaks.sciplotgod",
+            restoredSourcePath: "/tmp/restored/axis-breaks.csv",
+            payload: restoredPayload
+        )
+        client.inspectHandler = { request in
+            InspectFileResponse(
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["RestoredSheet"],
+                inspection: client.inspectResponse.inspection,
+                dataset: client.inspectResponse.dataset
+            )
+        }
+        client.renderHandler = { request in
+            RenderPreviewResponse(
+                template: request.template,
+                requestedTemplateID: request.template,
+                canonicalID: request.template,
+                role: "plot",
+                lifecyclePolicy: "stable",
+                implementationID: request.template,
+                sheet: request.sheet,
+                previews: [.init(filename: "axis_breaks_preview.pdf", pdfBase64: TestPayloads.pdfBase64, qa: nil)],
+                submissionReport: TestPayloads.submissionReport()
+            )
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.openProject(URL(fileURLWithPath: "/tmp/axis-breaks.sciplotgod"))
+        await waitUntil({ session.previewResponse?.previews.first?.filename == "axis_breaks_preview.pdf" }, timeout: 2.0)
+
+        XCTAssertEqual(session.selectedTemplateID, "step_line")
+        XCTAssertEqual(client.renderRequests.last?.options.xAxisBreaks?.first?.id, "x-gap")
+        XCTAssertEqual(client.renderRequests.last?.options.xAxisBreaks?.first?.displayMode, "split")
+        XCTAssertEqual(client.renderRequests.last?.options.yAxisBreaks?.first?.displayMode, "compress")
+        XCTAssertEqual(session.renderOptions.xAxisBreaks?.first?.id, "x-gap")
+        XCTAssertEqual(session.renderOptions.yAxisBreaks?.first?.displayMode, "compress")
+        XCTAssertFalse(session.isProjectDirty)
+    }
+
     func testDataWorkbookLoadsSourceTableAndFitAnalysis() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
@@ -630,6 +944,31 @@ final class PlotSessionTests: XCTestCase {
             { client.sourceTablePreviewRequests.last?.options?.dataTransforms?.first?.targetColumn == "radius" },
             timeout: 2.0
         )
+    }
+
+    func testDataPipelineSummaryCountsVariablesAndActiveTransforms() async throws {
+        let session = PlotSession()
+
+        XCTAssertFalse(session.dataPipelineSummary.hasPipeline)
+        XCTAssertEqual(session.dataPipelineSummary.title, "No data edits")
+        XCTAssertEqual(session.dataPipelineSummary.detail, "Source data is used directly.")
+
+        session.addDataVariable(kind: "scalar")
+        session.addDataVariable(kind: "expression")
+        session.addDataTransform(kind: "derived_column")
+        session.addDataTransform(kind: "row_filter")
+
+        guard let disabledTransformID = session.renderOptions.dataTransforms?.last?.id else {
+            XCTFail("Expected a data transform to disable.")
+            return
+        }
+        session.updateDataTransform(id: disabledTransformID, policy: .immediate) {
+            $0.enabled = false
+        }
+
+        XCTAssertTrue(session.dataPipelineSummary.hasPipeline)
+        XCTAssertEqual(session.dataPipelineSummary.title, "2 variables, 2 transforms")
+        XCTAssertEqual(session.dataPipelineSummary.detail, "1 active transform, 1 disabled")
     }
 
     func testReferenceGuideSelectionAndNudgeRefreshPreview() async throws {
