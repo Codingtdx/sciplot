@@ -335,6 +335,19 @@ def test_data_studio_template_create_round_trips_comparison_enabled_and_rejects_
     assert "Enable Comparison needs at least one metric column binding" in invalid_compare.text
 
 
+def test_data_studio_template_recommendations_return_empty_matches_for_unknown_source(tmp_path: Path) -> None:
+    unknown_path = tmp_path / "notes.csv"
+    unknown_path.write_text("note,value\nalpha,beta\n", encoding="utf-8")
+
+    response = client.post(
+        "/data-studio/template-recommendations",
+        json={"source_path": str(unknown_path)},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["matches"] == []
+
+
 def test_data_studio_workbook_import_preview_and_export_routes_work_end_to_end(tmp_path: Path) -> None:
     left = _build_workbook(tmp_path, "Left Group")
     right = _build_workbook(tmp_path, "Right Group")

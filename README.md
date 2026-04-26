@@ -147,7 +147,12 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 - Blocking gate (recommended one-command entry):
   - `.venv/bin/python scripts/blocking_gate.py`
-  - Use `--require-manual --manual-check ...` to enforce all three manual smoke checks in the same run. Only pass a `--manual-check` after that desktop flow was actually completed; capture or save-panel failures should be recorded as blocked/pending in `docs/engineering-handoff.md`.
+  - Inner beta strict path:
+    - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all`
+    - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>`
+  - `--manual-check` remains available as a non-strict human assertion path. Under `--require-manual`, checklist flags alone no longer satisfy the inner beta gate; use a complete evidence bundle instead.
+  - Only pass a `--manual-check` after that desktop flow was actually completed; capture or save-panel failures should be recorded as blocked/pending in `docs/engineering-handoff.md`.
+  - The default overlay evidence sample for inner beta should be a richer Plot project that includes transform + fit + overlay state, not a minimal overlay-only case.
 - Clean:
   - `.venv/bin/python scripts/clean_repo.py`
 - Ruff:
@@ -186,6 +191,17 @@ If you are taking over development, use this order:
      - Plot import -> preview -> export
      - Data Studio import -> open in Plot
      - Overlay add/select/drag(or nudge) -> save/reopen consistency
+   - for inner beta sign-off, record those three flows into an evidence bundle and run:
+     - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all`
+     - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>`
+   - the current hard-gated Plot reopen states for inner beta are:
+     - `fit`
+     - `reference/text/shape overlays`
+     - `data variables/transforms`
+     - `extra_x_axis / extra_y_axis`
+     - `x_axis_breaks / y_axis_breaks`
+     - `analytical_layers`
+   - Data Studio inner beta readiness also requires trustworthy heterogeneous import behavior: correct recommendation, correct no-recommendation, and consistent preview/build semantics for real raw fixtures.
    - if you prefer explicit commands, run clean/ruff/mypy/pytest/smoke_check/xcodebuild build/test in order
 5. Confirm you can execute one complete end-to-end flow in each workbench:
    - Plot

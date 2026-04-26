@@ -558,4 +558,510 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertTrue(response.valid)
         XCTAssertEqual(response.submissionReport?.readiness, "ready")
     }
+
+    func testDecodeSaveProjectResponsePreservesPlotSourceSHA256() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/sample.sciplotgod",
+          "payload": {
+            "version": 1,
+            "selected_workbench": "plot",
+            "plot": {
+              "session_kind": "plot",
+              "source_filename": "sample.csv",
+              "source_media_type": "text/csv",
+              "embedded_source_relpath": "sources/plot/primary/sample.csv",
+              "source_sha256": "abc123",
+              "sheet": "Representative_Curve",
+              "selected_template_id": "curve",
+              "render_options": {
+                "size": "60x55",
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+                "visual_theme_id": "clean_light"
+              },
+              "fit_options": {
+                "enabled": false,
+                "model_id": "linear"
+              },
+              "project_display_name": "Sample Project",
+              "source_provenance": {
+                "original_input_path": "/tmp/sample.csv",
+                "saved_input_mtime_ns": 123,
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "data_studio": null,
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(SaveProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.payload.plot?.sourceSHA256, "abc123")
+        XCTAssertEqual(response.payload.plot?.embeddedSourceRelpath, "sources/plot/primary/sample.csv")
+    }
+
+    func testDecodeOpenProjectResponsePreservesEmbeddedWorkbookSHA256() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/data_studio.sciplotgod",
+          "restored_source_path": null,
+          "restored_workbook_paths": ["/tmp/E4_9_1.xlsx"],
+          "payload": {
+            "version": 1,
+            "selected_workbench": "data_studio",
+            "plot": null,
+            "data_studio": {
+              "session_kind": "data_studio",
+              "version": 1,
+              "selected_template_id": "builtin/tensile",
+              "workbook_paths": ["/tmp/E4_9_1.xlsx"],
+              "selected_workbook_id": "workbook-1",
+              "primary_workbook_id": "workbook-1",
+              "selected_recipe_id": "representative_curve",
+              "comparison_recipe_ids": ["representative_curve"],
+              "selected_figure_family_id": "curve",
+              "selected_figure_template_id": "curve",
+              "group_states": [],
+              "specimen_states": [],
+              "figure_preferences": [],
+              "imported_paths": ["/tmp/E4_9_1.csv"],
+              "template_draft_path": null,
+              "embedded_workbooks": [
+                {
+                  "workbook_filename": "E4_9_1.xlsx",
+                  "embedded_workbook_relpath": "sources/data_studio/workbooks/E4_9_1.xlsx",
+                  "workbook_sha256": "def456",
+                  "original_workbook_path": "/tmp/E4_9_1.xlsx",
+                  "saved_workbook_mtime_ns": 456
+                }
+              ],
+              "project_display_name": "E4_9_1",
+              "source_provenance": {
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(OpenProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.payload.dataStudio?.embeddedWorkbooks.first?.workbookSHA256, "def456")
+        XCTAssertEqual(
+            response.payload.dataStudio?.embeddedWorkbooks.first?.embeddedWorkbookRelpath,
+            "sources/data_studio/workbooks/E4_9_1.xlsx"
+        )
+    }
+
+    func testDecodeSaveProjectResponsePreservesCoreAdvancedPlotState() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/core-advanced.sciplotgod",
+          "payload": {
+            "version": 1,
+            "selected_workbench": "plot",
+            "plot": {
+              "session_kind": "plot",
+              "source_filename": "sample.csv",
+              "source_media_type": "text/csv",
+              "embedded_source_relpath": "sources/plot/primary/sample.csv",
+              "source_sha256": "abc123",
+              "sheet": "Representative_Curve",
+              "selected_template_id": "curve",
+              "render_options": {
+                "size": "60x55",
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+                "visual_theme_id": "clean_light",
+                "reference_guides": [
+                  {
+                    "id": "target-line",
+                    "enabled": true,
+                    "kind": "line",
+                    "axis_target": "y_primary",
+                    "value": 2.5,
+                    "label": "Target"
+                  }
+                ],
+                "text_annotations": [
+                  {
+                    "id": "note-1",
+                    "enabled": true,
+                    "text": "Peak",
+                    "coordinate_space": "data",
+                    "x": 1.5,
+                    "y": 2.2,
+                    "y_axis_target": "y_primary",
+                    "horizontal_alignment": "right",
+                    "vertical_alignment": "bottom",
+                    "display_style": "callout",
+                    "connector_enabled": true,
+                    "target_x": 1.0,
+                    "target_y": 2.0,
+                    "target_y_axis_target": "y_primary"
+                  }
+                ],
+                "shape_annotations": [
+                  {
+                    "id": "focus-window",
+                    "enabled": true,
+                    "kind": "rectangle",
+                    "bracket_orientation": "horizontal",
+                    "x_start": 0.5,
+                    "x_end": 1.5,
+                    "y_start": 2.0,
+                    "y_end": 3.0,
+                    "y_axis_target": "y_primary",
+                    "label": "Window"
+                  }
+                ],
+                "data_variables": [
+                  {
+                    "id": "scale",
+                    "enabled": true,
+                    "kind": "scalar",
+                    "label": "Scale",
+                    "value": 2.0
+                  }
+                ],
+                "data_transforms": [
+                  {
+                    "id": "double-y",
+                    "enabled": true,
+                    "kind": "derived_column",
+                    "target_column": "Y_scaled",
+                    "expression": "col('Y') * var('scale')"
+                  },
+                  {
+                    "id": "filter-window",
+                    "enabled": true,
+                    "kind": "row_filter",
+                    "label": "Window",
+                    "column": "X",
+                    "operator": "between",
+                    "lower": 1.0,
+                    "upper": 2.0
+                  }
+                ]
+              },
+              "fit_options": {
+                "enabled": true,
+                "model_id": "polynomial_2"
+              },
+              "project_display_name": "Core Advanced",
+              "source_provenance": {
+                "original_input_path": "/tmp/sample.csv",
+                "saved_input_mtime_ns": 123,
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "data_studio": null,
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(SaveProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.payload.plot?.sourceSHA256, "abc123")
+        XCTAssertEqual(response.payload.plot?.selectedTemplateID, "curve")
+        XCTAssertEqual(response.payload.plot?.fitOptions.modelID, "polynomial_2")
+        XCTAssertEqual(response.payload.plot?.renderOptions.referenceGuides?.first?.label, "Target")
+        XCTAssertEqual(response.payload.plot?.renderOptions.textAnnotations?.first?.text, "Peak")
+        XCTAssertEqual(response.payload.plot?.renderOptions.shapeAnnotations?.first?.label, "Window")
+        XCTAssertEqual(response.payload.plot?.renderOptions.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(response.payload.plot?.renderOptions.dataTransforms?.last?.filterOperator, "between")
+    }
+
+    func testDecodeOpenProjectResponsePreservesCoreAdvancedPlotState() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/core-advanced.sciplotgod",
+          "restored_source_path": "/tmp/restored/sample.csv",
+          "restored_workbook_paths": [],
+          "payload": {
+            "version": 1,
+            "selected_workbench": "plot",
+            "plot": {
+              "session_kind": "plot",
+              "source_filename": "sample.csv",
+              "source_media_type": "text/csv",
+              "embedded_source_relpath": "sources/plot/primary/sample.csv",
+              "source_sha256": "abc123",
+              "sheet": "Representative_Curve",
+              "selected_template_id": "curve",
+              "render_options": {
+                "size": "60x55",
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+                "visual_theme_id": "clean_light",
+                "reference_guides": [
+                  {
+                    "id": "target-line",
+                    "enabled": true,
+                    "kind": "line",
+                    "axis_target": "y_primary",
+                    "value": 2.5,
+                    "label": "Target"
+                  }
+                ],
+                "text_annotations": [
+                  {
+                    "id": "note-1",
+                    "enabled": true,
+                    "text": "Peak",
+                    "coordinate_space": "data",
+                    "x": 1.5,
+                    "y": 2.2,
+                    "y_axis_target": "y_primary",
+                    "horizontal_alignment": "right",
+                    "vertical_alignment": "bottom",
+                    "display_style": "callout",
+                    "connector_enabled": true,
+                    "target_x": 1.0,
+                    "target_y": 2.0,
+                    "target_y_axis_target": "y_primary"
+                  }
+                ],
+                "shape_annotations": [
+                  {
+                    "id": "focus-window",
+                    "enabled": true,
+                    "kind": "rectangle",
+                    "bracket_orientation": "horizontal",
+                    "x_start": 0.5,
+                    "x_end": 1.5,
+                    "y_start": 2.0,
+                    "y_end": 3.0,
+                    "y_axis_target": "y_primary",
+                    "label": "Window"
+                  }
+                ],
+                "data_variables": [
+                  {
+                    "id": "scale",
+                    "enabled": true,
+                    "kind": "scalar",
+                    "label": "Scale",
+                    "value": 2.0
+                  }
+                ],
+                "data_transforms": [
+                  {
+                    "id": "double-y",
+                    "enabled": true,
+                    "kind": "derived_column",
+                    "target_column": "Y_scaled",
+                    "expression": "col('Y') * var('scale')"
+                  },
+                  {
+                    "id": "filter-window",
+                    "enabled": true,
+                    "kind": "row_filter",
+                    "label": "Window",
+                    "column": "X",
+                    "operator": "between",
+                    "lower": 1.0,
+                    "upper": 2.0
+                  }
+                ]
+              },
+              "fit_options": {
+                "enabled": true,
+                "model_id": "polynomial_2"
+              },
+              "project_display_name": "Core Advanced",
+              "source_provenance": {
+                "original_input_path": "/tmp/sample.csv",
+                "saved_input_mtime_ns": 123,
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "data_studio": null,
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(OpenProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.restoredSourcePath, "/tmp/restored/sample.csv")
+        XCTAssertEqual(response.payload.plot?.sourceSHA256, "abc123")
+        XCTAssertEqual(response.payload.plot?.selectedTemplateID, "curve")
+        XCTAssertEqual(response.payload.plot?.fitOptions.modelID, "polynomial_2")
+        XCTAssertEqual(response.payload.plot?.renderOptions.referenceGuides?.first?.label, "Target")
+        XCTAssertEqual(response.payload.plot?.renderOptions.textAnnotations?.first?.text, "Peak")
+        XCTAssertEqual(response.payload.plot?.renderOptions.shapeAnnotations?.first?.label, "Window")
+        XCTAssertEqual(response.payload.plot?.renderOptions.dataVariables?.first?.id, "scale")
+        XCTAssertEqual(response.payload.plot?.renderOptions.dataTransforms?.last?.filterOperator, "between")
+    }
+
+    func testDecodeSaveProjectResponsePreservesFunctionCurveAxesAndAnalyticalLayers() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/function-advanced.sciplotgod",
+          "payload": {
+            "version": 1,
+            "selected_workbench": "plot",
+            "plot": {
+              "session_kind": "plot",
+              "source_filename": "function.csv",
+              "source_media_type": "text/csv",
+              "embedded_source_relpath": "sources/plot/primary/function.csv",
+              "source_sha256": "func123",
+              "sheet": 0,
+              "selected_template_id": "function_curve",
+              "render_options": {
+                "style_preset": "nature",
+                "palette_preset": "colorblind_safe",
+                "visual_theme_id": "clean_light",
+                "extra_x_axis": {
+                  "enabled": true,
+                  "position": "top",
+                  "title": "Gallons",
+                  "data_value": 3.78541,
+                  "display_value": 1.0
+                },
+                "extra_y_axis": {
+                  "enabled": true,
+                  "position": "right",
+                  "binding_mode": "series_assignment",
+                  "series_ids": ["Model"],
+                  "title": "Half Stress",
+                  "data_value": 2.0,
+                  "display_value": 1.0
+                },
+                "analytical_layers": [
+                  {
+                    "id": "function-1",
+                    "enabled": true,
+                    "kind": "function",
+                    "expression": "sin(x) + 1",
+                    "x_start": 0.0,
+                    "x_end": 3.0,
+                    "sample_count": 120,
+                    "y_axis_target": "y_primary",
+                    "label": "Model"
+                  }
+                ]
+              },
+              "fit_options": {
+                "enabled": false,
+                "model_id": "linear"
+              },
+              "project_display_name": "Function Advanced",
+              "source_provenance": {
+                "original_input_path": "/tmp/function.csv",
+                "saved_input_mtime_ns": 123,
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "data_studio": null,
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(SaveProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.payload.plot?.selectedTemplateID, "function_curve")
+        XCTAssertEqual(response.payload.plot?.renderOptions.extraXAxis?.title, "Gallons")
+        XCTAssertEqual(response.payload.plot?.renderOptions.extraYAxis?.bindingMode, "series_assignment")
+        XCTAssertEqual(response.payload.plot?.renderOptions.extraYAxis?.seriesIDs, ["Model"])
+        XCTAssertEqual(response.payload.plot?.renderOptions.analyticalLayers?.first?.expression, "sin(x) + 1")
+        XCTAssertEqual(response.payload.plot?.renderOptions.analyticalLayers?.first?.sampleCount, 120)
+    }
+
+    func testDecodeOpenProjectResponsePreservesAxisBreaks() throws {
+        let payload = """
+        {
+          "project_path": "/tmp/axis-breaks.sciplotgod",
+          "restored_source_path": "/tmp/restored/axis-breaks.csv",
+          "restored_workbook_paths": [],
+          "payload": {
+            "version": 1,
+            "selected_workbench": "plot",
+            "plot": {
+              "session_kind": "plot",
+              "source_filename": "axis-breaks.csv",
+              "source_media_type": "text/csv",
+              "embedded_source_relpath": "sources/plot/primary/axis-breaks.csv",
+              "source_sha256": "axis123",
+              "sheet": 0,
+              "selected_template_id": "step_line",
+              "render_options": {
+                "style_preset": "editorial",
+                "palette_preset": "roma",
+                "visual_theme_id": "roma",
+                "x_axis_breaks": [
+                  {
+                    "id": "x-gap",
+                    "enabled": true,
+                    "start": 0.8,
+                    "end": 1.2,
+                    "display_mode": "split"
+                  }
+                ],
+                "y_axis_breaks": [
+                  {
+                    "id": "y-gap",
+                    "enabled": false,
+                    "start": 1.4,
+                    "end": 2.2,
+                    "display_mode": "compress"
+                  }
+                ]
+              },
+              "fit_options": {
+                "enabled": false,
+                "model_id": "linear"
+              },
+              "project_display_name": "Axis Breaks",
+              "source_provenance": {
+                "original_input_path": "/tmp/axis-breaks.csv",
+                "saved_input_mtime_ns": 123,
+                "saved_at": "2026-04-26T04:30:18.424131+00:00"
+              }
+            },
+            "data_studio": null,
+            "composer": null,
+            "code_console": null,
+            "artifacts": {
+              "manifest_relpath": "artifacts/manifest.json"
+            }
+          }
+        }
+        """
+
+        let response = try decoder.decode(OpenProjectResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.payload.plot?.selectedTemplateID, "step_line")
+        XCTAssertEqual(response.payload.plot?.renderOptions.xAxisBreaks?.first?.id, "x-gap")
+        XCTAssertEqual(response.payload.plot?.renderOptions.xAxisBreaks?.first?.displayMode, "split")
+        XCTAssertEqual(response.payload.plot?.renderOptions.yAxisBreaks?.first?.displayMode, "compress")
+    }
 }

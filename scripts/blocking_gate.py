@@ -5,6 +5,12 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
+
+try:
+    from scripts import manual_smoke_evidence
+except ImportError:
+    import manual_smoke_evidence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ".venv/bin/python"
@@ -90,7 +96,7 @@ MANUAL_CHECKS: tuple[tuple[str, str], ...] = (
 )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run blocking gate automation matrix and track manual smoke checklist coverage."
     )
@@ -107,11 +113,15 @@ def parse_args() -> argparse.Namespace:
         help="Mark one manual smoke check as completed. Repeat for each completed check.",
     )
     parser.add_argument(
+        "--manual-evidence",
+        help="Path to a manual smoke evidence JSON bundle. Passed checks with real evidence files count toward manual coverage.",
+    )
+    parser.add_argument(
         "--skip-manual-checklist",
         action="store_true",
         help="Skip manual checklist output and status handling.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def run_gate_command(item: GateCommand) -> None:
@@ -145,9 +155,10 @@ def report_manual_checklist(*, selected: set[str], require_manual: bool) -> int:
     return 0
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
     selected_manual_checks = set(args.manual_check)
+    strict_manual_checks: set[str] | None = None
     try:
         for item in AUTOMATED_GATE_COMMANDS:
             run_gate_command(item)
@@ -158,7 +169,28 @@ def main() -> int:
     print("[gate] automated matrix passed.")
     if args.skip_manual_checklist:
         return 0
-    return report_manual_checklist(selected=selected_manual_checks, require_manual=args.require_manual)
+    if args.manual_evidence:
+        evidence_checks, evidence_issues = manual_smoke_evidence.completed_checks_from_evidence(Path(args.manual_evidence))
+        if evidence_checks:
+            print("[gate] manual evidence confirms:", ", ".join(sorted(evidence_checks)))
+            selected_manual_checks.update(evidence_checks)
+        if evidence_issues:
+            print("[gate] manual evidence issues:")
+            for issue in evidence_issues:
+                print(f"  - {issue}")
+        if args.require_manual:
+            strict_manual_checks = set(evidence_checks)
+            selected_manual_checks = set(evidence_checks)
+        else:
+            selected_manual_checks.update(evidence_checks)
+    elif args.require_manual:
+        print("[gate] failing because --require-manual now requires --manual-evidence with complete evidence.")
+        strict_manual_checks = set()
+
+    return report_manual_checklist(
+        selected=strict_manual_checks if strict_manual_checks is not None else selected_manual_checks,
+        require_manual=args.require_manual,
+    )
 
 
 if __name__ == "__main__":

@@ -276,8 +276,25 @@
 ## 验证命令
 
 - `.venv/bin/python scripts/blocking_gate.py`
+- `.venv/bin/python scripts/manual_smoke_evidence.py init --output /tmp/sciplot_inner_beta_evidence.json`
+- `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_evidence.json --require-all`
+- `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_evidence.json`
 - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-check plot_import_preview_export --manual-check data_studio_import_open_plot --manual-check overlay_drag_save_reopen`
+- `--require-manual` 现在只接受完整 `--manual-evidence`；`--manual-check` 只保留为非 strict 的人工声明入口，不能单独让 inner beta gate 通过。
 - `--manual-check` 只能在对应真实桌面流实际完成后使用；如果 Computer Use / 屏幕捕获 / 原生保存面板阻塞交互，必须在 `docs/engineering-handoff.md` 记录为 pending 或 blocked，不能为了让 gate 通过而标记完成。
+- inner beta 准入推荐 evidence bundle 路径；只有 evidence 中三条 required checks 都是 `passed` 且证据文件实际存在时，`--manual-evidence` 才应视为通过。
+- `overlay_drag_save_reopen` 的 inner beta 默认样本应使用 richer Plot project（至少带 transform + fit + overlay），不要只用最小 overlay case。
+- 当前 inner beta Plot reopen hard gate 覆盖：
+  - `fit`
+  - `reference_guides`
+  - `text_annotations`
+  - `shape_annotations`
+  - `data_variables`
+  - `data_transforms`
+  - `extra_x_axis / extra_y_axis`
+  - `x_axis_breaks / y_axis_breaks`
+  - `analytical_layers`
+- 当前 inner beta Data Studio intake hardening 至少要求 heterogeneous fixtures 对 `template-recommendations`、`template-preview`、`build-workbook` 保持同一语义，并且 unknown source 必须允许“正确不推荐”。
 - `.venv/bin/python scripts/clean_repo.py`
 - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`

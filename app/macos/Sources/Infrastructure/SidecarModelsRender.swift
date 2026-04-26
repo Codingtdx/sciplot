@@ -33,24 +33,54 @@ struct ExtraAxisPayload: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case enabled
         case position
-        case bindingMode = "binding_mode"
-        case seriesIDs = "series_ids"
+        case bindingMode
+        case bindingModeLegacy = "binding_mode"
+        case seriesIDs = "seriesIds"
+        case seriesIDsLegacy = "series_ids"
         case title
-        case displayUnit = "display_unit"
-        case dataValue = "data_value"
-        case displayValue = "display_value"
+        case displayUnit
+        case displayUnitLegacy = "display_unit"
+        case dataValue
+        case dataValueLegacy = "data_value"
+        case displayValue
+        case displayValueLegacy = "display_value"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
         position = try container.decodeIfPresent(String.self, forKey: .position) ?? "top"
-        bindingMode = try container.decodeIfPresent(String.self, forKey: .bindingMode) ?? "conversion"
-        seriesIDs = try container.decodeIfPresent([String].self, forKey: .seriesIDs) ?? []
+        bindingMode = (
+            try container.decodeIfPresent(String.self, forKey: .bindingMode)
+            ?? container.decodeIfPresent(String.self, forKey: .bindingModeLegacy)
+        ) ?? "conversion"
+        seriesIDs = (
+            try container.decodeIfPresent([String].self, forKey: .seriesIDs)
+            ?? container.decodeIfPresent([String].self, forKey: .seriesIDsLegacy)
+        ) ?? []
         title = try container.decodeIfPresent(String.self, forKey: .title)
         displayUnit = try container.decodeIfPresent(String.self, forKey: .displayUnit)
-        dataValue = try container.decodeIfPresent(Double.self, forKey: .dataValue) ?? 1.0
-        displayValue = try container.decodeIfPresent(Double.self, forKey: .displayValue) ?? 1.0
+            ?? container.decodeIfPresent(String.self, forKey: .displayUnitLegacy)
+        dataValue = (
+            try container.decodeIfPresent(Double.self, forKey: .dataValue)
+            ?? container.decodeIfPresent(Double.self, forKey: .dataValueLegacy)
+        ) ?? 1.0
+        displayValue = (
+            try container.decodeIfPresent(Double.self, forKey: .displayValue)
+            ?? container.decodeIfPresent(Double.self, forKey: .displayValueLegacy)
+        ) ?? 1.0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encode(position, forKey: .position)
+        try container.encode(bindingMode, forKey: .bindingMode)
+        try container.encode(seriesIDs, forKey: .seriesIDs)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(displayUnit, forKey: .displayUnit)
+        try container.encode(dataValue, forKey: .dataValue)
+        try container.encode(displayValue, forKey: .displayValue)
     }
 }
 
@@ -1222,17 +1252,17 @@ struct PlotProjectPayload: Codable, Equatable, Sendable {
     let sourceProvenance: PlotProjectSourceProvenancePayload
 
     enum CodingKeys: String, CodingKey {
-        case sessionKind
-        case sourceFilename
-        case sourceMediaType
-        case embeddedSourceRelpath
-        case sourceSHA256
-        case sheet
-        case selectedTemplateID
-        case renderOptions
-        case fitOptions
-        case projectDisplayName
-        case sourceProvenance
+        case sessionKind = "sessionKind"
+        case sourceFilename = "sourceFilename"
+        case sourceMediaType = "sourceMediaType"
+        case embeddedSourceRelpath = "embeddedSourceRelpath"
+        case sourceSHA256 = "sourceSha256"
+        case sheet = "sheet"
+        case selectedTemplateID = "selectedTemplateId"
+        case renderOptions = "renderOptions"
+        case fitOptions = "fitOptions"
+        case projectDisplayName = "projectDisplayName"
+        case sourceProvenance = "sourceProvenance"
     }
 }
 
@@ -1246,11 +1276,11 @@ struct DataStudioProjectWorkbookPayload: Codable, Equatable, Sendable, Identifia
     var id: String { embeddedWorkbookRelpath }
 
     enum CodingKeys: String, CodingKey {
-        case workbookFilename
-        case embeddedWorkbookRelpath
-        case workbookSHA256
-        case originalWorkbookPath
-        case savedWorkbookMtimeNs
+        case workbookFilename = "workbookFilename"
+        case embeddedWorkbookRelpath = "embeddedWorkbookRelpath"
+        case workbookSHA256 = "workbookSha256"
+        case originalWorkbookPath = "originalWorkbookPath"
+        case savedWorkbookMtimeNs = "savedWorkbookMtimeNs"
     }
 }
 
@@ -1275,24 +1305,24 @@ struct DataStudioProjectPayload: Codable, Equatable, Sendable {
     let sourceProvenance: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
-        case sessionKind
-        case version
-        case selectedTemplateID
-        case workbookPaths
-        case selectedWorkbookID
-        case primaryWorkbookID
-        case selectedRecipeID
-        case comparisonRecipeIDs
-        case selectedFigureFamilyID
-        case selectedFigureTemplateID
-        case groupStates
-        case specimenStates
-        case figurePreferences
-        case importedPaths
-        case templateDraftPath
-        case embeddedWorkbooks
-        case projectDisplayName
-        case sourceProvenance
+        case sessionKind = "sessionKind"
+        case version = "version"
+        case selectedTemplateID = "selectedTemplateId"
+        case workbookPaths = "workbookPaths"
+        case selectedWorkbookID = "selectedWorkbookId"
+        case primaryWorkbookID = "primaryWorkbookId"
+        case selectedRecipeID = "selectedRecipeId"
+        case comparisonRecipeIDs = "comparisonRecipeIds"
+        case selectedFigureFamilyID = "selectedFigureFamilyId"
+        case selectedFigureTemplateID = "selectedFigureTemplateId"
+        case groupStates = "groupStates"
+        case specimenStates = "specimenStates"
+        case figurePreferences = "figurePreferences"
+        case importedPaths = "importedPaths"
+        case templateDraftPath = "templateDraftPath"
+        case embeddedWorkbooks = "embeddedWorkbooks"
+        case projectDisplayName = "projectDisplayName"
+        case sourceProvenance = "sourceProvenance"
     }
 }
 

@@ -149,8 +149,8 @@ extension PlotSession {
                     ?? "Double Y becomes available after inspect finishes."
             )
         }
-        guard supportsFitOverlayControls else {
-            return .disabled("Double Y is only available for curve, point-line, and scatter templates.")
+        guard supportsExtraYAxisSeriesBinding else {
+            return .disabled("Double Y is only available for curve-like templates with series ownership.")
         }
         guard seriesAssignmentCandidateIDs.count > 1 else {
             return .disabled("Double Y becomes available once inspect finds at least two series.")
@@ -199,6 +199,13 @@ extension PlotSession {
             return false
         }
         return Set(["curve", "point_line", "scatter"]).contains(templateID)
+    }
+
+    var supportsExtraYAxisSeriesBinding: Bool {
+        guard let templateID = effectiveTemplateID else {
+            return false
+        }
+        return Set(["curve", "point_line", "scatter", "function_curve"]).contains(templateID)
     }
 
     var fitModelLabel: String {

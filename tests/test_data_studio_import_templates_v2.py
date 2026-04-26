@@ -404,6 +404,61 @@ def test_excel_multi_sheet_template_preview_builds_selected_sheet(
     assert workbook.metrics[0].label == "Peak Force"
 
 
+def test_v2_template_builds_multi_segment_curve_only_workbook_without_explicit_segment_selectors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.data_studio import template_store
+
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", tmp_path / "templates" / "user")
+    template = TemplateDefinition(
+        version=2,
+        id="user/rheology_multi_segment_curve_only",
+        label="Rheology Multi Segment Curve Only",
+        family="table_import",
+        builtin=False,
+        description="Fixture multi-segment import template.",
+        file_types=("csv",),
+        parse_strategy="table_template_v2",
+        field_bindings=(
+            TemplateFieldBinding(id="x", role="curve_x", label="Temperature", column_name="Temperature"),
+            TemplateFieldBinding(id="y1", role="curve_y", label="Storage Modulus", column_name="Storage Modulus"),
+            TemplateFieldBinding(
+                id="y2",
+                role="curve_y",
+                label="Loss Modulus",
+                column_name="Loss Modulus",
+                optional=True,
+            ),
+        ),
+        output_kind="curve_metrics",
+        comparison_enabled=False,
+        source_format=TemplateSourceFormat(encoding="utf-16", delimiter="\t", sheet_name="Sheet1"),
+        segment_policy="series_per_segment",
+        segment_selectors=(),
+    )
+    save_template(template)
+
+    preview = preview_template_apply(RHEOLOGY_ROOT / "S-PA.csv", template)
+    assert preview.errors == ()
+    assert preview.series_count == 4
+    assert len(preview.segments) == 2
+
+    workbook = build_data_studio_workbook(
+        file_paths=[RHEOLOGY_ROOT / "S-PA.csv"],
+        output_path=tmp_path / "multi_segment.xlsx",
+        template_id=template.id,
+        group_name="Multi Segment",
+    )
+
+    assert workbook.preferred_sheet == "All_Curves"
+    curves = load_curve_table(workbook.workbook_path, sheet_name="All_Curves")
+    assert len(curves) == 4
+    assert {curve.sample for curve in curves} == {"S-PA"}
+    assert {curve.x_label for curve in curves} == {"Temperature"}
+    assert {curve.y_label for curve in curves} == {"G'", 'G"'}
+
+
 def test_unknown_source_does_not_default_to_unmatched_user_template(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
