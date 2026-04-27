@@ -96,9 +96,9 @@ struct RootSplitView: View {
         switch model.selectedWorkbench {
         case .plot:
             PlotInspectorView(session: model.plotSession) {
-                EmptyView()
-            } trailingSections: {
                 PlotExportInspectorSection(session: model.plotSession)
+            } trailingSections: {
+                EmptyView()
             }
         case .dataStudio:
             DataStudioInspectorView(session: model.dataStudioSession)

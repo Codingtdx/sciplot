@@ -4657,3 +4657,81 @@ Use this block for every new round:
     - `Computer Use get_app_state("com.apple.finder")`: `cgWindowNotFound`。
     - `Computer Use get_app_state("com.microsoft.edgemac")`: `cgWindowNotFound`。
     - 结论：真实桌面逐台验收 blocked by tool-chain；未做虚假通过标记。
+
+## 2026-04-27 (Round BQ)
+
+- Scope:
+  - 删除已合并分支：
+    - local `codex/plot-data-boundary-hardening`
+    - remote `origin/codex/plot-data-boundary-hardening`
+  - 全局精修 macOS inspector / rail presentation grammar：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - 加强 presentation grammar gate：
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- User-visible impact:
+  - Plot inspector 不再使用 `Form + Section` 默认大标题，空导入状态下右侧不再显示 `No figure controls`。
+  - Plot `Actions` 移到 inspector 顶部，Export disabled 状态改成更轻的 bordered button，不再出现明显蓝色残影。
+  - Plot template rail 的缩略图去掉外层 rounded card 背景，更像 source-list 里的 miniature plot glyph。
+  - Data Studio / Composer / Code Console inspector 主动作也统一为轻量 bordered button，减少 disabled 状态的视觉噪音。
+
+- Risks:
+  - 分支删除已完成；若需要恢复远端分支，可从 `main` 历史里的 merge parent `6ea3406` 重新创建。
+  - Plot advanced overlay 项内部仍有轻量 selected background，用于表达当前选中 overlay；这不是壳层卡片，不应和 template rail / empty state 的卡片化问题混为一谈。
+  - 本轮未改 sidecar contract、业务流程或 inspector 宽度策略；若后续继续精修，需要优先看真实导入后的 inspector dense state，而不是空态截图。
+
+- Rollback points:
+  - GUI typography / inspector grammar:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - Plot rail glyph:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Gate additions:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - 用户截图里的核心问题不是壳层结构，而是 inspector typography 与控件状态仍像临时表单：默认 section 标题过重、disabled prominent button 太抢眼、空态文案在右侧占据不必要层级。
+    - 这轮改共享 grammar，而不是只修 Plot，是为了防止四台继续出现“一个像工具、一个像 demo panel”的视觉割裂。
+  - Rejected alternatives:
+    - 再次重做 `RootSplitView` 壳层：拒绝，因为当前结构已经是 native split + toolbar + inspector，问题集中在局部 presentation grammar。
+    - 保留 disabled prominent button：拒绝，因为空态时蓝色残影会被误读成主视觉动作。
+    - 只用人工视觉判断：拒绝，因此同步加强 `check_macos_gui_presentation.py`，把 Plot inspector / Data Studio inspector / template thumbnail 约束纳入 gate。
+  - Boundaries:
+    - 不改 sidecar contract、不改业务流程、不改 `inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
+    - 不恢复已删除 legacy 分支；`main` 是唯一继续工作线。
+
+- Validation (executed):
+  - Git:
+    - `git branch -vv`: before deletion showed `main` and `codex/plot-data-boundary-hardening`。
+    - `git merge-base --is-ancestor codex/plot-data-boundary-hardening main`: passed。
+    - `git branch -d codex/plot-data-boundary-hardening`: deleted local branch。
+    - `git push origin --delete codex/plot-data-boundary-hardening`: deleted remote branch。
+    - `git fetch --prune && git branch -r`: only `origin/HEAD -> origin/main` and `origin/main` remain。
+  - Source-level:
+    - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed。
+    - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed, 6 tests。
+    - `git diff --check`: passed。
+  - macOS:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed。
+    - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix:
+      - `clean_repo`: passed。
+      - `ruff`: passed。
+      - `mypy`: passed。
+      - `pytest`: passed, 275 tests。
+      - `smoke_check`: passed。
+      - `macos_gui_presentation`: passed。
+      - `xcodebuild build`: passed。
+      - `xcodebuild test`: passed, 188 tests。
+      - manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle。
+  - GUI acceptance:
+    - `Computer Use get_app_state("com.codegod.desktop")`: worked after launching the rebuilt Debug app.
+    - Observed Plot empty-state inspector now shows only `Actions` / disabled `Export` / `Advanced`; `No figure controls` is gone and the disabled Export button is no longer prominent.

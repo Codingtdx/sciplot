@@ -44,7 +44,29 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Plot rail uses compact native rows",
         path="app/macos/Sources/Features/Plot/PlotTemplateView.swift",
         required=("PlotTemplateRow(",),
-        forbidden=("PlotTemplateCard(", "private struct PlotTemplateCard"),
+        forbidden=(
+            "PlotTemplateCard(",
+            "private struct PlotTemplateCard",
+            ".background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10",
+        ),
+    ),
+    SourceCheck(
+        label="Plot inspector uses shared plain sections",
+        path="app/macos/Sources/Features/Plot/PlotInspectorView.swift",
+        required=(
+            'InspectorSection(title: "Actions")',
+            'InspectorSection(title: "Axis")',
+            'InspectorSection(title: "Advanced Plot")',
+        ),
+        forbidden=(
+            "Form {",
+            "Section(styleSectionTitle)",
+            'Section("Actions")',
+            'Section("Axis")',
+            'Section("Advanced Plot")',
+            'InspectorEmptyState(message: "No figure controls")',
+            ".formStyle(",
+        ),
     ),
     SourceCheck(
         label="Plot preview empty state is not a hero card",
@@ -66,6 +88,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift",
         required=('WorkbenchRailTitle(title: "Workbook Groups"',),
         forbidden=('EmptyStateCard(title: "No groups")',),
+    ),
+    SourceCheck(
+        label="Data Studio inspector uses shared plain sections",
+        path="app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift",
+        required=('InspectorSection(title: "Actions")', 'InspectorSection(title: "Figure")'),
+        forbidden=('Section("Figure")', 'Section("Actions")', 'InspectorEmptyState(message: "No figure controls")'),
     ),
     SourceCheck(
         label="Composer asset rail avoids hero imported-panel empty state",
@@ -106,6 +134,13 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=("InspectorSection(",),
         forbidden=(".formStyle(.grouped)",),
     ),
+)
+
+INSPECTOR_FILES = (
+    "app/macos/Sources/Features/Plot/PlotInspectorView.swift",
+    "app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift",
+    "app/macos/Sources/Features/Composer/ComposerInspectorView.swift",
+    "app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift",
 )
 
 WORKBENCH_ROOTS = (
@@ -149,6 +184,17 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
             continue
         if "WorkbenchScaffold(" in source:
             issues.append(f"{relative_path}: workbench root must not use WorkbenchScaffold")
+
+    for relative_path in INSPECTOR_FILES:
+        try:
+            source = _read_source(root, relative_path)
+        except AssertionError as error:
+            issues.append(str(error))
+            continue
+        if "InspectorSection(" not in source:
+            issues.append(f"{relative_path}: inspector must consume shared InspectorSection grammar")
+        if ".buttonStyle(.borderedProminent)" in source:
+            issues.append(f"{relative_path}: inspector primary actions should avoid disabled prominent button ghosts")
 
     return issues
 

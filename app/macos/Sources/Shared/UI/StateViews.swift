@@ -356,14 +356,14 @@ struct InspectorSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 12, content: { content })
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
@@ -372,7 +372,7 @@ struct InspectorEmptyState: View {
 
     var body: some View {
         Text(StatusCopy.short(message) ?? "No content")
-            .font(.footnote)
+            .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -403,6 +403,7 @@ struct AdaptiveInspectorTextRow: View {
 
     private var horizontalLabel: some View {
         Text(title)
+            .font(.callout)
             .foregroundStyle(.secondary)
     }
 
@@ -414,6 +415,7 @@ struct AdaptiveInspectorTextRow: View {
 
     private var horizontalValue: some View {
         Text(value)
+            .font(.callout)
             .foregroundStyle(secondaryValue ? .secondary : .primary)
             .fixedSize(horizontal: true, vertical: false)
             .inspectorSelectable(selectable)
@@ -421,6 +423,7 @@ struct AdaptiveInspectorTextRow: View {
 
     private var stackedValue: some View {
         Text(value)
+            .font(.callout)
             .foregroundStyle(secondaryValue ? .secondary : .primary)
             .fixedSize(horizontal: false, vertical: true)
             .inspectorSelectable(selectable)
@@ -447,6 +450,7 @@ struct AdaptiveInspectorControlRow<Content: View>: View {
                 }
             } label: {
                 Text(title)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -474,6 +478,7 @@ struct InspectorActionStack<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             content
         }
+        .controlSize(.small)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

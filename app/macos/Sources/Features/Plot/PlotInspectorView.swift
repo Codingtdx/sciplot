@@ -22,27 +22,31 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     }
 
     var body: some View {
-        Form {
-            leadingSections
-            plotOptionsSection
-            if session.showsAdvancedPlotSection {
-                advancedPlotSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                leadingSections
+                plotOptionsSection
+                if session.showsAdvancedPlotSection {
+                    advancedPlotSection
+                }
+                if shouldShowAxesSection {
+                    axesSection
+                }
+                if session.shouldShowSeriesLegendControls {
+                    seriesSection
+                }
+                trailingSections
             }
-            if shouldShowAxesSection {
-                axesSection
-            }
-            if session.shouldShowSeriesLegendControls {
-                seriesSection
-            }
-            trailingSections
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .formStyle(.columns)
         .inspectorSurface()
     }
 
+    @ViewBuilder
     private var plotOptionsSection: some View {
-        Section(styleSectionTitle) {
-            if let template = session.selectedTemplateSummary {
+        if let template = session.selectedTemplateSummary {
+            InspectorSection(title: styleSectionTitle) {
                 if session.editableOptionIDs.contains("size") && session.allowedSizes.count > 1 {
                     AdaptiveInspectorControlRow(title: "Canvas") {
                         Picker("", selection: sizeBinding(defaultSize: template.defaultSize)) {
@@ -138,14 +142,12 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                         }
                     }
                 }
-            } else {
-                InspectorEmptyState(message: "No figure controls")
             }
         }
     }
 
     private var axesSection: some View {
-        Section("Axis") {
+        InspectorSection(title: "Axis") {
             if session.editableOptionIDs.contains("xscale") {
                 AdaptiveInspectorControlRow(title: "X scale") {
                     Picker("", selection: stringBinding(
@@ -298,7 +300,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     }
 
     private var advancedPlotSection: some View {
-        Section("Advanced Plot") {
+        InspectorSection(title: "Advanced Plot") {
             if session.supportsFitOverlayControls {
                 AdaptiveInspectorControlRow(title: "Fit Overlay") {
                     Toggle("", isOn: fitEnabledBinding)
@@ -552,7 +554,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     }
 
     private var seriesSection: some View {
-        Section("Legend") {
+        InspectorSection(title: "Legend") {
             if session.seriesOrderLabels.isEmpty {
                 InspectorEmptyState(message: "No legend entries")
             } else {
@@ -1537,12 +1539,12 @@ struct PlotExportInspectorSection: View {
     @Bindable var session: PlotSession
 
     var body: some View {
-        Section("Actions") {
+        InspectorSection(title: "Actions") {
             InspectorActionStack {
                 Button("Export") {
                     Task { await session.exportCurrentSelection() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(!session.exportAvailability.isEnabled)
                 .help(
                     session.exportAvailability.reason

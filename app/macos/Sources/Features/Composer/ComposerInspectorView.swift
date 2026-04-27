@@ -66,7 +66,7 @@ struct ComposerInspectorView: View {
                     Button("Merge Selected Cells") {
                         session.mergeSelectedCells()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .disabled(!presentation.mergeSelectedCellsAvailability.isEnabled)
                     .help(
                         presentation.mergeSelectedCellsAvailability.reason
@@ -79,7 +79,7 @@ struct ComposerInspectorView: View {
                     Button("Unmerge Region") {
                         session.unmergeSelectedRegion()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .disabled(!presentation.unmergeSelectedRegionAvailability.isEnabled)
                     .help(
                         presentation.unmergeSelectedRegionAvailability.reason
@@ -107,7 +107,7 @@ struct ComposerInspectorView: View {
                     Button(session.placementActionTitle) {
                         session.placeFocusedPanelInSelectedTarget()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .disabled(!presentation.placementAvailability.isEnabled)
                     .help(
                         presentation.placementAvailability.reason
@@ -195,7 +195,7 @@ struct ComposerInspectorView: View {
                 Button("Export") {
                     Task { await session.exportComposition() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(!session.exportAvailability.isEnabled)
                 .help(
                     session.exportAvailability.reason

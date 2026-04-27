@@ -29,10 +29,20 @@ struct RootSplitView {
 }
 """,
         "app/macos/Sources/Features/Plot/PlotTemplateView.swift": "PlotTemplateRow()\n",
+        "app/macos/Sources/Features/Plot/PlotInspectorView.swift": """
+ScrollView {
+    InspectorSection(title: "Actions") { Button("Export") {}.buttonStyle(.bordered) }
+    InspectorSection(title: "Axis") {}
+    InspectorSection(title: "Advanced Plot") {}
+}
+""",
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": "SubtleStageHint(title: \"Preview\")\n",
         "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": "PlotTemplateView()\n",
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"
+        ),
+        "app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift": (
+            "InspectorSection(title: \"Actions\")\nInspectorSection(title: \"Figure\")\n"
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
             "WorkbenchRailTitle(title: \"Workbook Groups\")\n"
@@ -42,7 +52,7 @@ struct RootSplitView {
             "RoundedRectangle(cornerRadius: 22)\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerInspectorView.swift": (
-            "ComposerInspectorPreviewContent()\n"
+            "InspectorSection(title: \"Preview\") { ComposerInspectorPreviewContent() }\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift": "ComposerCanvasView()\n",
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (

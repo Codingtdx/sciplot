@@ -173,11 +173,6 @@ struct PlotTemplateThumbnailView: View {
                 drawScatter(in: plotRect, context: &context, palette: palette)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.13), lineWidth: 1)
-        )
         .aspectRatio(aspectRatio, contentMode: .fit)
     }
 
@@ -194,14 +189,8 @@ struct PlotTemplateThumbnailView: View {
         context: inout GraphicsContext,
         palette: ThumbnailPalette
     ) {
-        context.fill(
-            Path(roundedRect: frame, cornerRadius: 8, style: .continuous),
-            with: .linearGradient(
-                Gradient(colors: [palette.panelTop, palette.panelBottom]),
-                startPoint: CGPoint(x: frame.midX, y: frame.minY),
-                endPoint: CGPoint(x: frame.midX, y: frame.maxY)
-            )
-        )
+        let path = Path(roundedRect: frame, cornerRadius: 5, style: .continuous)
+        context.fill(path, with: .color(palette.panelTop.opacity(0.22)))
     }
 
     private func drawGrid(in rect: CGRect, context: inout GraphicsContext, color: Color) {

@@ -38,11 +38,10 @@ struct DataStudioInspectorView: View {
         .inspectorSurface()
     }
 
+    @ViewBuilder
     private var figureSection: some View {
-        Section("Figure") {
-            if session.figureFamilies.isEmpty {
-                InspectorEmptyState(message: "No figure controls")
-            } else {
+        if !session.figureFamilies.isEmpty {
+            InspectorSection(title: "Figure") {
                 if !session.availableFigureTemplates.isEmpty {
                     AdaptiveInspectorControlRow(title: "Template") {
                         Picker("", selection: figureTemplateBinding) {
@@ -81,12 +80,12 @@ struct DataStudioInspectorView: View {
     }
 
     private var actionsSection: some View {
-        Section("Actions") {
+        InspectorSection(title: "Actions") {
             InspectorActionStack {
                 Button("Open in Plot") {
                     session.openCurrentFigureInPlot()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(!session.canOpenCurrentFigureInPlot)
                 .help(
                     session.canOpenCurrentFigureInPlot

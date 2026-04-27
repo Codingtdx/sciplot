@@ -26,7 +26,7 @@ struct CodeConsoleContextView: View {
                 Button("Export") {
                     session.exportCurrentOutputs()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(!session.exportAvailability.isEnabled)
                 .help(
                     session.exportAvailability.reason
