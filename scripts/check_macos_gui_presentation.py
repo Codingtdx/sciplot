@@ -55,8 +55,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/Features/Plot/PlotInspectorView.swift",
         required=(
             'InspectorSection(title: "Actions")',
+            "PlotInspectorModePicker(",
+            "PlotDataPipelineInspectorView(",
+            "PlotInspectorLayerListView(",
+            "PlotSelectedLayerEditorView(",
             'InspectorSection(title: "Axis")',
-            'InspectorSection(title: "Advanced Plot")',
+            'InspectorSection(title: "Fit Overlay")',
         ),
         forbidden=(
             "Form {",
@@ -64,8 +68,55 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'Section("Actions")',
             'Section("Axis")',
             'Section("Advanced Plot")',
+            'InspectorSection(title: "Advanced Plot")',
             'InspectorEmptyState(message: "No figure controls")',
             ".formStyle(",
+        ),
+    ),
+    SourceCheck(
+        label="Plot data inspector uses pipeline list and selected editor",
+        path="app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift",
+        required=(
+            "PlotDataPipelineSelection",
+            "pipelineList",
+            "selectedEditor",
+            "pipelineRow(",
+        ),
+        forbidden=(
+            'DisclosureGroup("Data")',
+            "ForEach(session.dataTransforms) { transform in\n                VStack",
+            "ForEach(session.dataVariables) { variable in\n                VStack",
+        ),
+    ),
+    SourceCheck(
+        label="Plot layer inspector uses selected object grammar",
+        path="app/macos/Sources/Features/Plot/PlotInspectorLayerListView.swift",
+        required=(
+            "PlotLayerSelection",
+            "layerRow(",
+            "session.selectedReferenceGuideID = id",
+            "session.selectedTextAnnotationID = id",
+            "session.selectedShapeAnnotationID = id",
+        ),
+        forbidden=(
+            'DisclosureGroup("Text Annotations")',
+            'DisclosureGroup("Reference Guides")',
+            'DisclosureGroup("Shape Annotations")',
+        ),
+    ),
+    SourceCheck(
+        label="Plot selected layer editor keeps one active editor",
+        path="app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift",
+        required=(
+            "PlotSelectedLayerEditorView",
+            "PlotArrangeInspectorView",
+            "selection: PlotLayerSelection?",
+        ),
+        forbidden=(
+            "ForEach(session.textAnnotations)",
+            "ForEach(session.referenceGuides)",
+            "ForEach(session.shapeAnnotations)",
+            "ForEach(session.analyticalLayers)",
         ),
     ),
     SourceCheck(

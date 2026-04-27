@@ -32,9 +32,38 @@ struct RootSplitView {
         "app/macos/Sources/Features/Plot/PlotInspectorView.swift": """
 ScrollView {
     InspectorSection(title: "Actions") { Button("Export") {}.buttonStyle(.bordered) }
+    PlotInspectorModePicker()
+    PlotDataPipelineInspectorView()
+    PlotInspectorLayerListView()
+    PlotSelectedLayerEditorView()
     InspectorSection(title: "Axis") {}
-    InspectorSection(title: "Advanced Plot") {}
+    InspectorSection(title: "Fit Overlay") {}
 }
+""",
+        "app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift": """
+struct PlotDataPipelineInspectorView {
+    let selection: PlotDataPipelineSelection? = nil
+    var pipelineList: String { "" }
+    var selectedEditor: String { "" }
+    func pipelineRow() {}
+}
+""",
+        "app/macos/Sources/Features/Plot/PlotInspectorLayerListView.swift": """
+struct PlotInspectorLayerListView {
+    let selection: PlotLayerSelection? = nil
+    func layerRow() {}
+    func select(id: String) {
+        session.selectedReferenceGuideID = id
+        session.selectedTextAnnotationID = id
+        session.selectedShapeAnnotationID = id
+    }
+}
+""",
+        "app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift": """
+struct PlotSelectedLayerEditorView {
+    let selection: PlotLayerSelection?
+}
+struct PlotArrangeInspectorView {}
 """,
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": "SubtleStageHint(title: \"Preview\")\n",
         "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": "PlotTemplateView()\n",

@@ -16,7 +16,8 @@ struct DataStudioInspectorView: View {
             PlotInspectorView(
                 session: session.plotSession,
                 styleSectionTitle: "Style",
-                plotOptionsAdvancedExpanded: plotOptionsAdvancedExpanded
+                plotOptionsAdvancedExpanded: plotOptionsAdvancedExpanded,
+                showsPlotInspectorModes: false
             ) {
                 figureSection
             } trailingSections: {

@@ -4735,3 +4735,91 @@ Use this block for every new round:
   - GUI acceptance:
     - `Computer Use get_app_state("com.codegod.desktop")`: worked after launching the rebuilt Debug app.
     - Observed Plot empty-state inspector now shows only `Actions` / disabled `Export` / `Advanced`; `No figure controls` is gone and the disabled Export button is no longer prominent.
+
+## 2026-04-27 (Round BR)
+
+- Scope:
+  - Pixelmator-style Plot inspector interaction refactor only; no sidecar contract, render payload, project schema, or inspector width changes.
+  - Reworked Plot inspector from one long advanced form into mode-based presentation:
+    - `Figure`
+    - `Data`
+    - `Layers`
+    - `Arrange`
+  - Added app-only presentation types and subviews:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorLayerListView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift`
+  - Slimmed legacy Plot advanced inspector files into wrappers so old full-list editors no longer define the primary interaction:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataTransformInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotFunctionLayerInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`
+  - Strengthened source-level GUI gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- User-visible impact:
+  - Plot inspector now starts with `Actions`, then a compact mode picker.
+  - `Figure` mode holds canvas/style/palette/theme, fit overlay, axis, and legend controls.
+  - `Data` mode shows a pipeline summary, add buttons, a variable/transform list, and one selected editor instead of expanding every variable and transform.
+  - `Layers` mode shows editable plot objects as a single list: fit overlay, function layers, reference guides, text annotations, shape annotations, and legend entries.
+  - `Arrange` mode only shows nudge/drag controls for the selected movable overlay.
+  - Text annotations, guides, functions, shapes, and transforms no longer appear as repeated full editor blocks in one vertical scroll.
+
+- Risks:
+  - Selection state for data pipeline and non-overlay layer rows is macOS presentation-only and not persisted, by design.
+  - Existing reference/text/shape overlay selection fields are still the real session selection for on-canvas operations.
+  - Data Studio embeds `PlotInspectorView` for figure styling, so it explicitly disables the Plot mode picker to avoid changing Data Studio IA in this round.
+  - Manual desktop GUI acceptance was attempted but blocked by Computer Use window capture instability; do not treat this as a manual smoke pass.
+
+- Rollback points:
+  - Mode shell:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+  - Data mode:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift`
+  - Layer/Arrange mode:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorLayerListView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift`
+  - Gate additions:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - The imported Plot inspector had become a feature dump: transforms, annotations, guides, functions, axis breaks, and fit controls all competed in one scroll.
+    - Pixelmator-style interaction solves this by separating task mode, object list, and selected object editor. That maps better to scientific plot editing because the user edits one current object at a time.
+  - Rejected alternatives:
+    - Keep tuning fonts/spacing in the old advanced form: rejected because it does not solve interaction complexity.
+    - Add another nested disclosure layer inside `Advanced Plot`: rejected because it preserves the form-dump mental model.
+    - Persist inspector mode/selection into `.sciplotgod`: rejected because this is view presentation state, not project truth.
+  - Boundaries:
+    - No sidecar routes changed.
+    - No `render_options` payload fields changed.
+    - No Python rendering semantics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed):
+  - Source-level:
+    - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+    - `git diff --check`: passed.
+    - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed, 6 tests.
+  - macOS:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed after fixing one SwiftUI `ShapeStyle` conditional.
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 188 tests.
+  - Full gate:
+    - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix:
+      - `clean_repo`: passed.
+      - `ruff`: passed.
+      - `mypy`: passed.
+      - `pytest`: passed, 275 tests.
+      - `smoke_check`: passed.
+      - `macos_gui_presentation`: passed.
+      - `xcodebuild build`: passed.
+      - `xcodebuild test`: passed, 188 tests.
+      - manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - GUI acceptance:
+    - `Computer Use list_apps`: worked and showed `SciPlot God — com.codegod.desktop` running.
+    - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
+    - `Computer Use get_app_state("com.apple.finder")`: timed out after 120s.
+    - Conclusion: real desktop acceptance is tool-chain blocked in this run; no manual smoke pass was claimed.

@@ -3,19 +3,25 @@ import SwiftUI
 struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     @Bindable var session: PlotSession
     private let styleSectionTitle: String
+    private let showsPlotInspectorModes: Bool
     private let leadingSections: LeadingSections
     private let trailingSections: TrailingSections
+    @State private var selectedMode: PlotInspectorMode = .figure
+    @State private var selectedDataPipelineItem: PlotDataPipelineSelection?
+    @State private var selectedPlotLayer: PlotLayerSelection?
     @State private var isPlotOptionsAdvancedExpanded: Bool
 
     init(
         session: PlotSession,
         styleSectionTitle: String = "Plot Options",
         plotOptionsAdvancedExpanded: Bool = false,
+        showsPlotInspectorModes: Bool = true,
         @ViewBuilder leadingSections: () -> LeadingSections = { EmptyView() },
         @ViewBuilder trailingSections: () -> TrailingSections = { EmptyView() }
     ) {
         self.session = session
         self.styleSectionTitle = styleSectionTitle
+        self.showsPlotInspectorModes = showsPlotInspectorModes
         self.leadingSections = leadingSections()
         self.trailingSections = trailingSections()
         _isPlotOptionsAdvancedExpanded = State(initialValue: plotOptionsAdvancedExpanded)
@@ -25,15 +31,20 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 leadingSections
-                plotOptionsSection
-                if session.showsAdvancedPlotSection {
-                    advancedPlotSection
-                }
-                if shouldShowAxesSection {
-                    axesSection
-                }
-                if session.shouldShowSeriesLegendControls {
-                    seriesSection
+                if showsPlotInspectorModes {
+                    PlotInspectorModePicker(selection: $selectedMode)
+                    plotModeContent
+                } else {
+                    plotOptionsSection
+                    if session.supportsFitOverlayControls {
+                        fitOverlaySection
+                    }
+                    if shouldShowAxesSection {
+                        axesSection
+                    }
+                    if session.shouldShowSeriesLegendControls {
+                        seriesSection
+                    }
                 }
                 trailingSections
             }
@@ -41,6 +52,58 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             .padding(.vertical, 14)
         }
         .inspectorSurface()
+    }
+
+    @ViewBuilder
+    private var plotModeContent: some View {
+        switch selectedMode {
+        case .figure:
+            plotOptionsSection
+            if session.supportsFitOverlayControls {
+                fitOverlaySection
+            }
+            if shouldShowAxesSection {
+                axesSection
+            }
+            if session.shouldShowSeriesLegendControls {
+                seriesSection
+            }
+        case .data:
+            PlotDataPipelineInspectorView(
+                session: session,
+                selection: $selectedDataPipelineItem
+            )
+        case .layers:
+            PlotInspectorLayerListView(
+                session: session,
+                selection: $selectedPlotLayer
+            )
+            PlotSelectedLayerEditorView(
+                session: session,
+                selection: effectiveSelectedPlotLayer
+            )
+        case .arrange:
+            PlotArrangeInspectorView(
+                session: session,
+                selection: effectiveSelectedPlotLayer
+            )
+        }
+    }
+
+    private var effectiveSelectedPlotLayer: PlotLayerSelection? {
+        if let selectedPlotLayer {
+            return selectedPlotLayer
+        }
+        if let id = session.selectedReferenceGuideID {
+            return .referenceGuide(id)
+        }
+        if let id = session.selectedTextAnnotationID {
+            return .textAnnotation(id)
+        }
+        if let id = session.selectedShapeAnnotationID {
+            return .shapeAnnotation(id)
+        }
+        return nil
     }
 
     @ViewBuilder
@@ -299,257 +362,32 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         }
     }
 
-    private var advancedPlotSection: some View {
-        InspectorSection(title: "Advanced Plot") {
-            if session.supportsFitOverlayControls {
-                AdaptiveInspectorControlRow(title: "Fit Overlay") {
-                    Toggle("", isOn: fitEnabledBinding)
-                        .labelsHidden()
-                        .disabled(!session.fitOverlayAvailability.isEnabled)
-                        .help(session.fitOverlayAvailability.reason ?? "Overlay the current figure with the selected fit model.")
-                }
-
-                AdaptiveInspectorControlRow(title: "Model") {
-                    Picker("", selection: fitModelBinding) {
-                        Text("Linear").tag("linear")
-                        Text("Polynomial 2").tag("polynomial_2")
-                        Text("Polynomial 3").tag("polynomial_3")
-                        Text("Exponential").tag("exponential")
-                        Text("Logarithmic").tag("logarithmic")
-                        Text("Power Law").tag("power_law")
-                        Text("Gaussian").tag("gaussian")
-                        Text("Logistic").tag("logistic")
-                        Text("Custom").tag("custom_function")
-                    }
+    private var fitOverlaySection: some View {
+        InspectorSection(title: "Fit Overlay") {
+            AdaptiveInspectorControlRow(title: "Visible") {
+                Toggle("", isOn: fitEnabledBinding)
                     .labelsHidden()
-                    .pickerStyle(.menu)
-                    .disabled(!session.fitAnalysisAvailability.isEnabled)
-                    .help(session.fitAnalysisAvailability.reason ?? "Choose the shared fit model for overlay and analysis.")
-                }
+                    .disabled(!session.fitOverlayAvailability.isEnabled)
+                    .help(session.fitOverlayAvailability.reason ?? "Show the selected fit model on the figure.")
             }
 
-            PlotFunctionLayerInspectorView(session: session)
-
-            PlotDataTransformInspectorView(session: session)
-
-            DisclosureGroup("Reference Guides") {
-                HStack(spacing: 10) {
-                    Button("Add Line") {
-                        session.addReferenceGuide(kind: "line")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Add Region") {
-                        session.addReferenceGuide(kind: "band")
-                    }
-                    .buttonStyle(.bordered)
+            AdaptiveInspectorControlRow(title: "Model") {
+                Picker("", selection: fitModelBinding) {
+                    Text("Linear").tag("linear")
+                    Text("Polynomial 2").tag("polynomial_2")
+                    Text("Polynomial 3").tag("polynomial_3")
+                    Text("Exponential").tag("exponential")
+                    Text("Logarithmic").tag("logarithmic")
+                    Text("Power Law").tag("power_law")
+                    Text("Gaussian").tag("gaussian")
+                    Text("Logistic").tag("logistic")
+                    Text("Custom").tag("custom_function")
                 }
-                .disabled(!session.referenceGuideAvailability.isEnabled)
-                .help(session.referenceGuideAvailability.reason ?? "Overlay reusable guide commands on the current figure.")
-
-                ForEach(session.referenceGuides) { guide in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
-                            Text(referenceGuideTitle(guide))
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-
-                            Spacer(minLength: 12)
-
-                            Button(isReferenceGuideSelected(guide.id) ? "Selected" : "Select") {
-                                session.selectReferenceGuide(id: guide.id)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Remove") {
-                                session.removeReferenceGuide(id: guide.id)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Visible") {
-                            Toggle("", isOn: referenceGuideEnabledBinding(id: guide.id))
-                                .labelsHidden()
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Kind") {
-                            Picker("", selection: referenceGuideKindBinding(id: guide.id)) {
-                                Text("Line").tag("line")
-                                Text("Region").tag("band")
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Axis") {
-                            Picker("", selection: referenceGuideAxisTargetBinding(id: guide.id)) {
-                                referenceGuideAxisOptions(currentValue: guide.axisTarget)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-
-                        if guide.kind == "line" {
-                            AdaptiveInspectorControlRow(title: "Value") {
-                                TextField("Value", text: referenceGuideValueBinding(id: guide.id))
-                                    .textFieldStyle(.roundedBorder)
-                            }
-                        } else {
-                            axisRangeRow(
-                                title: "Region",
-                                lowerTitle: "Start",
-                                upperTitle: "End",
-                                lowerBinding: referenceGuideStartBinding(id: guide.id),
-                                upperBinding: referenceGuideEndBinding(id: guide.id)
-                            )
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Label") {
-                            TextField("Optional", text: referenceGuideLabelBinding(id: guide.id))
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        if isReferenceGuideSelected(guide.id) {
-                            referenceGuideTransformControls(for: guide)
-                        }
-                    }
-                    .padding(10)
-                    .background(isReferenceGuideSelected(guide.id) ? Color.accentColor.opacity(0.08) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .padding(.top, 6)
-                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .disabled(!session.fitAnalysisAvailability.isEnabled)
+                .help(session.fitAnalysisAvailability.reason ?? "Choose the shared fit model.")
             }
-
-            DisclosureGroup("Text Annotations") {
-                HStack(spacing: 10) {
-                    Button("Add Note") {
-                        session.addTextAnnotation()
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Add Callout") {
-                        session.addTextAnnotation(displayStyle: "callout", connectorEnabled: true)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .disabled(!session.textAnnotationAvailability.isEnabled)
-                .help(session.textAnnotationAvailability.reason ?? "Overlay labels and callouts on the current figure.")
-
-                ForEach(session.textAnnotations) { annotation in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
-                            Text(annotationTitle(annotation))
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-
-                            Spacer(minLength: 12)
-
-                            Button(isTextAnnotationSelected(annotation.id) ? "Selected" : "Select") {
-                                session.selectTextAnnotation(id: annotation.id)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Remove") {
-                                session.removeTextAnnotation(id: annotation.id)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Visible") {
-                            Toggle("", isOn: textAnnotationEnabledBinding(id: annotation.id))
-                                .labelsHidden()
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Text") {
-                            TextField("Annotation", text: textAnnotationTextBinding(id: annotation.id))
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Style") {
-                            Picker("", selection: textAnnotationDisplayStyleBinding(id: annotation.id)) {
-                                Text("Plain").tag("plain")
-                                Text("Callout").tag("callout")
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Space") {
-                            Picker("", selection: textAnnotationCoordinateSpaceBinding(id: annotation.id)) {
-                                Text("Frame").tag("axes_fraction")
-                                Text("Data").tag("data")
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                        }
-
-                        if annotation.coordinateSpace == "data" {
-                            AdaptiveInspectorControlRow(title: "Y Axis") {
-                                Picker("", selection: textAnnotationYAxisTargetBinding(id: annotation.id)) {
-                                    annotationYAxisOptions(currentValue: annotation.yAxisTarget)
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                            }
-                        }
-
-                        annotationPositionRow(for: annotation.id)
-
-                        AdaptiveInspectorControlRow(title: "Align X") {
-                            Picker("", selection: textAnnotationHorizontalAlignmentBinding(id: annotation.id)) {
-                                Text("Left").tag("left")
-                                Text("Center").tag("center")
-                                Text("Right").tag("right")
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Align Y") {
-                            Picker("", selection: textAnnotationVerticalAlignmentBinding(id: annotation.id)) {
-                                Text("Top").tag("top")
-                                Text("Center").tag("center")
-                                Text("Bottom").tag("bottom")
-                            }
-                                .labelsHidden()
-                                .pickerStyle(.segmented)
-                        }
-
-                        AdaptiveInspectorControlRow(title: "Connector") {
-                            Toggle("", isOn: textAnnotationConnectorEnabledBinding(id: annotation.id))
-                                .labelsHidden()
-                        }
-
-                        if annotation.connectorEnabled {
-                            AdaptiveInspectorControlRow(title: "Target Y") {
-                                Picker("", selection: textAnnotationTargetYAxisTargetBinding(id: annotation.id)) {
-                                    annotationYAxisOptions(currentValue: annotation.targetYAxisTarget)
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                            }
-
-                            axisRangeRow(
-                                title: "Target",
-                                lowerTitle: "X",
-                                upperTitle: "Y",
-                                lowerBinding: textAnnotationTargetXBinding(id: annotation.id),
-                                upperBinding: textAnnotationTargetYBinding(id: annotation.id)
-                            )
-                        }
-
-                        if isTextAnnotationSelected(annotation.id) {
-                            textAnnotationTransformControls(for: annotation)
-                        }
-                    }
-                    .padding(10)
-                    .background(isTextAnnotationSelected(annotation.id) ? Color.accentColor.opacity(0.08) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .padding(.top, 6)
-                }
-            }
-
-            PlotShapeAnnotationInspectorView(session: session)
         }
     }
 
