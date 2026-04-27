@@ -131,18 +131,18 @@ struct Base64PDFPreviewView: View {
 
     var body: some View {
         let fingerprint = PreviewImageDecoder.fingerprint(forBase64: base64PDF)
-        let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let previewShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         if let data = PreviewImageDecoder.decodeBase64Data(base64PDF),
            PreviewImageDecoder.looksLikePDFData(data)
         {
             PDFPreviewView(data: data, fingerprint: fingerprint)
                 .clipShape(previewShape)
-                .background(.black.opacity(0.02), in: previewShape)
+                .overlay(
+                    previewShape
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                )
         } else {
-            EmptyStateCard(
-                title: "Preview unavailable",
-                message: "Preview data is invalid. Re-run preview or choose another source."
-            )
+            SubtleStageHint(title: "Preview unavailable", systemImage: "exclamationmark.triangle")
         }
     }
 }

@@ -300,10 +300,16 @@ private struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var workspaceBody: some View {
         if session.orderedGroups.isEmpty {
-            EmptyStateCard(title: "No workbook groups")
+            SubtleStageHint(
+                title: "Import source files to build workbook groups",
+                systemImage: "tray.and.arrow.down"
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if session.includedGroups.isEmpty {
-            EmptyStateCard(title: "No groups in compare")
+            SubtleStageHint(
+                title: "Include a workbook group to compare",
+                systemImage: "checklist"
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             if let warning = session.previewWarning {

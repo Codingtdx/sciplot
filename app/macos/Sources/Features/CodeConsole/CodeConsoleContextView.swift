@@ -4,13 +4,16 @@ struct CodeConsoleContextView: View {
     @Bindable var session: CodeConsoleSession
 
     var body: some View {
-        Form {
-            actionsSection
-            bindingSection
-            runnerSection
-            outputHandoffSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                actionsSection
+                bindingSection
+                runnerSection
+                outputHandoffSection
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .formStyle(.grouped)
         .inspectorSurface()
     }
 
@@ -18,7 +21,7 @@ struct CodeConsoleContextView: View {
     private var actionsSection: some View {
         let presentation = session.outputsPresentation
 
-        Section("Actions") {
+        InspectorSection(title: "Actions") {
             InspectorActionStack {
                 Button("Export") {
                     session.exportCurrentOutputs()
@@ -58,7 +61,7 @@ struct CodeConsoleContextView: View {
 
     @ViewBuilder
     private var bindingSection: some View {
-        Section("Binding") {
+        InspectorSection(title: "Binding") {
             if let binding = session.selectedBinding {
                 AdaptiveInspectorTextRow(
                     title: "Source",
@@ -88,7 +91,7 @@ struct CodeConsoleContextView: View {
 
     @ViewBuilder
     private var runnerSection: some View {
-        Section("Runner") {
+        InspectorSection(title: "Runner") {
             AdaptiveInspectorTextRow(title: "Prompt", value: session.promptText.isEmpty ? "Not ready" : "Ready")
             AdaptiveInspectorTextRow(title: "Editor", value: session.editorText.isEmpty ? "Empty" : "Loaded")
             AdaptiveInspectorTextRow(title: "Runner", value: session.isRunning ? "Running" : "Idle")
@@ -97,7 +100,7 @@ struct CodeConsoleContextView: View {
 
     @ViewBuilder
     private var outputHandoffSection: some View {
-        Section("Outputs & Handoff") {
+        InspectorSection(title: "Outputs & Handoff") {
             if let run = session.latestRunResponse {
                 AdaptiveInspectorTextRow(title: "Run status", value: run.status.capitalized)
                 AdaptiveInspectorTextRow(title: "Generated files", value: "\(run.generatedFiles.count)")

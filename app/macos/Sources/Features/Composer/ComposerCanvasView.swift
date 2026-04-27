@@ -169,36 +169,18 @@ private struct ComposerCanvasBoard: View {
     let metrics: ComposerCanvasMetrics
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 28)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(nsColor: .controlBackgroundColor),
-                            Color(nsColor: .windowBackgroundColor),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28)
-                        .strokeBorder(.quaternary, lineWidth: 1)
-                )
-
-            RoundedRectangle(cornerRadius: 24)
-                .fill(.white)
-                .frame(
-                    width: metrics.frameRect.width,
-                    height: metrics.frameRect.height
-                )
-                .position(metrics.frameRect.center)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.03), radius: 8, y: 4)
-        }
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(Color(nsColor: .textBackgroundColor))
+            .frame(
+                width: metrics.frameRect.width,
+                height: metrics.frameRect.height
+            )
+            .position(metrics.frameRect.center)
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.025), radius: 5, y: 2)
     }
 }
 

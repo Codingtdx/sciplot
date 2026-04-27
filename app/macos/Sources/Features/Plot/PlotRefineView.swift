@@ -7,7 +7,7 @@ struct PlotRefineView: View {
         ZStack(alignment: .topTrailing) {
             previewSurface
 
-            if session.isPreviewing {
+            if session.isPreviewing, session.previewResponse?.previews.first != nil {
                 updatingBadge
                     .padding(16)
             }
@@ -28,14 +28,23 @@ struct PlotRefineView: View {
                     previewShape
                         .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1, antialiased: true)
                 )
-        } else if session.isInspecting || session.isPreviewing {
-            BusyStateCard(
-                title: session.isInspecting ? "Inspecting Source" : "Rendering Preview"
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            EmptyStateCard(title: "No Preview")
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color.clear
+                .overlay(alignment: .center) {
+                    if session.isInspecting || session.isPreviewing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(10)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                }
+                .overlay(alignment: .bottomLeading) {
+                    SubtleStageHint(
+                        title: "Import data to start a figure",
+                        systemImage: "tray.and.arrow.down"
+                    )
+                    .padding(.horizontal, 2)
+                }
         }
     }
 

@@ -36,7 +36,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             }
             trailingSections
         }
-        .formStyle(.grouped)
+        .formStyle(.columns)
         .inspectorSurface()
     }
 

@@ -99,13 +99,25 @@ struct QuickLookThumbnailView: View {
                     .scaledToFit()
                     .padding(8)
             } else if let errorMessage = model.errorMessage {
-                EmptyStateCard(title: "Thumbnail unavailable", message: errorMessage)
+                SubtleStageHint(
+                    title: errorMessage.isEmpty ? "Thumbnail unavailable" : errorMessage,
+                    systemImage: "exclamationmark.triangle"
+                )
             } else {
                 BusyStateCard(title: "Loading thumbnail", message: "Quick Look is generating a preview.")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.quinary.opacity(0.2), in: RoundedRectangle(cornerRadius: 16))
+        .background(alignment: .center) {
+            if model.image != nil {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.quinary.opacity(0.16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                    )
+            }
+        }
         .task(id: url) {
             guard loadsOnAppear else {
                 return

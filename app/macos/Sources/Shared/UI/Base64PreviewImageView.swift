@@ -6,7 +6,7 @@ struct Base64PreviewImageView: View {
 
     var body: some View {
         if let image = PreviewImageDecoder.decodeBase64PNG(base64PNG) {
-            let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+            let previewShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
             GeometryReader { geometry in
                 Image(nsImage: image)
                     .resizable()
@@ -18,12 +18,12 @@ struct Base64PreviewImageView: View {
                     )
             }
             .clipShape(previewShape)
-            .background(.black.opacity(0.02), in: previewShape)
-        } else {
-            EmptyStateCard(
-                title: "Preview unavailable",
-                message: "Preview data is invalid. Re-run preview or choose another source."
+            .overlay(
+                previewShape
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
             )
+        } else {
+            SubtleStageHint(title: "Preview unavailable", systemImage: "exclamationmark.triangle")
         }
     }
 }

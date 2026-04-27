@@ -8,7 +8,10 @@ struct ComposerAssetBrowserView: View {
             WorkbenchRailTitle(title: "Library", trailing: "\(session.orderedPanels.count)")
 
             if session.orderedPanels.isEmpty {
-                EmptyStateCard(title: "No imported panels")
+                SubtleStageHint(
+                    title: "Import panels to start a layout",
+                    systemImage: "tray.and.arrow.down"
+                )
             } else {
                 List(selection: panelSelectionBinding) {
                     ForEach(session.orderedPanels) { panel in
@@ -52,6 +55,7 @@ struct ComposerAssetBrowserView: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: false))
                 .scrollContentBackground(.hidden)
+                .listRowSeparator(.hidden)
             }
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)

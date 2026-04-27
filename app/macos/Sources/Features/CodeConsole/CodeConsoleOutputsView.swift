@@ -27,11 +27,15 @@ struct CodeConsoleOutputsView: View {
                 logsSection(title: "Stdout", text: run.stdout)
                 logsSection(title: "Stderr", text: run.stderr)
             } else {
-                EmptyStateCard(title: "No run output")
+                SubtleStageHint(
+                    title: "Run code to inspect outputs",
+                    systemImage: "play.circle",
+                    alignment: .center
+                )
+                .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func summaryGrid(run: CodeConsoleRunResponse) -> some View {
@@ -73,13 +77,8 @@ struct CodeConsoleOutputsView: View {
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(
-                            (session.selectedGeneratedFile?.path == item.path
-                                ? AnyShapeStyle(Color.accentColor.opacity(0.12))
-                                : AnyShapeStyle(Color.clear)),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        )
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -119,7 +118,8 @@ struct CodeConsoleOutputsView: View {
             {
                 previewContent(for: selectedGeneratedFile, url: selectedGeneratedFileURL)
             } else {
-                EmptyStateCard(title: "No preview selected")
+                SubtleStageHint(title: "Select an output to preview", alignment: .center)
+                    .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
             }
         }
     }
@@ -130,15 +130,16 @@ struct CodeConsoleOutputsView: View {
         url: URL
     ) -> some View {
         if !FileManager.default.fileExists(atPath: url.path) {
-            EmptyStateCard(
-                title: "Preview unavailable",
-                message: "Selected file is missing. Re-run or choose another output."
-            )
+            SubtleStageHint(title: "Selected output is missing", systemImage: "exclamationmark.triangle")
+                .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
         } else if file.fileType.caseInsensitiveCompare("pdf") == .orderedSame {
-            let previewShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+            let previewShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
             PDFPreviewView(url: url)
                 .clipShape(previewShape)
-                .background(.quinary.opacity(0.2), in: previewShape)
+                .overlay(
+                    previewShape
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                )
         } else {
             QuickLookThumbnailView(
                 url: url,

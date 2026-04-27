@@ -86,3 +86,9 @@ def test_require_manual_rejects_explicit_manual_checks_without_evidence(monkeypa
     )
 
     assert exit_code == 2
+
+
+def test_automated_gate_includes_macos_gui_presentation_check() -> None:
+    labels = [item.label for item in blocking_gate.AUTOMATED_GATE_COMMANDS]
+
+    assert "macos_gui_presentation" in labels

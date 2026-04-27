@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 try:
     from scripts import manual_smoke_evidence
@@ -40,6 +40,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
             "src/rendering",
             "tests",
             "scripts/smoke_check.py",
+            "scripts/check_macos_gui_presentation.py",
         ),
     ),
     GateCommand(
@@ -57,6 +58,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
     ),
     GateCommand("pytest", (PYTHON, "-m", "pytest", "tests")),
     GateCommand("smoke_check", (PYTHON, "scripts/smoke_check.py")),
+    GateCommand("macos_gui_presentation", (PYTHON, "scripts/check_macos_gui_presentation.py")),
     GateCommand(
         "xcodebuild build",
         (
@@ -66,7 +68,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
             "-scheme",
             "SciPlotGodMac",
             "-destination",
-            "platform=macOS",
+            "platform=macOS,arch=arm64",
             "-derivedDataPath",
             "app/macos/.derivedData",
             "build",
@@ -81,7 +83,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
             "-scheme",
             "SciPlotGodMac",
             "-destination",
-            "platform=macOS",
+            "platform=macOS,arch=arm64",
             "-derivedDataPath",
             "app/macos/.derivedData",
             "test",
@@ -114,7 +116,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--manual-evidence",
-        help="Path to a manual smoke evidence JSON bundle. Passed checks with real evidence files count toward manual coverage.",
+        help=(
+            "Path to a manual smoke evidence JSON bundle. "
+            "Passed checks with real evidence files count toward manual coverage."
+        ),
     )
     parser.add_argument(
         "--skip-manual-checklist",
@@ -170,7 +175,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.skip_manual_checklist:
         return 0
     if args.manual_evidence:
-        evidence_checks, evidence_issues = manual_smoke_evidence.completed_checks_from_evidence(Path(args.manual_evidence))
+        evidence_checks, evidence_issues = manual_smoke_evidence.completed_checks_from_evidence(
+            Path(args.manual_evidence)
+        )
         if evidence_checks:
             print("[gate] manual evidence confirms:", ", ".join(sorted(evidence_checks)))
             selected_manual_checks.update(evidence_checks)

@@ -34,27 +34,23 @@ struct PlotTemplateView: View {
             WorkbenchRailTitle(title: "Templates", trailing: "\(session.templateGalleryItems.count)")
 
             if session.templateGalleryItems.isEmpty {
-                EmptyStateCard(title: "No templates")
+                SubtleStageHint(
+                    title: "Import data to choose a template",
+                    systemImage: "tray.and.arrow.down"
+                )
             } else {
-                List {
+                List(selection: selectedTemplateBinding) {
                     ForEach(session.templateGalleryItems) { item in
-                        Button {
-                            guard item.selectable else {
-                                return
-                            }
-                            session.chooseTemplate(item.id)
-                        } label: {
-                            PlotTemplateCard(
-                                title: item.title,
-                                kind: item.thumbnailKind,
-                                aspectRatio: item.aspectRatio,
-                                selected: session.selectedTemplateID == item.id,
-                                enabled: item.selectable
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        PlotTemplateRow(
+                            title: item.title,
+                            kind: item.thumbnailKind,
+                            aspectRatio: item.aspectRatio,
+                            enabled: item.selectable
+                        )
+                        .tag(Optional(item.id))
                         .disabled(!item.availability.isEnabled)
                         .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
+                        .listRowSeparator(.hidden)
                     }
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: false))
@@ -63,7 +59,45 @@ struct PlotTemplateView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var selectedTemplateBinding: Binding<String?> {
+        Binding(
+            get: { session.selectedTemplateID },
+            set: { newValue in
+                guard let newValue,
+                      session.templateGalleryItems.contains(where: { $0.id == newValue && $0.selectable })
+                else {
+                    return
+                }
+                session.chooseTemplate(newValue)
+            }
+        )
+    }
+}
+
+private struct PlotTemplateRow: View {
+    let title: String
+    let kind: PlotTemplateThumbnailKind
+    let aspectRatio: CGFloat
+    let enabled: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            PlotTemplateThumbnailView(kind: kind, aspectRatio: aspectRatio)
+                .frame(width: 34, height: 26)
+                .opacity(enabled ? 1.0 : 0.55)
+
+            Text(title)
+                .font(.body.weight(.medium))
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .opacity(enabled ? 1.0 : 0.6)
     }
 }
 
@@ -701,45 +735,5 @@ private extension CGRect {
             width: width - insets.leading - insets.trailing,
             height: height - insets.top - insets.bottom
         )
-    }
-}
-
-private struct PlotTemplateCard: View {
-    let title: String
-    let kind: PlotTemplateThumbnailKind
-    let aspectRatio: CGFloat
-    let selected: Bool
-    let enabled: Bool
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            PlotTemplateThumbnailView(kind: kind, aspectRatio: aspectRatio)
-                .frame(width: 54, height: 42)
-
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer(minLength: 4)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(
-                    selected ? Color.accentColor : Color.secondary.opacity(enabled ? 0.2 : 0.08),
-                    lineWidth: selected ? 1.6 : 1
-                )
-        )
-        .opacity(enabled ? 1 : 0.78)
-        .animation(MotionTokens.selection, value: selected)
-        .animation(MotionTokens.selection, value: enabled)
-    }
-
-    private var cardBackground: some ShapeStyle {
-        selected ? AnyShapeStyle(Color.accentColor.opacity(0.10)) : AnyShapeStyle(Color.clear)
     }
 }

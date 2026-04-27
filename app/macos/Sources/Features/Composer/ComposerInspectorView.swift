@@ -4,19 +4,22 @@ struct ComposerInspectorView: View {
     @Bindable var session: ComposerSession
 
     var body: some View {
-        Form {
-            selectionSection
-            editSection
-            exportActionsSection
-            previewSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                selectionSection
+                editSection
+                exportActionsSection
+                previewSection
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .formStyle(.grouped)
         .inspectorSurface()
     }
 
     @ViewBuilder
     private var selectionSection: some View {
-        Section("Selection") {
+        InspectorSection(title: "Selection") {
             if let region = session.selectedFreeRegion {
                 AdaptiveInspectorTextRow(title: "Target", value: session.regionSummary(region))
                 AdaptiveInspectorTextRow(title: "Span", value: "\(region.colSpan)x\(region.rowSpan)")
@@ -48,13 +51,12 @@ struct ComposerInspectorView: View {
                     AdaptiveInspectorTextRow(title: "Label", value: session.resolvedLabel(for: panel))
                 }
             }
-
         }
     }
 
     @ViewBuilder
     private var editSection: some View {
-        Section("Edit") {
+        InspectorSection(title: "Edit") {
             let presentation = session.editPresentation
 
             if let selection = session.selectedCellSelection, selection.cellCount > 1 {
@@ -188,7 +190,7 @@ struct ComposerInspectorView: View {
 
     @ViewBuilder
     private var exportActionsSection: some View {
-        Section("Actions") {
+        InspectorSection(title: "Actions") {
             InspectorActionStack {
                 Button("Export") {
                     Task { await session.exportComposition() }
@@ -228,16 +230,8 @@ struct ComposerInspectorView: View {
 
     @ViewBuilder
     private var previewSection: some View {
-        Section("Preview") {
-            if session.isPreviewing {
-                BusyStateCard(title: "Rendering preview")
-                .frame(height: 180)
-            } else if let preview = session.previewResponse {
-                Base64PreviewImageView(base64PNG: preview.pngBase64)
-                    .frame(height: 200)
-            } else {
-                InspectorEmptyState(message: "No preview")
-            }
+        InspectorSection(title: "Preview") {
+            ComposerInspectorPreviewContent(session: session)
 
             if session.isExporting {
                 ProgressView()
@@ -256,5 +250,24 @@ struct ComposerInspectorView: View {
             row: selection.origin.row + selection.rowSpan - 1
         )
         return "\(session.cellDisplayLabel(selection.origin))-\(session.cellDisplayLabel(trailingCell))"
+    }
+}
+
+private struct ComposerInspectorPreviewContent: View {
+    @Bindable var session: ComposerSession
+
+    var body: some View {
+        Group {
+            if session.isPreviewing {
+                BusyStateCard(title: "Rendering preview")
+                    .frame(height: 180)
+            } else if let preview = session.previewResponse {
+                Base64PreviewImageView(base64PNG: preview.pngBase64)
+                    .frame(height: 200)
+            } else {
+                SubtleStageHint(title: "Select or place a panel to preview", alignment: .leading)
+                    .frame(height: 96)
+            }
+        }
     }
 }

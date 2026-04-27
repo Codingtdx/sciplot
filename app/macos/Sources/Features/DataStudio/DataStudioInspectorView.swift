@@ -28,12 +28,13 @@ struct DataStudioInspectorView: View {
     }
 
     private var compactEmptyInspector: some View {
-        Form {
-            Section("Actions") {
+        ScrollView {
+            InspectorSection(title: "Actions") {
                 InspectorEmptyState(message: "No workbook groups")
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .formStyle(.grouped)
         .inspectorSurface()
     }
 

@@ -100,7 +100,6 @@ struct InspectorSurfaceModifier: ViewModifier {
         content
             .scrollContentBackground(.hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -138,6 +137,27 @@ struct WorkbenchRailTitle: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+struct SubtleStageHint: View {
+    let title: String
+    var systemImage: String? = nil
+    var alignment: Alignment = .bottomLeading
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+            }
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+        .padding(.vertical, 14)
     }
 }
 

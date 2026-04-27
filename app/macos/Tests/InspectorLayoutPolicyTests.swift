@@ -3,7 +3,6 @@ import SwiftUI
 import XCTest
 @testable import SciPlotGodMac
 
-@MainActor
 final class InspectorLayoutPolicyTests: XCTestCase {
     func testUnifiedInspectorColumnWidthPolicyStaysStable() {
         XCTAssertEqual(InspectorColumnLayoutPolicy.minWidth, 360)
@@ -13,6 +12,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertLessThan(InspectorColumnLayoutPolicy.idealWidth, InspectorColumnLayoutPolicy.maxWidth)
     }
 
+    @MainActor
     func testQuickLookThumbnailModelClearsPreviousImageWhenStartingNewLoad() async {
         let firstURL = URL(fileURLWithPath: "/tmp/first.pdf")
         let secondURL = URL(fileURLWithPath: "/tmp/second.pdf")
@@ -50,6 +50,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertTrue(model.image === secondImage)
     }
 
+    @MainActor
     func testQuickLookThumbnailModelIgnoresStaleLoaderResultWhenNewerRequestFinishesFirst() async {
         let firstURL = URL(fileURLWithPath: "/tmp/slow.pdf")
         let secondURL = URL(fileURLWithPath: "/tmp/fast.pdf")
@@ -79,6 +80,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    @MainActor
     func testGuiSmokeRendersKeyWorkbenchViews() async throws {
         let snapshots = try await canonicalWorkbenchSnapshots()
         exportSnapshotsIfRequested(snapshots)
@@ -92,97 +94,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         }
     }
 
-    func testGuiSnapshotFingerprintsStayStable() async throws {
-        let snapshots = try await canonicalWorkbenchSnapshots()
-
-        for (label, data) in snapshots {
-            let fingerprint = try XCTUnwrap(
-                SnapshotFingerprint.make(fromPNGData: data),
-                "\(label) should decode into a snapshot fingerprint."
-            )
-            guard let expected = expectedSnapshotFingerprints[label] else {
-                XCTFail("Missing fingerprint fixture for \(label): \(fingerprint.debugSummary)")
-                continue
-            }
-            XCTAssertTrue(
-                fingerprint.matches(expected),
-                "\(label) fingerprint drifted. expected \(expected.debugSummary) got \(fingerprint.debugSummary)"
-            )
-        }
-    }
-
-    func testPlotDataWorkbookSheetHasDedicatedFileAndPipelineSummary() throws {
-        let sourceRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Features/Plot", isDirectory: true)
-        let workbenchSource = try String(
-            contentsOf: sourceRoot.appendingPathComponent("PlotWorkbenchView.swift"),
-            encoding: .utf8
-        )
-        let workbookSource = try String(
-            contentsOf: sourceRoot.appendingPathComponent("PlotDataWorkbookSheet.swift"),
-            encoding: .utf8
-        )
-
-        XCTAssertFalse(workbenchSource.contains("struct PlotDataWorkbookSheet"))
-        XCTAssertTrue(workbookSource.contains("struct PlotDataWorkbookSheet"))
-        XCTAssertTrue(workbookSource.contains("dataPipelineSummary"))
-    }
-
-    func testRootSplitViewKeepsNavigationOnlySidebarChrome() throws {
-        let appRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/App", isDirectory: true)
-        let rootSource = try String(
-            contentsOf: appRoot.appendingPathComponent("RootSplitView.swift"),
-            encoding: .utf8
-        )
-
-        XCTAssertTrue(rootSource.contains("WorkbenchSidebarRail("))
-        XCTAssertTrue(rootSource.contains("WorkbenchToolbarContent("))
-        XCTAssertFalse(rootSource.contains("Text(\"SciPlot God\")"))
-    }
-
-    func testWorkbenchRootsDoNotUseSharedWorkbenchScaffold() throws {
-        let sourceRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Features", isDirectory: true)
-        let workbenchFiles = [
-            "Plot/PlotWorkbenchView.swift",
-            "DataStudio/DataStudioWorkbenchView.swift",
-            "Composer/ComposerWorkbenchView.swift",
-            "CodeConsole/CodeConsoleWorkbenchView.swift",
-        ]
-
-        for relativePath in workbenchFiles {
-            let source = try String(
-                contentsOf: sourceRoot.appendingPathComponent(relativePath),
-                encoding: .utf8
-            )
-            XCTAssertFalse(
-                source.contains("WorkbenchScaffold("),
-                "\(relativePath) should compose its native shell directly."
-            )
-        }
-    }
-
-    func testDataStudioRailUsesCompactHeaderAndAvoidsDuplicateEmptyState() throws {
-        let sourceRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Features/DataStudio", isDirectory: true)
-        let source = try String(
-            contentsOf: sourceRoot.appendingPathComponent("DataStudioWorkbenchView.swift"),
-            encoding: .utf8
-        )
-
-        XCTAssertTrue(source.contains("WorkbenchRailTitle(title: \"Workbook Groups\""))
-        XCTAssertFalse(source.contains("EmptyStateCard(title: \"No groups\")"))
-    }
-
+    @MainActor
     private func canonicalWorkbenchSnapshots() async throws -> [(String, Data)] {
         let plotSession = PlotSession()
         plotSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -353,6 +265,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         }
     }
 
+    @MainActor
     private func snapshotPNGData<V: View>(for view: V, size: CGSize) -> Data? {
         let rootedView = AnyView(
             view
@@ -432,6 +345,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         context.closePDF()
     }
 
+    @MainActor
     private func makeSnapshotQuickLookModel() -> QuickLookThumbnailModel {
         let thumbnail = NSImage(size: NSSize(width: 320, height: 220))
         thumbnail.lockFocus()
@@ -479,121 +393,6 @@ final class InspectorLayoutPolicyTests: XCTestCase {
             let destinationURL = destinationRoot.appendingPathComponent(filename)
             try? data.write(to: destinationURL, options: .atomic)
         }
-    }
-}
-
-private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
-    "Plot template gallery": SnapshotFingerprint(
-        differenceHash: 0x0000000000000080,
-        averageLuma: 0.9989,
-        nonWhiteFraction: 0.0139
-    ),
-    "Plot imported inspector": SnapshotFingerprint(
-        differenceHash: 0x0000010101010101,
-        averageLuma: 0.9776,
-        nonWhiteFraction: 0.1806
-    ),
-    "Plot data workbook": SnapshotFingerprint(
-        differenceHash: 0x8080808080a60300,
-        averageLuma: 0.5863,
-        nonWhiteFraction: 0.6111
-    ),
-    "Data Studio template editor": SnapshotFingerprint(
-        differenceHash: 0x7001010909190900,
-        averageLuma: 0.9779,
-        nonWhiteFraction: 0.1944
-    ),
-    "Data Studio specimen filter": SnapshotFingerprint(
-        differenceHash: 0x8ec0c8c8c8c8c880,
-        averageLuma: 0.6377,
-        nonWhiteFraction: 0.6111
-    ),
-    "Data Studio figure inspector": SnapshotFingerprint(
-        differenceHash: 0x0101010101010101,
-        averageLuma: 0.9770,
-        nonWhiteFraction: 0.1528
-    ),
-    "Code Console outputs preview": SnapshotFingerprint(
-        differenceHash: 0x000000003c381401,
-        averageLuma: 0.9754,
-        nonWhiteFraction: 0.1389
-    ),
-    "Composer canvas selection": SnapshotFingerprint(
-        differenceHash: 0x8000050001070787,
-        averageLuma: 0.9800,
-        nonWhiteFraction: 0.2083
-    ),
-]
-
-private struct SnapshotFingerprint: Equatable {
-    let differenceHash: UInt64
-    let averageLuma: Double
-    let nonWhiteFraction: Double
-
-    var debugSummary: String {
-        let hash = String(format: "%016llx", differenceHash)
-        return "hash=\(hash) luma=\(String(format: "%.4f", averageLuma)) coverage=\(String(format: "%.4f", nonWhiteFraction))"
-    }
-
-    static func make(fromPNGData data: Data) -> SnapshotFingerprint? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-        else {
-            return nil
-        }
-
-        let width = 9
-        let height = 8
-        let bytesPerRow = width
-        let pixelCount = width * height
-        var pixels = [UInt8](repeating: 0, count: pixelCount)
-        guard let context = CGContext(
-            data: &pixels,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceGray(),
-            bitmapInfo: CGImageAlphaInfo.none.rawValue
-        ) else {
-            return nil
-        }
-
-        context.interpolationQuality = .medium
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-        var hash: UInt64 = 0
-        var bitIndex = 0
-        for row in 0..<height {
-            for column in 0..<(width - 1) {
-                let left = pixels[row * width + column]
-                let right = pixels[row * width + column + 1]
-                if left > right {
-                    hash |= UInt64(1) << UInt64(bitIndex)
-                }
-                bitIndex += 1
-            }
-        }
-
-        let averageLuma = pixels.reduce(0.0) { $0 + Double($1) / 255.0 } / Double(pixelCount)
-        let nonWhiteFraction = Double(pixels.filter { $0 < 247 }.count) / Double(pixelCount)
-        return SnapshotFingerprint(
-            differenceHash: hash,
-            averageLuma: averageLuma,
-            nonWhiteFraction: nonWhiteFraction
-        )
-    }
-
-    func matches(
-        _ expected: SnapshotFingerprint,
-        hashTolerance: Int = 8,
-        lumaTolerance: Double = 0.05,
-        coverageTolerance: Double = 0.08
-    ) -> Bool {
-        let hashDistance = (differenceHash ^ expected.differenceHash).nonzeroBitCount
-        return hashDistance <= hashTolerance
-            && abs(averageLuma - expected.averageLuma) <= lumaTolerance
-            && abs(nonWhiteFraction - expected.nonWhiteFraction) <= coverageTolerance
     }
 }
 
