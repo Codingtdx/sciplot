@@ -5,8 +5,7 @@ struct ComposerAssetBrowserView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Library")
-                .font(.title3.weight(.semibold))
+            WorkbenchRailTitle(title: "Library", trailing: "\(session.orderedPanels.count)")
 
             if session.orderedPanels.isEmpty {
                 EmptyStateCard(title: "No imported panels")
@@ -55,9 +54,7 @@ struct ComposerAssetBrowserView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .padding(18)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.quinary.opacity(0.12), in: RoundedRectangle(cornerRadius: 24))
     }
 
     private var panelSelectionBinding: Binding<Set<String>> {
@@ -85,12 +82,12 @@ private struct ComposerLibraryRow: View {
         HStack(alignment: .top, spacing: 12) {
             ComposerPanelThumbnailView(
                 url: URL(fileURLWithPath: panel.filePath),
-                size: CGSize(width: 76, height: 58),
-                cornerRadius: 12
+                size: CGSize(width: 70, height: 54),
+                cornerRadius: 10
             )
-            .frame(width: 76, height: 58)
+            .frame(width: 70, height: 54)
             .opacity(panel.hidden ? 0.45 : 1.0)
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
             .simultaneousGesture(
                 DragGesture(minimumDistance: 1)
                     .onChanged { _ in
@@ -106,7 +103,7 @@ private struct ComposerLibraryRow: View {
                 ComposerPanelThumbnailView(
                     url: URL(fileURLWithPath: panel.filePath),
                     size: CGSize(width: 132, height: 96),
-                    cornerRadius: 14
+                    cornerRadius: 12
                 )
                 .frame(width: 132, height: 96)
             }
@@ -122,7 +119,7 @@ private struct ComposerLibraryRow: View {
 
                     if !resolvedLabel.isEmpty {
                         Text(resolvedLabel)
-                            .font(.caption.weight(.bold))
+                        .font(.caption.weight(.bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(.background, in: Capsule())
@@ -148,7 +145,7 @@ private struct ComposerLibraryRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

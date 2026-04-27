@@ -6,24 +6,22 @@ struct DataStudioWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if session.focusedWorkbook != nil {
-                topBar
-            }
-
+        VStack(alignment: .leading, spacing: 12) {
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
                 DataStudioGroupRailView(session: session)
-                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 360, maxHeight: .infinity)
+                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 16)
+                    .padding(.vertical, 12)
 
                 DataStudioPreviewWorkspaceView(session: session)
-                    .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.trailing, 16)
+                    .padding(.vertical, 12)
             }
         }
-        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             session.attachUndoManager(undoManager)
@@ -45,45 +43,6 @@ struct DataStudioWorkbenchView: View {
         }
         .sheet(isPresented: analysisBinding) {
             DataStudioAnalysisSheet(session: session)
-        }
-    }
-
-    private var topBar: some View {
-        let isBusyActivity = session.currentActivity != .idle
-        return HStack(alignment: .center, spacing: 12) {
-            Text(session.focusTitle)
-                .font(.title2.weight(.semibold))
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            Spacer(minLength: 16)
-
-            Button("Analysis") {
-                session.showAnalysis()
-            }
-            .buttonStyle(.bordered)
-            .disabled(session.focusedWorkbook == nil && session.currentRecipe == nil)
-
-            Image(systemName: activitySymbol)
-                .symbolEffect(
-                    .pulse.byLayer,
-                    options: .repeating,
-                    value: isBusyActivity
-                )
-                .font(.headline)
-                .foregroundStyle(session.errorMessage == nil ? Color.secondary : Color.orange)
-        }
-    }
-
-    private var activitySymbol: String {
-        if session.errorMessage != nil {
-            return "exclamationmark.triangle.fill"
-        }
-        switch session.currentActivity {
-        case .previewingComparison, .idle:
-            return session.previewStatusSymbol
-        case .loadingTemplates, .previewingSource, .creatingTemplate, .buildingWorkbook, .importingWorkbooks, .exportingComparison:
-            return "arrow.triangle.2.circlepath"
         }
     }
 
@@ -137,10 +96,8 @@ private struct DataStudioGroupRailView: View {
     var body: some View {
         let autoKeepAvailability = session.autoKeepAllAvailability
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Workbook Groups")
-                    .font(.headline)
-                Spacer()
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                WorkbenchRailTitle(title: "Workbook Groups", trailing: "\(session.orderedGroups.count)")
                 Button("Auto Keep 5 All") {
                     session.applySuggestedExclusionsToAllWorkbooks()
                 }
@@ -148,14 +105,10 @@ private struct DataStudioGroupRailView: View {
                 .controlSize(.small)
                 .disabled(!autoKeepAvailability.isEnabled)
                 .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
-                Text("\(session.orderedGroups.count)")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
             }
 
             if session.orderedGroups.isEmpty {
-                EmptyStateCard(title: "No groups")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                Spacer(minLength: 0)
             } else {
                 List(selection: focusedWorkbookSelection) {
                     ForEach(session.orderedGroups) { group in
@@ -165,6 +118,7 @@ private struct DataStudioGroupRailView: View {
                     .onMove(perform: session.moveGroups)
                 }
                 .listStyle(.inset)
+                .scrollContentBackground(.hidden)
                 .animation(MotionTokens.list, value: session.orderedGroups.map(\.id))
             }
         }
@@ -387,40 +341,42 @@ private struct DataStudioFocusedWorkbookStrip: View {
     let workbook: DataStudioWorkbookItem
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Focused Group")
-                        .font(.headline)
-                    Spacer()
-                    DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Focused Group")
+                    .font(.headline)
+                Spacer()
+                DataStudioSpecimenFilterPrimaryTrigger(session: session, workbook: workbook)
+            }
 
-                if !displayedMetrics.isEmpty {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
-                        ForEach(Array(displayedMetrics.prefix(3)), id: \.id) { metric in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(metric.unit.isEmpty ? metric.label : "\(metric.label) (\(metric.unit))")
-                                    .font(.subheadline.weight(.semibold))
-                                Text(metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
-                                    .font(.title3.weight(.semibold))
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 2)
+            if !displayedMetrics.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
+                    ForEach(Array(displayedMetrics.prefix(3)), id: \.id) { metric in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(metric.unit.isEmpty ? metric.label : "\(metric.label) (\(metric.unit))")
+                                .font(.subheadline.weight(.semibold))
+                            Text(metric.mean?.formatted(.number.precision(.fractionLength(2))) ?? "n/a")
+                                .font(.title3.weight(.semibold))
                         }
-                    }
-                }
-
-                if !notices.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(notices.prefix(3))) { notice in
-                            Label(notice.message, systemImage: notice.style.systemImage)
-                                .font(.footnote)
-                                .foregroundStyle(notice.style == .warning ? .orange : .secondary)
-                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
                     }
                 }
             }
+
+            if !notices.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(notices.prefix(3))) { notice in
+                        Label(notice.message, systemImage: notice.style.systemImage)
+                            .font(.footnote)
+                            .foregroundStyle(notice.style == .warning ? .orange : .secondary)
+                    }
+                }
+            }
+        }
+        .padding(.top, 6)
+        .overlay(alignment: .top) {
+            Divider()
         }
     }
 
@@ -453,8 +409,12 @@ private struct DataStudioInlinePreviewBanner: View {
                 .buttonStyle(.bordered)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background((stale ? Color.orange : Color.yellow).opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 9)
+        .background((stale ? Color.orange : Color.yellow).opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder((stale ? Color.orange : Color.yellow).opacity(0.16), lineWidth: 1)
+        )
     }
 }
 

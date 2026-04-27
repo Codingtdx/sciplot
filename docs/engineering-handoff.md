@@ -4245,3 +4245,206 @@ Use this block for every new round:
   - Inner beta admission semantics:
     - strict manual gate 现在要求 `.venv/bin/python scripts/manual_smoke_evidence.py validate --input <path> --require-all` 与 `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence <path>` 双双通过。
     - `overlay_drag_save_reopen` 默认 evidence 样本继续指向 richer Plot project，而不是最小 overlay-only case。
+
+### 2026-04-26 (Round BM): macOS four-workbench full shell refactor
+
+- Scope:
+  - 一阶段收口 `Plot / Data Studio / Composer / Code Console` 四个 workbench 的统一壳层，不改 sidecar public contract、`.sciplotgod` 结构或 `src/plot_contract.json`。
+  - 共享 presentation system 重构：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+    - 新增统一 `WorkbenchScaffold / WorkbenchHeaderStrip / WorkbenchRailPane / WorkbenchPrimaryPane / WorkbenchStatusIndicator / WorkbenchRailTitle`
+    - 收紧 `EmptyStateCard / ErrorStateCard / DiagnosticIssueCard / BusyStateCard / InspectorSection`
+  - app shell 收口：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+    - `RootSplitView` 改成 dedicated workbench chrome（`WorkbenchSidebarRail` + `WorkbenchToolbarContent`）
+    - Quick Help 继续作为唯一 app-level 帮助入口，但改成更轻、更短的原生 sheet
+  - 四个 workbench root 统一 adopt shared scaffold：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - 结果优先 / rail 紧凑化 / 小字清理：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - GUI structural regression coverage更新：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+    - 新增 shared shell source assertions，并刷新快照 fingerprint fixture
+
+- User-visible impact:
+  - 四个 workbench 现在共用同一套更原生的三栏工具壳层：左 rail 更紧凑，中央结果区优先，右 inspector 的 section / disclosure / actions 语言统一。
+  - Plot 模板 rail 从大卡片压成更可扫的紧凑列表，重复副标题被移除；Code Console 调整为 outputs-first 布局；Composer canvas 与 Data Studio preview 更明显成为主角。
+  - Quick Help 保持唯一入口，但 sheet copy 明显缩短；错误态继续可见，默认只显示短摘要，详情折叠。
+
+- Risks:
+  - `WorkbenchScaffold` 现在用固定 rail + divider 的稳定布局替代内层 `HSplitView`。如果后续有人把它重新换回嵌套 split，需要重新检查 inspector 同开时的 AppKit 约束冲突。
+  - 这轮 snapshot fingerprint 已按新外观更新；后续如果再改 shared scaffold、template rail 或 Code Console outputs surface，需要把 drift 当成真实 UI contract 变化处理，而不是随手忽略。
+  - 四个 workbench 现在更依赖 shared state/presentation components；如果未来在单个 workbench 本地加特殊外观分支，容易重新长出第二套按钮/空态/错误态语言。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把四个 workbench 从“各自长自己的 demo panel”收敛成同一套长期可用的原生桌面工具语言，让 shell 一眼可认、结果区优先、Inspector 行为稳定。
+    - 共享 presentation system 的价值不只是换皮，而是把状态卡、空态、错误态、header strip、rail 标题和动作 affordance 重新收口到单一事实源，避免继续在每个 workbench 局部复制一套语义。
+    - Code Console 明确切到 outputs-first，是因为在科研工作流里可交付结果比编辑器本身更像主对象；编辑器应该退到次级位，而不是继续抢中心视觉。
+  - Rejected alternatives:
+    - 只先改 Plot，再让其他 workbench 跟进：拒绝，因为用户要求的是一阶段整体落地，分 workbench staging 会把 shared shell decision 拖回重复实现。
+    - 保留内层 `HSplitView` 以追求“可拖分栏感”：拒绝，因为它在 app-level `NavigationSplitView + inspector` 之内引入了额外 AppKit 约束噪音，稳定性收益明显低于布局成本。
+    - 保留模板卡片副标题或各 workbench 自定义说明文案：拒绝，因为这些小字对高频操作几乎没有信息增益，只会削弱统一性和扫描效率。
+  - Boundaries:
+    - 不改 Plot / Data Studio canonical workflow，不改 Quick Help 单一入口规则，不改 inspector 列宽策略 `360 / 400 / 460`。
+    - 不新增业务接口，不改 sidecar contracts，不恢复任何已删除 legacy route。
+
+- Validation (executed):
+  - RED -> GREEN:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testRootSplitViewUsesDedicatedWorkbenchChrome -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testWorkbenchRootsUseSharedWorkbenchScaffold`: 先 fail，完成 shared shell adoption 后 passed。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSnapshotFingerprintsStayStable`: 先暴露 `Plot template gallery` 与 `Code Console outputs preview` drift；刷新新壳层 fingerprint fixture 后 passed。
+  - Targeted / structural:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed（`131 tests`）。
+  - Full repo gate:
+    - `.venv/bin/python scripts/blocking_gate.py`: passed（clean/ruff/mypy/pytest `272 passed`/smoke_check/xcodebuild build/xcodebuild test `192 tests`；manual checklist not enforced）。
+    - `git diff --check`: passed。
+  - GUI acceptance:
+    - 通过 `Computer Use` 重新启动并检查了新构建 app，人工确认了四个 workbench 的统一 shell、Plot 紧凑模板 rail、Data Studio group rail + preview、Composer canvas 主次关系、Code Console outputs-first empty shell，以及 Quick Help 精简 sheet。
+    - `plot_import_preview_export / data_studio_import_open_plot / overlay_drag_save_reopen` 这三条 strict manual evidence 本轮未重新采集，因此未把本轮视为 strict manual closure。
+
+### 2026-04-26 (Round BN): macOS GUI native shell recovery reset
+
+- Scope:
+  - 按用户明确反馈，直接撤回上一轮过厚的 `WorkbenchScaffold` 壳层方向，回到更接近 Codex/macOS 的单层 native shell。
+  - 重点修改：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - 行为收口：
+    - sidebar 去掉独立 `SciPlot God` 大标题块，只保留导航。
+    - detail 去掉 workbench 横幅式标题条，标题/上下文回到 window title + toolbar 语义。
+    - toolbar 改成 icon-first，并把 Plot/Code Console sheet picker、Plot Data Workbook、Data Studio Analysis 收进 toolbar。
+    - 四个 workbench root 不再通过 shared scaffold 叠第二层壳，而是直接用 native split 内容布局。
+    - shared `EmptyStateCard / BusyStateCard / ErrorStateCard / DiagnosticIssueCard / InspectorSection` 改成轻量内容语言，不再默认铺厚 material/card。
+
+- User-visible impact:
+  - 整体观感回到更原生、更轻的 macOS 工具窗口：没有 sidebar 顶部品牌海报区，没有 detail 顶部整条模块横幅，也没有黑灰阴影套盒子。
+  - Plot / Data Studio / Composer / Code Console 现在都保持“左 rail + 中央主区 + 右 inspector”的单层节奏，但中央内容区是主角，空态也改成贴底短句提示。
+  - Quick Help 继续是唯一帮助入口，但 sheet 变成轻量动作清单，不再像另一张说明卡。
+
+- Risks:
+  - 这轮保留了 workbench 内部 native split 布局，但不再用共享 scaffold 管外观；后续如果再引入 app-level banner 或厚 material 容器，极容易重新长出用户明确反感的“套壳感”。
+  - `InspectorLayoutPolicyTests` 的 `Plot template gallery` 与 `Code Console outputs preview` fingerprint 已更新到新视觉基线；后续对 rail/outputs 表达再改时，要把 drift 当作真实 UI contract 变化处理。
+  - macOS test host 启动时仍会打印一条 `NavigationSplitView` 约束噪音日志，但本轮 build/test/人工验收都未见功能异常；如果后续扩展 app-level split 行为，需继续关注。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/QuickHelpSheet.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把界面层级拉回“内容自己表达层级”的原生桌面范式，而不是继续在内容上方叠一套自造品牌/模块壳。
+    - 用户明确拒绝了“大名字 + 模块横幅 + 厚阴影卡片”的视觉方向，所以这轮不是微调上一版，而是直接删掉那套壳语言。
+    - toolbar icon-first 与 window title/subtitle 语义更接近 Codex/macOS 的长期使用工作流，也减少了正文区重复标题。
+  - Rejected alternatives:
+    - 继续打磨 `WorkbenchScaffold`：拒绝，因为问题不在 spacing 微调，而在它本身引入了第二层壳和额外视觉重心。
+    - 只把空态卡片变薄、保留横幅与 sidebar 品牌块：拒绝，因为用户反感的是整套层级语言，不是单个圆角大小。
+    - 用自绘 glass/card 再做一版“更现代”的壳：拒绝，因为用户要的是更原生，不是更多自定义 chrome。
+  - Boundaries:
+    - 不改 sidecar、业务契约、导入/导出流程、inspector 列宽策略 `360 / 400 / 460`。
+    - 不恢复多级帮助页，不新增第二套 toolbar 文本按钮入口。
+
+- Validation (executed):
+  - RED -> GREEN:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: 先让 `testRootSplitViewKeepsNavigationOnlySidebarChrome` 与 `testWorkbenchRootsDoNotUseSharedWorkbenchScaffold` fail，再实现壳层回退并转绿。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testRootSplitViewKeepsNavigationOnlySidebarChrome -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testWorkbenchRootsDoNotUseSharedWorkbenchScaffold -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testGuiSnapshotFingerprintsStayStable`: passed。
+  - Automated:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed（`131 tests`）。
+  - GUI acceptance:
+    - 通过 `Computer Use` 启动新构建 app，逐个检查了 `Plot / Data Studio / Composer / Code Console`。
+    - 已人工确认：
+      - sidebar 内无独立大标题块；
+      - detail 顶部无整条 workbench 横幅；
+      - toolbar 为图标优先；
+      - Plot/Data Studio/Code Console 空态贴底；
+      - Composer canvas、Plot preview、Data Studio preview 成为主视觉对象；
+      - Quick Help 为轻量 sheet。
+
+### 2026-04-27 (Round BO): native shell follow-through verification and Data Studio rail cleanup
+
+- Scope:
+  - 在已经存在的 native shell reset 工作树基础上，补齐一处仍不符合目标的 Data Studio rail 表达，并完成一轮 fresh 验证与桌面验收。
+  - 实际代码改动集中在：
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+  - 实际收口内容：
+    - `DataStudioGroupRailView` 改成 `WorkbenchRailTitle(title: "Workbook Groups", trailing: ...)`
+    - 删除左 rail 里的重复 `EmptyStateCard(title: "No groups")`
+    - 空 workbook 状态只保留中央主区 `No workbook groups`
+    - 给该行为补 source-level regression test
+
+- User-visible impact:
+  - Data Studio 在空项目时不再出现“左边一块空态、中央又一块空态”的双重表达，左 rail 只保留紧凑标题和批量动作，主空态留在中央结果区。
+  - 四个 workbench 的单层 native shell 在当前工作树上已重新验收：sidebar 只像导航，toolbar 图标优先，中央内容优先，Quick Help 维持轻量 sheet。
+
+- Risks:
+  - 当前 macOS 测试与桌面运行仍会打印一条 `NavigationSplitView` 相关的 AppKit constraint 噪音日志；本轮未见功能异常，但后续如果继续调整 split 布局，仍要把它当作回归观察点。
+  - 本轮 `blocking_gate.py` 仍未强制 manual evidence，严格 inner beta 三条人工证据依旧未在本轮补采。
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Tests/InspectorLayoutPolicyTests.swift`
+
+- Decision Record:
+  - Why:
+    - 用户要的是“内容自己成为层级中心”的 Apple 原生工具窗口，因此 rail 里的重复空态也应去掉，避免 sidebar 再长出一层页面感。
+    - 这一步不是新风格探索，而是把已批准的 native shell 原则贯彻到 Data Studio 最后一个显眼违例上。
+  - Rejected alternatives:
+    - 保留左 rail 空态，只把文字缩短：拒绝，因为问题是重复语义，不是文案长短。
+    - 把中央空态移走、把提示留在 rail：拒绝，因为结果区才是当前文档状态的主显示面。
+  - Boundaries:
+    - 不改 sidecar contract、不改导入工作流、不改 inspector 宽度策略 `360 / 400 / 460`。
+
+- Validation (executed):
+  - RED -> GREEN:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testDataStudioRailUsesCompactHeaderAndAvoidsDuplicateEmptyState`
+      - 在加入断言后先失败；
+      - 完成 Data Studio rail 清理后重新运行并通过。
+  - Automated:
+    - `git diff --check`: passed。
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests`: passed（`132 tests`）。
+    - `.venv/bin/python scripts/blocking_gate.py`: passed（`ruff`/`mypy`/`pytest 272 passed`/`smoke_check`/`xcodebuild build`/`xcodebuild test 193 tests`）。
+  - GUI acceptance:
+    - 通过 `Computer Use` 重新打开 `/Users/dongxutian/Documents/codegod/app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`，人工检查了四个 workbench。
+    - 已确认：
+      - Plot：sidebar 无额外品牌区，模板 rail 紧凑，`No Preview` 贴底，inspector 可隐藏再显示。
+      - Data Studio：左 rail 只剩 `Workbook Groups` 标题与 `Auto Keep 5 All`，重复空态已消失，中央保留单一 `No workbook groups`。
+      - Composer：canvas 仍是主视觉对象，library 退为轻量列表位。
+      - Code Console：保持 outputs-first，空态留在主区，右侧 inspector 没再长成第二个页面。
+      - Quick Help：toolbar `Help` 仍打开轻量 sheet。

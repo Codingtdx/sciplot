@@ -15,8 +15,8 @@ struct CodeConsoleEditorView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("External AI Prompt")
-                    .font(.headline)
+                Text("Prompt")
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Button("Refresh") {
                     session.refreshPrompt()
@@ -46,9 +46,13 @@ struct CodeConsoleEditorView: View {
                     .textSelection(.enabled)
             }
             .frame(minHeight: 150, maxHeight: 220)
+            .padding(12)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
         }
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var editorCard: some View {
@@ -56,8 +60,8 @@ struct CodeConsoleEditorView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Python Code")
-                    .font(.headline)
+                Text("Python")
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Button("Restore Starter") {
                     session.restoreStarterCode()
@@ -84,9 +88,11 @@ struct CodeConsoleEditorView: View {
                 .font(.body.monospaced())
                 .padding(12)
                 .frame(minHeight: 320)
-                .background(.quinary.opacity(0.2), in: RoundedRectangle(cornerRadius: 18))
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
+                )
         }
-        .padding(16)
-        .background(.quinary.opacity(0.18), in: RoundedRectangle(cornerRadius: 18))
     }
 }

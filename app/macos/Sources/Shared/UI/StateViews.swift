@@ -123,26 +123,42 @@ extension View {
     }
 }
 
+struct WorkbenchRailTitle: View {
+    let title: String
+    var trailing: String? = nil
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            Spacer(minLength: 8)
+            if let trailing, !trailing.isEmpty {
+                Text(trailing)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 struct EmptyStateCard: View {
     let title: String
     var message: String? = nil
 
     var body: some View {
         let summary = StatusCopy.short(message)
-        Group {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: "sparkles.rectangle.stack")
+                .font(.headline)
             if let summary {
-                ContentUnavailableView {
-                    Label(title, systemImage: "sparkles.rectangle.stack")
-                } description: {
-                    Text(summary)
-                }
-            } else {
-                ContentUnavailableView {
-                    Label(title, systemImage: "sparkles.rectangle.stack")
-                }
+                Text(summary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.vertical, 14)
     }
 }
 
@@ -186,21 +202,27 @@ struct ErrorStateCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: "exclamationmark.triangle.fill")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
 
             Text(summaryMessage)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 
             if let retryTitle, let retryAction {
                 Button(retryTitle, action: retryAction)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.orange.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.18), lineWidth: 1)
+        )
     }
 }
 
@@ -227,26 +249,28 @@ struct DiagnosticIssueCard: View {
                     .foregroundStyle(.orange)
 
                 Text(message.summary)
-                    .font(.footnote)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(isExpanded ? nil : 1)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 8)
 
-                Button {
-                    withAnimation(MotionTokens.selection) {
-                        isExpanded.toggle()
+                if message.detail != message.summary {
+                    Button {
+                        withAnimation(MotionTokens.selection) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .foregroundStyle(.secondary)
                     }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .help(isExpanded ? "Hide details" : "Show details")
                 }
-                .buttonStyle(.plain)
-                .help(isExpanded ? "Hide details" : "Show details")
             }
 
-            if isExpanded {
+            if isExpanded, message.detail != message.summary {
                 ScrollView {
                     Text(message.detail)
                         .font(.footnote.monospaced())
@@ -268,14 +292,18 @@ struct DiagnosticIssueCard: View {
 
                     if let retryTitle, let retryAction {
                         Button(retryTitle, action: retryAction)
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.bordered)
                     }
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .padding(.horizontal, 12)
-        .background(.quinary.opacity(0.32), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.orange.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.16), lineWidth: 1)
+        )
     }
 }
 
@@ -285,20 +313,21 @@ struct BusyStateCard: View {
 
     var body: some View {
         let summary = StatusCopy.short(message)
-        return ContentUnavailableView {
-            Label {
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
                 Text(title)
                     .font(.headline)
-            } icon: {
-                ProgressView()
-                    .controlSize(.large)
             }
-        } description: {
             if let summary {
                 Text(summary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.vertical, 14)
     }
 }
 
@@ -307,14 +336,14 @@ struct InspectorSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12, content: { content })
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 12, content: { content })
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 4)
     }
 }
 

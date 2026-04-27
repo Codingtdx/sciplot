@@ -5,19 +5,17 @@ struct RootSplitView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(Workbench.allCases, selection: $model.selectedWorkbench) { workbench in
-                Label(workbench.title, systemImage: workbench.systemImage)
-                    .tag(workbench)
-            }
-            .navigationTitle("SciPlot God")
-            .listStyle(.sidebar)
+            WorkbenchSidebarRail(selection: $model.selectedWorkbench)
         } detail: {
             activeWorkbenchDetail
                 .id(model.selectedWorkbench)
                 .transition(MotionTokens.stateTransition)
                 .animation(MotionTokens.workbenchSwitch, value: model.selectedWorkbench)
+                .navigationTitle(activeWindowTitle)
+                .navigationSubtitle(activeWindowSubtitle ?? "")
                 .toolbar {
-                    activeToolbarContent
+                    ActiveWorkbenchToolbarContent(model: model)
+                    WorkbenchToolbarContent(model: model)
                 }
         }
         .inspector(isPresented: $model.inspectorPresented) {
@@ -28,7 +26,6 @@ struct RootSplitView: View {
             ideal: InspectorColumnLayoutPolicy.idealWidth,
             max: InspectorColumnLayoutPolicy.maxWidth
         )
-        .toolbar(removing: .sidebarToggle)
         .task {
             await model.bootstrapIfNeeded()
         }
@@ -71,8 +68,8 @@ struct RootSplitView: View {
                 ) {
                     Task { await model.bootstrapIfNeeded() }
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
 
             activeWorkbenchView
@@ -112,29 +109,160 @@ struct RootSplitView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var activeToolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .automatic) {
-            Button("Import", systemImage: "tray.and.arrow.down") {
-                model.beginImportForActiveWorkbench()
+    private var activeWindowTitle: String {
+        switch model.selectedWorkbench {
+        case .plot:
+            return model.plotSession.selectedSourceFilename ?? Workbench.plot.title
+        case .dataStudio:
+            return model.dataStudioSession.focusedWorkbook == nil
+                ? Workbench.dataStudio.title
+                : model.dataStudioSession.focusTitle
+        case .composer:
+            if let selectedPanelID = model.composerSession.selectedPanelID,
+               let panel = model.composerSession.orderedPanels.first(where: { $0.id == selectedPanelID }) {
+                return URL(fileURLWithPath: panel.filePath).lastPathComponent
             }
+            return Workbench.composer.title
+        case .codeConsole:
+            return model.codeConsoleSession.selectedSourceFilename ?? Workbench.codeConsole.title
+        }
+    }
 
-            Button("Export", systemImage: "square.and.arrow.up") {
+    private var activeWindowSubtitle: String? {
+        switch model.selectedWorkbench {
+        case .plot:
+            return model.plotSession.selectedFileURL == nil ? nil : model.plotSession.selectedSheet.displayName
+        case .dataStudio:
+            return model.dataStudioSession.focusedWorkbook == nil ? nil : model.dataStudioSession.currentRecipeLabel
+        case .composer:
+            let count = model.composerSession.project.panels.count
+            return count == 0 ? nil : "\(count) panels"
+        case .codeConsole:
+            return model.codeConsoleSession.selectedFileURL == nil ? nil : model.codeConsoleSession.selectedSheet.displayName
+        }
+    }
+
+}
+
+private struct WorkbenchSidebarRail: View {
+    @Binding var selection: Workbench
+
+    var body: some View {
+        List(Workbench.allCases, selection: $selection) { workbench in
+            Label(workbench.title, systemImage: workbench.systemImage)
+                .lineLimit(1)
+                .tag(workbench)
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("")
+    }
+}
+
+private struct ActiveWorkbenchToolbarContent: ToolbarContent {
+    @Bindable var model: AppModel
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .automatic) {
+            switch model.selectedWorkbench {
+            case .plot:
+                if model.plotSession.selectedFileURL != nil {
+                    Menu {
+                        Picker("Sheet", selection: plotSheetBinding) {
+                            ForEach(model.plotSession.availableSheets, id: \.self) { sheet in
+                                Text(sheet.displayName).tag(sheet)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "tablecells")
+                    }
+                    .help(model.plotSession.selectedSheet.displayName)
+                }
+
+                Button {
+                    model.plotSession.showDataWorkbook()
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                }
+                .disabled(!model.plotSession.dataWorkbookAvailability.isEnabled)
+                .help(model.plotSession.dataWorkbookAvailability.reason ?? "Open Data Workbook")
+
+            case .dataStudio:
+                Button {
+                    model.dataStudioSession.showAnalysis()
+                } label: {
+                    Image(systemName: "function")
+                }
+                .disabled(model.dataStudioSession.focusedWorkbook == nil && model.dataStudioSession.currentRecipe == nil)
+                .help("Open Analysis")
+
+            case .composer:
+                EmptyView()
+
+            case .codeConsole:
+                if model.codeConsoleSession.selectedFileURL != nil {
+                    Menu {
+                        Picker("Sheet", selection: codeConsoleSheetBinding) {
+                            ForEach(model.codeConsoleSession.availableSheets, id: \.self) { sheet in
+                                Text(sheet.displayName).tag(sheet)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "tablecells")
+                    }
+                    .help(model.codeConsoleSession.selectedSheet.displayName)
+                }
+            }
+        }
+    }
+
+    private var plotSheetBinding: Binding<SheetValue> {
+        Binding(
+            get: { model.plotSession.selectedSheet },
+            set: { model.plotSession.setSelectedSheet($0) }
+        )
+    }
+
+    private var codeConsoleSheetBinding: Binding<SheetValue> {
+        Binding(
+            get: { model.codeConsoleSession.selectedSheet },
+            set: { model.codeConsoleSession.setSelectedSheet($0) }
+        )
+    }
+}
+
+private struct WorkbenchToolbarContent: ToolbarContent {
+    @Bindable var model: AppModel
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                model.beginImportForActiveWorkbench()
+            } label: {
+                Image(systemName: "tray.and.arrow.down")
+            }
+            .help("Import or Open")
+
+            Button {
                 Task { await model.exportActiveWorkbench() }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
             }
             .disabled(!model.activeExportAvailability.isEnabled)
             .help(model.activeExportHelpText)
 
-            Button("Help", systemImage: "questionmark.circle") {
+            Button {
                 model.showHelpForActiveWorkbench()
+            } label: {
+                Image(systemName: "questionmark.circle")
             }
+            .help("Quick Help")
 
-            Button(
-                model.inspectorPresented ? "Hide Inspector" : "Show Inspector",
-                systemImage: "sidebar.right"
-            ) {
+            Button {
                 model.toggleInspector()
+            } label: {
+                Image(systemName: "sidebar.right")
             }
+            .help(model.inspectorPresented ? "Hide Inspector" : "Show Inspector")
 
             if model.selectedWorkbench == .dataStudio {
                 Menu {
@@ -146,8 +274,9 @@ struct RootSplitView: View {
                         model.clearCurrentDataStudioSession()
                     }
                 } label: {
-                    Label("Data Studio Menu", systemImage: "ellipsis.circle")
+                    Image(systemName: "ellipsis.circle")
                 }
+                .help("Data Studio")
             }
         }
     }

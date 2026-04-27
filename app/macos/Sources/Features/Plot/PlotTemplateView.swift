@@ -31,42 +31,39 @@ struct PlotTemplateView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Templates")
-                .font(.headline)
+            WorkbenchRailTitle(title: "Templates", trailing: "\(session.templateGalleryItems.count)")
 
             if session.templateGalleryItems.isEmpty {
-                ContentUnavailableView("No templates", systemImage: "rectangle.grid.2x2")
-                .frame(maxWidth: .infinity, minHeight: 160)
+                EmptyStateCard(title: "No templates")
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(session.templateGalleryItems) { item in
-                            Button {
-                                guard item.selectable else {
-                                    return
-                                }
-                                session.chooseTemplate(item.id)
-                            } label: {
-                                PlotTemplateCard(
-                                    title: item.title,
-                                    kind: item.thumbnailKind,
-                                    aspectRatio: item.aspectRatio,
-                                    selected: session.selectedTemplateID == item.id,
-                                    enabled: item.selectable
-                                )
+                List {
+                    ForEach(session.templateGalleryItems) { item in
+                        Button {
+                            guard item.selectable else {
+                                return
                             }
-                            .buttonStyle(.plain)
-                            .disabled(!item.availability.isEnabled)
-                            .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
+                            session.chooseTemplate(item.id)
+                        } label: {
+                            PlotTemplateCard(
+                                title: item.title,
+                                kind: item.thumbnailKind,
+                                aspectRatio: item.aspectRatio,
+                                selected: session.selectedTemplateID == item.id,
+                                enabled: item.selectable
+                            )
                         }
+                        .buttonStyle(.plain)
+                        .disabled(!item.availability.isEnabled)
+                        .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
                     }
                 }
+                .listStyle(.inset(alternatesRowBackgrounds: false))
+                .scrollContentBackground(.hidden)
                 .animation(MotionTokens.list, value: session.templateGalleryItems.map(\.id))
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.quinary.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -142,7 +139,7 @@ struct PlotTemplateThumbnailView: View {
                 drawScatter(in: plotRect, context: &context, palette: palette)
             }
         }
-        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(Color.secondary.opacity(0.13), lineWidth: 1)
@@ -715,37 +712,34 @@ private struct PlotTemplateCard: View {
     let enabled: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .center, spacing: 10) {
             PlotTemplateThumbnailView(kind: kind, aspectRatio: aspectRatio)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 46, idealHeight: 62, maxHeight: 88)
+                .frame(width: 54, height: 42)
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-                Spacer(minLength: 4)
-            }
+            Spacer(minLength: 4)
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(
                     selected ? Color.accentColor : Color.secondary.opacity(enabled ? 0.2 : 0.08),
                     lineWidth: selected ? 1.6 : 1
                 )
         )
-        .shadow(color: Color.black.opacity(selected ? 0.08 : 0.03), radius: selected ? 4 : 2, y: 1)
         .opacity(enabled ? 1 : 0.78)
         .animation(MotionTokens.selection, value: selected)
         .animation(MotionTokens.selection, value: enabled)
     }
 
     private var cardBackground: some ShapeStyle {
-        selected ? AnyShapeStyle(Color.accentColor.opacity(0.10)) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
+        selected ? AnyShapeStyle(Color.accentColor.opacity(0.10)) : AnyShapeStyle(Color.clear)
     }
 }

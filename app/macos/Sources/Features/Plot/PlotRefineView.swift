@@ -18,15 +18,15 @@ struct PlotRefineView: View {
     @ViewBuilder
     private var previewSurface: some View {
         if let preview = session.previewResponse?.previews.first {
-            let previewShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+            let previewShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
             Base64PDFPreviewView(base64PDF: preview.pdfBase64)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(Color(nsColor: .controlBackgroundColor))
                 .clipShape(previewShape)
                 .compositingGroup()
                 .overlay(
                     previewShape
-                        .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1, antialiased: true)
+                        .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1, antialiased: true)
                 )
         } else if session.isInspecting || session.isPreviewing {
             BusyStateCard(
@@ -34,10 +34,8 @@ struct PlotRefineView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ContentUnavailableView("No Preview", systemImage: "photo.on.rectangle")
+            EmptyStateCard(title: "No Preview")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 

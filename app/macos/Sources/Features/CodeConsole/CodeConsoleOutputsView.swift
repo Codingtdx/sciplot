@@ -8,8 +8,7 @@ struct CodeConsoleOutputsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Outputs")
-                .font(.headline)
+            WorkbenchRailTitle(title: "Outputs")
 
             if session.isRunning {
                 BusyStateCard(title: "Running Code Console")
@@ -32,7 +31,7 @@ struct CodeConsoleOutputsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func summaryGrid(run: CodeConsoleRunResponse) -> some View {
@@ -51,7 +50,7 @@ struct CodeConsoleOutputsView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             Text("Generated Files")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
 
             if run.generatedFiles.isEmpty {
                 Text("No generated files")
@@ -77,9 +76,9 @@ struct CodeConsoleOutputsView: View {
                         .padding(10)
                         .background(
                             (session.selectedGeneratedFile?.path == item.path
-                                ? AnyShapeStyle(.quinary.opacity(0.32))
-                                : AnyShapeStyle(.quinary.opacity(0.15))),
-                            in: RoundedRectangle(cornerRadius: 14)
+                                ? AnyShapeStyle(Color.accentColor.opacity(0.12))
+                                : AnyShapeStyle(Color.clear)),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                         )
                     }
                     .buttonStyle(.plain)
@@ -113,7 +112,7 @@ struct CodeConsoleOutputsView: View {
     private var generatedPreviewSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Preview")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
 
             if let selectedGeneratedFile = session.selectedGeneratedFile,
                let selectedGeneratedFileURL = session.selectedGeneratedFileURL
@@ -153,7 +152,7 @@ struct CodeConsoleOutputsView: View {
     private func logsSection(title: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
 
             ScrollView {
                 Text(text.isEmpty ? "No output." : text)
@@ -163,7 +162,11 @@ struct CodeConsoleOutputsView: View {
             }
             .frame(minHeight: 90, maxHeight: 140)
             .padding(10)
-            .background(.quinary.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
         }
     }
 }

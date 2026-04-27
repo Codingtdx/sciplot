@@ -18,40 +18,40 @@ enum QuickHelpCatalog {
             return QuickHelpContent(
                 title: "Plot",
                 actions: [
-                    .init(id: "plot-import", title: "Import", detail: "Open a source file from the toolbar or Command menu."),
-                    .init(id: "plot-template", title: "Template", detail: "Pick a compatible template from the left gallery rail."),
-                    .init(id: "plot-refine", title: "Refine", detail: "Use Inspector for style, axis, legend, and advanced overlays."),
-                    .init(id: "plot-export", title: "Export", detail: "Export from toolbar or Inspector Actions as PDF or 300 dpi TIFF."),
+                    .init(id: "plot-import", title: "Import", detail: "Open a source file."),
+                    .init(id: "plot-template", title: "Template", detail: "Pick a compatible template."),
+                    .init(id: "plot-refine", title: "Refine", detail: "Use Inspector for axes, style, and overlays."),
+                    .init(id: "plot-export", title: "Export", detail: "Export PDF or 300 dpi TIFF."),
                 ]
             )
         case .dataStudio:
             return QuickHelpContent(
                 title: "Data Studio",
                 actions: [
-                    .init(id: "ds-import", title: "Import", detail: "Run the native import wizard to build or open workbook groups."),
-                    .init(id: "ds-groups", title: "Group Review", detail: "Rename, reorder, include, or auto-filter groups from the left rail."),
-                    .init(id: "ds-compare", title: "Compare Preview", detail: "Choose figure family/template and refine from the shared Inspector."),
-                    .init(id: "ds-export", title: "Export", detail: "Export bundle outputs from toolbar or Inspector Actions."),
+                    .init(id: "ds-import", title: "Import", detail: "Build or open workbook groups."),
+                    .init(id: "ds-groups", title: "Groups", detail: "Rename, reorder, include, or auto-filter groups."),
+                    .init(id: "ds-compare", title: "Compare", detail: "Choose figure family and refine in Inspector."),
+                    .init(id: "ds-export", title: "Export", detail: "Export workbook and figure outputs."),
                 ]
             )
         case .composer:
             return QuickHelpContent(
                 title: "Composer",
                 actions: [
-                    .init(id: "composer-import", title: "Import", detail: "Import graph PDFs or assets from the toolbar."),
-                    .init(id: "composer-layout", title: "Layout", detail: "Select cells or regions, then place, merge, and arrange panels."),
-                    .init(id: "composer-inspect", title: "Inspect", detail: "Use Inspector to edit labels, locks, and placement controls."),
-                    .init(id: "composer-export", title: "Export", detail: "Export composition from toolbar or Inspector Actions."),
+                    .init(id: "composer-import", title: "Import", detail: "Import graph PDFs or assets."),
+                    .init(id: "composer-layout", title: "Layout", detail: "Place, move, and merge panels on canvas."),
+                    .init(id: "composer-inspect", title: "Inspect", detail: "Edit labels, locks, and placement."),
+                    .init(id: "composer-export", title: "Export", detail: "Export the composition."),
                 ]
             )
         case .codeConsole:
             return QuickHelpContent(
                 title: "Code Console",
                 actions: [
-                    .init(id: "console-bind", title: "Bind Context", detail: "Import or select a bound dataset and target sheet."),
-                    .init(id: "console-prompt", title: "Prompt And Code", detail: "Refresh/copy prompt, then paste Python into the editor."),
-                    .init(id: "console-run", title: "Run", detail: "Run code to generate managed outputs and previews."),
-                    .init(id: "console-export", title: "Export", detail: "Export generated PDF figures from toolbar or Inspector Actions."),
+                    .init(id: "console-bind", title: "Bind", detail: "Choose a dataset and sheet."),
+                    .init(id: "console-prompt", title: "Prompt", detail: "Refresh or copy the external AI prompt."),
+                    .init(id: "console-run", title: "Run", detail: "Run Python and inspect outputs."),
+                    .init(id: "console-export", title: "Export", detail: "Export generated PDF figures."),
                 ]
             )
         }
@@ -69,21 +69,25 @@ struct QuickHelpSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Core Actions") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
                     ForEach(content.actions) { action in
-                        VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 10) {
                             Text(action.title)
-                                .font(.headline)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(width: 92, alignment: .leading)
+
                             Text(action.detail)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
             }
-            .listStyle(.inset)
-            .navigationTitle("\(content.title) Quick Help")
+            .navigationTitle(content.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
@@ -93,6 +97,6 @@ struct QuickHelpSheet: View {
                 }
             }
         }
-        .frame(minWidth: 520, minHeight: 360)
+        .frame(minWidth: 460, minHeight: 320)
     }
 }

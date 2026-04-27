@@ -5,24 +5,22 @@ struct PlotWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if session.selectedSourceFilename != nil {
-                topSourceBar
-            }
-
+        VStack(alignment: .leading, spacing: 12) {
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
                 PlotTemplateView(session: session)
-                    .frame(minWidth: 230, idealWidth: 260, maxWidth: 300, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(minWidth: 230, idealWidth: 250, maxWidth: 290, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, 16)
+                    .padding(.vertical, 12)
 
                 PlotRefineView(session: session)
-                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.trailing, 16)
+                    .padding(.vertical, 12)
             }
         }
-        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             session.attachUndoManager(undoManager)
@@ -50,43 +48,6 @@ struct PlotWorkbenchView: View {
         }
     }
 
-    private var topSourceBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text(session.selectedSourceFilename ?? "")
-                .font(.title2.weight(.semibold))
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            Spacer(minLength: 16)
-
-            if session.selectedFileURL != nil {
-                Picker("Sheet", selection: selectedSheetBinding) {
-                    ForEach(session.availableSheets, id: \.self) { sheet in
-                        Text(sheet.displayName).tag(sheet)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 220, alignment: .leading)
-            }
-
-            Button("Data") {
-                session.showDataWorkbook()
-            }
-            .buttonStyle(.bordered)
-            .disabled(!session.dataWorkbookAvailability.isEnabled)
-            .help(session.dataWorkbookAvailability.reason ?? "Open the Data Workbook.")
-
-            Image(systemName: session.liveStatusSymbol)
-                .symbolEffect(
-                    .pulse.byLayer,
-                    options: .repeating,
-                    value: session.isInspecting || session.isPreviewing
-                )
-                .font(.headline)
-                .foregroundStyle(session.errorMessage == nil ? Color.secondary : Color.orange)
-        }
-    }
-
     private var bindingForImporter: Binding<Bool> {
         Binding(
             get: { session.isImporterPresented },
@@ -101,10 +62,4 @@ struct PlotWorkbenchView: View {
         )
     }
 
-    private var selectedSheetBinding: Binding<SheetValue> {
-        Binding(
-            get: { session.selectedSheet },
-            set: { session.setSelectedSheet($0) }
-        )
-    }
 }

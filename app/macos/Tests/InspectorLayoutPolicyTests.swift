@@ -130,6 +130,59 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertTrue(workbookSource.contains("dataPipelineSummary"))
     }
 
+    func testRootSplitViewKeepsNavigationOnlySidebarChrome() throws {
+        let appRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/App", isDirectory: true)
+        let rootSource = try String(
+            contentsOf: appRoot.appendingPathComponent("RootSplitView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(rootSource.contains("WorkbenchSidebarRail("))
+        XCTAssertTrue(rootSource.contains("WorkbenchToolbarContent("))
+        XCTAssertFalse(rootSource.contains("Text(\"SciPlot God\")"))
+    }
+
+    func testWorkbenchRootsDoNotUseSharedWorkbenchScaffold() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Features", isDirectory: true)
+        let workbenchFiles = [
+            "Plot/PlotWorkbenchView.swift",
+            "DataStudio/DataStudioWorkbenchView.swift",
+            "Composer/ComposerWorkbenchView.swift",
+            "CodeConsole/CodeConsoleWorkbenchView.swift",
+        ]
+
+        for relativePath in workbenchFiles {
+            let source = try String(
+                contentsOf: sourceRoot.appendingPathComponent(relativePath),
+                encoding: .utf8
+            )
+            XCTAssertFalse(
+                source.contains("WorkbenchScaffold("),
+                "\(relativePath) should compose its native shell directly."
+            )
+        }
+    }
+
+    func testDataStudioRailUsesCompactHeaderAndAvoidsDuplicateEmptyState() throws {
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Features/DataStudio", isDirectory: true)
+        let source = try String(
+            contentsOf: sourceRoot.appendingPathComponent("DataStudioWorkbenchView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("WorkbenchRailTitle(title: \"Workbook Groups\""))
+        XCTAssertFalse(source.contains("EmptyStateCard(title: \"No groups\")"))
+    }
+
     private func canonicalWorkbenchSnapshots() async throws -> [(String, Data)] {
         let plotSession = PlotSession()
         plotSession.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
@@ -431,9 +484,9 @@ final class InspectorLayoutPolicyTests: XCTestCase {
 
 private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
     "Plot template gallery": SnapshotFingerprint(
-        differenceHash: 0x80b0b0b0b0b0b0b0,
-        averageLuma: 0.3163,
-        nonWhiteFraction: 1.0000
+        differenceHash: 0x0000000000000080,
+        averageLuma: 0.9989,
+        nonWhiteFraction: 0.0139
     ),
     "Plot imported inspector": SnapshotFingerprint(
         differenceHash: 0x0000010101010101,
@@ -461,9 +514,9 @@ private let expectedSnapshotFingerprints: [String: SnapshotFingerprint] = [
         nonWhiteFraction: 0.1528
     ),
     "Code Console outputs preview": SnapshotFingerprint(
-        differenceHash: 0x000000c0e0e0c000,
-        averageLuma: 0.0492,
-        nonWhiteFraction: 1.0000
+        differenceHash: 0x000000003c381401,
+        averageLuma: 0.9754,
+        nonWhiteFraction: 0.1389
     ),
     "Composer canvas selection": SnapshotFingerprint(
         differenceHash: 0x8000050001070787,
