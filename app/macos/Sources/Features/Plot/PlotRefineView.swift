@@ -18,16 +18,8 @@ struct PlotRefineView: View {
     @ViewBuilder
     private var previewSurface: some View {
         if let preview = session.previewResponse?.previews.first {
-            let previewShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
             Base64PDFPreviewView(base64PDF: preview.pdfBase64)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(previewShape)
-                .compositingGroup()
-                .overlay(
-                    previewShape
-                        .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1, antialiased: true)
-                )
         } else {
             Color.clear
                 .overlay(alignment: .center) {
@@ -40,8 +32,8 @@ struct PlotRefineView: View {
                 }
                 .overlay(alignment: .bottomLeading) {
                     SubtleStageHint(
-                        title: "Import data to start a figure",
-                        systemImage: "tray.and.arrow.down"
+                        title: "Preview",
+                        systemImage: "doc.richtext"
                     )
                     .padding(.horizontal, 2)
                 }

@@ -11,8 +11,8 @@ struct PlotWorkbenchView: View {
             }
 
             HSplitView {
-                PlotTemplateView(session: session)
-                    .frame(minWidth: 230, idealWidth: 250, maxWidth: 290, maxHeight: .infinity, alignment: .topLeading)
+                PlotSourceLibraryView(session: session)
+                    .frame(minWidth: 260, idealWidth: 300, maxWidth: 340, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 16)
                     .padding(.vertical, 12)
 

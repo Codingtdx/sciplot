@@ -33,6 +33,94 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-27: Plot chrome de-duplication follow-up
+
+- Change:
+  - Removed the top toolbar workbench segmented picker from `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`; workbench switching remains in the native left sidebar.
+  - Simplified the Plot empty Source section in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift` so it shows only one `Import Data` button instead of both explanatory import text and an import button.
+  - Updated `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py` and `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py` to prevent reintroducing the duplicated top workbench picker or the duplicated left import empty state.
+
+- User-visible impact:
+  - The titlebar is cleaner and no longer duplicates the sidebar navigation.
+  - The Plot left rail Source area is less noisy before import.
+  - No sidecar, render payload, project schema, or workflow contract changes.
+
+- Risks:
+  - Users now switch workbenches only from the sidebar/menu, which matches the user's requested cleanup but removes one redundant toolbar shortcut.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Validation (executed):
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed (`6 passed`).
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - Computer Use GUI acceptance: passed; top toolbar workbench picker is gone and Source shows only `Import Data`.
+
+### 2026-04-27: Plot macOS Pro information architecture reset
+
+- Change:
+  - Reworked Plot around a clearer professional macOS tool-window hierarchy:
+    - global actions stay in the system toolbar (`Import`, `Export`, `Quick Help`, `Inspector`)
+    - data preparation moved into the Plot left rail
+    - the right inspector is contextual editing only
+  - Added `PlotSourceLibraryView` in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift` with three explicit left-rail regions:
+    - `Source`: current file, sheet, and `Data Workbook`
+    - `Data Preparation`: `Source Data`, `Transformed`, `Variables`, `Fit`
+    - `Templates`: compact template library rows
+  - Removed Plot sheet picker / Data Workbook controls from the app toolbar by deleting the per-workbench toolbar content path in `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`.
+  - Removed Plot export actions from `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`; export remains available through toolbar/menu.
+  - Lightened Plot empty/preview stage copy so the central canvas no longer repeats the left Source import instruction.
+  - Added source-level GUI presentation checks to prevent regressing `Sheet` / `Data Workbook` into the global toolbar or `Export` into Plot inspector.
+
+- User-visible impact:
+  - Plot now separates `Import/Export` from `Sheet/Data Workbook` and from contextual figure editing.
+  - The left rail is no longer a mostly empty template-only area; it owns source selection, data workbook access, preparation tabs, and templates.
+  - Imported Plot state shows the figure preview as the main object while the inspector edits `Figure / Data / Layers / Arrange` context.
+  - No sidecar contract, render payload, project schema, or inspector width policy changes.
+
+- Risks:
+  - Data Studio analysis and Code Console sheet shortcuts were removed from the global toolbar along with the previous per-workbench toolbar path; if future UX wants them, they should be placed in their own workbench surfaces rather than the app-global action cluster.
+  - Plot preview still uses the existing PDFKit preview component; this round removed the extra SwiftUI outer preview shell but did not redesign PDFKit scaling behavior.
+
+- Rollback points:
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+  - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - first-principles 动机是把 Plot 的三种层级拆清楚：toolbar 是全局流程端点，left rail 是导入后的数据准备与模板选择，inspector 是当前对象属性编辑。
+    - Pixelmator Pro / Final Cut Pro 式复杂工具不是把功能全堆进 inspector，而是用 source/library/layer/context 分区控制复杂度。
+  - Rejected alternatives:
+    - 继续微调右侧 inspector 字体：拒绝，因为用户指出的问题是交互层级错位，不是字重或 spacing 的单点问题。
+    - 把 Sheet / Data Workbook 留在 toolbar：拒绝，因为它们属于画图前的数据准备层，不是全局 import/export 端点。
+    - 在 Plot inspector 保留 Export：拒绝，因为这会让 contextual inspector 继续承担全局结束动作。
+  - Boundaries:
+    - 只改 macOS presentation architecture and view composition.
+    - 不改 sidecar routes、render payload、project schema、plot contract、Python data/fit semantics。
+    - 右侧 inspector 宽度继续使用 `360 / 400 / 460`。
+
+- Validation (executed):
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed (`6 passed`).
+  - `.venv/bin/python scripts/clean_repo.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed (`188 tests, 0 failures`).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix; manual smoke remained pending by design.
+  - Computer Use GUI acceptance:
+    - empty Plot state: passed; toolbar only shows global actions, left rail shows `Source / Data Preparation / Templates`, central stage only shows a small `Preview` hint, inspector has no Export section.
+    - imported Plot state with `/Users/dongxutian/Documents/codegod/examples/curve_table.csv`: passed; left rail shows source/sheet/data workbook/prep/templates, central preview renders, toolbar export is enabled, inspector remains contextual.
+
 ### 2026-04-26: Merged `codex/plot-data-boundary-hardening` into `main`
 
 - Change:

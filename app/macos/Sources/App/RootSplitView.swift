@@ -14,7 +14,6 @@ struct RootSplitView: View {
                 .navigationTitle(activeWindowTitle)
                 .navigationSubtitle(activeWindowSubtitle ?? "")
                 .toolbar {
-                    ActiveWorkbenchToolbarContent(model: model)
                     WorkbenchToolbarContent(model: model)
                 }
         }
@@ -96,7 +95,7 @@ struct RootSplitView: View {
         switch model.selectedWorkbench {
         case .plot:
             PlotInspectorView(session: model.plotSession) {
-                PlotExportInspectorSection(session: model.plotSession)
+                EmptyView()
             } trailingSections: {
                 EmptyView()
             }
@@ -158,78 +157,6 @@ private struct WorkbenchSidebarRail: View {
     }
 }
 
-private struct ActiveWorkbenchToolbarContent: ToolbarContent {
-    @Bindable var model: AppModel
-
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .automatic) {
-            switch model.selectedWorkbench {
-            case .plot:
-                if model.plotSession.selectedFileURL != nil {
-                    Menu {
-                        Picker("Sheet", selection: plotSheetBinding) {
-                            ForEach(model.plotSession.availableSheets, id: \.self) { sheet in
-                                Text(sheet.displayName).tag(sheet)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "tablecells")
-                    }
-                    .help(model.plotSession.selectedSheet.displayName)
-                }
-
-                Button {
-                    model.plotSession.showDataWorkbook()
-                } label: {
-                    Image(systemName: "sidebar.leading")
-                }
-                .disabled(!model.plotSession.dataWorkbookAvailability.isEnabled)
-                .help(model.plotSession.dataWorkbookAvailability.reason ?? "Open Data Workbook")
-
-            case .dataStudio:
-                Button {
-                    model.dataStudioSession.showAnalysis()
-                } label: {
-                    Image(systemName: "function")
-                }
-                .disabled(model.dataStudioSession.focusedWorkbook == nil && model.dataStudioSession.currentRecipe == nil)
-                .help("Open Analysis")
-
-            case .composer:
-                EmptyView()
-
-            case .codeConsole:
-                if model.codeConsoleSession.selectedFileURL != nil {
-                    Menu {
-                        Picker("Sheet", selection: codeConsoleSheetBinding) {
-                            ForEach(model.codeConsoleSession.availableSheets, id: \.self) { sheet in
-                                Text(sheet.displayName).tag(sheet)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "tablecells")
-                    }
-                    .help(model.codeConsoleSession.selectedSheet.displayName)
-                }
-            }
-        }
-    }
-
-    private var plotSheetBinding: Binding<SheetValue> {
-        Binding(
-            get: { model.plotSession.selectedSheet },
-            set: { model.plotSession.setSelectedSheet($0) }
-        )
-    }
-
-    private var codeConsoleSheetBinding: Binding<SheetValue> {
-        Binding(
-            get: { model.codeConsoleSession.selectedSheet },
-            set: { model.codeConsoleSession.setSelectedSheet($0) }
-        )
-    }
-}
-
 private struct WorkbenchToolbarContent: ToolbarContent {
     @Bindable var model: AppModel
 
@@ -263,21 +190,6 @@ private struct WorkbenchToolbarContent: ToolbarContent {
                 Image(systemName: "sidebar.right")
             }
             .help(model.inspectorPresented ? "Hide Inspector" : "Show Inspector")
-
-            if model.selectedWorkbench == .dataStudio {
-                Menu {
-                    Button("New Data Studio Session") {
-                        model.newDataStudioSession()
-                    }
-
-                    Button("Clear Current Session", role: .destructive) {
-                        model.clearCurrentDataStudioSession()
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .help("Data Studio")
-            }
         }
     }
 }

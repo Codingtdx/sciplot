@@ -28,10 +28,22 @@ struct RootSplitView {
     }
 }
 """,
-        "app/macos/Sources/Features/Plot/PlotTemplateView.swift": "PlotTemplateRow()\n",
+        "app/macos/Sources/Features/Plot/PlotTemplateView.swift": """
+struct PlotSourceLibraryView {
+    var body: some View {
+        RailSectionHeader(title: "Source")
+        RailSectionHeader(title: "Data Preparation")
+        WorkbenchRailTitle(title: "Templates")
+        Picker("Sheet", selection: binding) {}
+        Label("Import Data", systemImage: "tray.and.arrow.down")
+        session.showDataWorkbook()
+        session.selectDataWorkbookTab(tab)
+        PlotTemplateRow()
+    }
+}
+""",
         "app/macos/Sources/Features/Plot/PlotInspectorView.swift": """
 ScrollView {
-    InspectorSection(title: "Actions") { Button("Export") {}.buttonStyle(.bordered) }
     PlotInspectorModePicker()
     PlotDataPipelineInspectorView()
     PlotInspectorLayerListView()
@@ -66,7 +78,7 @@ struct PlotSelectedLayerEditorView {
 struct PlotArrangeInspectorView {}
 """,
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": "SubtleStageHint(title: \"Preview\")\n",
-        "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": "PlotTemplateView()\n",
+        "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": "PlotSourceLibraryView(session: session)\n",
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"
         ),

@@ -1373,49 +1373,6 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     }
 }
 
-struct PlotExportInspectorSection: View {
-    @Bindable var session: PlotSession
-
-    var body: some View {
-        InspectorSection(title: "Actions") {
-            InspectorActionStack {
-                Button("Export") {
-                    Task { await session.exportCurrentSelection() }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!session.exportAvailability.isEnabled)
-                .help(
-                    session.exportAvailability.reason
-                        ?? "Export the current plot as PDF or 300 dpi TIFF."
-                )
-                .inspectorActionButton()
-            }
-
-            DisclosureGroup("Advanced") {
-                InspectorActionStack {
-                    Button("Reveal Output") {
-                        session.revealLatestExport()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!session.revealOutputAvailability.isEnabled)
-                    .help(
-                        session.revealOutputAvailability.reason
-                            ?? "Reveal the latest exported plot files in Finder."
-                    )
-                    .inspectorActionButton()
-                }
-
-                LatestExportList(
-                    items: session.latestExportItems,
-                    openButtonTitle: { "Open \($0.label)" },
-                    openButtonHelp: { "Open the exported plot file \($0.label)." },
-                    openAction: { session.openLatestExport(id: $0.id) }
-                )
-            }
-        }
-    }
-}
-
 enum PlotAxisSelection {
     case x
     case y

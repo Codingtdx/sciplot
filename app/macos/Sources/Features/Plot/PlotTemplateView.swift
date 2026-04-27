@@ -76,6 +76,263 @@ struct PlotTemplateView: View {
     }
 }
 
+struct PlotSourceLibraryView: View {
+    @Bindable var session: PlotSession
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                sourceSection
+                dataPreparationSection
+                templatesSection
+            }
+            .padding(.trailing, 4)
+        }
+        .scrollContentBackground(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var sourceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            RailSectionHeader(title: "Source")
+
+            if let filename = session.selectedSourceFilename {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(filename)
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(sourceStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if session.availableSheets.count > 1 {
+                    Picker("Sheet", selection: selectedSheetBinding) {
+                        ForEach(session.availableSheets, id: \.self) { sheet in
+                            Text(sheet.displayName).tag(sheet)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .help("Choose the sheet used for inspect and preview.")
+                } else {
+                    PlotSourcePropertyRow(title: "Sheet", value: session.selectedSheet.displayName)
+                }
+
+                Button {
+                    session.showDataWorkbook()
+                } label: {
+                    Label("Data Workbook", systemImage: "tablecells")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!session.dataWorkbookAvailability.isEnabled)
+                .help(session.dataWorkbookAvailability.reason ?? "Open source data, transforms, variables, and fit results.")
+            } else {
+                Button {
+                    session.isImporterPresented = true
+                } label: {
+                    Label("Import Data", systemImage: "tray.and.arrow.down")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Import a CSV, Excel workbook, or SciPlot project.")
+            }
+        }
+    }
+
+    private var dataPreparationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RailSectionHeader(title: "Data Preparation")
+
+            PlotDataPreparationRow(
+                title: PlotDataWorkbookTab.sourceData.title,
+                systemImage: "tablecells",
+                detail: session.selectedFileURL == nil ? "Import first" : session.selectedSheet.displayName,
+                availability: session.dataWorkbookAvailability
+            ) {
+                openDataWorkbook(tab: .sourceData)
+            }
+
+            PlotDataPreparationRow(
+                title: PlotDataWorkbookTab.transformed.title,
+                systemImage: "function",
+                detail: session.dataPipelineSummary.hasPipeline ? session.dataPipelineSummary.title : "Raw source",
+                availability: session.dataTransformAvailability
+            ) {
+                openDataWorkbook(tab: .transformed)
+            }
+
+            PlotDataPreparationRow(
+                title: PlotDataWorkbookTab.variables.title,
+                systemImage: "number",
+                detail: session.dataVariables.isEmpty ? "No variables" : "\(session.dataVariables.count) variables",
+                availability: session.dataTransformAvailability
+            ) {
+                openDataWorkbook(tab: .variables)
+            }
+
+            PlotDataPreparationRow(
+                title: PlotDataWorkbookTab.fit.title,
+                systemImage: "point.topleft.down.curvedto.point.bottomright.up",
+                detail: session.fitModelLabel,
+                availability: session.fitAnalysisAvailability
+            ) {
+                openDataWorkbook(tab: .fit)
+            }
+        }
+    }
+
+    private var templatesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            WorkbenchRailTitle(title: "Templates", trailing: "\(session.templateGalleryItems.count)")
+
+            if session.templateGalleryItems.isEmpty {
+                SubtleStageHint(
+                    title: "Templates appear after import",
+                    systemImage: "square.grid.2x2"
+                )
+            } else {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(session.templateGalleryItems) { item in
+                        Button {
+                            guard item.selectable else {
+                                return
+                            }
+                            session.chooseTemplate(item.id)
+                        } label: {
+                            PlotTemplateRow(
+                                title: item.title,
+                                kind: item.thumbnailKind,
+                                aspectRatio: item.aspectRatio,
+                                enabled: item.selectable
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!item.availability.isEnabled)
+                        .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
+                        .background {
+                            if session.selectedTemplateID == item.id {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.14))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedSheetBinding: Binding<SheetValue> {
+        Binding(
+            get: { session.selectedSheet },
+            set: { newValue in
+                session.setSelectedSheet(newValue)
+            }
+        )
+    }
+
+    private var sourceStatusText: String {
+        if session.isInspecting {
+            return "Inspecting"
+        }
+        if session.needsInspection {
+            return "Ready to inspect"
+        }
+        if let template = session.selectedTemplateSummary?.label {
+            return template
+        }
+        return "Ready"
+    }
+
+    private func openDataWorkbook(tab: PlotDataWorkbookTab) {
+        guard dataWorkbookAvailability(for: tab).isEnabled else {
+            return
+        }
+        session.selectDataWorkbookTab(tab)
+        session.showDataWorkbook()
+    }
+
+    private func dataWorkbookAvailability(for tab: PlotDataWorkbookTab) -> ActionAvailability {
+        switch tab {
+        case .sourceData:
+            return session.dataWorkbookAvailability
+        case .transformed, .variables:
+            return session.dataTransformAvailability
+        case .fit:
+            return session.fitAnalysisAvailability
+        }
+    }
+}
+
+private struct RailSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+}
+
+private struct PlotSourcePropertyRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .font(.caption)
+    }
+}
+
+private struct PlotDataPreparationRow: View {
+    let title: String
+    let systemImage: String
+    let detail: String
+    let availability: ActionAvailability
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body)
+                        .lineLimit(1)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 5)
+        }
+        .buttonStyle(.plain)
+        .disabled(!availability.isEnabled)
+        .help(availability.reason ?? "Open \(title).")
+        .opacity(availability.isEnabled ? 1.0 : 0.5)
+    }
+}
+
 private struct PlotTemplateRow: View {
     let title: String
     let kind: PlotTemplateThumbnailKind
