@@ -103,6 +103,52 @@ struct InspectorSurfaceModifier: ViewModifier {
     }
 }
 
+struct InspectorChromeRoot<Content: View>: View {
+    let title: String
+    let hideAction: () -> Void
+    let content: Content
+
+    init(
+        title: String,
+        hideAction: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.hideAction = hideAction
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Button(action: hideAction) {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 28, height: 26)
+                        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Hide Inspector")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
 extension View {
     func inspectorSurface() -> some View {
         modifier(InspectorSurfaceModifier())

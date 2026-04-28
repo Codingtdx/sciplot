@@ -1,10 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct RootSplitView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $model.columnVisibility) {
             WorkbenchSidebarRail(selection: $model.selectedWorkbench)
         } detail: {
             activeWorkbenchDetail
@@ -16,10 +17,24 @@ struct RootSplitView: View {
                 .toolbar {
                     WorkbenchToolbarContent(model: model)
                 }
+                .overlay(alignment: .trailing) {
+                    if !model.inspectorPresented {
+                        InspectorEdgeRevealButton {
+                            model.showInspector()
+                        }
+                        .padding(.trailing, 10)
+                        .transition(MotionTokens.stateTransition)
+                    }
+                }
         }
         .inspector(isPresented: $model.inspectorPresented) {
-            activeInspectorView
+            InspectorChromeRoot(title: activeInspectorTitle) {
+                model.hideInspector()
+            } content: {
+                activeInspectorContent
+            }
         }
+        .toolbar(removing: .sidebarToggle)
         .inspectorColumnWidth(
             min: InspectorColumnLayoutPolicy.minWidth,
             ideal: InspectorColumnLayoutPolicy.idealWidth,
@@ -55,6 +70,7 @@ struct RootSplitView: View {
         } message: {
             Text("Opening a new Plot input will replace the current imported dataset and template state.")
         }
+        .background(WindowToolbarConfigurator())
     }
 
     @ViewBuilder
@@ -91,7 +107,7 @@ struct RootSplitView: View {
     }
 
     @ViewBuilder
-    private var activeInspectorView: some View {
+    private var activeInspectorContent: some View {
         switch model.selectedWorkbench {
         case .plot:
             PlotInspectorView(session: model.plotSession) {
@@ -105,6 +121,45 @@ struct RootSplitView: View {
             ComposerInspectorView(session: model.composerSession)
         case .codeConsole:
             CodeConsoleContextView(session: model.codeConsoleSession)
+        }
+    }
+
+    private var activeInspectorTitle: String {
+        switch model.selectedWorkbench {
+        case .plot:
+            return plotInspectorTitle
+        case .dataStudio:
+            return "Data Studio"
+        case .composer:
+            return "Composer"
+        case .codeConsole:
+            return "Console"
+        }
+    }
+
+    private var plotInspectorTitle: String {
+        switch model.plotSession.canvasSelection {
+        case .figure:
+            return "Figure"
+        case .axis(let axis):
+            return axis.title
+        case .dataPipeline:
+            return "Data"
+        case .layer(let layer):
+            switch layer {
+            case .fitOverlay:
+                return "Fit Overlay"
+            case .function:
+                return "Function"
+            case .referenceGuide:
+                return "Guide"
+            case .textAnnotation:
+                return "Text"
+            case .shapeAnnotation:
+                return "Shape"
+            case .series:
+                return "Series"
+            }
         }
     }
 
@@ -161,6 +216,15 @@ private struct WorkbenchToolbarContent: ToolbarContent {
     @Bindable var model: AppModel
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button {
+                model.toggleWorkbenchSidebar()
+            } label: {
+                Image(systemName: "sidebar.left")
+            }
+            .help(model.columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar")
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 model.beginImportForActiveWorkbench()
@@ -183,13 +247,65 @@ private struct WorkbenchToolbarContent: ToolbarContent {
                 Image(systemName: "questionmark.circle")
             }
             .help("Quick Help")
+        }
+    }
+}
 
-            Button {
-                model.toggleInspector()
-            } label: {
-                Image(systemName: "sidebar.right")
+private struct InspectorEdgeRevealButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "sidebar.right")
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 28, height: 52)
+                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
+        .help("Show Inspector")
+    }
+}
+
+private struct WindowToolbarConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let toolbar = view.window?.toolbar else {
+                return
             }
-            .help(model.inspectorPresented ? "Hide Inspector" : "Show Inspector")
+            for delay in [0.0, 0.05, 0.15, 0.35, 0.8, 1.2] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak toolbar] in
+                    guard let toolbar else {
+                        return
+                    }
+                    configure(toolbar)
+                }
+            }
+        }
+    }
+
+    private func configure(_ toolbar: NSToolbar) {
+        toolbar.allowsUserCustomization = false
+        toolbar.autosavesConfiguration = false
+        toolbar.displayMode = .iconOnly
+        toolbar.sizeMode = .regular
+
+        for index in toolbar.items.indices.reversed() {
+            let rawIdentifier = toolbar.items[index].itemIdentifier.rawValue
+            if rawIdentifier == "com.apple.SwiftUI.navigationSplitView.toggleSidebar"
+                || rawIdentifier.contains("navigationSplitView.toggleSidebar") {
+                toolbar.removeItem(at: index)
+            }
         }
     }
 }

@@ -137,7 +137,7 @@ struct PlotInspectorLayerListView: View {
                         layerRow(
                             title: textAnnotationTitle(annotation),
                             subtitle: annotation.connectorEnabled ? "Callout" : "Text",
-                            systemImage: annotation.connectorEnabled ? "text.bubble" : "textformat",
+                            systemImage: annotation.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
                             isEnabled: textAnnotationEnabledBinding(id: annotation.id),
                             isSelected: selection == .textAnnotation(annotation.id),
                             onSelect: {

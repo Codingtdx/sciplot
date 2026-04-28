@@ -7,8 +7,10 @@ struct SciPlotGodApp: App {
     var body: some Scene {
         WindowGroup("SciPlot God") {
             RootSplitView(model: model)
-                .frame(minWidth: 1160, minHeight: 760)
+                .frame(minWidth: 1440, minHeight: 780)
         }
+        .defaultSize(width: 1520, height: 900)
+        .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.presented)
         .restorationBehavior(.disabled)
         .commands {

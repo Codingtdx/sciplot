@@ -22,6 +22,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/App/SciPlotGodApp.swift",
         required=(
             'WindowGroup("SciPlot God")',
+            ".defaultSize(width:",
+            ".windowResizability(.contentMinSize)",
             ".defaultLaunchBehavior(.presented)",
             ".restorationBehavior(.disabled)",
             "@State private var model = AppModel()",
@@ -37,7 +39,16 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="RootSplitView keeps sidebar as navigation chrome",
         path="app/macos/Sources/App/RootSplitView.swift",
-        required=("WorkbenchSidebarRail(", "WorkbenchToolbarContent("),
+        required=(
+            "NavigationSplitView(columnVisibility:",
+            "WorkbenchSidebarRail(",
+            "WorkbenchToolbarContent(",
+            "InspectorChromeRoot(title:",
+            "InspectorEdgeRevealButton",
+            "WindowToolbarConfigurator",
+            ".toolbar(removing: .sidebarToggle)",
+            '"sidebar.left"',
+        ),
         forbidden=(
             'Text("SciPlot God")',
             "WorkbenchSegmentedPicker",
@@ -45,6 +56,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "ActiveWorkbenchToolbarContent",
             "plotSheetBinding",
             "showDataWorkbook()",
+            "model.toggleInspector()",
             "PlotExportInspectorSection(session:",
         ),
     ),
@@ -61,28 +73,54 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="Plot workbench uses Source and Library rail",
         path="app/macos/Sources/Features/Plot/PlotWorkbenchView.swift",
-        required=("PlotSourceLibraryView(session:",),
-        forbidden=("PlotTemplateView(session:",),
+        required=(
+            "PlotSourceLibraryView(session: session, density:",
+            "PlotWorkspaceLayoutPolicy",
+            "sourceRailCollapseThreshold",
+            "PlotSourceRailDensity.compact",
+        ),
+        forbidden=(
+            "PlotTemplateView(session:",
+            "frame(minWidth: 1160",
+            "PlotSourceRailEdgeButton",
+            "sourceRailPresented",
+        ),
+    ),
+    SourceCheck(
+        label="Shared inspector chrome lets the native inspector own width",
+        path="app/macos/Sources/Shared/UI/StateViews.swift",
+        required=("struct InspectorChromeRoot", "static let minWidth: CGFloat = 360"),
+        forbidden=(
+            "content\n                .frame(\n                    minWidth: InspectorColumnLayoutPolicy.minWidth",
+            ".frame(\n            minWidth: InspectorColumnLayoutPolicy.minWidth",
+        ),
     ),
     SourceCheck(
         label="Plot left panel owns data preparation",
         path="app/macos/Sources/Features/Plot/PlotTemplateView.swift",
         required=(
+            "enum PlotSourceRailDensity",
             "struct PlotSourceLibraryView",
+            "PlotCompactSourceLibraryView",
             'RailSectionHeader(title: "Source")',
             'RailSectionHeader(title: "Objects")',
-            'RailSectionHeader(title: "Data Preparation")',
             'WorkbenchRailTitle(title: "Templates"',
             "Picker(\"Sheet\"",
             "session.showDataWorkbook()",
             "session.selectDataWorkbookTab(tab)",
             "PlotObjectListItem",
+            "PlotTemplateBrowserPopover",
         ),
         forbidden=(
+            'title: "Import from toolbar"',
             'title: "Import data"',
             'Label("Import",',
             'Label("Import Data"',
+            '"textformat"',
             "session.isImporterPresented = true",
+            'title: "No Source"',
+            'title: "Objects appear after import"',
+            'title: "Templates appear after import"',
         ),
     ),
     SourceCheck(
@@ -150,6 +188,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'DisclosureGroup("Text Annotations")',
             'DisclosureGroup("Reference Guides")',
             'DisclosureGroup("Shape Annotations")',
+            '"textformat"',
         ),
     ),
     SourceCheck(
@@ -157,30 +196,42 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift",
         required=(
             "PlotSelectedLayerEditorView",
-            "PlotArrangeInspectorView",
             "selection: PlotLayerSelection?",
+            "exactGuideValueEditor",
+            "exactGuideRangeEditor",
         ),
         forbidden=(
             "ForEach(session.textAnnotations)",
             "ForEach(session.referenceGuides)",
             "ForEach(session.shapeAnnotations)",
             "ForEach(session.analyticalLayers)",
+            "PlotArrangeInspectorView",
+            "nudgeReferenceGuide(",
         ),
     ),
     SourceCheck(
-        label="Plot preview owns the tool strip and avoids hero empty state",
+        label="Plot preview owns the tool palette and avoids duplicate overlay controls",
         path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
         required=(
-            "PlotToolStripView(",
+            "PlotFloatingToolPalette(",
+        ),
+        forbidden=(
+            'EmptyStateCard(title: "No Preview")',
             "PlotToolOptionsBar(",
-            "PlotCanvasOverlayControlsView(",
+            "PlotCanvasOverlayControlsView",
             "selectedMovableLayer",
-            "alignment: .bottomTrailing",
-            "positionLabel",
+            'title: "Preview"',
             "Option + Arrow",
             ".keyboardShortcut(shortcut, modifiers: [.option])",
         ),
-        forbidden=('EmptyStateCard(title: "No Preview")',),
+    ),
+    SourceCheck(
+        label="Plot canvas overlay controls avoid localized text symbol labels",
+        path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
+        forbidden=(
+            'return "textformat"',
+            '"textformat"',
+        ),
     ),
     SourceCheck(
         label="Plot tool and canvas selection are app-only presentation state",
@@ -188,22 +239,28 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=(
             "enum PlotTool",
             "enum PlotCanvasSelection",
-            "struct PlotToolStripView",
+            "struct PlotFloatingToolPalette",
+            "PlotToolPopoverContent",
+            "PlotGuideToolCreateForm",
+            "axisTarget",
+            "valueText",
+            "startText",
+            "endText",
+            "floatingPaletteTools",
+            "floatingPaletteToolGroups",
+            "opensToolPopover",
             "PlotLayerSelection",
             "shortcutKey",
-            "showsCanvasOptions",
             "plotToolAvailability",
             "activatePlotTool",
         ),
         forbidden=(
             "struct PlotInspectorModePicker",
+            "struct PlotToolStripView",
+            "PlotToolOptionsBar",
+            ".background(.thinMaterial, in: Capsule())",
             ".keyboardShortcut(shortcutKey, modifiers: [])",
-            "addReferenceGuide(kind:",
-            "addTextAnnotation()",
-            "addShapeAnnotation(kind:",
-            "addAnalyticalFunctionLayer()",
-            "addAxisBreak(axis:",
-            "updateExtraYAxis { axis in",
+            'return "textformat"',
         ),
     ),
     SourceCheck(
@@ -308,6 +365,48 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         for token in check.forbidden:
             if token in source:
                 issues.append(f"{check.path}: {check.label}: forbidden token still present {token!r}")
+
+    try:
+        root_split = _read_source(root, "app/macos/Sources/App/RootSplitView.swift")
+        toolbar_start = root_split.index("private struct WorkbenchToolbarContent")
+        toolbar_end = root_split.index("private struct InspectorEdgeRevealButton", toolbar_start)
+        toolbar_source = root_split[toolbar_start:toolbar_end]
+        if '"sidebar.right"' in toolbar_source:
+            issues.append("app/macos/Sources/App/RootSplitView.swift: toolbar must not own the inspector toggle")
+        if "toggleInspector()" in toolbar_source:
+            issues.append("app/macos/Sources/App/RootSplitView.swift: toolbar must not toggle the inspector")
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/App/RootSplitView.swift: toolbar structure check failed: {error}")
+
+    try:
+        plot_mode = _read_source(root, "app/macos/Sources/Features/Plot/PlotInspectorMode.swift")
+        palette_start = plot_mode.index("static let floatingPaletteTools")
+        palette_end = plot_mode.index("var title:", palette_start)
+        palette_source = plot_mode[palette_start:palette_end]
+        if ".dataCursor" in palette_source:
+            issues.append(
+                "app/macos/Sources/Features/Plot/PlotInspectorMode.swift: "
+                "Data Cursor must not be in the main floating palette"
+            )
+
+        activate_start = plot_mode.index("func activatePlotTool")
+        activate_end = plot_mode.index("func selectCanvasSelection", activate_start)
+        activate_source = plot_mode[activate_start:activate_end]
+        for forbidden_call in (
+            "addReferenceGuide(",
+            "addTextAnnotation(",
+            "addShapeAnnotation(",
+            "addAnalyticalFunctionLayer(",
+            "addAxisBreak(",
+            "updateExtraYAxis",
+        ):
+            if forbidden_call in activate_source:
+                issues.append(
+                    "app/macos/Sources/Features/Plot/PlotInspectorMode.swift: "
+                    f"activatePlotTool must stay side-effect-light; found {forbidden_call!r}"
+                )
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/Features/Plot/PlotInspectorMode.swift: tool structure check failed: {error}")
 
     for relative_path in WORKBENCH_ROOTS:
         try:

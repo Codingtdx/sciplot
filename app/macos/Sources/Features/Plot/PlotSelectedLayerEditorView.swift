@@ -141,24 +141,43 @@ struct PlotSelectedLayerEditorView: View {
                 .pickerStyle(.menu)
             }
             if guide.kind == "line" {
-                AdaptiveInspectorControlRow(title: "Value") {
-                    TextField("Value", text: referenceGuideValueBinding(id: id))
-                        .textFieldStyle(.roundedBorder)
-                }
+                exactGuideValueEditor(id: id)
             } else {
-                axisRangeRow(
-                    title: "Region",
-                    lowerTitle: "Start",
-                    upperTitle: "End",
-                    lowerBinding: referenceGuideStartBinding(id: id),
-                    upperBinding: referenceGuideEndBinding(id: id)
-                )
+                exactGuideRangeEditor(id: id)
             }
             AdaptiveInspectorControlRow(title: "Label") {
                 TextField("Optional", text: referenceGuideLabelBinding(id: id))
                     .textFieldStyle(.roundedBorder)
             }
+            AdaptiveInspectorControlRow(title: "Visible") {
+                Toggle("", isOn: referenceGuideEnabledBinding(id: id))
+                    .labelsHidden()
+            }
+            Button(role: .destructive) {
+                session.removeReferenceGuide(id: id)
+                session.selectCanvasSelection(.figure)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
         }
+    }
+
+    private func exactGuideValueEditor(id: String) -> some View {
+        AdaptiveInspectorControlRow(title: "Value") {
+            TextField("Value", text: referenceGuideValueBinding(id: id))
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func exactGuideRangeEditor(id: String) -> some View {
+        axisRangeRow(
+            title: "Region",
+            lowerTitle: "Start",
+            upperTitle: "End",
+            lowerBinding: referenceGuideStartBinding(id: id),
+            upperBinding: referenceGuideEndBinding(id: id)
+        )
     }
 
     private func textAnnotationEditor(id: String) -> some View {
@@ -471,6 +490,15 @@ struct PlotSelectedLayerEditorView: View {
             get: { referenceGuide(id).label ?? "" },
             set: { label in
                 session.updateReferenceGuide(id: id, policy: .debounced) { $0.label = label.isEmpty ? nil : label }
+            }
+        )
+    }
+
+    private func referenceGuideEnabledBinding(id: String) -> Binding<Bool> {
+        boolBinding(
+            get: { referenceGuide(id).enabled },
+            set: { enabled in
+                session.updateReferenceGuide(id: id, policy: .immediate) { $0.enabled = enabled }
             }
         )
     }
@@ -811,130 +839,6 @@ struct PlotSelectedLayerEditorView: View {
             TextField(label, text: binding)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 84)
-        }
-    }
-}
-
-struct PlotArrangeInspectorView: View {
-    @Bindable var session: PlotSession
-    let selection: PlotLayerSelection?
-
-    var body: some View {
-        InspectorSection(title: "Arrange") {
-            switch selection {
-            case .referenceGuide(let id):
-                if let guide = session.referenceGuides.first(where: { $0.id == id }) {
-                    referenceGuideTransformControls(for: guide)
-                } else {
-                    InspectorEmptyState(message: "Select an overlay")
-                }
-            case .textAnnotation(let id):
-                if let annotation = session.textAnnotations.first(where: { $0.id == id }) {
-                    textAnnotationTransformControls(for: annotation)
-                } else {
-                    InspectorEmptyState(message: "Select an overlay")
-                }
-            case .shapeAnnotation(let id):
-                if let annotation = session.shapeAnnotations.first(where: { $0.id == id }) {
-                    shapeAnnotationTransformControls(for: annotation)
-                } else {
-                    InspectorEmptyState(message: "Select an overlay")
-                }
-            default:
-                InspectorEmptyState(message: "Select an overlay")
-            }
-        }
-    }
-
-    private func referenceGuideTransformControls(for guide: ReferenceGuidePayload) -> some View {
-        let value = guide.kind == "line"
-            ? (guide.value ?? 0.0)
-            : ((guide.start ?? 0.0) + (guide.end ?? 1.0)) / 2.0
-        let xValue = guide.axisTarget == "x" ? value : 0.0
-        let yValue = guide.axisTarget == "x" ? 0.0 : value
-        let step = guide.kind == "line" ? 0.1 : 0.05
-
-        return PlotOverlayTransformControls(
-            title: guide.kind == "line" ? "Adjust Guide" : "Move Region",
-            xLabel: "X",
-            yLabel: "Y",
-            xValue: xValue,
-            yValue: yValue,
-            stepX: step,
-            stepY: step
-        ) { deltaX, deltaY in
-            session.nudgeReferenceGuide(
-                id: guide.id,
-                deltaX: deltaX,
-                deltaY: deltaY,
-                policy: .debounced
-            )
-        }
-    }
-
-    private func textAnnotationTransformControls(for annotation: TextAnnotationPayload) -> some View {
-        let step = annotation.coordinateSpace == "axes_fraction" ? 0.02 : 0.1
-        return VStack(alignment: .leading, spacing: 8) {
-            PlotOverlayTransformControls(
-                title: "Move Annotation",
-                xLabel: "X",
-                yLabel: "Y",
-                xValue: annotation.x,
-                yValue: annotation.y,
-                stepX: step,
-                stepY: step
-            ) { deltaX, deltaY in
-                session.nudgeTextAnnotationPosition(
-                    id: annotation.id,
-                    deltaX: deltaX,
-                    deltaY: deltaY,
-                    includeTarget: false,
-                    policy: .debounced
-                )
-            }
-
-            if annotation.connectorEnabled {
-                PlotOverlayTransformControls(
-                    title: "Move Target",
-                    xLabel: "TX",
-                    yLabel: "TY",
-                    xValue: annotation.targetX,
-                    yValue: annotation.targetY,
-                    stepX: step,
-                    stepY: step
-                ) { deltaX, deltaY in
-                    session.updateTextAnnotation(id: annotation.id, policy: .debounced) { item in
-                        item.targetX += deltaX
-                        item.targetY += deltaY
-                        if item.coordinateSpace == "axes_fraction" {
-                            item.targetX = min(max(item.targetX, 0.0), 1.0)
-                            item.targetY = min(max(item.targetY, 0.0), 1.0)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func shapeAnnotationTransformControls(for annotation: ShapeAnnotationPayload) -> some View {
-        let centerX = (annotation.xStart + annotation.xEnd) / 2.0
-        let centerY = (annotation.yStart + annotation.yEnd) / 2.0
-
-        return PlotOverlayTransformControls(
-            title: "Move Shape",
-            xLabel: "X",
-            yLabel: "Y",
-            xValue: centerX,
-            yValue: centerY,
-            stepX: 0.05,
-            stepY: 0.05
-        ) { deltaX, deltaY in
-            session.nudgeShapeAnnotation(
-                id: annotation.id,
-                deltaX: deltaX,
-                deltaY: deltaY,
-                policy: .debounced
-            )
         }
     }
 }

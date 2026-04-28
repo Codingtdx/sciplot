@@ -10,7 +10,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
 
     init(
         session: PlotSession,
-        styleSectionTitle: String = "Plot Options",
+        styleSectionTitle: String = "Figure",
         plotOptionsAdvancedExpanded: Bool = false,
         showsPlotInspectorModes: Bool = true,
         @ViewBuilder leadingSections: () -> LeadingSections = { EmptyView() },
@@ -1097,76 +1097,6 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         )
     }
 
-    private func referenceGuideTransformControls(for guide: ReferenceGuidePayload) -> some View {
-        let value = guide.kind == "line"
-            ? (guide.value ?? 0.0)
-            : ((guide.start ?? 0.0) + (guide.end ?? 1.0)) / 2.0
-        let xValue = guide.axisTarget == "x" ? value : 0.0
-        let yValue = guide.axisTarget == "x" ? 0.0 : value
-        let step = guide.kind == "line" ? 0.1 : 0.05
-
-        return PlotOverlayTransformControls(
-            title: guide.kind == "line" ? "Adjust Guide" : "Move Region",
-            xLabel: "X",
-            yLabel: "Y",
-            xValue: xValue,
-            yValue: yValue,
-            stepX: step,
-            stepY: step
-        ) { deltaX, deltaY in
-            session.nudgeReferenceGuide(
-                id: guide.id,
-                deltaX: deltaX,
-                deltaY: deltaY,
-                policy: .debounced
-            )
-        }
-    }
-
-    private func textAnnotationTransformControls(for annotation: TextAnnotationPayload) -> some View {
-        let step = annotation.coordinateSpace == "axes_fraction" ? 0.02 : 0.1
-        return VStack(alignment: .leading, spacing: 8) {
-            PlotOverlayTransformControls(
-                title: "Move Annotation",
-                xLabel: "X",
-                yLabel: "Y",
-                xValue: annotation.x,
-                yValue: annotation.y,
-                stepX: step,
-                stepY: step
-            ) { deltaX, deltaY in
-                session.nudgeTextAnnotationPosition(
-                    id: annotation.id,
-                    deltaX: deltaX,
-                    deltaY: deltaY,
-                    includeTarget: false,
-                    policy: .debounced
-                )
-            }
-
-            if annotation.connectorEnabled {
-                PlotOverlayTransformControls(
-                    title: "Move Callout Target",
-                    xLabel: "TX",
-                    yLabel: "TY",
-                    xValue: annotation.targetX,
-                    yValue: annotation.targetY,
-                    stepX: step,
-                    stepY: step
-                ) { deltaX, deltaY in
-                    session.updateTextAnnotation(id: annotation.id, policy: .debounced) { item in
-                        item.targetX += deltaX
-                        item.targetY += deltaY
-                        if item.coordinateSpace == "axes_fraction" {
-                            item.targetX = min(max(item.targetX, 0.0), 1.0)
-                            item.targetY = min(max(item.targetY, 0.0), 1.0)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private func axisTickLabelControls(title: String, axis: PlotAxisSelection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -1331,7 +1261,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
 }
 
 extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections == EmptyView {
-    init(session: PlotSession, styleSectionTitle: String = "Plot Options") {
+    init(session: PlotSession, styleSectionTitle: String = "Figure") {
         self.init(
             session: session,
             styleSectionTitle: styleSectionTitle,
@@ -1364,9 +1294,6 @@ private struct PlotSelectionInspectorView<FigureContent: View, AxisContent: View
             axisContent
         case .layer(let layer):
             PlotSelectedLayerEditorView(session: session, selection: layer)
-            if layer.isMovableOverlay {
-                PlotArrangeInspectorView(session: session, selection: layer)
-            }
         case .dataPipeline:
             InspectorSection(title: "Data") {
                 AdaptiveInspectorTextRow(title: "Pipeline", value: session.dataPipelineSummary.title)

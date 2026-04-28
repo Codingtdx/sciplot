@@ -161,6 +161,8 @@
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
+- Plot Source rail 默认常驻并自动紧凑；禁止恢复用户可见的 Source hide/show 边缘按钮。Source rail 只承载 source 状态、对象列表和推荐模板，不再放重复导入说明。
+- Plot 工具条是对象创建/选择入口，左侧 Objects list 负责选择/显隐/删除对象，右侧 selection inspector 负责精确科研参数编辑。Reference guide / region 默认必须通过 Axis + Value 或 Start/End 输入创建和编辑，禁止把拖拽、nudge HUD 或画布浮动参数面板作为默认路径。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data`、`Transformed`、`Variables` 和 `Fit`
@@ -168,9 +170,9 @@
   - Plot inspector `Advanced Plot` 里的 fit overlay 只开放给 `curve / point_line / scatter`
   - Plot inspector `Advanced Plot` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
   - Plot inspector `Axis -> Advanced` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
-  - Plot inspector `Advanced Plot` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
-  - Plot inspector `Advanced Plot` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
-  - Plot inspector `Advanced Plot` 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
+  - Plot tool + selection inspector 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
+  - Plot tool + selection inspector 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
+  - Plot tool + selection inspector 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
   - Plot inspector `Advanced Plot` 里的 `function layers` 通过 `render_options.analytical_layers` 持久化；当前只对 `function_curve` 开放基础编辑，表达式安全解析和采样归后端共享表达式引擎负责，不能借此引入自由脚本/命令栈或前端第二套数学执行器
   - Plot inspector `Advanced Plot` 里的 `data variables / data transforms` 通过 `render_options.data_variables / render_options.data_transforms` 持久化；基础 GUI 只编辑 typed payload 并展示后端错误，变量、mask、binning、aggregate、smooth、pivot、表达式与错误解释归后端负责，不能借此引入前端表达式执行器或第二套 loader 语义
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：

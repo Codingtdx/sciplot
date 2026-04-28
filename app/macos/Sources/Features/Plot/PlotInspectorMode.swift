@@ -14,6 +14,36 @@ enum PlotTool: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    static let floatingPaletteTools: [PlotTool] = [
+        .select,
+        .panZoom,
+        .fit,
+        .guide,
+        .text,
+        .shape,
+        .function,
+        .axisBreak,
+        .secondaryAxis,
+    ]
+
+    static let floatingPaletteToolGroups: [[PlotTool]] = [
+        [
+            .select,
+            .panZoom,
+        ],
+        [
+            .fit,
+            .guide,
+            .text,
+            .shape,
+            .function,
+        ],
+        [
+            .axisBreak,
+            .secondaryAxis,
+        ],
+    ]
+
     var title: String {
         switch self {
         case .select:
@@ -52,7 +82,7 @@ enum PlotTool: String, CaseIterable, Identifiable {
         case .guide:
             return "ruler"
         case .text:
-            return "textformat"
+            return "character.cursor.ibeam"
         case .shape:
             return "rectangle.dashed"
         case .function:
@@ -114,11 +144,11 @@ enum PlotTool: String, CaseIterable, Identifiable {
         }
     }
 
-    var showsCanvasOptions: Bool {
+    var opensToolPopover: Bool {
         switch self {
-        case .fit, .guide, .text, .shape, .function, .axisBreak, .secondaryAxis:
+        case .guide, .text, .shape, .function:
             return true
-        case .select, .panZoom, .dataCursor:
+        case .select, .panZoom, .dataCursor, .fit, .axisBreak, .secondaryAxis:
             return false
         }
     }
@@ -179,14 +209,6 @@ enum PlotLayerSelection: Hashable, Identifiable {
         }
     }
 
-    var isMovableOverlay: Bool {
-        switch self {
-        case .referenceGuide, .textAnnotation, .shapeAnnotation:
-            return true
-        case .fitOverlay, .function, .series:
-            return false
-        }
-    }
 }
 
 enum PlotCanvasSelection: Hashable, Identifiable {
@@ -321,19 +343,28 @@ extension PlotSession {
     }
 }
 
-struct PlotToolStripView: View {
+struct PlotFloatingToolPalette: View {
     @Bindable var session: PlotSession
+    @State private var presentedTool: PlotTool?
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(PlotTool.allCases) { tool in
-                toolButton(tool)
+        HStack(spacing: 4) {
+            ForEach(Array(PlotTool.floatingPaletteToolGroups.enumerated()), id: \.offset) { index, group in
+                if index > 0 {
+                    Divider()
+                        .frame(height: 24)
+                        .padding(.horizontal, 2)
+                }
+
+                ForEach(group) { tool in
+                    toolButton(tool)
+                }
             }
         }
-        .padding(5)
-        .background(.thinMaterial, in: Capsule())
+        .padding(7)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay(
-            Capsule()
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .strokeBorder(Color.secondary.opacity(0.16), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.10), radius: 12, x: 0, y: 6)
@@ -344,21 +375,232 @@ struct PlotToolStripView: View {
         let availability = session.plotToolAvailability(for: tool)
         Button {
             session.activatePlotTool(tool)
+            presentedTool = tool.opensToolPopover ? tool : nil
         } label: {
             Image(systemName: tool.systemImage)
                 .font(.system(size: 14, weight: .medium))
-                .frame(width: 34, height: 32)
-                .contentShape(Rectangle())
+                .frame(width: 32, height: 32)
+                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .foregroundStyle(session.selectedPlotTool == tool ? Color.accentColor : Color.primary)
         .background {
             if session.selectedPlotTool == tool {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.accentColor.opacity(0.16))
             }
         }
         .disabled(!availability.isEnabled)
         .help(availability.reason ?? tool.help)
+        .popover(isPresented: popoverBinding(for: tool), arrowEdge: .bottom) {
+            PlotToolPopoverContent(
+                session: session,
+                tool: tool,
+                dismiss: {
+                    presentedTool = nil
+                }
+            )
+        }
+    }
+
+    private func popoverBinding(for tool: PlotTool) -> Binding<Bool> {
+        Binding(
+            get: { presentedTool == tool },
+            set: { isPresented in
+                if !isPresented, presentedTool == tool {
+                    presentedTool = nil
+                }
+            }
+        )
+    }
+}
+
+private struct PlotToolPopoverContent: View {
+    @Bindable var session: PlotSession
+    let tool: PlotTool
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(tool.title, systemImage: tool.systemImage)
+                .font(.headline)
+
+            switch tool {
+            case .guide:
+                PlotGuideToolCreateForm(session: session, dismiss: dismiss)
+            case .text:
+                Button {
+                    addText(displayStyle: "plain", connectorEnabled: false)
+                } label: {
+                    Label("Add Text", systemImage: "plus")
+                }
+                Button {
+                    addText(displayStyle: "callout", connectorEnabled: true)
+                } label: {
+                    Label("Add Callout", systemImage: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
+                }
+            case .shape:
+                Button {
+                    addShape(kind: "rectangle")
+                } label: {
+                    Label("Add Rectangle", systemImage: "rectangle")
+                }
+                Button {
+                    addShape(kind: "ellipse")
+                } label: {
+                    Label("Add Ellipse", systemImage: "oval")
+                }
+                Button {
+                    addShape(kind: "bracket")
+                } label: {
+                    Label("Add Bracket", systemImage: "square.split.diagonal")
+                }
+            case .function:
+                Button {
+                    addFunction()
+                } label: {
+                    Label("Add Function", systemImage: "plus")
+                }
+            case .select, .panZoom, .dataCursor, .fit, .axisBreak, .secondaryAxis:
+                EmptyView()
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .padding(12)
+        .frame(width: 190, alignment: .leading)
+    }
+
+    private func addText(displayStyle: String, connectorEnabled: Bool) {
+        session.addTextAnnotation(displayStyle: displayStyle, connectorEnabled: connectorEnabled)
+        if let id = session.selectedTextAnnotationID {
+            session.selectPlotLayer(.textAnnotation(id))
+        }
+        dismiss()
+    }
+
+    private func addShape(kind: String) {
+        session.addShapeAnnotation(kind: kind)
+        if let id = session.selectedShapeAnnotationID {
+            session.selectPlotLayer(.shapeAnnotation(id))
+        }
+        dismiss()
+    }
+
+    private func addFunction() {
+        session.addAnalyticalFunctionLayer()
+        if let layer = session.analyticalLayers.last {
+            session.selectPlotLayer(.function(layer.id))
+        }
+        dismiss()
+    }
+}
+
+private struct PlotGuideToolCreateForm: View {
+    @Bindable var session: PlotSession
+    let dismiss: () -> Void
+
+    @State private var kind = "line"
+    @State private var axisTarget = "y_primary"
+    @State private var valueText = "0"
+    @State private var startText = "0"
+    @State private var endText = "1"
+    @State private var labelText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("", selection: $kind) {
+                Text("Line").tag("line")
+                Text("Region").tag("band")
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+
+            Picker("Axis", selection: $axisTarget) {
+                Text("X").tag("x")
+                Text("Primary Y").tag("y_primary")
+                if session.hasActiveSecondaryYAxis || axisTarget == "y_secondary" {
+                    Text("Secondary Y").tag("y_secondary")
+                }
+            }
+            .pickerStyle(.menu)
+
+            if kind == "line" {
+                LabeledContent("Value") {
+                    TextField("0", text: $valueText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 88)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    LabeledContent("Start") {
+                        TextField("0", text: $startText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
+                    }
+                    LabeledContent("End") {
+                        TextField("1", text: $endText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
+                    }
+                }
+            }
+
+            LabeledContent("Label") {
+                TextField("Optional", text: $labelText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 124)
+            }
+
+            Button {
+                addGuide()
+            } label: {
+                Label(kind == "line" ? "Add Line" : "Add Region", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!canCreate)
+        }
+    }
+
+    private var canCreate: Bool {
+        if kind == "line" {
+            return parsed(valueText) != nil
+        }
+        guard let start = parsed(startText), let end = parsed(endText) else {
+            return false
+        }
+        return start != end
+    }
+
+    private func addGuide() {
+        session.addReferenceGuide(kind: kind, axisTarget: axisTarget)
+        guard let id = session.selectedReferenceGuideID else {
+            dismiss()
+            return
+        }
+
+        let label = labelText.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.updateReferenceGuide(id: id, policy: .immediate) { guide in
+            guide.axisTarget = axisTarget
+            guide.label = label.isEmpty ? nil : label
+            if kind == "line" {
+                guide.value = parsed(valueText) ?? 0
+                guide.start = nil
+                guide.end = nil
+            } else {
+                guide.value = nil
+                let start = parsed(startText) ?? 0
+                let end = parsed(endText) ?? 1
+                guide.start = min(start, end)
+                guide.end = max(start, end)
+            }
+        }
+        session.selectPlotLayer(.referenceGuide(id))
+        dismiss()
+    }
+
+    private func parsed(_ text: String) -> Double? {
+        Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }

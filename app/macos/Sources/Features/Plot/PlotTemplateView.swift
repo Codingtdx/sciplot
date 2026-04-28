@@ -26,6 +26,11 @@ enum PlotTemplateThumbnailKind: String, Sendable {
     case fallback
 }
 
+enum PlotSourceRailDensity: Equatable {
+    case regular
+    case compact
+}
+
 struct PlotTemplateView: View {
     @Bindable var session: PlotSession
 
@@ -78,20 +83,34 @@ struct PlotTemplateView: View {
 
 struct PlotSourceLibraryView: View {
     @Bindable var session: PlotSession
+    let density: PlotSourceRailDensity
+    @State private var dataPreparationExpanded = false
+    @State private var templateBrowserPresented = false
+
+    init(session: PlotSession, density: PlotSourceRailDensity = .regular) {
+        self.session = session
+        self.density = density
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                sourceSection
-                if session.selectedFileURL != nil {
-                    objectsSection
-                    dataPreparationSection
-                    templatesSection
+        Group {
+            if density == .compact {
+                PlotCompactSourceLibraryView(session: session)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sourceSection
+                        if session.selectedFileURL != nil {
+                            objectsSection
+                            dataPreparationSection
+                            templatesSection
+                        }
+                    }
+                    .padding(.trailing, 4)
                 }
+                .scrollContentBackground(.hidden)
             }
-            .padding(.trailing, 4)
         }
-        .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -105,11 +124,6 @@ struct PlotSourceLibraryView: View {
                         .font(.body.weight(.medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
-
-                    Text(sourceStatusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
 
                 if session.availableSheets.count > 1 {
@@ -135,10 +149,10 @@ struct PlotSourceLibraryView: View {
                 .disabled(!session.dataWorkbookAvailability.isEnabled)
                 .help(session.dataWorkbookAvailability.reason ?? "Open source data, transforms, variables, and fit results.")
             } else {
-                SubtleStageHint(
-                    title: "Import from toolbar",
-                    systemImage: "tray.and.arrow.down"
-                )
+                Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
             }
         }
     }
@@ -147,120 +161,106 @@ struct PlotSourceLibraryView: View {
         VStack(alignment: .leading, spacing: 8) {
             RailSectionHeader(title: "Objects")
 
-            if session.selectedFileURL == nil {
-                SubtleStageHint(
-                    title: "Objects appear after import",
-                    systemImage: "square.stack.3d.up"
+            LazyVStack(alignment: .leading, spacing: 2) {
+                objectRow(
+                    item: PlotObjectListItem(
+                        id: "figure",
+                        title: "Figure",
+                        systemImage: "doc.richtext",
+                        selection: .figure
+                    )
                 )
-            } else {
-                LazyVStack(alignment: .leading, spacing: 2) {
+
+                if session.supportsFitOverlayControls {
                     objectRow(
                         item: PlotObjectListItem(
-                            id: "figure",
-                            title: "Figure",
-                            subtitle: session.selectedTemplateSummary?.label ?? "Canvas",
-                            systemImage: "doc.richtext",
-                            selection: .figure
+                            id: PlotLayerSelection.fitOverlay.id,
+                            title: "Fit Overlay",
+                            systemImage: "chart.xyaxis.line",
+                            selection: .layer(.fitOverlay)
+                        ),
+                        isEnabled: fitEnabledBinding
+                    )
+                }
+
+                ForEach(session.analyticalLayers) { layer in
+                    let selection = PlotLayerSelection.function(layer.id)
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: selection.id,
+                            title: functionTitle(layer),
+                            systemImage: "function",
+                            selection: .layer(selection)
+                        ),
+                        isEnabled: analyticalLayerEnabledBinding(id: layer.id),
+                        onDelete: {
+                            session.removeAnalyticalLayer(id: layer.id)
+                            clearIfSelected(.layer(selection))
+                        }
+                    )
+                }
+
+                ForEach(session.referenceGuides) { guide in
+                    let selection = PlotLayerSelection.referenceGuide(guide.id)
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: selection.id,
+                            title: referenceGuideTitle(guide),
+                            systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
+                            selection: .layer(selection)
+                        ),
+                        isEnabled: referenceGuideEnabledBinding(id: guide.id),
+                        onDelete: {
+                            session.removeReferenceGuide(id: guide.id)
+                            clearIfSelected(.layer(selection))
+                        }
+                    )
+                }
+
+                ForEach(session.textAnnotations) { annotation in
+                    let selection = PlotLayerSelection.textAnnotation(annotation.id)
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: selection.id,
+                            title: textAnnotationTitle(annotation),
+                            systemImage: annotation.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
+                            selection: .layer(selection)
+                        ),
+                        isEnabled: textAnnotationEnabledBinding(id: annotation.id),
+                        onDelete: {
+                            session.removeTextAnnotation(id: annotation.id)
+                            clearIfSelected(.layer(selection))
+                        }
+                    )
+                }
+
+                ForEach(session.shapeAnnotations) { annotation in
+                    let selection = PlotLayerSelection.shapeAnnotation(annotation.id)
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: selection.id,
+                            title: shapeAnnotationTitle(annotation),
+                            systemImage: shapeSymbol(annotation.kind),
+                            selection: .layer(selection)
+                        ),
+                        isEnabled: shapeAnnotationEnabledBinding(id: annotation.id),
+                        onDelete: {
+                            session.removeShapeAnnotation(id: annotation.id)
+                            clearIfSelected(.layer(selection))
+                        }
+                    )
+                }
+
+                ForEach(session.seriesOrderLabels, id: \.self) { seriesID in
+                    let selection = PlotLayerSelection.series(seriesID)
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: selection.id,
+                            title: seriesID,
+                            systemImage: "list.bullet.rectangle",
+                            selection: .layer(selection)
                         )
                     )
-
-                    if session.supportsFitOverlayControls {
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: PlotLayerSelection.fitOverlay.id,
-                                title: "Fit Overlay",
-                                subtitle: session.fitModelLabel,
-                                systemImage: "chart.xyaxis.line",
-                                selection: .layer(.fitOverlay)
-                            ),
-                            isEnabled: fitEnabledBinding
-                        )
-                    }
-
-                    ForEach(session.analyticalLayers) { layer in
-                        let selection = PlotLayerSelection.function(layer.id)
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: selection.id,
-                                title: functionTitle(layer),
-                                subtitle: "Function",
-                                systemImage: "function",
-                                selection: .layer(selection)
-                            ),
-                            isEnabled: analyticalLayerEnabledBinding(id: layer.id),
-                            onDelete: {
-                                session.removeAnalyticalLayer(id: layer.id)
-                                clearIfSelected(.layer(selection))
-                            }
-                        )
-                    }
-
-                    ForEach(session.referenceGuides) { guide in
-                        let selection = PlotLayerSelection.referenceGuide(guide.id)
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: selection.id,
-                                title: referenceGuideTitle(guide),
-                                subtitle: guide.kind == "band" ? "Region" : "Guide",
-                                systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
-                                selection: .layer(selection)
-                            ),
-                            isEnabled: referenceGuideEnabledBinding(id: guide.id),
-                            onDelete: {
-                                session.removeReferenceGuide(id: guide.id)
-                                clearIfSelected(.layer(selection))
-                            }
-                        )
-                    }
-
-                    ForEach(session.textAnnotations) { annotation in
-                        let selection = PlotLayerSelection.textAnnotation(annotation.id)
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: selection.id,
-                                title: textAnnotationTitle(annotation),
-                                subtitle: annotation.connectorEnabled ? "Callout" : "Text",
-                                systemImage: annotation.connectorEnabled ? "text.bubble" : "textformat",
-                                selection: .layer(selection)
-                            ),
-                            isEnabled: textAnnotationEnabledBinding(id: annotation.id),
-                            onDelete: {
-                                session.removeTextAnnotation(id: annotation.id)
-                                clearIfSelected(.layer(selection))
-                            }
-                        )
-                    }
-
-                    ForEach(session.shapeAnnotations) { annotation in
-                        let selection = PlotLayerSelection.shapeAnnotation(annotation.id)
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: selection.id,
-                                title: shapeAnnotationTitle(annotation),
-                                subtitle: shapeKindLabel(annotation.kind),
-                                systemImage: shapeSymbol(annotation.kind),
-                                selection: .layer(selection)
-                            ),
-                            isEnabled: shapeAnnotationEnabledBinding(id: annotation.id),
-                            onDelete: {
-                                session.removeShapeAnnotation(id: annotation.id)
-                                clearIfSelected(.layer(selection))
-                            }
-                        )
-                    }
-
-                    ForEach(session.seriesOrderLabels, id: \.self) { seriesID in
-                        let selection = PlotLayerSelection.series(seriesID)
-                        objectRow(
-                            item: PlotObjectListItem(
-                                id: selection.id,
-                                title: seriesID,
-                                subtitle: "Series",
-                                systemImage: "list.bullet.rectangle",
-                                selection: .layer(selection)
-                            )
-                        )
-                    }
                 }
             }
         }
@@ -281,15 +281,9 @@ struct PlotSourceLibraryView: View {
                         .foregroundStyle(session.canvasSelection == item.selection ? Color.accentColor : Color.secondary)
                         .frame(width: 18)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.callout.weight(.medium))
-                            .lineLimit(1)
-                        Text(item.subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text(item.title)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
 
                     Spacer(minLength: 8)
                 }
@@ -323,85 +317,132 @@ struct PlotSourceLibraryView: View {
     }
 
     private var dataPreparationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RailSectionHeader(title: "Data Preparation")
+        DisclosureGroup(isExpanded: $dataPreparationExpanded) {
+            VStack(alignment: .leading, spacing: 4) {
+                PlotDataPreparationRow(
+                    title: PlotDataWorkbookTab.sourceData.title,
+                    systemImage: "tablecells",
+                    detail: session.selectedFileURL == nil ? "Source" : session.selectedSheet.displayName,
+                    availability: session.dataWorkbookAvailability
+                ) {
+                    openDataWorkbook(tab: .sourceData)
+                }
 
-            PlotDataPreparationRow(
-                title: PlotDataWorkbookTab.sourceData.title,
-                systemImage: "tablecells",
-                detail: session.selectedFileURL == nil ? "Source" : session.selectedSheet.displayName,
-                availability: session.dataWorkbookAvailability
-            ) {
-                openDataWorkbook(tab: .sourceData)
-            }
+                PlotDataPreparationRow(
+                    title: PlotDataWorkbookTab.transformed.title,
+                    systemImage: "function",
+                    detail: session.dataPipelineSummary.hasPipeline ? session.dataPipelineSummary.title : "Raw",
+                    availability: session.dataTransformAvailability
+                ) {
+                    openDataWorkbook(tab: .transformed)
+                }
 
-            PlotDataPreparationRow(
-                title: PlotDataWorkbookTab.transformed.title,
-                systemImage: "function",
-                detail: session.dataPipelineSummary.hasPipeline ? session.dataPipelineSummary.title : "Raw source",
-                availability: session.dataTransformAvailability
-            ) {
-                openDataWorkbook(tab: .transformed)
-            }
+                PlotDataPreparationRow(
+                    title: PlotDataWorkbookTab.variables.title,
+                    systemImage: "number",
+                    detail: session.dataVariables.isEmpty ? "None" : "\(session.dataVariables.count)",
+                    availability: session.dataTransformAvailability
+                ) {
+                    openDataWorkbook(tab: .variables)
+                }
 
-            PlotDataPreparationRow(
-                title: PlotDataWorkbookTab.variables.title,
-                systemImage: "number",
-                detail: session.dataVariables.isEmpty ? "None" : "\(session.dataVariables.count) variables",
-                availability: session.dataTransformAvailability
-            ) {
-                openDataWorkbook(tab: .variables)
+                PlotDataPreparationRow(
+                    title: PlotDataWorkbookTab.fit.title,
+                    systemImage: "point.topleft.down.curvedto.point.bottomright.up",
+                    detail: session.fitModelLabel,
+                    availability: session.fitAnalysisAvailability
+                ) {
+                    openDataWorkbook(tab: .fit)
+                }
             }
-
-            PlotDataPreparationRow(
-                title: PlotDataWorkbookTab.fit.title,
-                systemImage: "point.topleft.down.curvedto.point.bottomright.up",
-                detail: session.fitModelLabel,
-                availability: session.fitAnalysisAvailability
-            ) {
-                openDataWorkbook(tab: .fit)
-            }
+            .padding(.top, 4)
+        } label: {
+            RailSectionHeader(title: "Data")
         }
+        .disclosureGroupStyle(.automatic)
     }
 
     private var templatesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            WorkbenchRailTitle(title: "Templates", trailing: "\(session.templateGalleryItems.count)")
+            WorkbenchRailTitle(title: "Templates", trailing: templateCountLabel)
 
             if session.templateGalleryItems.isEmpty {
-                SubtleStageHint(
-                    title: "Templates appear after import",
-                    systemImage: "square.grid.2x2"
-                )
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
             } else {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(session.templateGalleryItems) { item in
+                    ForEach(visibleTemplateItems) { item in
+                        templateButton(for: item)
+                    }
+
+                    if session.templateGalleryItems.count > visibleTemplateItems.count {
                         Button {
-                            guard item.selectable else {
-                                return
-                            }
-                            session.chooseTemplate(item.id)
+                            templateBrowserPresented.toggle()
                         } label: {
-                            PlotTemplateRow(
-                                title: item.title,
-                                kind: item.thumbnailKind,
-                                aspectRatio: item.aspectRatio,
-                                enabled: item.selectable
-                            )
+                            Label("All Templates", systemImage: "square.grid.2x2")
+                                .font(.callout.weight(.medium))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 5)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(!item.availability.isEnabled)
-                        .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
-                        .background {
-                            if session.selectedTemplateID == item.id {
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.14))
-                            }
+                        .popover(isPresented: $templateBrowserPresented, arrowEdge: .trailing) {
+                            PlotTemplateBrowserPopover(session: session)
                         }
                     }
                 }
             }
         }
+    }
+
+    private var visibleTemplateItems: [PlotTemplateGalleryItem] {
+        let items = Array(session.templateGalleryItems.prefix(4))
+        guard let selectedTemplateID = session.selectedTemplateID,
+              !items.contains(where: { $0.id == selectedTemplateID }),
+              let selected = session.templateGalleryItems.first(where: { $0.id == selectedTemplateID })
+        else {
+            return items
+        }
+        guard !items.isEmpty else {
+            return [selected]
+        }
+        return Array(items.dropLast()) + [selected]
+    }
+
+    private var templateCountLabel: String? {
+        let count = session.templateGalleryItems.count
+        return count == 0 ? nil : "\(count)"
+    }
+
+    private func templateButton(for item: PlotTemplateGalleryItem) -> some View {
+        Button {
+            selectTemplate(item)
+        } label: {
+            PlotTemplateRow(
+                title: item.title,
+                kind: item.thumbnailKind,
+                aspectRatio: item.aspectRatio,
+                enabled: item.selectable
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!item.availability.isEnabled)
+        .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
+        .background {
+            if session.selectedTemplateID == item.id {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.14))
+            }
+        }
+    }
+
+    private func selectTemplate(_ item: PlotTemplateGalleryItem) {
+        guard item.selectable else {
+            return
+        }
+        session.chooseTemplate(item.id)
     }
 
     private var selectedSheetBinding: Binding<SheetValue> {
@@ -411,19 +452,6 @@ struct PlotSourceLibraryView: View {
                 session.setSelectedSheet(newValue)
             }
         )
-    }
-
-    private var sourceStatusText: String {
-        if session.isInspecting {
-            return "Inspecting"
-        }
-        if session.needsInspection {
-            return "Ready to inspect"
-        }
-        if let template = session.selectedTemplateSummary?.label {
-            return template
-        }
-        return "Ready"
     }
 
     private func openDataWorkbook(tab: PlotDataWorkbookTab) {
@@ -543,9 +571,174 @@ struct PlotSourceLibraryView: View {
 private struct PlotObjectListItem: Identifiable {
     let id: String
     let title: String
-    let subtitle: String
     let systemImage: String
     let selection: PlotCanvasSelection
+}
+
+private struct PlotCompactSourceLibraryView: View {
+    @Bindable var session: PlotSession
+    @State private var templateBrowserPresented = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if session.selectedFileURL == nil {
+                Image(systemName: "doc.badge.plus")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 42, height: 42)
+            } else {
+                compactButton(
+                    systemImage: "tablecells",
+                    help: session.dataWorkbookAvailability.reason ?? "Data Workbook"
+                ) {
+                    session.showDataWorkbook()
+                }
+                .disabled(!session.dataWorkbookAvailability.isEnabled)
+
+                Divider()
+                    .padding(.vertical, 2)
+
+                compactSelectionButton(
+                    selection: .figure,
+                    systemImage: "doc.richtext",
+                    help: "Figure"
+                )
+
+                if session.supportsFitOverlayControls {
+                    compactSelectionButton(
+                        selection: .layer(.fitOverlay),
+                        systemImage: "chart.xyaxis.line",
+                        help: "Fit Overlay"
+                    )
+                }
+
+                ForEach(session.referenceGuides) { guide in
+                    compactSelectionButton(
+                        selection: .layer(.referenceGuide(guide.id)),
+                        systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
+                        help: guide.kind == "band" ? "Region" : "Guide"
+                    )
+                }
+
+                ForEach(session.textAnnotations) { annotation in
+                    compactSelectionButton(
+                        selection: .layer(.textAnnotation(annotation.id)),
+                        systemImage: annotation.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
+                        help: "Text"
+                    )
+                }
+
+                ForEach(session.shapeAnnotations) { annotation in
+                    compactSelectionButton(
+                        selection: .layer(.shapeAnnotation(annotation.id)),
+                        systemImage: compactShapeSymbol(annotation.kind),
+                        help: "Shape"
+                    )
+                }
+
+                if !session.templateGalleryItems.isEmpty {
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    compactButton(systemImage: "square.grid.2x2", help: "Templates") {
+                        templateBrowserPresented.toggle()
+                    }
+                    .popover(isPresented: $templateBrowserPresented, arrowEdge: .trailing) {
+                        PlotTemplateBrowserPopover(session: session)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 6)
+    }
+
+    private func compactSelectionButton(
+        selection: PlotCanvasSelection,
+        systemImage: String,
+        help: String
+    ) -> some View {
+        compactButton(systemImage: systemImage, help: help) {
+            session.selectCanvasSelection(selection)
+        }
+        .background {
+            if session.canvasSelection == selection {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.14))
+            }
+        }
+    }
+
+    private func compactButton(
+        systemImage: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 42, height: 34)
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func compactShapeSymbol(_ kind: String) -> String {
+        switch kind {
+        case "ellipse":
+            return "circle.dashed"
+        case "bracket":
+            return "square.split.diagonal.2x2"
+        default:
+            return "rectangle.dashed"
+        }
+    }
+}
+
+private struct PlotTemplateBrowserPopover: View {
+    @Bindable var session: PlotSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Templates")
+                .font(.headline)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(session.templateGalleryItems) { item in
+                        Button {
+                            guard item.selectable else {
+                                return
+                            }
+                            session.chooseTemplate(item.id)
+                        } label: {
+                            PlotTemplateRow(
+                                title: item.title,
+                                kind: item.thumbnailKind,
+                                aspectRatio: item.aspectRatio,
+                                enabled: item.selectable
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!item.availability.isEnabled)
+                        .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
+                        .background {
+                            if session.selectedTemplateID == item.id {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.14))
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(width: 260, height: 320)
+        }
+        .padding(12)
+    }
 }
 
 private struct RailSectionHeader: View {

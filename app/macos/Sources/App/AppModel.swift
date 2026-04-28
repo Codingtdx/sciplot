@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
@@ -22,6 +23,7 @@ final class AppModel {
     let codeConsoleSession: CodeConsoleSession
 
     var selectedWorkbench: Workbench = .plot
+    var columnVisibility: NavigationSplitViewVisibility = .all
     var inspectorPresented = true
     var isQuickHelpPresented = false
     var quickHelpWorkbench: Workbench?
@@ -246,6 +248,18 @@ final class AppModel {
 
     func toggleInspector() {
         inspectorPresented.toggle()
+    }
+
+    func hideInspector() {
+        inspectorPresented = false
+    }
+
+    func showInspector() {
+        inspectorPresented = true
+    }
+
+    func toggleWorkbenchSidebar() {
+        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 
     func newDataStudioSession() {

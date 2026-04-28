@@ -33,6 +33,258 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-28: Plot scientific object editing closure
+
+- Change:
+  - Tightened the Plot interaction model around scientific exact editing instead of drag/nudge defaults.
+  - Removed the user-facing Plot Source rail hide/show state:
+    - deleted app-level `plotSourceRailPresented`
+    - removed `PlotSourceRailEdgeButton`
+    - kept Source visible by default
+    - added automatic regular/compact density through `PlotSourceRailDensity`
+  - Reduced Plot Source panel copy:
+    - empty Source is now icon-only
+    - central empty preview hint text is gone
+    - Objects rows keep object name, icon, visibility, and delete only
+  - Replaced the canvas bottom-right overlay HUD with a single selection-inspector path.
+  - Upgraded the Guide tool popover from two Add buttons to an exact creation form:
+    - Line / Region
+    - Axis
+    - Value or Start/End
+    - optional label
+  - Refocused the selected Guide inspector to exact controls:
+    - Kind
+    - Axis
+    - Value or Start/End
+    - Label
+    - Visible
+    - Delete
+  - Removed old default Arrange/nudge inspector UI for reference guides and removed unused canvas movable-overlay presentation state.
+  - Strengthened the macOS GUI presentation gate so the old Source hide button, bottom HUD, hero empty text, and guide nudge editor cannot return accidentally.
+  - Synchronized `/Users/dongxutian/Documents/codegod/README.md` and `/Users/dongxutian/Documents/codegod/AGENTS.md` so future work follows the same Plot interaction rule: tools create/select objects, the left rail manages source/objects/templates, and the right inspector owns exact scientific parameters.
+
+- User-visible impact:
+  - The Source rail no longer exposes an awkward secondary hide icon; it stays available and becomes compact automatically in tighter layouts.
+  - Empty Plot is quieter and no longer repeats low-value `No Source` / `Preview` text.
+  - Adding a reference line/region now starts with numeric coordinates, which matches scientific plotting expectations.
+  - The preview no longer competes with the right inspector by showing a second floating edit panel for the same selected object.
+  - The right inspector is the single default place to refine selected plot objects.
+
+- Risks:
+  - Very narrow windows now show a compact icon rail instead of allowing Source to be fully hidden; if future users need a document-only presentation mode, that should be added as a deliberate View menu command rather than an edge glyph.
+  - Existing backend nudge methods remain for tests and typed payload durability, but the default GUI no longer exposes them for Guide editing.
+  - The Guide popover uses simple numeric text parsing; invalid numbers disable creation instead of surfacing a validation banner.
+  - The toolbar still shows a system overflow affordance in the launched app window captured by Computer Use; this was not part of this specific Source/Guide/HUD closure and should be considered in the next toolbar pass if it remains visually objectionable.
+
+- Rollback points:
+  - Plot source rail:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Plot tool creation / selected object editing:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+  - Interaction documentation:
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+
+- Decision Record:
+  - Why:
+    - Pixelmator-style tools are still useful as object creation/selection entry points, but scientific plot references must be parameter-first because a line or region usually encodes a meaningful x/y coordinate.
+    - A single selection inspector avoids contradictory controls between the canvas HUD and the right panel.
+    - Source rail hiding was a layout workaround, not a user-level concept in this workflow.
+  - Rejected alternatives:
+    - Keep the bottom HUD for quick movement: rejected because it made guide editing look drag-first and duplicated the inspector.
+    - Hide the Source rail manually: rejected because the chosen behavior is default visible with automatic compact density.
+    - Add true PDF click-to-place: rejected for this round because it needs hit-test metadata and would cross the current presentation-only boundary.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation:
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py -q`: passed, 6 tests.
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/clean_repo.py`: passed, reclaimed about `209.4 MB`.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 189 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 189 tests all passed.
+  - After README/AGENTS synchronization:
+    - `git diff --check`: passed.
+    - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+    - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py -q`: passed, 6 tests.
+  - Final full gate after documentation sync:
+    - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+    - Gate details: `clean_repo` reclaimed about `240.5 MB`; `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 189 tests all passed.
+    - Xcode still reports the known CoreSimulator out-of-date warning; macOS build/test completed successfully.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance:
+    - `open -n app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`: launched without terminal error.
+    - `Computer Use get_app_state("com.codegod.desktop")`: succeeded for empty Plot; Source showed only the header plus icon, and the old Source hide button / `No Source` / `Preview` text were absent.
+    - `open -a app/macos/.derivedData/Build/Products/Debug/SciPlot God.app examples/curve_table.csv`: opened imported Plot.
+    - `Computer Use`: confirmed imported Source/Object/Templates rail remained visible, Guide popover exposed Line/Region + Axis + Value form, Add Line created a guide, selected the object, and right inspector showed exact Guide controls without bottom HUD.
+
+### 2026-04-28: Plot left/right layout usability closure
+
+- Change:
+  - Tightened the Plot left/right layout in `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`:
+    - `PlotSourceLibraryView` now lives behind an app-owned `plotSourceRailPresented` binding.
+    - The Plot source rail uses a compact `224 / 250 / 286` width policy.
+    - The source rail auto-collapses below the usable detail-width threshold so the canvas and `360 / 400 / 460` inspector are protected first.
+    - The Plot source rail hide/show affordance sits on the source edge rather than in the global toolbar.
+  - Updated `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/SciPlotGodApp.swift` so the main window has a larger professional default/minimum geometry:
+    - minimum `1440 x 780`
+    - default `1520 x 900`
+    - `.windowResizability(.contentMinSize)`
+  - Strengthened `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`:
+    - `NavigationSplitView(columnVisibility:)` remains the app shell owner.
+    - `WindowToolbarConfigurator` now repeatedly removes SwiftUI's duplicate split-view toolbar item during the short rebuild window after layout changes.
+    - The toolbar remains global-only: `Import`, `Export`, `Quick Help`; no right-top inspector toggle and no workbench segmented picker.
+  - Refined `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`:
+    - empty Source state is only `No Source`
+    - data preparation is a compact collapsed `Data` disclosure
+    - templates show the current/recommended short list, with all templates moved into a popover
+  - Replaced remaining Plot `textformat` SF Symbols in object rows and canvas HUD with `character.cursor.ibeam` to avoid localized "格式" text rendering.
+  - Strengthened `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py` and `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py` so these layout and icon rules stay gated.
+
+- User-visible impact:
+  - Narrower windows should preserve the plot canvas and right inspector before the left source rail.
+  - The left rail is less heavy before import and less wasteful after import.
+  - Right inspector content is not internally width-capped by `InspectorChromeRoot`; the native inspector owns column width.
+  - The canvas/object text tool no longer risks displaying the localized word "格式" instead of a tool icon.
+  - Global toolbar actions remain clean and unambiguous.
+
+- Risks:
+  - The duplicate-toolbar cleanup is a tiny AppKit bridge over SwiftUI toolbar behavior. It is intentionally narrow, but it relies on SwiftUI's current `navigationSplitView.toggleSidebar` toolbar identifier shape.
+  - The Plot source rail collapse threshold is presentation-only and based on available detail width; if the product later adds another persistent side surface, the threshold may need retuning.
+  - Hosted macOS XCTest still logs an AppKit split-view safe-area constraint recovery warning. Tests pass and the app-level minimum/default window geometry was increased, but this remains worth watching in future native layout work.
+  - Desktop GUI acceptance was blocked this run: `Computer Use get_app_state("com.codegod.desktop")` returned `Apple event error -10005: cgWindowNotFound`, Finder capture timed out, and a system screenshot showed the Mac lock screen. No manual smoke pass was claimed.
+
+- Rollback points:
+  - App shell/window geometry:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/SciPlotGodApp.swift`
+  - Plot left/source rail:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Plot tool/icon surfaces:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorLayerListView.swift`
+  - Shared inspector chrome:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - Regression gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - The user's screenshot showed the left/source side and right inspector fighting the canvas. The first-principles fix is layout priority, not another inspector style pass.
+    - Pixelmator-style pro tools protect the editing canvas and contextual inspector; source/library panels are useful but should be easy to collapse and should not consume the window when space is tight.
+  - Rejected alternatives:
+    - Put source-rail visibility into the global toolbar: rejected because panel visibility belongs at the corresponding edge and would recreate the ambiguous right-top toolbar cluster.
+    - Keep source rail state as local view storage: rejected because toolbar/layout rebuilds could reintroduce stale split-view toolbar state after source collapse.
+    - Remove the source rail entirely: rejected because Source, Objects, Data, and Templates are the right pre-plot/object context layer; the problem was priority and density.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed):
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed (`6 passed`).
+  - `.venv/bin/python scripts/clean_repo.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed (`189 tests`).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix:
+    - `clean_repo`
+    - `ruff`
+    - `mypy`
+    - `pytest` (`275 passed`, 5 warnings)
+    - `smoke_check`
+    - `macos_gui_presentation`
+    - `xcodebuild build`
+    - `xcodebuild test` (`189 tests`)
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence.
+  - Xcode still reports the existing CoreSimulator out-of-date warning; macOS build/test completed successfully.
+
+### 2026-04-28: Plot native toolbar, inspector, and canvas tool closure
+
+- Change:
+  - Reworked `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift` so `NavigationSplitView` owns column visibility and the right inspector is wrapped by `InspectorChromeRoot`.
+  - Removed the global toolbar inspector toggle; inspector hide now lives in the inspector header, and restore uses a right-edge reveal button.
+  - Kept global toolbar actions to `Import`, `Export`, and `Quick Help`; the left sidebar toggle is a left navigation item only.
+  - Added a narrow AppKit toolbar configurator to disable toolbar customization/autosave and remove SwiftUI's duplicate hidden split-view toggle from the overflow menu.
+  - Replaced the Plot preview's capsule tool strip plus persistent options bar with `PlotFloatingToolPalette` and per-tool popovers for `Guide`, `Text`, `Shape`, and `Function`.
+  - Updated `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py` and `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py` to guard the new toolbar/inspector/tool-palette structure.
+
+- User-visible impact:
+  - The ambiguous right-top inspector/overflow cluster is gone in the tested window state.
+  - Left sidebar visibility is controlled from the left side; right inspector visibility is controlled from the inspector itself or the right edge.
+  - The inspector opens at the stable `360 / 400 / 460` width policy and starts with a `Figure` header instead of another form-like title.
+  - Canvas tools now feel like one native floating palette; add actions live in local popovers instead of a second long pill.
+
+- Risks:
+  - The AppKit cleanup targets SwiftUI's current raw toolbar identifier `com.apple.SwiftUI.navigationSplitView.toggleSidebar`; if Apple changes that identifier, the duplicate overflow item may need another tiny bridge update.
+  - True canvas hit-testing is still out of scope; popovers add typed overlays and immediately select them, while exact placement remains controlled by existing typed overlay editors/nudging.
+  - Toolbar customization is intentionally disabled for this window to prevent hidden stale items from reappearing.
+
+- Rollback points:
+  - App shell and toolbar:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppModel.swift`
+  - Shared inspector chrome:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - Plot canvas tools:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Regression gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - The previous toolbar mixed global actions, sidebar state, inspector state, and system overflow into one right-side cluster; that contradicted the Pixelmator/Apple model where side panels are controlled at their own edges.
+    - The canvas tool strip should be an object-operation palette, not another form surface.
+  - Rejected alternatives:
+    - Keep SwiftUI's automatic sidebar toggle: rejected because Computer Use showed it was placed in the right overflow menu in this window.
+    - Put inspector toggle back in the toolbar: rejected because it recreated the exact ambiguous cluster called out by the user.
+    - Keep the persistent tool options bar: rejected because it duplicated the inspector and created mismatched rounded geometry.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed):
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py`: passed (`6 passed`).
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed (`189 tests`).
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Computer Use desktop acceptance:
+    - `get_app_state("com.codegod.desktop")`: succeeded.
+    - Confirmed toolbar has left sidebar button plus `Import / Export / Help`; no right-side `more toolbar items` overflow after removing the duplicate SwiftUI split-view toggle.
+    - Confirmed inspector header hide button collapses the inspector.
+    - Confirmed right-edge reveal button restores the inspector.
+  - Xcode still reports the existing CoreSimulator out-of-date warning; macOS build/test completed successfully.
+
 ### 2026-04-27: Plot chrome de-duplication follow-up
 
 - Change:
