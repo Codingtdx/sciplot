@@ -53,5 +53,13 @@ struct SubmissionReportResponse: Codable, Equatable, Sendable {
 struct PreviewItemResponse: Codable, Equatable, Sendable {
     let filename: String
     let pdfBase64: String
+    let pngBase64: String?
     let qa: QAReportResponse?
+
+    init(filename: String, pdfBase64: String, pngBase64: String? = nil, qa: QAReportResponse?) {
+        self.filename = filename
+        self.pdfBase64 = pdfBase64
+        self.pngBase64 = pngBase64
+        self.qa = qa
+    }
 }

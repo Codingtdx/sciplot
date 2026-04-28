@@ -3,6 +3,7 @@ import SwiftUI
 struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     @Bindable var session: PlotSession
     private let styleSectionTitle: String
+    private let adjustmentCategory: PlotAdjustmentCategory?
     private let showsPlotInspectorModes: Bool
     private let leadingSections: LeadingSections
     private let trailingSections: TrailingSections
@@ -11,6 +12,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     init(
         session: PlotSession,
         styleSectionTitle: String = "Figure",
+        adjustmentCategory: PlotAdjustmentCategory? = nil,
         plotOptionsAdvancedExpanded: Bool = false,
         showsPlotInspectorModes: Bool = true,
         @ViewBuilder leadingSections: () -> LeadingSections = { EmptyView() },
@@ -18,6 +20,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     ) {
         self.session = session
         self.styleSectionTitle = styleSectionTitle
+        self.adjustmentCategory = adjustmentCategory
         self.showsPlotInspectorModes = showsPlotInspectorModes
         self.leadingSections = leadingSections()
         self.trailingSections = trailingSections()
@@ -28,7 +31,9 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 leadingSections
-                if showsPlotInspectorModes {
+                if let adjustmentCategory {
+                    adjustmentCategoryContent(adjustmentCategory)
+                } else if showsPlotInspectorModes {
                     PlotSelectionInspectorView(session: session) {
                         plotOptionsSection
                         if shouldShowAxesSection {
@@ -61,6 +66,258 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             .padding(.vertical, 14)
         }
         .inspectorSurface()
+    }
+
+    @ViewBuilder
+    private func adjustmentCategoryContent(_ category: PlotAdjustmentCategory) -> some View {
+        switch category {
+        case .figure:
+            figureAdjustmentContent
+        case .axes:
+            axesAdjustmentContent
+        case .legend:
+            legendAdjustmentContent
+        case .guides:
+            guidesAdjustmentContent
+        case .fit:
+            fitAdjustmentContent
+        case .functions:
+            functionsAdjustmentContent
+        case .annotations:
+            annotationsAdjustmentContent
+        case .advancedAxes:
+            advancedAxesAdjustmentContent
+        }
+    }
+
+    private var figureAdjustmentContent: some View {
+        Group {
+            if session.selectedTemplateSummary == nil {
+                InspectorSection(title: "Figure") {
+                    InspectorEmptyState(message: "Import data")
+                }
+            } else {
+                plotOptionsSection
+            }
+        }
+    }
+
+    private var axesAdjustmentContent: some View {
+        InspectorSection(title: "Axis") {
+            if !shouldShowAxesSection {
+                InspectorEmptyState(message: "No axis controls")
+            } else {
+                axisScaleControls
+                axisRangeControls
+                if showsTickLabelControls {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Tick Labels")
+                            .font(.subheadline.weight(.semibold))
+
+                        if supportsTickLabelControls(for: .x) {
+                            axisTickLabelControls(title: "X axis", axis: .x)
+                        }
+
+                        if supportsTickLabelControls(for: .y) {
+                            axisTickLabelControls(title: "Y axis", axis: .y)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+    }
+
+    private var legendAdjustmentContent: some View {
+        Group {
+            if session.shouldShowSeriesLegendControls {
+                seriesSection
+            } else {
+                InspectorSection(title: "Legend") {
+                    InspectorEmptyState(message: "No reorderable legend entries")
+                }
+            }
+        }
+    }
+
+    private var guidesAdjustmentContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            InspectorSection(title: "Guides") {
+                HStack(spacing: 8) {
+                    Button("Add Line") {
+                        session.addReferenceGuide(kind: "line")
+                        if let id = session.selectedReferenceGuideID {
+                            session.selectPlotLayer(.referenceGuide(id))
+                        }
+                    }
+                    .disabled(!session.referenceGuideAvailability.isEnabled)
+                    .help(session.referenceGuideAvailability.reason ?? "Add a reference line.")
+
+                    Button("Add Region") {
+                        session.addReferenceGuide(kind: "band")
+                        if let id = session.selectedReferenceGuideID {
+                            session.selectPlotLayer(.referenceGuide(id))
+                        }
+                    }
+                    .disabled(!session.referenceGuideAvailability.isEnabled)
+                    .help(session.referenceGuideAvailability.reason ?? "Add a reference region.")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                objectList(
+                    emptyMessage: "No guides",
+                    rows: session.referenceGuides.map {
+                        PlotAdjustmentObjectRow(
+                            id: $0.id,
+                            title: referenceGuideTitle($0),
+                            detail: $0.kind == "band" ? "Region" : "Line",
+                            systemImage: $0.kind == "band" ? "rectangle.dashed" : "ruler",
+                            selection: .referenceGuide($0.id)
+                        )
+                    }
+                )
+            }
+
+            selectedGuideEditor
+        }
+    }
+
+    private var fitAdjustmentContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            fitOverlaySection
+            InspectorSection(title: "Analysis") {
+                Button {
+                    session.showDataWorkbook()
+                    session.selectDataWorkbookTab(.fit)
+                } label: {
+                    Label("Open Fit Table", systemImage: "tablecells")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!session.fitAnalysisAvailability.isEnabled)
+                .help(session.fitAnalysisAvailability.reason ?? "Open fit analysis results.")
+            }
+        }
+    }
+
+    private var functionsAdjustmentContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            InspectorSection(title: "Functions") {
+                Button("Add Function") {
+                    session.addAnalyticalFunctionLayer()
+                    if let layer = session.analyticalLayers.last {
+                        session.selectPlotLayer(.function(layer.id))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!session.analyticalLayerAvailability.isEnabled)
+                .help(session.analyticalLayerAvailability.reason ?? "Add a backend-rendered function layer.")
+
+                objectList(
+                    emptyMessage: "No function layers",
+                    rows: session.analyticalLayers.map {
+                        PlotAdjustmentObjectRow(
+                            id: $0.id,
+                            title: functionTitle($0),
+                            detail: "Function",
+                            systemImage: "function",
+                            selection: .function($0.id)
+                        )
+                    }
+                )
+            }
+
+            selectedFunctionEditor
+        }
+    }
+
+    private var annotationsAdjustmentContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            InspectorSection(title: "Annotations") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button("Add Text") {
+                            session.addTextAnnotation()
+                            if let id = session.selectedTextAnnotationID {
+                                session.selectPlotLayer(.textAnnotation(id))
+                            }
+                        }
+                        .disabled(!session.textAnnotationAvailability.isEnabled)
+                        .help(session.textAnnotationAvailability.reason ?? "Add text.")
+
+                        Button("Add Callout") {
+                            session.addTextAnnotation(displayStyle: "callout", connectorEnabled: true)
+                            if let id = session.selectedTextAnnotationID {
+                                session.selectPlotLayer(.textAnnotation(id))
+                            }
+                        }
+                        .disabled(!session.textAnnotationAvailability.isEnabled)
+                        .help(session.textAnnotationAvailability.reason ?? "Add a callout.")
+                    }
+
+                    HStack(spacing: 8) {
+                        Button("Rectangle") {
+                            addShape(kind: "rectangle")
+                        }
+                        Button("Ellipse") {
+                            addShape(kind: "ellipse")
+                        }
+                        Button("Bracket") {
+                            addShape(kind: "bracket")
+                        }
+                    }
+                    .disabled(!session.shapeAnnotationAvailability.isEnabled)
+                    .help(session.shapeAnnotationAvailability.reason ?? "Add a shape annotation.")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                objectList(emptyMessage: "No annotations", rows: annotationRows)
+            }
+
+            selectedAnnotationEditor
+        }
+    }
+
+    private var advancedAxesAdjustmentContent: some View {
+        InspectorSection(title: "Advanced Axes") {
+            if !showsExtraAxesControls && !showsAxisBreakControls {
+                InspectorEmptyState(message: "No advanced axis controls")
+            } else {
+                if showsExtraAxesControls {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Extra Axes")
+                            .font(.subheadline.weight(.semibold))
+
+                        if supportsExtraXAxisControls {
+                            extraAxisControls(title: "X axis", axis: .x)
+                        }
+
+                        if supportsExtraYAxisControls {
+                            extraAxisControls(title: "Y axis", axis: .y)
+                        }
+                    }
+                }
+
+                if showsAxisBreakControls {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Broken Axes")
+                            .font(.subheadline.weight(.semibold))
+
+                        if supportsXAxisBreakControls {
+                            axisBreakControls(title: "X axis", axis: .x)
+                        }
+
+                        if supportsYAxisBreakControls {
+                            axisBreakControls(title: "Y axis", axis: .y)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -372,6 +629,222 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
                     )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var axisScaleControls: some View {
+        if session.editableOptionIDs.contains("xscale") {
+            AdaptiveInspectorControlRow(title: "X scale") {
+                Picker("", selection: stringBinding(
+                    get: { session.renderOptions.xscale ?? "linear" },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .immediate) { $0.xscale = newValue }
+                    }
+                )) {
+                    Text("Linear").tag("linear")
+                    Text("Log").tag("log")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+        }
+
+        if session.editableOptionIDs.contains("yscale") {
+            AdaptiveInspectorControlRow(title: "Y scale") {
+                Picker("", selection: stringBinding(
+                    get: { session.renderOptions.yscale ?? "linear" },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .immediate) { $0.yscale = newValue }
+                    }
+                )) {
+                    Text("Linear").tag("linear")
+                    Text("Log").tag("log")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var axisRangeControls: some View {
+        if session.editableOptionIDs.contains("reverse_x") {
+            AdaptiveInspectorControlRow(title: "Reverse X") {
+                Toggle("", isOn: boolBinding(
+                    get: { session.renderOptions.reverseX },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .immediate) { $0.reverseX = newValue }
+                    }
+                ))
+                .labelsHidden()
+            }
+        }
+
+        if session.editableOptionIDs.contains("x_min") || session.editableOptionIDs.contains("x_max") {
+            axisRangeRow(
+                title: "X range",
+                lowerTitle: "Min",
+                upperTitle: "Max",
+                lowerBinding: numericTextBinding(
+                    get: { session.renderOptions.xMin },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .debounced) { $0.xMin = newValue }
+                    }
+                ),
+                upperBinding: numericTextBinding(
+                    get: { session.renderOptions.xMax },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .debounced) { $0.xMax = newValue }
+                    }
+                )
+            )
+        }
+
+        if session.editableOptionIDs.contains("y_min") || session.editableOptionIDs.contains("y_max") {
+            axisRangeRow(
+                title: "Y range",
+                lowerTitle: "Min",
+                upperTitle: "Max",
+                lowerBinding: numericTextBinding(
+                    get: { session.renderOptions.yMin },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .debounced) { $0.yMin = newValue }
+                    }
+                ),
+                upperBinding: numericTextBinding(
+                    get: { session.renderOptions.yMax },
+                    set: { newValue in
+                        session.updateRenderOptions(policy: .debounced) { $0.yMax = newValue }
+                    }
+                )
+            )
+        }
+
+        if session.editableOptionIDs.contains("baseline") {
+            AdaptiveInspectorControlRow(title: "Baseline") {
+                TextField(
+                    "Baseline",
+                    text: stringBinding(
+                        get: { session.renderOptions.baseline ?? "" },
+                        set: { newValue in
+                            session.updateRenderOptions(policy: .debounced) { $0.baseline = newValue.isEmpty ? nil : newValue }
+                        }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+
+    private func objectList(emptyMessage: String, rows: [PlotAdjustmentObjectRow]) -> some View {
+        Group {
+            if rows.isEmpty {
+                InspectorEmptyState(message: emptyMessage)
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(rows) { row in
+                        PlotAdjustmentObjectButton(
+                            row: row,
+                            isSelected: session.canvasSelection == .layer(row.selection)
+                        ) {
+                            session.selectPlotLayer(row.selection)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectedGuideEditor: some View {
+        if case .layer(let selection) = session.canvasSelection,
+           case .referenceGuide = selection {
+            PlotSelectedLayerEditorView(session: session, selection: selection)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedFunctionEditor: some View {
+        if case .layer(let selection) = session.canvasSelection,
+           case .function = selection {
+            PlotSelectedLayerEditorView(session: session, selection: selection)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedAnnotationEditor: some View {
+        if case .layer(let selection) = session.canvasSelection {
+            switch selection {
+            case .textAnnotation, .shapeAnnotation:
+                PlotSelectedLayerEditorView(session: session, selection: selection)
+            case .fitOverlay, .function, .referenceGuide, .series:
+                EmptyView()
+            }
+        }
+    }
+
+    private var annotationRows: [PlotAdjustmentObjectRow] {
+        let textRows = session.textAnnotations.map {
+            PlotAdjustmentObjectRow(
+                id: "text:\($0.id)",
+                title: annotationTitle($0),
+                detail: $0.connectorEnabled ? "Callout" : "Text",
+                systemImage: $0.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
+                selection: .textAnnotation($0.id)
+            )
+        }
+        let shapeRows = session.shapeAnnotations.map {
+            PlotAdjustmentObjectRow(
+                id: "shape:\($0.id)",
+                title: shapeTitle($0),
+                detail: shapeKindLabel($0.kind),
+                systemImage: shapeSymbol($0.kind),
+                selection: .shapeAnnotation($0.id)
+            )
+        }
+        return textRows + shapeRows
+    }
+
+    private func addShape(kind: String) {
+        session.addShapeAnnotation(kind: kind)
+        if let id = session.selectedShapeAnnotationID {
+            session.selectPlotLayer(.shapeAnnotation(id))
+        }
+    }
+
+    private func functionTitle(_ layer: AnalyticalLayerPayload) -> String {
+        let label = layer.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return label.isEmpty ? layer.expression : label
+    }
+
+    private func shapeTitle(_ annotation: ShapeAnnotationPayload) -> String {
+        let label = annotation.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !label.isEmpty {
+            return label
+        }
+        return shapeKindLabel(annotation.kind)
+    }
+
+    private func shapeKindLabel(_ kind: String) -> String {
+        switch kind {
+        case "ellipse":
+            return "Ellipse"
+        case "bracket":
+            return "Bracket"
+        default:
+            return "Rectangle"
+        }
+    }
+
+    private func shapeSymbol(_ kind: String) -> String {
+        switch kind {
+        case "ellipse":
+            return "oval"
+        case "bracket":
+            return "square.split.diagonal"
+        default:
+            return "rectangle"
         }
     }
 
@@ -1268,6 +1741,61 @@ extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections
             leadingSections: { EmptyView() },
             trailingSections: { EmptyView() }
         )
+    }
+
+    init(
+        session: PlotSession,
+        styleSectionTitle: String = "Figure",
+        adjustmentCategory: PlotAdjustmentCategory
+    ) {
+        self.init(
+            session: session,
+            styleSectionTitle: styleSectionTitle,
+            adjustmentCategory: adjustmentCategory,
+            leadingSections: { EmptyView() },
+            trailingSections: { EmptyView() }
+        )
+    }
+}
+
+private struct PlotAdjustmentObjectRow: Identifiable {
+    let id: String
+    let title: String
+    let detail: String
+    let systemImage: String
+    let selection: PlotLayerSelection
+}
+
+private struct PlotAdjustmentObjectButton: View {
+    let row: PlotAdjustmentObjectRow
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: row.systemImage)
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(row.title)
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1)
+                    Text(row.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 7)
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

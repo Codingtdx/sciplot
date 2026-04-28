@@ -1090,7 +1090,7 @@ enum TestPayloads {
             implementationID: "curve",
             sheet: .name("Representative_Curve"),
             previews: [
-                .init(filename: "sample_curve.pdf", pdfBase64: pdfBase64, qa: nil),
+                .init(filename: "sample_curve.pdf", pdfBase64: pdfBase64, pngBase64: pngBase64, qa: nil),
             ],
             submissionReport: submissionReport()
         )

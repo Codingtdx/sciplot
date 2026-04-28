@@ -178,6 +178,23 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(comparison.comparisonSet.workbookLabels.count, 2)
     }
 
+    func testDecodePreviewItemPayloadKeepsPNGAndPDFPreviews() throws {
+        let payload = """
+        {
+          "filename": "sample_curve.pdf",
+          "pdf_base64": "\(TestPayloads.pdfBase64)",
+          "png_base64": "\(TestPayloads.pngBase64)",
+          "qa": null
+        }
+        """
+
+        let response = try decoder.decode(PreviewItemResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.filename, "sample_curve.pdf")
+        XCTAssertEqual(response.pdfBase64, TestPayloads.pdfBase64)
+        XCTAssertEqual(response.pngBase64, TestPayloads.pngBase64)
+    }
+
     func testDecodeDataStudioTemplatePreviewPayloadUsesTemplateID() throws {
         let payload = """
         {

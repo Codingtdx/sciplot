@@ -16,14 +16,66 @@ final class AppModelTests: XCTestCase {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
         model.switchWorkbench(.dataStudio)
-        model.beginImportForActiveWorkbench()
+        model.beginImport(for: .dataStudio)
         XCTAssertEqual(model.selectedWorkbench, .dataStudio)
         XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
 
         model.switchWorkbench(.composer)
-        model.beginImportForActiveWorkbench()
+        model.beginImport(for: .composer)
         XCTAssertTrue(model.composerSession.isImportMenuPresented)
         XCTAssertFalse(model.composerSession.isImportPresented)
+    }
+
+    func testWorkbenchWindowIDsAreStableSingletonSceneIDs() {
+        XCTAssertEqual(Workbench.plot.windowSceneID, "plot")
+        XCTAssertEqual(Workbench.dataStudio.windowSceneID, "data-studio")
+        XCTAssertEqual(Workbench.composer.windowSceneID, "composer")
+        XCTAssertEqual(Workbench.codeConsole.windowSceneID, "code-console")
+    }
+
+    func testExplicitWorkbenchActionsDoNotNeedVisibleWorkbenchSwitching() async {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.switchWorkbench(.plot)
+        model.beginImport(for: .dataStudio)
+        XCTAssertEqual(model.selectedWorkbench, .plot)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
+
+        model.beginImport(for: .codeConsole)
+        XCTAssertEqual(model.selectedWorkbench, .plot)
+        XCTAssertTrue(model.codeConsoleSession.isImporterPresented)
+
+        await model.saveProject(for: .composer)
+        XCTAssertEqual(model.selectedWorkbench, .plot)
+    }
+
+    func testLauncherStartsPresentedAndRoutesModuleActionsToRealSessions() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        XCTAssertNil(model.requestedWorkbenchWindow)
+
+        model.enterWorkbench(.composer)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .composer)
+
+        model.showLauncher()
+        model.beginLauncherPrimaryAction(for: .plot)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .plot)
+        XCTAssertTrue(model.plotSession.isImporterPresented)
+
+        model.showLauncher()
+        model.beginLauncherPrimaryAction(for: .dataStudio)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .dataStudio)
+        XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
+
+        model.showLauncher()
+        model.beginLauncherPrimaryAction(for: .composer)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .composer)
+        XCTAssertTrue(model.composerSession.isImportMenuPresented)
+
+        model.showLauncher()
+        model.beginLauncherPrimaryAction(for: .codeConsole)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .codeConsole)
+        XCTAssertTrue(model.codeConsoleSession.isImporterPresented)
     }
 
     func testShowHelpForActiveWorkbenchPresentsQuickHelp() {
@@ -45,7 +97,7 @@ final class AppModelTests: XCTestCase {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
         model.switchWorkbench(.dataStudio)
-        model.beginImportForActiveWorkbench()
+        model.beginImport(for: .dataStudio)
         XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
 
         model.dataStudioSession.chooseImportKind(.rawFiles)
@@ -68,6 +120,7 @@ final class AppModelTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 20_000_000)
 
         XCTAssertEqual(model.selectedWorkbench, .plot)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .plot)
         XCTAssertEqual(model.plotSession.selectedFileURL, workbookURL)
         XCTAssertEqual(model.plotSession.selectedSheet, .name("Representative_Curve"))
         XCTAssertEqual(model.codeConsoleSession.boundContext.first?.value, "prepared.xlsx")

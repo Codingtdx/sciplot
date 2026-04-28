@@ -551,17 +551,26 @@ def rendered_plots_to_preview_payload(
 ) -> list[PreviewItemResponse]:
     previews: list[PreviewItemResponse] = []
     for rendered in rendered_plots:
-        buffer = BytesIO()
+        pdf_buffer = BytesIO()
         rendered.figure.savefig(
-            buffer,
+            pdf_buffer,
             format="pdf",
+            facecolor="white",
+            bbox_inches=None,
+        )
+        png_buffer = BytesIO()
+        rendered.figure.savefig(
+            png_buffer,
+            format="png",
+            dpi=160,
             facecolor="white",
             bbox_inches=None,
         )
         previews.append(
             PreviewItemResponse(
                 filename=rendered.filename,
-                pdf_base64=b64encode(buffer.getvalue()).decode("ascii"),
+                pdf_base64=b64encode(pdf_buffer.getvalue()).decode("ascii"),
+                png_base64=b64encode(png_buffer.getvalue()).decode("ascii"),
                 qa=(
                     serialize_dataclass(rendered.qa_report)
                     if getattr(rendered, "qa_report", None) is not None

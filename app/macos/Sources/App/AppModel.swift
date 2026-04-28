@@ -23,8 +23,15 @@ final class AppModel {
     let codeConsoleSession: CodeConsoleSession
 
     var selectedWorkbench: Workbench = .plot
+    var requestedWorkbenchWindow: Workbench?
     var columnVisibility: NavigationSplitViewVisibility = .all
     var inspectorPresented = true
+    var inspectorPresentationByWorkbench: [Workbench: Bool] = [
+        .plot: true,
+        .dataStudio: true,
+        .composer: true,
+        .codeConsole: true,
+    ]
     var isQuickHelpPresented = false
     var quickHelpWorkbench: Workbench?
     var bootstrapErrorMessage: String?
@@ -32,7 +39,11 @@ final class AppModel {
     var isPlotReplacementConfirmationPresented = false
 
     var activeExportAvailability: ActionAvailability {
-        switch selectedWorkbench {
+        exportAvailability(for: selectedWorkbench)
+    }
+
+    func exportAvailability(for workbench: Workbench) -> ActionAvailability {
+        switch workbench {
         case .plot:
             return plotSession.exportAvailability
         case .dataStudio:
@@ -45,7 +56,11 @@ final class AppModel {
     }
 
     var activeRevealAvailability: ActionAvailability {
-        switch selectedWorkbench {
+        revealAvailability(for: selectedWorkbench)
+    }
+
+    func revealAvailability(for workbench: Workbench) -> ActionAvailability {
+        switch workbench {
         case .plot:
             return plotSession.revealOutputAvailability
         case .dataStudio:
@@ -58,7 +73,11 @@ final class AppModel {
     }
 
     var activeSaveProjectAvailability: ActionAvailability {
-        switch selectedWorkbench {
+        saveProjectAvailability(for: selectedWorkbench)
+    }
+
+    func saveProjectAvailability(for workbench: Workbench) -> ActionAvailability {
+        switch workbench {
         case .plot:
             return plotSession.saveProjectAvailability
         case .dataStudio:
@@ -69,7 +88,11 @@ final class AppModel {
     }
 
     var activeExportCommandTitle: String {
-        switch selectedWorkbench {
+        exportCommandTitle(for: selectedWorkbench)
+    }
+
+    func exportCommandTitle(for workbench: Workbench) -> String {
+        switch workbench {
         case .plot:
             return "Export Plot"
         case .dataStudio:
@@ -82,11 +105,16 @@ final class AppModel {
     }
 
     var activeExportHelpText: String {
-        if let reason = activeExportAvailability.reason {
+        exportHelpText(for: selectedWorkbench)
+    }
+
+    func exportHelpText(for workbench: Workbench) -> String {
+        let availability = exportAvailability(for: workbench)
+        if let reason = availability.reason {
             return reason
         }
 
-        switch selectedWorkbench {
+        switch workbench {
         case .plot:
             return "Export the current plot as PDF or 300 dpi TIFF."
         case .dataStudio:
@@ -170,11 +198,29 @@ final class AppModel {
 
     func switchWorkbench(_ workbench: Workbench) {
         selectedWorkbench = workbench
+        requestOpenWindow(for: workbench)
         refreshCodeConsoleContext()
     }
 
+    func enterWorkbench(_ workbench: Workbench) {
+        requestOpenWindow(for: workbench)
+    }
+
+    func showLauncher() {
+        requestedWorkbenchWindow = nil
+    }
+
+    func beginLauncherPrimaryAction(for workbench: Workbench) {
+        requestOpenWindow(for: workbench)
+        beginImport(for: workbench)
+    }
+
     func beginImportForActiveWorkbench() {
-        switch selectedWorkbench {
+        beginImport(for: selectedWorkbench)
+    }
+
+    func beginImport(for workbench: Workbench) {
+        switch workbench {
         case .plot:
             requestPlotImport()
         case .dataStudio:
@@ -187,7 +233,11 @@ final class AppModel {
     }
 
     func exportActiveWorkbench() async {
-        switch selectedWorkbench {
+        await export(for: selectedWorkbench)
+    }
+
+    func export(for workbench: Workbench) async {
+        switch workbench {
         case .plot:
             await plotSession.exportCurrentSelection()
         case .dataStudio:
@@ -200,7 +250,11 @@ final class AppModel {
     }
 
     func saveProject() async {
-        switch selectedWorkbench {
+        await saveProject(for: selectedWorkbench)
+    }
+
+    func saveProject(for workbench: Workbench) async {
+        switch workbench {
         case .plot:
             await plotSession.saveProject()
         case .dataStudio:
@@ -212,7 +266,11 @@ final class AppModel {
     }
 
     func saveProjectAs() async {
-        switch selectedWorkbench {
+        await saveProjectAs(for: selectedWorkbench)
+    }
+
+    func saveProjectAs(for workbench: Workbench) async {
+        switch workbench {
         case .plot:
             await plotSession.saveProjectAs()
         case .dataStudio:
@@ -224,7 +282,11 @@ final class AppModel {
     }
 
     func showHelpForActiveWorkbench() {
-        quickHelpWorkbench = selectedWorkbench
+        showHelp(for: selectedWorkbench)
+    }
+
+    func showHelp(for workbench: Workbench) {
+        quickHelpWorkbench = workbench
         isQuickHelpPresented = true
     }
 
@@ -234,7 +296,11 @@ final class AppModel {
     }
 
     func revealActiveOutput() {
-        switch selectedWorkbench {
+        revealOutput(for: selectedWorkbench)
+    }
+
+    func revealOutput(for workbench: Workbench) {
+        switch workbench {
         case .plot:
             plotSession.revealLatestExport()
         case .dataStudio:
@@ -247,15 +313,30 @@ final class AppModel {
     }
 
     func toggleInspector() {
-        inspectorPresented.toggle()
+        toggleInspector(for: selectedWorkbench)
+        inspectorPresented = isInspectorPresented(for: selectedWorkbench)
+    }
+
+    func toggleInspector(for workbench: Workbench) {
+        setInspectorPresented(!isInspectorPresented(for: workbench), for: workbench)
     }
 
     func hideInspector() {
+        setInspectorPresented(false, for: selectedWorkbench)
         inspectorPresented = false
     }
 
     func showInspector() {
+        setInspectorPresented(true, for: selectedWorkbench)
         inspectorPresented = true
+    }
+
+    func isInspectorPresented(for workbench: Workbench) -> Bool {
+        inspectorPresentationByWorkbench[workbench] ?? true
+    }
+
+    func setInspectorPresented(_ isPresented: Bool, for workbench: Workbench) {
+        inspectorPresentationByWorkbench[workbench] = isPresented
     }
 
     func toggleWorkbenchSidebar() {
@@ -280,6 +361,7 @@ final class AppModel {
         fitOptions: FitOptionsPayload? = nil
     ) {
         selectedWorkbench = .plot
+        requestOpenWindow(for: .plot)
         if plotSession.hasSessionContent {
             pendingPlotReplacementAction = .openExternalFigure(inputURL, sheet, templateID, options, fitOptions)
             isPlotReplacementConfirmationPresented = true
@@ -325,6 +407,7 @@ final class AppModel {
                     await openProjectDocument(url)
                 } else {
                     selectedWorkbench = .plot
+                    requestOpenWindow(for: .plot)
                     plotSession.importFile(url)
                 }
                 refreshCodeConsoleContext()
@@ -373,6 +456,7 @@ final class AppModel {
             return
         }
         selectedWorkbench = .plot
+        requestOpenWindow(for: .plot)
         if plotSession.hasSessionContent {
             pendingPlotReplacementAction = .openPlotDocument(url)
             isPlotReplacementConfirmationPresented = true
@@ -394,9 +478,11 @@ final class AppModel {
             switch response.payload.selectedWorkbench {
             case "data_studio":
                 selectedWorkbench = .dataStudio
+                requestOpenWindow(for: .dataStudio)
                 await dataStudioSession.restoreProject(from: response)
             default:
                 selectedWorkbench = .plot
+                requestOpenWindow(for: .plot)
                 await plotSession.restoreProject(from: response)
             }
         } catch {
@@ -411,6 +497,16 @@ final class AppModel {
                     plotSession.errorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+
+    func requestOpenWindow(for workbench: Workbench) {
+        requestedWorkbenchWindow = workbench
+    }
+
+    func consumeRequestedWorkbenchWindow(_ workbench: Workbench) {
+        if requestedWorkbenchWindow == workbench {
+            requestedWorkbenchWindow = nil
         }
     }
 }

@@ -18,10 +18,14 @@ class SourceCheck:
 
 PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
-        label="app scene remains a single native main window",
+        label="app scene exposes launcher plus singleton workbench windows",
         path="app/macos/Sources/App/SciPlotGodApp.swift",
         required=(
-            'WindowGroup("SciPlot God")',
+            'WindowGroup("SciPlot God", id: "launcher")',
+            'Window("Plot", id: Workbench.plot.windowSceneID)',
+            'Window("Data Studio", id: Workbench.dataStudio.windowSceneID)',
+            'Window("Composer", id: Workbench.composer.windowSceneID)',
+            'Window("Code Console", id: Workbench.codeConsole.windowSceneID)',
             ".defaultSize(width:",
             ".windowResizability(.contentMinSize)",
             ".defaultLaunchBehavior(.presented)",
@@ -37,19 +41,21 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="RootSplitView keeps sidebar as navigation chrome",
+        label="workbench windows do not use the old global split shell",
         path="app/macos/Sources/App/RootSplitView.swift",
         required=(
-            "NavigationSplitView(columnVisibility:",
-            "WorkbenchSidebarRail(",
-            "WorkbenchContentShell(",
-            "WorkbenchToolbarContent(",
-            "InspectorChromeRoot(title:",
+            "struct LauncherWindowRoot",
+            "struct WorkbenchWindowRoot",
+            "WorkbenchWindowOpenHandler",
+            ".focusedSceneValue(\\.workbenchCommandContext, workbench)",
+            "WorkbenchWindowToolbarContent(",
             "WindowToolbarConfigurator",
-            "WorkbenchHeaderActionGroup(model:",
-            'ToolbarItem(id: "globalActionGroup"',
         ),
         forbidden=(
+            "NavigationSplitView(",
+            "WorkbenchSidebarRail",
+            "WorkbenchContentShell",
+            "InspectorChromeRoot",
             'Text("SciPlot God")',
             "WorkbenchSegmentedPicker",
             'Picker("Workbench"',
@@ -66,6 +72,54 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
+        label="AppModel owns launcher navigation and real module actions",
+        path="app/macos/Sources/App/AppModel.swift",
+        required=(
+            "var requestedWorkbenchWindow: Workbench?",
+            "func enterWorkbench(_ workbench: Workbench)",
+            "func showLauncher()",
+            "func beginLauncherPrimaryAction(for workbench: Workbench)",
+            "func beginImport(for workbench: Workbench)",
+            "func export(for workbench: Workbench) async",
+            "func saveProject(for workbench: Workbench) async",
+            "func showHelp(for workbench: Workbench)",
+            "func requestOpenWindow(for workbench: Workbench)",
+        ),
+        forbidden=(
+            "selectedWorkbench: Workbench?",
+            "case start",
+            "case home",
+        ),
+    ),
+    SourceCheck(
+        label="Launcher uses native glass and real workbench modules",
+        path="app/macos/Sources/App/LauncherView.swift",
+        required=(
+            "struct LauncherView",
+            "GlassEffectContainer",
+            ".glassEffect(",
+            "LauncherModuleSelectionView",
+            "LauncherActionPanel",
+            "@Environment(\\.openWindow)",
+            "model.beginLauncherPrimaryAction(for:",
+            "Workbench.allCases",
+        ),
+        forbidden=(
+            "LauncherBackdrop",
+            "LauncherModulePreview",
+            "PlotLauncherSketch",
+            "DataStudioLauncherSketch",
+            "ComposerLauncherSketch",
+            "CodeConsoleLauncherSketch",
+            "Color.accentColor.opacity(0.18)",
+            "Magic Wand",
+            "Brush",
+            "Paint",
+            "Eraser",
+            "Crop",
+        ),
+    ),
+    SourceCheck(
         label="Plot tools use native commands without stealing text input",
         path="app/macos/Sources/App/AppCommands.swift",
         required=(
@@ -76,15 +130,31 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         forbidden=(),
     ),
     SourceCheck(
-        label="Plot workbench uses Templates-only inner rail",
+        label="Plot workbench uses source/type plus adjustment-category layout",
         path="app/macos/Sources/Features/Plot/PlotWorkbenchView.swift",
         required=(
-            "PlotTemplateLibraryView(session: session, density:",
-            "PlotWorkspaceLayoutPolicy",
-            "templateRailCollapseThreshold",
-            "PlotTemplateRailDensity.compact",
+            "PlotPixelmatorWorkspace",
+            "PlotSourceTypePanel",
+            "PlotAdjustmentInspector",
+            "PlotAdjustmentRail",
+            "PlotTypeSearchField",
+            "PlotDataWorkbookEntry",
+            "PlotRefineView(session: session)",
         ),
         forbidden=(
+            "PlotLayerPanel",
+            "PlotVerticalToolRail",
+            "PlotFloatingToolPalette",
+            "PlotTemplateChooserList",
+            "templatePopoverPresented",
+            "PlotLibraryPanel",
+            "PlotSourceSummary",
+            "PlotObjectLibraryView",
+            "PlotDataUtilityButton",
+            'WorkbenchRailTitle(title: "Source"',
+            'WorkbenchRailTitle(title: "Objects"',
+            'WorkbenchRailTitle(title: "Templates"',
+            'Label("No source"',
             "PlotTemplateView(session:",
             "frame(minWidth: 1160",
             "PlotSourceRailEdgeButton",
@@ -94,18 +164,18 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Shared shell uses aligned native header metrics",
+        label="Shared UI no longer defines the old global workbench header shell",
         path="app/macos/Sources/Shared/UI/StateViews.swift",
         required=(
+            "static let minWidth: CGFloat = 320",
+            "static let idealWidth: CGFloat = 360",
+            "static let maxWidth: CGFloat = 420",
+        ),
+        forbidden=(
             "enum WorkbenchHeaderMetrics",
-            "static let height: CGFloat = 56",
             "struct WorkbenchContentShell",
             "struct InspectorHeaderTabs",
             "struct InspectorChromeRoot",
-            "static let minWidth: CGFloat = 360",
-            ".frame(height: WorkbenchHeaderMetrics.height)",
-        ),
-        forbidden=(
             "content\n                .frame(\n                    minWidth: InspectorColumnLayoutPolicy.minWidth",
             ".frame(\n            minWidth: InspectorColumnLayoutPolicy.minWidth",
             "Button(action: hideAction)",
@@ -113,7 +183,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot left panel is templates-only",
+        label="Plot template browser remains a contract-fed template view",
         path="app/macos/Sources/Features/Plot/PlotTemplateView.swift",
         required=(
             "enum PlotTemplateRailDensity",
@@ -156,9 +226,19 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot inspector uses selection-driven plain sections",
+        label="Plot inspector supports explicit adjustment categories",
         path="app/macos/Sources/Features/Plot/PlotInspectorView.swift",
         required=(
+            "adjustmentCategory: PlotAdjustmentCategory?",
+            "adjustmentCategoryContent",
+            "figureAdjustmentContent",
+            "axesAdjustmentContent",
+            "legendAdjustmentContent",
+            "guidesAdjustmentContent",
+            "fitAdjustmentContent",
+            "functionsAdjustmentContent",
+            "annotationsAdjustmentContent",
+            "advancedAxesAdjustmentContent",
             "PlotSelectionInspectorView",
             "session.canvasSelection",
             "PlotSelectedLayerEditorView(",
@@ -232,12 +312,16 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot preview owns the tool palette and avoids duplicate overlay controls",
+        label="Plot preview owns the live preview stage and tool dock",
         path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
         required=(
-            "PlotFloatingToolPalette(",
+            "PlotPreviewStage",
+            "Base64PreviewImageView(base64PNG:",
+            "Base64PDFPreviewView(base64PDF:",
         ),
         forbidden=(
+            "PlotToolDock",
+            "PlotFloatingToolPalette(",
             'EmptyStateCard(title: "No Preview")',
             "PlotToolOptionsBar(",
             "PlotCanvasOverlayControlsView",
@@ -248,15 +332,14 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Toolbar action group is explicit and avoids overflow glyphs",
+        label="Workbench toolbar action group is scoped per module window",
         path="app/macos/Sources/App/RootSplitView.swift",
         required=(
-            "private struct WorkbenchHeaderActionGroup",
-            "model.beginImportForActiveWorkbench()",
-            "model.exportActiveWorkbench()",
-            "model.showHelpForActiveWorkbench()",
-            "model.toggleInspector()",
-            '"sidebar.right"',
+            "private struct WorkbenchWindowToolbarContent",
+            "model.beginImport(for: workbench)",
+            "model.export(for: workbench)",
+            "model.showHelp(for: workbench)",
+            "model.toggleInspector(for: workbench)",
         ),
         forbidden=(
             ">>",
@@ -274,27 +357,29 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot tool and canvas selection are app-only presentation state",
+        label="Plot adjustment categories replace the old popover tool palette",
         path="app/macos/Sources/Features/Plot/PlotInspectorMode.swift",
         required=(
+            "enum PlotAdjustmentCategory",
+            "struct PlotAdjustmentRailItem",
+            "static let railCategories",
+            "plotAdjustmentAvailability",
+            "selectPlotAdjustmentCategory",
             "enum PlotTool",
             "enum PlotCanvasSelection",
-            "struct PlotFloatingToolPalette",
-            "PlotToolPopoverContent",
-            "PlotGuideToolCreateForm",
-            "axisTarget",
-            "valueText",
-            "startText",
-            "endText",
-            "floatingPaletteTools",
-            "floatingPaletteToolGroups",
-            "opensToolPopover",
             "PlotLayerSelection",
             "shortcutKey",
             "plotToolAvailability",
             "activatePlotTool",
         ),
         forbidden=(
+            "struct PlotFloatingToolPalette",
+            "PlotToolPopoverContent",
+            "PlotGuideToolCreateForm",
+            "floatingPaletteTools",
+            "floatingPaletteToolGroups",
+            "opensToolPopover",
+            ".popover(",
             "struct PlotInspectorModePicker",
             "struct PlotToolStripView",
             "PlotToolOptionsBar",
@@ -412,8 +497,16 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                 issues.append(f"{check.path}: {check.label}: forbidden token still present {token!r}")
 
     try:
+        app_scene = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")
+        command_attachment_count = app_scene.count("AppCommands(model: model)")
+        if command_attachment_count != 1:
+            issues.append(
+                "app/macos/Sources/App/SciPlotGodApp.swift: "
+                f"AppCommands must be attached exactly once; found {command_attachment_count}"
+            )
+
         root_split = _read_source(root, "app/macos/Sources/App/RootSplitView.swift")
-        toolbar_start = root_split.index("private struct WorkbenchToolbarContent")
+        toolbar_start = root_split.index("private struct WorkbenchWindowToolbarContent")
         toolbar_end = root_split.index("private struct WindowToolbarConfigurator", toolbar_start)
         toolbar_source = root_split[toolbar_start:toolbar_end]
         if ">>" in toolbar_source or "<<" in toolbar_source:
@@ -426,13 +519,28 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
 
     try:
         plot_mode = _read_source(root, "app/macos/Sources/Features/Plot/PlotInspectorMode.swift")
-        palette_start = plot_mode.index("static let floatingPaletteTools")
-        palette_end = plot_mode.index("var title:", palette_start)
-        palette_source = plot_mode[palette_start:palette_end]
-        if ".dataCursor" in palette_source:
+        rail_start = plot_mode.index("static let railCategories")
+        rail_end = plot_mode.index("var title:", rail_start)
+        rail_source = plot_mode[rail_start:rail_end]
+        for category in (
+            ".figure",
+            ".axes",
+            ".legend",
+            ".guides",
+            ".fit",
+            ".functions",
+            ".annotations",
+            ".advancedAxes",
+        ):
+            if category not in rail_source:
+                issues.append(
+                    "app/macos/Sources/Features/Plot/PlotInspectorMode.swift: "
+                    f"adjustment rail is missing {category}"
+                )
+        if ".dataCursor" in rail_source:
             issues.append(
                 "app/macos/Sources/Features/Plot/PlotInspectorMode.swift: "
-                "Data Cursor must not be in the main floating palette"
+                "Data Cursor must not be in the adjustment rail"
             )
 
         activate_start = plot_mode.index("func activatePlotTool")

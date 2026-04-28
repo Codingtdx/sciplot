@@ -264,7 +264,7 @@ private struct PlotTemplateBrowserPopover: View {
     }
 }
 
-private struct PlotTemplateRow: View {
+struct PlotTemplateRow: View {
     let title: String
     let kind: PlotTemplateThumbnailKind
     let aspectRatio: CGFloat

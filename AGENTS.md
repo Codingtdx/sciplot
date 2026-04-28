@@ -5,12 +5,15 @@
 
 ## 当前产品模型
 
-- app-level primary workbench 固定为：
+- app 启动必须先进入原生 `Launcher` 开窗器；四个产品区都是互相独立的单例模块窗口：
   - `Plot`
   - `Data Studio`
   - `Composer`
   - `Code Console`
-- `Start / Home / Project / Settings` 只能作为 utility affordance，不得恢复为一级产品区。
+- `Launcher` 是受支持的 app entry surface，不再属于旧的 `Start/Home` 禁区；它只能打开/聚焦模块窗口，并承载真实模块入口与真实动作。
+- Launcher 的模块动作必须落到真实链路：Plot import/open project、Data Studio raw import、Composer graph/assets import、Code Console bind/import context。禁止为了模仿 Pixelmator Pro 而添加项目不存在的绘图/修图工具。
+- `Start / Home / Project / Settings` 只能作为 utility affordance，不得恢复为一级产品区或全局工作台。
+- 模块之间不得再通过同一窗口左侧 rail 做视觉切换；`Command-1/2/3/4` 必须打开/聚焦对应单例模块窗口。
 
 ## 目录职责（当前真相）
 
@@ -71,6 +74,7 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
+- Plot live preview 统一走 `POST /render-preview` 返回的 `PreviewItemResponse`：`png_base64` 优先用于 GUI bitmap live preview，`pdf_base64` 必须继续保留为权威精确预览/导出兜底。禁止把绘图语义重写到 Swift Charts/Canvas 形成第二套渲染规则。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`，Plot `Transformed` 预览可额外携带 typed `options.data_variables / options.data_transforms`。不要把全量 workbook 表格塞回 inspect/session payload。
 - Plot `POST /inspect-file` 可选携带 typed `options.data_variables / options.data_transforms` 以做 transform-aware inspect/recommendation；有 transforms 时识别必须基于变换后的表，因此 derived/pivot/aggregate 之后的数据可以直接进入同一 ranked recommendation payload，不要求原始 raw shape 先被识别；无 options 时必须保持快速原始导入推荐路径，不得把高级数据引擎变成普通导入的隐性成本。
 - Plot 推荐必须识别 DataGraph-inspired advanced input shapes：XYZ long table 或 matrix scalar field 可推荐 `contour_field`，theta/radius 曲线可推荐 `polar_curve`，小型 mixed table 可推荐 `table_figure`。这些推荐必须继续走 `POST /inspect-file` 的 ranked recommendation payload，不得在 macOS 侧按列名重建第二套高级模板判断。
@@ -120,6 +124,10 @@
 ## 桌面运行时约束（macOS）
 
 - 受支持宿主只有 `app/macos`。
+- Scene 模型固定为一个默认启动的 `Launcher` `WindowGroup`，加 `Plot` / `Data Studio` / `Composer` / `Code Console` 四个 `Window` 单例模块窗口；scene id 必须由 `Workbench.windowSceneID` 统一提供。
+- 模块窗口不得恢复旧全局工作台壳：禁止左侧模块切换栏、`WorkbenchSidebarRail`、`WorkbenchContentShell`、多层 `项目名 + 模块名 + 内容标题` 额头，和把 `RootSplitView` 当作四模块共享视觉 shell。
+- 命令菜单必须按 focused module context 路由当前窗口；`selectedWorkbench` 只能作为兼容/兜底状态，不得驱动可见的全局模块切换 UI。
+- toolbar 的 `Launcher` 返回入口可以作为 utility affordance 保留，只负责打开/聚焦 Launcher。
 - sidecar 策略是 app-managed ownership：
   - 不能只靠端口连通判断可用；
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
@@ -140,7 +148,7 @@
   - 用户显式修改 style 后再改 theme/palette，style 必须保持；
   - 用户显式修改 theme 后再改 palette，theme 必须保持；反之亦然；
   - 打开已保存 figure/project 时，持久化值优先，只有缺失或失效时才回退到 template 推荐值。
-- 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
+- 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 320, ideal: 360, max: 420)`。
 - macOS 导出交互统一以全局 toolbar / menu command 为准：
   - toolbar `Export` 保留为唯一全局主入口；
   - inspector body 不得恢复第二套 `Import` / `Export` 主按钮；
@@ -160,27 +168,32 @@
 - 共享状态文案（`InspectorEmptyState` / `EmptyStateCard` / `ErrorStateCard`）统一保持“状态 + 下一步”的短句，不回退到长段解释文案。
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
-- 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
-- Plot 内侧左栏只允许承载 Templates；Source / Sheet / Data Workbook 不得恢复到该左栏。模板栏可以自动紧凑，但不提供用户可见 hide/show 边缘按钮。
-- Plot 工具条是对象创建/选择入口，右侧 selection inspector 负责精确科研参数编辑。Reference guide / region 默认必须通过 Axis + Value 或 Start/End 输入创建和编辑，禁止把拖拽、nudge HUD 或画布浮动参数面板作为默认路径。
+- 共享 inspector 的 `Axes` 调整区是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
+- Plot 必须使用 Pixelmator-Pro 语法的四区布局：左侧数据/图型面板，中间白色 figure/page preview，右侧深色 glass adjustment inspector，最右侧竖向调整分类栏。
+- Plot 左侧 `PlotSourceTypePanel` 只负责“用什么数据画什么图”：Import/Open、当前文件名、sheet picker、contract/backend recommendation 驱动的图类型列表，以及 `Data Workbook` 的 `Source Data / Transformed / Variables / Fit` 入口。左侧不得恢复 layer/object 列表、fit/function/guide/text/shape overlay 行、`Source` / `Objects` / `Templates` 分区说明文案、`No source` 空说明、假工具、第二套 Import/Export 主按钮或前端本地业务判断。
+- Plot 最右侧 `PlotAdjustmentRail` 是绘图调整分类入口，不是对象创建工具条。固定顺序为 `Figure`、`Axes`、`Legend`、`Guides`、`Fit`、`Functions`、`Annotations`、`Advanced Axes`；点击只切换右侧 inspector category，禁止弹出快捷菜单。`Data Cursor` 在 preview hit-testing metadata 存在前不得进入该栏。
+- 右侧 adjustment inspector 负责精确科研参数编辑。Reference guide / region、function、text/shape annotation 的创建按钮必须在对应 inspector 分类内 inline 出现；创建后通过 Axis + Value 或 Start/End 等精确输入编辑，禁止把拖拽、nudge HUD、画布浮动参数面板或 popover 作为默认路径。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data`、`Transformed`、`Variables` 和 `Fit`
   - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`、`Exponential`、`Logarithmic`、`Power Law`、`Gaussian`、`Logistic` 和 backend-only `Custom Function`
-  - Plot inspector `Advanced Plot` 里的 fit overlay 只开放给 `curve / point_line / scatter`
-  - Plot inspector `Advanced Plot` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
-  - Plot inspector `Axis -> Advanced` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
-  - Plot tool + selection inspector 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
-  - Plot tool + selection inspector 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
-  - Plot tool + selection inspector 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
-  - Plot inspector `Advanced Plot` 里的 `function layers` 通过 `render_options.analytical_layers` 持久化；当前只对 `function_curve` 开放基础编辑，表达式安全解析和采样归后端共享表达式引擎负责，不能借此引入自由脚本/命令栈或前端第二套数学执行器
-  - Plot inspector `Advanced Plot` 里的 `data variables / data transforms` 通过 `render_options.data_variables / render_options.data_transforms` 持久化；基础 GUI 只编辑 typed payload 并展示后端错误，变量、mask、binning、aggregate、smooth、pivot、表达式与错误解释归后端负责，不能借此引入前端表达式执行器或第二套 loader 语义
+  - Plot adjustment inspector `Fit` 里的 fit overlay 只开放给 `curve / point_line / scatter`
+  - Plot adjustment inspector `Advanced Axes` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
+  - Plot adjustment inspector `Advanced Axes` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
+  - Plot adjustment inspector `Guides` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
+  - Plot adjustment inspector `Annotations` 里的 `text annotations` 通过 `render_options.text_annotations` 持久化；当前支持普通 note 与 callout connector，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套坐标/样式常量
+  - Plot adjustment inspector `Annotations` 里的 `shape annotations` 通过 `render_options.shape_annotations` 持久化；当前支持 `rectangle / ellipse / bracket`，可绑定 `primary y / secondary y`，并复用 broken-axis panel/坐标映射与 preview/export/save-open project 同一路径，但不能借此引入第二套几何/样式常量
+  - Plot adjustment inspector `Functions` 里的 `function layers` 通过 `render_options.analytical_layers` 持久化；当前只对 `function_curve` 开放基础编辑，表达式安全解析和采样归后端共享表达式引擎负责，不能借此引入自由脚本/命令栈或前端第二套数学执行器
+  - Plot `Data Workbook` 里的 `data variables / data transforms` 通过 `render_options.data_variables / render_options.data_transforms` 持久化；基础 GUI 只编辑 typed payload 并展示后端错误，变量、mask、binning、aggregate、smooth、pivot、表达式与错误解释归后端负责，不能借此引入前端表达式执行器或第二套 loader 语义
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`
   - `Fit` 当前支持共享 Plot fit model surface
   - `Current Figure` 拟合只开放给 `curve / point_line / scatter`
-- macOS GUI smoke / fingerprint 基线必须继续覆盖 imported-state inspector：
+- macOS GUI smoke / fingerprint 基线必须继续覆盖 Launcher、四个独立模块窗口与 Plot workspace：
+  - Launcher
+  - Plot empty workspace
+  - Plot imported workspace
   - Plot imported inspector
   - Plot data workbook
   - Data Studio figure inspector

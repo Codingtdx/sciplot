@@ -5,9 +5,9 @@ import XCTest
 
 final class InspectorLayoutPolicyTests: XCTestCase {
     func testUnifiedInspectorColumnWidthPolicyStaysStable() {
-        XCTAssertEqual(InspectorColumnLayoutPolicy.minWidth, 360)
-        XCTAssertEqual(InspectorColumnLayoutPolicy.idealWidth, 400)
-        XCTAssertEqual(InspectorColumnLayoutPolicy.maxWidth, 460)
+        XCTAssertEqual(InspectorColumnLayoutPolicy.minWidth, 320)
+        XCTAssertEqual(InspectorColumnLayoutPolicy.idealWidth, 360)
+        XCTAssertEqual(InspectorColumnLayoutPolicy.maxWidth, 420)
         XCTAssertLessThan(InspectorColumnLayoutPolicy.minWidth, InspectorColumnLayoutPolicy.idealWidth)
         XCTAssertLessThan(InspectorColumnLayoutPolicy.idealWidth, InspectorColumnLayoutPolicy.maxWidth)
     }
@@ -112,6 +112,9 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         )
         importedPlotSession.sourceTableResponse = TestPayloads.sourceTablePreview(path: "/tmp/imported-curve.csv")
         importedPlotSession.fitAnalysisResponse = TestPayloads.fitAnalysis(path: "/tmp/imported-curve.csv")
+        importedPlotSession.previewResponse = TestPayloads.renderPreview()
+
+        let launcherModel = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
         let dataStudioClient = MockSidecarClient()
         let dataStudioSession = DataStudioSession()
@@ -192,6 +195,30 @@ final class InspectorLayoutPolicyTests: XCTestCase {
 
         let rawSnapshots: [(String, Data?)] = [
             (
+                "Launcher",
+                snapshotPNGData(
+                    for: LauncherView(model: launcherModel),
+                    size: CGSize(width: 1180, height: 700),
+                    colorScheme: .dark
+                )
+            ),
+            (
+                "Plot workspace empty",
+                snapshotPNGData(
+                    for: PlotWorkbenchView(session: plotSession),
+                    size: CGSize(width: 1100, height: 720),
+                    colorScheme: .dark
+                )
+            ),
+            (
+                "Plot workspace imported",
+                snapshotPNGData(
+                    for: PlotWorkbenchView(session: importedPlotSession),
+                    size: CGSize(width: 1100, height: 720),
+                    colorScheme: .dark
+                )
+            ),
+            (
                 "Plot template gallery",
                 snapshotPNGData(
                     for: PlotTemplateView(session: plotSession),
@@ -266,16 +293,20 @@ final class InspectorLayoutPolicyTests: XCTestCase {
     }
 
     @MainActor
-    private func snapshotPNGData<V: View>(for view: V, size: CGSize) -> Data? {
+    private func snapshotPNGData<V: View>(
+        for view: V,
+        size: CGSize,
+        colorScheme: ColorScheme = .light
+    ) -> Data? {
         let rootedView = AnyView(
             view
                 .environment(\.locale, Locale(identifier: "en_US_POSIX"))
-                .environment(\.colorScheme, .light)
+                .environment(\.colorScheme, colorScheme)
         )
         let hostingView = NSHostingView(rootView: rootedView)
         hostingView.frame = CGRect(origin: .zero, size: size)
         hostingView.setFrameSize(size)
-        hostingView.appearance = NSAppearance(named: .aqua)
+        hostingView.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
         hostingView.layoutSubtreeIfNeeded()
         hostingView.displayIfNeeded()
         RunLoop.current.run(until: Date().addingTimeInterval(0.05))

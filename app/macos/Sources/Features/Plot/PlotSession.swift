@@ -85,6 +85,7 @@ final class PlotSession {
     var fitAnalysisOffset = 0
     var fitAnalysisSelectedSeriesID: String?
     var selectedPlotTool: PlotTool = .select
+    var selectedPlotAdjustmentCategory: PlotAdjustmentCategory = .figure
     var canvasSelection: PlotCanvasSelection = .figure
     var selectedReferenceGuideID: String?
     var selectedTextAnnotationID: String?

@@ -2,14 +2,9 @@ import AppKit
 import SwiftUI
 
 enum InspectorColumnLayoutPolicy {
-    static let minWidth: CGFloat = 360
-    static let idealWidth: CGFloat = 400
-    static let maxWidth: CGFloat = 460
-}
-
-enum WorkbenchHeaderMetrics {
-    static let height: CGFloat = 56
-    static let horizontalPadding: CGFloat = 16
+    static let minWidth: CGFloat = 320
+    static let idealWidth: CGFloat = 360
+    static let maxWidth: CGFloat = 420
 }
 
 @MainActor
@@ -105,96 +100,6 @@ struct InspectorSurfaceModifier: ViewModifier {
         content
             .scrollContentBackground(.hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-struct WorkbenchContentShell<Content: View>: View {
-    let title: String
-    let subtitle: String?
-    let content: Content
-
-    init(
-        title: String,
-        subtitle: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.headline)
-                        .lineLimit(1)
-
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, WorkbenchHeaderMetrics.horizontalPadding)
-            .frame(height: WorkbenchHeaderMetrics.height)
-            .background(.thinMaterial)
-            .overlay(alignment: .bottom) {
-                Divider()
-            }
-
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-struct InspectorHeaderTabs: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.headline)
-            .lineLimit(1)
-    }
-}
-
-struct InspectorChromeRoot<Content: View>: View {
-    let title: String
-    let content: Content
-
-    init(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                InspectorHeaderTabs(title: title)
-
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, WorkbenchHeaderMetrics.horizontalPadding)
-            .frame(height: WorkbenchHeaderMetrics.height)
-            .background(.thinMaterial)
-            .overlay(alignment: .bottom) {
-                Divider()
-            }
-
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

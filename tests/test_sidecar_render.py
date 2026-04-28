@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from base64 import b64decode
 from pathlib import Path
 
 import pandas as pd
@@ -105,6 +106,26 @@ def test_render_preview_accepts_analytical_function_layers(tmp_path: Path) -> No
     payload = response.json()
     assert payload["preview"]["filename"] == "curve_function_curve.pdf"
     assert payload["submission_report"]["template"] == "function_curve"
+
+
+def test_render_preview_returns_png_live_preview_payload(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    response = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    preview = response.json()["preview"]
+    assert preview["pdf_base64"]
+    png_bytes = b64decode(preview["png_base64"])
+    assert png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:

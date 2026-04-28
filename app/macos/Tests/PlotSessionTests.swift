@@ -697,12 +697,18 @@ final class PlotSessionTests: XCTestCase {
         let initialRenderCount = client.renderRequests.count
 
         session.activatePlotTool(.fit)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .fit)
         session.activatePlotTool(.guide)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .guides)
         session.activatePlotTool(.text)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .annotations)
         session.activatePlotTool(.shape)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .annotations)
         session.activatePlotTool(.function)
         session.activatePlotTool(.axisBreak)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .advancedAxes)
         session.activatePlotTool(.secondaryAxis)
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .advancedAxes)
 
         XCTAssertEqual(session.selectedPlotTool, .secondaryAxis)
         XCTAssertFalse(session.fitOptions.enabled)
@@ -714,6 +720,30 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertTrue(session.yAxisBreaks.isEmpty)
         XCTAssertFalse(session.renderOptions.extraYAxis?.enabled ?? false)
         XCTAssertEqual(client.renderRequests.count, initialRenderCount)
+    }
+
+    func testFunctionToolShortcutRoutesToFunctionAdjustmentWhenTemplateSupportsIt() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.chooseTemplate("function_curve")
+        session.activatePlotTool(.function)
+
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .functions)
+        XCTAssertTrue(session.analyticalLayers.isEmpty)
+    }
+
+    func testPlotTypeItemsExposeFullContractFedListBeforeImport() {
+        let session = PlotSession()
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        XCTAssertEqual(session.plotTypeItems.count, TestPayloads.meta().templates.count)
+        XCTAssertEqual(session.templateGalleryItems.count, 5)
+        XCTAssertTrue(session.plotTypeItems.allSatisfy { !$0.selectable })
     }
 
     func testReferenceGuideEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {

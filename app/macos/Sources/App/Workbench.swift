@@ -34,6 +34,19 @@ enum Workbench: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
+    var windowSceneID: String {
+        switch self {
+        case .plot:
+            return "plot"
+        case .dataStudio:
+            return "data-studio"
+        case .composer:
+            return "composer"
+        case .codeConsole:
+            return "code-console"
+        }
+    }
+
     var shortcutKey: KeyEquivalent {
         switch self {
         case .plot:

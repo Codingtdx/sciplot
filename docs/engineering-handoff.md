@@ -26,12 +26,161 @@ Every development round must update this file.
    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
 3. Sanity-check one user flow in each workbench:
+   - Launcher: choose each module and verify the primary action opens the real module workflow
    - Plot: Import -> Inspect -> Template -> Refine -> Preflight -> Export
    - Data Studio: Import -> Group Review -> Compare Preview -> Export/Open in Plot
    - Composer: preview/export with layer/hidden/lock semantics
    - Code Console: context bind -> run -> outputs/reveal
 
 ## 3) Decision Records
+
+### 2026-04-28: Plot interaction model v3, data/type left and adjustment rail right
+
+- Change:
+  - Replaced Plot's left object/layer panel with `PlotSourceTypePanel`.
+  - Left Plot panel now owns Import/Open, current file, sheet switching, full contract/backend-fed plot type selection, and `Data Workbook` tab entry points (`Source Data`, `Transformed`, `Variables`, `Fit`).
+  - Replaced the far-right popover tool palette with `PlotAdjustmentRail`.
+  - Right rail categories are fixed to `Figure`, `Axes`, `Legend`, `Guides`, `Fit`, `Functions`, `Annotations`, and `Advanced Axes`; clicking a category switches the right inspector instead of opening a popover.
+  - Added `PlotAdjustmentCategory`, `PlotAdjustmentRailItem`, `PlotSession.selectedPlotAdjustmentCategory`, and `PlotSession.plotTypeItems`.
+  - Retained `PlotTool` only as a keyboard/menu compatibility layer; tool shortcuts route into adjustment categories and do not create objects.
+  - Moved guide/function/text/shape creation into inline controls inside the corresponding inspector category.
+  - Strengthened `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py` to forbid the old object left panel, floating tool palette, and right-rail popovers.
+
+- User-visible impact:
+  - Plot now reads as a plotting workflow: choose data/sheet/type on the left, refine figure/axes/legend/guides/fit/functions/annotations/advanced axes on the right.
+  - The right rail no longer behaves like a generic drawing tools strip, and it no longer opens small creation popovers.
+  - `Data Cursor` remains hidden until hit-testing metadata exists.
+
+- Decision Record:
+  - First-principles motivation: scientific plotting starts from data shape and figure type, then proceeds through refinement categories. The previous layer/tool arrangement copied Pixelmator's spatial shell but gave Plot the wrong interaction hierarchy.
+  - Rejected keeping overlay objects in the left panel because it made the left side compete with plot type and sheet choice.
+  - Rejected popover-based creation on the right rail because category buttons should select inspector state, matching the native sidebar/inspector pattern already working well.
+  - Current boundary: this round is front-end interaction restructuring only. It does not change sidecar APIs, render contract, project schema, or preview PNG/PDF semantics.
+  - Failure condition: if the far-right rail starts creating objects directly, showing popovers, or if the left panel regains fit/function/guide/text/shape object rows, the v3 model has regressed.
+
+- Risks and rollback points:
+  - Plot category routing is now split between `PlotInspectorMode.swift`, `PlotSession.swift`, and `PlotInspectorView.swift`; rollback these with `PlotWorkbenchView.swift` if the inspector fails to follow right-rail selection.
+  - `plotTypeItems` intentionally exposes the full contract/recommendation list while the old gallery remains compact; rollback point is `PlotSessionPresentation.swift` if a legacy compact template surface depends on the previous behavior.
+  - Presentation gate rollback lives in `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py`.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 3 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testActivatingPlotToolsDoesNotCreatePlotObjects -only-testing:SciPlotGodMacTests/PlotSessionTests/testFunctionToolShortcutRoutesToFunctionAdjustmentWhenTemplateSupportsIt -only-testing:SciPlotGodMacTests/PlotSessionTests/testPlotTypeItemsExposeFullContractFedListBeforeImport`: passed, 3 tests.
+  - `.venv/bin/python -m pytest tests`: passed, 277 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 195 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 277 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 195 tests all passed.
+  - Known environment warning: Xcode reports CoreSimulator service/version warnings during hosted macOS operations; macOS tests still passed.
+  - Manual inner-beta evidence remains pending and unenforced: Plot import/preview/export, Data Studio import/open Plot, and overlay save/reopen were not marked complete without a real evidence bundle.
+
+### 2026-04-28: Pixelmator-Pro window model and Plot GUI rebuild v2
+
+- Change:
+  - Replaced the old single-window global workbench shell with one default Launcher window plus four singleton module windows:
+    - `WindowGroup("SciPlot God", id: "launcher")`
+    - `Window("Plot", id: Workbench.plot.windowSceneID)`
+    - `Window("Data Studio", id: Workbench.dataStudio.windowSceneID)`
+    - `Window("Composer", id: Workbench.composer.windowSceneID)`
+    - `Window("Code Console", id: Workbench.codeConsole.windowSceneID)`
+  - Added `Workbench.windowSceneID` and focused command routing so `Command-1/2/3/4`, Import/Open, Export, Save Project, Help, and Inspector act on the focused module window instead of a visible global module switcher.
+  - Rebuilt the Launcher as a clean glass opener: module list plus real actions, with no blue accent line, central sketch, fake visual preview, or decorative Pixelmator tool inventory.
+  - Rebuilt Plot as a Pixelmator-Pro grammar workspace:
+    - left `PlotLayerPanel`
+    - central white preview stage
+    - right `PlotInlineInspectorPanel`
+    - far-right `PlotVerticalToolRail`
+  - Removed the old module-window path through `NavigationSplitView`, `WorkbenchSidebarRail`, `WorkbenchContentShell`, and `InspectorChromeRoot`.
+  - Kept `AppCommands` attached exactly once so the app menu no longer repeats `Workbench` / `Plot Tools` for every scene.
+  - Tightened GUI presentation checks so module windows cannot restore the old shell, and Plot's left panel cannot restore `Source` / `Objects` / `Templates` section labels or `No source` empty copy.
+  - Added a presentation gate test that rejects duplicate command attachment.
+  - Kept backend sidecar API, plot contract, PNG/PDF preview payloads, and `.sciplotgod` project schema unchanged.
+
+- User-visible impact:
+  - Opening the app shows only the Launcher. Choosing Plot, Data Studio, Composer, or Code Console opens/focuses that module in its own window.
+  - Module windows no longer show a far-left module switcher or stacked project/module/content headers.
+  - Plot now follows the requested Pixelmator-style spatial layout: layers/objects left, figure page center, scientific inspector right, tools on the far right.
+  - Data Studio, Composer, and Code Console keep their existing internal workflows but live in independent module windows.
+
+- Decision Record:
+  - First-principles motivation: module choice is an app-level opening action, not persistent navigation inside every module. Once a user enters Plot, the screen should spend pixels on Plot concepts rather than cross-module switching.
+  - Rejected keeping `RootSplitView` as the visual owner because it forces a shared shell and multi-header shape that directly conflicts with the Pixelmator reference.
+  - Rejected copying Pixelmator's editing tools because they are not SciPlot domain concepts; the far-right rail only exposes real Plot typed actions.
+  - Current boundary: this round changes front-end scene/layout/command routing only. Data Studio, Composer, Code Console deep redesign and a Swift-native plotting engine remain out of scope.
+  - Failure condition: if commands start acting on the wrong focused module window, or `selectedWorkbench` becomes visible navigation again, the window model has regressed.
+
+- Risks and rollback points:
+  - Window routing now depends on focused values and `openWindow`; rollback points are `app/macos/Sources/App/SciPlotGodApp.swift`, `app/macos/Sources/App/AppCommands.swift`, `app/macos/Sources/App/AppModel.swift`, and `app/macos/Sources/App/RootSplitView.swift`.
+  - Launcher primary actions now open/focus module windows before triggering the real workflow; rollback point is `app/macos/Sources/App/LauncherView.swift`.
+  - Plot's left panel is no longer the previous template rail. Roll back `app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`, `PlotRefineView.swift`, and `PlotInspectorMode.swift` if object selection or template choice regresses.
+  - Presentation gate rollback lives in `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py`.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 3 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests/testWorkbenchWindowIDsAreStableSingletonSceneIDs -only-testing:SciPlotGodMacTests/AppModelTests/testExplicitWorkbenchActionsDoNotNeedVisibleWorkbenchSwitching -only-testing:SciPlotGodMacTests/AppModelTests/testLauncherStartsPresentedAndRoutesModuleActionsToRealSessions`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 193 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 277 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 193 tests all passed.
+  - Lightweight desktop smoke after the final build:
+    - Launching `app/macos/.derivedData/Build/Products/Debug/SciPlot God.app` produced one onscreen `SciPlot God` Launcher window.
+    - The menu bar exposed one set of `Workbench` and `Plot Tools` menus.
+    - Choosing `Workbench -> Plot` produced an onscreen `Plot` singleton window while keeping the Launcher onscreen.
+  - Computer Use accessibility lookup could not attach to this debug app window (`cgWindowNotFound`), so visual smoke used the system CoreGraphics window list instead.
+  - Known environment warning: Xcode reports CoreSimulator service/version warnings during hosted macOS operations; macOS build still passed.
+  - Manual inner-beta evidence remains pending and unenforced: Plot import/preview/export, Data Studio import/open Plot, and overlay save/reopen were not marked complete without a real evidence bundle.
+
+### 2026-04-28: Pixelmator-style Launcher, Plot shell, and PNG live preview
+
+- Change:
+  - Added a native Launcher-first entry surface in `app/macos/Sources/App/LauncherView.swift` and routed it through `AppModel.isLauncherPresented`.
+  - Launcher module actions are real workflow entrypoints:
+    - Plot import/open project through the existing Plot importer
+    - Data Studio raw import wizard
+    - Composer import menu
+    - Code Console context importer
+  - Reworked Plot into a dark pro workspace:
+    - left Plot library contains Source/Data Workbook utility, Templates, and Objects/Layers
+    - center stage shows a white figure/page preview
+    - tool dock uses existing real Plot tools only; `Data Cursor` stays out of the main dock
+    - right inspector remains contextual scientific editing
+  - Added Plot PNG live preview payloads:
+    - `PreviewItemResponse.png_base64` in sidecar schema
+    - Matplotlib `/render-preview` now serializes both PDF and 160 dpi PNG
+    - macOS `PreviewItemResponse.pngBase64` decodes the optional PNG and Plot preview prefers it before PDF fallback
+  - Updated GUI presentation gate and tests to require Launcher + Plot dark workspace + denser inspector policy.
+  - Updated `README.md` and `AGENTS.md` to remove the old no-launcher / templates-only rail / `360 / 400 / 460` inspector conflicts.
+  - Added GUI smoke snapshot coverage for Launcher, Plot empty workspace, and Plot imported workspace while preserving existing imported inspector/data workbook/Data Studio figure snapshots.
+
+- User-visible impact:
+  - App opens to a Launcher where users choose Plot, Data Studio, Composer, or Code Console.
+  - Plot now feels closer to a pro macOS graphics workspace without adding fake Pixelmator tools.
+  - Plot preview can update from a lighter bitmap payload while PDF remains the exact export-grade fallback.
+  - Inspector is denser at `320 / 360 / 420`.
+
+- Decision Record:
+  - First-principles motivation: module choice is now a real first interaction, and Plot needs one coherent authoring space where source, templates, and scientific objects sit next to the figure stage.
+  - Rejected copying Pixelmator tool inventory because those tools are not SciPlot domain concepts.
+  - Rejected a Swift-native plotting rewrite for v1 because Swift Charts/Canvas would duplicate contract-owned style, axes, broken axes, overlays, and export semantics.
+  - Current boundary: PNG preview is a live-view optimization only. PDF export and backend Matplotlib rendering remain authoritative.
+  - Failure condition: if future Swift UI starts recomputing plot geometry/style locally, preview/export/project replay can diverge from sidecar semantics.
+
+- Risks and rollback points:
+  - `PreviewItemResponse` now carries optional PNG; older comparison-preview paths omit it intentionally. Roll back `app/sidecar/schemas_common.py`, `app/sidecar/schemas_render.py`, and `app/macos/Sources/Infrastructure/SidecarModelsCommon.swift` if clients cannot tolerate the added field.
+  - Launcher-first state changes app startup semantics. Roll back `LauncherView.swift`, `RootSplitView.swift`, and `AppModel.swift` if launch restoration or document open routing regresses.
+  - Plot library is broader than the previous templates-only rail. Roll back `PlotWorkbenchView.swift`, `PlotRefineView.swift`, and `PlotInspectorMode.swift` if the new spatial grouping interferes with import/template/refine flow.
+  - GUI gate rollback lives in `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py`.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py::test_render_preview_returns_png_live_preview_payload tests/test_check_macos_gui_presentation.py -q`: passed, 3 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodePreviewItemPayloadKeepsPNGAndPDFPreviews -only-testing:SciPlotGodMacTests/AppModelTests/testLauncherStartsPresentedAndRoutesModuleActionsToRealSessions -only-testing:SciPlotGodMacTests/InspectorLayoutPolicyTests/testUnifiedInspectorColumnWidthPolicyStaysStable`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 276 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 191 tests all passed.
+  - Known environment warning: Xcode reports CoreSimulator service/version warnings during hosted macOS tests; macOS build and tests still passed.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
 
 ### 2026-04-28: Global shell baseline alignment and Plot templates-only rail
 

@@ -392,13 +392,17 @@ extension PlotSession {
     }
 
     var templateGalleryItems: [PlotTemplateGalleryItem] {
+        Array(plotTypeItems.prefix(5))
+    }
+
+    var plotTypeItems: [PlotTemplateGalleryItem] {
         let templates = availableTemplateSummaries
         guard !templates.isEmpty else {
             return []
         }
 
         guard inspectionResponse != nil else {
-            return templates.prefix(5).map { template in
+            return templates.map { template in
                 PlotTemplateGalleryItem(
                     id: template.id,
                     title: template.label,
@@ -411,7 +415,7 @@ extension PlotSession {
         }
 
         let summariesByID = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
-        return compatibleRecommendations.prefix(5).map { recommendation in
+        return compatibleRecommendations.map { recommendation in
             let summary = summariesByID[recommendation.templateID]
             return PlotTemplateGalleryItem(
                 id: recommendation.templateID,

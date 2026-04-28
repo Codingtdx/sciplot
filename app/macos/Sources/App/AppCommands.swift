@@ -1,13 +1,27 @@
 import SwiftUI
 
+private struct WorkbenchCommandContextKey: FocusedValueKey {
+    typealias Value = Workbench
+}
+
+extension FocusedValues {
+    var workbenchCommandContext: Workbench? {
+        get { self[WorkbenchCommandContextKey.self] }
+        set { self[WorkbenchCommandContextKey.self] = newValue }
+    }
+}
+
 struct AppCommands: Commands {
     let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.workbenchCommandContext) private var focusedWorkbench
 
     var body: some Commands {
         CommandMenu("Workbench") {
             ForEach(Workbench.allCases) { workbench in
                 Button(workbench.title) {
-                    model.switchWorkbench(workbench)
+                    model.requestOpenWindow(for: workbench)
+                    openWindow(id: workbench.windowSceneID)
                 }
                 .keyboardShortcut(workbench.shortcutKey, modifiers: [.command])
             }
@@ -24,49 +38,59 @@ struct AppCommands: Commands {
                 model.newDataStudioSession()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .disabled(model.selectedWorkbench != .dataStudio)
+            .disabled(commandWorkbench != .dataStudio)
 
             Button("Import or Open") {
-                model.beginImportForActiveWorkbench()
+                let workbench = commandWorkbench
+                model.requestOpenWindow(for: workbench)
+                openWindow(id: workbench.windowSceneID)
+                model.beginImport(for: workbench)
             }
             .keyboardShortcut("o", modifiers: [.command])
 
             Button("Save Project…") {
-                Task { await model.saveProject() }
+                let workbench = commandWorkbench
+                Task { await model.saveProject(for: workbench) }
             }
             .keyboardShortcut("s", modifiers: [.command])
-            .disabled(!model.activeSaveProjectAvailability.isEnabled)
+            .disabled(!model.saveProjectAvailability(for: commandWorkbench).isEnabled)
 
             Button("Save Project As…") {
-                Task { await model.saveProjectAs() }
+                let workbench = commandWorkbench
+                Task { await model.saveProjectAs(for: workbench) }
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
-            .disabled(!model.activeSaveProjectAvailability.isEnabled)
+            .disabled(!model.saveProjectAvailability(for: commandWorkbench).isEnabled)
 
-            Button(model.activeExportCommandTitle) {
-                Task { await model.exportActiveWorkbench() }
+            Button(model.exportCommandTitle(for: commandWorkbench)) {
+                let workbench = commandWorkbench
+                Task { await model.export(for: workbench) }
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
-            .disabled(!model.activeExportAvailability.isEnabled)
+            .disabled(!model.exportAvailability(for: commandWorkbench).isEnabled)
 
             Button("Reveal in Finder") {
-                model.revealActiveOutput()
+                model.revealOutput(for: commandWorkbench)
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
-            .disabled(!model.activeRevealAvailability.isEnabled)
+            .disabled(!model.revealAvailability(for: commandWorkbench).isEnabled)
 
             Button("Clear Current Session", role: .destructive) {
                 model.clearCurrentDataStudioSession()
             }
-            .disabled(model.selectedWorkbench != .dataStudio)
+            .disabled(commandWorkbench != .dataStudio)
         }
 
         CommandGroup(after: .sidebar) {
-            Button(model.inspectorPresented ? "Hide Inspector" : "Show Inspector") {
-                model.toggleInspector()
+            Button(model.isInspectorPresented(for: commandWorkbench) ? "Hide Inspector" : "Show Inspector") {
+                model.toggleInspector(for: commandWorkbench)
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
         }
+    }
+
+    private var commandWorkbench: Workbench {
+        focusedWorkbench ?? model.selectedWorkbench
     }
 
     @ViewBuilder
@@ -76,7 +100,7 @@ struct AppCommands: Commands {
         let button = Button(title) {
             model.plotSession.activatePlotTool(tool)
         }
-        .disabled(model.selectedWorkbench != .plot || !availability.isEnabled)
+        .disabled(commandWorkbench != .plot || !availability.isEnabled)
 
         if let shortcutKey = tool.shortcutKey {
             button.keyboardShortcut(shortcutKey, modifiers: [.command, .option])
