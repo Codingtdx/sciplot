@@ -191,19 +191,6 @@ struct ComposerInspectorView: View {
     @ViewBuilder
     private var exportActionsSection: some View {
         InspectorSection(title: "Actions") {
-            InspectorActionStack {
-                Button("Export") {
-                    Task { await session.exportComposition() }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!session.exportAvailability.isEnabled)
-                .help(
-                    session.exportAvailability.reason
-                        ?? "Export the current composition as PDF or 300 dpi TIFF."
-                )
-                .inspectorActionButton()
-            }
-
             DisclosureGroup("Advanced") {
                 InspectorActionStack {
                     Button("Reveal Output") {

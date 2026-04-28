@@ -26,7 +26,7 @@ enum PlotTemplateThumbnailKind: String, Sendable {
     case fallback
 }
 
-enum PlotSourceRailDensity: Equatable {
+enum PlotTemplateRailDensity: Equatable {
     case regular
     case compact
 }
@@ -81,13 +81,12 @@ struct PlotTemplateView: View {
     }
 }
 
-struct PlotSourceLibraryView: View {
+struct PlotTemplateLibraryView: View {
     @Bindable var session: PlotSession
-    let density: PlotSourceRailDensity
-    @State private var dataPreparationExpanded = false
+    let density: PlotTemplateRailDensity
     @State private var templateBrowserPresented = false
 
-    init(session: PlotSession, density: PlotSourceRailDensity = .regular) {
+    init(session: PlotSession, density: PlotTemplateRailDensity = .regular) {
         self.session = session
         self.density = density
     }
@@ -95,271 +94,16 @@ struct PlotSourceLibraryView: View {
     var body: some View {
         Group {
             if density == .compact {
-                PlotCompactSourceLibraryView(session: session)
+                PlotCompactTemplateLibraryView(session: session)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        sourceSection
-                        if session.selectedFileURL != nil {
-                            objectsSection
-                            dataPreparationSection
-                            templatesSection
-                        }
-                    }
-                    .padding(.trailing, 4)
+                    templatesSection
+                        .padding(.trailing, 4)
                 }
                 .scrollContentBackground(.hidden)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var sourceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            RailSectionHeader(title: "Source")
-
-            if let filename = session.selectedSourceFilename {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(filename)
-                        .font(.body.weight(.medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if session.availableSheets.count > 1 {
-                    Picker("Sheet", selection: selectedSheetBinding) {
-                        ForEach(session.availableSheets, id: \.self) { sheet in
-                            Text(sheet.displayName).tag(sheet)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .help("Choose the sheet used for inspect and preview.")
-                } else {
-                    PlotSourcePropertyRow(title: "Sheet", value: session.selectedSheet.displayName)
-                }
-
-                Button {
-                    session.showDataWorkbook()
-                } label: {
-                    Label("Data Workbook", systemImage: "tablecells")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(!session.dataWorkbookAvailability.isEnabled)
-                .help(session.dataWorkbookAvailability.reason ?? "Open source data, transforms, variables, and fit results.")
-            } else {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-            }
-        }
-    }
-
-    private var objectsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RailSectionHeader(title: "Objects")
-
-            LazyVStack(alignment: .leading, spacing: 2) {
-                objectRow(
-                    item: PlotObjectListItem(
-                        id: "figure",
-                        title: "Figure",
-                        systemImage: "doc.richtext",
-                        selection: .figure
-                    )
-                )
-
-                if session.supportsFitOverlayControls {
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: PlotLayerSelection.fitOverlay.id,
-                            title: "Fit Overlay",
-                            systemImage: "chart.xyaxis.line",
-                            selection: .layer(.fitOverlay)
-                        ),
-                        isEnabled: fitEnabledBinding
-                    )
-                }
-
-                ForEach(session.analyticalLayers) { layer in
-                    let selection = PlotLayerSelection.function(layer.id)
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: selection.id,
-                            title: functionTitle(layer),
-                            systemImage: "function",
-                            selection: .layer(selection)
-                        ),
-                        isEnabled: analyticalLayerEnabledBinding(id: layer.id),
-                        onDelete: {
-                            session.removeAnalyticalLayer(id: layer.id)
-                            clearIfSelected(.layer(selection))
-                        }
-                    )
-                }
-
-                ForEach(session.referenceGuides) { guide in
-                    let selection = PlotLayerSelection.referenceGuide(guide.id)
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: selection.id,
-                            title: referenceGuideTitle(guide),
-                            systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
-                            selection: .layer(selection)
-                        ),
-                        isEnabled: referenceGuideEnabledBinding(id: guide.id),
-                        onDelete: {
-                            session.removeReferenceGuide(id: guide.id)
-                            clearIfSelected(.layer(selection))
-                        }
-                    )
-                }
-
-                ForEach(session.textAnnotations) { annotation in
-                    let selection = PlotLayerSelection.textAnnotation(annotation.id)
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: selection.id,
-                            title: textAnnotationTitle(annotation),
-                            systemImage: annotation.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
-                            selection: .layer(selection)
-                        ),
-                        isEnabled: textAnnotationEnabledBinding(id: annotation.id),
-                        onDelete: {
-                            session.removeTextAnnotation(id: annotation.id)
-                            clearIfSelected(.layer(selection))
-                        }
-                    )
-                }
-
-                ForEach(session.shapeAnnotations) { annotation in
-                    let selection = PlotLayerSelection.shapeAnnotation(annotation.id)
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: selection.id,
-                            title: shapeAnnotationTitle(annotation),
-                            systemImage: shapeSymbol(annotation.kind),
-                            selection: .layer(selection)
-                        ),
-                        isEnabled: shapeAnnotationEnabledBinding(id: annotation.id),
-                        onDelete: {
-                            session.removeShapeAnnotation(id: annotation.id)
-                            clearIfSelected(.layer(selection))
-                        }
-                    )
-                }
-
-                ForEach(session.seriesOrderLabels, id: \.self) { seriesID in
-                    let selection = PlotLayerSelection.series(seriesID)
-                    objectRow(
-                        item: PlotObjectListItem(
-                            id: selection.id,
-                            title: seriesID,
-                            systemImage: "list.bullet.rectangle",
-                            selection: .layer(selection)
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    private func objectRow(
-        item: PlotObjectListItem,
-        isEnabled: Binding<Bool>? = nil,
-        onDelete: (() -> Void)? = nil
-    ) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                session.selectCanvasSelection(item.selection)
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: item.systemImage)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(session.canvasSelection == item.selection ? Color.accentColor : Color.secondary)
-                        .frame(width: 18)
-
-                    Text(item.title)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-
-                    Spacer(minLength: 8)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if let isEnabled {
-                Toggle("", isOn: isEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-            }
-
-            if let onDelete {
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-            }
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 7)
-        .background {
-            if session.canvasSelection == item.selection {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.12))
-            }
-        }
-    }
-
-    private var dataPreparationSection: some View {
-        DisclosureGroup(isExpanded: $dataPreparationExpanded) {
-            VStack(alignment: .leading, spacing: 4) {
-                PlotDataPreparationRow(
-                    title: PlotDataWorkbookTab.sourceData.title,
-                    systemImage: "tablecells",
-                    detail: session.selectedFileURL == nil ? "Source" : session.selectedSheet.displayName,
-                    availability: session.dataWorkbookAvailability
-                ) {
-                    openDataWorkbook(tab: .sourceData)
-                }
-
-                PlotDataPreparationRow(
-                    title: PlotDataWorkbookTab.transformed.title,
-                    systemImage: "function",
-                    detail: session.dataPipelineSummary.hasPipeline ? session.dataPipelineSummary.title : "Raw",
-                    availability: session.dataTransformAvailability
-                ) {
-                    openDataWorkbook(tab: .transformed)
-                }
-
-                PlotDataPreparationRow(
-                    title: PlotDataWorkbookTab.variables.title,
-                    systemImage: "number",
-                    detail: session.dataVariables.isEmpty ? "None" : "\(session.dataVariables.count)",
-                    availability: session.dataTransformAvailability
-                ) {
-                    openDataWorkbook(tab: .variables)
-                }
-
-                PlotDataPreparationRow(
-                    title: PlotDataWorkbookTab.fit.title,
-                    systemImage: "point.topleft.down.curvedto.point.bottomright.up",
-                    detail: session.fitModelLabel,
-                    availability: session.fitAnalysisAvailability
-                ) {
-                    openDataWorkbook(tab: .fit)
-                }
-            }
-            .padding(.top, 4)
-        } label: {
-            RailSectionHeader(title: "Data")
-        }
-        .disclosureGroupStyle(.automatic)
     }
 
     private var templatesSection: some View {
@@ -398,7 +142,7 @@ struct PlotSourceLibraryView: View {
     }
 
     private var visibleTemplateItems: [PlotTemplateGalleryItem] {
-        let items = Array(session.templateGalleryItems.prefix(4))
+        let items = Array(session.templateGalleryItems.prefix(6))
         guard let selectedTemplateID = session.selectedTemplateID,
               !items.contains(where: { $0.id == selectedTemplateID }),
               let selected = session.templateGalleryItems.first(where: { $0.id == selectedTemplateID })
@@ -418,7 +162,10 @@ struct PlotSourceLibraryView: View {
 
     private func templateButton(for item: PlotTemplateGalleryItem) -> some View {
         Button {
-            selectTemplate(item)
+            guard item.selectable else {
+                return
+            }
+            session.chooseTemplate(item.id)
         } label: {
             PlotTemplateRow(
                 title: item.title,
@@ -437,238 +184,25 @@ struct PlotSourceLibraryView: View {
             }
         }
     }
-
-    private func selectTemplate(_ item: PlotTemplateGalleryItem) {
-        guard item.selectable else {
-            return
-        }
-        session.chooseTemplate(item.id)
-    }
-
-    private var selectedSheetBinding: Binding<SheetValue> {
-        Binding(
-            get: { session.selectedSheet },
-            set: { newValue in
-                session.setSelectedSheet(newValue)
-            }
-        )
-    }
-
-    private func openDataWorkbook(tab: PlotDataWorkbookTab) {
-        guard dataWorkbookAvailability(for: tab).isEnabled else {
-            return
-        }
-        session.selectDataWorkbookTab(tab)
-        session.showDataWorkbook()
-    }
-
-    private func dataWorkbookAvailability(for tab: PlotDataWorkbookTab) -> ActionAvailability {
-        switch tab {
-        case .sourceData:
-            return session.dataWorkbookAvailability
-        case .transformed, .variables:
-            return session.dataTransformAvailability
-        case .fit:
-            return session.fitAnalysisAvailability
-        }
-    }
-
-    private func clearIfSelected(_ selection: PlotCanvasSelection) {
-        if session.canvasSelection == selection {
-            session.selectCanvasSelection(.figure)
-        }
-    }
-
-    private func functionTitle(_ layer: AnalyticalLayerPayload) -> String {
-        let label = layer.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return label.isEmpty ? layer.expression : label
-    }
-
-    private func referenceGuideTitle(_ guide: ReferenceGuidePayload) -> String {
-        let label = guide.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !label.isEmpty {
-            return label
-        }
-        return guide.kind == "band" ? "Region" : "Line"
-    }
-
-    private func textAnnotationTitle(_ annotation: TextAnnotationPayload) -> String {
-        let trimmed = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Annotation" : trimmed
-    }
-
-    private func shapeAnnotationTitle(_ annotation: ShapeAnnotationPayload) -> String {
-        let label = annotation.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !label.isEmpty {
-            return label
-        }
-        return shapeKindLabel(annotation.kind)
-    }
-
-    private func shapeKindLabel(_ kind: String) -> String {
-        switch kind {
-        case "ellipse":
-            return "Ellipse"
-        case "bracket":
-            return "Bracket"
-        default:
-            return "Rectangle"
-        }
-    }
-
-    private func shapeSymbol(_ kind: String) -> String {
-        switch kind {
-        case "ellipse":
-            return "circle.dashed"
-        case "bracket":
-            return "square.split.diagonal.2x2"
-        default:
-            return "rectangle.dashed"
-        }
-    }
-
-    private var fitEnabledBinding: Binding<Bool> {
-        Binding {
-            session.fitOptions.enabled
-        } set: { enabled in
-            session.updateFitEnabled(enabled)
-        }
-    }
-
-    private func analyticalLayerEnabledBinding(id: String) -> Binding<Bool> {
-        Binding {
-            session.analyticalLayers.first(where: { $0.id == id })?.enabled ?? true
-        } set: { enabled in
-            session.updateAnalyticalLayer(id: id, policy: .immediate) { $0.enabled = enabled }
-        }
-    }
-
-    private func referenceGuideEnabledBinding(id: String) -> Binding<Bool> {
-        Binding {
-            session.referenceGuides.first(where: { $0.id == id })?.enabled ?? true
-        } set: { enabled in
-            session.updateReferenceGuide(id: id, policy: .immediate) { $0.enabled = enabled }
-        }
-    }
-
-    private func textAnnotationEnabledBinding(id: String) -> Binding<Bool> {
-        Binding {
-            session.textAnnotations.first(where: { $0.id == id })?.enabled ?? true
-        } set: { enabled in
-            session.updateTextAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
-        }
-    }
-
-    private func shapeAnnotationEnabledBinding(id: String) -> Binding<Bool> {
-        Binding {
-            session.shapeAnnotations.first(where: { $0.id == id })?.enabled ?? true
-        } set: { enabled in
-            session.updateShapeAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
-        }
-    }
 }
 
-private struct PlotObjectListItem: Identifiable {
-    let id: String
-    let title: String
-    let systemImage: String
-    let selection: PlotCanvasSelection
-}
-
-private struct PlotCompactSourceLibraryView: View {
+private struct PlotCompactTemplateLibraryView: View {
     @Bindable var session: PlotSession
     @State private var templateBrowserPresented = false
 
     var body: some View {
         VStack(spacing: 10) {
-            if session.selectedFileURL == nil {
-                Image(systemName: "doc.badge.plus")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 42, height: 42)
-            } else {
-                compactButton(
-                    systemImage: "tablecells",
-                    help: session.dataWorkbookAvailability.reason ?? "Data Workbook"
-                ) {
-                    session.showDataWorkbook()
-                }
-                .disabled(!session.dataWorkbookAvailability.isEnabled)
-
-                Divider()
-                    .padding(.vertical, 2)
-
-                compactSelectionButton(
-                    selection: .figure,
-                    systemImage: "doc.richtext",
-                    help: "Figure"
-                )
-
-                if session.supportsFitOverlayControls {
-                    compactSelectionButton(
-                        selection: .layer(.fitOverlay),
-                        systemImage: "chart.xyaxis.line",
-                        help: "Fit Overlay"
-                    )
-                }
-
-                ForEach(session.referenceGuides) { guide in
-                    compactSelectionButton(
-                        selection: .layer(.referenceGuide(guide.id)),
-                        systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
-                        help: guide.kind == "band" ? "Region" : "Guide"
-                    )
-                }
-
-                ForEach(session.textAnnotations) { annotation in
-                    compactSelectionButton(
-                        selection: .layer(.textAnnotation(annotation.id)),
-                        systemImage: annotation.connectorEnabled ? "text.bubble" : "character.cursor.ibeam",
-                        help: "Text"
-                    )
-                }
-
-                ForEach(session.shapeAnnotations) { annotation in
-                    compactSelectionButton(
-                        selection: .layer(.shapeAnnotation(annotation.id)),
-                        systemImage: compactShapeSymbol(annotation.kind),
-                        help: "Shape"
-                    )
-                }
-
-                if !session.templateGalleryItems.isEmpty {
-                    Divider()
-                        .padding(.vertical, 2)
-
-                    compactButton(systemImage: "square.grid.2x2", help: "Templates") {
-                        templateBrowserPresented.toggle()
-                    }
-                    .popover(isPresented: $templateBrowserPresented, arrowEdge: .trailing) {
-                        PlotTemplateBrowserPopover(session: session)
-                    }
-                }
+            compactButton(systemImage: "square.grid.2x2", help: "Templates") {
+                templateBrowserPresented.toggle()
             }
-
+            .disabled(session.templateGalleryItems.isEmpty)
+            .popover(isPresented: $templateBrowserPresented, arrowEdge: .trailing) {
+                PlotTemplateBrowserPopover(session: session)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 6)
-    }
-
-    private func compactSelectionButton(
-        selection: PlotCanvasSelection,
-        systemImage: String,
-        help: String
-    ) -> some View {
-        compactButton(systemImage: systemImage, help: help) {
-            session.selectCanvasSelection(selection)
-        }
-        .background {
-            if session.canvasSelection == selection {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.14))
-            }
-        }
     }
 
     private func compactButton(
@@ -685,17 +219,6 @@ private struct PlotCompactSourceLibraryView: View {
         }
         .buttonStyle(.plain)
         .help(help)
-    }
-
-    private func compactShapeSymbol(_ kind: String) -> String {
-        switch kind {
-        case "ellipse":
-            return "circle.dashed"
-        case "bracket":
-            return "square.split.diagonal.2x2"
-        default:
-            return "rectangle.dashed"
-        }
     }
 }
 
@@ -738,71 +261,6 @@ private struct PlotTemplateBrowserPopover: View {
             .frame(width: 260, height: 320)
         }
         .padding(12)
-    }
-}
-
-private struct RailSectionHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
-    }
-}
-
-private struct PlotSourcePropertyRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            Text(value)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .font(.caption)
-    }
-}
-
-private struct PlotDataPreparationRow: View {
-    let title: String
-    let systemImage: String
-    let detail: String
-    let availability: ActionAvailability
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .lineLimit(1)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-            }
-            .contentShape(Rectangle())
-            .padding(.vertical, 5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!availability.isEnabled)
-        .help(availability.reason ?? "Open \(title).")
-        .opacity(availability.isEnabled ? 1.0 : 0.5)
     }
 }
 

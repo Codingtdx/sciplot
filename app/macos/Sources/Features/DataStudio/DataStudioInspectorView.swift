@@ -95,17 +95,6 @@ struct DataStudioInspectorView: View {
                 )
                 .inspectorActionButton()
 
-                Button("Export Bundle") {
-                    Task { await session.exportComparisonBundle() }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!session.exportAvailability.isEnabled)
-                .help(
-                    session.exportAvailability.reason
-                        ?? "Export the comparison workbook, filtered workbooks, and figure outputs."
-                )
-                .inspectorActionButton()
-
                 Button("Analysis") {
                     session.showAnalysis()
                 }

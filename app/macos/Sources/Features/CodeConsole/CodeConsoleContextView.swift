@@ -22,19 +22,6 @@ struct CodeConsoleContextView: View {
         let presentation = session.outputsPresentation
 
         InspectorSection(title: "Actions") {
-            InspectorActionStack {
-                Button("Export") {
-                    session.exportCurrentOutputs()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!session.exportAvailability.isEnabled)
-                .help(
-                    session.exportAvailability.reason
-                        ?? "Export the latest run's generated PDF figures as PDF or 300 dpi TIFF."
-                )
-                .inspectorActionButton()
-            }
-
             DisclosureGroup("Advanced") {
                 InspectorActionStack {
                     Button("Reveal Output") {

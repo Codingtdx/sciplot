@@ -27,17 +27,26 @@ struct RootSplitView {
     var body: some View {
         NavigationSplitView(columnVisibility: $model.columnVisibility) {}
         WorkbenchSidebarRail()
+        WorkbenchContentShell(title: "Plot") {}
         WorkbenchToolbarContent()
         InspectorChromeRoot(title: "Figure") {}
-        .toolbar(removing: .sidebarToggle)
     }
 }
 private struct WorkbenchToolbarContent {
     var body: some View {
-        Image(systemName: "sidebar.left")
+        ToolbarItem(id: "globalActionGroup", placement: .primaryAction) {}
+        WorkbenchHeaderActionGroup(model: model)
     }
 }
-private struct InspectorEdgeRevealButton {}
+private struct WorkbenchHeaderActionGroup {
+    func body() {
+        model.beginImportForActiveWorkbench()
+        model.exportActiveWorkbench()
+        model.showHelpForActiveWorkbench()
+        model.toggleInspector()
+        Image(systemName: "sidebar.right")
+    }
+}
 private struct WindowToolbarConfigurator {}
 """,
         "app/macos/Sources/App/AppCommands.swift": """
@@ -51,17 +60,11 @@ struct AppCommands {
 }
 """,
         "app/macos/Sources/Features/Plot/PlotTemplateView.swift": """
-enum PlotSourceRailDensity { case regular, compact }
-struct PlotSourceLibraryView {
+enum PlotTemplateRailDensity { case regular, compact }
+struct PlotTemplateLibraryView {
     var body: some View {
-        RailSectionHeader(title: "Source")
-        RailSectionHeader(title: "Objects")
         WorkbenchRailTitle(title: "Templates")
-        Picker("Sheet", selection: binding) {}
-        session.showDataWorkbook()
-        session.selectDataWorkbookTab(tab)
-        PlotObjectListItem()
-        PlotCompactSourceLibraryView()
+        PlotCompactTemplateLibraryView()
         PlotTemplateRow()
         PlotTemplateBrowserPopover()
     }
@@ -129,15 +132,28 @@ struct PlotGuideToolCreateForm {
 enum PlotLayerSelection {}
 """,
         "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": """
-PlotSourceLibraryView(session: session, density: sourceRailDensity)
-PlotWorkspaceLayoutPolicy.sourceRailCollapseThreshold
-PlotSourceRailDensity.compact
+PlotTemplateLibraryView(session: session, density: templateRailDensity)
+PlotWorkspaceLayoutPolicy.templateRailCollapseThreshold
+PlotTemplateRailDensity.compact
 """,
         "app/macos/Sources/Shared/UI/StateViews.swift": """
+enum WorkbenchHeaderMetrics {
+    static let height: CGFloat = 56
+}
 enum InspectorColumnLayoutPolicy {
     static let minWidth: CGFloat = 360
 }
-struct InspectorChromeRoot {}
+struct WorkbenchContentShell {
+    var body: some View {
+        EmptyView().frame(height: WorkbenchHeaderMetrics.height)
+    }
+}
+struct InspectorHeaderTabs {}
+struct InspectorChromeRoot {
+    var body: some View {
+        EmptyView().frame(height: WorkbenchHeaderMetrics.height)
+    }
+}
 """,
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"

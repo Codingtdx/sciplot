@@ -42,12 +42,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=(
             "NavigationSplitView(columnVisibility:",
             "WorkbenchSidebarRail(",
+            "WorkbenchContentShell(",
             "WorkbenchToolbarContent(",
             "InspectorChromeRoot(title:",
-            "InspectorEdgeRevealButton",
             "WindowToolbarConfigurator",
-            ".toolbar(removing: .sidebarToggle)",
-            '"sidebar.left"',
+            "WorkbenchHeaderActionGroup(model:",
+            'ToolbarItem(id: "globalActionGroup"',
         ),
         forbidden=(
             'Text("SciPlot God")',
@@ -56,8 +56,13 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "ActiveWorkbenchToolbarContent",
             "plotSheetBinding",
             "showDataWorkbook()",
-            "model.toggleInspector()",
             "PlotExportInspectorSection(session:",
+            "InspectorEdgeRevealButton",
+            "chevron.forward.2",
+            "chevron.backward.2",
+            'Image(systemName: "chevron',
+            ".toolbar(removing: .sidebarToggle)",
+            'ToolbarItem(id: "workbenchSidebarToggle"',
         ),
     ),
     SourceCheck(
@@ -71,47 +76,64 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         forbidden=(),
     ),
     SourceCheck(
-        label="Plot workbench uses Source and Library rail",
+        label="Plot workbench uses Templates-only inner rail",
         path="app/macos/Sources/Features/Plot/PlotWorkbenchView.swift",
         required=(
-            "PlotSourceLibraryView(session: session, density:",
+            "PlotTemplateLibraryView(session: session, density:",
             "PlotWorkspaceLayoutPolicy",
-            "sourceRailCollapseThreshold",
-            "PlotSourceRailDensity.compact",
+            "templateRailCollapseThreshold",
+            "PlotTemplateRailDensity.compact",
         ),
         forbidden=(
             "PlotTemplateView(session:",
             "frame(minWidth: 1160",
             "PlotSourceRailEdgeButton",
             "sourceRailPresented",
+            "PlotSourceLibraryView(",
+            "PlotSourceRailDensity",
         ),
     ),
     SourceCheck(
-        label="Shared inspector chrome lets the native inspector own width",
+        label="Shared shell uses aligned native header metrics",
         path="app/macos/Sources/Shared/UI/StateViews.swift",
-        required=("struct InspectorChromeRoot", "static let minWidth: CGFloat = 360"),
+        required=(
+            "enum WorkbenchHeaderMetrics",
+            "static let height: CGFloat = 56",
+            "struct WorkbenchContentShell",
+            "struct InspectorHeaderTabs",
+            "struct InspectorChromeRoot",
+            "static let minWidth: CGFloat = 360",
+            ".frame(height: WorkbenchHeaderMetrics.height)",
+        ),
         forbidden=(
             "content\n                .frame(\n                    minWidth: InspectorColumnLayoutPolicy.minWidth",
             ".frame(\n            minWidth: InspectorColumnLayoutPolicy.minWidth",
+            "Button(action: hideAction)",
+            'help("Hide Inspector")',
         ),
     ),
     SourceCheck(
-        label="Plot left panel owns data preparation",
+        label="Plot left panel is templates-only",
         path="app/macos/Sources/Features/Plot/PlotTemplateView.swift",
         required=(
+            "enum PlotTemplateRailDensity",
+            "struct PlotTemplateLibraryView",
+            "PlotCompactTemplateLibraryView",
+            'WorkbenchRailTitle(title: "Templates"',
+            "PlotTemplateBrowserPopover",
+        ),
+        forbidden=(
             "enum PlotSourceRailDensity",
             "struct PlotSourceLibraryView",
             "PlotCompactSourceLibraryView",
             'RailSectionHeader(title: "Source")',
             'RailSectionHeader(title: "Objects")',
-            'WorkbenchRailTitle(title: "Templates"',
+            'RailSectionHeader(title: "Data")',
             "Picker(\"Sheet\"",
             "session.showDataWorkbook()",
             "session.selectDataWorkbookTab(tab)",
             "PlotObjectListItem",
-            "PlotTemplateBrowserPopover",
-        ),
-        forbidden=(
+            "PlotDataPreparationRow",
             'title: "Import from toolbar"',
             'title: "Import data"',
             'Label("Import",',
@@ -226,6 +248,24 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
+        label="Toolbar action group is explicit and avoids overflow glyphs",
+        path="app/macos/Sources/App/RootSplitView.swift",
+        required=(
+            "private struct WorkbenchHeaderActionGroup",
+            "model.beginImportForActiveWorkbench()",
+            "model.exportActiveWorkbench()",
+            "model.showHelpForActiveWorkbench()",
+            "model.toggleInspector()",
+            '"sidebar.right"',
+        ),
+        forbidden=(
+            ">>",
+            "<<",
+            "chevron.forward.2",
+            "chevron.backward.2",
+        ),
+    ),
+    SourceCheck(
         label="Plot canvas overlay controls avoid localized text symbol labels",
         path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
         forbidden=(
@@ -283,7 +323,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Data Studio inspector uses shared plain sections",
         path="app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift",
         required=('InspectorSection(title: "Actions")', 'InspectorSection(title: "Figure")'),
-        forbidden=('Section("Figure")', 'Section("Actions")', 'InspectorEmptyState(message: "No figure controls")'),
+        forbidden=(
+            'Section("Figure")',
+            'Section("Actions")',
+            'InspectorEmptyState(message: "No figure controls")',
+            'Button("Export Bundle")',
+        ),
     ),
     SourceCheck(
         label="Composer asset rail avoids hero imported-panel empty state",
@@ -302,7 +347,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Composer inspector preview avoids nested shell",
         path="app/macos/Sources/Features/Composer/ComposerInspectorView.swift",
         required=("ComposerInspectorPreviewContent",),
-        forbidden=('Section("Preview")',),
+        forbidden=('Section("Preview")', 'Button("Export")'),
     ),
     SourceCheck(
         label="Code Console root avoids hero card empty state",
@@ -322,7 +367,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Code Console inspector uses plain sections",
         path="app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift",
         required=("InspectorSection(",),
-        forbidden=(".formStyle(.grouped)",),
+        forbidden=(".formStyle(.grouped)", 'Button("Export")'),
     ),
 )
 
@@ -369,12 +414,13 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
     try:
         root_split = _read_source(root, "app/macos/Sources/App/RootSplitView.swift")
         toolbar_start = root_split.index("private struct WorkbenchToolbarContent")
-        toolbar_end = root_split.index("private struct InspectorEdgeRevealButton", toolbar_start)
+        toolbar_end = root_split.index("private struct WindowToolbarConfigurator", toolbar_start)
         toolbar_source = root_split[toolbar_start:toolbar_end]
-        if '"sidebar.right"' in toolbar_source:
-            issues.append("app/macos/Sources/App/RootSplitView.swift: toolbar must not own the inspector toggle")
-        if "toggleInspector()" in toolbar_source:
-            issues.append("app/macos/Sources/App/RootSplitView.swift: toolbar must not toggle the inspector")
+        if ">>" in toolbar_source or "<<" in toolbar_source:
+            issues.append(
+                "app/macos/Sources/App/RootSplitView.swift: "
+                "toolbar must not use chevron text for panel toggles"
+            )
     except (AssertionError, ValueError) as error:
         issues.append(f"app/macos/Sources/App/RootSplitView.swift: toolbar structure check failed: {error}")
 

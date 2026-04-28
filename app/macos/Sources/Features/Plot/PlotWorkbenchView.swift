@@ -11,21 +11,21 @@ struct PlotWorkbenchView: View {
             }
 
             GeometryReader { geometry in
-                let sourceRailDensity: PlotSourceRailDensity =
-                    geometry.size.width < PlotWorkspaceLayoutPolicy.sourceRailCollapseThreshold
-                    ? PlotSourceRailDensity.compact
-                    : PlotSourceRailDensity.regular
+                let templateRailDensity: PlotTemplateRailDensity =
+                    geometry.size.width < PlotWorkspaceLayoutPolicy.templateRailCollapseThreshold
+                    ? PlotTemplateRailDensity.compact
+                    : PlotTemplateRailDensity.regular
 
                 HSplitView {
-                    PlotSourceLibraryView(session: session, density: sourceRailDensity)
+                    PlotTemplateLibraryView(session: session, density: templateRailDensity)
                         .frame(
-                            minWidth: PlotWorkspaceLayoutPolicy.sourceRailMinWidth(for: sourceRailDensity),
-                            idealWidth: PlotWorkspaceLayoutPolicy.sourceRailIdealWidth(for: sourceRailDensity),
-                            maxWidth: PlotWorkspaceLayoutPolicy.sourceRailMaxWidth(for: sourceRailDensity),
+                            minWidth: PlotWorkspaceLayoutPolicy.templateRailMinWidth(for: templateRailDensity),
+                            idealWidth: PlotWorkspaceLayoutPolicy.templateRailIdealWidth(for: templateRailDensity),
+                            maxWidth: PlotWorkspaceLayoutPolicy.templateRailMaxWidth(for: templateRailDensity),
                             maxHeight: .infinity,
                             alignment: .topLeading
                         )
-                        .padding(.leading, sourceRailDensity == .compact ? 6 : 10)
+                        .padding(.leading, templateRailDensity == .compact ? 6 : 10)
                         .padding(.vertical, 10)
 
                     PlotRefineView(session: session)
@@ -78,32 +78,32 @@ struct PlotWorkbenchView: View {
 }
 
 private enum PlotWorkspaceLayoutPolicy {
-    static let sourceRailCollapseThreshold: CGFloat = 980
+    static let templateRailCollapseThreshold: CGFloat = 980
 
-    static func sourceRailMinWidth(for density: PlotSourceRailDensity) -> CGFloat {
+    static func templateRailMinWidth(for density: PlotTemplateRailDensity) -> CGFloat {
         switch density {
         case .regular:
-            return 224
+            return 188
         case .compact:
-            return 104
+            return 70
         }
     }
 
-    static func sourceRailIdealWidth(for density: PlotSourceRailDensity) -> CGFloat {
+    static func templateRailIdealWidth(for density: PlotTemplateRailDensity) -> CGFloat {
         switch density {
         case .regular:
-            return 250
+            return 214
         case .compact:
-            return 116
+            return 78
         }
     }
 
-    static func sourceRailMaxWidth(for density: PlotSourceRailDensity) -> CGFloat {
+    static func templateRailMaxWidth(for density: PlotTemplateRailDensity) -> CGFloat {
         switch density {
         case .regular:
-            return 286
+            return 246
         case .compact:
-            return 132
+            return 88
         }
     }
 }

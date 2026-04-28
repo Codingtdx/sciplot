@@ -141,10 +141,10 @@
   - 用户显式修改 theme 后再改 palette，theme 必须保持；反之亦然；
   - 打开已保存 figure/project 时，持久化值优先，只有缺失或失效时才回退到 template 推荐值。
 - 右侧 inspector 统一列宽策略：`inspectorColumnWidth(min: 360, ideal: 400, max: 460)`。
-- macOS 导出交互统一以 Data Studio inspector 模式为准：
-  - toolbar `Export` 保留为全局主入口；
-  - Plot / Composer / Code Console inspector 必须提供 `Actions` 区，主按钮就是 `Export`；
-  - `Advanced` 内统一放 `Reveal Output` 和 `Latest Export`，不要再散落第二套导出按钮或状态卡；
+- macOS 导出交互统一以全局 toolbar / menu command 为准：
+  - toolbar `Export` 保留为唯一全局主入口；
+  - inspector body 不得恢复第二套 `Import` / `Export` 主按钮；
+  - inspector `Advanced` 可以放 `Reveal Output` 和 `Latest Export` 这类导出后的后续动作，不要再散落第二套导出主入口或状态卡；
   - Plot / Composer / Code Console 的 figure export 必须先选格式（`PDF` / `300 dpi TIFF`），再选目标路径；
   - 单文件导出保留可编辑文件名；多文件导出只选一个 base filename，再追加稳定 suffix；
   - Code Console 的 toolbar/inspector `Export` 只导出 latest run 生成的 PDF figure files，不得退回成 reveal output folder。
@@ -161,8 +161,8 @@
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axis -> Advanced` 是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
-- Plot Source rail 默认常驻并自动紧凑；禁止恢复用户可见的 Source hide/show 边缘按钮。Source rail 只承载 source 状态、对象列表和推荐模板，不再放重复导入说明。
-- Plot 工具条是对象创建/选择入口，左侧 Objects list 负责选择/显隐/删除对象，右侧 selection inspector 负责精确科研参数编辑。Reference guide / region 默认必须通过 Axis + Value 或 Start/End 输入创建和编辑，禁止把拖拽、nudge HUD 或画布浮动参数面板作为默认路径。
+- Plot 内侧左栏只允许承载 Templates；Source / Sheet / Data Workbook 不得恢复到该左栏。模板栏可以自动紧凑，但不提供用户可见 hide/show 边缘按钮。
+- Plot 工具条是对象创建/选择入口，右侧 selection inspector 负责精确科研参数编辑。Reference guide / region 默认必须通过 Axis + Value 或 Start/End 输入创建和编辑，禁止把拖拽、nudge HUD 或画布浮动参数面板作为默认路径。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data`、`Transformed`、`Variables` 和 `Fit`

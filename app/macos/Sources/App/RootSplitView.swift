@@ -12,29 +12,15 @@ struct RootSplitView: View {
                 .id(model.selectedWorkbench)
                 .transition(MotionTokens.stateTransition)
                 .animation(MotionTokens.workbenchSwitch, value: model.selectedWorkbench)
-                .navigationTitle(activeWindowTitle)
-                .navigationSubtitle(activeWindowSubtitle ?? "")
                 .toolbar {
                     WorkbenchToolbarContent(model: model)
-                }
-                .overlay(alignment: .trailing) {
-                    if !model.inspectorPresented {
-                        InspectorEdgeRevealButton {
-                            model.showInspector()
-                        }
-                        .padding(.trailing, 10)
-                        .transition(MotionTokens.stateTransition)
-                    }
                 }
         }
         .inspector(isPresented: $model.inspectorPresented) {
             InspectorChromeRoot(title: activeInspectorTitle) {
-                model.hideInspector()
-            } content: {
                 activeInspectorContent
             }
         }
-        .toolbar(removing: .sidebarToggle)
         .inspectorColumnWidth(
             min: InspectorColumnLayoutPolicy.minWidth,
             ideal: InspectorColumnLayoutPolicy.idealWidth,
@@ -75,21 +61,23 @@ struct RootSplitView: View {
 
     @ViewBuilder
     private var activeWorkbenchDetail: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let runtimeIssueMessage = model.runtimeIssueMessage {
-                DiagnosticIssueCard(
-                    message: runtimeIssueMessage,
-                    retryTitle: "Retry Runtime"
-                ) {
-                    Task { await model.bootstrapIfNeeded() }
+        WorkbenchContentShell(title: activeWindowTitle, subtitle: activeWindowSubtitle) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let runtimeIssueMessage = model.runtimeIssueMessage {
+                    DiagnosticIssueCard(
+                        message: runtimeIssueMessage,
+                        retryTitle: "Retry Runtime"
+                    ) {
+                        Task { await model.bootstrapIfNeeded() }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-            }
 
-            activeWorkbenchView
+                activeWorkbenchView
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -216,16 +204,17 @@ private struct WorkbenchToolbarContent: ToolbarContent {
     @Bindable var model: AppModel
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Button {
-                model.toggleWorkbenchSidebar()
-            } label: {
-                Image(systemName: "sidebar.left")
-            }
-            .help(model.columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar")
+        ToolbarItem(id: "globalActionGroup", placement: .primaryAction) {
+            WorkbenchHeaderActionGroup(model: model)
         }
+    }
+}
 
-        ToolbarItemGroup(placement: .primaryAction) {
+private struct WorkbenchHeaderActionGroup: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 8) {
             Button {
                 model.beginImportForActiveWorkbench()
             } label: {
@@ -241,35 +230,25 @@ private struct WorkbenchToolbarContent: ToolbarContent {
             .disabled(!model.activeExportAvailability.isEnabled)
             .help(model.activeExportHelpText)
 
+            Divider()
+                .frame(height: 18)
+                .padding(.horizontal, 2)
+
             Button {
                 model.showHelpForActiveWorkbench()
             } label: {
                 Image(systemName: "questionmark.circle")
             }
             .help("Quick Help")
-        }
-    }
-}
 
-private struct InspectorEdgeRevealButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "sidebar.right")
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 28, height: 52)
-                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            Button {
+                model.toggleInspector()
+            } label: {
+                Image(systemName: "sidebar.right")
+            }
+            .help(model.inspectorPresented ? "Hide Inspector" : "Show Inspector")
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
-        .help("Show Inspector")
+        .controlSize(.regular)
     }
 }
 
@@ -299,13 +278,5 @@ private struct WindowToolbarConfigurator: NSViewRepresentable {
         toolbar.autosavesConfiguration = false
         toolbar.displayMode = .iconOnly
         toolbar.sizeMode = .regular
-
-        for index in toolbar.items.indices.reversed() {
-            let rawIdentifier = toolbar.items[index].itemIdentifier.rawValue
-            if rawIdentifier == "com.apple.SwiftUI.navigationSplitView.toggleSidebar"
-                || rawIdentifier.contains("navigationSplitView.toggleSidebar") {
-                toolbar.removeItem(at: index)
-            }
-        }
     }
 }

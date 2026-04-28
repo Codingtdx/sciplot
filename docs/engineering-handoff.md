@@ -33,6 +33,90 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-28: Global shell baseline alignment and Plot templates-only rail
+
+- Change:
+  - Added shared native shell header metrics:
+    - `WorkbenchHeaderMetrics.height = 56`
+    - `WorkbenchContentShell`
+    - `InspectorHeaderTabs`
+  - Wrapped every workbench detail in the same center header shell, so center workspace header and right inspector header share height and divider placement.
+  - Updated `InspectorChromeRoot` to use the same 56pt header and bottom divider as the center workspace.
+  - Replaced the separate right-edge inspector reveal affordance and duplicate inspector-header hide button with a single standard toolbar `sidebar.right` toggle in the global action group.
+  - Let `NavigationSplitView` own the native left sidebar toggle again instead of adding a second custom left-toggle toolbar item, eliminating the system `More` / `>>` overflow menu.
+  - Grouped toolbar actions as global document actions (`Import`, `Export`) followed by utility controls (`Help`, `Inspector`) with a divider.
+  - Removed duplicate primary Export buttons from Data Studio, Composer, and Code Console inspectors; those inspectors now keep export follow-up actions under Advanced only.
+  - Converted Plot inner rail from Source/Objects/Data/Templates to Templates-only:
+    - removed Source section
+    - removed sheet picker
+    - removed Data Workbook row
+    - removed empty source file glyph
+    - kept recommended templates plus All Templates popover
+  - Strengthened `scripts/check_macos_gui_presentation.py` so the aligned shell, templates-only rail, and no-chevron toolbar rules are hard gates.
+  - Updated `README.md` and `AGENTS.md` to match the new Plot interaction boundary.
+
+- User-visible impact:
+  - The center workspace and inspector now use matching 56pt headers with aligned bottom dividers.
+  - Plot's left inner panel no longer shows `SOURCE`, sheet controls, or a file-placeholder icon; it only presents templates.
+  - Import/Export no longer visually compete with panel-specific controls in the left rail or inspector body.
+  - The right inspector toggle uses a standard sidebar icon instead of a `>>`-style overflow glyph, and the top toolbar no longer exposes a `More` overflow menu in the four primary workbenches checked.
+
+- Risks:
+  - Removing Source/Sheet/Data Workbook from the Plot inner rail makes those utilities less spatially close to template selection. This is intentional for this round; future Data Workbook access should be reintroduced through a clearly scoped command/menu/utility affordance, not the template rail.
+  - Moving the workbench title from navigation title semantics into the content header changes the exact native toolbar title presentation; the tradeoff is stronger cross-panel baseline alignment.
+  - The toolbar action group is now a custom grouped SwiftUI toolbar item; if macOS toolbar layout changes, the group may need another small placement pass.
+
+- Rollback points:
+  - Global shell / toolbar:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Shared/UI/StateViews.swift`
+  - Plot template rail:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotWorkbenchView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+  - Inspector export cleanup:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Composer/ComposerInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift`
+  - Documentation:
+    - `/Users/dongxutian/Documents/codegod/README.md`
+    - `/Users/dongxutian/Documents/codegod/AGENTS.md`
+
+- Decision Record:
+  - Why:
+    - The screenshot problem was a shell/grid problem more than a local inspector control problem: center content and inspector needed one shared header metric.
+    - Pixelmator-style pro apps separate global document actions, canvas/workspace, and contextual inspection; DataGraph-style plotting benefits from clean template selection without duplicating source and data controls in the same rail.
+  - Rejected alternatives:
+    - Keep Source/Switch Sheet/Data Workbook in the Plot inner rail: rejected because it mixes data preparation with template selection and reproduces the circled screenshot clutter.
+    - Keep inspector reveal on the right edge or duplicated inside the inspector header: rejected because the requested interaction puts the right-panel toggle in one top action group with a standard sidebar icon.
+    - Keep a custom left sidebar toolbar item: rejected after desktop acceptance showed that it caused a system `More` overflow entry; the native `NavigationSplitView` toggle is cleaner and controls the same far-left workbench sidebar.
+    - Recreate a React/Tailwind shell: rejected because this repo's supported frontend is native SwiftUI/macOS.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation:
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py -q`: passed, 6 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 189 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 189 tests all passed.
+  - Known environment warning: Xcode still reports CoreSimulator framework version mismatch; macOS build and hosted macOS tests pass.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance with Computer Use:
+    - Finder baseline capture worked.
+    - `open -n app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`: launched without terminal error.
+    - Empty Plot: center header and inspector header share the same visual baseline; Plot inner rail shows Templates only, with no `SOURCE`, sheet picker, Data Workbook row, or file placeholder.
+    - Data Studio, Composer, and Code Console: shared center/inspector header structure is visible, toolbar has no `More` / `>>` overflow, and right inspector stays controlled by the single `sidebar.right` toolbar button.
+    - Inspector toolbar toggle was clicked: it hid and restored the inspector; no duplicate inspector-header hide button remains.
+
 ### 2026-04-28: Plot scientific object editing closure
 
 - Change:
