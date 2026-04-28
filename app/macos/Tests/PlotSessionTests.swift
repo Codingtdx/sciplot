@@ -746,6 +746,16 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertTrue(session.plotTypeItems.allSatisfy { !$0.selectable })
     }
 
+    func testOpeningDataWorkbookDefaultsToSourceDataFromToolbar() {
+        let session = PlotSession()
+
+        session.dataWorkbookTab = .fit
+        session.showDataWorkbook()
+
+        XCTAssertTrue(session.isDataWorkbookPresented)
+        XCTAssertEqual(session.dataWorkbookTab, .sourceData)
+    }
+
     func testReferenceGuideEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
         let client = MockSidecarClient()
         client.saveProjectHandler = { request in

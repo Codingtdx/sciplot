@@ -34,6 +34,52 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-28: Plot micro-polish v4 and Pro workspace alignment
+
+- Change:
+  - Tightened Plot's Pixelmator-style workspace without changing the backend contract, project schema, or preview PNG/PDF semantics.
+  - Moved Plot's primary data/workbook utility out of the left panel: `Data Workbook` is now a toolbar icon action that opens the workbook sheet on `Source Data` by default.
+  - Simplified `PlotSourceTypePanel` to a compact sheet picker plus five recommended plot-type thumbnail cards from `session.templateGalleryItems`.
+  - Added `PlotTypeChooserSheet` and `PlotTypeCard`: `More` opens a searchable native sheet backed by `session.plotTypeItems`, and choosing an item still calls the existing `chooseTemplate` path.
+  - Removed the left-panel file name, Import/Open button, source helper copy, and default `Data Tables / Source Data / Transformed / Variables / Fit` rows.
+  - Added shared Pro workspace corner metrics so outer glass panels use a consistent larger radius and inner rows/cards use a smaller radius.
+  - Lightly aligned other modules with the same layout grammar:
+    - Data Studio left rail now includes figure family/template choice near `Workbook Groups`.
+    - Composer keeps its real asset library / canvas / inspector split and continues routing import through toolbar/menu.
+    - Code Console left rail now stays focused on bound context; `Open Source` and `Reveal Source` moved to inspector `Advanced`.
+  - Strengthened `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py` so Plot cannot regress to left-panel imports, file names, Data Table rows, or right-rail popover creation.
+
+- User-visible impact:
+  - Plot's left side is calmer and closer to the requested drawing order: pick sheet, pick one of five likely chart types, or open `More` for the full catalog.
+  - Import/Open/Export/Help/Inspector stay in the right-side native toolbar cluster, and Data Workbook is a single utility icon instead of four persistent left-panel entries.
+  - Data Studio, Composer, and Code Console now read more like sibling Pro workspaces without adding fake Pixelmator tools or changing their business flows.
+
+- Decision Record:
+  - First-principles motivation: the left panel should answer the user's immediate setup question, “which sheet and which chart type?”, while the right inspector answers refinement questions. Putting import buttons, file names, and workbook tabs in the same panel made the left side feel like a mixed dashboard rather than a selection surface.
+  - Rejected keeping Data Workbook tab rows in the left panel because they duplicate right-side adjustment categories and pull data-preparation utilities into the primary plotting choice surface.
+  - Rejected showing all chart types by default because it reduces thumbnail legibility and makes the recommendation payload feel less useful; the full list remains one click away in `More`.
+  - Current boundary: other modules received layout-grammar alignment only. Their deeper interaction taxonomy should be handled in module-specific follow-up rounds.
+  - Failure condition: if Plot's left panel regains Import/Open, filename copy, `Data Tables` rows, or if `More` becomes a rail popover instead of a chooser sheet, the v4 model has regressed.
+
+- Risks and rollback points:
+  - Plot type selection now has two presentation surfaces: five-card default and searchable full chooser. Rollback points are `PlotWorkbenchView.swift` and `PlotTemplateView.swift`.
+  - Toolbar Data Workbook behavior now defaults to `Source Data`; inspector-specific workbook links still pass their explicit tabs. Rollback points are `PlotSession.swift`, `AppModel.swift`, `RootSplitView.swift`, and `PlotInspectorView.swift`.
+  - Data Studio figure choice moved from the center context bar to the left rail. Rollback point is `DataStudioWorkbenchView.swift` if preview refresh or focus state feels less discoverable.
+  - Code Console source open/reveal moved to inspector `Advanced`. Rollback points are `CodeConsoleWorkbenchView.swift` and `CodeConsoleContextView.swift`.
+
+- Actual regression results:
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 3 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testOpeningDataWorkbookDefaultsToSourceDataFromToolbar -only-testing:SciPlotGodMacTests/AppModelTests/testPlotDataWorkbookToolbarActionOpensSourceDataTab`: passed, 2 tests.
+  - `.venv/bin/python -m pytest tests`: passed, 277 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 197 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 277 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 197 tests all passed.
+  - Known environment warning: Xcode reports CoreSimulator service/version warnings during hosted macOS operations; macOS build and tests still passed.
+  - Manual inner-beta evidence remains pending and unenforced: Plot import/preview/export, Data Studio import/open Plot, and overlay save/reopen must not be marked complete without a real evidence bundle.
+
 ### 2026-04-28: Plot interaction model v3, data/type left and adjustment rail right
 
 - Change:

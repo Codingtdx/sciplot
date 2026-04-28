@@ -229,7 +229,8 @@ final class PlotSession {
         schedulePreviewRefresh(policy: .immediate)
     }
 
-    func showDataWorkbook() {
+    func showDataWorkbook(tab: PlotDataWorkbookTab = .sourceData) {
+        dataWorkbookTab = tab
         isDataWorkbookPresented = true
     }
 

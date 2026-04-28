@@ -20,10 +20,27 @@ struct CodeConsoleContextView: View {
     @ViewBuilder
     private var actionsSection: some View {
         let presentation = session.outputsPresentation
+        let sourcePresentation = session.sourceActionsPresentation
 
         InspectorSection(title: "Actions") {
             DisclosureGroup("Advanced") {
                 InspectorActionStack {
+                    Button("Open Source") {
+                        session.openCurrentSource()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!sourcePresentation.openSourceAvailability.isEnabled)
+                    .help(sourcePresentation.openSourceAvailability.reason ?? "Open the bound source file.")
+                    .inspectorActionButton()
+
+                    Button("Reveal Source") {
+                        session.revealCurrentSource()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!sourcePresentation.revealSourceAvailability.isEnabled)
+                    .help(sourcePresentation.revealSourceAvailability.reason ?? "Reveal the bound source file in Finder.")
+                    .inspectorActionButton()
+
                     Button("Reveal Output") {
                         session.revealLatestOutput()
                     }

@@ -137,8 +137,13 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "PlotSourceTypePanel",
             "PlotAdjustmentInspector",
             "PlotAdjustmentRail",
-            "PlotTypeSearchField",
-            "PlotDataWorkbookEntry",
+            "PlotTypeChooserSheet",
+            "PlotTypeCard",
+            "session.templateGalleryItems",
+            "session.plotTypeItems",
+            "isPlotTypeChooserPresented",
+            ".sheet(isPresented: $isPlotTypeChooserPresented)",
+            'Label("More", systemImage: "square.grid.2x2")',
             "PlotRefineView(session: session)",
         ),
         forbidden=(
@@ -161,6 +166,18 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "sourceRailPresented",
             "PlotSourceLibraryView(",
             "PlotSourceRailDensity",
+            "PlotTypeSearchField",
+            "PlotDataWorkbookEntry",
+            "workbookAvailability(for:",
+            "session.selectedSourceFilename",
+            "session.isImporterPresented = true",
+            '"Import or open data"',
+            '"CSV, Excel, or project"',
+            '"Data Tables"',
+            '"Source Data"',
+            '"Transformed"',
+            '"Variables"',
+            "case .fit:",
         ),
     ),
     SourceCheck(
@@ -338,6 +355,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "private struct WorkbenchWindowToolbarContent",
             "model.beginImport(for: workbench)",
             "model.export(for: workbench)",
+            "model.showPlotDataWorkbook()",
+            "if workbench == .plot",
             "model.showHelp(for: workbench)",
             "model.toggleInspector(for: workbench)",
         ),
@@ -401,7 +420,11 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="Data Studio rail avoids duplicate group empty state",
         path="app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift",
-        required=('WorkbenchRailTitle(title: "Workbook Groups"',),
+        required=(
+            'WorkbenchRailTitle(title: "Workbook Groups"',
+            "DataStudioFigureChoiceSection",
+            "figureFamilyBinding",
+        ),
         forbidden=('EmptyStateCard(title: "No groups")',),
     ),
     SourceCheck(
@@ -437,7 +460,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="Code Console root avoids hero card empty state",
         path="app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift",
-        forbidden=("EmptyStateCard(",),
+        required=("CodeConsoleSourceRailView",),
+        forbidden=(
+            "EmptyStateCard(",
+            'Button("Open Source")',
+            'Button("Reveal")',
+        ),
     ),
     SourceCheck(
         label="Code Console outputs avoid hero cards",
@@ -451,7 +479,11 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="Code Console inspector uses plain sections",
         path="app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift",
-        required=("InspectorSection(",),
+        required=(
+            "InspectorSection(",
+            'Button("Open Source")',
+            'Button("Reveal Source")',
+        ),
         forbidden=(".formStyle(.grouped)", 'Button("Export")'),
     ),
 )

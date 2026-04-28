@@ -31,6 +31,17 @@ enum PlotTemplateRailDensity: Equatable {
     case compact
 }
 
+private struct PlotTemplateRowThumbnailSizeKey: EnvironmentKey {
+    static let defaultValue = CGSize(width: 34, height: 26)
+}
+
+extension EnvironmentValues {
+    var plotTemplateRowThumbnailSize: CGSize {
+        get { self[PlotTemplateRowThumbnailSizeKey.self] }
+        set { self[PlotTemplateRowThumbnailSizeKey.self] = newValue }
+    }
+}
+
 struct PlotTemplateView: View {
     @Bindable var session: PlotSession
 
@@ -269,11 +280,12 @@ struct PlotTemplateRow: View {
     let kind: PlotTemplateThumbnailKind
     let aspectRatio: CGFloat
     let enabled: Bool
+    @Environment(\.plotTemplateRowThumbnailSize) private var thumbnailSize
 
     var body: some View {
         HStack(spacing: 10) {
             PlotTemplateThumbnailView(kind: kind, aspectRatio: aspectRatio)
-                .frame(width: 34, height: 26)
+                .frame(width: thumbnailSize.width, height: thumbnailSize.height)
                 .opacity(enabled ? 1.0 : 0.55)
 
             Text(title)

@@ -232,6 +232,10 @@ final class AppModel {
         }
     }
 
+    func showPlotDataWorkbook() {
+        plotSession.showDataWorkbook()
+    }
+
     func exportActiveWorkbench() async {
         await export(for: selectedWorkbench)
     }

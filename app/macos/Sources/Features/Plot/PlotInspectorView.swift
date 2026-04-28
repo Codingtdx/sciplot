@@ -188,8 +188,7 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             fitOverlaySection
             InspectorSection(title: "Analysis") {
                 Button {
-                    session.showDataWorkbook()
-                    session.selectDataWorkbookTab(.fit)
+                    session.showDataWorkbook(tab: .fit)
                 } label: {
                     Label("Open Fit Table", systemImage: "tablecells")
                 }
@@ -1826,8 +1825,7 @@ private struct PlotSelectionInspectorView<FigureContent: View, AxisContent: View
             InspectorSection(title: "Data") {
                 AdaptiveInspectorTextRow(title: "Pipeline", value: session.dataPipelineSummary.title)
                 Button {
-                    session.selectDataWorkbookTab(.transformed)
-                    session.showDataWorkbook()
+                    session.showDataWorkbook(tab: .transformed)
                 } label: {
                     Label("Open Workbook", systemImage: "tablecells")
                 }

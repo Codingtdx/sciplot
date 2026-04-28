@@ -68,7 +68,7 @@ private struct PlotPixelmatorWorkspace: View {
     let isInspectorPresented: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
             PlotSourceTypePanel(session: session)
                 .frame(width: 278)
                 .frame(maxHeight: .infinity)
@@ -98,13 +98,19 @@ private struct PlotPixelmatorWorkspace: View {
     }
 }
 
+private enum ProWorkspaceMetrics {
+    static let panelSpacing: CGFloat = 12
+    static let outerCornerRadius: CGFloat = 22
+    static let innerCornerRadius: CGFloat = 12
+}
+
 private struct PlotSourceTypePanel: View {
     @Bindable var session: PlotSession
-    @State private var searchText = ""
+    @State private var isPlotTypeChooserPresented = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            sourceHeader
+        VStack(spacing: 12) {
+            sheetPicker
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
 
@@ -113,38 +119,40 @@ private struct PlotSourceTypePanel: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text("Plot Types")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
 
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(filteredPlotTypeItems) { item in
-                                PlotTypeButton(item: item, isSelected: session.effectiveTemplateID == item.id) {
-                                    guard item.selectable else {
-                                        return
-                                    }
-                                    session.chooseTemplate(item.id)
-                                    session.selectPlotAdjustmentCategory(.figure)
-                                }
+                            Spacer(minLength: 0)
+
+                            Button {
+                                isPlotTypeChooserPresented = true
+                            } label: {
+                                Label("More", systemImage: "square.grid.2x2")
+                                    .font(.caption.weight(.semibold))
                             }
+                            .buttonStyle(.plain)
+                            .disabled(session.plotTypeItems.isEmpty)
+                            .help("Show every compatible plot type.")
                         }
-                    }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Data Tables")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-
-                        VStack(spacing: 4) {
-                            ForEach(PlotDataWorkbookTab.allCases) { tab in
-                                PlotDataWorkbookEntry(
-                                    session: session,
-                                    tab: tab,
-                                    availability: workbookAvailability(for: tab)
-                                )
+                        if session.templateGalleryItems.isEmpty {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.system(size: 24, weight: .regular))
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity, minHeight: 120)
+                        } else {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(session.templateGalleryItems) { item in
+                                    PlotTypeCard(
+                                        item: item,
+                                        isSelected: session.effectiveTemplateID == item.id,
+                                        action: { choose(item) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -152,45 +160,23 @@ private struct PlotSourceTypePanel: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
             }
-
-            Divider()
-                .padding(.horizontal, 12)
-
-            PlotTypeSearchField(text: $searchText)
-                .padding(.horizontal, 10)
-                .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .glassEffect(
             .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         )
+        .sheet(isPresented: $isPlotTypeChooserPresented) {
+            PlotTypeChooserSheet(session: session, isPresented: $isPlotTypeChooserPresented)
+        }
     }
 
-    private var sourceHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Button {
-                    session.isImporterPresented = true
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 28, height: 26)
-                }
-                .buttonStyle(.plain)
-                .help("Import or Open")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.selectedSourceFilename ?? "Import or open data")
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Text(session.selectedFileURL == nil ? "CSV, Excel, or project" : session.selectedSheet.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-            }
+    private var sheetPicker: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tablecells")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
 
             Picker("", selection: sheetBinding) {
                 ForEach(session.availableSheets, id: \.self) { sheet in
@@ -203,6 +189,9 @@ private struct PlotSourceTypePanel: View {
             .disabled(session.selectedFileURL == nil || session.availableSheets.count < 2)
             .help(session.selectedFileURL == nil ? "Import data before choosing a sheet." : "Choose the sheet to inspect.")
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
     }
 
     private var sheetBinding: Binding<SheetValue> {
@@ -213,28 +202,16 @@ private struct PlotSourceTypePanel: View {
         }
     }
 
-    private var filteredPlotTypeItems: [PlotTemplateGalleryItem] {
-        let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !needle.isEmpty else {
-            return session.plotTypeItems
+    private func choose(_ item: PlotTemplateGalleryItem) {
+        guard item.selectable else {
+            return
         }
-        return session.plotTypeItems.filter { item in
-            item.title.lowercased().contains(needle)
-                || (item.description ?? "").lowercased().contains(needle)
-        }
-    }
-
-    private func workbookAvailability(for tab: PlotDataWorkbookTab) -> ActionAvailability {
-        switch tab {
-        case .sourceData, .transformed, .variables:
-            return session.dataWorkbookAvailability
-        case .fit:
-            return session.fitAnalysisAvailability
-        }
+        session.chooseTemplate(item.id)
+        session.selectPlotAdjustmentCategory(.figure)
     }
 }
 
-private struct PlotTypeButton: View {
+private struct PlotTypeCard: View {
     let item: PlotTemplateGalleryItem
     let isSelected: Bool
     let action: () -> Void
@@ -247,82 +224,81 @@ private struct PlotTypeButton: View {
                 aspectRatio: item.aspectRatio,
                 enabled: item.selectable
             )
-            .padding(.vertical, 8)
+            .environment(\.plotTemplateRowThumbnailSize, CGSize(width: 84, height: 56))
+            .padding(.vertical, 10)
             .padding(.horizontal, 10)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!item.availability.isEnabled)
         .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
         .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.05))
         }
     }
 }
 
-private struct PlotDataWorkbookEntry: View {
+private struct PlotTypeChooserSheet: View {
     @Bindable var session: PlotSession
-    let tab: PlotDataWorkbookTab
-    let availability: ActionAvailability
+    @Binding var isPresented: Bool
+    @State private var searchText = ""
 
     var body: some View {
-        Button {
-            session.showDataWorkbook()
-            session.selectDataWorkbookTab(tab)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(session.dataWorkbookTab == tab ? Color.accentColor : Color.secondary)
-                    .frame(width: 20)
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search plot types", text: $searchText)
+                        .textFieldStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
 
-                Text(tab.title)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
-
-                Spacer(minLength: 6)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(filteredItems) { item in
+                            PlotTypeCard(
+                                item: item,
+                                isSelected: session.effectiveTemplateID == item.id,
+                                action: {
+                                    guard item.selectable else {
+                                        return
+                                    }
+                                    session.chooseTemplate(item.id)
+                                    session.selectPlotAdjustmentCategory(.figure)
+                                    isPresented = false
+                                }
+                            )
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
             }
-            .padding(.vertical, 7)
-            .padding(.horizontal, 10)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(20)
+            .navigationTitle("Plot Types")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        isPresented = false
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(!availability.isEnabled)
-        .help(availability.reason ?? "Open \(tab.title).")
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(session.dataWorkbookTab == tab ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.04))
-        }
+        .frame(minWidth: 520, minHeight: 560)
     }
 
-    private var systemImage: String {
-        switch tab {
-        case .sourceData:
-            return "tablecells"
-        case .transformed:
-            return "line.3.horizontal.decrease.circle"
-        case .variables:
-            return "number.square"
-        case .fit:
-            return "point.topleft.down.curvedto.point.bottomright.up"
+    private var filteredItems: [PlotTemplateGalleryItem] {
+        let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else {
+            return session.plotTypeItems
         }
-    }
-}
-
-private struct PlotTypeSearchField: View {
-    @Binding var text: String
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $text)
-                .textFieldStyle(.plain)
+        return session.plotTypeItems.filter { item in
+            item.title.lowercased().contains(needle)
+                || (item.description ?? "").lowercased().contains(needle)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.08), in: Capsule())
     }
 }
 
@@ -338,7 +314,7 @@ private struct PlotAdjustmentInspector: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .glassEffect(
                 .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
             )
     }
 }
@@ -356,7 +332,7 @@ private struct PlotAdjustmentRail: View {
         .padding(.vertical, 9)
         .glassEffect(
             .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         )
     }
 

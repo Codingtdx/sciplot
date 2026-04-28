@@ -78,6 +78,16 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.codeConsoleSession.isImporterPresented)
     }
 
+    func testPlotDataWorkbookToolbarActionOpensSourceDataTab() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        model.plotSession.dataWorkbookTab = .fit
+        model.showPlotDataWorkbook()
+
+        XCTAssertTrue(model.plotSession.isDataWorkbookPresented)
+        XCTAssertEqual(model.plotSession.dataWorkbookTab, .sourceData)
+    }
+
     func testShowHelpForActiveWorkbenchPresentsQuickHelp() {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 

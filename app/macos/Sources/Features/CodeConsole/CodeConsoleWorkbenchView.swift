@@ -10,7 +10,7 @@ struct CodeConsoleWorkbenchView: View {
             }
 
             HSplitView {
-                sourceRail
+                CodeConsoleSourceRailView(session: session)
                     .frame(minWidth: 250, idealWidth: 280, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.leading, 16)
                     .padding(.vertical, 12)
@@ -55,10 +55,19 @@ struct CodeConsoleWorkbenchView: View {
         }
     }
 
-    private var sourceRail: some View {
-        let presentation = session.sourceActionsPresentation
+    private var bindingForImporter: Binding<Bool> {
+        Binding(
+            get: { session.isImporterPresented },
+            set: { session.isImporterPresented = $0 }
+        )
+    }
+}
 
-        return VStack(alignment: .leading, spacing: 12) {
+private struct CodeConsoleSourceRailView: View {
+    @Bindable var session: CodeConsoleSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
             WorkbenchRailTitle(title: "Bound Context", trailing: "\(session.availableBindings.count)")
 
             List(selection: selectedBindingSelection) {
@@ -69,28 +78,6 @@ struct CodeConsoleWorkbenchView: View {
             }
             .listStyle(.inset(alternatesRowBackgrounds: false))
             .scrollContentBackground(.hidden)
-
-            HStack(spacing: 10) {
-                Button("Open Source") {
-                    session.openCurrentSource()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!presentation.openSourceAvailability.isEnabled)
-                .help(
-                    presentation.openSourceAvailability.reason
-                        ?? "Open the bound source file."
-                )
-
-                Button("Reveal") {
-                    session.revealCurrentSource()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!presentation.revealSourceAvailability.isEnabled)
-                .help(
-                    presentation.revealSourceAvailability.reason
-                        ?? "Reveal the bound source file in Finder."
-                )
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -103,13 +90,6 @@ struct CodeConsoleWorkbenchView: View {
                     session.setSelectedBinding(id: newValue)
                 }
             }
-        )
-    }
-
-    private var bindingForImporter: Binding<Bool> {
-        Binding(
-            get: { session.isImporterPresented },
-            set: { session.isImporterPresented = $0 }
         )
     }
 }

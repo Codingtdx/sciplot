@@ -128,6 +128,7 @@
 - 模块窗口不得恢复旧全局工作台壳：禁止左侧模块切换栏、`WorkbenchSidebarRail`、`WorkbenchContentShell`、多层 `项目名 + 模块名 + 内容标题` 额头，和把 `RootSplitView` 当作四模块共享视觉 shell。
 - 命令菜单必须按 focused module context 路由当前窗口；`selectedWorkbench` 只能作为兼容/兜底状态，不得驱动可见的全局模块切换 UI。
 - toolbar 的 `Launcher` 返回入口可以作为 utility affordance 保留，只负责打开/聚焦 Launcher。
+- 模块主动作统一归属原生 window toolbar 的 primary action group，并在视觉上锚定右上角：`Import/Open`、`Export`、`Launcher`、`Help`、`Inspector` 不得回流到左侧选择面板或 inspector body。Plot 额外允许一个 toolbar `Data Workbook` 图标按钮，默认打开 `Source Data`。
 - sidecar 策略是 app-managed ownership：
   - 不能只靠端口连通判断可用；
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
@@ -169,11 +170,13 @@
 - 状态反馈优先“文档状态”（当前源/模板/最近输出/最近失败），而不是流程阶段术语。
 - Plot/Data Studio 的关键编辑必须接入原生 `UndoManager` 撤销/重做语义。
 - 共享 inspector 的 `Axes` 调整区是唯一允许放置智能刻度控制（density / edge-label visibility）的入口；不要新增 Data Studio-only 的第二套坐标轴标签 UI。
+- 四个模块统一使用 Pro workspace 语法：左侧选择当前工作对象，中间是主工作区，右侧是上下文 inspector。Plot 额外保留最右侧竖向 adjustment rail；其他模块除非已有真实可切换调整分类，不新增假 rail。
 - Plot 必须使用 Pixelmator-Pro 语法的四区布局：左侧数据/图型面板，中间白色 figure/page preview，右侧深色 glass adjustment inspector，最右侧竖向调整分类栏。
-- Plot 左侧 `PlotSourceTypePanel` 只负责“用什么数据画什么图”：Import/Open、当前文件名、sheet picker、contract/backend recommendation 驱动的图类型列表，以及 `Data Workbook` 的 `Source Data / Transformed / Variables / Fit` 入口。左侧不得恢复 layer/object 列表、fit/function/guide/text/shape overlay 行、`Source` / `Objects` / `Templates` 分区说明文案、`No source` 空说明、假工具、第二套 Import/Export 主按钮或前端本地业务判断。
+- Plot 左侧 `PlotSourceTypePanel` 只负责“选哪张表、画成什么图”：顶部一个紧凑 sheet picker；下方只显示 `session.templateGalleryItems` 的 5 个推荐图型大缩略图卡；`More` 打开 `PlotTypeChooserSheet`，用搜索 + `session.plotTypeItems` 选择全部兼容图型。左侧不得显示文件名、Import/Open、`Data Tables`、`Source Data`、`Transformed`、`Variables`、`Fit` 常驻入口、layer/object 列表、fit/function/guide/text/shape overlay 行、`Source` / `Objects` / `Templates` 分区说明文案、`No source` 空说明、假工具或前端本地业务判断。
 - Plot 最右侧 `PlotAdjustmentRail` 是绘图调整分类入口，不是对象创建工具条。固定顺序为 `Figure`、`Axes`、`Legend`、`Guides`、`Fit`、`Functions`、`Annotations`、`Advanced Axes`；点击只切换右侧 inspector category，禁止弹出快捷菜单。`Data Cursor` 在 preview hit-testing metadata 存在前不得进入该栏。
 - 右侧 adjustment inspector 负责精确科研参数编辑。Reference guide / region、function、text/shape annotation 的创建按钮必须在对应 inspector 分类内 inline 出现；创建后通过 Axis + Value 或 Start/End 等精确输入编辑，禁止把拖拽、nudge HUD、画布浮动参数面板或 popover 作为默认路径。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
+  - toolbar `Data Workbook` 图标是默认打开入口，并默认落到 `Source Data`；左侧 `PlotSourceTypePanel` 不再拆出 workbook tab 入口
   - v1 只读，不做 inline cell editing
   - 页签固定为 `Source Data`、`Transformed`、`Variables` 和 `Fit`
   - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`、`Exponential`、`Logarithmic`、`Power Law`、`Gaussian`、`Logistic` 和 backend-only `Custom Function`
@@ -190,6 +193,9 @@
   - 页签固定为 `Source Data` 和 `Fit`
   - `Fit` 当前支持共享 Plot fit model surface
   - `Current Figure` 拟合只开放给 `curve / point_line / scatter`
+- Data Studio 模块的左侧只承载 `Workbook Groups` 与真实 figure family/template 选择；中间承载 compare/figure preview 与 focused group 状态；右侧继续承载 figure/action inspector。不要把 import/export 主动作塞回左侧。
+- Composer 模块左侧保留真实 asset library，中间是 canvas，右侧是 selection/edit/preview inspector。Import 只通过 toolbar/menu 的真实 graph/assets import flow 进入，不在左侧重复主按钮。
+- Code Console 模块左侧保留 bound context 选择，中间是 prompt/code/output 工作区，右侧是 context/runner/output handoff inspector。`Open Source` / `Reveal Source` 这类源定位动作属于 inspector `Advanced` 或 toolbar utility，不回到左侧堆按钮。
 - macOS GUI smoke / fingerprint 基线必须继续覆盖 Launcher、四个独立模块窗口与 Plot workspace：
   - Launcher
   - Plot empty workspace

@@ -55,6 +55,9 @@ private struct WorkbenchWindowToolbarContent {
         ToolbarItem(id: "workbenchActionGroup", placement: .primaryAction) {
             model.beginImport(for: workbench)
             model.export(for: workbench)
+            if workbench == .plot {
+                model.showPlotDataWorkbook()
+            }
             model.showHelp(for: workbench)
             model.toggleInspector(for: workbench)
         }
@@ -197,8 +200,15 @@ PlotSourceTypePanel(session: session)
 PlotRefineView(session: session)
 PlotAdjustmentInspector(session: session)
 PlotAdjustmentRail(session: session)
-PlotTypeSearchField(text: $searchText)
-PlotDataWorkbookEntry(tab: .sourceData)
+@State private var isPlotTypeChooserPresented = false
+ForEach(session.templateGalleryItems) { item in PlotTypeCard(item: item) }
+Button { isPlotTypeChooserPresented = true } label: {
+    Label("More", systemImage: "square.grid.2x2")
+}
+.sheet(isPresented: $isPlotTypeChooserPresented) {
+    PlotTypeChooserSheet(session: session, isPresented: $isPlotTypeChooserPresented)
+}
+ForEach(session.plotTypeItems) { item in item.title }
 """,
         "app/macos/Sources/Shared/UI/StateViews.swift": """
 enum InspectorColumnLayoutPolicy {
@@ -215,6 +225,8 @@ enum InspectorColumnLayoutPolicy {
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
             "WorkbenchRailTitle(title: \"Workbook Groups\")\n"
+            "DataStudioFigureChoiceSection(session: session)\n"
+            "let figureFamilyBinding = Binding<String?>.constant(nil)\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": "SubtleStageHint(title: \"Import\")\n",
         "app/macos/Sources/Features/Composer/ComposerCanvasView.swift": (
@@ -225,12 +237,16 @@ enum InspectorColumnLayoutPolicy {
         ),
         "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift": "ComposerCanvasView()\n",
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (
-            "CodeConsoleOutputsView()\n"
+            "CodeConsoleSourceRailView(session: session)\nCodeConsoleOutputsView()\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift": (
             "SubtleStageHint(title: \"Run\")\n"
         ),
-        "app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift": "InspectorSection()\n",
+        "app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift": (
+            "InspectorSection()\n"
+            "Button(\"Open Source\") {}\n"
+            "Button(\"Reveal Source\") {}\n"
+        ),
     }
     if overrides:
         sources.update(overrides)

@@ -204,6 +204,16 @@ private struct WorkbenchWindowActionGroup: View {
             .disabled(!model.exportAvailability(for: workbench).isEnabled)
             .help(model.exportHelpText(for: workbench))
 
+            if workbench == .plot {
+                Button {
+                    model.showPlotDataWorkbook()
+                } label: {
+                    Image(systemName: "tablecells")
+                }
+                .disabled(!model.plotSession.dataWorkbookAvailability.isEnabled)
+                .help(model.plotSession.dataWorkbookAvailability.reason ?? "Open Data Workbook")
+            }
+
             Divider()
                 .frame(height: 18)
                 .padding(.horizontal, 2)

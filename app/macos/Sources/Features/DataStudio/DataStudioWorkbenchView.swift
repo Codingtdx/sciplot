@@ -107,6 +107,10 @@ private struct DataStudioGroupRailView: View {
                 .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
             }
 
+            DataStudioFigureChoiceSection(session: session)
+
+            Divider()
+
             if session.orderedGroups.isEmpty {
                 Spacer(minLength: 0)
             } else {
@@ -129,6 +133,67 @@ private struct DataStudioGroupRailView: View {
         Binding(
             get: { session.focusedWorkbook?.response.workbookPath },
             set: { session.focusWorkbook(path: $0) }
+        )
+    }
+}
+
+private struct DataStudioFigureChoiceSection: View {
+    @Bindable var session: DataStudioSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Figures")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            Picker("", selection: figureFamilyBinding) {
+                ForEach(session.figureFamilies) { family in
+                    Text(family.title).tag(Optional(family.id))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .disabled(session.figureFamilies.isEmpty)
+            .help(session.figureFamilies.isEmpty ? "Import workbook groups before choosing a figure." : "Choose the current figure family.")
+
+            if session.availableFigureTemplates.count > 1 {
+                Picker("", selection: figureTemplateBinding) {
+                    ForEach(session.availableFigureTemplates) { template in
+                        Text(template.label).tag(Optional(template.id))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .help("Choose the figure template.")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var figureFamilyBinding: Binding<String?> {
+        Binding(
+            get: { session.currentFigureFamily?.id },
+            set: { newValue in
+                if let newValue {
+                    session.selectFigureFamily(id: newValue)
+                }
+            }
+        )
+    }
+
+    private var figureTemplateBinding: Binding<String?> {
+        Binding(
+            get: { session.currentFigureTemplateID },
+            set: { newValue in
+                if let newValue {
+                    session.selectFigureTemplate(id: newValue)
+                }
+            }
         )
     }
 }
@@ -252,49 +317,9 @@ private struct DataStudioPreviewWorkspaceView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !session.orderedGroups.isEmpty {
-                figureContextBar
-            }
-
             workspaceBody
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var figureContextBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(session.figureFamilies) { family in
-                        Button {
-                            session.selectFigureFamily(id: family.id)
-                        } label: {
-                            Text(family.title)
-                                .font(.footnote.weight(.medium))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(familyBackground(selected: session.currentFigureFamily?.id == family.id), in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-
-            HStack(spacing: 12) {
-                if session.availableFigureTemplates.count > 1 {
-                    Picker("Figure Template", selection: selectedFigureTemplateBinding) {
-                        ForEach(session.availableFigureTemplates) { item in
-                            Text(item.label).tag(Optional(item.id))
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 180, alignment: .leading)
-                }
-
-                Spacer()
-            }
-        }
     }
 
     @ViewBuilder
@@ -326,20 +351,6 @@ private struct DataStudioPreviewWorkspaceView: View {
         }
     }
 
-    private var selectedFigureTemplateBinding: Binding<String?> {
-        Binding(
-            get: { session.currentFigureTemplateID },
-            set: { newValue in
-                if let newValue {
-                    session.selectFigureTemplate(id: newValue)
-                }
-            }
-        )
-    }
-
-    private func familyBackground(selected: Bool) -> Color {
-        selected ? Color.accentColor.opacity(0.18) : Color(nsColor: .quaternaryLabelColor).opacity(0.12)
-    }
 }
 
 private struct DataStudioFocusedWorkbookStrip: View {
