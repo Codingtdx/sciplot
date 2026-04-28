@@ -84,6 +84,8 @@ final class PlotSession {
     var sourceTableOffset = 0
     var fitAnalysisOffset = 0
     var fitAnalysisSelectedSeriesID: String?
+    var selectedPlotTool: PlotTool = .select
+    var canvasSelection: PlotCanvasSelection = .figure
     var selectedReferenceGuideID: String?
     var selectedTextAnnotationID: String?
     var selectedShapeAnnotationID: String?

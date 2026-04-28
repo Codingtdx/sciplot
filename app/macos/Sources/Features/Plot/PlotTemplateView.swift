@@ -83,8 +83,11 @@ struct PlotSourceLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 sourceSection
-                dataPreparationSection
-                templatesSection
+                if session.selectedFileURL != nil {
+                    objectsSection
+                    dataPreparationSection
+                    templatesSection
+                }
             }
             .padding(.trailing, 4)
         }
@@ -132,14 +135,189 @@ struct PlotSourceLibraryView: View {
                 .disabled(!session.dataWorkbookAvailability.isEnabled)
                 .help(session.dataWorkbookAvailability.reason ?? "Open source data, transforms, variables, and fit results.")
             } else {
-                Button {
-                    session.isImporterPresented = true
-                } label: {
-                    Label("Import Data", systemImage: "tray.and.arrow.down")
+                SubtleStageHint(
+                    title: "Import from toolbar",
+                    systemImage: "tray.and.arrow.down"
+                )
+            }
+        }
+    }
+
+    private var objectsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RailSectionHeader(title: "Objects")
+
+            if session.selectedFileURL == nil {
+                SubtleStageHint(
+                    title: "Objects appear after import",
+                    systemImage: "square.stack.3d.up"
+                )
+            } else {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    objectRow(
+                        item: PlotObjectListItem(
+                            id: "figure",
+                            title: "Figure",
+                            subtitle: session.selectedTemplateSummary?.label ?? "Canvas",
+                            systemImage: "doc.richtext",
+                            selection: .figure
+                        )
+                    )
+
+                    if session.supportsFitOverlayControls {
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: PlotLayerSelection.fitOverlay.id,
+                                title: "Fit Overlay",
+                                subtitle: session.fitModelLabel,
+                                systemImage: "chart.xyaxis.line",
+                                selection: .layer(.fitOverlay)
+                            ),
+                            isEnabled: fitEnabledBinding
+                        )
+                    }
+
+                    ForEach(session.analyticalLayers) { layer in
+                        let selection = PlotLayerSelection.function(layer.id)
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: selection.id,
+                                title: functionTitle(layer),
+                                subtitle: "Function",
+                                systemImage: "function",
+                                selection: .layer(selection)
+                            ),
+                            isEnabled: analyticalLayerEnabledBinding(id: layer.id),
+                            onDelete: {
+                                session.removeAnalyticalLayer(id: layer.id)
+                                clearIfSelected(.layer(selection))
+                            }
+                        )
+                    }
+
+                    ForEach(session.referenceGuides) { guide in
+                        let selection = PlotLayerSelection.referenceGuide(guide.id)
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: selection.id,
+                                title: referenceGuideTitle(guide),
+                                subtitle: guide.kind == "band" ? "Region" : "Guide",
+                                systemImage: guide.kind == "band" ? "rectangle.dashed" : "ruler",
+                                selection: .layer(selection)
+                            ),
+                            isEnabled: referenceGuideEnabledBinding(id: guide.id),
+                            onDelete: {
+                                session.removeReferenceGuide(id: guide.id)
+                                clearIfSelected(.layer(selection))
+                            }
+                        )
+                    }
+
+                    ForEach(session.textAnnotations) { annotation in
+                        let selection = PlotLayerSelection.textAnnotation(annotation.id)
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: selection.id,
+                                title: textAnnotationTitle(annotation),
+                                subtitle: annotation.connectorEnabled ? "Callout" : "Text",
+                                systemImage: annotation.connectorEnabled ? "text.bubble" : "textformat",
+                                selection: .layer(selection)
+                            ),
+                            isEnabled: textAnnotationEnabledBinding(id: annotation.id),
+                            onDelete: {
+                                session.removeTextAnnotation(id: annotation.id)
+                                clearIfSelected(.layer(selection))
+                            }
+                        )
+                    }
+
+                    ForEach(session.shapeAnnotations) { annotation in
+                        let selection = PlotLayerSelection.shapeAnnotation(annotation.id)
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: selection.id,
+                                title: shapeAnnotationTitle(annotation),
+                                subtitle: shapeKindLabel(annotation.kind),
+                                systemImage: shapeSymbol(annotation.kind),
+                                selection: .layer(selection)
+                            ),
+                            isEnabled: shapeAnnotationEnabledBinding(id: annotation.id),
+                            onDelete: {
+                                session.removeShapeAnnotation(id: annotation.id)
+                                clearIfSelected(.layer(selection))
+                            }
+                        )
+                    }
+
+                    ForEach(session.seriesOrderLabels, id: \.self) { seriesID in
+                        let selection = PlotLayerSelection.series(seriesID)
+                        objectRow(
+                            item: PlotObjectListItem(
+                                id: selection.id,
+                                title: seriesID,
+                                subtitle: "Series",
+                                systemImage: "list.bullet.rectangle",
+                                selection: .layer(selection)
+                            )
+                        )
+                    }
                 }
-                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func objectRow(
+        item: PlotObjectListItem,
+        isEnabled: Binding<Bool>? = nil,
+        onDelete: (() -> Void)? = nil
+    ) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                session.selectCanvasSelection(item.selection)
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(session.canvasSelection == item.selection ? Color.accentColor : Color.secondary)
+                        .frame(width: 18)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        Text(item.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if let isEnabled {
+                Toggle("", isOn: isEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
+
+            if let onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
                 .controlSize(.small)
-                .help("Import a CSV, Excel workbook, or SciPlot project.")
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 7)
+        .background {
+            if session.canvasSelection == item.selection {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.12))
             }
         }
     }
@@ -151,7 +329,7 @@ struct PlotSourceLibraryView: View {
             PlotDataPreparationRow(
                 title: PlotDataWorkbookTab.sourceData.title,
                 systemImage: "tablecells",
-                detail: session.selectedFileURL == nil ? "Import first" : session.selectedSheet.displayName,
+                detail: session.selectedFileURL == nil ? "Source" : session.selectedSheet.displayName,
                 availability: session.dataWorkbookAvailability
             ) {
                 openDataWorkbook(tab: .sourceData)
@@ -169,7 +347,7 @@ struct PlotSourceLibraryView: View {
             PlotDataPreparationRow(
                 title: PlotDataWorkbookTab.variables.title,
                 systemImage: "number",
-                detail: session.dataVariables.isEmpty ? "No variables" : "\(session.dataVariables.count) variables",
+                detail: session.dataVariables.isEmpty ? "None" : "\(session.dataVariables.count) variables",
                 availability: session.dataTransformAvailability
             ) {
                 openDataWorkbook(tab: .variables)
@@ -266,6 +444,108 @@ struct PlotSourceLibraryView: View {
             return session.fitAnalysisAvailability
         }
     }
+
+    private func clearIfSelected(_ selection: PlotCanvasSelection) {
+        if session.canvasSelection == selection {
+            session.selectCanvasSelection(.figure)
+        }
+    }
+
+    private func functionTitle(_ layer: AnalyticalLayerPayload) -> String {
+        let label = layer.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return label.isEmpty ? layer.expression : label
+    }
+
+    private func referenceGuideTitle(_ guide: ReferenceGuidePayload) -> String {
+        let label = guide.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !label.isEmpty {
+            return label
+        }
+        return guide.kind == "band" ? "Region" : "Line"
+    }
+
+    private func textAnnotationTitle(_ annotation: TextAnnotationPayload) -> String {
+        let trimmed = annotation.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Annotation" : trimmed
+    }
+
+    private func shapeAnnotationTitle(_ annotation: ShapeAnnotationPayload) -> String {
+        let label = annotation.label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !label.isEmpty {
+            return label
+        }
+        return shapeKindLabel(annotation.kind)
+    }
+
+    private func shapeKindLabel(_ kind: String) -> String {
+        switch kind {
+        case "ellipse":
+            return "Ellipse"
+        case "bracket":
+            return "Bracket"
+        default:
+            return "Rectangle"
+        }
+    }
+
+    private func shapeSymbol(_ kind: String) -> String {
+        switch kind {
+        case "ellipse":
+            return "circle.dashed"
+        case "bracket":
+            return "square.split.diagonal.2x2"
+        default:
+            return "rectangle.dashed"
+        }
+    }
+
+    private var fitEnabledBinding: Binding<Bool> {
+        Binding {
+            session.fitOptions.enabled
+        } set: { enabled in
+            session.updateFitEnabled(enabled)
+        }
+    }
+
+    private func analyticalLayerEnabledBinding(id: String) -> Binding<Bool> {
+        Binding {
+            session.analyticalLayers.first(where: { $0.id == id })?.enabled ?? true
+        } set: { enabled in
+            session.updateAnalyticalLayer(id: id, policy: .immediate) { $0.enabled = enabled }
+        }
+    }
+
+    private func referenceGuideEnabledBinding(id: String) -> Binding<Bool> {
+        Binding {
+            session.referenceGuides.first(where: { $0.id == id })?.enabled ?? true
+        } set: { enabled in
+            session.updateReferenceGuide(id: id, policy: .immediate) { $0.enabled = enabled }
+        }
+    }
+
+    private func textAnnotationEnabledBinding(id: String) -> Binding<Bool> {
+        Binding {
+            session.textAnnotations.first(where: { $0.id == id })?.enabled ?? true
+        } set: { enabled in
+            session.updateTextAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
+        }
+    }
+
+    private func shapeAnnotationEnabledBinding(id: String) -> Binding<Bool> {
+        Binding {
+            session.shapeAnnotations.first(where: { $0.id == id })?.enabled ?? true
+        } set: { enabled in
+            session.updateShapeAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
+        }
+    }
+}
+
+private struct PlotObjectListItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let selection: PlotCanvasSelection
 }
 
 private struct RailSectionHeader: View {

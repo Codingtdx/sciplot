@@ -638,6 +638,8 @@ extension PlotSession {
         selectedFileURL = url
         sourceProvenance = sourceProvenanceForCurrentURL(url)
         selectedSheet = sheet
+        selectedPlotTool = .select
+        canvasSelection = .figure
         inspectionResponse = nil
         runtimeState.inspectedInputPath = nil
         runtimeState.inspectedSheet = nil

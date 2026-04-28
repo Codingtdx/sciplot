@@ -13,6 +13,12 @@ struct AppCommands: Commands {
             }
         }
 
+        CommandMenu("Plot Tools") {
+            ForEach(PlotTool.allCases) { tool in
+                plotToolButton(tool)
+            }
+        }
+
         CommandGroup(after: .newItem) {
             Button("New Data Studio Session") {
                 model.newDataStudioSession()
@@ -60,6 +66,22 @@ struct AppCommands: Commands {
                 model.toggleInspector()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
+        }
+    }
+
+    @ViewBuilder
+    private func plotToolButton(_ tool: PlotTool) -> some View {
+        let availability = model.plotSession.plotToolAvailability(for: tool)
+        let title = "\(tool.title) Tool"
+        let button = Button(title) {
+            model.plotSession.activatePlotTool(tool)
+        }
+        .disabled(model.selectedWorkbench != .plot || !availability.isEnabled)
+
+        if let shortcutKey = tool.shortcutKey {
+            button.keyboardShortcut(shortcutKey, modifiers: [.command, .option])
+        } else {
+            button
         }
     }
 }

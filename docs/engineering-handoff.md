@@ -4911,3 +4911,388 @@ Use this block for every new round:
     - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
     - `Computer Use get_app_state("com.apple.finder")`: timed out after 120s.
     - Conclusion: real desktop acceptance is tool-chain blocked in this run; no manual smoke pass was claimed.
+
+## 2026-04-27 - Plot Tool-Driven Interaction Refactor
+
+- Scope:
+  - Replaced Plot's primary inspector mode picker with a tool-driven editing model.
+  - Added app-only Plot presentation state:
+    - `PlotTool`
+    - `PlotCanvasSelection`
+    - `PlotObjectListItem`
+  - Added a central Plot tool strip for select, pan, fit, guide, text, shape, function, axis break, and secondary-axis tasks.
+  - Expanded the Plot left rail from `Source / Data Preparation / Templates` to `Source / Objects / Data Preparation / Templates`.
+  - Reworked the Plot inspector into a selection-driven editor. Figure selection shows figure/axis basics; object selection shows one active object editor; movable overlays also show arrange controls.
+  - Removed unused wrapper views that preserved the previous list-heavy inspector path:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotDataTransformInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotFunctionLayerInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotShapeAnnotationInspectorView.swift`
+
+- User-visible impact:
+  - Plot no longer exposes `Figure / Data / Layers / Arrange` as the main inspector interaction.
+  - Import remains a toolbar/menu-level global action; the Plot left rail no longer repeats an `Import Data` button.
+  - Left rail now provides a plot object list for Figure, Fit Overlay, function layers, guides, text annotations, shape annotations, and series entries.
+  - The central preview has a compact native tool strip, making common editing tasks visible near the figure instead of buried in the inspector.
+  - The inspector follows the selected object and avoids showing data pipeline or layer-management lists by default.
+
+- Risks:
+  - `PlotCanvasSelection` and `selectedPlotTool` are presentation state only and intentionally not persisted to `.sciplotgod`.
+  - The first direct-manipulation pass still uses existing overlay add/select/nudge APIs; true PDF curve hit-testing is not implemented in this round.
+  - `Data Cursor` is present as a disabled tool with help because plot hit-testing metadata is not yet part of the public render contract.
+  - Data Studio still embeds `PlotInspectorView` with the legacy figure-only path, so this round does not redesign Data Studio internals.
+
+- Rollback points:
+  - Tool and selection model:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSession.swift`
+  - Left rail:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Center stage:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Inspector:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorView.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSelectedLayerEditorView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - The previous Pixelmator-inspired mode picker improved organization but still forced users into small inspector controls and long property editing.
+    - A professional plot editor should follow `tool -> object -> contextual properties`: choose a task near the canvas, select a plot object from the object list, and only then refine the selected object.
+  - Rejected alternatives:
+    - Make the inspector controls larger: rejected because it preserves the form-first model.
+    - Move every advanced feature into left rail buttons: rejected because object properties belong in an inspector.
+    - Add PDF curve hit-testing now: rejected because it would require a new render metadata contract and is outside this presentation-only round.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed):
+  - Source-level:
+    - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+    - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+    - `git diff --check`: passed.
+    - `.venv/bin/python scripts/clean_repo.py`: passed, reclaimed about 261.5 MB on first run.
+    - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py tests/test_blocking_gate.py -q`: passed, 6 tests.
+  - macOS:
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 188 tests.
+  - Full gate:
+    - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+    - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` all passed.
+    - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - GUI acceptance:
+    - `Computer Use list_apps`: worked and showed `SciPlot God - com.codegod.desktop` running.
+    - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
+    - `Computer Use get_app_state("com.apple.finder")`: timed out after 120s, indicating a tool-chain/window-capture issue rather than a SciPlot-only failure.
+    - Local fallback `screencapture -x /tmp/sciplot_tool_interaction_acceptance.png`: produced a black capture, so desktop visual acceptance remains blocked.
+    - No manual smoke pass was claimed.
+
+## 2026-04-27 - Plot Canvas Overlay Controls
+
+- Scope:
+  - Added a canvas-level floating overlay control HUD in Plot preview.
+  - The HUD appears only when the current `PlotCanvasSelection` is a movable overlay:
+    - reference guide / region
+    - text annotation / callout
+    - shape annotation
+  - The HUD provides direct nudge controls, delete, and finish-edit actions without requiring the user to move to the right inspector.
+  - Strengthened the source-level GUI presentation gate so Plot preview must keep both the tool strip and canvas overlay controls.
+
+- User-visible impact:
+  - After adding or selecting a guide, text annotation, or shape, users can move it from the canvas surface using a compact native material HUD.
+  - Deleting the selected overlay is now available near the object being edited.
+  - The right inspector remains the precise property editor; the canvas HUD handles quick manipulation.
+
+- Risks:
+  - Movement still uses existing typed overlay nudge APIs and does not implement PDF hit testing.
+  - The HUD is intentionally limited to movable overlays; fit overlay, function layers, and series entries still use the object list and selection inspector.
+
+- Rollback points:
+  - Canvas HUD:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - The previous tool-driven refactor moved task entry out of the inspector, but selected overlays still required inspector-side arrange controls for quick movement.
+    - Pixelmator-style editing expects the selected object to expose immediate contextual controls near the canvas.
+  - Rejected alternatives:
+    - Put another Arrange toolbar in the right inspector: rejected because it keeps the click-heavy inspector-first loop.
+    - Add true drag handles on the rendered PDF: rejected for this round because it requires hit-test/render metadata not currently in the public contract.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+
+- Validation (executed so far):
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` all passed.
+  - Desktop GUI acceptance remains blocked by the same window capture/tool-chain failure recorded above.
+
+## 2026-04-27 - Plot Tool Command Validation Fix
+
+- Scope:
+  - Reviewed the recent Pixelmator-style Plot tool interaction for macOS-native command behavior.
+  - Fixed an interaction bug where tool buttons used bare single-key shortcuts (`V/H/F/...`) directly on toolbar buttons.
+  - Moved Plot tool shortcuts into a native `Plot Tools` command menu using `Command + Option` combinations.
+  - Kept the on-canvas tool strip as visible pointer UI only, so text fields in the Tool Options Bar and inspector are less likely to lose typed characters to tool switching.
+  - Centralized Plot tool availability and activation in `PlotSession`:
+    - `plotToolAvailability(for:)`
+    - `activatePlotTool(_:)`
+
+- User-visible impact:
+  - Plot tools are now discoverable through the macOS menu bar, matching desktop pro-app expectations.
+  - Tool shortcuts no longer use bare character keys that can conflict with text/function input.
+  - Disabled tool commands follow the same availability rules as the visible tool strip.
+
+- Bug / unreasonable behavior found:
+  - Bare tool shortcuts were too aggressive for a macOS document/editor surface because Plot also has text-entry fields for annotations, functions, labels, and numeric controls.
+  - `Command + Option + I` was already owned by the app-level inspector toggle, so `Data Cursor` intentionally has no command shortcut until hit-testing exists.
+
+- Rollback points:
+  - Tool command routing:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/AppCommands.swift`
+  - Tool activation / availability:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - Apple-style Mac apps expose pro actions through commands and menus; bare key shortcuts should not steal ordinary text input.
+    - Centralizing activation avoids future drift between toolbar buttons and menu commands.
+  - Rejected alternatives:
+    - Keep bare keys and rely on focus behavior: rejected because SwiftUI button shortcuts can still behave too broadly in text-heavy surfaces.
+    - Hide shortcuts entirely: rejected because pro tools benefit from command discoverability and keyboard workflows.
+    - Implement a custom responder-chain keyboard router immediately: rejected for this round because native commands solve the verified conflict with less AppKit surface.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+
+- Validation (executed so far):
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 188 tests all passed.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance:
+    - `open -n app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`: launched without terminal error.
+    - `Computer Use list_apps`: showed `SciPlot God - com.codegod.desktop` running.
+    - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
+    - `Computer Use get_app_state("com.apple.finder")`: failed with `errAETimeout`, so the capture issue is not isolated to SciPlot God.
+    - No manual GUI smoke pass was claimed.
+
+## 2026-04-27 - Plot Tool Options Bar
+
+- Scope:
+  - Added a lightweight canvas-level Tool Options Bar below the Plot tool strip.
+  - Added single-key shortcuts to the Plot tool strip:
+    - `V` Select
+    - `H` Pan
+    - `I` Cursor
+    - `F` Fit
+    - `G` Guide
+    - `T` Text
+    - `S` Shape
+    - `U` Function
+    - `B` Axis Break
+    - `Y` Secondary Y
+  - Tool options are intentionally contextual and short:
+    - `Fit`: visibility and model
+    - `Guide`: line/region and axis target
+    - `Text`: text value and text/callout style
+    - `Shape`: rectangle/ellipse/bracket
+    - `Function`: expression and Y-axis target
+    - `Axis Break`: add X/Y break
+    - `Secondary Y`: enable/disable secondary Y axis
+  - Strengthened the GUI presentation gate so the Plot preview must retain the tool options bar and keyboard shortcut affordances.
+
+- User-visible impact:
+  - Plot editing moves another step away from the right-inspector-first loop.
+  - Choosing a tool now exposes the small set of choices needed for that tool near the canvas, while the inspector remains the precise selected-object editor.
+  - Common Plot tool selection is available from the keyboard, matching pro Mac editor expectations.
+
+- Risks:
+  - Tool shortcuts are single-key SwiftUI shortcuts scoped to the visible tool buttons; future command-menu integration may be needed if global routing becomes necessary.
+  - The Tool Options Bar edits existing typed payload fields only; it still does not add PDF hit-testing or direct drag handles.
+
+- Rollback points:
+  - Tool shortcuts:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+  - Tool options bar:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - Pixelmator-style tools are not just icons; the active tool exposes a small contextual option surface near the canvas.
+    - This reduces tiny inspector hunting without duplicating global Import/Export or moving business workflow into the canvas.
+  - Rejected alternatives:
+    - Put these controls back into the right inspector: rejected because it preserves the form-first workflow.
+    - Add a large permanent toolbar across the stage: rejected because it would recreate chrome clutter.
+    - Add true object hit testing now: rejected because it needs a render metadata contract and is not presentation-only.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed so far):
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 188 tests all passed.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance:
+    - `open -n app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`: launched without terminal error.
+    - `Computer Use list_apps`: showed `SciPlot God - com.codegod.desktop` running.
+    - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
+    - `Computer Use get_app_state("com.apple.finder")`: failed with `errAETimeout`, so the capture issue is not isolated to SciPlot God.
+    - No manual GUI smoke pass was claimed.
+
+## 2026-04-27 - Plot Overlay Keyboard Nudge
+
+- Scope:
+  - Extended the Plot canvas overlay HUD for movable overlays:
+    - reference guides / regions
+    - text annotations / callouts
+    - shape annotations
+  - Added `Option + Arrow` keyboard nudging to the HUD's directional controls.
+  - Added a compact monospaced position readout inside the HUD:
+    - guide value or region span
+    - text annotation x/y
+    - shape center x/y
+  - Strengthened the GUI presentation gate so the Plot preview must retain keyboard nudge affordances and position feedback.
+
+- User-visible impact:
+  - Selected overlays can now be nudged from the keyboard without moving attention to the right inspector.
+  - The HUD gives immediate positional feedback without turning the canvas into another dense form.
+  - The right inspector remains the exact editor for detailed values.
+
+- Risks:
+  - Keyboard nudge is routed through SwiftUI button shortcuts and is scoped to the HUD being present.
+  - Text fields in the tool options bar may still capture normal typing focus; the nudge shortcut intentionally uses `Option + Arrow` to reduce conflict.
+  - This still uses existing typed nudge APIs and does not add PDF/object hit-testing metadata.
+
+- Rollback points:
+  - Canvas HUD:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Presentation gate:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - Pixelmator-style direct manipulation is partly keyboard-driven: once an object is selected, small movement should not require inspector hopping.
+    - `Option + Arrow` gives a conservative pro-editor shortcut without colliding with normal arrow-key caret movement as aggressively as bare arrows.
+  - Rejected alternatives:
+    - Bare arrow nudging: rejected because it would conflict more often with text fields and native focus movement.
+    - Delete-key deletion: rejected for this round because destructive object removal deserves a more explicit confirmation/command model before becoming a keyboard shortcut.
+    - True drag handles: still rejected until render hit-test metadata exists.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed so far):
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 188 tests all passed.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance remains blocked by the same window capture/tool-chain failure recorded above.
+
+## 2026-04-27 - Plot Tool Acceptance Sweep
+
+- Scope:
+  - Audited the Plot tool-driven interaction for user-visible bugs and unreasonable behavior.
+  - Fixed the biggest issue found in source/test validation: Plot tool activation no longer creates or enables plot objects by itself.
+  - Moved object creation behind explicit tool option actions:
+    - `Add Guide`
+    - `Add Text`
+    - `Add Shape`
+    - `Add Function`
+  - Kept `Fit`, `Axis Break`, and `Secondary Y` as edit tools with explicit toggle/add controls, instead of creating payload on shortcut/tool selection.
+  - Removed redundant empty Plot chrome:
+    - The central tool strip is hidden until a Plot source exists.
+    - The left Plot rail now shows only the `Source` hint before import; `Objects`, `Data Preparation`, and `Templates` appear after a source exists.
+  - Replaced the invalid `axis.arrow` SF Symbol with `arrow.left.and.right`.
+
+- User-visible impact:
+  - Pressing a Plot tool shortcut or clicking a tool no longer silently adds overlays/functions/axis features.
+  - The empty Plot state is quieter and no longer repeats the import prompt across several sections.
+  - Axis Break now has a valid system icon.
+  - The tool options bar exposes object creation as an intentional action, closer to the Pixelmator-style distinction between choosing a tool and creating/editing an object.
+
+- Risks:
+  - Because true PDF/object hit testing is still out of scope, adding an overlay still happens through an explicit `Add` control rather than direct click-to-place on the canvas.
+  - Existing imported-state workflows should be preserved, but users who expected one-click tool creation will now use the Add button.
+  - Hosted XCTest still logs an AppKit split-view constraint warning around inspector safe-area geometry; tests pass, and the required `360 / 400 / 460` inspector width policy was not changed.
+
+- Rollback points:
+  - Tool model and icon:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorMode.swift`
+  - Canvas tool options and empty-state visibility:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - Left source/library rail:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotTemplateView.swift`
+  - Regression coverage:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/PlotSessionTests.swift`
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+
+- Decision Record:
+  - Why:
+    - Tool activation and object creation are different user intents in pro macOS editors. Conflating them made keyboard shortcuts and repeated clicks dangerous.
+    - Empty states should describe only the next useful step, not duplicate the same import state in every panel.
+  - Rejected alternatives:
+    - Keep one-click tool creation: rejected because it silently mutates the figure and can create duplicates.
+    - Add true click-to-place now: rejected because it needs reliable canvas/PDF hit testing metadata and would cross the current presentation-only boundary.
+    - Remove tool shortcuts entirely: rejected because native command shortcuts are useful once they are side-effect-free.
+  - Boundaries:
+    - No sidecar route changed.
+    - No render payload changed.
+    - No project schema changed.
+    - No plot contract or `nature` metrics changed.
+    - Inspector width policy remains `360 / 400 / 460`.
+
+- Validation (executed so far):
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 2 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `git diff --check`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/PlotSessionTests/testActivatingPlotToolsDoesNotCreatePlotObjects`: passed, 1 test.
+  - The rerun no longer emitted the invalid `axis.arrow` SF Symbol warning.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 275 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 189 tests all passed.
+  - Manual smoke checklist remains pending and unenforced without `--require-manual` evidence bundle.
+  - Desktop GUI acceptance:
+    - `open -n app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`: launched without terminal error.
+    - `Computer Use list_apps`: showed `SciPlot God — com.codegod.desktop` running.
+    - `Computer Use get_app_state("com.apple.finder")`: timed out after 120 seconds.
+    - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
+    - Manual desktop acceptance remains blocked by the window capture tool chain; no manual smoke pass was claimed.

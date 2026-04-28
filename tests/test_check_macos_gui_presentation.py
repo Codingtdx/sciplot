@@ -28,25 +28,35 @@ struct RootSplitView {
     }
 }
 """,
+        "app/macos/Sources/App/AppCommands.swift": """
+struct AppCommands {
+    var body: some Commands {
+        CommandMenu("Plot Tools") {
+            model.plotSession.activatePlotTool(tool)
+                .keyboardShortcut(shortcutKey, modifiers: [.command, .option])
+        }
+    }
+}
+""",
         "app/macos/Sources/Features/Plot/PlotTemplateView.swift": """
 struct PlotSourceLibraryView {
     var body: some View {
         RailSectionHeader(title: "Source")
+        RailSectionHeader(title: "Objects")
         RailSectionHeader(title: "Data Preparation")
         WorkbenchRailTitle(title: "Templates")
         Picker("Sheet", selection: binding) {}
-        Label("Import Data", systemImage: "tray.and.arrow.down")
         session.showDataWorkbook()
         session.selectDataWorkbookTab(tab)
+        PlotObjectListItem()
         PlotTemplateRow()
     }
 }
 """,
         "app/macos/Sources/Features/Plot/PlotInspectorView.swift": """
 ScrollView {
-    PlotInspectorModePicker()
-    PlotDataPipelineInspectorView()
-    PlotInspectorLayerListView()
+    PlotSelectionInspectorView()
+    session.canvasSelection
     PlotSelectedLayerEditorView()
     InspectorSection(title: "Axis") {}
     InspectorSection(title: "Fit Overlay") {}
@@ -77,7 +87,28 @@ struct PlotSelectedLayerEditorView {
 }
 struct PlotArrangeInspectorView {}
 """,
-        "app/macos/Sources/Features/Plot/PlotRefineView.swift": "SubtleStageHint(title: \"Preview\")\n",
+        "app/macos/Sources/Features/Plot/PlotRefineView.swift": """
+PlotToolStripView(selection: $session.selectedPlotTool)
+PlotToolOptionsBar(session: session)
+PlotCanvasOverlayControlsView(session: session, selection: selectedMovableLayer)
+let selectedMovableLayer = PlotLayerSelection.referenceGuide("id")
+alignment: .bottomTrailing
+let positionLabel = "x 0 y 0"
+Text("Option + Arrow")
+.keyboardShortcut(shortcut, modifiers: [.option])
+SubtleStageHint(title: "Preview")
+""",
+        "app/macos/Sources/Features/Plot/PlotInspectorMode.swift": """
+enum PlotTool {}
+enum PlotCanvasSelection {}
+struct PlotToolStripView {
+    var shortcutKey = "v"
+    var showsCanvasOptions = true
+    func plotToolAvailability() {}
+    func activatePlotTool() {}
+}
+enum PlotLayerSelection {}
+""",
         "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift": "PlotSourceLibraryView(session: session)\n",
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"

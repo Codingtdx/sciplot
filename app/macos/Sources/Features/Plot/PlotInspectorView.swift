@@ -6,9 +6,6 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     private let showsPlotInspectorModes: Bool
     private let leadingSections: LeadingSections
     private let trailingSections: TrailingSections
-    @State private var selectedMode: PlotInspectorMode = .figure
-    @State private var selectedDataPipelineItem: PlotDataPipelineSelection?
-    @State private var selectedPlotLayer: PlotLayerSelection?
     @State private var isPlotOptionsAdvancedExpanded: Bool
 
     init(
@@ -32,8 +29,20 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             VStack(alignment: .leading, spacing: 18) {
                 leadingSections
                 if showsPlotInspectorModes {
-                    PlotInspectorModePicker(selection: $selectedMode)
-                    plotModeContent
+                    PlotSelectionInspectorView(session: session) {
+                        plotOptionsSection
+                        if shouldShowAxesSection {
+                            axesSection
+                        }
+                    } axisContent: {
+                        if shouldShowAxesSection {
+                            axesSection
+                        } else {
+                            InspectorSection(title: "Axis") {
+                                InspectorEmptyState(message: "Select a plotted axis")
+                            }
+                        }
+                    }
                 } else {
                     plotOptionsSection
                     if session.supportsFitOverlayControls {
@@ -52,58 +61,6 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             .padding(.vertical, 14)
         }
         .inspectorSurface()
-    }
-
-    @ViewBuilder
-    private var plotModeContent: some View {
-        switch selectedMode {
-        case .figure:
-            plotOptionsSection
-            if session.supportsFitOverlayControls {
-                fitOverlaySection
-            }
-            if shouldShowAxesSection {
-                axesSection
-            }
-            if session.shouldShowSeriesLegendControls {
-                seriesSection
-            }
-        case .data:
-            PlotDataPipelineInspectorView(
-                session: session,
-                selection: $selectedDataPipelineItem
-            )
-        case .layers:
-            PlotInspectorLayerListView(
-                session: session,
-                selection: $selectedPlotLayer
-            )
-            PlotSelectedLayerEditorView(
-                session: session,
-                selection: effectiveSelectedPlotLayer
-            )
-        case .arrange:
-            PlotArrangeInspectorView(
-                session: session,
-                selection: effectiveSelectedPlotLayer
-            )
-        }
-    }
-
-    private var effectiveSelectedPlotLayer: PlotLayerSelection? {
-        if let selectedPlotLayer {
-            return selectedPlotLayer
-        }
-        if let id = session.selectedReferenceGuideID {
-            return .referenceGuide(id)
-        }
-        if let id = session.selectedTextAnnotationID {
-            return .textAnnotation(id)
-        }
-        if let id = session.selectedShapeAnnotationID {
-            return .shapeAnnotation(id)
-        }
-        return nil
     }
 
     @ViewBuilder
@@ -1373,11 +1330,6 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
     }
 }
 
-enum PlotAxisSelection {
-    case x
-    case y
-}
-
 extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections == EmptyView {
     init(session: PlotSession, styleSectionTitle: String = "Plot Options") {
         self.init(
@@ -1386,5 +1338,49 @@ extension PlotInspectorView where LeadingSections == EmptyView, TrailingSections
             leadingSections: { EmptyView() },
             trailingSections: { EmptyView() }
         )
+    }
+}
+
+private struct PlotSelectionInspectorView<FigureContent: View, AxisContent: View>: View {
+    @Bindable var session: PlotSession
+    let figureContent: FigureContent
+    let axisContent: AxisContent
+
+    init(
+        session: PlotSession,
+        @ViewBuilder figureContent: () -> FigureContent,
+        @ViewBuilder axisContent: () -> AxisContent
+    ) {
+        self.session = session
+        self.figureContent = figureContent()
+        self.axisContent = axisContent()
+    }
+
+    var body: some View {
+        switch session.canvasSelection {
+        case .figure:
+            figureContent
+        case .axis:
+            axisContent
+        case .layer(let layer):
+            PlotSelectedLayerEditorView(session: session, selection: layer)
+            if layer.isMovableOverlay {
+                PlotArrangeInspectorView(session: session, selection: layer)
+            }
+        case .dataPipeline:
+            InspectorSection(title: "Data") {
+                AdaptiveInspectorTextRow(title: "Pipeline", value: session.dataPipelineSummary.title)
+                Button {
+                    session.selectDataWorkbookTab(.transformed)
+                    session.showDataWorkbook()
+                } label: {
+                    Label("Open Workbook", systemImage: "tablecells")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!session.dataTransformAvailability.isEnabled)
+                .help(session.dataTransformAvailability.reason ?? "Open the data pipeline in Data Workbook.")
+            }
+        }
     }
 }

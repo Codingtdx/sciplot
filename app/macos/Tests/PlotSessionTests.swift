@@ -686,6 +686,36 @@ final class PlotSessionTests: XCTestCase {
         )
     }
 
+    func testActivatingPlotToolsDoesNotCreatePlotObjects() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+
+        session.activatePlotTool(.fit)
+        session.activatePlotTool(.guide)
+        session.activatePlotTool(.text)
+        session.activatePlotTool(.shape)
+        session.activatePlotTool(.function)
+        session.activatePlotTool(.axisBreak)
+        session.activatePlotTool(.secondaryAxis)
+
+        XCTAssertEqual(session.selectedPlotTool, .secondaryAxis)
+        XCTAssertFalse(session.fitOptions.enabled)
+        XCTAssertTrue(session.referenceGuides.isEmpty)
+        XCTAssertTrue(session.textAnnotations.isEmpty)
+        XCTAssertTrue(session.shapeAnnotations.isEmpty)
+        XCTAssertTrue(session.analyticalLayers.isEmpty)
+        XCTAssertTrue(session.xAxisBreaks.isEmpty)
+        XCTAssertTrue(session.yAxisBreaks.isEmpty)
+        XCTAssertFalse(session.renderOptions.extraYAxis?.enabled ?? false)
+        XCTAssertEqual(client.renderRequests.count, initialRenderCount)
+    }
+
     func testReferenceGuideEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
         let client = MockSidecarClient()
         client.saveProjectHandler = { request in
