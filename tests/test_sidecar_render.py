@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from base64 import b64decode
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.sidecar import routes_render
 from app.sidecar.server import app
@@ -126,6 +128,40 @@ def test_render_preview_returns_png_live_preview_payload(tmp_path: Path) -> None
     assert preview["pdf_base64"]
     png_bytes = b64decode(preview["png_base64"])
     assert png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_render_preview_preview_config_increases_png_resolution(tmp_path: Path) -> None:
+    routes_render._RENDER_PREVIEW_CACHE.clear()  # noqa: SLF001
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    base_request = {
+        "input_path": str(input_path),
+        "sheet": 0,
+        "template": "curve",
+    }
+    default_response = client.post("/render-preview", json=base_request)
+    assert default_response.status_code == 200, default_response.text
+    default_png = b64decode(default_response.json()["preview"]["png_base64"])
+    default_size = Image.open(BytesIO(default_png)).size
+
+    high_res_response = client.post(
+        "/render-preview",
+        json={
+            **base_request,
+            "preview_config": {
+                "pixel_width": 2400,
+                "pixel_height": 1800,
+                "scale": 2.0,
+            },
+        },
+    )
+    assert high_res_response.status_code == 200, high_res_response.text
+    high_res_png = b64decode(high_res_response.json()["preview"]["png_base64"])
+    high_res_size = Image.open(BytesIO(high_res_png)).size
+
+    assert high_res_size[0] > default_size[0]
+    assert high_res_size[1] > default_size[1]
 
 
 def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:

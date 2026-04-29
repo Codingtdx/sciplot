@@ -11,7 +11,7 @@ def _write_sources(root: Path, overrides: dict[str, str] | None = None) -> None:
 import SwiftUI
 @main
 struct SciPlotGodApp: App {
-    @State private var model = AppModel()
+    @State private var model = SciPlotGodAppState.model
     var body: some Scene {
         WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 1520, height: 900)
@@ -33,11 +33,19 @@ struct SciPlotGodApp: App {
         }
     }
 }
+private enum SciPlotGodAppState {
+    static let model = AppModel()
+}
+final class AppWindowManager {
+    func openLauncherAfterSceneAttempt() {}
+}
 """,
         "app/macos/Sources/App/RootSplitView.swift": """
 struct LauncherWindowRoot {
     var body: some View {
-        LauncherView(model: model)
+        AppWindowSharedChrome(model: model, bootstrapOnAppear: false) {
+            LauncherView(model: model)
+        }
             .modifier(WorkbenchWindowOpenHandler(model: model))
     }
 }
@@ -85,8 +93,8 @@ struct LauncherView {
     var body: some View {
         GlassEffectContainer {
             Workbench.allCases
-            LauncherModuleSelectionView()
-            LauncherActionPanel()
+            LauncherWelcomeSurface()
+            LauncherModuleEntryRow()
             Button("Plot") { openWindow(id: Workbench.plot.windowSceneID) }
             Button("Import") { model.beginLauncherPrimaryAction(for: .plot) }
             Button("Data Studio") { model.beginLauncherPrimaryAction(for: .dataStudio) }
@@ -256,7 +264,11 @@ enum InspectorColumnLayoutPolicy {
             "SubtleStageHint(title: \"Run\")\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift": (
-            "InspectorSection()\n"
+            "InspectorSection(title: \"Binding\")\n"
+            "InspectorSection(title: \"Runner\")\n"
+            "InspectorSection(title: \"Outputs & Handoff\")\n"
+            "InspectorSection(title: \"Advanced\")\n"
+            "private var advancedSection: some View {}\n"
             "Button(\"Open Source\") {}\n"
             "Button(\"Reveal Source\") {}\n"
         ),

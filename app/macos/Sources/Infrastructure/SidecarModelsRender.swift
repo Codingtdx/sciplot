@@ -1185,25 +1185,34 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
     let generatedFiles: [CodeConsoleGeneratedFileResponse]
 }
 
+struct PreviewRenderConfigPayload: Codable, Equatable, Hashable, Sendable {
+    let pixelWidth: Int
+    let pixelHeight: Int
+    let scale: Double
+}
+
 struct RenderRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
     let template: String
     let options: RenderOptionsPayload
     let fitOptions: FitOptionsPayload
+    let previewConfig: PreviewRenderConfigPayload?
 
     init(
         inputPath: String,
         sheet: SheetValue,
         template: String,
         options: RenderOptionsPayload,
-        fitOptions: FitOptionsPayload = FitOptionsPayload()
+        fitOptions: FitOptionsPayload = FitOptionsPayload(),
+        previewConfig: PreviewRenderConfigPayload? = nil
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
         self.template = template
         self.options = options
         self.fitOptions = fitOptions
+        self.previewConfig = previewConfig
     }
 }
 

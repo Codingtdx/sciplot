@@ -82,6 +82,7 @@ def _render_preview_cache_key(
     template: str,
     options_payload: object,
     fit_options_payload: object,
+    preview_config_payload: object,
 ) -> str:
     return _stable_json_hash(
         {
@@ -91,6 +92,7 @@ def _render_preview_cache_key(
             "template": template,
             "options": options_payload,
             "fit_options": fit_options_payload,
+            "preview_config": preview_config_payload,
         }
     )
 
@@ -326,12 +328,18 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
             payload_options = request.options
             options_payload = payload_options.model_dump(mode="json")
             fit_options_payload = request.fit_options.model_dump(mode="json")
+            preview_config_payload = (
+                request.preview_config.model_dump(mode="json")
+                if request.preview_config is not None
+                else None
+            )
             cache_key = _render_preview_cache_key(
                 input_path=input_path,
                 sheet=sheet,
                 template=resolved_template,
                 options_payload=options_payload,
                 fit_options_payload=fit_options_payload,
+                preview_config_payload=preview_config_payload,
             )
             cached = _RENDER_PREVIEW_CACHE.get(cache_key)
             if cached is not None:
@@ -351,7 +359,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 resolved_template_id=resolved_template,
             )
             try:
-                previews = rendered_plots_to_preview_payload(rendered_plots)
+                previews = rendered_plots_to_preview_payload(rendered_plots, preview_config=request.preview_config)
                 submission_report = build_render_submission_report(
                     context="preview",
                     template=resolved_template,

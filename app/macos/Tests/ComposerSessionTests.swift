@@ -4,6 +4,17 @@ import XCTest
 
 @MainActor
 final class ComposerSessionTests: XCTestCase {
+    func testConfigureDoesNotPreviewEmptyProject() async throws {
+        let client = MockSidecarClient()
+        let session = ComposerSession(previewDelayNanoseconds: 1_000_000)
+
+        session.configure(client: client)
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertTrue(client.composePreviewRequests.isEmpty)
+        XCTAssertNil(session.previewResponse)
+    }
+
     func testExportAvailabilityExplainsBlockingStates() {
         let session = ComposerSession()
         XCTAssertFalse(session.exportAvailability.isEnabled)

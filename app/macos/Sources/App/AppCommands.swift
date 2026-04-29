@@ -22,6 +22,7 @@ struct AppCommands: Commands {
                 Button(workbench.title) {
                     model.requestOpenWindow(for: workbench)
                     openWindow(id: workbench.windowSceneID)
+                    AppWindowManager.shared.openWorkbenchAfterSceneAttempt(workbench, model: model)
                 }
                 .keyboardShortcut(workbench.shortcutKey, modifiers: [.command])
             }
@@ -44,6 +45,7 @@ struct AppCommands: Commands {
                 let workbench = commandWorkbench
                 model.requestOpenWindow(for: workbench)
                 openWindow(id: workbench.windowSceneID)
+                AppWindowManager.shared.openWorkbenchAfterSceneAttempt(workbench, model: model)
                 model.beginImport(for: workbench)
             }
             .keyboardShortcut("o", modifiers: [.command])

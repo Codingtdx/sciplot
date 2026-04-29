@@ -65,6 +65,7 @@ final class PlotSession {
     var renderOptions = RenderOptionsPayload()
     var fitOptions = FitOptionsPayload()
     var previewResponse: RenderPreviewResponse?
+    var previewPixelBucket: PlotPreviewPixelBucket?
     var preflightResponse: PreflightRenderResponse?
     var exportResponse: ExportRenderResponse?
     var errorMessage: String?

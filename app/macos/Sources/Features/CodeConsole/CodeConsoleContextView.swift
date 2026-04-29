@@ -6,10 +6,10 @@ struct CodeConsoleContextView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                actionsSection
                 bindingSection
                 runnerSection
                 outputHandoffSection
+                advancedSection
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -18,48 +18,46 @@ struct CodeConsoleContextView: View {
     }
 
     @ViewBuilder
-    private var actionsSection: some View {
+    private var advancedSection: some View {
         let presentation = session.outputsPresentation
         let sourcePresentation = session.sourceActionsPresentation
 
-        InspectorSection(title: "Actions") {
-            DisclosureGroup("Advanced") {
-                InspectorActionStack {
-                    Button("Open Source") {
-                        session.openCurrentSource()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!sourcePresentation.openSourceAvailability.isEnabled)
-                    .help(sourcePresentation.openSourceAvailability.reason ?? "Open the bound source file.")
-                    .inspectorActionButton()
-
-                    Button("Reveal Source") {
-                        session.revealCurrentSource()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!sourcePresentation.revealSourceAvailability.isEnabled)
-                    .help(sourcePresentation.revealSourceAvailability.reason ?? "Reveal the bound source file in Finder.")
-                    .inspectorActionButton()
-
-                    Button("Reveal Output") {
-                        session.revealLatestOutput()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!presentation.revealLatestOutputAvailability.isEnabled)
-                    .help(
-                        presentation.revealLatestOutputAvailability.reason
-                            ?? "Reveal the latest export or managed output folder in Finder."
-                    )
-                    .inspectorActionButton()
+        InspectorSection(title: "Advanced") {
+            InspectorActionStack {
+                Button("Open Source") {
+                    session.openCurrentSource()
                 }
+                .buttonStyle(.bordered)
+                .disabled(!sourcePresentation.openSourceAvailability.isEnabled)
+                .help(sourcePresentation.openSourceAvailability.reason ?? "Open the bound source file.")
+                .inspectorActionButton()
 
-                LatestExportList(
-                    items: session.latestExportItems,
-                    openButtonTitle: { "Open \($0.label)" },
-                    openButtonHelp: { "Open the exported Code Console figure \($0.label)." },
-                    openAction: { session.openLatestExport(id: $0.id) }
+                Button("Reveal Source") {
+                    session.revealCurrentSource()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!sourcePresentation.revealSourceAvailability.isEnabled)
+                .help(sourcePresentation.revealSourceAvailability.reason ?? "Reveal the bound source file in Finder.")
+                .inspectorActionButton()
+
+                Button("Reveal Output") {
+                    session.revealLatestOutput()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!presentation.revealLatestOutputAvailability.isEnabled)
+                .help(
+                    presentation.revealLatestOutputAvailability.reason
+                        ?? "Reveal the latest export or managed output folder in Finder."
                 )
+                .inspectorActionButton()
             }
+
+            LatestExportList(
+                items: session.latestExportItems,
+                openButtonTitle: { "Open \($0.label)" },
+                openButtonHelp: { "Open the exported Code Console figure \($0.label)." },
+                openAction: { session.openLatestExport(id: $0.id) }
+            )
         }
     }
 

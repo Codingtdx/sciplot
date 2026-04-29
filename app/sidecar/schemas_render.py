@@ -226,10 +226,17 @@ class FileRequest(StrictModel):
     options: RenderOptionsPayload | None = None
 
 
+class PreviewRenderConfigPayload(StrictModel):
+    pixel_width: int = Field(ge=1, le=4096)
+    pixel_height: int = Field(ge=1, le=4096)
+    scale: float = Field(ge=1.0, le=4.0)
+
+
 class RenderRequest(FileRequest):
     template: str
     options: RenderOptionsPayload = Field(default_factory=RenderOptionsPayload)
     fit_options: FitOptionsPayload = Field(default_factory=FitOptionsPayload)
+    preview_config: PreviewRenderConfigPayload | None = None
 
 
 class ExportRenderRequest(RenderRequest):
@@ -546,8 +553,23 @@ class OpenProjectResponse(StrictModel):
     payload: ProjectBundlePayload
 
 
+def _preview_png_dpi(rendered: Any, preview_config: PreviewRenderConfigPayload | None) -> int:
+    if preview_config is None:
+        return 160
+
+    width_inches, height_inches = rendered.figure.get_size_inches()
+    width_inches = max(float(width_inches), 0.1)
+    height_inches = max(float(height_inches), 0.1)
+    target_dpi = max(
+        preview_config.pixel_width / width_inches,
+        preview_config.pixel_height / height_inches,
+    )
+    return int(max(160, min(260, round(target_dpi))))
+
+
 def rendered_plots_to_preview_payload(
     rendered_plots: list[Any],
+    preview_config: PreviewRenderConfigPayload | None = None,
 ) -> list[PreviewItemResponse]:
     previews: list[PreviewItemResponse] = []
     for rendered in rendered_plots:
@@ -562,7 +584,7 @@ def rendered_plots_to_preview_payload(
         rendered.figure.savefig(
             png_buffer,
             format="png",
-            dpi=160,
+            dpi=_preview_png_dpi(rendered, preview_config),
             facecolor="white",
             bbox_inches=None,
         )
@@ -609,6 +631,7 @@ __all__ = [
     "PlotProjectSourceProvenancePayload",
     "PreflightRenderResponse",
     "PreflightResultResponse",
+    "PreviewRenderConfigPayload",
     "ProjectBundlePayload",
     "AnalyticalLayerPayload",
     "ReferenceGuidePayload",

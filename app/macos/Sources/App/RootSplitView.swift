@@ -5,11 +5,12 @@ struct LauncherWindowRoot: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        AppWindowSharedChrome(model: model) {
+        AppWindowSharedChrome(model: model, bootstrapOnAppear: false) {
             LauncherView(model: model)
         }
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .containerBackground(.thickMaterial, for: .window)
         .background(WindowToolbarConfigurator())
     }
 }
@@ -67,20 +68,25 @@ struct WorkbenchWindowRoot: View {
 
 private struct AppWindowSharedChrome<Content: View>: View {
     @Bindable var model: AppModel
+    let bootstrapOnAppear: Bool
     let content: Content
 
     init(
         model: AppModel,
+        bootstrapOnAppear: Bool = true,
         @ViewBuilder content: () -> Content
     ) {
         self.model = model
+        self.bootstrapOnAppear = bootstrapOnAppear
         self.content = content()
     }
 
     var body: some View {
         content
             .task {
-                await model.bootstrapIfNeeded()
+                if bootstrapOnAppear {
+                    await model.bootstrapIfNeeded()
+                }
             }
             .modifier(WorkbenchWindowOpenHandler(model: model))
             .sheet(isPresented: $model.isQuickHelpPresented, onDismiss: {
@@ -166,6 +172,7 @@ struct WorkbenchWindowOpenHandler: ViewModifier {
                     return
                 }
                 openWindow(id: requestedWindow.windowSceneID)
+                AppWindowManager.shared.openWorkbenchAfterSceneAttempt(requestedWindow, model: model)
                 model.consumeRequestedWorkbenchWindow(requestedWindow)
             }
     }
@@ -221,6 +228,7 @@ private struct WorkbenchWindowActionGroup: View {
             Button {
                 model.showLauncher()
                 openWindow(id: "launcher")
+                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
             } label: {
                 Image(systemName: "square.grid.2x2")
             }

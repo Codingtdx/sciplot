@@ -10,20 +10,27 @@ struct PlotRefineView: View {
 
 struct PlotPreviewStage: View {
     @Bindable var session: PlotSession
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color(nsColor: .underPageBackgroundColor)
-                .opacity(0.72)
+        GeometryReader { geometry in
+            let previewBucket = PlotPreviewPixelBucket(stageSize: geometry.size, displayScale: displayScale)
+            ZStack(alignment: .topTrailing) {
+                Color(nsColor: .underPageBackgroundColor)
+                    .opacity(0.72)
 
-            previewSurface
-                .padding(34)
+                previewSurface
+                    .padding(34)
 
-            if session.isPreviewing, session.previewResponse?.previews.first != nil {
-                updatingBadge
-                    .padding(16)
+                if session.isPreviewing, session.previewResponse?.previews.first != nil {
+                    updatingBadge
+                        .padding(16)
+                }
             }
-
+            .task(id: previewBucket) {
+                session.updatePreviewPixelBucket(stageSize: geometry.size, displayScale: displayScale)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }

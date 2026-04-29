@@ -1,6 +1,38 @@
 import CoreGraphics
 import Foundation
 
+struct PlotPreviewPixelBucket: Equatable, Hashable, Sendable {
+    static let pixelBucketSize = 128
+    static let minPixelDimension = 512
+    static let maxPixelDimension = 2600
+
+    let config: PreviewRenderConfigPayload
+
+    init(stageSize: CGSize, displayScale: CGFloat) {
+        let scale = max(Double(displayScale), 1.0)
+        var pixelWidth = max(Double(stageSize.width) * scale, Double(Self.minPixelDimension))
+        var pixelHeight = max(Double(stageSize.height) * scale, Double(Self.minPixelDimension))
+        let longestEdge = max(pixelWidth, pixelHeight)
+
+        if longestEdge > Double(Self.maxPixelDimension) {
+            let ratio = Double(Self.maxPixelDimension) / longestEdge
+            pixelWidth *= ratio
+            pixelHeight *= ratio
+        }
+
+        config = PreviewRenderConfigPayload(
+            pixelWidth: Self.bucketedPixelDimension(pixelWidth),
+            pixelHeight: Self.bucketedPixelDimension(pixelHeight),
+            scale: scale
+        )
+    }
+
+    private static func bucketedPixelDimension(_ value: Double) -> Int {
+        let rounded = Int((value / Double(pixelBucketSize)).rounded()) * pixelBucketSize
+        return min(max(rounded, minPixelDimension), maxPixelDimension)
+    }
+}
+
 enum PlotPreviewRefreshPolicy {
     case immediate
     case debounced

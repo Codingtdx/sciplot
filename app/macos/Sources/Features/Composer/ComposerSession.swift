@@ -90,7 +90,13 @@ final class ComposerSession {
 
     func configure(client: any SidecarClienting) {
         self.client = client
-        schedulePreview()
+        if hasPreviewableContent {
+            schedulePreview()
+        }
+    }
+
+    private var hasPreviewableContent: Bool {
+        !project.panels.isEmpty || !project.regions.isEmpty || !project.texts.isEmpty
     }
 
     func attachUndoManager(_ undoManager: UndoManager?) {

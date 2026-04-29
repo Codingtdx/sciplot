@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import XCTest
 @testable import SciPlotGodMac
 
@@ -390,6 +391,36 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(request.options.dataTransforms?.first?.columns, ["Time"])
         XCTAssertEqual(request.options.dataTransforms?.first?.bins, 8)
         XCTAssertEqual(request.options.dataTransforms?.first?.groupBy, ["Group"])
+    }
+
+    func testEncodeRenderRequestWithPreviewConfig() throws {
+        let request = RenderRequest(
+            inputPath: "/tmp/sample.csv",
+            sheet: .index(0),
+            template: "curve",
+            options: RenderOptionsPayload(stylePreset: "nature"),
+            previewConfig: PreviewRenderConfigPayload(pixelWidth: 2048, pixelHeight: 1536, scale: 2.0)
+        )
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let payload = try JSONSerialization.jsonObject(with: try encoder.encode(request)) as? [String: Any]
+        let previewConfig = payload?["preview_config"] as? [String: Any]
+
+        XCTAssertEqual(previewConfig?["pixel_width"] as? Int, 2048)
+        XCTAssertEqual(previewConfig?["pixel_height"] as? Int, 1536)
+        XCTAssertEqual(previewConfig?["scale"] as? Double, 2.0)
+    }
+
+    func testPreviewPixelBucketRoundsAndClampsStageSize() {
+        let bucket = PlotPreviewPixelBucket(stageSize: CGSize(width: 1800, height: 1300), displayScale: 2.0)
+
+        XCTAssertEqual(bucket.config.pixelWidth, 2560)
+        XCTAssertEqual(bucket.config.pixelHeight, 1920)
+        XCTAssertEqual(bucket.config.scale, 2.0)
+
+        let nearSameBucket = PlotPreviewPixelBucket(stageSize: CGSize(width: 1808, height: 1304), displayScale: 2.0)
+        XCTAssertEqual(bucket, nearSameBucket)
     }
 
     func testDecodePlotContractSizePresetsWithoutIDField() throws {

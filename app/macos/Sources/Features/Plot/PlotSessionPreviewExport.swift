@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 extension PlotSession {
@@ -213,7 +214,7 @@ extension PlotSession {
     }
 
     func schedulePreviewRefresh(policy: PlotPreviewRefreshPolicy) {
-        guard let request = currentRenderRequest() else {
+        guard let request = currentRenderRequest(includePreviewConfig: true) else {
             return
         }
 
@@ -257,7 +258,21 @@ extension PlotSession {
         }
     }
 
-    func currentRenderRequest() -> RenderRequest? {
+    func updatePreviewPixelBucket(stageSize: CGSize, displayScale: CGFloat) {
+        guard stageSize.width > 64, stageSize.height > 64 else {
+            return
+        }
+
+        let nextBucket = PlotPreviewPixelBucket(stageSize: stageSize, displayScale: displayScale)
+        guard nextBucket != previewPixelBucket else {
+            return
+        }
+
+        previewPixelBucket = nextBucket
+        schedulePreviewRefresh(policy: .debounced)
+    }
+
+    func currentRenderRequest(includePreviewConfig: Bool = false) -> RenderRequest? {
         guard
             let selectedFileURL,
             let selectedTemplateID = effectiveTemplateID,
@@ -273,7 +288,8 @@ extension PlotSession {
             sheet: selectedSheet,
             template: selectedTemplateID,
             options: renderOptions,
-            fitOptions: fitOptions
+            fitOptions: fitOptions,
+            previewConfig: includePreviewConfig ? previewPixelBucket?.config : nil
         )
     }
 
