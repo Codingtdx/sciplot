@@ -17,11 +17,8 @@ struct LauncherView: View {
                     openWorkbench(workbench, performPrimaryAction: performPrimaryAction)
                 }
             )
-            .glassEffect(
-                .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: 30, style: .continuous)
-            )
             .frame(width: 720)
+            .proGlassPanel(theme: theme, cornerRadius: 30)
         }
         .frame(width: 760, height: 460)
         .background(Color.clear)

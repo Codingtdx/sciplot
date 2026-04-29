@@ -129,6 +129,9 @@
 - 命令菜单必须按 focused module context 路由当前窗口；`selectedWorkbench` 只能作为兼容/兜底状态，不得驱动可见的全局模块切换 UI。
 - toolbar 的 `Launcher` 返回入口可以作为 utility affordance 保留，只负责打开/聚焦 Launcher。
 - 模块主动作统一归属原生 window toolbar 的 primary action group，并在视觉上锚定右上角：`Import/Open`、`Export`、`Launcher`、`Help`、`Inspector` 不得回流到左侧选择面板或 inspector body。Plot 额外允许一个 toolbar `Data Workbook` 图标按钮，默认打开 `Source Data`。
+- 外观策略固定为 app-wide `Follow System / Light / Dark`，入口在 `View > Appearance`。浅色主题走接近 Codex 的近白/暖白 Pro workspace，不要回到大面积冷灰底；深色主题保持当前专业 dark workspace。
+- 自定义 Liquid Glass panel / rail / row 必须走共享 shaped helper（当前在 `app/macos/Sources/Shared/UI/StateViews.swift` 的 `proGlassPanel` / `proGlassRail` / `proGlassRow`），让填色、裁切、描边和 `glassEffect` 使用同一个圆角形状；禁止在模块主 panel 上恢复裸 `.background(theme.panelFill)` 或 `.background(theme.rowFill)` 方形托底。
+- macOS 前端交接说明见 `docs/macos-frontend-design.md`。应用图标资产在 `app/macos/Assets.xcassets/AppIcon.appiconset`，源稿在 `docs/assets/sciplot-god-app-icon.svg`，可用 `scripts/generate_app_icon.py` 重新生成 PNG 尺寸。
 - sidecar 策略是 app-managed ownership：
   - 不能只靠端口连通判断可用；
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；

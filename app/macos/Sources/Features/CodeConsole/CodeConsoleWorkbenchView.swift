@@ -44,11 +44,7 @@ private struct CodeConsoleProWorkspace: View {
                 .padding(12)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
-                .background(theme.panelFill)
-                .glassEffect(
-                    .regular.interactive(),
-                    in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-                )
+                .proGlassPanel(theme: theme)
                 .padding(.leading, 12)
                 .padding(.vertical, 12)
 
@@ -60,12 +56,7 @@ private struct CodeConsoleProWorkspace: View {
                 CodeConsoleContextView(session: session)
                     .frame(width: 340)
                     .frame(maxHeight: .infinity)
-                    .background(theme.panelFill)
-                    .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-                    )
+                    .proGlassPanel(theme: theme)
                     .padding(.trailing, 10)
                     .padding(.vertical, 12)
                     .transition(.move(edge: .trailing).combined(with: .opacity))

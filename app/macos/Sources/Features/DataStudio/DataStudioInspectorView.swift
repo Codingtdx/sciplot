@@ -29,12 +29,7 @@ struct DataStudioPreparationInspectorView: View {
             .padding(.vertical, 14)
         }
         .inspectorSurface()
-        .background(theme.panelFill)
-        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-        )
+        .proGlassPanel(theme: theme)
     }
 
     private var figureSection: some View {

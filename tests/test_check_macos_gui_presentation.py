@@ -126,7 +126,7 @@ struct LauncherView {
             LauncherCloseButton { dismiss() }
         }
         .frame(width: 760, height: 460)
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .proGlassPanel(theme: theme, cornerRadius: 30)
     }
 }
 struct LauncherCloseButton {}
@@ -263,15 +263,80 @@ enum InspectorColumnLayoutPolicy {
 }
 enum ProWorkspaceTheme {
     var rootBackground: Color { .clear }
-    var stageBackground: Color { .clear }
+    var stageBackground: Color {
+        switch self {
+        case .light:
+            return .clear
+        case .dark:
+            return .clear
+        }
+    }
     var panelFill: Color { .clear }
     var rowFill: Color { .clear }
     var selectedRowFill: Color { .clear }
+    var isCodexLikeLightWorkspace: Bool { true }
 }
 struct ProWorkspaceThemeKey {}
 extension EnvironmentValues {
     var proWorkspaceTheme: ProWorkspaceTheme { get { ProWorkspaceTheme() } set {} }
 }
+extension View {
+    func proGlassPanel(theme: ProWorkspaceTheme) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        return self
+            .background(theme.panelFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
+    }
+    func proGlassRail(theme: ProWorkspaceTheme) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        return self
+            .background(theme.panelFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
+    }
+    func proGlassRow(theme: ProWorkspaceTheme) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return self
+            .background(theme.rowFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
+    }
+}
+""",
+        "app/macos/SciPlotGod.xcodeproj/project.pbxproj": """
+Assets.xcassets
+Assets.xcassets in Resources
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+""",
+        "app/macos/Assets.xcassets/AppIcon.appiconset/Contents.json": """
+{
+  "images" : [
+    { "filename": "AppIcon-16.png", "idiom": "mac", "scale": "1x", "size": "16x16" },
+    { "filename": "AppIcon-32.png", "idiom": "mac", "scale": "2x", "size": "16x16" },
+    { "filename": "AppIcon-32.png", "idiom": "mac", "scale": "1x", "size": "32x32" },
+    { "filename": "AppIcon-64.png", "idiom": "mac", "scale": "2x", "size": "32x32" },
+    { "filename": "AppIcon-128.png", "idiom": "mac", "scale": "1x", "size": "128x128" },
+    { "filename": "AppIcon-256.png", "idiom": "mac", "scale": "2x", "size": "128x128" },
+    { "filename": "AppIcon-256.png", "idiom": "mac", "scale": "1x", "size": "256x256" },
+    { "filename": "AppIcon-512.png", "idiom": "mac", "scale": "2x", "size": "256x256" },
+    { "filename": "AppIcon-512.png", "idiom": "mac", "scale": "1x", "size": "512x512" },
+    { "filename": "AppIcon-1024.png", "idiom": "mac", "scale": "2x", "size": "512x512" }
+  ]
+}
+""",
+        "docs/assets/sciplot-god-app-icon.svg": "<svg />\n",
+        "docs/macos-frontend-design.md": """
+# macOS Frontend Design Handoff
+
+Liquid Glass
+Pro workspace
+Launcher
+Plot
+Data Studio
+Composer
+Code Console
+App Icon
 """,
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"
@@ -314,7 +379,7 @@ extension EnvironmentValues {
             "ComposerAssetBrowserView(session: session)\n"
             "ComposerCanvasView(session: session)\n"
             "ComposerInspectorView(session: session)\n"
-            ".glassEffect(.regular.interactive())\n"
+            ".proGlassPanel(theme: theme)\n"
             "@Environment(\\.proWorkspaceTheme) private var theme\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (
@@ -323,7 +388,7 @@ extension EnvironmentValues {
             "CodeConsoleRunWorkspaceView(session: session)\n"
             "CodeConsoleContextView(session: session)\n"
             "Picker(\"Sheet\", selection: selectedSheetSelection)\n"
-            ".glassEffect(.regular.interactive())\n"
+            ".proGlassPanel(theme: theme)\n"
             ".padding(.top, 54)\n"
             "@Environment(\\.proWorkspaceTheme) private var theme\n"
         ),
@@ -358,6 +423,19 @@ extension EnvironmentValues {
         path = root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+
+    icon_dir = root / "app/macos/Assets.xcassets/AppIcon.appiconset"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    for filename in (
+        "AppIcon-16.png",
+        "AppIcon-32.png",
+        "AppIcon-64.png",
+        "AppIcon-128.png",
+        "AppIcon-256.png",
+        "AppIcon-512.png",
+        "AppIcon-1024.png",
+    ):
+        (icon_dir / filename).write_bytes(b"png")
 
 
 def test_gui_presentation_checks_accept_expected_grammar(tmp_path: Path) -> None:

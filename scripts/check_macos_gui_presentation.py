@@ -117,7 +117,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=(
             "struct LauncherView",
             "GlassEffectContainer",
-            ".glassEffect(",
+            ".proGlassPanel(theme: theme, cornerRadius: 30)",
             "LauncherWelcomeSurface",
             "LauncherModuleEntryRow",
             "LauncherCloseButton",
@@ -233,6 +233,10 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "panelFill",
             "rowFill",
             "selectedRowFill",
+            "var isCodexLikeLightWorkspace",
+            "func proGlassPanel",
+            "func proGlassRail",
+            "func proGlassRow",
         ),
         forbidden=(
             "enum WorkbenchHeaderMetrics",
@@ -243,6 +247,46 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             ".frame(\n            minWidth: InspectorColumnLayoutPolicy.minWidth",
             "Button(action: hideAction)",
             'help("Hide Inspector")',
+            "Color(red: 0.78, green: 0.81, blue: 0.84)",
+            "Color(red: 0.88, green: 0.90, blue: 0.92)",
+        ),
+    ),
+    SourceCheck(
+        label="macOS app icon asset catalog is configured",
+        path="app/macos/SciPlotGod.xcodeproj/project.pbxproj",
+        required=(
+            "Assets.xcassets",
+            "Assets.xcassets in Resources",
+            "ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon",
+        ),
+    ),
+    SourceCheck(
+        label="App icon set includes the required macOS sizes",
+        path="app/macos/Assets.xcassets/AppIcon.appiconset/Contents.json",
+        required=(
+            '"idiom": "mac"',
+            '"size": "16x16"',
+            '"size": "32x32"',
+            '"size": "128x128"',
+            '"size": "256x256"',
+            '"size": "512x512"',
+            '"scale": "1x"',
+            '"scale": "2x"',
+        ),
+    ),
+    SourceCheck(
+        label="macOS frontend design handoff documents Pro workspace and Liquid Glass",
+        path="docs/macos-frontend-design.md",
+        required=(
+            "# macOS Frontend Design Handoff",
+            "Liquid Glass",
+            "Pro workspace",
+            "Launcher",
+            "Plot",
+            "Data Studio",
+            "Composer",
+            "Code Console",
+            "App Icon",
         ),
     ),
     SourceCheck(
@@ -520,7 +564,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "ComposerCanvasView(session: session)",
             "ComposerInspectorView(session: session)",
             "@Environment(\\.proWorkspaceTheme)",
-            ".glassEffect(",
+            ".proGlassPanel(theme: theme)",
         ),
         forbidden=(
             "HSplitView",
@@ -576,7 +620,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "CodeConsoleContextView(session: session)",
             'Picker("Sheet", selection: selectedSheetSelection)',
             "@Environment(\\.proWorkspaceTheme)",
-            ".glassEffect(",
+            ".proGlassPanel(theme: theme)",
             ".padding(.top, 54)",
         ),
         forbidden=(
@@ -692,6 +736,74 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         for token in check.forbidden:
             if token in source:
                 issues.append(f"{check.path}: {check.label}: forbidden token still present {token!r}")
+
+    try:
+        shaped_glass_source = _read_source(root, "app/macos/Sources/Shared/UI/StateViews.swift")
+        for helper in ("proGlassPanel", "proGlassRail", "proGlassRow"):
+            helper_start = shaped_glass_source.index(f"func {helper}")
+            helper_end = shaped_glass_source.find("\n    func ", helper_start + 1)
+            if helper_end == -1:
+                helper_end = shaped_glass_source.find("\n}", helper_start)
+            helper_source = shaped_glass_source[helper_start:helper_end]
+            for token in (".background(", "in: shape", ".clipShape(shape)", ".glassEffect("):
+                if token not in helper_source:
+                    issues.append(
+                        "app/macos/Sources/Shared/UI/StateViews.swift: "
+                        f"{helper} must use shaped background, clipping, and glassEffect; missing {token!r}"
+                    )
+
+        light_theme_start = shaped_glass_source.index("case .light:")
+        light_theme_end = shaped_glass_source.index("case .dark:", light_theme_start)
+        light_theme_source = shaped_glass_source[light_theme_start:light_theme_end]
+        if "isCodexLikeLightWorkspace" not in shaped_glass_source:
+            issues.append(
+                "app/macos/Sources/Shared/UI/StateViews.swift: "
+                "light theme must expose a testable Codex-like workspace marker"
+            )
+        if "0.78" in light_theme_source or "0.80" in light_theme_source:
+            issues.append(
+                "app/macos/Sources/Shared/UI/StateViews.swift: "
+                "light workspace tokens must avoid cold gray 0.78/0.80 stage values"
+            )
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/Shared/UI/StateViews.swift: shaped glass/theme check failed: {error}")
+
+    for relative_path in WORKBENCH_ROOTS + ("app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift",):
+        try:
+            source = _read_source(root, relative_path)
+        except AssertionError as error:
+            issues.append(str(error))
+            continue
+        for forbidden in (".background(theme.panelFill)", ".background(theme.rowFill)"):
+            if forbidden in source:
+                issues.append(
+                    f"{relative_path}: glass surfaces must use shaped proGlass helpers, found {forbidden!r}"
+                )
+
+    try:
+        icon_contents = _read_source(root, "app/macos/Assets.xcassets/AppIcon.appiconset/Contents.json")
+        for filename in (
+            "AppIcon-16.png",
+            "AppIcon-32.png",
+            "AppIcon-128.png",
+            "AppIcon-256.png",
+            "AppIcon-512.png",
+            "AppIcon-1024.png",
+        ):
+            if filename not in icon_contents:
+                issues.append(
+                    "app/macos/Assets.xcassets/AppIcon.appiconset/Contents.json: "
+                    f"missing icon image {filename!r}"
+                )
+            elif not (root / "app/macos/Assets.xcassets/AppIcon.appiconset" / filename).exists():
+                issues.append(
+                    "app/macos/Assets.xcassets/AppIcon.appiconset: "
+                    f"referenced icon image is missing {filename!r}"
+                )
+        if not (root / "docs/assets/sciplot-god-app-icon.svg").exists():
+            issues.append("docs/assets/sciplot-god-app-icon.svg: source icon artwork is missing")
+    except AssertionError as error:
+        issues.append(str(error))
 
     try:
         app_scene = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")

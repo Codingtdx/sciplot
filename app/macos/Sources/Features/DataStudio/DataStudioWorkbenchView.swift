@@ -141,11 +141,7 @@ private struct DataStudioGroupRailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(theme.panelFill)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-        )
+        .proGlassPanel(theme: theme)
     }
 
     private var focusedWorkbookSelection: Binding<String?> {

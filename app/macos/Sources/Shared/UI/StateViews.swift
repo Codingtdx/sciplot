@@ -78,7 +78,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var rootBackground: Color {
         switch self {
         case .light:
-            return Color(red: 0.88, green: 0.90, blue: 0.92)
+            return Color(red: 0.985, green: 0.982, blue: 0.972)
         case .dark:
             return Color(red: 0.075, green: 0.078, blue: 0.085)
         }
@@ -87,7 +87,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var stageBackground: Color {
         switch self {
         case .light:
-            return Color(red: 0.78, green: 0.81, blue: 0.84)
+            return Color(red: 0.956, green: 0.952, blue: 0.940)
         case .dark:
             return Color(red: 0.045, green: 0.048, blue: 0.054)
         }
@@ -96,7 +96,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var panelFill: Color {
         switch self {
         case .light:
-            return Color.white.opacity(0.26)
+            return Color.white.opacity(0.74)
         case .dark:
             return Color.white.opacity(0.045)
         }
@@ -105,7 +105,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var rowFill: Color {
         switch self {
         case .light:
-            return Color.white.opacity(0.34)
+            return Color.white.opacity(0.58)
         case .dark:
             return Color.white.opacity(0.065)
         }
@@ -114,7 +114,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var selectedRowFill: Color {
         switch self {
         case .light:
-            return Color.accentColor.opacity(0.18)
+            return Color.accentColor.opacity(0.14)
         case .dark:
             return Color.accentColor.opacity(0.16)
         }
@@ -123,7 +123,7 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var previewSurround: Color {
         switch self {
         case .light:
-            return Color(red: 0.80, green: 0.83, blue: 0.86)
+            return Color(red: 0.930, green: 0.926, blue: 0.912)
         case .dark:
             return Color(red: 0.040, green: 0.043, blue: 0.050)
         }
@@ -132,10 +132,14 @@ enum ProWorkspaceTheme: Equatable, Sendable {
     var hairline: Color {
         switch self {
         case .light:
-            return Color.black.opacity(0.10)
+            return Color.black.opacity(0.08)
         case .dark:
             return Color.white.opacity(0.10)
         }
+    }
+
+    var isCodexLikeLightWorkspace: Bool {
+        self == .light
     }
 }
 
@@ -167,6 +171,46 @@ private struct ProWorkspaceAppearanceModifier: ViewModifier {
 extension View {
     func proWorkspaceAppearance(appearanceMode: AppAppearanceMode) -> some View {
         modifier(ProWorkspaceAppearanceModifier(appearanceMode: appearanceMode))
+    }
+
+    func proGlassPanel(
+        theme: ProWorkspaceTheme,
+        cornerRadius: CGFloat = ProWorkspaceMetrics.outerCornerRadius
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(theme.panelFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
+            .overlay {
+                shape.stroke(theme.hairline, lineWidth: 0.8)
+            }
+    }
+
+    func proGlassRail(
+        theme: ProWorkspaceTheme,
+        cornerRadius: CGFloat = ProWorkspaceMetrics.outerCornerRadius
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(theme.panelFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
+            .overlay {
+                shape.stroke(theme.hairline, lineWidth: 0.8)
+            }
+    }
+
+    func proGlassRow(
+        theme: ProWorkspaceTheme,
+        isSelected: Bool = false,
+        cornerRadius: CGFloat = ProWorkspaceMetrics.innerCornerRadius
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(isSelected ? theme.selectedRowFill : theme.rowFill, in: shape)
+            .clipShape(shape)
+            .glassEffect(.regular.interactive(), in: shape)
     }
 }
 

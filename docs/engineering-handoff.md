@@ -34,6 +34,27 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-29: Liquid Glass theme repair, frontend handoff, and app icon
+
+- What changed:
+  - Reworked app-wide `ProWorkspaceTheme` light tokens away from cool gray toward a near-white, slightly warm Codex-like workspace while preserving the dark Pro workspace.
+  - Added shared shaped Liquid Glass helpers in `StateViews.swift` so panel, rail, and row fills are clipped to the same rounded shape that receives `glassEffect`.
+  - Updated Plot, Data Studio, Composer, Code Console, and Launcher surfaces to use the shaped glass helpers instead of raw rectangular panel backgrounds.
+  - Added the macOS `AppIcon` asset catalog plus generated PNG sizes and kept source artwork at `docs/assets/sciplot-god-app-icon.svg`.
+  - Added `docs/macos-frontend-design.md` as the main frontend design and interaction handoff.
+
+- Design rationale:
+  - The user-visible issue was not just color choice: raw rectangular fills behind rounded glass panels caused square corners to show through. The fix centralizes shape, fill, clipping, outline, and native glass sampling in one helper.
+  - Light mode now follows a clean near-white workspace direction instead of imitating the previous dark layout with gray fills. Plot's rendered page remains pure white in both themes.
+  - The app icon is a text-free chart glass mark so it stays readable in Dock and App Switcher sizes.
+
+- Verification to refresh for this round:
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`
+  - `.venv/bin/python -m pytest tests`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
+  - `.venv/bin/python scripts/blocking_gate.py`
+
 ### 2026-04-29: Data Studio / Composer / Code Console deep Pro workspace unification
 
 - Change:

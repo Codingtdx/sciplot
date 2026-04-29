@@ -148,11 +148,7 @@ private struct PlotSourceTypePanel: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(theme.panelFill)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-        )
+        .proGlassPanel(theme: theme)
         .sheet(isPresented: $isPlotTypeChooserPresented) {
             PlotTypeChooserSheet(session: session, isPresented: $isPlotTypeChooserPresented)
         }
@@ -299,12 +295,7 @@ private struct PlotAdjustmentInspector: View {
             session: session,
             adjustmentCategory: session.selectedPlotAdjustmentCategory
         )
-            .background(theme.panelFill)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .glassEffect(
-                .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-            )
+        .proGlassPanel(theme: theme)
     }
 }
 
@@ -321,11 +312,7 @@ private struct PlotAdjustmentRail: View {
         }
         .frame(width: PlotAdjustmentRailMetrics.railWidth)
         .padding(.vertical, PlotAdjustmentRailMetrics.verticalPadding)
-        .background(theme.panelFill)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.outerCornerRadius, style: .continuous)
-        )
+        .proGlassRail(theme: theme, cornerRadius: PlotAdjustmentRailMetrics.outerCornerRadius)
     }
 
     private func railButton(_ item: PlotAdjustmentRailItem) -> some View {

@@ -82,6 +82,12 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            AppWindowManager.shared.openLauncher(model: SciPlotGodAppState.model)
+        }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             AppWindowManager.shared.openLauncher(model: SciPlotGodAppState.model)
@@ -222,6 +228,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     private func hasVisibleWindow(id: String, title: String? = nil) -> Bool {

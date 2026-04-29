@@ -12,6 +12,13 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertLessThan(InspectorColumnLayoutPolicy.idealWidth, InspectorColumnLayoutPolicy.maxWidth)
     }
 
+    func testProWorkspaceThemeExposesCodexLikeLightModeMarker() {
+        XCTAssertTrue(ProWorkspaceTheme.light.isCodexLikeLightWorkspace)
+        XCTAssertFalse(ProWorkspaceTheme.dark.isCodexLikeLightWorkspace)
+        XCTAssertEqual(ProWorkspaceTheme(colorScheme: .light), .light)
+        XCTAssertEqual(ProWorkspaceTheme(colorScheme: .dark), .dark)
+    }
+
     @MainActor
     func testQuickLookThumbnailModelClearsPreviousImageWhenStartingNewLoad() async {
         let firstURL = URL(fileURLWithPath: "/tmp/first.pdf")

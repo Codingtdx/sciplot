@@ -14,6 +14,7 @@
 		C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Sources/App/Workbench.swift */; };
 		C00000000000000000000079 /* Sources/App/QuickHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */; };
 		C00000000000000000000080 /* Sources/App/LauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000080 /* Sources/App/LauncherView.swift */; };
+		C00000000000000000000086 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000086 /* Assets.xcassets */; };
 		C00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */; };
 		C00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */; };
 		C00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */; };
@@ -108,6 +109,7 @@
 		B00000000000000000000005 /* Sources/App/Workbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/Workbench.swift; sourceTree = "<group>"; };
 		B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/QuickHelpSheet.swift; sourceTree = "<group>"; };
 		B00000000000000000000080 /* Sources/App/LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/LauncherView.swift; sourceTree = "<group>"; };
+		B00000000000000000000086 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B00000000000000000000006 /* Sources/Features/CodeConsole/CodeConsoleContextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleContextView.swift; sourceTree = "<group>"; };
 		B00000000000000000000007 /* Sources/Features/CodeConsole/CodeConsoleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleEditorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000008 /* Sources/Features/CodeConsole/CodeConsoleOutputsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/CodeConsole/CodeConsoleOutputsView.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 		A00000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
+				B00000000000000000000086 /* Assets.xcassets */,
 				A00000000000000000000003 /* Sources */,
 				A00000000000000000000004 /* Tests */,
 				A00000000000000000000005 /* Products */,
@@ -397,6 +400,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C00000000000000000000086 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -536,6 +540,7 @@
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
@@ -564,6 +569,7 @@
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
