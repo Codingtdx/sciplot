@@ -9,9 +9,9 @@ struct SciPlotGodApp: App {
     var body: some Scene {
         WindowGroup("SciPlot God", id: "launcher") {
             LauncherWindowRoot(model: model)
-                .frame(width: 660, height: 360)
+                .frame(width: 760, height: 460)
         }
-        .defaultSize(width: 660, height: 360)
+        .defaultSize(width: 760, height: 460)
         .windowResizability(.contentSize)
         .windowStyle(.plain)
         .defaultLaunchBehavior(.presented)
@@ -65,13 +65,10 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        AppWindowManager.shared.openLauncherAfterSceneAttempt(model: SciPlotGodAppState.model)
-    }
-
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             AppWindowManager.shared.openLauncher(model: SciPlotGodAppState.model)
+            return false
         }
         return true
     }
@@ -85,13 +82,17 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
     func openLauncherAfterSceneAttempt(model: AppModel) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            self.openLauncher(model: model)
+            if !self.hasVisibleWindow(id: "launcher", title: "SciPlot God") {
+                self.openLauncher(model: model)
+            }
         }
     }
 
     func openWorkbenchAfterSceneAttempt(_ workbench: Workbench, model: AppModel) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            self.openWorkbench(workbench, model: model)
+            if !self.hasVisibleWindow(id: workbench.windowSceneID, title: workbench.title) {
+                self.openWorkbench(workbench, model: model)
+            }
         }
     }
 
@@ -113,7 +114,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
         let controller = NSWindowController(
             window: BorderlessLauncherWindow(
-                contentRect: NSRect(origin: .zero, size: CGSize(width: 660, height: 360)),
+                contentRect: NSRect(origin: .zero, size: CGSize(width: 760, height: 460)),
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
@@ -128,6 +129,19 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
         controllers[id] = controller
         present(window)
+    }
+
+    func closeLauncher() {
+        if let controller = controllers["launcher"], let window = controller.window {
+            window.close()
+            return
+        }
+
+        NSApp.windows
+            .first { window in
+                window.identifier?.rawValue == "launcher" || window.title == "SciPlot God"
+            }?
+            .close()
     }
 
     func openWorkbench(_ workbench: Workbench, model: AppModel) {
@@ -193,12 +207,24 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
+    private func hasVisibleWindow(id: String, title: String? = nil) -> Bool {
+        NSApp.windows.contains { window in
+            guard window.isVisible else {
+                return false
+            }
+            if window.identifier?.rawValue == id {
+                return true
+            }
+            return title.map { window.title == $0 } ?? false
+        }
+    }
+
     private func configureLauncherWindow(_ window: NSWindow) {
         window.identifier = NSUserInterfaceItemIdentifier("launcher")
         window.title = "SciPlot God"
-        window.setContentSize(CGSize(width: 660, height: 360))
-        window.minSize = CGSize(width: 660, height: 360)
-        window.maxSize = CGSize(width: 660, height: 360)
+        window.setContentSize(CGSize(width: 760, height: 460))
+        window.minSize = CGSize(width: 760, height: 460)
+        window.maxSize = CGSize(width: 760, height: 460)
         window.styleMask = [.borderless]
         window.isReleasedWhenClosed = false
         window.isOpaque = false

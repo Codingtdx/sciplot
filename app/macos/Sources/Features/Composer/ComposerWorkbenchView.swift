@@ -3,32 +3,14 @@ import UniformTypeIdentifiers
 
 struct ComposerWorkbenchView: View {
     let session: ComposerSession
+    var isInspectorPresented = true
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
-            if let errorMessage = session.errorMessage {
-                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
-            }
-
-            HSplitView {
-                ComposerAssetBrowserView(session: session)
-                    .frame(
-                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
-                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
-                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
-                    .padding(.leading, 16)
-                    .padding(.vertical, 12)
-
-                ComposerCanvasView(session: session)
-                    .padding(.trailing, 16)
-                    .padding(.vertical, 12)
-            }
-        }
+        ComposerProWorkspace(session: session, isInspectorPresented: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
+        .preferredColorScheme(.dark)
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -84,4 +66,68 @@ struct ComposerWorkbenchView: View {
         )
     }
 
+}
+
+private struct ComposerProWorkspace: View {
+    let session: ComposerSession
+    let isInspectorPresented: Bool
+
+    var body: some View {
+        HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
+            ComposerAssetBrowserView(session: session)
+                .padding(12)
+                .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .glassEffect(
+                    .regular.interactive(),
+                    in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+                )
+                .padding(.leading, 12)
+                .padding(.vertical, 12)
+
+            ComposerCanvasStageView(session: session)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 12)
+
+            if isInspectorPresented {
+                ComposerInspectorView(session: session)
+                    .frame(width: 340)
+                    .frame(maxHeight: .infinity)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+                    .glassEffect(
+                        .regular.interactive(),
+                        in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+                    )
+                    .padding(.trailing, 10)
+                    .padding(.vertical, 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(MotionTokens.selection, value: isInspectorPresented)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct ComposerCanvasStageView: View {
+    let session: ComposerSession
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(nsColor: .underPageBackgroundColor)
+                .opacity(0.72)
+
+            ComposerCanvasView(session: session)
+                .padding(28)
+
+            if let errorMessage = session.errorMessage {
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
+                    .frame(maxWidth: 640)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+    }
 }

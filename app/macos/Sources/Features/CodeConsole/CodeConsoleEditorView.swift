@@ -14,30 +14,7 @@ struct CodeConsoleEditorView: View {
         let presentation = session.editorPresentation
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Prompt")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Button("Refresh") {
-                    session.refreshPrompt()
-                }
-                .buttonStyle(.bordered)
-                .disabled(!presentation.refreshPromptAvailability.isEnabled)
-                .help(
-                    presentation.refreshPromptAvailability.reason
-                        ?? "Refresh the bound context and regenerate the external AI prompt."
-                )
-
-                Button("Copy Prompt") {
-                    session.copyPromptToPasteboard()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!presentation.copyPromptAvailability.isEnabled)
-                .help(
-                    presentation.copyPromptAvailability.reason
-                        ?? "Copy the current external AI prompt to the clipboard."
-                )
-            }
+            promptHeader(presentation: presentation)
 
             ScrollView {
                 Text(session.promptText.isEmpty ? "Bind a dataset to generate the prompt." : session.promptText)
@@ -45,7 +22,7 @@ struct CodeConsoleEditorView: View {
                     .font(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
             }
-            .frame(minHeight: 150, maxHeight: 220)
+            .frame(minHeight: 96, idealHeight: 126, maxHeight: 150)
             .padding(12)
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
@@ -53,6 +30,34 @@ struct CodeConsoleEditorView: View {
                     .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
             )
         }
+    }
+
+    private func promptHeader(presentation: CodeConsoleEditorPresentation) -> some View {
+        HStack {
+            Text("Prompt")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Button("Refresh") {
+                session.refreshPrompt()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!presentation.refreshPromptAvailability.isEnabled)
+            .help(
+                presentation.refreshPromptAvailability.reason
+                    ?? "Refresh the bound context and regenerate the external AI prompt."
+            )
+
+            Button("Copy Prompt") {
+                session.copyPromptToPasteboard()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!presentation.copyPromptAvailability.isEnabled)
+            .help(
+                presentation.copyPromptAvailability.reason
+                    ?? "Copy the current external AI prompt to the clipboard."
+            )
+        }
+        .layoutPriority(1)
     }
 
     private var editorCard: some View {
@@ -87,7 +92,7 @@ struct CodeConsoleEditorView: View {
             TextEditor(text: $session.editorText)
                 .font(.body.monospaced())
                 .padding(12)
-                .frame(minHeight: 320)
+                .frame(minHeight: 210, idealHeight: 260, maxHeight: .infinity)
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)

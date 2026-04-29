@@ -18,10 +18,8 @@ struct ComposerAssetBrowserView: View {
             .disabled(session.orderedPanels.isEmpty)
 
             if session.orderedPanels.isEmpty {
-                SubtleStageHint(
-                    title: "Import panels to start a layout",
-                    systemImage: "tray.and.arrow.down"
-                )
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredPanels.isEmpty {
                 SubtleStageHint(
                     title: "No panels match this filter",

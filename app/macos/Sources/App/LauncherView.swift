@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LauncherView: View {
     @Bindable var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
     @State private var focusedWorkbench: Workbench = .plot
 
@@ -9,18 +10,24 @@ struct LauncherView: View {
         GlassEffectContainer(spacing: 0) {
             LauncherWelcomeSurface(
                 focusedWorkbench: $focusedWorkbench,
+                close: closeLauncher,
                 open: { workbench, performPrimaryAction in
                     openWorkbench(workbench, performPrimaryAction: performPrimaryAction)
                 }
             )
             .glassEffect(
                 .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 30, style: .continuous)
             )
-            .frame(width: 620)
+            .frame(width: 720)
         }
-        .frame(width: 660, height: 360)
+        .frame(width: 760, height: 460)
         .background(Color.clear)
+    }
+
+    private func closeLauncher() {
+        dismiss()
+        AppWindowManager.shared.closeLauncher()
     }
 
     private func openWorkbench(_ workbench: Workbench, performPrimaryAction: Bool = false) {
@@ -37,13 +44,14 @@ struct LauncherView: View {
 
 private struct LauncherWelcomeSurface: View {
     @Binding var focusedWorkbench: Workbench
+    let close: () -> Void
     let open: (Workbench, Bool) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 26) {
             header
 
-            VStack(spacing: 6) {
+            VStack(spacing: 12) {
                 ForEach(Workbench.allCases) { workbench in
                     LauncherModuleEntryRow(
                         workbench: workbench,
@@ -61,19 +69,25 @@ private struct LauncherWelcomeSurface: View {
                 }
             }
         }
-        .padding(18)
+        .padding(.horizontal, 30)
+        .padding(.top, 26)
+        .padding(.bottom, 30)
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("SciPlot God")
-                .font(.title2.weight(.semibold))
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("SciPlot God")
+                    .font(.largeTitle.weight(.semibold))
+
+                Text("Choose a module")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer(minLength: 12)
 
-            Text("Choose a module")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            LauncherCloseButton(action: close)
         }
         .contentShape(Rectangle())
         .gesture(WindowDragGesture())
@@ -89,18 +103,18 @@ private struct LauncherModuleEntryRow: View {
     let primaryAction: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 18) {
             Button(action: open) {
-                HStack(spacing: 12) {
+                HStack(spacing: 16) {
                     Image(systemName: workbench.systemImage)
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 24)
+                        .font(.system(size: 22, weight: .semibold))
+                        .frame(width: 34)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(workbench.title)
-                            .font(.callout.weight(.semibold))
+                            .font(.title3.weight(.semibold))
                         Text(subtitle)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -114,16 +128,16 @@ private struct LauncherModuleEntryRow: View {
 
             primaryButton
         }
-        .padding(.vertical, 9)
-        .padding(.leading, 12)
-        .padding(.trailing, 10)
+        .padding(.vertical, 14)
+        .padding(.leading, 18)
+        .padding(.trailing, 16)
         .background {
             if isSelected {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(.primary.opacity(0.08))
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture(perform: select)
     }
 
@@ -147,7 +161,7 @@ private struct LauncherModuleEntryRow: View {
     private var primaryLabel: some View {
         Label(primaryTitle, systemImage: primarySymbol)
             .labelStyle(.titleAndIcon)
-            .frame(width: 148)
+            .frame(width: 168)
     }
 
     private var subtitle: String {
@@ -187,5 +201,22 @@ private struct LauncherModuleEntryRow: View {
         case .codeConsole:
             return "link"
         }
+    }
+}
+
+private struct LauncherCloseButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .frame(width: 28, height: 28)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .background(.primary.opacity(0.08), in: Circle())
+        .help("Close Launcher")
     }
 }

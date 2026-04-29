@@ -39,7 +39,7 @@ struct DataStudioPreparationInspectorView: View {
     private var figureSection: some View {
         InspectorSection(title: "Figure") {
             if session.orderedGroups.isEmpty {
-                InspectorEmptyState(message: "Import raw data to build workbook groups.")
+                InspectorEmptyState(message: "No figure")
             } else {
                 AdaptiveInspectorTextRow(
                     title: "Group",

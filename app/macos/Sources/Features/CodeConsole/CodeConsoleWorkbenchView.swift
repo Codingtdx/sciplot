@@ -2,31 +2,13 @@ import SwiftUI
 
 struct CodeConsoleWorkbenchView: View {
     @Bindable var session: CodeConsoleSession
+    var isInspectorPresented = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
-            if let errorMessage = session.errorMessage {
-                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
-            }
-
-            HSplitView {
-                CodeConsoleSourceRailView(session: session)
-                    .frame(
-                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
-                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
-                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
-                    .padding(.leading, 16)
-                    .padding(.vertical, 12)
-
-                CodeConsoleRunWorkspaceView(session: session)
-                    .padding(.trailing, 16)
-                    .padding(.vertical, 12)
-            }
-        }
+        CodeConsoleProWorkspace(session: session, isInspectorPresented: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
+        .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: bindingForImporter,
             allowedContentTypes: FileTypeCatalog.plotInputs,
@@ -51,27 +33,84 @@ struct CodeConsoleWorkbenchView: View {
     }
 }
 
+private struct CodeConsoleProWorkspace: View {
+    @Bindable var session: CodeConsoleSession
+    let isInspectorPresented: Bool
+
+    var body: some View {
+        HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
+            CodeConsoleSourceRailView(session: session)
+                .padding(12)
+                .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .glassEffect(
+                    .regular.interactive(),
+                    in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+                )
+                .padding(.leading, 12)
+                .padding(.vertical, 12)
+
+            CodeConsoleRunStageView(session: session)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 12)
+
+            if isInspectorPresented {
+                CodeConsoleContextView(session: session)
+                    .frame(width: 340)
+                    .frame(maxHeight: .infinity)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+                    .glassEffect(
+                        .regular.interactive(),
+                        in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+                    )
+                    .padding(.trailing, 10)
+                    .padding(.vertical, 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(MotionTokens.selection, value: isInspectorPresented)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct CodeConsoleRunStageView: View {
+    @Bindable var session: CodeConsoleSession
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(nsColor: .underPageBackgroundColor)
+                .opacity(0.72)
+
+            CodeConsoleRunWorkspaceView(session: session)
+                .padding(.horizontal, 18)
+                .padding(.top, 54)
+                .padding(.bottom, 18)
+
+            if let errorMessage = session.errorMessage {
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
+                    .frame(maxWidth: 640)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+    }
+}
+
 struct CodeConsoleRunWorkspaceView: View {
     @Bindable var session: CodeConsoleSession
 
     var body: some View {
-        if session.availableBindings.isEmpty {
-            SubtleStageHint(
-                title: "Import a file or bind a Plot or Data Studio dataset",
-                systemImage: "tray.and.arrow.down",
-                alignment: .center
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            VSplitView {
-                CodeConsoleEditorView(session: session)
-                    .frame(minHeight: 480, idealHeight: 560, maxHeight: .infinity)
+        VSplitView {
+            CodeConsoleEditorView(session: session)
+                .frame(minHeight: 390, idealHeight: 500, maxHeight: .infinity)
 
-                CodeConsoleOutputsView(session: session)
-                    .frame(minHeight: 260, idealHeight: 340, maxHeight: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            CodeConsoleOutputsView(session: session)
+                .frame(minHeight: 210, idealHeight: 300, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

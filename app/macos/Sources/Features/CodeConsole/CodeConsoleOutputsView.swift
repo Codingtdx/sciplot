@@ -27,12 +27,8 @@ struct CodeConsoleOutputsView: View {
                 logsSection(title: "Stdout", text: run.stdout)
                 logsSection(title: "Stderr", text: run.stderr)
             } else {
-                SubtleStageHint(
-                    title: "Run code to inspect outputs",
-                    systemImage: "play.circle",
-                    alignment: .center
-                )
-                .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,7 +114,7 @@ struct CodeConsoleOutputsView: View {
             {
                 previewContent(for: selectedGeneratedFile, url: selectedGeneratedFileURL)
             } else {
-                SubtleStageHint(title: "Select an output to preview", alignment: .center)
+                Color.clear
                     .frame(maxWidth: .infinity, minHeight: 220, maxHeight: .infinity)
             }
         }

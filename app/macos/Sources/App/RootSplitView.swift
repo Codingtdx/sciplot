@@ -50,17 +50,15 @@ struct WorkbenchWindowRoot: View {
                 isInspectorPresented: model.isInspectorPresented(for: .dataStudio)
             )
         case .composer:
-            WorkbenchTwoPaneWindow(isInspectorVisible: model.isInspectorPresented(for: .composer)) {
-                ComposerWorkbenchView(session: model.composerSession)
-            } inspector: {
-                ComposerInspectorView(session: model.composerSession)
-            }
+            ComposerWorkbenchView(
+                session: model.composerSession,
+                isInspectorPresented: model.isInspectorPresented(for: .composer)
+            )
         case .codeConsole:
-            WorkbenchTwoPaneWindow(isInspectorVisible: model.isInspectorPresented(for: .codeConsole)) {
-                CodeConsoleWorkbenchView(session: model.codeConsoleSession)
-            } inspector: {
-                CodeConsoleContextView(session: model.codeConsoleSession)
-            }
+            CodeConsoleWorkbenchView(
+                session: model.codeConsoleSession,
+                isInspectorPresented: model.isInspectorPresented(for: .codeConsole)
+            )
         }
     }
 }
@@ -109,54 +107,6 @@ private struct AppWindowSharedChrome<Content: View>: View {
             } message: {
                 Text("Opening a new Plot input will replace the current imported dataset and template state.")
             }
-    }
-}
-
-private struct WorkbenchTwoPaneWindow<Content: View, Inspector: View>: View {
-    let content: Content
-    let inspector: Inspector
-    let isInspectorVisible: Bool
-
-    init(
-        isInspectorVisible: Bool,
-        @ViewBuilder content: () -> Content,
-        @ViewBuilder inspector: () -> Inspector
-    ) {
-        self.isInspectorVisible = isInspectorVisible
-        self.content = content()
-        self.inspector = inspector()
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            if isInspectorVisible {
-                Divider()
-                ModuleInlineInspectorPanel {
-                    inspector
-                }
-                .frame(width: InspectorColumnLayoutPolicy.idealWidth)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-        }
-        .animation(MotionTokens.selection, value: isInspectorVisible)
-        .background(Color(nsColor: .underPageBackgroundColor))
-    }
-}
-
-private struct ModuleInlineInspectorPanel<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(.thinMaterial)
     }
 }
 

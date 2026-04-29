@@ -117,7 +117,7 @@ private struct DataStudioGroupRailView: View {
                 }
 
                 if session.orderedGroups.isEmpty {
-                    SubtleStageHint(title: "Import workbook groups", systemImage: "tray.and.arrow.down")
+                    Color.clear
                         .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity)
                 } else {
                     List(selection: focusedWorkbookSelection) {
@@ -162,7 +162,7 @@ private struct DataStudioFigureRailSection: View {
             WorkbenchRailTitle(title: "Figures", trailing: "\(session.figureFamilies.count)")
 
             if session.figureFamilies.isEmpty {
-                SubtleStageHint(title: "Import groups to choose figures", systemImage: "chart.xyaxis.line")
+                Color.clear
                     .frame(maxWidth: .infinity, minHeight: 110)
             } else {
                 ScrollView {
@@ -448,17 +448,11 @@ private struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var stageContent: some View {
         if session.orderedGroups.isEmpty {
-            SubtleStageHint(
-                title: "Import source files to build workbook groups",
-                systemImage: "tray.and.arrow.down"
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if session.includedGroups.isEmpty {
-            SubtleStageHint(
-                title: "Include a workbook group to compare",
-                systemImage: "checklist"
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             PlotRefineView(session: session.plotSession)
         }

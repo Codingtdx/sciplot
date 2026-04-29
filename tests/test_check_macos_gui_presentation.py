@@ -39,6 +39,8 @@ private enum SciPlotGodAppState {
 }
 final class AppWindowManager {
     func openLauncherAfterSceneAttempt() {}
+    func applicationShouldHandleReopen() {}
+    func hasVisibleWindow(id: String) -> Bool { false }
     func configureLauncherWindow(_ window: NSWindow) {
         window.styleMask = [.borderless]
         window.isOpaque = false
@@ -61,6 +63,8 @@ struct WorkbenchWindowRoot {
     var body: some View {
         PlotWorkbenchView(session: model.plotSession)
         DataStudioWorkbenchView(session: model.dataStudioSession)
+        ComposerWorkbenchView(session: model.composerSession)
+        CodeConsoleWorkbenchView(session: model.codeConsoleSession)
             .focusedSceneValue(\\.workbenchCommandContext, workbench)
             .modifier(WorkbenchWindowOpenHandler(model: model))
     }
@@ -109,11 +113,13 @@ struct LauncherView {
             Button("Data Studio") { model.beginLauncherPrimaryAction(for: .dataStudio) }
             Button("Composer") { model.beginLauncherPrimaryAction(for: .composer) }
             Button("Code Console") { model.beginLauncherPrimaryAction(for: .codeConsole) }
+            LauncherCloseButton { dismiss() }
         }
-        .frame(width: 660, height: 360)
+        .frame(width: 760, height: 460)
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
+struct LauncherCloseButton {}
 """,
         "app/macos/Sources/App/AppCommands.swift": """
 struct AppCommands {
@@ -272,11 +278,29 @@ enum InspectorColumnLayoutPolicy {
             "InspectorSection(title: \"Actions\") {}\n"
             "InspectorSection(title: \"Preview\") { ComposerInspectorPreviewContent() }\n"
         ),
-        "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift": "ComposerCanvasView()\n",
+        "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift": (
+            "ComposerProWorkspace\n"
+            "ComposerAssetBrowserView(session: session)\n"
+            "ComposerCanvasView(session: session)\n"
+            "ComposerInspectorView(session: session)\n"
+            ".glassEffect(.regular.interactive())\n"
+            ".preferredColorScheme(.dark)\n"
+        ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (
+            "CodeConsoleProWorkspace\n"
             "CodeConsoleSourceRailView(session: session)\nCodeConsoleOutputsView()\n"
             "CodeConsoleRunWorkspaceView(session: session)\n"
+            "CodeConsoleContextView(session: session)\n"
             "Picker(\"Sheet\", selection: selectedSheetSelection)\n"
+            ".glassEffect(.regular.interactive())\n"
+            ".preferredColorScheme(.dark)\n"
+            ".padding(.top, 54)\n"
+        ),
+        "app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift": (
+            ".frame(minHeight: 96, idealHeight: 126, maxHeight: 150)\n"
+            ".frame(minHeight: 210, idealHeight: 260, maxHeight: .infinity)\n"
+            "private func promptHeader\n"
+            ".layoutPriority(1)\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift": (
             "SubtleStageHint(title: \"Run\")\n"
@@ -289,6 +313,11 @@ enum InspectorColumnLayoutPolicy {
             "private var advancedSection: some View {}\n"
             "Button(\"Open Source\") {}\n"
             "Button(\"Reveal Source\") {}\n"
+        ),
+        "docs/ui-ux-audit-2026-04-29.md": (
+            "# SciPlot God UI/UX Audit\n"
+            "Pixelmator Pro\nDataGraph\nOrigin\nPrism\nFigma\nKeynote\nVS Code\nJupyter\n"
+            "Reasonable\nNeeds attention\n"
         ),
     }
     if overrides:
