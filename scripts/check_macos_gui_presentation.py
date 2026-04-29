@@ -33,6 +33,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             ".restorationBehavior(.disabled)",
             "@State private var model = SciPlotGodAppState.model",
             "final class AppWindowManager",
+            "AppAppearanceMode",
+            "preferredColorScheme",
             "openLauncherAfterSceneAttempt",
             "applicationShouldHandleReopen",
             "hasVisibleWindow(id:",
@@ -120,6 +122,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "LauncherModuleEntryRow",
             "LauncherCloseButton",
             "@Environment(\\.openWindow)",
+            "@Environment(\\.proWorkspaceTheme)",
             "model.beginLauncherPrimaryAction(for:",
             "Workbench.allCases",
             ".frame(width: 760, height: 460)",
@@ -152,6 +155,9 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Plot tools use native commands without stealing text input",
         path="app/macos/Sources/App/AppCommands.swift",
         required=(
+            'Menu("Appearance")',
+            "ForEach(AppAppearanceMode.allCases)",
+            "appearanceModeRawValue = mode.rawValue",
             'CommandMenu("Plot Tools")',
             "model.plotSession.activatePlotTool(tool)",
             ".keyboardShortcut(shortcutKey, modifiers: [.command, .option])",
@@ -169,6 +175,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "PlotAdjustmentRailMetrics",
             "PlotTypeChooserSheet",
             "PlotTypeCard",
+            "@Environment(\\.proWorkspaceTheme)",
             "session.templateGalleryItems",
             "session.plotTypeItems",
             "isPlotTypeChooserPresented",
@@ -208,6 +215,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             '"Transformed"',
             '"Variables"',
             "case .fit:",
+            ".preferredColorScheme(.dark)",
         ),
     ),
     SourceCheck(
@@ -217,6 +225,14 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "static let minWidth: CGFloat = 320",
             "static let idealWidth: CGFloat = 360",
             "static let maxWidth: CGFloat = 420",
+            "enum ProWorkspaceTheme",
+            "struct ProWorkspaceThemeKey",
+            "var proWorkspaceTheme",
+            "rootBackground",
+            "stageBackground",
+            "panelFill",
+            "rowFill",
+            "selectedRowFill",
         ),
         forbidden=(
             "enum WorkbenchHeaderMetrics",
@@ -459,6 +475,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "DataStudioPreparationInspectorView(session: session)",
             "PlotRefineView(session: session.plotSession)",
             "isInspectorPresented",
+            "@Environment(\\.proWorkspaceTheme)",
             ".glassEffect(",
         ),
         forbidden=(
@@ -470,6 +487,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "DataStudioFigureChoiceSection",
             "HSplitView",
             "WorkbenchTwoPaneWindow",
+            ".preferredColorScheme(.dark)",
         ),
     ),
     SourceCheck(
@@ -501,13 +519,14 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "ComposerAssetBrowserView(session: session)",
             "ComposerCanvasView(session: session)",
             "ComposerInspectorView(session: session)",
+            "@Environment(\\.proWorkspaceTheme)",
             ".glassEffect(",
-            ".preferredColorScheme(.dark)",
         ),
         forbidden=(
             "HSplitView",
             "WorkbenchTwoPaneWindow",
             'SubtleStageHint(title: "Import panels to start a layout"',
+            ".preferredColorScheme(.dark)",
         ),
     ),
     SourceCheck(
@@ -556,8 +575,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "CodeConsoleRunWorkspaceView",
             "CodeConsoleContextView(session: session)",
             'Picker("Sheet", selection: selectedSheetSelection)',
+            "@Environment(\\.proWorkspaceTheme)",
             ".glassEffect(",
-            ".preferredColorScheme(.dark)",
             ".padding(.top, 54)",
         ),
         forbidden=(
@@ -569,6 +588,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "EmptyStateCard(",
             'Button("Open Source")',
             'Button("Reveal")',
+            ".preferredColorScheme(.dark)",
         ),
     ),
     SourceCheck(
@@ -675,7 +695,7 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
 
     try:
         app_scene = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")
-        command_attachment_count = app_scene.count("AppCommands(model: model)")
+        command_attachment_count = app_scene.count("AppCommands(model: model")
         if command_attachment_count != 1:
             issues.append(
                 "app/macos/Sources/App/SciPlotGodApp.swift: "

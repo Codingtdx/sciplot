@@ -11,13 +11,13 @@ struct PlotRefineView: View {
 struct PlotPreviewStage: View {
     @Bindable var session: PlotSession
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         GeometryReader { geometry in
             let previewBucket = PlotPreviewPixelBucket(stageSize: geometry.size, displayScale: displayScale)
             ZStack(alignment: .topTrailing) {
-                Color(nsColor: .underPageBackgroundColor)
-                    .opacity(0.72)
+                theme.stageBackground
 
                 previewSurface
                     .padding(34)

@@ -67,6 +67,7 @@ private struct AppWindowSharedChrome<Content: View>: View {
     @Bindable var model: AppModel
     let bootstrapOnAppear: Bool
     let content: Content
+    @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
 
     init(
         model: AppModel,
@@ -80,6 +81,7 @@ private struct AppWindowSharedChrome<Content: View>: View {
 
     var body: some View {
         content
+            .proWorkspaceAppearance(appearanceMode: appearanceMode)
             .task {
                 if bootstrapOnAppear {
                     await model.bootstrapIfNeeded()
@@ -107,6 +109,10 @@ private struct AppWindowSharedChrome<Content: View>: View {
             } message: {
                 Text("Opening a new Plot input will replace the current imported dataset and template state.")
             }
+    }
+
+    private var appearanceMode: AppAppearanceMode {
+        AppAppearanceMode.storedValue(from: appearanceModeRawValue)
     }
 }
 

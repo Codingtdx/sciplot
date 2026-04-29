@@ -1,6 +1,57 @@
 import AppKit
 import SwiftUI
 
+enum AppAppearanceMode: String, CaseIterable, Identifiable, Sendable {
+    case system
+    case light
+    case dark
+
+    static let storageKey = "appAppearanceMode"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return "Follow System"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .system:
+            return "circle.lefthalf.filled"
+        case .light:
+            return "sun.max"
+        case .dark:
+            return "moon"
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+
+    func effectiveColorScheme(system: ColorScheme) -> ColorScheme {
+        preferredColorScheme ?? system
+    }
+
+    static func storedValue(from rawValue: String) -> AppAppearanceMode {
+        AppAppearanceMode(rawValue: rawValue) ?? .system
+    }
+}
+
 enum InspectorColumnLayoutPolicy {
     static let minWidth: CGFloat = 320
     static let idealWidth: CGFloat = 360
@@ -14,6 +65,109 @@ enum ProWorkspaceMetrics {
     static let leftRailMinWidth: CGFloat = 280
     static let leftRailIdealWidth: CGFloat = 320
     static let leftRailMaxWidth: CGFloat = 360
+}
+
+enum ProWorkspaceTheme: Equatable, Sendable {
+    case light
+    case dark
+
+    init(colorScheme: ColorScheme) {
+        self = colorScheme == .dark ? .dark : .light
+    }
+
+    var rootBackground: Color {
+        switch self {
+        case .light:
+            return Color(red: 0.88, green: 0.90, blue: 0.92)
+        case .dark:
+            return Color(red: 0.075, green: 0.078, blue: 0.085)
+        }
+    }
+
+    var stageBackground: Color {
+        switch self {
+        case .light:
+            return Color(red: 0.78, green: 0.81, blue: 0.84)
+        case .dark:
+            return Color(red: 0.045, green: 0.048, blue: 0.054)
+        }
+    }
+
+    var panelFill: Color {
+        switch self {
+        case .light:
+            return Color.white.opacity(0.26)
+        case .dark:
+            return Color.white.opacity(0.045)
+        }
+    }
+
+    var rowFill: Color {
+        switch self {
+        case .light:
+            return Color.white.opacity(0.34)
+        case .dark:
+            return Color.white.opacity(0.065)
+        }
+    }
+
+    var selectedRowFill: Color {
+        switch self {
+        case .light:
+            return Color.accentColor.opacity(0.18)
+        case .dark:
+            return Color.accentColor.opacity(0.16)
+        }
+    }
+
+    var previewSurround: Color {
+        switch self {
+        case .light:
+            return Color(red: 0.80, green: 0.83, blue: 0.86)
+        case .dark:
+            return Color(red: 0.040, green: 0.043, blue: 0.050)
+        }
+    }
+
+    var hairline: Color {
+        switch self {
+        case .light:
+            return Color.black.opacity(0.10)
+        case .dark:
+            return Color.white.opacity(0.10)
+        }
+    }
+}
+
+struct ProWorkspaceThemeKey: EnvironmentKey {
+    static let defaultValue = ProWorkspaceTheme(colorScheme: .dark)
+}
+
+extension EnvironmentValues {
+    var proWorkspaceTheme: ProWorkspaceTheme {
+        get { self[ProWorkspaceThemeKey.self] }
+        set { self[ProWorkspaceThemeKey.self] = newValue }
+    }
+}
+
+private struct ProWorkspaceAppearanceModifier: ViewModifier {
+    let appearanceMode: AppAppearanceMode
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .preferredColorScheme(appearanceMode.preferredColorScheme)
+            .environment(
+                \.proWorkspaceTheme,
+                ProWorkspaceTheme(colorScheme: appearanceMode.effectiveColorScheme(system: systemColorScheme))
+            )
+    }
+}
+
+extension View {
+    func proWorkspaceAppearance(appearanceMode: AppAppearanceMode) -> some View {
+        modifier(ProWorkspaceAppearanceModifier(appearanceMode: appearanceMode))
+    }
 }
 
 @MainActor

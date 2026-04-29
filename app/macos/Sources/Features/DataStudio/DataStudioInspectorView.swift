@@ -16,6 +16,7 @@ struct DataStudioInspectorView: View {
 
 struct DataStudioPreparationInspectorView: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ScrollView {
@@ -28,7 +29,7 @@ struct DataStudioPreparationInspectorView: View {
             .padding(.vertical, 14)
         }
         .inspectorSurface()
-        .background(.regularMaterial)
+        .background(theme.panelFill)
         .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
         .glassEffect(
             .regular.interactive(),

@@ -4,6 +4,7 @@ struct PlotWorkbenchView: View {
     @Bindable var session: PlotSession
     var isInspectorPresented = true
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         PlotPixelmatorWorkspace(
@@ -11,8 +12,7 @@ struct PlotWorkbenchView: View {
             isInspectorPresented: isInspectorPresented
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
-        .preferredColorScheme(.dark)
+        .background(theme.rootBackground)
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -92,6 +92,7 @@ private struct PlotPixelmatorWorkspace: View {
 private struct PlotSourceTypePanel: View {
     @Bindable var session: PlotSession
     @State private var isPlotTypeChooserPresented = false
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(spacing: 12) {
@@ -147,6 +148,7 @@ private struct PlotSourceTypePanel: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(theme.panelFill)
         .glassEffect(
             .regular.interactive(),
             in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
@@ -176,7 +178,7 @@ private struct PlotSourceTypePanel: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
+        .background(theme.rowFill, in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
     }
 
     private var sheetBinding: Binding<SheetValue> {
@@ -200,6 +202,7 @@ private struct PlotTypeCard: View {
     let item: PlotTemplateGalleryItem
     let isSelected: Bool
     let action: () -> Void
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         Button(action: action) {
@@ -219,7 +222,7 @@ private struct PlotTypeCard: View {
         .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
         .background {
             RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.05))
+                .fill(isSelected ? theme.selectedRowFill : theme.rowFill)
         }
     }
 }
@@ -289,13 +292,14 @@ private struct PlotTypeChooserSheet: View {
 
 private struct PlotAdjustmentInspector: View {
     @Bindable var session: PlotSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         PlotInspectorView(
             session: session,
             adjustmentCategory: session.selectedPlotAdjustmentCategory
         )
-            .background(.regularMaterial)
+            .background(theme.panelFill)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .glassEffect(
                 .regular.interactive(),
@@ -306,6 +310,7 @@ private struct PlotAdjustmentInspector: View {
 
 private struct PlotAdjustmentRail: View {
     @Bindable var session: PlotSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(spacing: PlotAdjustmentRailMetrics.itemSpacing) {
@@ -316,6 +321,7 @@ private struct PlotAdjustmentRail: View {
         }
         .frame(width: PlotAdjustmentRailMetrics.railWidth)
         .padding(.vertical, PlotAdjustmentRailMetrics.verticalPadding)
+        .background(theme.panelFill)
         .glassEffect(
             .regular.interactive(),
             in: RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.outerCornerRadius, style: .continuous)
@@ -337,7 +343,7 @@ private struct PlotAdjustmentRail: View {
         .background {
             if session.selectedPlotAdjustmentCategory == item.category {
                 RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.itemCornerRadius, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.16))
+                    .fill(theme.selectedRowFill)
             }
         }
         .disabled(!availability.isEnabled)

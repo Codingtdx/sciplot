@@ -4,11 +4,13 @@ struct LauncherView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.proWorkspaceTheme) private var theme
     @State private var focusedWorkbench: Workbench = .plot
 
     var body: some View {
         GlassEffectContainer(spacing: 0) {
             LauncherWelcomeSurface(
+                theme: theme,
                 focusedWorkbench: $focusedWorkbench,
                 close: closeLauncher,
                 open: { workbench, performPrimaryAction in
@@ -43,6 +45,7 @@ struct LauncherView: View {
 }
 
 private struct LauncherWelcomeSurface: View {
+    let theme: ProWorkspaceTheme
     @Binding var focusedWorkbench: Workbench
     let close: () -> Void
     let open: (Workbench, Bool) -> Void
@@ -56,6 +59,7 @@ private struct LauncherWelcomeSurface: View {
                     LauncherModuleEntryRow(
                         workbench: workbench,
                         isSelected: focusedWorkbench == workbench,
+                        theme: theme,
                         select: {
                             focusedWorkbench = workbench
                         },
@@ -98,6 +102,7 @@ private struct LauncherWelcomeSurface: View {
 private struct LauncherModuleEntryRow: View {
     let workbench: Workbench
     let isSelected: Bool
+    let theme: ProWorkspaceTheme
     let select: () -> Void
     let open: () -> Void
     let primaryAction: () -> Void
@@ -134,7 +139,7 @@ private struct LauncherModuleEntryRow: View {
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.primary.opacity(0.08))
+                    .fill(theme.selectedRowFill)
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -206,6 +211,7 @@ private struct LauncherModuleEntryRow: View {
 
 private struct LauncherCloseButton: View {
     let action: () -> Void
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         Button(action: action) {
@@ -216,7 +222,7 @@ private struct LauncherCloseButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .background(.primary.opacity(0.08), in: Circle())
+        .background(theme.rowFill, in: Circle())
         .help("Close Launcher")
     }
 }

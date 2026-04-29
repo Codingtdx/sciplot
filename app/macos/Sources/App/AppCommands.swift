@@ -13,6 +13,7 @@ extension FocusedValues {
 
 struct AppCommands: Commands {
     let model: AppModel
+    @Binding var appearanceModeRawValue: String
     @Environment(\.openWindow) private var openWindow
     @FocusedValue(\.workbenchCommandContext) private var focusedWorkbench
 
@@ -31,6 +32,18 @@ struct AppCommands: Commands {
         CommandMenu("Plot Tools") {
             ForEach(PlotTool.allCases) { tool in
                 plotToolButton(tool)
+            }
+        }
+
+        CommandGroup(after: .toolbar) {
+            Menu("Appearance") {
+                ForEach(AppAppearanceMode.allCases) { mode in
+                    Button {
+                        appearanceModeRawValue = mode.rawValue
+                    } label: {
+                        Label(mode.title, systemImage: appearanceMode == mode ? "checkmark" : mode.systemImage)
+                    }
+                }
             }
         }
 
@@ -93,6 +106,10 @@ struct AppCommands: Commands {
 
     private var commandWorkbench: Workbench {
         focusedWorkbench ?? model.selectedWorkbench
+    }
+
+    private var appearanceMode: AppAppearanceMode {
+        AppAppearanceMode.storedValue(from: appearanceModeRawValue)
     }
 
     @ViewBuilder

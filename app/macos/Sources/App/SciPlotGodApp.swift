@@ -5,11 +5,13 @@ import SwiftUI
 struct SciPlotGodApp: App {
     @NSApplicationDelegateAdaptor(AppActivationDelegate.self) private var appDelegate
     @State private var model = SciPlotGodAppState.model
+    @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
 
     var body: some Scene {
         WindowGroup("SciPlot God", id: "launcher") {
             LauncherWindowRoot(model: model)
                 .frame(width: 760, height: 460)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
         .defaultSize(width: 760, height: 460)
         .windowResizability(.contentSize)
@@ -17,12 +19,13 @@ struct SciPlotGodApp: App {
         .defaultLaunchBehavior(.presented)
         .restorationBehavior(.disabled)
         .commands {
-            AppCommands(model: model)
+            AppCommands(model: model, appearanceModeRawValue: appearanceModeRawValueBinding)
         }
 
         Window("Plot", id: Workbench.plot.windowSceneID) {
             WorkbenchWindowRoot(workbench: .plot, model: model)
                 .frame(minWidth: 1280, minHeight: 760)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
         .defaultSize(width: 1520, height: 900)
         .windowResizability(.contentMinSize)
@@ -31,6 +34,7 @@ struct SciPlotGodApp: App {
         Window("Data Studio", id: Workbench.dataStudio.windowSceneID) {
             WorkbenchWindowRoot(workbench: .dataStudio, model: model)
                 .frame(minWidth: 1180, minHeight: 740)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
         .defaultSize(width: 1360, height: 840)
         .windowResizability(.contentMinSize)
@@ -39,6 +43,7 @@ struct SciPlotGodApp: App {
         Window("Composer", id: Workbench.composer.windowSceneID) {
             WorkbenchWindowRoot(workbench: .composer, model: model)
                 .frame(minWidth: 1180, minHeight: 740)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
         .defaultSize(width: 1360, height: 840)
         .windowResizability(.contentMinSize)
@@ -47,10 +52,22 @@ struct SciPlotGodApp: App {
         Window("Code Console", id: Workbench.codeConsole.windowSceneID) {
             WorkbenchWindowRoot(workbench: .codeConsole, model: model)
                 .frame(minWidth: 1180, minHeight: 740)
+                .preferredColorScheme(appearanceMode.preferredColorScheme)
         }
         .defaultSize(width: 1360, height: 840)
         .windowResizability(.contentMinSize)
         .restorationBehavior(.disabled)
+    }
+
+    private var appearanceMode: AppAppearanceMode {
+        AppAppearanceMode.storedValue(from: appearanceModeRawValue)
+    }
+
+    private var appearanceModeRawValueBinding: Binding<String> {
+        Binding(
+            get: { appearanceModeRawValue },
+            set: { appearanceModeRawValue = AppAppearanceMode.storedValue(from: $0).rawValue }
+        )
     }
 }
 

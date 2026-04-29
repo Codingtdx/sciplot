@@ -5,6 +5,7 @@ struct DataStudioWorkbenchView: View {
     @Bindable var session: DataStudioSession
     var isInspectorPresented = true
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -29,8 +30,7 @@ struct DataStudioWorkbenchView: View {
         }
         .animation(MotionTokens.selection, value: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
-        .preferredColorScheme(.dark)
+        .background(theme.rootBackground)
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -100,6 +100,7 @@ struct DataStudioWorkbenchView: View {
 
 private struct DataStudioGroupRailView: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         let autoKeepAvailability = session.autoKeepAllAvailability
@@ -140,6 +141,7 @@ private struct DataStudioGroupRailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(theme.panelFill)
         .glassEffect(
             .regular.interactive(),
             in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
@@ -156,6 +158,7 @@ private struct DataStudioGroupRailView: View {
 
 private struct DataStudioFigureRailSection: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -184,7 +187,7 @@ private struct DataStudioFigureRailSection: View {
         }
         .padding(12)
         .background(
-            Color.white.opacity(0.06),
+            theme.rowFill,
             in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         )
     }
@@ -236,6 +239,7 @@ private struct DataStudioFigureRailRow: View {
     let selectedTemplateID: String?
     let selectFamily: () -> Void
     let selectTemplate: (String) -> Void
+    @Environment(\.proWorkspaceTheme) private var theme
 
     private var isSelected: Bool {
         family.id == selectedFamilyID
@@ -266,7 +270,7 @@ private struct DataStudioFigureRailRow: View {
             }
             .buttonStyle(.plain)
             .background(
-                isSelected ? Color.accentColor.opacity(0.16) : Color.clear,
+                isSelected ? theme.selectedRowFill : Color.clear,
                 in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous)
             )
 
@@ -404,6 +408,7 @@ private struct DataStudioGroupRowView: View {
 
 private struct DataStudioPreviewWorkspaceView: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -419,8 +424,7 @@ private struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var previewStage: some View {
         ZStack(alignment: .top) {
-            Color(nsColor: .underPageBackgroundColor)
-                .opacity(0.72)
+            theme.stageBackground
 
             stageContent
 

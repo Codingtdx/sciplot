@@ -5,12 +5,12 @@ struct ComposerWorkbenchView: View {
     let session: ComposerSession
     var isInspectorPresented = true
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ComposerProWorkspace(session: session, isInspectorPresented: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
-        .preferredColorScheme(.dark)
+        .background(theme.rootBackground)
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -71,6 +71,7 @@ struct ComposerWorkbenchView: View {
 private struct ComposerProWorkspace: View {
     let session: ComposerSession
     let isInspectorPresented: Bool
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -78,6 +79,7 @@ private struct ComposerProWorkspace: View {
                 .padding(12)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
+                .background(theme.panelFill)
                 .glassEffect(
                     .regular.interactive(),
                     in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
@@ -93,7 +95,7 @@ private struct ComposerProWorkspace: View {
                 ComposerInspectorView(session: session)
                     .frame(width: 340)
                     .frame(maxHeight: .infinity)
-                    .background(.regularMaterial)
+                    .background(theme.panelFill)
                     .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
                     .glassEffect(
                         .regular.interactive(),
@@ -111,11 +113,11 @@ private struct ComposerProWorkspace: View {
 
 private struct ComposerCanvasStageView: View {
     let session: ComposerSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color(nsColor: .underPageBackgroundColor)
-                .opacity(0.72)
+            theme.stageBackground
 
             ComposerCanvasView(session: session)
                 .padding(28)

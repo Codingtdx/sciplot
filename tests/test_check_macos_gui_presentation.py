@@ -12,14 +12,17 @@ import SwiftUI
 @main
 struct SciPlotGodApp: App {
     @State private var model = SciPlotGodAppState.model
+    @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
+    var appearanceMode: AppAppearanceMode { .system }
     var body: some Scene {
         WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 1520, height: 900)
             .windowResizability(.contentMinSize)
             .windowStyle(.plain)
+            .preferredColorScheme(appearanceMode.preferredColorScheme)
             .defaultLaunchBehavior(.presented)
             .restorationBehavior(.disabled)
-            .commands { AppCommands(model: model) }
+            .commands { AppCommands(model: model, appearanceModeRawValue: appearanceModeRawValueBinding) }
         Window("Plot", id: Workbench.plot.windowSceneID) {
             WorkbenchWindowRoot(workbench: .plot, model: model)
         }
@@ -36,6 +39,12 @@ struct SciPlotGodApp: App {
 }
 private enum SciPlotGodAppState {
     static let model = AppModel()
+}
+enum AppAppearanceMode {
+    static let storageKey = "appAppearanceMode"
+    static let system = AppAppearanceMode()
+    var rawValue: String { "system" }
+    var preferredColorScheme: ColorScheme? { nil }
 }
 final class AppWindowManager {
     func openLauncherAfterSceneAttempt() {}
@@ -102,6 +111,7 @@ final class AppModel {
         "app/macos/Sources/App/LauncherView.swift": """
 struct LauncherView {
     @Environment(\\.openWindow) private var openWindow
+    @Environment(\\.proWorkspaceTheme) private var theme
     var body: some View {
         GlassEffectContainer {
             Workbench.allCases
@@ -123,7 +133,15 @@ struct LauncherCloseButton {}
 """,
         "app/macos/Sources/App/AppCommands.swift": """
 struct AppCommands {
+    @Binding var appearanceModeRawValue: String
     var body: some Commands {
+        CommandGroup(after: .toolbar) {
+            Menu("Appearance") {
+                ForEach(AppAppearanceMode.allCases) { mode in
+                    Button(mode.title) { appearanceModeRawValue = mode.rawValue }
+                }
+            }
+        }
         CommandMenu("Plot Tools") {
             model.plotSession.activatePlotTool(tool)
                 .keyboardShortcut(shortcutKey, modifiers: [.command, .option])
@@ -235,12 +253,24 @@ Button { isPlotTypeChooserPresented = true } label: {
     PlotTypeChooserSheet(session: session, isPresented: $isPlotTypeChooserPresented)
 }
 ForEach(session.plotTypeItems) { item in item.title }
+@Environment(\\.proWorkspaceTheme) private var theme
 """,
         "app/macos/Sources/Shared/UI/StateViews.swift": """
 enum InspectorColumnLayoutPolicy {
     static let minWidth: CGFloat = 320
     static let idealWidth: CGFloat = 360
     static let maxWidth: CGFloat = 420
+}
+enum ProWorkspaceTheme {
+    var rootBackground: Color { .clear }
+    var stageBackground: Color { .clear }
+    var panelFill: Color { .clear }
+    var rowFill: Color { .clear }
+    var selectedRowFill: Color { .clear }
+}
+struct ProWorkspaceThemeKey {}
+extension EnvironmentValues {
+    var proWorkspaceTheme: ProWorkspaceTheme { get { ProWorkspaceTheme() } set {} }
 }
 """,
         "app/macos/Sources/Features/Plot/PlotDataWorkbookSheet.swift": (
@@ -260,6 +290,7 @@ enum InspectorColumnLayoutPolicy {
             "DataStudioPreparationInspectorView(session: session)\n"
             "PlotRefineView(session: session.plotSession)\n"
             ".glassEffect(.regular.interactive())\n"
+            "@Environment(\\.proWorkspaceTheme) private var theme\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": (
             "enum ComposerLibraryFilter {}\n"
@@ -284,7 +315,7 @@ enum InspectorColumnLayoutPolicy {
             "ComposerCanvasView(session: session)\n"
             "ComposerInspectorView(session: session)\n"
             ".glassEffect(.regular.interactive())\n"
-            ".preferredColorScheme(.dark)\n"
+            "@Environment(\\.proWorkspaceTheme) private var theme\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (
             "CodeConsoleProWorkspace\n"
@@ -293,8 +324,8 @@ enum InspectorColumnLayoutPolicy {
             "CodeConsoleContextView(session: session)\n"
             "Picker(\"Sheet\", selection: selectedSheetSelection)\n"
             ".glassEffect(.regular.interactive())\n"
-            ".preferredColorScheme(.dark)\n"
             ".padding(.top, 54)\n"
+            "@Environment(\\.proWorkspaceTheme) private var theme\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleEditorView.swift": (
             ".frame(minHeight: 96, idealHeight: 126, maxHeight: 150)\n"
@@ -367,11 +398,11 @@ struct SciPlotGodApp: App {
             .windowResizability(.contentMinSize)
             .defaultLaunchBehavior(.presented)
             .restorationBehavior(.disabled)
-            .commands { AppCommands(model: model) }
+            .commands { AppCommands(model: model, appearanceModeRawValue: appearanceModeRawValueBinding) }
         Window("Plot", id: Workbench.plot.windowSceneID) {
             WorkbenchWindowRoot(workbench: .plot, model: model)
         }
-            .commands { AppCommands(model: model) }
+            .commands { AppCommands(model: model, appearanceModeRawValue: appearanceModeRawValueBinding) }
         Window("Data Studio", id: Workbench.dataStudio.windowSceneID) {
             WorkbenchWindowRoot(workbench: .dataStudio, model: model)
         }

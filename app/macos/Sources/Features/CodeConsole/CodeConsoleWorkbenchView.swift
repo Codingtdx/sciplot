@@ -3,12 +3,12 @@ import SwiftUI
 struct CodeConsoleWorkbenchView: View {
     @Bindable var session: CodeConsoleSession
     var isInspectorPresented = true
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         CodeConsoleProWorkspace(session: session, isInspectorPresented: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
-        .preferredColorScheme(.dark)
+        .background(theme.rootBackground)
         .fileImporter(
             isPresented: bindingForImporter,
             allowedContentTypes: FileTypeCatalog.plotInputs,
@@ -36,6 +36,7 @@ struct CodeConsoleWorkbenchView: View {
 private struct CodeConsoleProWorkspace: View {
     @Bindable var session: CodeConsoleSession
     let isInspectorPresented: Bool
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -43,6 +44,7 @@ private struct CodeConsoleProWorkspace: View {
                 .padding(12)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
+                .background(theme.panelFill)
                 .glassEffect(
                     .regular.interactive(),
                     in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
@@ -58,7 +60,7 @@ private struct CodeConsoleProWorkspace: View {
                 CodeConsoleContextView(session: session)
                     .frame(width: 340)
                     .frame(maxHeight: .infinity)
-                    .background(.regularMaterial)
+                    .background(theme.panelFill)
                     .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
                     .glassEffect(
                         .regular.interactive(),
@@ -76,11 +78,11 @@ private struct CodeConsoleProWorkspace: View {
 
 private struct CodeConsoleRunStageView: View {
     @Bindable var session: CodeConsoleSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color(nsColor: .underPageBackgroundColor)
-                .opacity(0.72)
+            theme.stageBackground
 
             CodeConsoleRunWorkspaceView(session: session)
                 .padding(.horizontal, 18)

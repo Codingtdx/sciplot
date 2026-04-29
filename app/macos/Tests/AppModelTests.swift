@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import XCTest
 @testable import SciPlotGodMac
 
@@ -31,6 +32,18 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(Workbench.dataStudio.windowSceneID, "data-studio")
         XCTAssertEqual(Workbench.composer.windowSceneID, "composer")
         XCTAssertEqual(Workbench.codeConsole.windowSceneID, "code-console")
+    }
+
+    func testAppearanceModeStorageAndPreferredColorSchemeMapping() {
+        XCTAssertEqual(AppAppearanceMode.storageKey, "appAppearanceMode")
+        XCTAssertEqual(AppAppearanceMode.allCases.map(\.rawValue), ["system", "light", "dark"])
+        XCTAssertNil(AppAppearanceMode.system.preferredColorScheme)
+        XCTAssertEqual(AppAppearanceMode.light.preferredColorScheme, .light)
+        XCTAssertEqual(AppAppearanceMode.dark.preferredColorScheme, .dark)
+        XCTAssertEqual(AppAppearanceMode.system.effectiveColorScheme(system: .dark), .dark)
+        XCTAssertEqual(AppAppearanceMode.light.effectiveColorScheme(system: .dark), .light)
+        XCTAssertEqual(AppAppearanceMode.dark.effectiveColorScheme(system: .light), .dark)
+        XCTAssertEqual(AppAppearanceMode.storedValue(from: "unexpected"), .system)
     }
 
     func testExplicitWorkbenchActionsDoNotNeedVisibleWorkbenchSwitching() async {
