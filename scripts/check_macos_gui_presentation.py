@@ -422,10 +422,14 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift",
         required=(
             'WorkbenchRailTitle(title: "Workbook Groups"',
-            "DataStudioFigureChoiceSection",
+            "DataStudioFigureRailSection",
+            "DataStudioFigureRailRow",
             "figureFamilyBinding",
         ),
-        forbidden=('EmptyStateCard(title: "No groups")',),
+        forbidden=(
+            'EmptyStateCard(title: "No groups")',
+            "DataStudioFigureChoiceSection",
+        ),
     ),
     SourceCheck(
         label="Data Studio inspector uses shared plain sections",
@@ -436,12 +440,24 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'Section("Actions")',
             'InspectorEmptyState(message: "No figure controls")',
             'Button("Export Bundle")',
+            "figureTemplateBinding",
+            'AdaptiveInspectorControlRow(title: "Template")',
         ),
     ),
     SourceCheck(
-        label="Composer asset rail avoids hero imported-panel empty state",
+        label="Composer asset rail is a real filtered panel library",
         path="app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift",
-        forbidden=('EmptyStateCard(title: "No imported panels")',),
+        required=(
+            "ComposerLibraryFilter",
+            'Picker("Library Filter"',
+            "filteredPanels",
+            "ComposerLibraryRow",
+        ),
+        forbidden=(
+            'EmptyStateCard(title: "No imported panels")',
+            'Button("Import")',
+            'Button("Export")',
+        ),
     ),
     SourceCheck(
         label="Composer canvas has one primary board boundary",
@@ -454,13 +470,24 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="Composer inspector preview avoids nested shell",
         path="app/macos/Sources/Features/Composer/ComposerInspectorView.swift",
-        required=("ComposerInspectorPreviewContent",),
+        required=(
+            "ComposerInspectorPreviewContent",
+            'InspectorSection(title: "Selection")',
+            'InspectorSection(title: "Placement")',
+            'InspectorSection(title: "Panel")',
+            'InspectorSection(title: "Actions")',
+            'InspectorSection(title: "Preview")',
+        ),
         forbidden=('Section("Preview")', 'Button("Export")'),
     ),
     SourceCheck(
         label="Code Console root avoids hero card empty state",
         path="app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift",
-        required=("CodeConsoleSourceRailView",),
+        required=(
+            "CodeConsoleSourceRailView",
+            "CodeConsoleRunWorkspaceView",
+            'Picker("Sheet", selection: selectedSheetSelection)',
+        ),
         forbidden=(
             "EmptyStateCard(",
             'Button("Open Source")',

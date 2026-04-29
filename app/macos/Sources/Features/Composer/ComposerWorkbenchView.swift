@@ -6,14 +6,20 @@ struct ComposerWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
                 ComposerAssetBrowserView(session: session)
-                    .frame(minWidth: 250, idealWidth: 280, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(
+                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
+                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
+                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
                     .padding(.leading, 16)
                     .padding(.vertical, 12)
 

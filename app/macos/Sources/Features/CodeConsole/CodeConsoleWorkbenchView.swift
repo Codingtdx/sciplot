@@ -4,18 +4,24 @@ struct CodeConsoleWorkbenchView: View {
     @Bindable var session: CodeConsoleSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
                 CodeConsoleSourceRailView(session: session)
-                    .frame(minWidth: 250, idealWidth: 280, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(
+                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
+                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
+                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
                     .padding(.leading, 16)
                     .padding(.vertical, 12)
 
-                codeConsoleContent
+                CodeConsoleRunWorkspaceView(session: session)
                     .padding(.trailing, 16)
                     .padding(.vertical, 12)
             }
@@ -37,24 +43,6 @@ struct CodeConsoleWorkbenchView: View {
         }
     }
 
-    @ViewBuilder
-    private var codeConsoleContent: some View {
-        if session.availableBindings.isEmpty {
-            SubtleStageHint(
-                title: "Import a file or bind a Plot or Data Studio dataset",
-                systemImage: "tray.and.arrow.down",
-                alignment: .center
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            VStack(alignment: .leading, spacing: 18) {
-                CodeConsoleOutputsView(session: session)
-                CodeConsoleEditorView(session: session)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-    }
-
     private var bindingForImporter: Binding<Bool> {
         Binding(
             get: { session.isImporterPresented },
@@ -63,11 +51,35 @@ struct CodeConsoleWorkbenchView: View {
     }
 }
 
+struct CodeConsoleRunWorkspaceView: View {
+    @Bindable var session: CodeConsoleSession
+
+    var body: some View {
+        if session.availableBindings.isEmpty {
+            SubtleStageHint(
+                title: "Import a file or bind a Plot or Data Studio dataset",
+                systemImage: "tray.and.arrow.down",
+                alignment: .center
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VSplitView {
+                CodeConsoleEditorView(session: session)
+                    .frame(minHeight: 480, idealHeight: 560, maxHeight: .infinity)
+
+                CodeConsoleOutputsView(session: session)
+                    .frame(minHeight: 260, idealHeight: 340, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
 private struct CodeConsoleSourceRailView: View {
     @Bindable var session: CodeConsoleSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             WorkbenchRailTitle(title: "Bound Context", trailing: "\(session.availableBindings.count)")
 
             List(selection: selectedBindingSelection) {
@@ -78,6 +90,22 @@ private struct CodeConsoleSourceRailView: View {
             }
             .listStyle(.inset(alternatesRowBackgrounds: false))
             .scrollContentBackground(.hidden)
+
+            Divider()
+
+            Picker("Sheet", selection: selectedSheetSelection) {
+                ForEach(session.availableSheets, id: \.self) { sheet in
+                    Text(sheet.displayName).tag(sheet)
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .disabled(session.availableBindings.isEmpty || session.availableSheets.count < 2)
+            .help(
+                session.availableBindings.isEmpty
+                    ? "Bind a dataset before choosing a sheet."
+                    : "Choose the sheet used to refresh the Code Console context."
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -90,6 +118,13 @@ private struct CodeConsoleSourceRailView: View {
                     session.setSelectedBinding(id: newValue)
                 }
             }
+        )
+    }
+
+    private var selectedSheetSelection: Binding<SheetValue> {
+        Binding(
+            get: { session.selectedSheet },
+            set: { session.setSelectedSheet($0) }
         )
     }
 }

@@ -225,19 +225,32 @@ enum InspectorColumnLayoutPolicy {
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
             "WorkbenchRailTitle(title: \"Workbook Groups\")\n"
-            "DataStudioFigureChoiceSection(session: session)\n"
+            "DataStudioFigureRailSection(session: session)\n"
+            "DataStudioFigureRailRow\n"
             "let figureFamilyBinding = Binding<String?>.constant(nil)\n"
         ),
-        "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": "SubtleStageHint(title: \"Import\")\n",
+        "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": (
+            "enum ComposerLibraryFilter {}\n"
+            "Picker(\"Library Filter\", selection: .constant(ComposerLibraryFilter.all)) {}\n"
+            "let filteredPanels = []\n"
+            "ComposerLibraryRow(panel: panel)\n"
+            "SubtleStageHint(title: \"Library\")\n"
+        ),
         "app/macos/Sources/Features/Composer/ComposerCanvasView.swift": (
             "RoundedRectangle(cornerRadius: 22)\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerInspectorView.swift": (
+            "InspectorSection(title: \"Selection\") {}\n"
+            "InspectorSection(title: \"Placement\") {}\n"
+            "InspectorSection(title: \"Panel\") {}\n"
+            "InspectorSection(title: \"Actions\") {}\n"
             "InspectorSection(title: \"Preview\") { ComposerInspectorPreviewContent() }\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift": "ComposerCanvasView()\n",
         "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift": (
             "CodeConsoleSourceRailView(session: session)\nCodeConsoleOutputsView()\n"
+            "CodeConsoleRunWorkspaceView(session: session)\n"
+            "Picker(\"Sheet\", selection: selectedSheetSelection)\n"
         ),
         "app/macos/Sources/Features/CodeConsole/CodeConsoleOutputsView.swift": (
             "SubtleStageHint(title: \"Run\")\n"

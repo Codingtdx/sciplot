@@ -2,19 +2,34 @@ import SwiftUI
 
 struct ComposerAssetBrowserView: View {
     @Bindable var session: ComposerSession
+    @State private var libraryFilter: ComposerLibraryFilter = .all
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            WorkbenchRailTitle(title: "Library", trailing: "\(session.orderedPanels.count)")
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
+            WorkbenchRailTitle(title: "Library", trailing: "\(filteredPanels.count)/\(session.orderedPanels.count)")
+
+            Picker("Library Filter", selection: $libraryFilter) {
+                ForEach(ComposerLibraryFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .disabled(session.orderedPanels.isEmpty)
 
             if session.orderedPanels.isEmpty {
                 SubtleStageHint(
                     title: "Import panels to start a layout",
                     systemImage: "tray.and.arrow.down"
                 )
+            } else if filteredPanels.isEmpty {
+                SubtleStageHint(
+                    title: "No panels match this filter",
+                    systemImage: "line.3.horizontal.decrease.circle"
+                )
             } else {
                 List(selection: panelSelectionBinding) {
-                    ForEach(session.orderedPanels) { panel in
+                    ForEach(filteredPanels) { panel in
                         ComposerLibraryRow(
                             panel: panel,
                             resolvedLabel: session.resolvedLabel(for: panel)
@@ -59,6 +74,10 @@ struct ComposerAssetBrowserView: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var filteredPanels: [ComposerPanelPayload] {
+        libraryFilter.filteredPanels(session.orderedPanels)
     }
 
     private var panelSelectionBinding: Binding<Set<String>> {
@@ -134,6 +153,10 @@ private struct ComposerLibraryRow: View {
                     Image(systemName: kindSymbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Text(panel.hidden ? "Library" : "Placed")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(panel.hidden ? Color.secondary : Color.green)
 
                     if panel.locked {
                         Image(systemName: "lock.fill")

@@ -38,6 +38,36 @@ enum ComposerPanelSourceSurface: String, Codable, Sendable {
     case canvas
 }
 
+enum ComposerLibraryFilter: String, CaseIterable, Identifiable {
+    case all
+    case graphs
+    case assets
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return "All"
+        case .graphs:
+            return "Graphs"
+        case .assets:
+            return "Assets"
+        }
+    }
+
+    func filteredPanels(_ panels: [ComposerPanelPayload]) -> [ComposerPanelPayload] {
+        switch self {
+        case .all:
+            return panels
+        case .graphs:
+            return panels.filter { $0.kind == "graph" }
+        case .assets:
+            return panels.filter { $0.kind != "graph" }
+        }
+    }
+}
+
 enum ComposerPlacementTarget: Hashable, Sendable {
     case cell(ComposerGridCell)
     case freeRegion(String)

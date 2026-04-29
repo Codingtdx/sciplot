@@ -34,6 +34,48 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-29: Data Studio / Composer / Code Console deep Pro workspace unification
+
+- Change:
+  - Deepened the non-Plot module workspaces without changing sidecar APIs, project schema, plot contract, or preview/export payloads.
+  - Promoted shared `ProWorkspaceMetrics` to shared UI so module left rails and panel spacing use the same 12pt spacing, 22pt outer radius, 12pt inner radius, and 280/320/360 rail policy.
+  - Rebuilt Data Studio's left rail into two real selection zones: `Workbook Groups` and `Figures`. Figure family/template choice now lives in `DataStudioFigureRailSection` / `DataStudioFigureRailRow`; the right inspector no longer duplicates the template picker.
+  - Added `ComposerLibraryFilter` with `All / Graphs / Assets` and applied it to the Composer library. Rows now preserve real panel status while filtering without changing selection or placement semantics.
+  - Reorganized Composer inspector into `Selection / Placement / Panel / Actions / Preview`, keeping canvas quick actions intact and keeping import/export out of the left rail.
+  - Added `CodeConsoleRunWorkspaceView` for the center prompt/code/output workspace and added a left-rail sheet picker that calls `setSelectedSheet` and reuses the existing debounced context refresh path.
+  - Strengthened GUI presentation checks and Swift tests for Data Studio figure rail selection, Composer library filtering, and Code Console sheet switching.
+
+- User-visible impact:
+  - Data Studio now reads as: choose workbook group and figure on the left, inspect the figure in the middle, refine/open/analyze on the right.
+  - Composer now has a calmer library with real filtering and a more purposeful inspector for selection, placement, panel state, actions, and preview.
+  - Code Console now treats prompt/code/output as the main workspace, while sheet choice stays near the bound context.
+
+- Decision Record:
+  - First-principles motivation: the three modules already had real domain objects, but the UI still mixed selection, editing, and follow-up actions. The Pro workspace grammar clarifies one question per zone: left chooses the object, center performs the work, right refines or hands off.
+  - Rejected adding Plot-style far-right rails because none of these modules has a real multi-category adjustment strip yet; adding one now would create fake Pixelmator tools.
+  - Rejected keeping Data Studio's inspector template picker because template choice is a selection concern and duplicating it made the right side compete with the left rail.
+  - Current boundary: this round is macOS frontend reclassification only. Backend endpoints, `.sciplotgod` persistence, render semantics, and project schema remain unchanged.
+  - Failure condition: if Data Studio regains a right-inspector template picker, Composer left rail regains Import/Export buttons, or Code Console source open/reveal moves back into the left rail, the workspace taxonomy has regressed.
+
+- Risks and rollback points:
+  - Data Studio figure row construction derives template rows from existing recipe metadata; rollback points are `DataStudioWorkbenchView.swift` and `DataStudioInspectorView.swift`.
+  - Composer library filtering is front-end-only and should not mutate selection or placement; rollback points are `ComposerSessionTypes.swift` and `ComposerAssetBrowserView.swift`.
+  - Code Console sheet switching now has a visible left-rail picker; rollback point is `CodeConsoleWorkbenchView.swift` if context refresh behavior becomes noisy.
+  - Presentation gate rollback lives in `scripts/check_macos_gui_presentation.py` and `tests/test_check_macos_gui_presentation.py`.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 3 tests.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/ComposerSessionTests/testComposerLibraryFilterDoesNotChangeSelectionOrPlacementSemantics -only-testing:SciPlotGodMacTests/CodeConsoleSessionTests/testSheetPickerSelectionRefreshesBoundContextWithLatestSheet -only-testing:SciPlotGodMacTests/DataStudioSessionTests/testSelectingFigureTemplateFromRailRefreshesPreview`: passed, 3 tests.
+  - `git diff --check`: passed.
+  - `.venv/bin/python -m pytest tests`: passed, 277 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 200 tests.
+  - `.venv/bin/python scripts/blocking_gate.py`: passed automated matrix.
+  - Gate details: `clean_repo`, `ruff`, `mypy`, `pytest` 277 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 200 tests all passed.
+  - Manual inner-beta evidence remains pending and unenforced: Plot import/preview/export, Data Studio import/open Plot, and overlay save/reopen were not marked complete without a real evidence bundle.
+  - Known environment warning: Xcode reports CoreSimulator service/version warnings during hosted macOS operations; macOS build and tests still passed.
+
 ### 2026-04-28: Plot micro-polish v4 and Pro workspace alignment
 
 - Change:

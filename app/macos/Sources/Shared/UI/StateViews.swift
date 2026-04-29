@@ -7,6 +7,15 @@ enum InspectorColumnLayoutPolicy {
     static let maxWidth: CGFloat = 420
 }
 
+enum ProWorkspaceMetrics {
+    static let panelSpacing: CGFloat = 12
+    static let outerCornerRadius: CGFloat = 22
+    static let innerCornerRadius: CGFloat = 12
+    static let leftRailMinWidth: CGFloat = 280
+    static let leftRailIdealWidth: CGFloat = 320
+    static let leftRailMaxWidth: CGFloat = 360
+}
+
 @MainActor
 enum MotionTokens {
     static let workbenchSwitch: Animation = .smooth(duration: 0.2)

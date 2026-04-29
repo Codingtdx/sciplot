@@ -193,9 +193,9 @@
   - 页签固定为 `Source Data` 和 `Fit`
   - `Fit` 当前支持共享 Plot fit model surface
   - `Current Figure` 拟合只开放给 `curve / point_line / scatter`
-- Data Studio 模块的左侧只承载 `Workbook Groups` 与真实 figure family/template 选择；中间承载 compare/figure preview 与 focused group 状态；右侧继续承载 figure/action inspector。不要把 import/export 主动作塞回左侧。
-- Composer 模块左侧保留真实 asset library，中间是 canvas，右侧是 selection/edit/preview inspector。Import 只通过 toolbar/menu 的真实 graph/assets import flow 进入，不在左侧重复主按钮。
-- Code Console 模块左侧保留 bound context 选择，中间是 prompt/code/output 工作区，右侧是 context/runner/output handoff inspector。`Open Source` / `Reveal Source` 这类源定位动作属于 inspector `Advanced` 或 toolbar utility，不回到左侧堆按钮。
+- Data Studio 模块的左侧只承载 `Workbook Groups` 与真实 figure family/template 选择；figure family/template 选择必须在左侧完成，右侧 inspector 不得恢复重复 template picker。中间承载 compare/figure preview、preview warning、focused group 状态和唯一 specimen filter 入口；右侧只承载当前 figure 的科学调整、fit、`Open in Plot`、`Analysis`、Reveal/Open exported outputs。不要把 import/export 主动作塞回左侧。
+- Composer 模块左侧保留真实 panel library，并允许 `All / Graphs / Assets` 过滤，row 展示 thumbnail、placed/library、hidden、locked、label 等真实状态；中间是 composition canvas；右侧 inspector 按 `Selection / Placement / Panel / Actions / Preview` 组织 merge/unmerge/place/remove、lock、visibility、auto/manual label 和 preview。Import 只通过 toolbar/menu 的真实 graph/assets import flow 进入，不在左侧重复主按钮。
+- Code Console 模块左侧保留 bound context 选择与 sheet picker；切换 sheet 必须调用 `setSelectedSheet` 并走现有 context refresh debounce/latest-write-wins 链路。中间是 prompt/code/output 工作区，`Run`、`Copy Prompt`、`Refresh`、`Restore Starter` 作为模块内部主命令留在工作区；右侧是 context/runner/output handoff inspector。`Open Source` / `Reveal Source` 这类源定位动作属于 inspector `Advanced` 或 toolbar utility，不回到左侧堆按钮。
 - macOS GUI smoke / fingerprint 基线必须继续覆盖 Launcher、四个独立模块窗口与 Plot workspace：
   - Launcher
   - Plot empty workspace

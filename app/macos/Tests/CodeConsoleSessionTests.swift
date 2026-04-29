@@ -363,6 +363,46 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(session.contextResponse?.sheet, .name("Representative_Curve"))
     }
 
+    func testSheetPickerSelectionRefreshesBoundContextWithLatestSheet() async {
+        let plot = PlotSession()
+        plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        plot.selectedSheet = .name("Source")
+        plot.selectedTemplateID = "curve"
+
+        let client = MockSidecarClient()
+        client.codeConsoleContextHandler = { request in
+            let base = TestPayloads.codeConsoleContext(path: request.inputPath)
+            return CodeConsoleContextResponse(
+                contextID: base.contextID,
+                inputPath: base.inputPath,
+                sheet: request.sheet,
+                sheetNames: ["Source", "Transformed", "Fit"],
+                inspection: base.inspection,
+                dataset: base.dataset,
+                template: base.template,
+                options: base.options,
+                promptText: base.promptText,
+                starterCode: base.starterCode,
+                sourceKind: base.sourceKind,
+                sourceLabel: base.sourceLabel
+            )
+        }
+
+        let session = CodeConsoleSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta())
+        session.refreshContext(plot: plot, dataStudio: DataStudioSession())
+        await session.refreshCurrentContext()
+
+        session.setSelectedSheet(.name("Fit"))
+        try? await Task.sleep(nanoseconds: 220_000_000)
+
+        XCTAssertEqual(session.availableSheets, [.name("Source"), .name("Transformed"), .name("Fit")])
+        XCTAssertEqual(client.codeConsoleContextRequests.last?.sheet, .name("Fit"))
+        XCTAssertEqual(session.contextResponse?.sheet, .name("Fit"))
+        XCTAssertTrue(session.boundContext.contains { $0.id == "sheet" && $0.value == "Fit" })
+    }
+
     func testAsyncLatestTaskCoordinatorExecutesLatestOperationOnly() async {
         let coordinator = AsyncLatestTaskCoordinator()
         var executedRevisions: [Int] = []

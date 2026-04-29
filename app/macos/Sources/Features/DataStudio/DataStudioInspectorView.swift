@@ -43,22 +43,11 @@ struct DataStudioInspectorView: View {
     private var figureSection: some View {
         if !session.figureFamilies.isEmpty {
             InspectorSection(title: "Figure") {
-                if !session.availableFigureTemplates.isEmpty {
-                    AdaptiveInspectorControlRow(title: "Template") {
-                        Picker("", selection: figureTemplateBinding) {
-                            ForEach(session.availableFigureTemplates) { template in
-                                Text(template.label).tag(Optional(template.id))
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                    }
-                }
-
                 AdaptiveInspectorTextRow(
                     title: "Metric",
                     value: session.currentFigureFamily?.title ?? "Representative Curve"
                 )
+                AdaptiveInspectorTextRow(title: "Figure", value: session.currentRecipeLabel)
 
                 if session.currentFigureFitAvailability.isEnabled {
                     AdaptiveInspectorControlRow(title: "Fit") {
@@ -167,17 +156,6 @@ struct DataStudioInspectorView: View {
                 }
             }
         }
-    }
-
-    private var figureTemplateBinding: Binding<String?> {
-        Binding(
-            get: { session.currentFigureTemplateID },
-            set: { newValue in
-                if let newValue {
-                    session.selectFigureTemplate(id: newValue)
-                }
-            }
-        )
     }
 
     private var fitEnabledBinding: Binding<Bool> {

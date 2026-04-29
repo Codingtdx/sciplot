@@ -6,14 +6,20 @@ struct DataStudioWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
             }
 
             HSplitView {
                 DataStudioGroupRailView(session: session)
-                    .frame(minWidth: 280, idealWidth: 320, maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(
+                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
+                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
+                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
                     .padding(.leading, 16)
                     .padding(.vertical, 12)
 
@@ -95,36 +101,40 @@ private struct DataStudioGroupRailView: View {
 
     var body: some View {
         let autoKeepAvailability = session.autoKeepAllAvailability
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                WorkbenchRailTitle(title: "Workbook Groups", trailing: "\(session.orderedGroups.count)")
-                Button("Auto Keep 5 All") {
-                    session.applySuggestedExclusionsToAllWorkbooks()
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    WorkbenchRailTitle(title: "Workbook Groups", trailing: "\(session.orderedGroups.count)")
+                    Button("Auto Keep 5 All") {
+                        session.applySuggestedExclusionsToAllWorkbooks()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!autoKeepAvailability.isEnabled)
+                    .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(!autoKeepAvailability.isEnabled)
-                .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
-            }
 
-            DataStudioFigureChoiceSection(session: session)
+                if session.orderedGroups.isEmpty {
+                    SubtleStageHint(title: "Import workbook groups", systemImage: "tray.and.arrow.down")
+                        .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity)
+                } else {
+                    List(selection: focusedWorkbookSelection) {
+                        ForEach(session.orderedGroups) { group in
+                            DataStudioGroupRowView(session: session, group: group)
+                                .tag(group.id)
+                        }
+                        .onMove(perform: session.moveGroups)
+                    }
+                    .listStyle(.inset)
+                    .scrollContentBackground(.hidden)
+                    .animation(MotionTokens.list, value: session.orderedGroups.map(\.id))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             Divider()
 
-            if session.orderedGroups.isEmpty {
-                Spacer(minLength: 0)
-            } else {
-                List(selection: focusedWorkbookSelection) {
-                    ForEach(session.orderedGroups) { group in
-                        DataStudioGroupRowView(session: session, group: group)
-                            .tag(group.id)
-                    }
-                    .onMove(perform: session.moveGroups)
-                }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
-                .animation(MotionTokens.list, value: session.orderedGroups.map(\.id))
-            }
+            DataStudioFigureRailSection(session: session)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -137,42 +147,39 @@ private struct DataStudioGroupRailView: View {
     }
 }
 
-private struct DataStudioFigureChoiceSection: View {
+private struct DataStudioFigureRailSection: View {
     @Bindable var session: DataStudioSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Figures")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
+        VStack(alignment: .leading, spacing: 10) {
+            WorkbenchRailTitle(title: "Figures", trailing: "\(session.figureFamilies.count)")
 
-            Picker("", selection: figureFamilyBinding) {
-                ForEach(session.figureFamilies) { family in
-                    Text(family.title).tag(Optional(family.id))
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .disabled(session.figureFamilies.isEmpty)
-            .help(session.figureFamilies.isEmpty ? "Import workbook groups before choosing a figure." : "Choose the current figure family.")
-
-            if session.availableFigureTemplates.count > 1 {
-                Picker("", selection: figureTemplateBinding) {
-                    ForEach(session.availableFigureTemplates) { template in
-                        Text(template.label).tag(Optional(template.id))
+            if session.figureFamilies.isEmpty {
+                SubtleStageHint(title: "Import groups to choose figures", systemImage: "chart.xyaxis.line")
+                    .frame(maxWidth: .infinity, minHeight: 110)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(session.figureFamilies) { family in
+                            DataStudioFigureRailRow(
+                                family: family,
+                                templates: templates(for: family),
+                                selectedFamilyID: figureFamilyBinding.wrappedValue,
+                                selectedTemplateID: selectedTemplateID(for: family),
+                                selectFamily: { session.selectFigureFamily(id: family.id) },
+                                selectTemplate: { session.selectFigureTemplate(id: $0) }
+                            )
+                        }
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .help("Choose the figure template.")
+                .frame(maxHeight: 260)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(12)
+        .background(
+            Color(nsColor: .quaternaryLabelColor).opacity(0.1),
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+        )
     }
 
     private var figureFamilyBinding: Binding<String?> {
@@ -186,15 +193,91 @@ private struct DataStudioFigureChoiceSection: View {
         )
     }
 
-    private var figureTemplateBinding: Binding<String?> {
-        Binding(
-            get: { session.currentFigureTemplateID },
-            set: { newValue in
-                if let newValue {
-                    session.selectFigureTemplate(id: newValue)
+    private func templates(for family: DataStudioFigureFamilyItem) -> [DataStudioFigureTemplateItem] {
+        let currentFamilyID = session.currentFigureFamily?.id
+        if currentFamilyID == family.id {
+            return session.availableFigureTemplates
+        }
+
+        var seen: Set<String> = []
+        return family.recipes
+            .filter(\.supported)
+            .compactMap { recipe in
+                guard seen.insert(recipe.templateID).inserted else {
+                    return nil
                 }
+                return DataStudioFigureTemplateItem(
+                    id: recipe.templateID,
+                    label: session.plotSession.templateLabel(for: recipe.templateID),
+                    recipeID: recipe.id
+                )
             }
-        )
+    }
+
+    private func selectedTemplateID(for family: DataStudioFigureFamilyItem) -> String? {
+        guard session.currentFigureFamily?.id == family.id else {
+            return nil
+        }
+        return session.currentFigureTemplateID
+    }
+}
+
+private struct DataStudioFigureRailRow: View {
+    let family: DataStudioFigureFamilyItem
+    let templates: [DataStudioFigureTemplateItem]
+    let selectedFamilyID: String?
+    let selectedTemplateID: String?
+    let selectFamily: () -> Void
+    let selectTemplate: (String) -> Void
+
+    private var isSelected: Bool {
+        family.id == selectedFamilyID
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: selectFamily) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: family.metricID == nil ? "waveform.path.ecg" : "chart.bar.xaxis")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(family.title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Text("\(templates.count) templates")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 6)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .contentShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.16) : Color.clear,
+                in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous)
+            )
+
+            if isSelected && !templates.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(templates) { template in
+                        Button(template.label) {
+                            selectTemplate(template.id)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(selectedTemplateID == template.id)
+                        .help("Use \(template.label) for \(family.title).")
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
     }
 }
 

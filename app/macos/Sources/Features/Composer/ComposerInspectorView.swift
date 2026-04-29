@@ -7,8 +7,9 @@ struct ComposerInspectorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 selectionSection
-                editSection
-                exportActionsSection
+                placementSection
+                panelSection
+                actionsSection
                 previewSection
             }
             .padding(.horizontal, 16)
@@ -55,9 +56,10 @@ struct ComposerInspectorView: View {
     }
 
     @ViewBuilder
-    private var editSection: some View {
-        InspectorSection(title: "Edit") {
+    private var placementSection: some View {
+        InspectorSection(title: "Placement") {
             let presentation = session.editPresentation
+            let hasPlacementTarget = session.selectedCellSelection != nil || session.selectedFreeRegion != nil || session.shouldShowPlacementAction
 
             if let selection = session.selectedCellSelection, selection.cellCount > 1 {
                 AdaptiveInspectorTextRow(title: "Merge", value: "\(selection.colSpan)x\(selection.rowSpan)")
@@ -102,7 +104,7 @@ struct ComposerInspectorView: View {
                 }
             }
 
-            if session.shouldShowPlacementAction {
+            if session.shouldShowPlacementAction && session.selectedFreeRegion == nil {
                 InspectorActionStack {
                     Button(session.placementActionTitle) {
                         session.placeFocusedPanelInSelectedTarget()
@@ -117,6 +119,27 @@ struct ComposerInspectorView: View {
                 }
             }
 
+            if session.selectedCellSelection != nil || session.selectedFreeRegion != nil || session.selectedPanel != nil {
+                InspectorActionStack {
+                    Button("Clear Selection") {
+                        session.clearTransientEditingState()
+                    }
+                    .buttonStyle(.bordered)
+                    .inspectorActionButton()
+                }
+            }
+
+            if !hasPlacementTarget {
+                InspectorEmptyState(message: "No placement target")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var panelSection: some View {
+        InspectorSection(title: "Panel") {
+            let presentation = session.editPresentation
+
             if let panel = session.selectedPanel {
                 AdaptiveInspectorControlRow(title: "Locked") {
                     Toggle(
@@ -124,6 +147,17 @@ struct ComposerInspectorView: View {
                         isOn: Binding(
                             get: { panel.locked },
                             set: { session.updateSelectedPanel(locked: $0) }
+                        )
+                    )
+                    .labelsHidden()
+                }
+
+                AdaptiveInspectorControlRow(title: "Visible") {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { !panel.hidden },
+                            set: { session.updateSelectedPanel(hidden: !$0) }
                         )
                     )
                     .labelsHidden()
@@ -138,7 +172,7 @@ struct ComposerInspectorView: View {
                         .disabled(!presentation.removeSelectedPanelAvailability.isEnabled)
                         .help(
                             presentation.removeSelectedPanelAvailability.reason
-                                ?? "Remove the selected panel from the board while keeping it in the asset rail."
+                                ?? "Remove the selected panel from the board while keeping it in the library."
                         )
                         .inspectorActionButton()
                     }
@@ -172,24 +206,14 @@ struct ComposerInspectorView: View {
                         )
                     }
                 }
-            }
-
-            if session.selectedCellSelection != nil || session.selectedFreeRegion != nil || session.selectedPanel != nil {
-                InspectorActionStack {
-                    Button("Clear Selection") {
-                        session.clearTransientEditingState()
-                    }
-                    .buttonStyle(.bordered)
-                    .inspectorActionButton()
-                }
             } else {
-                InspectorEmptyState(message: "No edit target")
+                InspectorEmptyState(message: "No panel selected")
             }
         }
     }
 
     @ViewBuilder
-    private var exportActionsSection: some View {
+    private var actionsSection: some View {
         InspectorSection(title: "Actions") {
             DisclosureGroup("Advanced") {
                 InspectorActionStack {

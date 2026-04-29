@@ -98,12 +98,6 @@ private struct PlotPixelmatorWorkspace: View {
     }
 }
 
-private enum ProWorkspaceMetrics {
-    static let panelSpacing: CGFloat = 12
-    static let outerCornerRadius: CGFloat = 22
-    static let innerCornerRadius: CGFloat = 12
-}
-
 private struct PlotSourceTypePanel: View {
     @Bindable var session: PlotSession
     @State private var isPlotTypeChooserPresented = false

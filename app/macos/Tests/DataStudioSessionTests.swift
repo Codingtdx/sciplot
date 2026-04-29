@@ -988,6 +988,61 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.availableFigureTemplates.first?.label, "Backend Box Strip")
     }
 
+    func testSelectingFigureTemplateFromRailRefreshesPreview() async {
+        let client = MockSidecarClient()
+        client.inspectHandler = { request in
+            TestPayloads.inspectFile(path: request.inputPath)
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.comparisonSet = DataStudioComparisonSetResponse(
+            id: "template-choice",
+            label: "Template Choice",
+            workbookPaths: ["/tmp/prepared.xlsx"],
+            workbookLabels: ["Prepared"],
+            comparisonWorkbookPath: "/tmp/template-choice.xlsx",
+            recipes: [
+                .init(
+                    id: "strength_box",
+                    label: "Strength Box",
+                    category: "metric",
+                    templateID: "box",
+                    sheetName: "Strength_Replicates",
+                    metricID: "Strength",
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+                .init(
+                    id: "strength_bar",
+                    label: "Strength Bar",
+                    category: "metric",
+                    templateID: "bar",
+                    sheetName: "Strength_Replicates",
+                    metricID: "Strength",
+                    enabledByDefault: true,
+                    supported: true,
+                    supportReason: ""
+                ),
+            ]
+        )
+        session.selectedFigureFamilyID = "strength"
+        session.syncFigureSelection()
+
+        session.selectFigureTemplate(id: "bar")
+
+        await waitUntil(
+            {
+                session.currentFigureTemplateID == "bar" &&
+                    client.renderRequests.last?.template == "bar"
+            },
+            timeout: 3.0
+        )
+
+        XCTAssertEqual(session.currentRecipe?.id, "strength_bar")
+    }
+
     func testDisplayedFigureFallsBackToRecommendedThemeAndPaletteWithoutStoredPreferences() async throws {
         let client = MockSidecarClient()
         let session = DataStudioSession()

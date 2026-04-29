@@ -444,6 +444,24 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertEqual(session.visibleBoardPanels.map(\.id), ["panel-2"])
     }
 
+    func testComposerLibraryFilterDoesNotChangeSelectionOrPlacementSemantics() {
+        let session = ComposerSession()
+        session.project.panels = [
+            graphPanel(id: "graph-1", col: 0, row: 0, zIndex: 0),
+            assetPanel(id: "asset-1", regionID: nil, xMm: 60, yMm: 2.5, wMm: 60, hMm: 55, zIndex: 1),
+        ]
+        session.focusedPanelID = "asset-1"
+        session.beginCellDragSelection(at: .init(col: 2, row: 0))
+
+        let graphIDs = ComposerLibraryFilter.graphs.filteredPanels(session.orderedPanels).map(\.id)
+        let assetIDs = ComposerLibraryFilter.assets.filteredPanels(session.orderedPanels).map(\.id)
+
+        XCTAssertEqual(graphIDs, ["graph-1"])
+        XCTAssertEqual(assetIDs, ["asset-1"])
+        XCTAssertEqual(session.focusedPanelID, "asset-1")
+        XCTAssertTrue(session.editPresentation.placementAvailability.isEnabled)
+    }
+
     func testResolvedLabelsFollowCanonicalPanelOrder() {
         let session = ComposerSession()
         session.project.panels = [
