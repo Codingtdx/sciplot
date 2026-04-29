@@ -6,19 +6,10 @@ struct PlotWorkbenchView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            PlotPixelmatorWorkspace(
-                session: session,
-                isInspectorPresented: isInspectorPresented
-            )
-
-            if let errorMessage = session.errorMessage {
-                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
-                    .padding(14)
-                    .frame(maxWidth: 520, alignment: .leading)
-                    .transition(MotionTokens.stateTransition)
-            }
-        }
+        PlotPixelmatorWorkspace(
+            session: session,
+            isInspectorPresented: isInspectorPresented
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
         .preferredColorScheme(.dark)
@@ -317,16 +308,17 @@ private struct PlotAdjustmentRail: View {
     @Bindable var session: PlotSession
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: PlotAdjustmentRailMetrics.itemSpacing) {
             ForEach(PlotAdjustmentCategory.railCategories) { item in
                 railButton(item)
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 9)
+        .frame(width: PlotAdjustmentRailMetrics.railWidth)
+        .padding(.vertical, PlotAdjustmentRailMetrics.verticalPadding)
         .glassEffect(
             .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+            in: RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.outerCornerRadius, style: .continuous)
         )
     }
 
@@ -337,18 +329,27 @@ private struct PlotAdjustmentRail: View {
         } label: {
             Image(systemName: item.category.systemImage)
                 .font(.system(size: 14, weight: .medium))
-                .frame(width: 36, height: 36)
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: PlotAdjustmentRailMetrics.itemSize, height: PlotAdjustmentRailMetrics.itemSize)
+                .contentShape(RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.itemCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .foregroundStyle(session.selectedPlotAdjustmentCategory == item.category ? Color.accentColor : Color.primary)
         .background {
             if session.selectedPlotAdjustmentCategory == item.category {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: PlotAdjustmentRailMetrics.itemCornerRadius, style: .continuous)
                     .fill(Color.accentColor.opacity(0.16))
             }
         }
         .disabled(!availability.isEnabled)
         .help(availability.reason ?? item.category.help)
     }
+}
+
+private enum PlotAdjustmentRailMetrics {
+    static let railWidth: CGFloat = 44
+    static let itemSize: CGFloat = 34
+    static let itemSpacing: CGFloat = 4
+    static let verticalPadding: CGFloat = 7
+    static let outerCornerRadius: CGFloat = 18
+    static let itemCornerRadius: CGFloat = 10
 }

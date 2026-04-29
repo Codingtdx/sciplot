@@ -3,32 +3,34 @@ import UniformTypeIdentifiers
 
 struct DataStudioWorkbenchView: View {
     @Bindable var session: DataStudioSession
+    var isInspectorPresented = true
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
-            if let errorMessage = session.errorMessage {
-                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
-            }
+        HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
+            DataStudioGroupRailView(session: session)
+                .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 12)
+                .padding(.vertical, 12)
 
-            HSplitView {
-                DataStudioGroupRailView(session: session)
-                    .frame(
-                        minWidth: ProWorkspaceMetrics.leftRailMinWidth,
-                        idealWidth: ProWorkspaceMetrics.leftRailIdealWidth,
-                        maxWidth: ProWorkspaceMetrics.leftRailMaxWidth,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
-                    .padding(.leading, 16)
-                    .padding(.vertical, 12)
+            DataStudioPreviewWorkspaceView(session: session)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 12)
 
-                DataStudioPreviewWorkspaceView(session: session)
-                    .padding(.trailing, 16)
+            if isInspectorPresented {
+                DataStudioPreparationInspectorView(session: session)
+                    .frame(width: 340)
+                    .frame(maxHeight: .infinity)
+                    .padding(.trailing, 10)
                     .padding(.vertical, 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
+        .animation(MotionTokens.selection, value: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.96))
+        .preferredColorScheme(.dark)
         .onAppear {
             session.attachUndoManager(undoManager)
         }
@@ -136,7 +138,12 @@ private struct DataStudioGroupRailView: View {
 
             DataStudioFigureRailSection(session: session)
         }
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+        )
     }
 
     private var focusedWorkbookSelection: Binding<String?> {
@@ -177,7 +184,7 @@ private struct DataStudioFigureRailSection: View {
         }
         .padding(12)
         .background(
-            Color(nsColor: .quaternaryLabelColor).opacity(0.1),
+            Color.white.opacity(0.06),
             in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         )
     }
@@ -399,14 +406,47 @@ private struct DataStudioPreviewWorkspaceView: View {
     @Bindable var session: DataStudioSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            workspaceBody
+        VStack(spacing: ProWorkspaceMetrics.panelSpacing) {
+            previewStage
+
+            if let focusedWorkbook = session.focusedWorkbook {
+                DataStudioFocusedWorkbookStrip(session: session, workbook: focusedWorkbook)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
-    private var workspaceBody: some View {
+    private var previewStage: some View {
+        ZStack(alignment: .top) {
+            Color(nsColor: .underPageBackgroundColor)
+                .opacity(0.72)
+
+            stageContent
+
+            if let warning = session.previewWarning {
+                DataStudioInlinePreviewBanner(message: warning, stale: session.isPreviewStale) {
+                    session.retryPreviewRefresh()
+                }
+                .frame(maxWidth: 640)
+                .padding(.top, 18)
+                .padding(.horizontal, 28)
+            }
+
+            if let errorMessage = session.errorMessage {
+                DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
+                    .frame(maxWidth: 640)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var stageContent: some View {
         if session.orderedGroups.isEmpty {
             SubtleStageHint(
                 title: "Import source files to build workbook groups",
@@ -420,17 +460,7 @@ private struct DataStudioPreviewWorkspaceView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            if let warning = session.previewWarning {
-                DataStudioInlinePreviewBanner(message: warning, stale: session.isPreviewStale) {
-                    session.retryPreviewRefresh()
-                }
-            }
-
             PlotRefineView(session: session.plotSession)
-
-            if let focusedWorkbook = session.focusedWorkbook {
-                DataStudioFocusedWorkbookStrip(session: session, workbook: focusedWorkbook)
-            }
         }
     }
 
@@ -474,10 +504,11 @@ private struct DataStudioFocusedWorkbookStrip: View {
                 }
             }
         }
-        .padding(.top, 6)
-        .overlay(alignment: .top) {
-            Divider()
-        }
+        .padding(14)
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+        )
     }
 
     private var displayedMetrics: [DataStudioMetricSummaryResponse] {

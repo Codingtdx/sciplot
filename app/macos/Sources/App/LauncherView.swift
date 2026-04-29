@@ -19,8 +19,8 @@ struct LauncherView: View {
             )
             .frame(width: 620)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(28)
+        .frame(width: 660, height: 360)
+        .background(Color.clear)
     }
 
     private func openWorkbench(_ workbench: Workbench, performPrimaryAction: Bool = false) {
@@ -75,6 +75,9 @@ private struct LauncherWelcomeSurface: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .contentShape(Rectangle())
+        .gesture(WindowDragGesture())
+        .allowsWindowActivationEvents(true)
     }
 }
 

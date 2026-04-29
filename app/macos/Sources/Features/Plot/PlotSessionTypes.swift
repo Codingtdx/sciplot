@@ -4,7 +4,7 @@ import Foundation
 struct PlotPreviewPixelBucket: Equatable, Hashable, Sendable {
     static let pixelBucketSize = 128
     static let minPixelDimension = 512
-    static let maxPixelDimension = 2600
+    static let maxPixelDimension = 4200
 
     let config: PreviewRenderConfigPayload
 

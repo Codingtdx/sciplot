@@ -26,6 +26,15 @@ struct PlotPreviewStage: View {
                     updatingBadge
                         .padding(16)
                 }
+
+                if let errorMessage = session.errorMessage {
+                    PlotStageDiagnosticBanner(message: errorMessage)
+                        .frame(maxWidth: 560)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 20)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .transition(MotionTokens.stateTransition)
+                }
             }
             .task(id: previewBucket) {
                 session.updatePreviewPixelBucket(stageSize: geometry.size, displayScale: displayScale)
@@ -64,6 +73,16 @@ struct PlotPreviewStage: View {
             .glassEffect(.regular, in: Capsule())
             .foregroundStyle(.secondary)
             .transition(MotionTokens.stateTransition)
+    }
+}
+
+struct PlotStageDiagnosticBanner: View {
+    let message: String
+
+    var body: some View {
+        DiagnosticIssueCard(message: DiagnosticMessage(detail: message))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Color.black.opacity(0.24), radius: 18, x: 0, y: 8)
     }
 }
 

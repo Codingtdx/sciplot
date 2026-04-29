@@ -9,8 +9,8 @@ struct LauncherWindowRoot: View {
             LauncherView(model: model)
         }
         .toolbar(removing: .title)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .containerBackground(.thickMaterial, for: .window)
+        .toolbarVisibility(.hidden, for: .windowToolbar)
+        .containerBackground(.clear, for: .window)
         .background(WindowToolbarConfigurator())
     }
 }
@@ -45,11 +45,10 @@ struct WorkbenchWindowRoot: View {
                 isInspectorPresented: model.isInspectorPresented(for: .plot)
             )
         case .dataStudio:
-            WorkbenchTwoPaneWindow(isInspectorVisible: model.isInspectorPresented(for: .dataStudio)) {
-                DataStudioWorkbenchView(session: model.dataStudioSession)
-            } inspector: {
-                DataStudioInspectorView(session: model.dataStudioSession)
-            }
+            DataStudioWorkbenchView(
+                session: model.dataStudioSession,
+                isInspectorPresented: model.isInspectorPresented(for: .dataStudio)
+            )
         case .composer:
             WorkbenchTwoPaneWindow(isInspectorVisible: model.isInspectorPresented(for: .composer)) {
                 ComposerWorkbenchView(session: model.composerSession)

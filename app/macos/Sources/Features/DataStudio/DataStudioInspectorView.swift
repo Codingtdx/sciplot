@@ -10,61 +10,50 @@ struct DataStudioInspectorView: View {
     }
 
     var body: some View {
-        if session.showsCompactEmptyInspector {
-            compactEmptyInspector
-        } else {
-            PlotInspectorView(
-                session: session.plotSession,
-                styleSectionTitle: "Style",
-                plotOptionsAdvancedExpanded: plotOptionsAdvancedExpanded,
-                showsPlotInspectorModes: false
-            ) {
-                figureSection
-            } trailingSections: {
-                if session.showsInspectorActions {
-                    actionsSection
-                }
-            }
-        }
+        DataStudioPreparationInspectorView(session: session)
     }
+}
 
-    private var compactEmptyInspector: some View {
+struct DataStudioPreparationInspectorView: View {
+    @Bindable var session: DataStudioSession
+
+    var body: some View {
         ScrollView {
-            InspectorSection(title: "Actions") {
-                InspectorEmptyState(message: "No workbook groups")
+            VStack(alignment: .leading, spacing: 16) {
+                figureSection
+                actionsSection
+                outputsSection
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
         .inspectorSurface()
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+        )
     }
 
-    @ViewBuilder
     private var figureSection: some View {
-        if !session.figureFamilies.isEmpty {
-            InspectorSection(title: "Figure") {
+        InspectorSection(title: "Figure") {
+            if session.orderedGroups.isEmpty {
+                InspectorEmptyState(message: "Import raw data to build workbook groups.")
+            } else {
                 AdaptiveInspectorTextRow(
-                    title: "Metric",
-                    value: session.currentFigureFamily?.title ?? "Representative Curve"
+                    title: "Group",
+                    value: session.focusedWorkbook.map { session.displayName(for: $0) } ?? "No focused group"
                 )
-                AdaptiveInspectorTextRow(title: "Figure", value: session.currentRecipeLabel)
-
-                if session.currentFigureFitAvailability.isEnabled {
-                    AdaptiveInspectorControlRow(title: "Fit") {
-                        Toggle("", isOn: fitEnabledBinding)
-                            .labelsHidden()
-                    }
-
-                    AdaptiveInspectorControlRow(title: "Model") {
-                        Picker("", selection: fitModelBinding) {
-                            Text("Linear").tag("linear")
-                            Text("Polynomial 2").tag("polynomial_2")
-                            Text("Polynomial 3").tag("polynomial_3")
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                    }
-                }
+                AdaptiveInspectorTextRow(
+                    title: "Figure",
+                    value: session.currentRecipeLabel,
+                    secondaryValue: session.currentRecipe == nil
+                )
+                AdaptiveInspectorTextRow(
+                    title: "Groups",
+                    value: "\(session.includedGroups.count) included"
+                )
             }
         }
     }
@@ -79,8 +68,8 @@ struct DataStudioInspectorView: View {
                 .disabled(!session.canOpenCurrentFigureInPlot)
                 .help(
                     session.canOpenCurrentFigureInPlot
-                        ? "Open the current comparison figure in Plot."
-                        : "Choose a supported figure context before opening in Plot."
+                        ? "Open the prepared workbook, sheet, figure type, and current options in Plot."
+                        : "Choose a supported figure before opening in Plot."
                 )
                 .inspectorActionButton()
 
@@ -92,35 +81,36 @@ struct DataStudioInspectorView: View {
                 .help("Open source data and fit analysis for the current Data Studio context.")
                 .inspectorActionButton()
             }
+        }
+    }
 
-            DisclosureGroup("Advanced") {
-                InspectorActionStack {
-                    Button("Reveal Workbook") {
-                        session.revealFocusedWorkbook()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(session.focusedWorkbook == nil)
-                    .help(
-                        session.focusedWorkbook == nil
-                            ? "Select a workbook group first."
-                            : "Reveal the focused workbook in Finder."
-                    )
-                    .inspectorActionButton()
-
-                    Button("Reveal Output") {
-                        session.revealLatestExport()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!session.revealOutputAvailability.isEnabled)
-                    .help(
-                        session.revealOutputAvailability.reason
-                            ?? "Reveal the latest output location in Finder."
-                    )
-                    .inspectorActionButton()
+    private var outputsSection: some View {
+        InspectorSection(title: "Outputs") {
+            InspectorActionStack {
+                Button("Reveal Workbook") {
+                    session.revealFocusedWorkbook()
                 }
+                .buttonStyle(.bordered)
+                .disabled(session.focusedWorkbook == nil)
+                .help(
+                    session.focusedWorkbook == nil
+                        ? "Select a workbook group first."
+                        : "Reveal the focused workbook in Finder."
+                )
+                .inspectorActionButton()
 
-                if session.comparisonExportResponse != nil {
-                    VStack(alignment: .leading, spacing: 8) {
+                Button("Reveal Output") {
+                    session.revealLatestExport()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!session.revealOutputAvailability.isEnabled)
+                .help(session.revealOutputAvailability.reason ?? "Reveal the latest output location in Finder.")
+                .inspectorActionButton()
+            }
+
+            if session.comparisonExportResponse != nil {
+                DisclosureGroup("Latest Export") {
+                    InspectorActionStack {
                         Button("Open Comparison Workbook") {
                             session.openLatestComparisonWorkbook()
                         }
@@ -156,19 +146,5 @@ struct DataStudioInspectorView: View {
                 }
             }
         }
-    }
-
-    private var fitEnabledBinding: Binding<Bool> {
-        Binding(
-            get: { session.currentFigureFitOptions.enabled },
-            set: { session.updateCurrentFigureFitEnabled($0) }
-        )
-    }
-
-    private var fitModelBinding: Binding<String> {
-        Binding(
-            get: { session.currentFigureFitOptions.modelID },
-            set: { session.updateCurrentFigureFitModel($0) }
-        )
     }
 }

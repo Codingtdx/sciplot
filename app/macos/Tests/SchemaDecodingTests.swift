@@ -415,8 +415,8 @@ final class SchemaDecodingTests: XCTestCase {
     func testPreviewPixelBucketRoundsAndClampsStageSize() {
         let bucket = PlotPreviewPixelBucket(stageSize: CGSize(width: 1800, height: 1300), displayScale: 2.0)
 
-        XCTAssertEqual(bucket.config.pixelWidth, 2560)
-        XCTAssertEqual(bucket.config.pixelHeight, 1920)
+        XCTAssertEqual(bucket.config.pixelWidth, 3584)
+        XCTAssertEqual(bucket.config.pixelHeight, 2560)
         XCTAssertEqual(bucket.config.scale, 2.0)
 
         let nearSameBucket = PlotPreviewPixelBucket(stageSize: CGSize(width: 1808, height: 1304), displayScale: 2.0)

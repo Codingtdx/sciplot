@@ -9,10 +9,11 @@ struct SciPlotGodApp: App {
     var body: some Scene {
         WindowGroup("SciPlot God", id: "launcher") {
             LauncherWindowRoot(model: model)
-                .frame(minWidth: 660, minHeight: 360)
+                .frame(width: 660, height: 360)
         }
-        .defaultSize(width: 700, height: 430)
-        .windowResizability(.contentMinSize)
+        .defaultSize(width: 660, height: 360)
+        .windowResizability(.contentSize)
+        .windowStyle(.plain)
         .defaultLaunchBehavior(.presented)
         .restorationBehavior(.disabled)
         .commands {
@@ -95,14 +96,38 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
     }
 
     func openLauncher(model: AppModel) {
-        openWindow(
-            id: "launcher",
-            title: "SciPlot God",
-            size: CGSize(width: 700, height: 430),
-            minSize: CGSize(width: 660, height: 360)
-        ) {
-            LauncherWindowRoot(model: model)
+        let id = "launcher"
+        if let controller = controllers[id], let window = controller.window {
+            configureLauncherWindow(window)
+            present(window)
+            return
         }
+
+        if let existingWindow = NSApp.windows.first(where: { window in
+            window.identifier?.rawValue == id || window.title == "SciPlot God"
+        }) {
+            configureLauncherWindow(existingWindow)
+            present(existingWindow)
+            return
+        }
+
+        let controller = NSWindowController(
+            window: BorderlessLauncherWindow(
+                contentRect: NSRect(origin: .zero, size: CGSize(width: 660, height: 360)),
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+        )
+        guard let window = controller.window else {
+            return
+        }
+        window.contentViewController = NSHostingController(rootView: LauncherWindowRoot(model: model))
+        configureLauncherWindow(window)
+        window.center()
+
+        controllers[id] = controller
+        present(window)
     }
 
     func openWorkbench(_ workbench: Workbench, model: AppModel) {
@@ -168,6 +193,25 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
+    private func configureLauncherWindow(_ window: NSWindow) {
+        window.identifier = NSUserInterfaceItemIdentifier("launcher")
+        window.title = "SciPlot God"
+        window.setContentSize(CGSize(width: 660, height: 360))
+        window.minSize = CGSize(width: 660, height: 360)
+        window.maxSize = CGSize(width: 660, height: 360)
+        window.styleMask = [.borderless]
+        window.isReleasedWhenClosed = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+    }
+
     private func sizing(for workbench: Workbench) -> (defaultSize: CGSize, minSize: CGSize) {
         switch workbench {
         case .plot:
@@ -176,4 +220,9 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
             return (CGSize(width: 1360, height: 840), CGSize(width: 1180, height: 740))
         }
     }
+}
+
+private final class BorderlessLauncherWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }

@@ -564,7 +564,7 @@ def _preview_png_dpi(rendered: Any, preview_config: PreviewRenderConfigPayload |
         preview_config.pixel_width / width_inches,
         preview_config.pixel_height / height_inches,
     )
-    return int(max(160, min(260, round(target_dpi))))
+    return int(max(180, min(620, round(target_dpi))))
 
 
 def rendered_plots_to_preview_payload(

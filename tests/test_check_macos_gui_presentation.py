@@ -16,6 +16,7 @@ struct SciPlotGodApp: App {
         WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 1520, height: 900)
             .windowResizability(.contentMinSize)
+            .windowStyle(.plain)
             .defaultLaunchBehavior(.presented)
             .restorationBehavior(.disabled)
             .commands { AppCommands(model: model) }
@@ -38,7 +39,13 @@ private enum SciPlotGodAppState {
 }
 final class AppWindowManager {
     func openLauncherAfterSceneAttempt() {}
+    func configureLauncherWindow(_ window: NSWindow) {
+        window.styleMask = [.borderless]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+    }
 }
+final class BorderlessLauncherWindow {}
 """,
         "app/macos/Sources/App/RootSplitView.swift": """
 struct LauncherWindowRoot {
@@ -53,6 +60,7 @@ struct WorkbenchWindowRoot {
     let workbench: Workbench
     var body: some View {
         PlotWorkbenchView(session: model.plotSession)
+        DataStudioWorkbenchView(session: model.dataStudioSession)
             .focusedSceneValue(\\.workbenchCommandContext, workbench)
             .modifier(WorkbenchWindowOpenHandler(model: model))
     }
@@ -96,11 +104,13 @@ struct LauncherView {
             LauncherWelcomeSurface()
             LauncherModuleEntryRow()
             Button("Plot") { openWindow(id: Workbench.plot.windowSceneID) }
+            WindowDragGesture()
             Button("Import") { model.beginLauncherPrimaryAction(for: .plot) }
             Button("Data Studio") { model.beginLauncherPrimaryAction(for: .dataStudio) }
             Button("Composer") { model.beginLauncherPrimaryAction(for: .composer) }
             Button("Code Console") { model.beginLauncherPrimaryAction(for: .codeConsole) }
         }
+        .frame(width: 660, height: 360)
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
@@ -173,6 +183,7 @@ struct PlotSelectedLayerEditorView {
 """,
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": """
 PlotPreviewStage(session: session)
+PlotStageDiagnosticBanner(message: errorMessage)
 Base64PreviewImageView(base64PNG: previewPNG)
 Base64PDFPreviewView(base64PDF: preview.pdfBase64)
 ProgressView()
@@ -208,6 +219,7 @@ PlotSourceTypePanel(session: session)
 PlotRefineView(session: session)
 PlotAdjustmentInspector(session: session)
 PlotAdjustmentRail(session: session)
+PlotAdjustmentRailMetrics
 @State private var isPlotTypeChooserPresented = false
 ForEach(session.templateGalleryItems) { item in PlotTypeCard(item: item) }
 Button { isPlotTypeChooserPresented = true } label: {
@@ -229,13 +241,19 @@ enum InspectorColumnLayoutPolicy {
             "struct PlotDataWorkbookSheet { let dataPipelineSummary = \"\" }\n"
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift": (
+            "DataStudioPreparationInspectorView\n"
             "InspectorSection(title: \"Actions\")\nInspectorSection(title: \"Figure\")\n"
+            "Button(\"Open in Plot\")\nButton(\"Analysis\")\n"
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
             "WorkbenchRailTitle(title: \"Workbook Groups\")\n"
             "DataStudioFigureRailSection(session: session)\n"
             "DataStudioFigureRailRow\n"
             "let figureFamilyBinding = Binding<String?>.constant(nil)\n"
+            "let isInspectorPresented = true\n"
+            "DataStudioPreparationInspectorView(session: session)\n"
+            "PlotRefineView(session: session.plotSession)\n"
+            ".glassEffect(.regular.interactive())\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": (
             "enum ComposerLibraryFilter {}\n"
