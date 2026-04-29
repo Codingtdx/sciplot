@@ -67,6 +67,15 @@ enum ProWorkspaceMetrics {
     static let leftRailMaxWidth: CGFloat = 360
 }
 
+enum ProCornerPolicy {
+    static let outer: CGFloat = 22
+    static let launcher: CGFloat = 30
+    static let rail: CGFloat = 18
+    static let row: CGFloat = 12
+    static let smallRow: CGFloat = 10
+    static let preview: CGFloat = 14
+}
+
 enum ProWorkspaceTheme: Equatable, Sendable {
     case light
     case dark
@@ -175,7 +184,7 @@ extension View {
 
     func proGlassPanel(
         theme: ProWorkspaceTheme,
-        cornerRadius: CGFloat = ProWorkspaceMetrics.outerCornerRadius
+        cornerRadius: CGFloat = ProCornerPolicy.outer
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
@@ -189,7 +198,7 @@ extension View {
 
     func proGlassRail(
         theme: ProWorkspaceTheme,
-        cornerRadius: CGFloat = ProWorkspaceMetrics.outerCornerRadius
+        cornerRadius: CGFloat = ProCornerPolicy.rail
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
@@ -204,7 +213,7 @@ extension View {
     func proGlassRow(
         theme: ProWorkspaceTheme,
         isSelected: Bool = false,
-        cornerRadius: CGFloat = ProWorkspaceMetrics.innerCornerRadius
+        cornerRadius: CGFloat = ProCornerPolicy.row
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self

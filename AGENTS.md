@@ -128,16 +128,17 @@
 - 模块窗口不得恢复旧全局工作台壳：禁止左侧模块切换栏、`WorkbenchSidebarRail`、`WorkbenchContentShell`、多层 `项目名 + 模块名 + 内容标题` 额头，和把 `RootSplitView` 当作四模块共享视觉 shell。
 - 命令菜单必须按 focused module context 路由当前窗口；`selectedWorkbench` 只能作为兼容/兜底状态，不得驱动可见的全局模块切换 UI。
 - toolbar 的 `Launcher` 返回入口可以作为 utility affordance 保留，只负责打开/聚焦 Launcher。
-- 模块主动作统一归属原生 window toolbar 的 primary action group，并在视觉上锚定右上角：`Import/Open`、`Export`、`Launcher`、`Help`、`Inspector` 不得回流到左侧选择面板或 inspector body。Plot 额外允许一个 toolbar `Data Workbook` 图标按钮，默认打开 `Source Data`。
+- 模块主动作统一归属原生 window toolbar 的 primary action group，并在视觉上锚定右上角：`Import/Open`、`Export`、`New Project`、`Launcher`、`Help`、`Inspector` 不得回流到左侧选择面板或 inspector body。Plot 额外允许一个 toolbar `Data Workbook` 图标按钮，默认打开 `Source Data`。
 - 外观策略固定为 app-wide `Follow System / Light / Dark`，入口在 `View > Appearance`。浅色主题走接近 Codex 的近白/暖白 Pro workspace，不要回到大面积冷灰底；深色主题保持当前专业 dark workspace。
 - 自定义 Liquid Glass panel / rail / row 必须走共享 shaped helper（当前在 `app/macos/Sources/Shared/UI/StateViews.swift` 的 `proGlassPanel` / `proGlassRail` / `proGlassRow`），让填色、裁切、描边和 `glassEffect` 使用同一个圆角形状；禁止在模块主 panel 上恢复裸 `.background(theme.panelFill)` 或 `.background(theme.rowFill)` 方形托底。
-- macOS 前端交接说明见 `docs/macos-frontend-design.md`。应用图标资产在 `app/macos/Assets.xcassets/AppIcon.appiconset`，源稿在 `docs/assets/sciplot-god-app-icon.svg`，可用 `scripts/generate_app_icon.py` 重新生成 PNG 尺寸。
+- macOS 前端交接说明见 `docs/macos-frontend-design.md`。应用图标资产在 `app/macos/Assets.xcassets/AppIcon.appiconset`，源稿在 `docs/assets/sciplot-god-app-icon.svg`，可用 `scripts/generate_app_icon.py` 重新生成 PNG 尺寸；图标方向是抽象玻璃数据流符号，不是白色图表页或窗口套壳。
 - sidecar 策略是 app-managed ownership：
   - 不能只靠端口连通判断可用；
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
-- Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。
+- Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。Plot 已有内容时，导入/打开新输入的替换确认必须挂在 Plot 窗口本身；即使入口来自 Launcher，也不得让 Launcher 承载 Plot-specific confirmation。
+- `New Project` 是返回 Launcher 的显式入口：它先清空当前 Plot session 与 pending replacement，再打开/聚焦 Launcher。普通 Plot 导入新文件不得把用户带回初始界面。
 - Data Studio 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
 - Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
 - Data Studio `Save Project…` / `Save Project As…` 同样走命令菜单，不新增第二套 toolbar 主入口。
@@ -176,7 +177,7 @@
 - 四个模块统一使用 Pro workspace 语法：左侧选择当前工作对象，中间是主工作区，右侧是上下文 inspector。Plot 额外保留最右侧竖向 adjustment rail；其他模块除非已有真实可切换调整分类，不新增假 rail。
 - Plot 必须使用 Pixelmator-Pro 语法的四区布局：左侧数据/图型面板，中间白色 figure/page preview，右侧深色 glass adjustment inspector，最右侧竖向调整分类栏。
 - Plot 左侧 `PlotSourceTypePanel` 只负责“选哪张表、画成什么图”：顶部一个紧凑 sheet picker；下方只显示 `session.templateGalleryItems` 的 5 个推荐图型大缩略图卡；`More` 打开 `PlotTypeChooserSheet`，用搜索 + `session.plotTypeItems` 选择全部兼容图型。左侧不得显示文件名、Import/Open、`Data Tables`、`Source Data`、`Transformed`、`Variables`、`Fit` 常驻入口、layer/object 列表、fit/function/guide/text/shape overlay 行、`Source` / `Objects` / `Templates` 分区说明文案、`No source` 空说明、假工具或前端本地业务判断。
-- Plot 最右侧 `PlotAdjustmentRail` 是绘图调整分类入口，不是对象创建工具条。固定顺序为 `Figure`、`Axes`、`Legend`、`Guides`、`Fit`、`Functions`、`Annotations`、`Advanced Axes`；点击只切换右侧 inspector category，禁止弹出快捷菜单。`Data Cursor` 在 preview hit-testing metadata 存在前不得进入该栏。
+- Plot 最右侧 `PlotAdjustmentRail` 是绘图调整分类入口，不是对象创建工具条。固定顺序为 `Figure`、`Axes`、`Legend`、`Guides`、`Fit`、`Functions`、`Annotations`、`Advanced Axes`；点击只切换右侧 inspector category，禁止弹出快捷菜单。`Legend` 里的图例排序是该分类的主功能，必须直接可见，不得藏进 `Advanced`。`Data Cursor` 在 preview hit-testing metadata 存在前不得进入该栏。
 - 右侧 adjustment inspector 负责精确科研参数编辑。Reference guide / region、function、text/shape annotation 的创建按钮必须在对应 inspector 分类内 inline 出现；创建后通过 Axis + Value 或 Start/End 等精确输入编辑，禁止把拖拽、nudge HUD、画布浮动参数面板或 popover 作为默认路径。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - toolbar `Data Workbook` 图标是默认打开入口，并默认落到 `Source Data`；左侧 `PlotSourceTypePanel` 不再拆出 workbook tab 入口

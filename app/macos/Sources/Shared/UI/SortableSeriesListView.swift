@@ -12,6 +12,7 @@ struct SortableSeriesListView: View {
     let title: String
     let rows: [SortableSeriesListRow]
     let moveItem: (_ id: String, _ offset: Int) -> Void
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -61,15 +62,13 @@ struct SortableSeriesListView: View {
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color(nsColor: .controlBackgroundColor))
-                        )
+                        .proGlassRow(theme: theme, cornerRadius: ProCornerPolicy.smallRow)
                     }
                 }
             }
         }
         .padding(12)
-        .background(.quinary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+        .background(theme.rowFill.opacity(0.7), in: RoundedRectangle(cornerRadius: ProCornerPolicy.preview, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ProCornerPolicy.preview, style: .continuous))
     }
 }

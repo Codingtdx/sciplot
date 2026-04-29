@@ -33,6 +33,8 @@ Launcher is a borderless glass welcome surface, not a fake window inside another
 
 Launcher must not bootstrap the sidecar just to appear. It should open immediately; sidecar startup belongs to real module work or real actions.
 
+Launcher is also not the owner of Plot's replacement state. If a user starts a Plot import from Launcher while Plot already has content, Launcher opens/focuses Plot and Plot hosts the replacement confirmation. Returning to the welcome surface is an explicit `New Project` action, not a side effect of importing a file.
+
 ## Plot
 
 Plot is the visual benchmark. It follows a Pixelmator-Pro-like arrangement while keeping SciPlot concepts:
@@ -43,6 +45,8 @@ Plot is the visual benchmark. It follows a Pixelmator-Pro-like arrangement while
 - Far-right rail: category switcher only. It never creates objects through popovers.
 
 Plot preview uses the backend renderer. Swift displays high-resolution PNG for live preview and keeps PDF as the exact/export-grade fallback; do not recreate plotting semantics in Swift Charts or Canvas.
+
+Legend is a good example of the interaction principle: if the category has one primary useful action, show it directly. `Legend order` and `Reset Series Order` belong at the top level of the Legend inspector. Do not bury them in an `Advanced` disclosure just to make every inspector category look symmetrical.
 
 ## Data Studio
 
@@ -108,7 +112,7 @@ Avoid:
 
 The app icon lives in `app/macos/Assets.xcassets/AppIcon.appiconset`. The source artwork is `docs/assets/sciplot-god-app-icon.svg`, and `scripts/generate_app_icon.py` regenerates the PNG sizes.
 
-The concept is a glass rounded square with a white figure page, light grid/axes, and a blue scientific curve. It intentionally has no text so the Dock and App Switcher versions remain legible.
+The concept is an abstract native-style glass squircle with a luminous data-flow curve, small data nodes, and a very soft field/ring hint. It intentionally avoids a literal document, white chart page, window shell, or text so the Dock and App Switcher versions read as an app icon rather than a screenshot.
 
 ## Change Checklist
 
@@ -119,4 +123,5 @@ When changing the macOS frontend:
 3. Route global actions through toolbar/menu command context.
 4. Use `ProWorkspaceTheme` and shaped glass helpers for custom surfaces.
 5. Keep Plot's page preview white across themes.
-6. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.
+6. Keep common or sole category actions visible; reserve `Advanced` for real advanced or follow-up work.
+7. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.

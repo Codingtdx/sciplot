@@ -609,24 +609,22 @@ struct PlotInspectorView<LeadingSections: View, TrailingSections: View>: View {
             if session.seriesOrderLabels.isEmpty {
                 InspectorEmptyState(message: "No legend entries")
             } else {
-                DisclosureGroup("Advanced") {
-                    SortableSeriesListView(
-                        title: "Legend order",
-                        rows: session.seriesOrderRows,
-                        moveItem: { id, offset in
-                            session.moveSeriesOrder(id: id, by: offset)
-                        }
-                    )
-
-                    Button("Reset Series Order") {
-                        session.resetSeriesOrder()
+                SortableSeriesListView(
+                    title: "Legend order",
+                    rows: session.seriesOrderRows,
+                    moveItem: { id, offset in
+                        session.moveSeriesOrder(id: id, by: offset)
                     }
-                    .disabled(!session.resetSeriesOrderAvailability.isEnabled)
-                    .help(
-                        session.resetSeriesOrderAvailability.reason
-                            ?? "Reset legend ordering back to the source order."
-                    )
+                )
+
+                Button("Reset Series Order") {
+                    session.resetSeriesOrder()
                 }
+                .disabled(!session.resetSeriesOrderAvailability.isEnabled)
+                .help(
+                    session.resetSeriesOrderAvailability.reason
+                        ?? "Reset legend ordering back to the source order."
+                )
             }
         }
     }
@@ -1769,6 +1767,7 @@ private struct PlotAdjustmentObjectButton: View {
     let row: PlotAdjustmentObjectRow
     let isSelected: Bool
     let action: () -> Void
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         Button(action: action) {
@@ -1793,8 +1792,7 @@ private struct PlotAdjustmentObjectButton: View {
             .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .background(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .proGlassRow(theme: theme, isSelected: isSelected, cornerRadius: ProCornerPolicy.smallRow)
     }
 }
 

@@ -71,6 +71,7 @@ struct WorkbenchWindowRoot {
     let workbench: Workbench
     var body: some View {
         PlotWorkbenchView(session: model.plotSession)
+            .modifier(PlotReplacementConfirmationHost(model: model))
         DataStudioWorkbenchView(session: model.dataStudioSession)
         ComposerWorkbenchView(session: model.composerSession)
         CodeConsoleWorkbenchView(session: model.codeConsoleSession)
@@ -92,6 +93,8 @@ private struct WorkbenchWindowToolbarContent {
         }
     }
 }
+private struct AppWindowSharedChrome {}
+private struct PlotReplacementConfirmationHost {}
 struct WorkbenchWindowOpenHandler {}
 private struct WindowToolbarConfigurator {}
 """,
@@ -100,6 +103,7 @@ final class AppModel {
     var requestedWorkbenchWindow: Workbench?
     func enterWorkbench(_ workbench: Workbench) {}
     func showLauncher() {}
+    func newProject() {}
     func beginLauncherPrimaryAction(for workbench: Workbench) { beginImport(for: workbench) }
     func beginImport(for workbench: Workbench) {}
     func export(for workbench: Workbench) async {}
@@ -126,7 +130,7 @@ struct LauncherView {
             LauncherCloseButton { dismiss() }
         }
         .frame(width: 760, height: 460)
-        .proGlassPanel(theme: theme, cornerRadius: 30)
+        .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)
     }
 }
 struct LauncherCloseButton {}
@@ -141,6 +145,9 @@ struct AppCommands {
                     Button(mode.title) { appearanceModeRawValue = mode.rawValue }
                 }
             }
+        }
+        CommandGroup(after: .newItem) {
+            Button("New Project") { model.newProject() }
         }
         CommandMenu("Plot Tools") {
             model.plotSession.activatePlotTool(tool)
@@ -177,6 +184,12 @@ ScrollView {
     PlotSelectedLayerEditorView()
     InspectorSection(title: "Axis") {}
     InspectorSection(title: "Fit Overlay") {}
+}
+private var seriesSection: some View {
+    InspectorSection(title: "Legend") {
+        SortableSeriesListView()
+        Button("Reset Series Order") {}
+    }
 }
 """,
         "app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift": """
@@ -275,6 +288,13 @@ enum ProWorkspaceTheme {
     var rowFill: Color { .clear }
     var selectedRowFill: Color { .clear }
     var isCodexLikeLightWorkspace: Bool { true }
+}
+enum ProCornerPolicy {
+    static let outer: CGFloat = 22
+    static let rail: CGFloat = 18
+    static let row: CGFloat = 12
+    static let smallRow: CGFloat = 10
+    static let preview: CGFloat = 14
 }
 struct ProWorkspaceThemeKey {}
 extension EnvironmentValues {

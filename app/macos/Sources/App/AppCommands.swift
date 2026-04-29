@@ -48,6 +48,13 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
+            Button("New Project") {
+                model.newProject()
+                openWindow(id: "launcher")
+                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+            }
+            .keyboardShortcut("n", modifiers: [.command])
+
             Button("New Data Studio Session") {
                 model.newDataStudioSession()
             }

@@ -5,6 +5,7 @@ struct OptionRowCard<Content: View>: View {
     let detail: String?
     let emphasized: Bool
     let content: Content
+    @Environment(\.proWorkspaceTheme) private var theme
 
     init(
         title: String,
@@ -39,12 +40,13 @@ struct OptionRowCard<Content: View>: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(emphasized ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor))
+            emphasized ? theme.selectedRowFill : theme.rowFill,
+            in: RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.secondary.opacity(emphasized ? 0.18 : 0.12), lineWidth: 1)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
+                .strokeBorder(theme.hairline, lineWidth: 0.8)
+        }
     }
 }

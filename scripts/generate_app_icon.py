@@ -16,6 +16,56 @@ def _rounded_rect(draw: ImageDraw.ImageDraw, box: tuple[float, float, float, flo
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
 
+def _rounded_rect_mask(size: int, box: tuple[float, float, float, float], radius: float) -> Image.Image:
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle(box, radius=radius, fill=255)
+    return mask
+
+
+def _diagonal_gradient(size: int, top_left: tuple[int, int, int], bottom_right: tuple[int, int, int]) -> Image.Image:
+    gradient = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    pixels = gradient.load()
+    denominator = max(1, (size - 1) * 2)
+    for y in range(size):
+        for x in range(size):
+            t = (x + y) / denominator
+            r = round(top_left[0] * (1 - t) + bottom_right[0] * t)
+            g = round(top_left[1] * (1 - t) + bottom_right[1] * t)
+            b = round(top_left[2] * (1 - t) + bottom_right[2] * t)
+            pixels[x, y] = (r, g, b, 255)
+    return gradient
+
+
+def _catmull_rom(points: list[tuple[float, float]], samples: int = 18) -> list[tuple[float, float]]:
+    if len(points) < 2:
+        return points
+
+    expanded = [points[0], *points, points[-1]]
+    output: list[tuple[float, float]] = []
+    for index in range(1, len(expanded) - 2):
+        p0, p1, p2, p3 = expanded[index - 1], expanded[index], expanded[index + 1], expanded[index + 2]
+        for step in range(samples):
+            t = step / samples
+            t2 = t * t
+            t3 = t2 * t
+            x = 0.5 * (
+                (2 * p1[0])
+                + (-p0[0] + p2[0]) * t
+                + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+            )
+            y = 0.5 * (
+                (2 * p1[1])
+                + (-p0[1] + p2[1]) * t
+                + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+            )
+            output.append((x, y))
+    output.append(points[-1])
+    return output
+
+
 def _draw_icon(size: int) -> Image.Image:
     scale = size / 1024
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -24,78 +74,119 @@ def _draw_icon(size: int) -> Image.Image:
     shadow_draw = ImageDraw.Draw(shadow)
     _rounded_rect(
         shadow_draw,
-        (78 * scale, 92 * scale, 946 * scale, 960 * scale),
-        210 * scale,
-        (31, 44, 72, 84),
+        (78 * scale, 90 * scale, 946 * scale, 958 * scale),
+        224 * scale,
+        (23, 38, 70, 92),
     )
-    shadow = shadow.filter(ImageFilter.GaussianBlur(max(1, int(24 * scale))))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(max(1, int(28 * scale))))
     image.alpha_composite(shadow)
 
+    outer = (70 * scale, 62 * scale, 954 * scale, 946 * scale)
+    outer_mask = _rounded_rect_mask(size, outer, 224 * scale)
+    glass = _diagonal_gradient(size, (250, 253, 249), (204, 236, 255))
+    glass.putalpha(outer_mask.point(lambda alpha: round(alpha * 0.95)))
+    image.alpha_composite(glass)
+
     draw = ImageDraw.Draw(image)
-    outer = (72 * scale, 64 * scale, 952 * scale, 944 * scale)
-    _rounded_rect(draw, outer, 210 * scale, (225, 242, 248, 232), (255, 255, 255, 190), max(1, int(6 * scale)))
+    _rounded_rect(
+        draw,
+        outer,
+        224 * scale,
+        fill=None,
+        outline=(255, 255, 255, 218),
+        width=max(1, int(7 * scale)),
+    )
+    _rounded_rect(
+        draw,
+        (92 * scale, 86 * scale, 932 * scale, 922 * scale),
+        202 * scale,
+        fill=None,
+        outline=(44, 96, 140, 34),
+        width=max(1, int(3 * scale)),
+    )
 
-    for y, alpha in ((112, 82), (170, 44), (230, 30)):
-        draw.arc(
-            (108 * scale, y * scale, 916 * scale, (y + 760) * scale),
-            205,
-            338,
-            fill=(255, 255, 255, alpha),
-            width=max(1, int(7 * scale)),
+    field = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    field_draw = ImageDraw.Draw(field)
+    for radius, alpha in ((310, 36), (238, 26), (166, 18)):
+        field_draw.ellipse(
+            (
+                (512 - radius) * scale,
+                (508 - radius) * scale,
+                (512 + radius) * scale,
+                (508 + radius) * scale,
+            ),
+            outline=(30, 98, 156, alpha),
+            width=max(1, int(5 * scale)),
         )
+    for angle in range(-35, 55, 18):
+        radians = math.radians(angle)
+        cx, cy = 510 * scale, 510 * scale
+        length = 590 * scale
+        dx = math.cos(radians) * length / 2
+        dy = math.sin(radians) * length / 2
+        field_draw.line(
+            (cx - dx, cy - dy, cx + dx, cy + dy),
+            fill=(28, 96, 150, 20),
+            width=max(1, int(3 * scale)),
+        )
+    field.putalpha(Image.composite(field.getchannel("A"), Image.new("L", (size, size), 0), outer_mask))
+    image.alpha_composite(field)
 
-    page = (224 * scale, 214 * scale, 800 * scale, 824 * scale)
-    _rounded_rect(draw, page, 74 * scale, (255, 255, 255, 246), (196, 213, 224, 170), max(1, int(5 * scale)))
-
-    grid_color = (111, 130, 145, 42)
-    for i in range(1, 6):
-        x = (224 + i * 96) * scale
-        draw.line((x, 284 * scale, x, 742 * scale), fill=grid_color, width=max(1, int(2 * scale)))
-    for i in range(1, 5):
-        y = (284 + i * 92) * scale
-        draw.line((286 * scale, y, 744 * scale, y), fill=grid_color, width=max(1, int(2 * scale)))
-
-    axis_color = (57, 70, 83, 150)
-    draw.line((286 * scale, 742 * scale, 744 * scale, 742 * scale), fill=axis_color, width=max(2, int(7 * scale)))
-    draw.line((286 * scale, 284 * scale, 286 * scale, 742 * scale), fill=axis_color, width=max(2, int(7 * scale)))
-
-    points = [
-        (318, 690),
-        (382, 636),
-        (444, 620),
-        (506, 546),
-        (570, 482),
-        (634, 502),
-        (700, 384),
+    primary_points = [
+        (198 * scale, 682 * scale),
+        (292 * scale, 622 * scale),
+        (390 * scale, 670 * scale),
+        (486 * scale, 536 * scale),
+        (572 * scale, 488 * scale),
+        (662 * scale, 338 * scale),
+        (804 * scale, 278 * scale),
     ]
-    smooth_points: list[tuple[float, float]] = []
-    for start, end in zip(points, points[1:]):
-        for step in range(10):
-            t = step / 10
-            x = start[0] + (end[0] - start[0]) * t
-            y = start[1] + (end[1] - start[1]) * t - math.sin(t * math.pi) * 18
-            smooth_points.append((x * scale, y * scale))
-    smooth_points.append((points[-1][0] * scale, points[-1][1] * scale))
+    secondary_points = [
+        (218 * scale, 566 * scale),
+        (344 * scale, 522 * scale),
+        (478 * scale, 454 * scale),
+        (614 * scale, 390 * scale),
+        (782 * scale, 202 * scale),
+    ]
+    primary_curve = _catmull_rom(primary_points)
+    secondary_curve = _catmull_rom(secondary_points)
 
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    glow_draw.line(smooth_points, fill=(31, 132, 255, 90), width=max(5, int(34 * scale)), joint="curve")
-    glow = glow.filter(ImageFilter.GaussianBlur(max(1, int(5 * scale))))
+    glow_draw.line(primary_curve, fill=(0, 120, 255, 155), width=max(5, int(78 * scale)), joint="curve")
+    glow_draw.line(secondary_curve, fill=(114, 91, 255, 96), width=max(4, int(42 * scale)), joint="curve")
+    glow = glow.filter(ImageFilter.GaussianBlur(max(1, int(15 * scale))))
+    glow.putalpha(Image.composite(glow.getchannel("A"), Image.new("L", (size, size), 0), outer_mask))
     image.alpha_composite(glow)
-    draw = ImageDraw.Draw(image)
-    draw.line(smooth_points, fill=(11, 111, 226, 255), width=max(4, int(23 * scale)), joint="curve")
-    draw.line(smooth_points, fill=(122, 197, 255, 230), width=max(2, int(9 * scale)), joint="curve")
 
-    for x, y in points[1:-1]:
-        radius = 18 * scale
+    draw = ImageDraw.Draw(image)
+    draw.line(secondary_curve, fill=(114, 95, 255, 168), width=max(2, int(18 * scale)), joint="curve")
+    draw.line(primary_curve, fill=(0, 101, 255, 255), width=max(4, int(38 * scale)), joint="curve")
+    draw.line(primary_curve, fill=(120, 221, 255, 240), width=max(2, int(13 * scale)), joint="curve")
+
+    for x, y in primary_points[1:-1]:
+        radius = 17 * scale
         draw.ellipse(
-            ((x * scale) - radius, (y * scale) - radius, (x * scale) + radius, (y * scale) + radius),
-            fill=(255, 255, 255, 238),
-            outline=(11, 111, 226, 230),
-            width=max(1, int(5 * scale)),
+            (x - radius, y - radius, x + radius, y + radius),
+            fill=(246, 252, 255, 246),
+            outline=(0, 103, 255, 220),
+            width=max(1, int(4 * scale)),
         )
 
-    draw.arc((144 * scale, 112 * scale, 880 * scale, 856 * scale), 210, 316, fill=(255, 255, 255, 86), width=max(1, int(12 * scale)))
+    draw.arc(
+        (118 * scale, 92 * scale, 906 * scale, 882 * scale),
+        206,
+        322,
+        fill=(255, 255, 255, 112),
+        width=max(1, int(14 * scale)),
+    )
+    draw.arc(
+        (172 * scale, 150 * scale, 858 * scale, 828 * scale),
+        218,
+        306,
+        fill=(255, 255, 255, 70),
+        width=max(1, int(7 * scale)),
+    )
     return image
 
 

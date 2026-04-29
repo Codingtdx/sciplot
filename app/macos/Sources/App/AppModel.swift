@@ -210,6 +210,14 @@ final class AppModel {
         requestedWorkbenchWindow = nil
     }
 
+    func newProject() {
+        cancelPendingPlotReplacement()
+        plotSession.newSession()
+        selectedWorkbench = .plot
+        requestedWorkbenchWindow = nil
+        refreshCodeConsoleContext()
+    }
+
     func beginLauncherPrimaryAction(for workbench: Workbench) {
         requestOpenWindow(for: workbench)
         beginImport(for: workbench)
@@ -452,13 +460,6 @@ final class AppModel {
     }
 
     func openPlotDocument(_ url: URL) {
-        if url.pathExtension.lowercased() == "sciplotgod" {
-            Task {
-                await openProjectDocument(url)
-                refreshCodeConsoleContext()
-            }
-            return
-        }
         selectedWorkbench = .plot
         requestOpenWindow(for: .plot)
         if plotSession.hasSessionContent {

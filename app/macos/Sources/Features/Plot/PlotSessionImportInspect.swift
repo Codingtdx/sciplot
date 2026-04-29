@@ -1,6 +1,16 @@
 import Foundation
 
 extension PlotSession {
+    func newSession() {
+        isImporterPresented = false
+        isDataWorkbookPresented = false
+        previewPixelBucket = nil
+        selectedPlotTool = .select
+        selectedPlotAdjustmentCategory = .figure
+        canvasSelection = .figure
+        clearPreviewContext(preserveRenderOptions: false)
+    }
+
     func handleImportedDocument(_ url: URL) {
         if url.pathExtension.lowercased() == "sciplotgod" {
             Task { await openProject(url) }

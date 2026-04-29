@@ -27,6 +27,7 @@ struct WorkbenchWindowRoot: View {
         .toolbar {
             WorkbenchWindowToolbarContent(workbench: workbench, model: model)
         }
+        .modifier(PlotReplacementConfirmationHost(model: model, isEnabled: workbench == .plot))
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .background(WindowToolbarConfigurator())
@@ -96,19 +97,6 @@ private struct AppWindowSharedChrome<Content: View>: View {
                     dismiss: { model.dismissQuickHelp() }
                 )
             }
-            .confirmationDialog(
-                "Replace the current Plot session?",
-                isPresented: $model.isPlotReplacementConfirmationPresented
-            ) {
-                Button("Replace Current Session", role: .destructive) {
-                    model.confirmPendingPlotReplacement()
-                }
-                Button("Cancel", role: .cancel) {
-                    model.cancelPendingPlotReplacement()
-                }
-            } message: {
-                Text("Opening a new Plot input will replace the current imported dataset and template state.")
-            }
     }
 
     private var appearanceMode: AppAppearanceMode {
@@ -130,6 +118,37 @@ struct WorkbenchWindowOpenHandler: ViewModifier {
                 AppWindowManager.shared.openWorkbenchAfterSceneAttempt(requestedWindow, model: model)
                 model.consumeRequestedWorkbenchWindow(requestedWindow)
             }
+    }
+}
+
+private struct PlotReplacementConfirmationHost: ViewModifier {
+    @Bindable var model: AppModel
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            "Replace the current Plot session?",
+            isPresented: replacementBinding
+        ) {
+            Button("Replace Current Session", role: .destructive) {
+                model.confirmPendingPlotReplacement()
+            }
+            Button("Cancel", role: .cancel) {
+                model.cancelPendingPlotReplacement()
+            }
+        } message: {
+            Text("Opening a new Plot input will replace the current imported dataset and template state.")
+        }
+    }
+
+    private var replacementBinding: Binding<Bool> {
+        Binding {
+            isEnabled && model.isPlotReplacementConfirmationPresented
+        } set: { isPresented in
+            if !isPresented, isEnabled {
+                model.cancelPendingPlotReplacement()
+            }
+        }
     }
 }
 
@@ -179,6 +198,15 @@ private struct WorkbenchWindowActionGroup: View {
             Divider()
                 .frame(height: 18)
                 .padding(.horizontal, 2)
+
+            Button {
+                model.newProject()
+                openWindow(id: "launcher")
+                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+            } label: {
+                Image(systemName: "document.badge.plus")
+            }
+            .help("New Project")
 
             Button {
                 model.showLauncher()

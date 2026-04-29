@@ -91,6 +91,33 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.codeConsoleSession.isImporterPresented)
     }
 
+    func testNewProjectClearsPlotStateAndRequestsLauncher() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+        model.plotSession.importFile(URL(fileURLWithPath: "/tmp/existing.csv"))
+        model.plotSession.chooseTemplate("curve")
+        model.plotSession.isDataWorkbookPresented = true
+        model.plotSession.errorMessage = "Old error"
+        model.plotSession.selectedPlotAdjustmentCategory = .legend
+
+        model.openInPlot(
+            inputURL: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
+            sheet: .name("Representative_Curve"),
+            templateID: "curve",
+            options: RenderOptionsPayload()
+        )
+        XCTAssertTrue(model.isPlotReplacementConfirmationPresented)
+
+        model.newProject()
+
+        XCTAssertFalse(model.isPlotReplacementConfirmationPresented)
+        XCTAssertNil(model.plotSession.selectedFileURL)
+        XCTAssertNil(model.plotSession.selectedTemplateID)
+        XCTAssertFalse(model.plotSession.isDataWorkbookPresented)
+        XCTAssertNil(model.plotSession.errorMessage)
+        XCTAssertEqual(model.plotSession.selectedPlotAdjustmentCategory, .figure)
+        XCTAssertNil(model.requestedWorkbenchWindow)
+    }
+
     func testPlotDataWorkbookToolbarActionOpensSourceDataTab() {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
@@ -168,6 +195,18 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertFalse(model.isPlotReplacementConfirmationPresented)
         XCTAssertEqual(model.plotSession.selectedFileURL?.path, "/tmp/prepared.xlsx")
+    }
+
+    func testOpenPlotDocumentRequestsPlotScopedReplacementForProjectFiles() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+        model.plotSession.importFile(URL(fileURLWithPath: "/tmp/existing.csv"))
+
+        model.openPlotDocument(URL(fileURLWithPath: "/tmp/next.sciplotgod"))
+
+        XCTAssertEqual(model.selectedWorkbench, .plot)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .plot)
+        XCTAssertTrue(model.isPlotReplacementConfirmationPresented)
+        XCTAssertEqual(model.plotSession.selectedFileURL?.path, "/tmp/existing.csv")
     }
 
     func testActiveExportAvailabilityTracksSelectedWorkbench() {

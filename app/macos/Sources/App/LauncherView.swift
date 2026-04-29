@@ -18,7 +18,7 @@ struct LauncherView: View {
                 }
             )
             .frame(width: 720)
-            .proGlassPanel(theme: theme, cornerRadius: 30)
+            .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)
         }
         .frame(width: 760, height: 460)
         .background(Color.clear)
@@ -133,13 +133,8 @@ private struct LauncherModuleEntryRow: View {
         .padding(.vertical, 14)
         .padding(.leading, 18)
         .padding(.trailing, 16)
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(theme.selectedRowFill)
-            }
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .proGlassRow(theme: theme, isSelected: isSelected, cornerRadius: ProCornerPolicy.row)
+        .contentShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
         .onTapGesture(perform: select)
     }
 
@@ -220,6 +215,8 @@ private struct LauncherCloseButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .background(theme.rowFill, in: Circle())
+        .clipShape(Circle())
+        .glassEffect(.regular.interactive(), in: Circle())
         .help("Close Launcher")
     }
 }

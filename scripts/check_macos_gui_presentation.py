@@ -98,6 +98,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "var requestedWorkbenchWindow: Workbench?",
             "func enterWorkbench(_ workbench: Workbench)",
             "func showLauncher()",
+            "func newProject()",
             "func beginLauncherPrimaryAction(for workbench: Workbench)",
             "func beginImport(for workbench: Workbench)",
             "func export(for workbench: Workbench) async",
@@ -117,7 +118,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=(
             "struct LauncherView",
             "GlassEffectContainer",
-            ".proGlassPanel(theme: theme, cornerRadius: 30)",
+            ".proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)",
             "LauncherWelcomeSurface",
             "LauncherModuleEntryRow",
             "LauncherCloseButton",
@@ -130,6 +131,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "dismiss()",
         ),
         forbidden=(
+            "confirmationDialog(",
             "LauncherBackdrop",
             "LauncherModulePreview",
             "PlotLauncherSketch",
@@ -158,6 +160,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'Menu("Appearance")',
             "ForEach(AppAppearanceMode.allCases)",
             "appearanceModeRawValue = mode.rawValue",
+            'Button("New Project")',
+            "model.newProject()",
             'CommandMenu("Plot Tools")',
             "model.plotSession.activatePlotTool(tool)",
             ".keyboardShortcut(shortcutKey, modifiers: [.command, .option])",
@@ -234,6 +238,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "rowFill",
             "selectedRowFill",
             "var isCodexLikeLightWorkspace",
+            "enum ProCornerPolicy",
             "func proGlassPanel",
             "func proGlassRail",
             "func proGlassRow",
@@ -802,6 +807,14 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                 )
         if not (root / "docs/assets/sciplot-god-app-icon.svg").exists():
             issues.append("docs/assets/sciplot-god-app-icon.svg: source icon artwork is missing")
+        else:
+            icon_source = _read_source(root, "docs/assets/sciplot-god-app-icon.svg")
+            for old_shell_token in ('<rect x="224" y="214"', 'width="576" height="610"', "white figure page"):
+                if old_shell_token in icon_source:
+                    issues.append(
+                        "docs/assets/sciplot-god-app-icon.svg: "
+                        "app icon must be an abstract native mark, not the old white chart page shell"
+                    )
     except AssertionError as error:
         issues.append(str(error))
 
@@ -870,6 +883,45 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                 )
     except (AssertionError, ValueError) as error:
         issues.append(f"app/macos/Sources/Features/Plot/PlotInspectorMode.swift: tool structure check failed: {error}")
+
+    try:
+        root_split = _read_source(root, "app/macos/Sources/App/RootSplitView.swift")
+        if "PlotReplacementConfirmationHost" not in root_split:
+            issues.append(
+                "app/macos/Sources/App/RootSplitView.swift: "
+                "Plot replacement confirmation must be hosted by the Plot window"
+            )
+        shared_chrome_start = root_split.index("private struct AppWindowSharedChrome")
+        shared_chrome_end = root_split.index("struct WorkbenchWindowOpenHandler", shared_chrome_start)
+        shared_chrome_source = root_split[shared_chrome_start:shared_chrome_end]
+        if "confirmationDialog(" in shared_chrome_source:
+            issues.append(
+                "app/macos/Sources/App/RootSplitView.swift: "
+                "shared window chrome must not present Plot replacement confirmation over Launcher"
+            )
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/App/RootSplitView.swift: Plot replacement host check failed: {error}")
+
+    try:
+        plot_inspector = _read_source(root, "app/macos/Sources/Features/Plot/PlotInspectorView.swift")
+        series_start = plot_inspector.index("private var seriesSection")
+        next_section = plot_inspector.find("\n    @ViewBuilder", series_start)
+        if next_section == -1:
+            next_section = plot_inspector.find("\n    private var", series_start + 1)
+        series_source = plot_inspector[series_start:next_section]
+        if 'DisclosureGroup("Advanced")' in series_source:
+            issues.append(
+                "app/macos/Sources/Features/Plot/PlotInspectorView.swift: "
+                "Legend order is the primary Legend function and must not be hidden in Advanced"
+            )
+        for required in ("SortableSeriesListView(", 'Button("Reset Series Order")'):
+            if required not in series_source:
+                issues.append(
+                    "app/macos/Sources/Features/Plot/PlotInspectorView.swift: "
+                    f"Legend section must expose {required!r} directly"
+                )
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/Features/Plot/PlotInspectorView.swift: Legend section check failed: {error}")
 
     for relative_path in WORKBENCH_ROOTS:
         try:

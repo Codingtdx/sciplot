@@ -34,6 +34,28 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-04-29: Plot import ownership, Legend visibility, rounded surfaces, and abstract app icon
+
+- What changed:
+  - Moved Plot replacement confirmation ownership into the Plot module window. Launcher can start a Plot import/open action, but it only opens/focuses Plot and delegates the actual replacement confirmation to Plot.
+  - Added explicit `New Project` entrypoints in commands and module toolbar utility chrome. New Project clears Plot session state, cancels pending replacement, and opens/focuses Launcher; ordinary Plot import stays in Plot.
+  - Simplified the Plot `Legend` inspector so `Legend order` and `Reset Series Order` are visible directly. `Advanced` is no longer used when a category has only one common action.
+  - Promoted `ProCornerPolicy` and widened use of shaped row/panel helpers so rounded Liquid Glass surfaces use a consistent corner hierarchy.
+  - Regenerated the macOS app icon as an abstract glass/data-flow symbol without a literal white chart page or window shell.
+
+- Design rationale:
+  - Importing a new Plot file is replacement inside Plot, not a request to leave the current workspace. Only the explicit New Project command should return users to the welcome surface.
+  - Inspector taxonomy follows workflow meaning over symmetry. A disclosure named `Advanced` should hide only low-frequency, diagnostic, output follow-up, or truly advanced controls.
+  - Rounded-corner consistency is a system rule: outer panels, rails, cards, rows, buttons, and preview/page surfaces need a clear decreasing radius hierarchy, with fill and clipping bound to the same shape.
+  - The icon should read like a native app mark at Dock size, so it now uses a luminous curve/data-node symbol and soft field rings instead of a screenshot-like chart page.
+
+- Verification to refresh for this round:
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`
+  - `.venv/bin/python -m pytest tests`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
+  - `.venv/bin/python scripts/blocking_gate.py`
+
 ### 2026-04-29: Liquid Glass theme repair, frontend handoff, and app icon
 
 - What changed:
@@ -46,7 +68,7 @@ Every development round must update this file.
 - Design rationale:
   - The user-visible issue was not just color choice: raw rectangular fills behind rounded glass panels caused square corners to show through. The fix centralizes shape, fill, clipping, outline, and native glass sampling in one helper.
   - Light mode now follows a clean near-white workspace direction instead of imitating the previous dark layout with gray fills. Plot's rendered page remains pure white in both themes.
-  - The app icon is a text-free chart glass mark so it stays readable in Dock and App Switcher sizes.
+  - The app icon is a text-free native glass/data mark so it stays readable in Dock and App Switcher sizes.
 
 - Verification to refresh for this round:
   - `.venv/bin/python scripts/check_macos_gui_presentation.py`
@@ -209,7 +231,7 @@ Every development round must update this file.
 - User-visible impact:
   - Opening the app shows only the Launcher. Choosing Plot, Data Studio, Composer, or Code Console opens/focuses that module in its own window.
   - Module windows no longer show a far-left module switcher or stacked project/module/content headers.
-  - Plot now follows the requested Pixelmator-style spatial layout: layers/objects left, figure page center, scientific inspector right, tools on the far right.
+  - Plot later evolved from that first Pixelmator-style pass into the current workflow layout: sheet/plot-type choice on the left, figure page center, scientific adjustment inspector right, and adjustment category rail on the far right.
   - Data Studio, Composer, and Code Console keep their existing internal workflows but live in independent module windows.
 
 - Decision Record:

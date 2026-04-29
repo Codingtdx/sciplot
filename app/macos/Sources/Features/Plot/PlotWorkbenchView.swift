@@ -174,7 +174,7 @@ private struct PlotSourceTypePanel: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(theme.rowFill, in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous))
+        .proGlassRow(theme: theme, cornerRadius: ProCornerPolicy.row)
     }
 
     private var sheetBinding: Binding<SheetValue> {
@@ -216,10 +216,7 @@ private struct PlotTypeCard: View {
         .buttonStyle(.plain)
         .disabled(!item.availability.isEnabled)
         .help(item.availability.reason ?? item.description ?? "Use \(item.title).")
-        .background {
-            RoundedRectangle(cornerRadius: ProWorkspaceMetrics.innerCornerRadius, style: .continuous)
-                .fill(isSelected ? theme.selectedRowFill : theme.rowFill)
-        }
+        .proGlassRow(theme: theme, isSelected: isSelected, cornerRadius: ProCornerPolicy.row)
     }
 }
 
@@ -343,6 +340,6 @@ private enum PlotAdjustmentRailMetrics {
     static let itemSize: CGFloat = 34
     static let itemSpacing: CGFloat = 4
     static let verticalPadding: CGFloat = 7
-    static let outerCornerRadius: CGFloat = 18
+    static let outerCornerRadius: CGFloat = ProCornerPolicy.rail
     static let itemCornerRadius: CGFloat = 10
 }
