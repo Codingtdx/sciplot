@@ -38,6 +38,8 @@ final class PlotSession {
     final class AsyncCoordination {
         let inspection = AsyncLatestTaskCoordinator()
         let preview = AsyncLatestTaskCoordinator()
+        let sourceTablePreview = AsyncLatestTaskCoordinator()
+        let fitAnalysis = AsyncLatestTaskCoordinator()
     }
 
     let previewDebounceNanoseconds: UInt64 = 250_000_000

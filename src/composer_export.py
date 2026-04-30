@@ -9,15 +9,14 @@ import fitz
 from PIL import Image
 
 from src.composer_assets import is_pdf_path, is_raster_path
-from src.composer_project import normalize_crop_rect, normalize_project
 from src.composer_preview import (
     PANEL_LABEL_FONT_SIZE_PT,
     crop_image,
     panel_label_origin_mm,
     panel_label_text,
-    panel_thumbnail_png,
     sorted_drawables,
 )
+from src.composer_project import normalize_crop_rect, normalize_project
 from src.composer_types import ComposerPanel, ComposerProject, ComposerText, mm_to_pt
 
 

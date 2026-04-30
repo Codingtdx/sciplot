@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-04-30T18:59:40+0800",
+  "samples": 20,
+  "warmup": 3,
+  "fixtures": {
+    "curve_csv": "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_t_5q4r2l/curve.csv",
+    "workbooks": [
+      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_t_5q4r2l/left.xlsx",
+      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_t_5q4r2l/right.xlsx"
+    ]
+  },
+  "measurements": {
+    "plot.preview.cold": {
+      "samples": 20,
+      "p50": 0.2799,
+      "p95": 0.2856,
+      "min": 0.2338,
+      "max": 0.2918,
+      "mean": 0.2679
+    },
+    "plot.preview.hot": {
+      "samples": 20,
+      "p50": 0.0008,
+      "p95": 0.0012,
+      "min": 0.0008,
+      "max": 0.0012,
+      "mean": 0.0009
+    },
+    "plot.export.cold": {
+      "samples": 20,
+      "p50": 0.2899,
+      "p95": 0.301,
+      "min": 0.2411,
+      "max": 0.3013,
+      "mean": 0.2754
+    },
+    "plot.export.hot": {
+      "samples": 20,
+      "p50": 0.2879,
+      "p95": 0.2929,
+      "min": 0.2365,
+      "max": 0.2977,
+      "mean": 0.2717
+    },
+    "data_studio.context.cold": {
+      "samples": 20,
+      "p50": 0.0013,
+      "p95": 0.0015,
+      "min": 0.0012,
+      "max": 0.0018,
+      "mean": 0.0013
+    },
+    "data_studio.context.hot": {
+      "samples": 20,
+      "p50": 0.0013,
+      "p95": 0.0014,
+      "min": 0.0012,
+      "max": 0.0014,
+      "mean": 0.0013
+    },
+    "data_studio.preview.cold": {
+      "samples": 20,
+      "p50": 0.301,
+      "p95": 0.3063,
+      "min": 0.2482,
+      "max": 0.3073,
+      "mean": 0.2864
+    },
+    "data_studio.preview.hot": {
+      "samples": 20,
+      "p50": 0.0013,
+      "p95": 0.0018,
+      "min": 0.0013,
+      "max": 0.0019,
+      "mean": 0.0014
+    },
+    "code_console.run.cold": {
+      "samples": 20,
+      "p50": 0.0028,
+      "p95": 0.0032,
+      "min": 0.0024,
+      "max": 0.0048,
+      "mean": 0.0029
+    },
+    "code_console.run.hot": {
+      "samples": 20,
+      "p50": 0.0027,
+      "p95": 0.0039,
+      "min": 0.0023,
+      "max": 0.0042,
+      "mean": 0.0028
+    }
+  }
+}

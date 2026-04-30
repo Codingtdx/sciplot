@@ -168,7 +168,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 - Clean:
   - `.venv/bin/python scripts/clean_repo.py`
 - Ruff:
-  - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
+  - `.venv/bin/python -m ruff check .`
 - Mypy:
   - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`
 - Pytest:

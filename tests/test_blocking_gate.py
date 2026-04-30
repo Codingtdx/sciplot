@@ -92,3 +92,9 @@ def test_automated_gate_includes_macos_gui_presentation_check() -> None:
     labels = [item.label for item in blocking_gate.AUTOMATED_GATE_COMMANDS]
 
     assert "macos_gui_presentation" in labels
+
+
+def test_automated_gate_runs_whole_repo_ruff() -> None:
+    ruff_command = next(item.command for item in blocking_gate.AUTOMATED_GATE_COMMANDS if item.label == "ruff")
+
+    assert ruff_command == (blocking_gate.PYTHON, "-m", "ruff", "check", ".")

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -57,10 +58,13 @@ def _bench_operation(
     samples: int,
     warmup: int,
     run_once: Callable[[int], None],
+    before_each: Callable[[], None] | None = None,
 ) -> dict[str, float | int]:
     timings: list[float] = []
     total = samples + warmup
     for index in range(total):
+        if before_each is not None:
+            before_each()
         started = time.perf_counter()
         run_once(index)
         elapsed = time.perf_counter() - started
@@ -68,6 +72,48 @@ def _bench_operation(
             timings.append(elapsed)
     print(f"[bench] {name}: {json.dumps(_stats(timings), ensure_ascii=False)}", flush=True)
     return _stats(timings)
+
+
+def _bench_hot_and_cold(
+    *,
+    name: str,
+    samples: int,
+    warmup: int,
+    run_once: Callable[[int], None],
+    clear_caches: Callable[[], None],
+) -> dict[str, dict[str, float | int]]:
+    cold_name = f"{name}.cold"
+    hot_name = f"{name}.hot"
+    return {
+        cold_name: _bench_operation(
+            name=cold_name,
+            samples=samples,
+            warmup=warmup,
+            run_once=run_once,
+            before_each=clear_caches,
+        ),
+        hot_name: _bench_operation(
+            name=hot_name,
+            samples=samples,
+            warmup=warmup,
+            run_once=run_once,
+        ),
+    }
+
+
+def clear_sidecar_hot_path_caches() -> None:
+    from app.sidecar import routes_render
+    from src.data_studio import comparison, workbooks
+    from src.rendering import cache as rendering_cache
+    from src.rendering import dataset_models, recommendation
+
+    rendering_cache.clear_input_cache()
+    dataset_models.clear_normalized_dataset_cache()
+    recommendation.clear_inspection_cache()
+    routes_render._RENDER_PREVIEW_CACHE.clear()  # noqa: SLF001
+    comparison._COMPARISON_PREVIEW_PDF_CACHE.clear()  # noqa: SLF001
+    workbooks._import_workbook_cached.cache_clear()  # noqa: SLF001
+    workbooks._load_workbook_specimen_bundle_cached.cache_clear()  # noqa: SLF001
 
 
 def run_benchmark(*, samples: int, warmup: int) -> dict[str, object]:
@@ -167,38 +213,52 @@ def run_benchmark(*, samples: int, warmup: int) -> dict[str, object]:
             if response.status_code != 200:
                 raise RuntimeError(response.text)
 
-        measurements = {
-            "plot.preview": _bench_operation(
+        measurements: dict[str, dict[str, float | int]] = {}
+        measurements.update(
+            _bench_hot_and_cold(
                 name="plot.preview",
                 samples=samples,
                 warmup=warmup,
                 run_once=plot_preview,
-            ),
-            "plot.export": _bench_operation(
+                clear_caches=clear_sidecar_hot_path_caches,
+            )
+        )
+        measurements.update(
+            _bench_hot_and_cold(
                 name="plot.export",
                 samples=samples,
                 warmup=warmup,
                 run_once=plot_export,
-            ),
-            "data_studio.context": _bench_operation(
+                clear_caches=clear_sidecar_hot_path_caches,
+            )
+        )
+        measurements.update(
+            _bench_hot_and_cold(
                 name="data_studio.context",
                 samples=samples,
                 warmup=warmup,
                 run_once=data_studio_context,
-            ),
-            "data_studio.preview": _bench_operation(
+                clear_caches=clear_sidecar_hot_path_caches,
+            )
+        )
+        measurements.update(
+            _bench_hot_and_cold(
                 name="data_studio.preview",
                 samples=samples,
                 warmup=warmup,
                 run_once=data_studio_preview,
-            ),
-            "code_console.run": _bench_operation(
+                clear_caches=clear_sidecar_hot_path_caches,
+            )
+        )
+        measurements.update(
+            _bench_hot_and_cold(
                 name="code_console.run",
                 samples=samples,
                 warmup=warmup,
                 run_once=code_console_run,
-            ),
-        }
+                clear_caches=clear_sidecar_hot_path_caches,
+            )
+        )
 
         return {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -219,7 +279,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("docs/performance/benchmark-2026-04-08.json"),
+        default=Path(f"docs/performance/benchmark-{datetime.now(UTC).date().isoformat()}.json"),
     )
     args = parser.parse_args()
 

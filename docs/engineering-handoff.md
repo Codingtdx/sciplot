@@ -19,7 +19,7 @@ Every development round must update this file.
    - `docs/product-architecture.md`
 2. Run full validation matrix:
    - `.venv/bin/python scripts/clean_repo.py`
-   - `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
+   - `.venv/bin/python -m ruff check .`
    - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`
    - `.venv/bin/python -m pytest tests`
    - `.venv/bin/python scripts/smoke_check.py`
@@ -33,6 +33,46 @@ Every development round must update this file.
    - Code Console: context bind -> run -> outputs/reveal
 
 ## 3) Decision Records
+
+### 2026-04-30: Review cleanup, whole-repo gate, async latest requests, and cold/hot benchmark
+
+- What changed:
+  - Finished the review/cleanup/performance pass from `/Users/dongxutian/Downloads/PLAN.md`.
+  - Made `scripts/blocking_gate.py` enforce whole-repo `ruff check .` and updated `README.md` / `AGENTS.md` / this runbook to match.
+  - Fixed `scripts/smoke_check.py --help` so help exits through argparse without running the smoke workspace.
+  - Cleaned the existing ruff findings across scripts and source files without changing public sidecar schemas, plot contract semantics, or project bundle format.
+  - Added cold/hot measurement variants to `scripts/benchmark_workbench_perf.py`; the default output now writes to the current UTC date instead of overwriting the old `2026-04-08` baseline.
+  - Routed Plot Data Workbook source-table and fit-analysis requests through `AsyncLatestTaskCoordinator`, so stale Source Data / Fit responses cannot overwrite newer state.
+  - Routed Data Studio import resolver segment preview through the same latest/cancel pattern and removed the local cancellation wrapper in favor of shared `isUserCancellationError`.
+
+- Decision Record:
+  - First-principles motivation: the previous guardrail shape allowed a green blocking gate while `ruff check .` still failed, and the existing benchmark mostly measured hot-cache paths. This round tightens the gate and makes the performance signal explicit without changing product contracts.
+  - Rejected a broad rendering rewrite because the new cold/hot benchmark did not isolate a single proven bottleneck beyond expected cold render/export cost.
+  - Current boundary: developer scripts, macOS async request ownership, lint cleanup, tests, docs, and benchmark reporting only.
+  - Failure condition: if stale Source Data / Fit / segment preview responses can overwrite newer UI state again, or if the blocking gate stops running whole-repo ruff, this cleanup has regressed.
+
+- Risks and rollback points:
+  - Plot request coordination rollback points: `PlotSession.swift`, `PlotSessionPreviewExport.swift`, and `PlotSessionTests.swift`.
+  - Data Studio request coordination rollback points: `DataStudioSession.swift`, `DataStudioSessionImportFlow.swift`, `DataStudioSessionTemplateDraft.swift`, and `DataStudioSessionTests.swift`.
+  - Developer script rollback points: `scripts/blocking_gate.py`, `scripts/smoke_check.py`, `scripts/benchmark_workbench_perf.py`, and their tests.
+  - Lint cleanup touched broad low-risk Python formatting/import sites; if behavior changes appear, compare the specific touched source module rather than reverting the whole pass.
+
+- Performance results:
+  - New report: `docs/performance/benchmark-2026-04-30-review-cleanup.json`.
+  - Default benchmark settings were used: 20 samples, 3 warmups.
+  - Key p50 values: `plot.preview.cold` 0.2799s, `plot.preview.hot` 0.0008s, `plot.export.cold` 0.2899s, `plot.export.hot` 0.2879s, `data_studio.preview.cold` 0.3010s, `data_studio.preview.hot` 0.0013s.
+  - Compared with `benchmark-2026-04-08.json`, hot-cache behavior remains in the same range while cold preview costs are now visible instead of hidden by cache reuse.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_smoke_check.py tests/test_blocking_gate.py tests/test_rendering_cache.py tests/test_benchmark_workbench_perf.py -q`: passed, 16 tests.
+  - `.venv/bin/python -m ruff check .`: passed.
+  - `.venv/bin/python scripts/smoke_check.py --help`: printed help and exited without running smoke.
+  - `xcodebuild test -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -configuration Debug -destination 'platform=macOS,arch=arm64' -only-testing:SciPlotGodMacTests/PlotSessionTests -only-testing:SciPlotGodMacTests/DataStudioSessionTests`: passed, 122 tests.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix.
+  - Gate details: `clean_repo`, whole-repo `ruff`, `mypy`, pytest 283 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 213 tests all passed.
+  - `.venv/bin/python scripts/benchmark_workbench_perf.py --output docs/performance/benchmark-2026-04-30-review-cleanup.json`: passed and wrote the cold/hot report.
+  - Known environment warnings: Xcode/CoreGraphics emitted existing hosted macOS warnings during GUI tests, but build and tests passed.
+  - Manual inner-beta evidence remains pending and unenforced; Computer Use visual spot-check was limited to launcher/module surface sanity after the automated gate.
 
 ### 2026-04-30: Launcher module-only entry and card-based Fit inspector
 

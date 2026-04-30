@@ -4,7 +4,6 @@ import csv
 from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
@@ -369,7 +368,7 @@ def _numeric_profile(values: list[str]) -> tuple[list[float], float, float, floa
 def _monotonic_score(values: list[float]) -> float:
     if len(values) < 3:
         return 0.0
-    diffs = [right - left for left, right in zip(values, values[1:]) if right != left]
+    diffs = [right - left for left, right in zip(values, values[1:], strict=False) if right != left]
     if not diffs:
         return 0.0
     non_negative = sum(1 for value in diffs if value >= 0) / len(diffs)
@@ -712,7 +711,13 @@ def _build_curve_pair_suggestion(
             adjacency_bonus = 0.16 if distance == 1 else max(0.0, 0.1 - 0.03 * (distance - 1))
             same_block_bonus = 0.2
             structural_bonus = left_monotonic * 0.22
-            score = x_candidate.confidence + y_candidate.confidence + adjacency_bonus + same_block_bonus + structural_bonus
+            score = (
+                x_candidate.confidence
+                + y_candidate.confidence
+                + adjacency_bonus
+                + same_block_bonus
+                + structural_bonus
+            )
             candidate_pairs.append((score, x_candidate, y_candidate))
     if not candidate_pairs:
         return None

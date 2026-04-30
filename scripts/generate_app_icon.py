@@ -6,13 +6,19 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ICON_DIR = REPO_ROOT / "app/macos/Assets.xcassets/AppIcon.appiconset"
 ASSET_ROOT = REPO_ROOT / "app/macos/Assets.xcassets"
 
 
-def _rounded_rect(draw: ImageDraw.ImageDraw, box: tuple[float, float, float, float], radius: float, fill, outline=None, width: int = 1) -> None:
+def _rounded_rect(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[float, float, float, float],
+    radius: float,
+    fill,
+    outline=None,
+    width: int = 1,
+) -> None:
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
 

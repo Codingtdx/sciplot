@@ -11,7 +11,6 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from src import plot_style
 from src.code_console_runner import DEFAULT_RUNNER_MANAGER
 from src.infrastructure.persistence.code_console_runs import prepare_managed_code_console_run_dir
 from src.infrastructure.runtime_cache import LRUCache

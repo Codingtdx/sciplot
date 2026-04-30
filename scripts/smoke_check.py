@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -2469,7 +2470,13 @@ def _run_smoke_workspace(base: Path) -> Path:
     )
 
 
-def main() -> int:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the SciPlot God public-surface smoke matrix.")
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parse_args(argv)
     capture_dir = os.environ.get(SMOKE_CAPTURE_DIR_ENV)
     if capture_dir:
         base = Path(capture_dir).expanduser()

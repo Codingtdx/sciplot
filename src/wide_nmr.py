@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-import tomllib
+
 from src.plot_contract import load_plot_contract
 
 _CONTRACT = load_plot_contract()

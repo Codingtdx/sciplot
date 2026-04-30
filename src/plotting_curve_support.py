@@ -231,7 +231,14 @@ CURVE_TEMPLATES: dict[str, CurveTemplate] = {
 
 _STANDARD_LEGEND_DEFAULT_ORDER = ("upper_right", "lower_right", "upper_left", "lower_left")
 _TENSILE_STANDARD_LEGEND_DEFAULT_ORDER = ("lower_right", "upper_right", "lower_left", "upper_left")
-_COMPACT_LEGEND_DEFAULT_ORDER = ("upper_center", "upper_right", "lower_right", "upper_left", "lower_left", "lower_center")
+_COMPACT_LEGEND_DEFAULT_ORDER = (
+    "upper_center",
+    "upper_right",
+    "lower_right",
+    "upper_left",
+    "lower_left",
+    "lower_center",
+)
 _TENSILE_COMPACT_LEGEND_DEFAULT_ORDER = (
     "lower_right",
     "upper_right",
@@ -285,11 +292,19 @@ def curve_legend_policy(
 ) -> LegendPlacementPolicy:
     profile = qa_profile("curve")
     if compact:
-        order_key = "tensile_compact_legend_candidate_order" if preserve_stress_label else "compact_legend_candidate_order"
+        order_key = (
+            "tensile_compact_legend_candidate_order"
+            if preserve_stress_label
+            else "compact_legend_candidate_order"
+        )
         default_order = (
             _TENSILE_COMPACT_LEGEND_DEFAULT_ORDER if preserve_stress_label else _COMPACT_LEGEND_DEFAULT_ORDER
         )
-        bias_key = "tensile_compact_legend_candidate_bias_step" if preserve_stress_label else "compact_legend_candidate_bias_step"
+        bias_key = (
+            "tensile_compact_legend_candidate_bias_step"
+            if preserve_stress_label
+            else "compact_legend_candidate_bias_step"
+        )
         default_bias = 25.0 if preserve_stress_label else 0.75
     else:
         order_key = "tensile_legend_candidate_order" if preserve_stress_label else "legend_candidate_order"

@@ -5,6 +5,19 @@ import pytest
 from scripts import smoke_check
 
 
+def test_help_exits_without_running_smoke(monkeypatch, capsys) -> None:
+    def fail_smoke(_base):
+        raise AssertionError("--help should not execute the smoke workspace")
+
+    monkeypatch.setattr(smoke_check, "_run_smoke_workspace", fail_smoke)
+
+    with pytest.raises(SystemExit) as exc_info:
+        smoke_check.main(["--help"])
+
+    assert exc_info.value.code == 0
+    assert "smoke" in capsys.readouterr().out.lower()
+
+
 def test_error_validation_fails_smoke_report_gate() -> None:
     reports = [
         {

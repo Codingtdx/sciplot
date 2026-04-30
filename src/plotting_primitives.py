@@ -748,7 +748,13 @@ def _resolved_major_ticks_for_density(
     if values.size == 0 or density_mode == "auto":
         return values
     if density_mode == "sparse":
-        target_count = max(2, min(values.size, min(max_major_ticks or _SPARSE_MAJOR_TICK_TARGET, _SPARSE_MAJOR_TICK_TARGET)))
+        target_count = max(
+            2,
+            min(
+                values.size,
+                min(max_major_ticks or _SPARSE_MAJOR_TICK_TARGET, _SPARSE_MAJOR_TICK_TARGET),
+            ),
+        )
         return _sparsify_major_ticks(values, target_count=target_count)
     if scale != "linear":
         return values

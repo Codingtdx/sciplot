@@ -4,13 +4,13 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from src import plot_style
-from src.plot_contract import template_names
 from src.data_studio.models import (
     DataStudioFigurePreference,
     DataStudioGroupState,
     DataStudioSessionPayload,
     DataStudioSpecimenState,
 )
+from src.plot_contract import template_names
 from src.rendering.fit_analysis import normalize_fit_options_payload
 from src.rendering.template_lifecycle import compatibility_template_ids, resolve_template_id
 

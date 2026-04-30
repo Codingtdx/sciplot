@@ -181,7 +181,7 @@ final class DataStudioSession {
                 selectedTemplateID = templates.first?.id
             }
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -264,6 +264,7 @@ final class DataStudioSession {
         projectURL = nil
         importedSourceURLs = []
         recommendedTemplateMatches = []
+        asyncCoordination.sourcePreview.cancel()
         sourcePreview = nil
         templatePreview = nil
         hoveredSuggestionID = nil
@@ -303,10 +304,6 @@ final class DataStudioSession {
         errorMessage = nil
         currentActivity = .idle
         runtimeState.lastSavedProjectSnapshot = nil
-    }
-
-    func isUserCancelled(_ error: Error) -> Bool {
-        isUserCancellationError(error)
     }
 
     var currentProjectSnapshot: ProjectSnapshot? {
@@ -408,6 +405,7 @@ extension DataStudioSession {
         let comparisonRefresh = AsyncLatestTaskCoordinator()
         let workbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
         let baselineWorkbookPreview = KeyedAsyncLatestTaskCoordinator<String>()
+        let sourcePreview = AsyncLatestTaskCoordinator()
     }
 
     enum DerivedState {
