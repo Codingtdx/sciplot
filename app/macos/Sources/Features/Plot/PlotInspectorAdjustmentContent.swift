@@ -218,18 +218,18 @@ struct PlotCanvasInteractionModeCard: View {
     @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             Image(systemName: mode.systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.74))
-                .frame(height: 22)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.70))
+                .frame(height: 20)
 
             Text(mode.title)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         }
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
@@ -239,6 +239,7 @@ struct PlotCanvasInteractionModeCard: View {
             RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
                 .strokeBorder(isSelected ? Color.accentColor.opacity(0.42) : theme.hairline, lineWidth: 1)
         }
+        .clipShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
     }
 }

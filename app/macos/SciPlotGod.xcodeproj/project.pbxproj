@@ -36,8 +36,8 @@
 		C00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift */; };
 		C00000000000000000000084 /* Sources/Features/Plot/PlotSelectedLayerEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000084 /* Sources/Features/Plot/PlotSelectedLayerEditorView.swift */; };
 		C00000000000000000000085 /* Sources/Features/Plot/PlotDataPipelineInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000085 /* Sources/Features/Plot/PlotDataPipelineInspectorView.swift */; };
-		C00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */; };
 		C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */; };
+		C00000000000000000000096 /* Sources/Features/Plot/PlotInteractivePreviewOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000096 /* Sources/Features/Plot/PlotInteractivePreviewOverlay.swift */; };
 		C0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */; };
 		C0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift */; };
 		C0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift */; };
@@ -146,8 +146,8 @@
 		B00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorLayerListView.swift; sourceTree = "<group>"; };
 		B00000000000000000000084 /* Sources/Features/Plot/PlotSelectedLayerEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotSelectedLayerEditorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000085 /* Sources/Features/Plot/PlotDataPipelineInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotDataPipelineInspectorView.swift; sourceTree = "<group>"; };
-		B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotOverlayTransformControls.swift; sourceTree = "<group>"; };
 		B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotRefineView.swift; sourceTree = "<group>"; };
+		B00000000000000000000096 /* Sources/Features/Plot/PlotInteractivePreviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInteractivePreviewOverlay.swift; sourceTree = "<group>"; };
 		B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotSession.swift; sourceTree = "<group>"; };
 		B0000000000000000000001B /* Sources/Features/Plot/PlotTemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotTemplateView.swift; sourceTree = "<group>"; };
 		B0000000000000000000001C /* Sources/Features/Plot/PlotWorkbenchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotWorkbenchView.swift; sourceTree = "<group>"; };
@@ -302,8 +302,8 @@
 				B00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift */,
 				B00000000000000000000084 /* Sources/Features/Plot/PlotSelectedLayerEditorView.swift */,
 				B00000000000000000000085 /* Sources/Features/Plot/PlotDataPipelineInspectorView.swift */,
-				B00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift */,
 				B00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift */,
+				B00000000000000000000096 /* Sources/Features/Plot/PlotInteractivePreviewOverlay.swift */,
 				B0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift */,
 				B00000000000000000000054 /* Sources/Features/Plot/PlotSessionPresentation.swift */,
 				B00000000000000000000055 /* Sources/Features/Plot/PlotSessionImportInspect.swift */,
@@ -509,8 +509,8 @@
 				C00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift in Sources */,
 				C00000000000000000000084 /* Sources/Features/Plot/PlotSelectedLayerEditorView.swift in Sources */,
 				C00000000000000000000085 /* Sources/Features/Plot/PlotDataPipelineInspectorView.swift in Sources */,
-				C00000000000000000000078 /* Sources/Features/Plot/PlotOverlayTransformControls.swift in Sources */,
 				C00000000000000000000019 /* Sources/Features/Plot/PlotRefineView.swift in Sources */,
+				C00000000000000000000096 /* Sources/Features/Plot/PlotInteractivePreviewOverlay.swift in Sources */,
 				C0000000000000000000001A /* Sources/Features/Plot/PlotSession.swift in Sources */,
 				C00000000000000000000054 /* Sources/Features/Plot/PlotSessionPresentation.swift in Sources */,
 				C00000000000000000000055 /* Sources/Features/Plot/PlotSessionImportInspect.swift in Sources */,

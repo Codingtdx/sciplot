@@ -5972,3 +5972,30 @@ Use this block for every new round:
   - `.venv/bin/python -m pytest tests -q`: passed, 279 tests.
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 210 tests.
   - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix.
+
+## 2026-04-30 - Plot Overlay Affordance Polish
+
+- Scope:
+  - Removed the button-like circular marker that appeared over selected text annotations in the Plot preview.
+  - Split the interactive preview overlay out of `PlotRefineView.swift` into its own focused file so the preview stage stays a shell.
+  - Deleted the stale `PlotOverlayTransformControls` HUD source and removed it from the Xcode project.
+
+- User-visible impact:
+  - Selected text annotations now show a quiet outline and short baseline rather than a blue circle.
+  - Callout target placement uses a small target tick instead of a dotted ring.
+  - Shape resize handles now use small rounded squares, matching the app's rounded-rectangle control grammar.
+  - Annotation mode cards are slightly tighter and clipped to their rounded shape.
+
+- Boundaries:
+  - No sidecar API, plot contract, project schema, preview render semantics, or export path changed.
+  - The overlay still draws only interaction affordances and writes existing typed payloads.
+
+- Validation:
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_check_macos_gui_presentation.py -q`: passed, 4 tests.
+  - `.venv/bin/python -m pytest tests -q`: passed, 280 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 210 tests.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix.
+  - Manual smoke: launched the debug app, opened Plot, imported `/private/tmp/sciplot_inner_beta_manual/curve_core_advanced.csv`, created a text annotation on the canvas, and confirmed the selected annotation no longer shows the old circular marker.

@@ -507,18 +507,18 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot preview owns the live preview stage and interactive overlay",
+        label="Plot preview owns only the live preview stage shell",
         path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
         required=(
             "PlotPreviewStage",
             "PlotStageDiagnosticBanner",
-            "Base64PreviewImageView(base64PNG:",
-            "Base64PDFPreviewView(base64PDF:",
-            "InteractivePlotOverlay",
-            "PlotPreviewCoordinateMapper",
-            "commitCanvasDraft",
+            "PlotInteractivePreviewSurface",
         ),
         forbidden=(
+            "struct PlotPreviewCoordinateMapper",
+            "struct InteractivePlotOverlay",
+            "drawExistingObjects",
+            "drawHandles",
             "PlotToolDock",
             "PlotFloatingToolPalette(",
             'EmptyStateCard(title: "No Preview")',
@@ -528,6 +528,26 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'title: "Preview"',
             "Option + Arrow",
             ".keyboardShortcut(shortcut, modifiers: [.option])",
+        ),
+    ),
+    SourceCheck(
+        label="Plot interactive overlay stays lightweight and avoids button-like text markers",
+        path="app/macos/Sources/Features/Plot/PlotInteractivePreviewOverlay.swift",
+        required=(
+            "PlotInteractivePreviewSurface",
+            "InteractivePlotOverlay",
+            "PlotPreviewCoordinateMapper",
+            "Base64PreviewImageView(base64PNG:",
+            "Base64PDFPreviewView(base64PDF:",
+            "commitCanvasDraft",
+            "drawTextSelection",
+            "drawTargetTick",
+            "drawRoundedSquareHandles",
+        ),
+        forbidden=(
+            "Path(ellipseIn: rect.insetBy",
+            "Path(ellipseIn: handleRect)",
+            "drawHandles(for:",
         ),
     ),
     SourceCheck(
@@ -551,7 +571,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     ),
     SourceCheck(
         label="Plot canvas overlay controls avoid localized text symbol labels",
-        path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
+        path="app/macos/Sources/Features/Plot/PlotInteractivePreviewOverlay.swift",
         forbidden=(
             'return "textformat"',
             '"textformat"',
@@ -1087,6 +1107,21 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                 )
     except (AssertionError, ValueError) as error:
         issues.append(f"app/macos/Sources/Features/Plot/PlotRefineView.swift: preview shadow check failed: {error}")
+
+    try:
+        project_source = _read_source(root, "app/macos/SciPlotGod.xcodeproj/project.pbxproj")
+        if "PlotOverlayTransformControls.swift" in project_source:
+            issues.append(
+                "app/macos/SciPlotGod.xcodeproj/project.pbxproj: "
+                "stale PlotOverlayTransformControls source must not be part of the build"
+            )
+        if (root / "app/macos/Sources/Features/Plot/PlotOverlayTransformControls.swift").exists():
+            issues.append(
+                "app/macos/Sources/Features/Plot/PlotOverlayTransformControls.swift: "
+                "stale canvas HUD source must be deleted"
+            )
+    except AssertionError as error:
+        issues.append(str(error))
 
     for relative_path in WORKBENCH_ROOTS:
         try:

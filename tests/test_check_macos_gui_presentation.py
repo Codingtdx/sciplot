@@ -259,11 +259,7 @@ struct PlotSelectedLayerEditorView {
 """,
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": """
 PlotPreviewStage(session: session)
-Base64PreviewImageView(base64PNG: previewPNG)
-Base64PDFPreviewView(base64PDF: preview.pdfBase64)
-InteractivePlotOverlay(session: session, mapper: mapper)
-PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: size)
-commitCanvasDraft(.text(point: point, displayStyle: "plain", connectorTarget: nil))
+PlotInteractivePreviewSurface(session: session, preview: preview)
 ProgressView()
 struct PlotStageDiagnosticBanner {
     let shape = RoundedRectangle(cornerRadius: 14)
@@ -271,6 +267,17 @@ struct PlotStageDiagnosticBanner {
 private struct PlotEmptyPreviewPage {
     let shape = RoundedRectangle(cornerRadius: 8)
 }
+""",
+        "app/macos/Sources/Features/Plot/PlotInteractivePreviewOverlay.swift": """
+PlotInteractivePreviewSurface(session: session, preview: preview)
+InteractivePlotOverlay(session: session, mapper: mapper)
+PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: size)
+Base64PreviewImageView(base64PNG: previewPNG)
+Base64PDFPreviewView(base64PDF: preview.pdfBase64)
+commitCanvasDraft(.text(point: point, displayStyle: "plain", connectorTarget: nil))
+drawTextSelection(at: point, in: &context)
+drawTargetTick(at: point, in: &context)
+drawRoundedSquareHandles(for: annotation, rect: rect, in: &context)
 """,
         "app/macos/Sources/Features/Plot/PlotInspectorMode.swift": """
 enum PlotAdjustmentCategory {
@@ -375,6 +382,8 @@ extension View {
 Assets.xcassets
 Assets.xcassets in Resources
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+Sources/Features/Plot/PlotRefineView.swift
+Sources/Features/Plot/PlotInteractivePreviewOverlay.swift
 """,
         "app/macos/Assets.xcassets/AppIcon.appiconset/Contents.json": """
 {
@@ -540,6 +549,30 @@ def test_gui_presentation_checks_report_forbidden_card_grammar(tmp_path: Path) -
     issues = check_macos_gui_presentation.run_checks(tmp_path)
 
     assert any("PlotTemplateCard" in issue for issue in issues)
+
+
+def test_gui_presentation_checks_reject_button_like_text_overlay_marker(tmp_path: Path) -> None:
+    _write_sources(
+        tmp_path,
+        {
+            "app/macos/Sources/Features/Plot/PlotInteractivePreviewOverlay.swift": """
+PlotInteractivePreviewSurface(session: session, preview: preview)
+InteractivePlotOverlay(session: session, mapper: mapper)
+PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: size)
+Base64PreviewImageView(base64PNG: previewPNG)
+Base64PDFPreviewView(base64PDF: preview.pdfBase64)
+commitCanvasDraft(.text(point: point, displayStyle: "plain", connectorTarget: nil))
+drawTextSelection(at: point, in: &context)
+drawTargetTick(at: point, in: &context)
+drawRoundedSquareHandles(for: annotation, rect: rect, in: &context)
+context.stroke(Path(ellipseIn: rect.insetBy(dx: -4, dy: -4)), with: .color(accent), lineWidth: 2)
+""",
+        },
+    )
+
+    issues = check_macos_gui_presentation.run_checks(tmp_path)
+
+    assert any("button-like text markers" in issue for issue in issues)
 
 
 def test_gui_presentation_checks_reject_duplicate_app_commands(tmp_path: Path) -> None:
