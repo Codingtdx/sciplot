@@ -80,9 +80,14 @@ struct PlotStageDiagnosticBanner: View {
     let message: String
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
         DiagnosticIssueCard(message: DiagnosticMessage(detail: message))
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.black.opacity(0.24), radius: 18, x: 0, y: 8)
+            .background(.regularMaterial, in: shape)
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            }
     }
 }
 
@@ -94,7 +99,10 @@ private struct PlotEmptyPreviewPage: View {
         ZStack {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.26), radius: 24, x: 0, y: 18)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.10), lineWidth: 1)
+                }
 
             if isBusy {
                 ProgressView()

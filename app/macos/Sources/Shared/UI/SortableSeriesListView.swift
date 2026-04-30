@@ -68,7 +68,6 @@ struct SortableSeriesListView: View {
             }
         }
         .padding(12)
-        .background(theme.rowFill.opacity(0.7), in: RoundedRectangle(cornerRadius: ProCornerPolicy.preview, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: ProCornerPolicy.preview, style: .continuous))
+        .proGlassRow(theme: theme, cornerRadius: ProCornerPolicy.preview)
     }
 }

@@ -46,7 +46,11 @@ Plot is the visual benchmark. It follows a Pixelmator-Pro-like arrangement while
 
 Plot preview uses the backend renderer. Swift displays high-resolution PNG for live preview and keeps PDF as the exact/export-grade fallback; do not recreate plotting semantics in Swift Charts or Canvas.
 
+The preview page should read like a real output surface, not a decorative card. Empty pages, PNG/PDF previews, and stage diagnostic banners use flat shaped surfaces with a hairline border only. Do not add drop shadows behind the figure page; the dark or light stage already provides enough separation.
+
 Legend is a good example of the interaction principle: if the category has one primary useful action, show it directly. `Legend order` and `Reset Series Order` belong at the top level of the Legend inspector. Do not bury them in an `Advanced` disclosure just to make every inspector category look symmetrical.
+
+Axes follow the same rule. Scale, range, baseline, and tick-label density are the main Axes workflow and should be visible in the Axes category. Secondary axes and broken axes belong in the separate `Advanced Axes` category instead of being duplicated or hidden inside a generic Advanced disclosure.
 
 ## Data Studio
 
@@ -123,5 +127,18 @@ When changing the macOS frontend:
 3. Route global actions through toolbar/menu command context.
 4. Use `ProWorkspaceTheme` and shaped glass helpers for custom surfaces.
 5. Keep Plot's page preview white across themes.
-6. Keep common or sole category actions visible; reserve `Advanced` for real advanced or follow-up work.
-7. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.
+6. Keep preview surfaces flat: no decorative shadow behind scientific output.
+7. Keep common or sole category actions visible; reserve `Advanced` for real advanced or follow-up work.
+8. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.
+
+## Frontend File Boundaries
+
+Keep SwiftUI files organized around user workflow responsibility, not around historical accumulation.
+
+- `PlotInspectorView` is only the inspector shell and selection router.
+- Plot inspector sections live beside it by responsibility: adjustment category content, figure/axis/legend controls, object rows, binding helpers, and advanced-axis controls.
+- `DataStudioWorkbenchView` is only the three-column workspace root and modal/import host.
+- Data Studio rail, preview workspace, and analysis sheet each live in their own view files.
+- Data Studio session extensions are split by workflow: import presentation, import flow, template draft, specimen presentation, specimen actions, figure workflow, project/export, analysis, and comparison refresh.
+
+When a file starts mixing view layout, async orchestration, presentation copy, and persistence payloads, split it in the same style before adding new behavior. The goal is not small files for their own sake; it is making the current workflow and ownership obvious to the next person.

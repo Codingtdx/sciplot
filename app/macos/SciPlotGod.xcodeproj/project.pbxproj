@@ -89,6 +89,20 @@
 		C00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */; };
 		C00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */; };
 		C00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */; };
+		C00000000000000000000087 /* Sources/Features/Plot/PlotInspectorAdjustmentContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000087 /* Sources/Features/Plot/PlotInspectorAdjustmentContent.swift */; };
+		C00000000000000000000088 /* Sources/Features/Plot/PlotInspectorFigureAxisSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000088 /* Sources/Features/Plot/PlotInspectorFigureAxisSections.swift */; };
+		C00000000000000000000089 /* Sources/Features/Plot/PlotInspectorObjectSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000089 /* Sources/Features/Plot/PlotInspectorObjectSections.swift */; };
+		C0000000000000000000008A /* Sources/Features/Plot/PlotInspectorBindingHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008A /* Sources/Features/Plot/PlotInspectorBindingHelpers.swift */; };
+		C0000000000000000000008B /* Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008B /* Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift */; };
+		C0000000000000000000008C /* Sources/Features/DataStudio/DataStudioGroupRailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008C /* Sources/Features/DataStudio/DataStudioGroupRailView.swift */; };
+		C0000000000000000000008D /* Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008D /* Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift */; };
+		C0000000000000000000008E /* Sources/Features/DataStudio/DataStudioAnalysisSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008E /* Sources/Features/DataStudio/DataStudioAnalysisSheet.swift */; };
+		C0000000000000000000008F /* Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000008F /* Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift */; };
+		C00000000000000000000090 /* Sources/Features/DataStudio/DataStudioSessionProjectExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000090 /* Sources/Features/DataStudio/DataStudioSessionProjectExport.swift */; };
+		C00000000000000000000091 /* Sources/Features/DataStudio/DataStudioSessionAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000091 /* Sources/Features/DataStudio/DataStudioSessionAnalysis.swift */; };
+		C00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift */; };
+		C00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift */; };
+		C00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -184,6 +198,20 @@
 		B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift; sourceTree = "<group>"; };
 		B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift; sourceTree = "<group>"; };
 		B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionComparison.swift; sourceTree = "<group>"; };
+		B00000000000000000000087 /* Sources/Features/Plot/PlotInspectorAdjustmentContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorAdjustmentContent.swift; sourceTree = "<group>"; };
+		B00000000000000000000088 /* Sources/Features/Plot/PlotInspectorFigureAxisSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorFigureAxisSections.swift; sourceTree = "<group>"; };
+		B00000000000000000000089 /* Sources/Features/Plot/PlotInspectorObjectSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorObjectSections.swift; sourceTree = "<group>"; };
+		B0000000000000000000008A /* Sources/Features/Plot/PlotInspectorBindingHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorBindingHelpers.swift; sourceTree = "<group>"; };
+		B0000000000000000000008B /* Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift; sourceTree = "<group>"; };
+		B0000000000000000000008C /* Sources/Features/DataStudio/DataStudioGroupRailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioGroupRailView.swift; sourceTree = "<group>"; };
+		B0000000000000000000008D /* Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift; sourceTree = "<group>"; };
+		B0000000000000000000008E /* Sources/Features/DataStudio/DataStudioAnalysisSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioAnalysisSheet.swift; sourceTree = "<group>"; };
+		B0000000000000000000008F /* Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift; sourceTree = "<group>"; };
+		B00000000000000000000090 /* Sources/Features/DataStudio/DataStudioSessionProjectExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionProjectExport.swift; sourceTree = "<group>"; };
+		B00000000000000000000091 /* Sources/Features/DataStudio/DataStudioSessionAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionAnalysis.swift; sourceTree = "<group>"; };
+		B00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift; sourceTree = "<group>"; };
+		B00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionImportFlow.swift; sourceTree = "<group>"; };
+		B00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift; sourceTree = "<group>"; };
 		A00000000000000000000008 /* SciPlot God.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot God.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000009 /* SciPlotGodMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotGodMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -244,15 +272,29 @@
 				B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */,
 				B00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift */,
 				B00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift */,
+				B00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift */,
+				B00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift */,
 				B00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift */,
+				B00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift */,
 				B00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift */,
+				B0000000000000000000008F /* Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift */,
+				B00000000000000000000090 /* Sources/Features/DataStudio/DataStudioSessionProjectExport.swift */,
+				B00000000000000000000091 /* Sources/Features/DataStudio/DataStudioSessionAnalysis.swift */,
 				B00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift */,
 				B00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift */,
 				B0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift */,
+				B0000000000000000000008C /* Sources/Features/DataStudio/DataStudioGroupRailView.swift */,
+				B0000000000000000000008D /* Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift */,
+				B0000000000000000000008E /* Sources/Features/DataStudio/DataStudioAnalysisSheet.swift */,
 				B00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift */,
 				B00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift */,
 				B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */,
 				B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */,
+				B00000000000000000000087 /* Sources/Features/Plot/PlotInspectorAdjustmentContent.swift */,
+				B00000000000000000000088 /* Sources/Features/Plot/PlotInspectorFigureAxisSections.swift */,
+				B00000000000000000000089 /* Sources/Features/Plot/PlotInspectorObjectSections.swift */,
+				B0000000000000000000008A /* Sources/Features/Plot/PlotInspectorBindingHelpers.swift */,
+				B0000000000000000000008B /* Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift */,
 				B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */,
 				B00000000000000000000082 /* Sources/Features/Plot/PlotInspectorMode.swift */,
 				B00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift */,
@@ -436,15 +478,29 @@
 				C0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift in Sources */,
 				C00000000000000000000043 /* Sources/Features/DataStudio/DataStudioSessionTypes.swift in Sources */,
 				C00000000000000000000048 /* Sources/Features/DataStudio/DataStudioSessionImportTemplate.swift in Sources */,
+				C00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift in Sources */,
+				C00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift in Sources */,
 				C00000000000000000000049 /* Sources/Features/DataStudio/DataStudioSessionSpecimenFilter.swift in Sources */,
+				C00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift in Sources */,
 				C00000000000000000000050 /* Sources/Features/DataStudio/DataStudioSessionComparison.swift in Sources */,
+				C0000000000000000000008F /* Sources/Features/DataStudio/DataStudioSessionFigureWorkflow.swift in Sources */,
+				C00000000000000000000090 /* Sources/Features/DataStudio/DataStudioSessionProjectExport.swift in Sources */,
+				C00000000000000000000091 /* Sources/Features/DataStudio/DataStudioSessionAnalysis.swift in Sources */,
 				C00000000000000000000046 /* Sources/Features/DataStudio/DataStudioImportWorkflowViews.swift in Sources */,
 				C00000000000000000000047 /* Sources/Features/DataStudio/DataStudioTemplateEditorViews.swift in Sources */,
 				C0000000000000000000003F /* Sources/Features/DataStudio/DataStudioWorkbenchView.swift in Sources */,
+				C0000000000000000000008C /* Sources/Features/DataStudio/DataStudioGroupRailView.swift in Sources */,
+				C0000000000000000000008D /* Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift in Sources */,
+				C0000000000000000000008E /* Sources/Features/DataStudio/DataStudioAnalysisSheet.swift in Sources */,
 				C00000000000000000000045 /* Sources/Features/DataStudio/DataStudioWorkbenchSpecimenViews.swift in Sources */,
 				C00000000000000000000040 /* Sources/Features/DataStudio/DataStudioInspectorView.swift in Sources */,
 				C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */,
 				C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */,
+				C00000000000000000000087 /* Sources/Features/Plot/PlotInspectorAdjustmentContent.swift in Sources */,
+				C00000000000000000000088 /* Sources/Features/Plot/PlotInspectorFigureAxisSections.swift in Sources */,
+				C00000000000000000000089 /* Sources/Features/Plot/PlotInspectorObjectSections.swift in Sources */,
+				C0000000000000000000008A /* Sources/Features/Plot/PlotInspectorBindingHelpers.swift in Sources */,
+				C0000000000000000000008B /* Sources/Features/Plot/PlotInspectorAdvancedAxisSections.swift in Sources */,
 				C00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift in Sources */,
 				C00000000000000000000082 /* Sources/Features/Plot/PlotInspectorMode.swift in Sources */,
 				C00000000000000000000083 /* Sources/Features/Plot/PlotInspectorLayerListView.swift in Sources */,

@@ -338,11 +338,35 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot inspector supports explicit adjustment categories",
+        label="Plot inspector routes explicit adjustment categories",
         path="app/macos/Sources/Features/Plot/PlotInspectorView.swift",
         required=(
             "adjustmentCategory: PlotAdjustmentCategory?",
             "adjustmentCategoryContent",
+            "PlotSelectionInspectorView",
+            "session.canvasSelection",
+            "PlotSelectedLayerEditorView(",
+        ),
+        forbidden=(
+            "PlotInspectorModePicker(",
+            "PlotDataPipelineInspectorView(",
+            "PlotInspectorLayerListView(",
+            "Form {",
+            "Section(styleSectionTitle)",
+            'Section("Actions")',
+            'Section("Axis")',
+            'Section("Advanced Plot")',
+            'InspectorSection(title: "Advanced Plot")',
+            'InspectorEmptyState(message: "No figure controls")',
+            "PlotExportInspectorSection",
+            'Button("Export")',
+            ".formStyle(",
+        ),
+    ),
+    SourceCheck(
+        label="Plot adjustment sections stay grouped by drawing workflow",
+        path="app/macos/Sources/Features/Plot/PlotInspectorAdjustmentContent.swift",
+        required=(
             "figureAdjustmentContent",
             "axesAdjustmentContent",
             "legendAdjustmentContent",
@@ -351,16 +375,30 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "functionsAdjustmentContent",
             "annotationsAdjustmentContent",
             "advancedAxesAdjustmentContent",
-            "PlotSelectionInspectorView",
-            "session.canvasSelection",
-            "PlotSelectedLayerEditorView(",
-            'InspectorSection(title: "Axis")',
-            'InspectorSection(title: "Fit Overlay")',
+            'InspectorSection(title: "Guides")',
+            'InspectorSection(title: "Functions")',
+            'InspectorSection(title: "Annotations")',
+            'InspectorSection(title: "Advanced Axes")',
         ),
         forbidden=(
-            "PlotInspectorModePicker(",
-            "PlotDataPipelineInspectorView(",
-            "PlotInspectorLayerListView(",
+            "PlotFloatingToolPalette(",
+            ".popover(",
+            'Button("Export")',
+        ),
+    ),
+    SourceCheck(
+        label="Plot figure axis legend controls stay in focused files",
+        path="app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift",
+        required=(
+            "plotOptionsSection",
+            "axesSection",
+            "seriesSection",
+            'InspectorSection(title: "Axis")',
+            'InspectorSection(title: "Fit Overlay")',
+            "SortableSeriesListView(",
+            'Button("Reset Series Order")',
+        ),
+        forbidden=(
             "Form {",
             "Section(styleSectionTitle)",
             'Section("Actions")',
@@ -517,15 +555,12 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="Data Studio uses Plot-style preparation workspace",
         path="app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift",
         required=(
-            'WorkbenchRailTitle(title: "Workbook Groups"',
-            "DataStudioFigureRailSection",
-            "DataStudioFigureRailRow",
-            "figureFamilyBinding",
             "DataStudioPreparationInspectorView(session: session)",
-            "PlotRefineView(session: session.plotSession)",
+            "DataStudioGroupRailView(session: session)",
+            "DataStudioPreviewWorkspaceView(session: session)",
+            "DataStudioAnalysisSheet(session: session)",
             "isInspectorPresented",
             "@Environment(\\.proWorkspaceTheme)",
-            ".glassEffect(",
         ),
         forbidden=(
             'EmptyStateCard(title: "No groups")',
@@ -537,6 +572,36 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "HSplitView",
             "WorkbenchTwoPaneWindow",
             ".preferredColorScheme(.dark)",
+        ),
+    ),
+    SourceCheck(
+        label="Data Studio left rail owns group and figure selection",
+        path="app/macos/Sources/Features/DataStudio/DataStudioGroupRailView.swift",
+        required=(
+            'WorkbenchRailTitle(title: "Workbook Groups"',
+            "DataStudioFigureRailSection",
+            "DataStudioFigureRailRow",
+            "figureFamilyBinding",
+            "proGlassPanel(theme: theme)",
+        ),
+        forbidden=(
+            'SubtleStageHint(title: "Import workbook groups"',
+            "WorkbenchTwoPaneWindow",
+            'Label("Import"',
+        ),
+    ),
+    SourceCheck(
+        label="Data Studio preview workspace reuses Plot preview without onboarding cards",
+        path="app/macos/Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift",
+        required=(
+            "PlotRefineView(session: session.plotSession)",
+            "DataStudioFocusedWorkbookStrip",
+            "DataStudioInlinePreviewBanner",
+        ),
+        forbidden=(
+            'SubtleStageHint(title: "Import groups to choose figures"',
+            'title: "Import source files to build workbook groups"',
+            "Import raw data to build workbook groups.",
         ),
     ),
     SourceCheck(
@@ -704,6 +769,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
 
 INSPECTOR_FILES = (
     "app/macos/Sources/Features/Plot/PlotInspectorView.swift",
+    "app/macos/Sources/Features/Plot/PlotInspectorAdjustmentContent.swift",
+    "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift",
     "app/macos/Sources/Features/DataStudio/DataStudioInspectorView.swift",
     "app/macos/Sources/Features/Composer/ComposerInspectorView.swift",
     "app/macos/Sources/Features/CodeConsole/CodeConsoleContextView.swift",
@@ -712,6 +779,8 @@ INSPECTOR_FILES = (
 WORKBENCH_ROOTS = (
     "app/macos/Sources/Features/Plot/PlotWorkbenchView.swift",
     "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift",
+    "app/macos/Sources/Features/DataStudio/DataStudioGroupRailView.swift",
+    "app/macos/Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift",
     "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift",
     "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift",
 )
@@ -903,25 +972,59 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         issues.append(f"app/macos/Sources/App/RootSplitView.swift: Plot replacement host check failed: {error}")
 
     try:
-        plot_inspector = _read_source(root, "app/macos/Sources/Features/Plot/PlotInspectorView.swift")
-        series_start = plot_inspector.index("private var seriesSection")
+        plot_inspector = _read_source(root, "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift")
+        series_start = plot_inspector.index("var seriesSection")
         next_section = plot_inspector.find("\n    @ViewBuilder", series_start)
         if next_section == -1:
-            next_section = plot_inspector.find("\n    private var", series_start + 1)
+            next_section = plot_inspector.find("\n    var", series_start + 1)
         series_source = plot_inspector[series_start:next_section]
         if 'DisclosureGroup("Advanced")' in series_source:
             issues.append(
-                "app/macos/Sources/Features/Plot/PlotInspectorView.swift: "
+                "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift: "
                 "Legend order is the primary Legend function and must not be hidden in Advanced"
             )
         for required in ("SortableSeriesListView(", 'Button("Reset Series Order")'):
             if required not in series_source:
                 issues.append(
-                    "app/macos/Sources/Features/Plot/PlotInspectorView.swift: "
+                    "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift: "
                     f"Legend section must expose {required!r} directly"
                 )
+        axes_start = plot_inspector.index("var axesSection")
+        axes_end = plot_inspector.index("var fitOverlaySection", axes_start)
+        axes_source = plot_inspector[axes_start:axes_end]
+        if 'DisclosureGroup("Advanced")' in axes_source:
+            issues.append(
+                "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift: "
+                "Axis range and tick controls are primary Axes controls and must not be hidden in Advanced"
+            )
+        for required in ("axisScaleControls", "axisRangeControls"):
+            if required not in axes_source:
+                issues.append(
+                    "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift: "
+                    f"Axes section must expose {required!r} directly"
+                )
     except (AssertionError, ValueError) as error:
-        issues.append(f"app/macos/Sources/Features/Plot/PlotInspectorView.swift: Legend section check failed: {error}")
+        issues.append(
+            "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift: "
+            f"Legend/Axes section check failed: {error}"
+        )
+
+    try:
+        plot_refine = _read_source(root, "app/macos/Sources/Features/Plot/PlotRefineView.swift")
+        for marker in ("struct PlotStageDiagnosticBanner", "private struct PlotEmptyPreviewPage"):
+            marker_start = plot_refine.index(marker)
+            next_struct = plot_refine.find("\nstruct ", marker_start + 1)
+            next_private_struct = plot_refine.find("\nprivate struct ", marker_start + 1)
+            candidates = [idx for idx in (next_struct, next_private_struct) if idx != -1]
+            marker_end = min(candidates) if candidates else len(plot_refine)
+            marker_source = plot_refine[marker_start:marker_end]
+            if ".shadow(" in marker_source:
+                issues.append(
+                    "app/macos/Sources/Features/Plot/PlotRefineView.swift: "
+                    f"{marker} must not add decorative shadow behind the preview stage"
+                )
+    except (AssertionError, ValueError) as error:
+        issues.append(f"app/macos/Sources/Features/Plot/PlotRefineView.swift: preview shadow check failed: {error}")
 
     for relative_path in WORKBENCH_ROOTS:
         try:

@@ -171,26 +171,45 @@ struct PlotTemplateLibraryView {
 ScrollView {
     adjustmentCategory: PlotAdjustmentCategory?
     adjustmentCategoryContent
-    figureAdjustmentContent
-    axesAdjustmentContent
-    legendAdjustmentContent
-    guidesAdjustmentContent
-    fitAdjustmentContent
-    functionsAdjustmentContent
-    annotationsAdjustmentContent
-    advancedAxesAdjustmentContent
     PlotSelectionInspectorView()
     session.canvasSelection
     PlotSelectedLayerEditorView()
-    InspectorSection(title: "Axis") {}
-    InspectorSection(title: "Fit Overlay") {}
+    InspectorSection(title: "Selection") {}
 }
-private var seriesSection: some View {
+""",
+        "app/macos/Sources/Features/Plot/PlotInspectorAdjustmentContent.swift": """
+figureAdjustmentContent
+axesAdjustmentContent
+legendAdjustmentContent
+guidesAdjustmentContent
+fitAdjustmentContent
+functionsAdjustmentContent
+annotationsAdjustmentContent
+advancedAxesAdjustmentContent
+InspectorSection(title: "Guides")
+InspectorSection(title: "Functions")
+InspectorSection(title: "Annotations")
+InspectorSection(title: "Advanced Axes")
+""",
+        "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift": """
+plotOptionsSection
+axesSection
+seriesSection
+InspectorSection(title: "Axis") {}
+InspectorSection(title: "Fit Overlay") {}
+var seriesSection: some View {
     InspectorSection(title: "Legend") {
         SortableSeriesListView()
         Button("Reset Series Order") {}
     }
 }
+var axesSection: some View {
+    InspectorSection(title: "Axis") {
+        axisScaleControls
+        axisRangeControls
+    }
+}
+var fitOverlaySection: some View {}
 """,
         "app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift": """
 struct PlotDataPipelineInspectorView {
@@ -220,10 +239,15 @@ struct PlotSelectedLayerEditorView {
 """,
         "app/macos/Sources/Features/Plot/PlotRefineView.swift": """
 PlotPreviewStage(session: session)
-PlotStageDiagnosticBanner(message: errorMessage)
 Base64PreviewImageView(base64PNG: previewPNG)
 Base64PDFPreviewView(base64PDF: preview.pdfBase64)
 ProgressView()
+struct PlotStageDiagnosticBanner {
+    let shape = RoundedRectangle(cornerRadius: 14)
+}
+private struct PlotEmptyPreviewPage {
+    let shape = RoundedRectangle(cornerRadius: 8)
+}
 """,
         "app/macos/Sources/Features/Plot/PlotInspectorMode.swift": """
 enum PlotAdjustmentCategory {
@@ -367,15 +391,24 @@ App Icon
             "Button(\"Open in Plot\")\nButton(\"Analysis\")\n"
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
+            "let isInspectorPresented = true\n"
+            "DataStudioPreparationInspectorView(session: session)\n"
+            "DataStudioGroupRailView(session: session)\n"
+            "DataStudioPreviewWorkspaceView(session: session)\n"
+            "DataStudioAnalysisSheet(session: session)\n"
+            "@Environment(\\.proWorkspaceTheme) private var theme\n"
+        ),
+        "app/macos/Sources/Features/DataStudio/DataStudioGroupRailView.swift": (
             "WorkbenchRailTitle(title: \"Workbook Groups\")\n"
             "DataStudioFigureRailSection(session: session)\n"
             "DataStudioFigureRailRow\n"
             "let figureFamilyBinding = Binding<String?>.constant(nil)\n"
-            "let isInspectorPresented = true\n"
-            "DataStudioPreparationInspectorView(session: session)\n"
+            "proGlassPanel(theme: theme)\n"
+        ),
+        "app/macos/Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift": (
             "PlotRefineView(session: session.plotSession)\n"
-            ".glassEffect(.regular.interactive())\n"
-            "@Environment(\\.proWorkspaceTheme) private var theme\n"
+            "DataStudioFocusedWorkbookStrip\n"
+            "DataStudioInlinePreviewBanner\n"
         ),
         "app/macos/Sources/Features/Composer/ComposerAssetBrowserView.swift": (
             "enum ComposerLibraryFilter {}\n"
