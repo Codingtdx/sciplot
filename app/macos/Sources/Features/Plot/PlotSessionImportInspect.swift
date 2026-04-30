@@ -415,6 +415,170 @@ extension PlotSession {
         }
     }
 
+    func beginCanvasPlacement(_ mode: PlotCanvasInteractionMode) {
+        guard mode == .select || plotAdjustmentAvailability(for: selectedPlotAdjustmentCategory).isEnabled else {
+            return
+        }
+        canvasInteractionMode = mode
+        switch mode {
+        case .text, .callout, .rectangle, .ellipse, .bracket:
+            selectPlotAdjustmentCategory(.annotations)
+        case .guideLine, .guideRegion:
+            selectPlotAdjustmentCategory(.guides)
+        case .select:
+            break
+        }
+    }
+
+    func commitCanvasDraft(_ draft: PlotCanvasDraft) {
+        switch draft {
+        case .text(let point, let displayStyle, let connectorTarget):
+            commitCanvasText(point: point, displayStyle: displayStyle, connectorTarget: connectorTarget)
+        case .shape(let kind, let start, let end):
+            commitCanvasShape(kind: kind, start: start, end: end)
+        case .guideLine(let axisTarget, let value):
+            commitCanvasGuideLine(axisTarget: axisTarget, value: value)
+        case .guideRegion(let axisTarget, let start, let end):
+            commitCanvasGuideRegion(axisTarget: axisTarget, start: start, end: end)
+        }
+        canvasInteractionMode = .select
+    }
+
+    private func commitCanvasText(
+        point: PlotCanvasDataPoint,
+        displayStyle: String,
+        connectorTarget: PlotCanvasDataPoint?
+    ) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.textAnnotations ?? []
+            let annotation = TextAnnotationPayload(
+                text: "Annotation",
+                coordinateSpace: "data",
+                x: point.x,
+                y: point.y,
+                displayStyle: displayStyle,
+                connectorEnabled: connectorTarget != nil || displayStyle == "callout",
+                targetX: connectorTarget?.x ?? point.x,
+                targetY: connectorTarget?.y ?? point.y,
+                targetYAxisTarget: "y_primary"
+            )
+            annotations.append(annotation)
+            options.textAnnotations = annotations
+            selectedTextAnnotationID = annotation.id
+            canvasSelection = .layer(.textAnnotation(annotation.id))
+        }
+    }
+
+    private func commitCanvasShape(
+        kind: String,
+        start: PlotCanvasDataPoint,
+        end: PlotCanvasDataPoint
+    ) {
+        updateRenderOptions(policy: .immediate) { options in
+            var annotations = options.shapeAnnotations ?? []
+            let xStart = min(start.x, end.x)
+            let xEnd = max(start.x, end.x)
+            let yStart = min(start.y, end.y)
+            let yEnd = max(start.y, end.y)
+            let bracketOrientation = abs(end.x - start.x) >= abs(end.y - start.y) ? "horizontal" : "vertical"
+            let annotation = ShapeAnnotationPayload(
+                kind: kind,
+                bracketOrientation: kind == "bracket" ? bracketOrientation : "horizontal",
+                xStart: kind == "bracket" && bracketOrientation == "vertical" ? start.x : xStart,
+                xEnd: kind == "bracket" && bracketOrientation == "vertical" ? start.x : xEnd,
+                yStart: kind == "bracket" && bracketOrientation == "horizontal" ? start.y : yStart,
+                yEnd: kind == "bracket" && bracketOrientation == "horizontal" ? start.y : yEnd
+            )
+            annotations.append(annotation)
+            options.shapeAnnotations = annotations
+            selectedShapeAnnotationID = annotation.id
+            canvasSelection = .layer(.shapeAnnotation(annotation.id))
+        }
+    }
+
+    private func commitCanvasGuideLine(axisTarget: String, value: Double) {
+        updateRenderOptions(policy: .immediate) { options in
+            var guides = options.referenceGuides ?? []
+            let guide = ReferenceGuidePayload(
+                kind: "line",
+                axisTarget: axisTarget,
+                value: value
+            )
+            guides.append(guide)
+            options.referenceGuides = guides
+            selectedReferenceGuideID = guide.id
+            canvasSelection = .layer(.referenceGuide(guide.id))
+        }
+    }
+
+    private func commitCanvasGuideRegion(axisTarget: String, start: Double, end: Double) {
+        updateRenderOptions(policy: .immediate) { options in
+            var guides = options.referenceGuides ?? []
+            let guide = ReferenceGuidePayload(
+                kind: "band",
+                axisTarget: axisTarget,
+                value: nil,
+                start: min(start, end),
+                end: max(start, end)
+            )
+            guides.append(guide)
+            options.referenceGuides = guides
+            selectedReferenceGuideID = guide.id
+            canvasSelection = .layer(.referenceGuide(guide.id))
+        }
+    }
+
+    func moveSelectedOverlay(
+        delta: PlotCanvasDataPoint,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        guard case .layer(let selection) = canvasSelection else {
+            return
+        }
+        switch selection {
+        case .referenceGuide(let id):
+            nudgeReferenceGuide(id: id, deltaX: delta.x, deltaY: delta.y, policy: policy)
+        case .textAnnotation(let id):
+            nudgeTextAnnotationPosition(id: id, deltaX: delta.x, deltaY: delta.y, includeTarget: true, policy: policy)
+        case .shapeAnnotation(let id):
+            nudgeShapeAnnotation(id: id, deltaX: delta.x, deltaY: delta.y, policy: policy)
+        case .fitOverlay, .function, .series:
+            break
+        }
+    }
+
+    func resizeSelectedOverlay(
+        handle: PlotCanvasResizeHandle,
+        point: PlotCanvasDataPoint,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        guard case .layer(.shapeAnnotation(let id)) = canvasSelection else {
+            return
+        }
+        updateShapeAnnotation(id: id, policy: policy) { annotation in
+            switch handle {
+            case .topLeft:
+                annotation.xStart = point.x
+                annotation.yEnd = point.y
+            case .topRight:
+                annotation.xEnd = point.x
+                annotation.yEnd = point.y
+            case .bottomLeft:
+                annotation.xStart = point.x
+                annotation.yStart = point.y
+            case .bottomRight:
+                annotation.xEnd = point.x
+                annotation.yStart = point.y
+            case .start:
+                annotation.xStart = point.x
+                annotation.yStart = point.y
+            case .end:
+                annotation.xEnd = point.x
+                annotation.yEnd = point.y
+            }
+        }
+    }
+
     func addAnalyticalFunctionLayer() {
         updateRenderOptions(policy: .immediate) { options in
             var layers = options.analyticalLayers ?? []
@@ -649,6 +813,7 @@ extension PlotSession {
         sourceProvenance = sourceProvenanceForCurrentURL(url)
         selectedSheet = sheet
         selectedPlotTool = .select
+        canvasInteractionMode = .select
         canvasSelection = .figure
         inspectionResponse = nil
         runtimeState.inspectedInputPath = nil

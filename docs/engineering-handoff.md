@@ -5933,3 +5933,42 @@ Use this block for every new round:
     - `Computer Use get_app_state("com.apple.finder")`: timed out after 120 seconds.
     - `Computer Use get_app_state("com.codegod.desktop")`: failed with `Apple event error -10005: cgWindowNotFound`.
     - Manual desktop acceptance remains blocked by the window capture tool chain; no manual smoke pass was claimed.
+
+## 2026-04-30 - Plot Interactive Preview Overlay
+
+- Scope:
+  - Added a hybrid Plot canvas interaction layer without replacing Matplotlib rendering.
+  - `/render-preview` responses may now include `interaction_metadata` with figure pixel size, axes bboxes, axis ranges, scales, and reversed-axis flags.
+  - macOS decodes that metadata into `PreviewInteractionMetadata` and maps preview clicks/drags through `PlotPreviewCoordinateMapper`.
+  - `InteractivePlotOverlay` sits above the PNG/PDF preview and draws only hover/selection/draft affordances. It does not redraw axes, series, legends, or fitted curves.
+  - Guides and annotations now use inspector mode cards plus direct preview placement: text is a click, callout is target click then label click, shapes are drag-created, guide lines are clicks, and guide regions are dragged intervals.
+
+- User-visible impact:
+  - Adding visual plot elements no longer starts with typing numeric positions in the right panel.
+  - The right inspector remains the precise refinement surface after creation: coordinates, label, visibility, and advanced fields stay typed and reproducible.
+  - Existing save/open/export semantics remain unchanged because the overlay writes the existing `reference_guides`, `text_annotations`, and `shape_annotations` payloads.
+
+- Boundaries:
+  - No native Swift chart engine was introduced.
+  - No plot contract or project schema changed.
+  - PDF/export output remains owned by the sidecar renderer.
+  - Fit, Functions, Broken Axes, Secondary Axes, and Data Cursor are not forced into canvas-first behavior in this round.
+  - When metadata is missing, the overlay falls back to axes-fraction placement instead of failing.
+
+- Files:
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_common.py`
+  - `/Users/dongxutian/Documents/codegod/app/sidecar/schemas_render.py`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarModelsCommon.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotRefineView.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionTypes.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotSessionImportInspect.swift`
+  - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Features/Plot/PlotInspectorAdjustmentContent.swift`
+
+- Validation:
+  - `git diff --check`: passed.
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+  - `.venv/bin/python -m pytest tests/test_sidecar_render.py tests/test_check_macos_gui_presentation.py -q`: passed, 15 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`: passed.
+  - `.venv/bin/python -m pytest tests -q`: passed, 279 tests.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 210 tests.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix.

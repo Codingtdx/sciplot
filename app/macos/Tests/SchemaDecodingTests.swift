@@ -185,7 +185,31 @@ final class SchemaDecodingTests: XCTestCase {
           "filename": "sample_curve.pdf",
           "pdf_base64": "\(TestPayloads.pdfBase64)",
           "png_base64": "\(TestPayloads.pngBase64)",
-          "qa": null
+          "qa": null,
+          "interaction_metadata": {
+            "figure": {
+              "pixel_width": 1600,
+              "pixel_height": 1200
+            },
+            "axes": [
+              {
+                "id": "primary",
+                "role": "primary",
+                "bbox_pixels": {
+                  "x": 220,
+                  "y": 180,
+                  "width": 980,
+                  "height": 760
+                },
+                "x_range": [0, 10],
+                "y_range": [1, 5],
+                "x_scale": "linear",
+                "y_scale": "linear",
+                "x_reversed": false,
+                "y_reversed": false
+              }
+            ]
+          }
         }
         """
 
@@ -194,6 +218,9 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.filename, "sample_curve.pdf")
         XCTAssertEqual(response.pdfBase64, TestPayloads.pdfBase64)
         XCTAssertEqual(response.pngBase64, TestPayloads.pngBase64)
+        XCTAssertEqual(response.interactionMetadata?.figure.pixelWidth, 1600)
+        XCTAssertEqual(response.interactionMetadata?.axes.first?.role, "primary")
+        XCTAssertEqual(response.interactionMetadata?.axes.first?.bboxPixels.width, 980)
     }
 
     func testDecodeDataStudioTemplatePreviewPayloadUsesTemplateID() throws {

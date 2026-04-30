@@ -53,6 +53,7 @@ class PreviewItemResponse(StrictModel):
     pdf_base64: str
     png_base64: str | None = None
     qa: QAReportResponse | None = None
+    interaction_metadata: dict[str, Any] | None = None
 
 
 class HealthResponse(StrictModel):

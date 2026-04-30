@@ -164,6 +164,37 @@ def test_render_preview_preview_config_increases_png_resolution(tmp_path: Path) 
     assert high_res_size[1] > default_size[1]
 
 
+def test_render_preview_returns_interaction_metadata_for_canvas_overlay(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    response = client.post(
+        "/render-preview",
+        json={
+            "input_path": str(input_path),
+            "sheet": 0,
+            "template": "curve",
+            "preview_config": {
+                "pixel_width": 1600,
+                "pixel_height": 1200,
+                "scale": 2.0,
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    metadata = response.json()["preview"]["interaction_metadata"]
+    assert metadata["figure"]["pixel_width"] > 0
+    assert metadata["figure"]["pixel_height"] > 0
+    primary_axis = next(axis for axis in metadata["axes"] if axis["role"] == "primary")
+    assert primary_axis["bbox_pixels"]["width"] > 0
+    assert primary_axis["bbox_pixels"]["height"] > 0
+    assert primary_axis["x_range"][0] < primary_axis["x_range"][1]
+    assert primary_axis["y_range"][0] < primary_axis["y_range"][1]
+    assert primary_axis["x_scale"] in {"linear", "log"}
+    assert primary_axis["y_scale"] in {"linear", "log"}
+
+
 def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:
     input_path = tmp_path / "field.csv"
     _make_xyz_csv(input_path)

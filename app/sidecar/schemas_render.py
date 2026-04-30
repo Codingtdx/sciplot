@@ -567,12 +567,95 @@ def _preview_png_dpi(rendered: Any, preview_config: PreviewRenderConfigPayload |
     return int(max(180, min(620, round(target_dpi))))
 
 
+def _preview_axis_role(rendered: Any, axis: Any) -> str:
+    try:
+        from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+        from src.rendering.axis_breaks import axis_break_panel_axes
+    except Exception:
+        return "axis"
+
+    primary = primary_axis(rendered)
+    if axis is primary:
+        return "primary"
+    if axis is secondary_y_axis(rendered):
+        return "secondary_y"
+    if axis in axis_break_panel_axes(rendered, axis_name="x"):
+        return "broken_x_panel"
+    if axis in axis_break_panel_axes(rendered, axis_name="y"):
+        return "broken_y_panel"
+    return "axis"
+
+
+def _preview_axis_metadata(
+    rendered: Any,
+    axis: Any,
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> dict[str, Any]:
+    bbox = axis.get_window_extent(renderer=renderer)
+    x0, x1 = axis.get_xlim()
+    y0, y1 = axis.get_ylim()
+    return {
+        "id": axis.get_gid() or f"axis-{rendered.figure.axes.index(axis)}",
+        "role": _preview_axis_role(rendered, axis),
+        "bbox_pixels": {
+            "x": float(bbox.x0 * scale),
+            "y": float((figure_height - bbox.y1) * scale),
+            "width": float(bbox.width * scale),
+            "height": float(bbox.height * scale),
+        },
+        "x_range": [float(min(x0, x1)), float(max(x0, x1))],
+        "y_range": [float(min(y0, y1)), float(max(y0, y1))],
+        "x_scale": str(axis.get_xscale()),
+        "y_scale": str(axis.get_yscale()),
+        "x_reversed": bool(x1 < x0),
+        "y_reversed": bool(y1 < y0),
+    }
+
+
+def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, Any] | None:
+    figure = getattr(rendered, "figure", None)
+    if figure is None or not getattr(figure, "axes", None):
+        return None
+
+    try:
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        source_dpi = max(float(figure.dpi), 1.0)
+        scale = float(png_dpi) / source_dpi
+        width_inches, height_inches = figure.get_size_inches()
+        figure_width = float(width_inches) * float(png_dpi)
+        figure_height = float(height_inches) * float(png_dpi)
+        return {
+            "figure": {
+                "pixel_width": int(round(figure_width)),
+                "pixel_height": int(round(figure_height)),
+            },
+            "axes": [
+                _preview_axis_metadata(
+                    rendered,
+                    axis,
+                    renderer=renderer,
+                    scale=scale,
+                    figure_height=float(figure.bbox.height),
+                )
+                for axis in figure.axes
+            ],
+        }
+    except Exception:
+        return None
+
+
 def rendered_plots_to_preview_payload(
     rendered_plots: list[Any],
     preview_config: PreviewRenderConfigPayload | None = None,
 ) -> list[PreviewItemResponse]:
     previews: list[PreviewItemResponse] = []
     for rendered in rendered_plots:
+        png_dpi = _preview_png_dpi(rendered, preview_config)
+        interaction_metadata = _preview_interaction_metadata(rendered, png_dpi=png_dpi)
         pdf_buffer = BytesIO()
         rendered.figure.savefig(
             pdf_buffer,
@@ -584,7 +667,7 @@ def rendered_plots_to_preview_payload(
         rendered.figure.savefig(
             png_buffer,
             format="png",
-            dpi=_preview_png_dpi(rendered, preview_config),
+            dpi=png_dpi,
             facecolor="white",
             bbox_inches=None,
         )
@@ -598,6 +681,7 @@ def rendered_plots_to_preview_payload(
                     if getattr(rendered, "qa_report", None) is not None
                     else None
                 ),
+                interaction_metadata=interaction_metadata,
             )
         )
     return previews

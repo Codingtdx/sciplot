@@ -54,27 +54,18 @@ extension PlotInspectorView {
     var guidesAdjustmentContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             InspectorSection(title: "Guides") {
-                HStack(spacing: 8) {
-                    Button("Add Line") {
-                        session.addReferenceGuide(kind: "line")
-                        if let id = session.selectedReferenceGuideID {
-                            session.selectPlotLayer(.referenceGuide(id))
-                        }
-                    }
-                    .disabled(!session.referenceGuideAvailability.isEnabled)
-                    .help(session.referenceGuideAvailability.reason ?? "Add a reference line.")
-
-                    Button("Add Region") {
-                        session.addReferenceGuide(kind: "band")
-                        if let id = session.selectedReferenceGuideID {
-                            session.selectPlotLayer(.referenceGuide(id))
-                        }
-                    }
-                    .disabled(!session.referenceGuideAvailability.isEnabled)
-                    .help(session.referenceGuideAvailability.reason ?? "Add a reference region.")
+                PlotCanvasInteractionModeGrid(
+                    modes: [
+                        .guideLine(axisTarget: "x"),
+                        .guideLine(axisTarget: "y_primary"),
+                        .guideRegion(axisTarget: "x"),
+                        .guideRegion(axisTarget: "y_primary"),
+                    ],
+                    selectedMode: session.canvasInteractionMode,
+                    availability: session.referenceGuideAvailability
+                ) { mode in
+                    session.beginCanvasPlacement(mode)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
 
                 objectList(
                     emptyMessage: "No guides",
@@ -133,49 +124,26 @@ extension PlotInspectorView {
     var annotationsAdjustmentContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             InspectorSection(title: "Annotations") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Button("Add Text") {
-                            session.addTextAnnotation()
-                            if let id = session.selectedTextAnnotationID {
-                                session.selectPlotLayer(.textAnnotation(id))
-                            }
-                        }
-                        .disabled(!session.textAnnotationAvailability.isEnabled)
-                        .help(session.textAnnotationAvailability.reason ?? "Add text.")
-
-                        Button("Add Callout") {
-                            session.addTextAnnotation(displayStyle: "callout", connectorEnabled: true)
-                            if let id = session.selectedTextAnnotationID {
-                                session.selectPlotLayer(.textAnnotation(id))
-                            }
-                        }
-                        .disabled(!session.textAnnotationAvailability.isEnabled)
-                        .help(session.textAnnotationAvailability.reason ?? "Add a callout.")
-                    }
-
-                    HStack(spacing: 8) {
-                        Button("Rectangle") {
-                            addShape(kind: "rectangle")
-                        }
-                        Button("Ellipse") {
-                            addShape(kind: "ellipse")
-                        }
-                        Button("Bracket") {
-                            addShape(kind: "bracket")
-                        }
-                    }
-                    .disabled(!session.shapeAnnotationAvailability.isEnabled)
-                    .help(session.shapeAnnotationAvailability.reason ?? "Add a shape annotation.")
+                PlotCanvasInteractionModeGrid(
+                    modes: [.text, .callout, .rectangle, .ellipse, .bracket],
+                    selectedMode: session.canvasInteractionMode,
+                    availability: annotationPlacementAvailability
+                ) { mode in
+                    session.beginCanvasPlacement(mode)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
 
                 objectList(emptyMessage: "No annotations", rows: annotationRows)
             }
 
             selectedAnnotationEditor
         }
+    }
+
+    private var annotationPlacementAvailability: ActionAvailability {
+        if session.textAnnotationAvailability.isEnabled || session.shapeAnnotationAvailability.isEnabled {
+            return .enabled()
+        }
+        return .disabled(session.textAnnotationAvailability.reason ?? session.shapeAnnotationAvailability.reason ?? "Annotations are unavailable.")
     }
 
     var advancedAxesAdjustmentContent: some View {
@@ -215,6 +183,63 @@ extension PlotInspectorView {
                 }
             }
         }
+    }
+}
+
+private struct PlotCanvasInteractionModeGrid: View {
+    let modes: [PlotCanvasInteractionMode]
+    let selectedMode: PlotCanvasInteractionMode
+    let availability: ActionAvailability
+    let select: (PlotCanvasInteractionMode) -> Void
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 88), spacing: 8)
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(modes) { mode in
+                Button {
+                    select(mode)
+                } label: {
+                    PlotCanvasInteractionModeCard(mode: mode, isSelected: selectedMode == mode)
+                }
+                .buttonStyle(.plain)
+                .disabled(!availability.isEnabled)
+                .help(availability.reason ?? mode.title)
+            }
+        }
+    }
+}
+
+struct PlotCanvasInteractionModeCard: View {
+    let mode: PlotCanvasInteractionMode
+    let isSelected: Bool
+    @Environment(\.proWorkspaceTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: mode.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.74))
+                .frame(height: 22)
+
+            Text(mode.title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
+                .fill(isSelected ? theme.selectedRowFill : theme.rowFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.42) : theme.hairline, lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
     }
 }
 

@@ -50,6 +50,10 @@ Plot is the visual benchmark. It follows a Pixelmator-Pro-like arrangement while
 
 Plot preview uses the backend renderer. Swift displays high-resolution PNG for live preview and keeps PDF as the exact/export-grade fallback; do not recreate plotting semantics in Swift Charts or Canvas.
 
+The native canvas layer is an interaction layer, not a second renderer. `InteractivePlotOverlay` sits above the PNG/PDF preview and may draw hover targets, selection outlines, handles, and placement drafts only. It writes back to the existing typed payloads for reference guides, text annotations, and shape annotations, then lets `/render-preview` redraw the real figure. If preview metadata is unavailable, the overlay may fall back to axes-fraction placement, but it must not invent chart semantics.
+
+Guides and annotations are now canvas-first. The inspector shows small mode cards for what the next click or drag will place; the user then places the object directly on the figure. After creation, the object is selected and the inspector becomes the precise editor for coordinates, labels, visibility, and advanced details. Do not restore large rows of `Add Text` / `Add Rectangle` style buttons as the primary path.
+
 The preview page should read like a real output surface, not a decorative card. Empty pages, PNG/PDF previews, and stage diagnostic banners use flat shaped surfaces with a hairline border only. Do not add drop shadows behind the figure page; the dark or light stage already provides enough separation.
 
 Legend is a good example of the interaction principle: if the category has one primary useful action, show it directly. `Legend order` and `Reset Series Order` belong at the top level of the Legend inspector. Do not bury them in an `Advanced` disclosure just to make every inspector category look symmetrical.

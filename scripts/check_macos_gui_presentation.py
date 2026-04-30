@@ -385,6 +385,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'InspectorSection(title: "Guides")',
             'InspectorSection(title: "Functions")',
             'InspectorSection(title: "Annotations")',
+            "PlotCanvasInteractionModeCard",
+            "beginCanvasPlacement(",
             'InspectorSection(title: "Advanced Axes")',
         ),
         forbidden=(
@@ -392,6 +394,11 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             ".popover(",
             'Button("Export")',
             'Button("Open Fit Table"',
+            'Button("Add Text"',
+            'Button("Add Callout"',
+            'Button("Rectangle"',
+            'Button("Ellipse"',
+            'Button("Bracket"',
             "session.showDataWorkbook(tab: .fit)",
         ),
     ),
@@ -500,13 +507,16 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         ),
     ),
     SourceCheck(
-        label="Plot preview owns the live preview stage and tool dock",
+        label="Plot preview owns the live preview stage and interactive overlay",
         path="app/macos/Sources/Features/Plot/PlotRefineView.swift",
         required=(
             "PlotPreviewStage",
             "PlotStageDiagnosticBanner",
             "Base64PreviewImageView(base64PNG:",
             "Base64PDFPreviewView(base64PDF:",
+            "InteractivePlotOverlay",
+            "PlotPreviewCoordinateMapper",
+            "commitCanvasDraft",
         ),
         forbidden=(
             "PlotToolDock",

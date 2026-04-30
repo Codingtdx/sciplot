@@ -452,36 +452,50 @@ extension PlotSession {
         selectPlotAdjustmentCategory(tool.adjustmentCategory)
         switch tool {
         case .select, .panZoom:
-            break
+            canvasInteractionMode = .select
         case .dataCursor:
+            canvasInteractionMode = .select
             selectCanvasSelection(.figure)
         case .fit:
+            canvasInteractionMode = .select
             if fitOptions.enabled {
                 selectPlotLayer(.fitOverlay)
             }
         case .guide:
             if let id = selectedReferenceGuideID ?? referenceGuides.last?.id {
+                canvasInteractionMode = .select
                 selectPlotLayer(.referenceGuide(id))
+            } else {
+                beginCanvasPlacement(.guideLine(axisTarget: "y_primary"))
             }
         case .text:
             if let id = selectedTextAnnotationID ?? textAnnotations.last?.id {
+                canvasInteractionMode = .select
                 selectPlotLayer(.textAnnotation(id))
+            } else {
+                beginCanvasPlacement(.text)
             }
         case .shape:
             if let id = selectedShapeAnnotationID ?? shapeAnnotations.last?.id {
+                canvasInteractionMode = .select
                 selectPlotLayer(.shapeAnnotation(id))
+            } else {
+                beginCanvasPlacement(.rectangle)
             }
         case .function:
+            canvasInteractionMode = .select
             if let layer = analyticalLayers.last {
                 selectPlotLayer(.function(layer.id))
             }
         case .axisBreak:
+            canvasInteractionMode = .select
             if xAxisBreakAvailability.isEnabled {
                 selectCanvasSelection(.axis(.x))
             } else if yAxisBreakAvailability.isEnabled {
                 selectCanvasSelection(.axis(.y))
             }
         case .secondaryAxis:
+            canvasInteractionMode = .select
             selectCanvasSelection(.axis(.y))
         }
     }

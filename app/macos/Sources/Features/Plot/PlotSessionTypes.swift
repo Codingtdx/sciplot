@@ -38,6 +38,119 @@ enum PlotPreviewRefreshPolicy {
     case debounced
 }
 
+struct PlotCanvasDataPoint: Equatable, Hashable, Sendable {
+    var x: Double
+    var y: Double
+}
+
+enum PlotCanvasInteractionMode: Equatable, Hashable, Identifiable, Sendable {
+    case select
+    case text
+    case callout
+    case rectangle
+    case ellipse
+    case bracket
+    case guideLine(axisTarget: String)
+    case guideRegion(axisTarget: String)
+
+    var id: String {
+        switch self {
+        case .select:
+            return "select"
+        case .text:
+            return "text"
+        case .callout:
+            return "callout"
+        case .rectangle:
+            return "rectangle"
+        case .ellipse:
+            return "ellipse"
+        case .bracket:
+            return "bracket"
+        case .guideLine(let axisTarget):
+            return "guide-line:\(axisTarget)"
+        case .guideRegion(let axisTarget):
+            return "guide-region:\(axisTarget)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .select:
+            return "Select"
+        case .text:
+            return "Text"
+        case .callout:
+            return "Callout"
+        case .rectangle:
+            return "Rectangle"
+        case .ellipse:
+            return "Ellipse"
+        case .bracket:
+            return "Bracket"
+        case .guideLine(let axisTarget):
+            return axisTarget == "x" ? "X Line" : "Y Line"
+        case .guideRegion(let axisTarget):
+            return axisTarget == "x" ? "X Region" : "Y Region"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .select:
+            return "cursorarrow"
+        case .text:
+            return "character.cursor.ibeam"
+        case .callout:
+            return "text.bubble"
+        case .rectangle:
+            return "rectangle"
+        case .ellipse:
+            return "oval"
+        case .bracket:
+            return "square.split.diagonal"
+        case .guideLine:
+            return "ruler"
+        case .guideRegion:
+            return "rectangle.dashed"
+        }
+    }
+
+    var requiresDrag: Bool {
+        switch self {
+        case .rectangle, .ellipse, .bracket, .guideRegion:
+            return true
+        case .select, .text, .callout, .guideLine:
+            return false
+        }
+    }
+
+    var isPlacementMode: Bool {
+        self != .select
+    }
+}
+
+enum PlotCanvasDraft: Equatable, Sendable {
+    case text(point: PlotCanvasDataPoint, displayStyle: String, connectorTarget: PlotCanvasDataPoint?)
+    case shape(kind: String, start: PlotCanvasDataPoint, end: PlotCanvasDataPoint)
+    case guideLine(axisTarget: String, value: Double)
+    case guideRegion(axisTarget: String, start: Double, end: Double)
+}
+
+enum PlotCanvasResizeHandle: Equatable, Hashable, Sendable {
+    case topLeft
+    case topRight
+    case bottomLeft
+    case bottomRight
+    case start
+    case end
+}
+
+enum PlotOverlayHitTarget: Equatable, Hashable, Sendable {
+    case move(PlotLayerSelection)
+    case resizeShape(id: String, handle: PlotCanvasResizeHandle)
+}
+
 enum PlotDataWorkbookTab: String, CaseIterable, Identifiable, Hashable {
     case sourceData
     case transformed

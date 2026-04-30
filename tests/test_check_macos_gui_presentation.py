@@ -188,6 +188,8 @@ InspectorSection(title: "Guides")
 InspectorSection(title: "Functions")
 InspectorSection(title: "Annotations")
 InspectorSection(title: "Advanced Axes")
+PlotCanvasInteractionModeCard()
+beginCanvasPlacement(.text)
 """,
         "app/macos/Sources/Features/Plot/PlotInspectorFigureAxisSections.swift": """
 plotOptionsSection
@@ -259,6 +261,9 @@ struct PlotSelectedLayerEditorView {
 PlotPreviewStage(session: session)
 Base64PreviewImageView(base64PNG: previewPNG)
 Base64PDFPreviewView(base64PDF: preview.pdfBase64)
+InteractivePlotOverlay(session: session, mapper: mapper)
+PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: size)
+commitCanvasDraft(.text(point: point, displayStyle: "plain", connectorTarget: nil))
 ProgressView()
 struct PlotStageDiagnosticBanner {
     let shape = RoundedRectangle(cornerRadius: 14)

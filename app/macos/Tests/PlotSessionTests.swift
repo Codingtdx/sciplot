@@ -1254,6 +1254,76 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertNil(session.selectedShapeAnnotationID)
     }
 
+    func testCanvasPlacementCreatesTextAnnotationPayload() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.commitCanvasDraft(
+            .text(
+                point: PlotCanvasDataPoint(x: 4.0, y: 12.0),
+                displayStyle: "plain",
+                connectorTarget: nil
+            )
+        )
+
+        let annotation = try XCTUnwrap(session.renderOptions.textAnnotations?.first)
+        XCTAssertEqual(annotation.coordinateSpace, "data")
+        XCTAssertEqual(annotation.x, 4.0)
+        XCTAssertEqual(annotation.y, 12.0)
+        XCTAssertEqual(annotation.displayStyle, "plain")
+        XCTAssertEqual(session.canvasSelection, .layer(.textAnnotation(annotation.id)))
+    }
+
+    func testCanvasPlacementCreatesReferenceGuidePayload() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.commitCanvasDraft(.guideLine(axisTarget: "x", value: 3.5))
+        session.commitCanvasDraft(.guideRegion(axisTarget: "y_primary", start: 10.0, end: 20.0))
+
+        let guides = try XCTUnwrap(session.renderOptions.referenceGuides)
+        XCTAssertEqual(guides[0].kind, "line")
+        XCTAssertEqual(guides[0].axisTarget, "x")
+        XCTAssertEqual(guides[0].value, 3.5)
+        XCTAssertEqual(guides[1].kind, "band")
+        XCTAssertEqual(guides[1].axisTarget, "y_primary")
+        XCTAssertEqual(guides[1].start, 10.0)
+        XCTAssertEqual(guides[1].end, 20.0)
+    }
+
+    func testCanvasPlacementCreatesShapeAnnotationPayload() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.commitCanvasDraft(
+            .shape(
+                kind: "rectangle",
+                start: PlotCanvasDataPoint(x: 1.0, y: 2.0),
+                end: PlotCanvasDataPoint(x: 5.0, y: 8.0)
+            )
+        )
+
+        let annotation = try XCTUnwrap(session.renderOptions.shapeAnnotations?.first)
+        XCTAssertEqual(annotation.kind, "rectangle")
+        XCTAssertEqual(annotation.xStart, 1.0)
+        XCTAssertEqual(annotation.xEnd, 5.0)
+        XCTAssertEqual(annotation.yStart, 2.0)
+        XCTAssertEqual(annotation.yEnd, 8.0)
+        XCTAssertEqual(session.canvasSelection, .layer(.shapeAnnotation(annotation.id)))
+    }
+
     func testSheetChangesReinspectAndRefreshPreviewWithoutClearingTheLastResult() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
