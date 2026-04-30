@@ -16,8 +16,8 @@ from src.data_studio.io_utils import list_sheet_names
 from src.data_studio.models import (
     ComparisonRecipe,
     ComparisonSet,
-    DataStudioFilteredWorkbookOutput,
     DataStudioFigureOutput,
+    DataStudioFilteredWorkbookOutput,
     DataStudioGroupState,
     DataStudioSpecimenState,
     WorkbookMetricSummary,
@@ -38,7 +38,6 @@ from src.plot_style import DEFAULT_PALETTE_PRESET, DEFAULT_STYLE_PRESET, normali
 from src.rendering.render_service import build_rendered_plots, close_rendered_plots, export_rendered_plots
 from src.rendering.template_lifecycle import resolve_template_id
 from src.text_normalization import slugify_label
-
 
 _COMPARISON_PREVIEW_PDF_CACHE = LRUCache[str, str](maxsize=64)
 _METRIC_COMPARISON_TEMPLATE_IDS = ("bar", "box", "box_strip", "violin", "point_error")

@@ -696,6 +696,8 @@ extension PlotSession {
     }
 
     func resetDataWorkbookState() {
+        asyncCoordination.sourceTablePreview.cancel()
+        asyncCoordination.fitAnalysis.cancel()
         sourceTableResponse = nil
         fitAnalysisResponse = nil
         sourceTableErrorMessage = nil
@@ -710,26 +712,34 @@ extension PlotSession {
 
     func loadSourceTablePreview(offset: Int = 0) {
         guard let client, let selectedFileURL else {
+            asyncCoordination.sourceTablePreview.cancel()
+            isLoadingSourceTable = false
             return
         }
         let resolvedOffset = max(0, offset)
+        let request = SourceTablePreviewRequest(
+            inputPath: selectedFileURL.path,
+            sheet: selectedSheet,
+            offset: resolvedOffset,
+            limit: sourceTablePageLimit,
+            options: dataWorkbookTab == .transformed ? renderOptions : nil
+        )
         sourceTableOffset = resolvedOffset
         isLoadingSourceTable = true
         sourceTableErrorMessage = nil
-        Task {
+        asyncCoordination.sourceTablePreview.schedule { [weak self] revision in
+            guard let self else { return }
             do {
-                let response = try await client.sourceTablePreview(
-                    .init(
-                        inputPath: selectedFileURL.path,
-                        sheet: selectedSheet,
-                        offset: resolvedOffset,
-                        limit: sourceTablePageLimit,
-                        options: dataWorkbookTab == .transformed ? renderOptions : nil
-                    )
-                )
+                let response = try await client.sourceTablePreview(request)
+                guard self.asyncCoordination.sourceTablePreview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
                 sourceTableResponse = response
                 isLoadingSourceTable = false
             } catch {
+                guard self.asyncCoordination.sourceTablePreview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
                 if isUserCancellationError(error) {
                     sourceTableErrorMessage = nil
                 } else {
@@ -747,33 +757,43 @@ extension PlotSession {
 
     func loadFitAnalysis(offset: Int = 0) {
         guard let client, let selectedFileURL else {
+            asyncCoordination.fitAnalysis.cancel()
+            isLoadingFitAnalysis = false
             return
         }
         guard fitAnalysisAvailability.isEnabled else {
+            asyncCoordination.fitAnalysis.cancel()
+            isLoadingFitAnalysis = false
             fitAnalysisErrorMessage = fitAnalysisAvailability.reason
             return
         }
         let resolvedOffset = max(0, offset)
+        let request = FitAnalysisRequest(
+            inputPath: selectedFileURL.path,
+            sheet: selectedSheet,
+            modelID: fitOptions.modelID,
+            seriesID: fitAnalysisSelectedSeriesID,
+            offset: resolvedOffset,
+            limit: fitAnalysisPageLimit,
+            options: (renderOptions.dataTransforms?.isEmpty == false || renderOptions.dataVariables?.isEmpty == false) ? renderOptions : nil,
+            customFunction: fitOptions.customFunction
+        )
         fitAnalysisOffset = resolvedOffset
         isLoadingFitAnalysis = true
         fitAnalysisErrorMessage = nil
-        Task {
+        asyncCoordination.fitAnalysis.schedule { [weak self] revision in
+            guard let self else { return }
             do {
-                let response = try await client.fitAnalysis(
-                    .init(
-                        inputPath: selectedFileURL.path,
-                        sheet: selectedSheet,
-                        modelID: fitOptions.modelID,
-                        seriesID: fitAnalysisSelectedSeriesID,
-                        offset: resolvedOffset,
-                        limit: fitAnalysisPageLimit,
-                        options: (renderOptions.dataTransforms?.isEmpty == false || renderOptions.dataVariables?.isEmpty == false) ? renderOptions : nil,
-                        customFunction: fitOptions.customFunction
-                    )
-                )
+                let response = try await client.fitAnalysis(request)
+                guard self.asyncCoordination.fitAnalysis.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
                 fitAnalysisResponse = response
                 isLoadingFitAnalysis = false
             } catch {
+                guard self.asyncCoordination.fitAnalysis.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
                 if isUserCancellationError(error) {
                     fitAnalysisErrorMessage = nil
                 } else {

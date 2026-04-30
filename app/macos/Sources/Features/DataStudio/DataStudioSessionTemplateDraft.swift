@@ -59,26 +59,32 @@ extension DataStudioSession {
         selectedPreviewSegmentID = id
         selectedPreviewBlockID = id
         guard let sourcePreview, let client else {
+            asyncCoordination.sourcePreview.cancel()
             return
         }
-        Task { @MainActor [weak self] in
+        let request = SourceTablePreviewRequest(
+            inputPath: sourcePreview.inputPath,
+            sheet: sourcePreview.sheet,
+            offset: 0,
+            limit: sourcePreview.limit,
+            encoding: sourcePreview.encoding,
+            delimiter: sourcePreview.delimiter,
+            segmentID: id
+        )
+        asyncCoordination.sourcePreview.schedule { [weak self] revision in
             guard let self else { return }
             do {
-                let response = try await client.sourceTablePreview(
-                    .init(
-                        inputPath: sourcePreview.inputPath,
-                        sheet: sourcePreview.sheet,
-                        offset: 0,
-                        limit: sourcePreview.limit,
-                        encoding: sourcePreview.encoding,
-                        delimiter: sourcePreview.delimiter,
-                        segmentID: id
-                    )
-                )
+                let response = try await client.sourceTablePreview(request)
+                guard self.asyncCoordination.sourcePreview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
                 self.sourcePreview = response
                 self.configureDraftDefaults(from: response, sampleURL: URL(fileURLWithPath: response.inputPath))
             } catch {
-                if isUserCancelled(error) {
+                guard self.asyncCoordination.sourcePreview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
+                if isUserCancellationError(error) {
                     return
                 }
                 self.errorMessage = error.localizedDescription
@@ -205,7 +211,7 @@ extension DataStudioSession {
             selectedTemplateID = response.id
             templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -228,7 +234,7 @@ extension DataStudioSession {
                 selectedTemplateID = templates.first?.id
             }
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -331,7 +337,7 @@ extension DataStudioSession {
             templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
             return template
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return nil
             }
             errorMessage = error.localizedDescription

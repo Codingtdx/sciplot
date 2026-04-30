@@ -323,7 +323,7 @@
   - `analytical_layers`
 - 当前 inner beta Data Studio intake hardening 至少要求 heterogeneous fixtures 对 `template-recommendations`、`template-preview`、`build-workbook` 保持同一语义，并且 unknown source 必须允许“正确不推荐”。
 - `.venv/bin/python scripts/clean_repo.py`
-- `.venv/bin/python -m ruff check app/sidecar make_plot.py src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering tests scripts/smoke_check.py`
+- `.venv/bin/python -m ruff check .`
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`
 - `.venv/bin/python -m pytest tests`
 - `.venv/bin/python scripts/smoke_check.py`

@@ -171,7 +171,12 @@ def load_stress_relaxation_metric(
             ) from exc
 
         metric_column = ["time", "strain", "stress", "normalized_stress"][y_index]
-        pair = block[["time", metric_column]].dropna().rename(columns={"time": "x", metric_column: "y"}).reset_index(drop=True)
+        pair = (
+            block[["time", metric_column]]
+            .dropna()
+            .rename(columns={"time": "x", metric_column: "y"})
+            .reset_index(drop=True)
+        )
         if pair.empty:
             continue
 

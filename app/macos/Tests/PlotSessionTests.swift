@@ -658,6 +658,66 @@ final class PlotSessionTests: XCTestCase {
         await waitUntil({ client.fitAnalysisRequests.last?.modelID == "polynomial_2" }, timeout: 2.0)
     }
 
+    func testDataWorkbookSourceTableIgnoresStaleResponse() async throws {
+        let client = MockSidecarClient()
+        var staleContinuation: CheckedContinuation<SourceTablePreviewResponse, Never>?
+        client.sourceTablePreviewHandler = { request in
+            if request.offset == 50 {
+                return await withCheckedContinuation { continuation in
+                    staleContinuation = continuation
+                }
+            }
+            return TestPayloads.sourceTablePreview(path: request.inputPath, offset: request.offset)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.selectedFileURL = URL(fileURLWithPath: "/tmp/sample.csv")
+        session.showDataWorkbook()
+
+        session.loadSourceTablePreview(offset: 50)
+        await waitUntil({ client.sourceTablePreviewRequests.count == 1 }, timeout: 2.0)
+        session.loadSourceTablePreview(offset: 0)
+        await waitUntil({ session.sourceTableResponse?.offset == 0 }, timeout: 2.0)
+
+        staleContinuation?.resume(returning: TestPayloads.sourceTablePreview(path: "/tmp/sample.csv", offset: 50))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertEqual(session.sourceTableResponse?.offset, 0)
+        XCTAssertFalse(session.isLoadingSourceTable)
+    }
+
+    func testDataWorkbookFitAnalysisIgnoresStaleResponse() async throws {
+        let client = MockSidecarClient()
+        var staleContinuation: CheckedContinuation<FitAnalysisResponse, Never>?
+        client.fitAnalysisHandler = { request in
+            if request.offset == 50 {
+                return await withCheckedContinuation { continuation in
+                    staleContinuation = continuation
+                }
+            }
+            return TestPayloads.fitAnalysis(path: request.inputPath, offset: request.offset)
+        }
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.selectedFileURL = URL(fileURLWithPath: "/tmp/sample.csv")
+        session.inspectionResponse = TestPayloads.inspectFile()
+        session.runtimeState.inspectedInputPath = "/tmp/sample.csv"
+        session.runtimeState.inspectedSheet = session.selectedSheet
+
+        session.loadFitAnalysis(offset: 50)
+        await waitUntil({ client.fitAnalysisRequests.count == 1 }, timeout: 2.0)
+        session.loadFitAnalysis(offset: 0)
+        await waitUntil({ session.fitAnalysisResponse?.offset == 0 }, timeout: 2.0)
+
+        staleContinuation?.resume(returning: TestPayloads.fitAnalysis(path: "/tmp/sample.csv", offset: 50))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertEqual(session.fitAnalysisResponse?.offset, 0)
+        XCTAssertFalse(session.isLoadingFitAnalysis)
+    }
+
     func testFitOverlayEditsRefreshPreviewAndPersistIntoProjectPayload() async throws {
         let client = MockSidecarClient()
         client.saveProjectHandler = { request in

@@ -1112,11 +1112,15 @@ enum TestPayloads {
         )
     }
 
-    static func sourceTablePreview(path: String = "/tmp/sample.csv") -> SourceTablePreviewResponse {
+    static func sourceTablePreview(
+        path: String = "/tmp/sample.csv",
+        offset: Int = 0,
+        selectedSegmentID: String? = nil
+    ) -> SourceTablePreviewResponse {
         SourceTablePreviewResponse(
             inputPath: path,
             sheet: .name("Representative_Curve"),
-            offset: 0,
+            offset: offset,
             limit: 50,
             totalRows: 3,
             totalCols: 2,
@@ -1160,13 +1164,16 @@ enum TestPayloads {
                 ),
             ],
             segments: [],
-            selectedSegmentID: nil,
+            selectedSegmentID: selectedSegmentID,
             encoding: "utf-8",
             delimiter: ","
         )
     }
 
-    static func fitAnalysis(path: String = "/tmp/sample.csv") -> FitAnalysisResponse {
+    static func fitAnalysis(
+        path: String = "/tmp/sample.csv",
+        offset: Int = 0
+    ) -> FitAnalysisResponse {
         FitAnalysisResponse(
             inputPath: path,
             sheet: .name("Representative_Curve"),
@@ -1195,7 +1202,7 @@ enum TestPayloads {
             ],
             warnings: [],
             totalRows: 3,
-            offset: 0,
+            offset: offset,
             limit: 50,
             rows: [
                 .init(rowIndex: 0, x: 0.0, y: 0.0, yFit: 0.0333, residual: -0.0333),

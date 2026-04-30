@@ -575,6 +575,39 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(summary["Y"], "Stress")
     }
 
+    func testSegmentPreviewIgnoresStaleResponse() async {
+        let client = MockSidecarClient()
+        var staleContinuation: CheckedContinuation<SourceTablePreviewResponse, Never>?
+        client.sourceTablePreviewHandler = { request in
+            if request.segmentID == "seg-a" {
+                return await withCheckedContinuation { continuation in
+                    staleContinuation = continuation
+                }
+            }
+            return TestPayloads.sourceTablePreview(
+                path: request.inputPath,
+                selectedSegmentID: request.segmentID
+            )
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.sourcePreview = TestPayloads.sourceTablePreview(path: "/tmp/raw.csv")
+
+        session.selectPreviewSegment(id: "seg-a")
+        await waitUntil({ client.sourceTablePreviewRequests.count == 1 }, timeout: 2.0)
+        session.selectPreviewSegment(id: "seg-b")
+        await waitUntil({ session.sourcePreview?.selectedSegmentID == "seg-b" }, timeout: 2.0)
+
+        staleContinuation?.resume(
+            returning: TestPayloads.sourceTablePreview(path: "/tmp/raw.csv", selectedSegmentID: "seg-a")
+        )
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertEqual(session.selectedPreviewSegmentID, "seg-b")
+        XCTAssertEqual(session.sourcePreview?.selectedSegmentID, "seg-b")
+    }
+
     func testResolverPresentationExplainsMissingTemplateSelection() async {
         let client = MockSidecarClient()
         let session = DataStudioSession()

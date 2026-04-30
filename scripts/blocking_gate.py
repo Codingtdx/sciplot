@@ -26,22 +26,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
     GateCommand("clean_repo", (PYTHON, "scripts/clean_repo.py")),
     GateCommand(
         "ruff",
-        (
-            PYTHON,
-            "-m",
-            "ruff",
-            "check",
-            "app/sidecar",
-            "make_plot.py",
-            "src/composer.py",
-            "src/plot_contract.py",
-            "src/data_loader.py",
-            "src/tensile_replicates.py",
-            "src/rendering",
-            "tests",
-            "scripts/smoke_check.py",
-            "scripts/check_macos_gui_presentation.py",
-        ),
+        (PYTHON, "-m", "ruff", "check", "."),
     ),
     GateCommand(
         "mypy",

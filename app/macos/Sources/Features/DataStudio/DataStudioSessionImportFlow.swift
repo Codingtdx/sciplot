@@ -70,7 +70,7 @@ extension DataStudioSession {
 
     func handleImportPanelFailure(_ error: Error) {
         resetImportPresentationState()
-        if isUserCancelled(error) {
+        if isUserCancellationError(error) {
             clearImportFlowError()
             return
         }
@@ -99,7 +99,7 @@ extension DataStudioSession {
             let response = try await client.openProject(.init(projectPath: url.path))
             await restoreProject(from: response)
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -161,7 +161,7 @@ extension DataStudioSession {
             selectedTemplateID = recommendedTemplateMatches.first?.templateID
             importFlow = .wizard(step: .resolver)
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -218,7 +218,7 @@ extension DataStudioSession {
             resetImportPresentationState()
             discardPendingSourcePreview()
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -263,7 +263,7 @@ extension DataStudioSession {
             resetImportPresentationState()
             discardPendingSourcePreview()
         } catch {
-            if isUserCancelled(error) {
+            if isUserCancellationError(error) {
                 return
             }
             errorMessage = error.localizedDescription
@@ -294,6 +294,7 @@ extension DataStudioSession {
     }
 
     func discardPendingSourcePreview() {
+        asyncCoordination.sourcePreview.cancel()
         importedSourceURLs = []
         sourcePreview = nil
         recommendedTemplateMatches = []

@@ -8,9 +8,9 @@ from src.data_loader import CurveSeries, ReplicateGroup
 from src.plotting_curve_support import INSIDE_LEGEND_INSET_FRACTION, compute_shared_curve_x_layout
 from src.plotting_curves import plot_curve_template, plot_curves, plot_scatter
 from src.plotting_heatmap import plot_heatmap
+from src.plotting_primitives import _cap_visible_major_ticks, _format_axis_label
 from src.plotting_stats import plot_bar, plot_box, plot_box_bar_plots, plot_violin
 from src.plotting_wide_nmr import plot_wide_nmr
-from src.plotting_primitives import _cap_visible_major_ticks, _format_axis_label
 from src.wide_nmr import WideNMRConfig
 
 
