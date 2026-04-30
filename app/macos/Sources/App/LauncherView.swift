@@ -18,7 +18,11 @@ struct LauncherView: View {
                 }
             )
             .frame(width: 720)
-            .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)
+            .proGlassPanel(
+                theme: theme,
+                cornerRadius: ProCornerPolicy.launcher,
+                showsBorder: false
+            )
         }
         .frame(width: 760, height: 460)
         .background(Color.clear)

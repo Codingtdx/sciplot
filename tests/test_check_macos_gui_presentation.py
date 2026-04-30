@@ -54,6 +54,7 @@ final class AppWindowManager {
         window.styleMask = [.borderless]
         window.isOpaque = false
         window.backgroundColor = .clear
+        window.hasShadow = false
     }
 }
 final class BorderlessLauncherWindow {}
@@ -130,7 +131,7 @@ struct LauncherView {
             LauncherCloseButton { dismiss() }
         }
         .frame(width: 760, height: 460)
-        .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)
+        .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher, showsBorder: false)
     }
 }
 struct LauncherCloseButton {}

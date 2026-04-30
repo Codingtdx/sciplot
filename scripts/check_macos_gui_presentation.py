@@ -42,6 +42,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "window.styleMask = [.borderless]",
             "window.isOpaque = false",
             "window.backgroundColor = .clear",
+            "window.hasShadow = false",
         ),
         forbidden=(
             "TestHostView",
@@ -118,7 +119,8 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         required=(
             "struct LauncherView",
             "GlassEffectContainer",
-            ".proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.launcher)",
+            "cornerRadius: ProCornerPolicy.launcher",
+            "showsBorder: false",
             "LauncherWelcomeSurface",
             "LauncherModuleEntryRow",
             "LauncherCloseButton",

@@ -253,7 +253,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = true
+        window.hasShadow = false
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true

@@ -184,7 +184,8 @@ extension View {
 
     func proGlassPanel(
         theme: ProWorkspaceTheme,
-        cornerRadius: CGFloat = ProCornerPolicy.outer
+        cornerRadius: CGFloat = ProCornerPolicy.outer,
+        showsBorder: Bool = true
     ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
@@ -192,7 +193,9 @@ extension View {
             .clipShape(shape)
             .glassEffect(.regular.interactive(), in: shape)
             .overlay {
-                shape.stroke(theme.hairline, lineWidth: 0.8)
+                if showsBorder {
+                    shape.stroke(theme.hairline, lineWidth: 0.8)
+                }
             }
     }
 

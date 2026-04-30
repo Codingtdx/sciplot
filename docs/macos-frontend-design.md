@@ -31,6 +31,8 @@ The point of this grammar is ordering, not decoration:
 
 Launcher is a borderless glass welcome surface, not a fake window inside another window. It should stay visually calm: one surface, clear module rows, one real primary action per module, and a custom close affordance.
 
+The Launcher surface is intentionally flatter than the module workspaces. Do not add an outer stroke or AppKit window shadow around the borderless welcome panel; those read as a stray gray outline instead of native glass. The rows can carry selection and action emphasis, while the outer surface should stay clean.
+
 Launcher must not bootstrap the sidecar just to appear. It should open immediately; sidecar startup belongs to real module work or real actions.
 
 Launcher is also not the owner of Plot's replacement state. If a user starts a Plot import from Launcher while Plot already has content, Launcher opens/focuses Plot and Plot hosts the replacement confirmation. Returning to the welcome surface is an explicit `New Project` action, not a side effect of importing a file.
@@ -90,11 +92,11 @@ Light mode should feel like Codex light: near-white, slightly warm, low gray, an
 
 Theme tokens live in `ProWorkspaceTheme`. Do not hard-code theme fills inside module views. If a new view needs a panel, rail, or row surface, use the shared shaped helpers:
 
-- `proGlassPanel(theme:cornerRadius:)`
+- `proGlassPanel(theme:cornerRadius:showsBorder:)`
 - `proGlassRail(theme:cornerRadius:)`
 - `proGlassRow(theme:isSelected:cornerRadius:)`
 
-These helpers keep fill, clipping, outline, and `glassEffect` on the same rounded shape. This prevents the square background behind rounded panels that appears when a raw `.background(theme.panelFill)` is applied before glass clipping.
+These helpers keep fill, clipping, optional outline, and `glassEffect` on the same rounded shape. This prevents the square background behind rounded panels that appears when a raw `.background(theme.panelFill)` is applied before glass clipping.
 
 ## Liquid Glass Rules
 
