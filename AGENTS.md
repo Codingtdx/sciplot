@@ -10,8 +10,8 @@
   - `Data Studio`
   - `Composer`
   - `Code Console`
-- `Launcher` 是受支持的 app entry surface，不再属于旧的 `Start/Home` 禁区；它只能打开/聚焦模块窗口，并承载真实模块入口与真实动作。
-- Launcher 的模块动作必须落到真实链路：Plot import/open project、Data Studio raw import、Composer graph/assets import、Code Console bind/import context。禁止为了模仿 Pixelmator Pro 而添加项目不存在的绘图/修图工具。
+- `Launcher` 是受支持的 app entry surface，不再属于旧的 `Start/Home` 禁区；它只能打开/聚焦模块窗口，不承载导入、绑定、导出等模块主动作。
+- Launcher 行内不得恢复 `Import/Open`、`Import Raw`、`Import`、`Bind` 这类 trailing 文本按钮。真实导入/绑定入口归属目标模块窗口的 toolbar/menu。禁止为了模仿 Pixelmator Pro 而添加项目不存在的绘图/修图工具。
 - `Start / Home / Project / Settings` 只能作为 utility affordance，不得恢复为一级产品区或全局工作台。
 - 模块之间不得再通过同一窗口左侧 rail 做视觉切换；`Command-1/2/3/4` 必须打开/聚焦对应单例模块窗口。
 
@@ -185,6 +185,8 @@
   - 页签固定为 `Source Data`、`Transformed`、`Variables` 和 `Fit`
   - `Fit` 当前支持 `Linear`、`Polynomial 2`、`Polynomial 3`、`Exponential`、`Logarithmic`、`Power Law`、`Gaussian`、`Logistic` 和 backend-only `Custom Function`
   - Plot adjustment inspector `Fit` 里的 fit overlay 只开放给 `curve / point_line / scatter`
+  - Plot adjustment inspector `Fit` 的默认模型选择必须用卡片网格和 UI-only 抽象函数示意图，不得恢复小 `Picker("Model")` 或把 `Open Fit Table` 作为主路径；拟合结果默认以内联 equation / R² / RMSE / points 摘要展示，详细 residual/table 仍放在 toolbar `Data Workbook` 的 `Fit` tab
+  - 点击 `Custom Function` 不得直接发送无 expression/parameters 的无效 `custom_function` 请求；没有有效 payload 时必须先展开 inspector 内联 custom form
   - Plot adjustment inspector `Advanced Axes` 里的 `extra x axis / extra y axis` 通过 `render_options.extra_x_axis / extra_y_axis` 持久化；当前每张图最多一个额外 X 轴和一个额外 Y 轴，`extra x axis` 只支持 `data_value -> display_value` 换算，`extra y axis` 还支持 `binding_mode=series_assignment` 的 double-Y 系列归属，并和 preview/export/save-open project 保持同一路径
   - Plot adjustment inspector `Advanced Axes` 里的 `broken axes` 通过 `render_options.x_axis_breaks / y_axis_breaks` 持久化；当前支持 `Compressed` 单图压缩断轴和 `Split` joined multi-panel 断轴，支持多个 break 区间，但只允许在线性轴上启用，不能与 enabled `extra x axis / extra y axis` 共存，并且一次只允许一个轴启用 active split；guide / annotation 也必须复用同一份断轴 panel/坐标映射
   - Plot adjustment inspector `Guides` 里的 `reference guides` 通过 `render_options.reference_guides` 持久化；当前支持多个 `line / region`，可绑定 `x / primary y / secondary y`，并和 preview/export/save-open project 保持同一路径，但不能借此引入第二套 axis/style 常量
@@ -195,7 +197,7 @@
 - Data Studio `Analysis` 也是 utility affordance，不是一级工作流阶段：
   - 作用域固定为 `Focused Workbook` 和 `Current Figure`
   - 页签固定为 `Source Data` 和 `Fit`
-  - `Fit` 当前支持共享 Plot fit model surface
+  - `Fit` 当前支持共享 Plot fit model surface，并复用 Plot 的卡片式模型选择与紧凑结果摘要；在 Data Studio 拥有真实 custom-function 编辑流之前，`Custom Function` 可禁用并解释
   - `Current Figure` 拟合只开放给 `curve / point_line / scatter`
 - Data Studio 模块的左侧只承载 `Workbook Groups` 与真实 figure family/template 选择；figure family/template 选择必须在左侧完成，右侧 inspector 不得恢复重复 template picker。中间承载 compare/figure preview、preview warning、focused group 状态和唯一 specimen filter 入口；右侧只承载当前 figure 的科学调整、fit、`Open in Plot`、`Analysis`、Reveal/Open exported outputs。不要把 import/export 主动作塞回左侧。
 - Composer 模块左侧保留真实 panel library，并允许 `All / Graphs / Assets` 过滤，row 展示 thumbnail、placed/library、hidden、locked、label 等真实状态；中间是 composition canvas；右侧 inspector 按 `Selection / Placement / Panel / Actions / Preview` 组织 merge/unmerge/place/remove、lock、visibility、auto/manual label 和 preview。Import 只通过 toolbar/menu 的真实 graph/assets import flow 进入，不在左侧重复主按钮。

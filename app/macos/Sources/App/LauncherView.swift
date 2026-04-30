@@ -13,8 +13,8 @@ struct LauncherView: View {
                 theme: theme,
                 focusedWorkbench: $focusedWorkbench,
                 close: closeLauncher,
-                open: { workbench, performPrimaryAction in
-                    openWorkbench(workbench, performPrimaryAction: performPrimaryAction)
+                open: { workbench in
+                    openWorkbench(workbench)
                 }
             )
             .frame(width: 720)
@@ -33,13 +33,9 @@ struct LauncherView: View {
         AppWindowManager.shared.closeLauncher()
     }
 
-    private func openWorkbench(_ workbench: Workbench, performPrimaryAction: Bool = false) {
+    private func openWorkbench(_ workbench: Workbench) {
         focusedWorkbench = workbench
-        if performPrimaryAction {
-            model.beginLauncherPrimaryAction(for: workbench)
-        } else {
-            model.enterWorkbench(workbench)
-        }
+        model.enterWorkbench(workbench)
         openWindow(id: workbench.windowSceneID)
         AppWindowManager.shared.openWorkbenchAfterSceneAttempt(workbench, model: model)
     }
@@ -49,7 +45,7 @@ private struct LauncherWelcomeSurface: View {
     let theme: ProWorkspaceTheme
     @Binding var focusedWorkbench: Workbench
     let close: () -> Void
-    let open: (Workbench, Bool) -> Void
+    let open: (Workbench) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
@@ -65,10 +61,7 @@ private struct LauncherWelcomeSurface: View {
                             focusedWorkbench = workbench
                         },
                         open: {
-                            open(workbench, false)
-                        },
-                        primaryAction: {
-                            open(workbench, true)
+                            open(workbench)
                         }
                     )
                 }
@@ -106,63 +99,33 @@ private struct LauncherModuleEntryRow: View {
     let theme: ProWorkspaceTheme
     let select: () -> Void
     let open: () -> Void
-    let primaryAction: () -> Void
 
     var body: some View {
-        HStack(spacing: 18) {
-            Button(action: open) {
-                HStack(spacing: 16) {
-                    Image(systemName: workbench.systemImage)
-                        .font(.system(size: 22, weight: .semibold))
-                        .frame(width: 34)
+        Button(action: open) {
+            HStack(spacing: 16) {
+                Image(systemName: workbench.systemImage)
+                    .font(.system(size: 22, weight: .semibold))
+                    .frame(width: 34)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(workbench.title)
-                            .font(.title3.weight(.semibold))
-                        Text(subtitle)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 8)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workbench.title)
+                        .font(.title3.weight(.semibold))
+                    Text(subtitle)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded { select() })
 
-            primaryButton
+                Spacer(minLength: 8)
+            }
+            .padding(.vertical, 14)
+            .padding(.leading, 18)
+            .padding(.trailing, 16)
+            .contentShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
         }
-        .padding(.vertical, 14)
-        .padding(.leading, 18)
-        .padding(.trailing, 16)
+        .buttonStyle(.plain)
         .proGlassRow(theme: theme, isSelected: isSelected, cornerRadius: ProCornerPolicy.row)
-        .contentShape(RoundedRectangle(cornerRadius: ProCornerPolicy.row, style: .continuous))
-        .onTapGesture(perform: select)
-    }
-
-    @ViewBuilder
-    private var primaryButton: some View {
-        if isSelected {
-            Button(action: primaryAction) {
-                primaryLabel
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.regular)
-        } else {
-            Button(action: primaryAction) {
-                primaryLabel
-            }
-            .buttonStyle(.glass)
-            .controlSize(.regular)
-        }
-    }
-
-    private var primaryLabel: some View {
-        Label(primaryTitle, systemImage: primarySymbol)
-            .labelStyle(.titleAndIcon)
-            .frame(width: 168)
+        .simultaneousGesture(TapGesture().onEnded { select() })
     }
 
     private var subtitle: String {
@@ -178,31 +141,6 @@ private struct LauncherModuleEntryRow: View {
         }
     }
 
-    private var primaryTitle: String {
-        switch workbench {
-        case .plot:
-            return "Import/Open"
-        case .dataStudio:
-            return "Import Raw"
-        case .composer:
-            return "Import"
-        case .codeConsole:
-            return "Bind"
-        }
-    }
-
-    private var primarySymbol: String {
-        switch workbench {
-        case .plot:
-            return "tray.and.arrow.down"
-        case .dataStudio:
-            return "tablecells.badge.ellipsis"
-        case .composer:
-            return "photo.on.rectangle.angled"
-        case .codeConsole:
-            return "link"
-        }
-    }
 }
 
 private struct LauncherCloseButton: View {

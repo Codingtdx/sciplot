@@ -29,13 +29,15 @@ The point of this grammar is ordering, not decoration:
 
 ## Launcher
 
-Launcher is a borderless glass welcome surface, not a fake window inside another window. It should stay visually calm: one surface, clear module rows, one real primary action per module, and a custom close affordance.
+Launcher is a borderless glass welcome surface, not a fake window inside another window. It should stay visually calm: one surface, clear module rows, and a custom close affordance.
+
+Launcher rows only open or focus modules. They do not expose trailing `Import`, `Bind`, or other text action buttons. Real import/open/bind actions belong to the destination module window toolbar or menu, where the resulting state and any confirmation UI are visually owned by that module.
 
 The Launcher surface is intentionally flatter than the module workspaces. Do not add an outer stroke or AppKit window shadow around the borderless welcome panel; those read as a stray gray outline instead of native glass. The rows can carry selection and action emphasis, while the outer surface should stay clean.
 
 Launcher must not bootstrap the sidecar just to appear. It should open immediately; sidecar startup belongs to real module work or real actions.
 
-Launcher is also not the owner of Plot's replacement state. If a user starts a Plot import from Launcher while Plot already has content, Launcher opens/focuses Plot and Plot hosts the replacement confirmation. Returning to the welcome surface is an explicit `New Project` action, not a side effect of importing a file.
+Launcher is also not the owner of Plot's replacement state. Plot import starts from Plot's toolbar or menu, and Plot hosts any replacement confirmation. Returning to the welcome surface is an explicit `New Project` action, not a side effect of importing a file.
 
 ## Plot
 
@@ -54,6 +56,10 @@ Legend is a good example of the interaction principle: if the category has one p
 
 Axes follow the same rule. Scale, range, baseline, and tick-label density are the main Axes workflow and should be visible in the Axes category. Secondary axes and broken axes belong in the separate `Advanced Axes` category instead of being duplicated or hidden inside a generic Advanced disclosure.
 
+Fit follows the same directness rule, but with less text. The Fit inspector uses large model cards with small abstract function glyphs for `Linear`, polynomial, exponential, logarithmic, power-law, Gaussian, logistic, and custom models. The glyphs are UI affordances only; backend fit analysis and plot rendering remain the only source of fit semantics. The default Fit flow stays inline in the inspector: select model, toggle overlay, read a compact equation/R2/RMSE/points summary. Data Workbook remains the place for detailed tables, not the default Fit interaction.
+
+Custom fit should not send an invalid `custom_function` request just because the card was clicked. If no valid expression and parameters exist, the inspector opens an inline custom editor first; only a valid payload switches the fit model and refreshes analysis.
+
 ## Data Studio
 
 Data Studio is a data preparation surface, not a second full plotting app. Its flow is `Import -> Group Review -> Compare Preview -> Export / Open in Plot`.
@@ -63,6 +69,8 @@ Data Studio is a data preparation surface, not a second full plotting app. Its f
 - Right: current figure summary, `Open in Plot`, `Analysis`, and output follow-up actions.
 
 When a workflow reaches plot styling or publication-grade graph adjustment, hand it to Plot through the existing `Open in Plot` path.
+
+Data Studio Analysis reuses the shared Fit model cards so Plot and Data Studio do not grow separate picker-style fit experiences. In Data Studio, custom fit setup can stay disabled or handed off to Plot until the Data Studio analysis surface owns a real custom-function editing flow.
 
 ## Composer
 
@@ -127,11 +135,13 @@ When changing the macOS frontend:
 1. Keep module actions real; do not invent fake tools to match another app.
 2. Preserve the left / center / right responsibility split.
 3. Route global actions through toolbar/menu command context.
-4. Use `ProWorkspaceTheme` and shaped glass helpers for custom surfaces.
-5. Keep Plot's page preview white across themes.
-6. Keep preview surfaces flat: no decorative shadow behind scientific output.
-7. Keep common or sole category actions visible; reserve `Advanced` for real advanced or follow-up work.
-8. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.
+4. Keep Launcher as module entry only; do not restore trailing import/bind buttons.
+5. Prefer visual choice cards over picker popups for small, high-value mutually exclusive choices.
+6. Use `ProWorkspaceTheme` and shaped glass helpers for custom surfaces.
+7. Keep Plot's page preview white across themes.
+8. Keep preview surfaces flat: no decorative shadow behind scientific output.
+9. Keep common or sole category actions visible; reserve `Advanced` for real advanced or follow-up work.
+10. Run `scripts/check_macos_gui_presentation.py` before considering the UI structure ready.
 
 ## Frontend File Boundaries
 

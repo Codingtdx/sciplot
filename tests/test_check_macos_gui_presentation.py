@@ -124,10 +124,6 @@ struct LauncherView {
             LauncherModuleEntryRow()
             Button("Plot") { openWindow(id: Workbench.plot.windowSceneID) }
             WindowDragGesture()
-            Button("Import") { model.beginLauncherPrimaryAction(for: .plot) }
-            Button("Data Studio") { model.beginLauncherPrimaryAction(for: .dataStudio) }
-            Button("Composer") { model.beginLauncherPrimaryAction(for: .composer) }
-            Button("Code Console") { model.beginLauncherPrimaryAction(for: .codeConsole) }
             LauncherCloseButton { dismiss() }
         }
         .frame(width: 760, height: 460)
@@ -184,6 +180,7 @@ axesAdjustmentContent
 legendAdjustmentContent
 guidesAdjustmentContent
 fitAdjustmentContent
+FitModelInspectorSection(session: session)
 functionsAdjustmentContent
 annotationsAdjustmentContent
 advancedAxesAdjustmentContent
@@ -197,7 +194,6 @@ plotOptionsSection
 axesSection
 seriesSection
 InspectorSection(title: "Axis") {}
-InspectorSection(title: "Fit Overlay") {}
 var seriesSection: some View {
     InspectorSection(title: "Legend") {
         SortableSeriesListView()
@@ -211,6 +207,27 @@ var axesSection: some View {
     }
 }
 var fitOverlaySection: some View {}
+""",
+        "app/macos/Sources/Shared/UI/FitModelGrid.swift": """
+struct FitModelOption {
+    let id: String
+    static let all = [
+        FitModelOption(id: "linear"),
+        FitModelOption(id: "polynomial_2"),
+        FitModelOption(id: "polynomial_3"),
+        FitModelOption(id: "exponential"),
+        FitModelOption(id: "logarithmic"),
+        FitModelOption(id: "power_law"),
+        FitModelOption(id: "gaussian"),
+        FitModelOption(id: "logistic"),
+        FitModelOption(id: "custom_function"),
+    ]
+}
+struct FitModelGrid {}
+struct FitModelCard {}
+struct FitModelGlyph {
+    var body: some View { Canvas { _, _ in } }
+}
 """,
         "app/macos/Sources/Features/Plot/PlotDataPipelineInspectorView.swift": """
 struct PlotDataPipelineInspectorView {
@@ -390,6 +407,11 @@ App Icon
             "DataStudioPreparationInspectorView\n"
             "InspectorSection(title: \"Actions\")\nInspectorSection(title: \"Figure\")\n"
             "Button(\"Open in Plot\")\nButton(\"Analysis\")\n"
+        ),
+        "app/macos/Sources/Features/DataStudio/DataStudioAnalysisSheet.swift": (
+            "FitModelGrid(\n"
+            "session.updateAnalysisFitModel(option.id)\n"
+            "analysisFitSummaryRows\n"
         ),
         "app/macos/Sources/Features/DataStudio/DataStudioWorkbenchView.swift": (
             "let isInspectorPresented = true\n"

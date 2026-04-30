@@ -201,112 +201,34 @@ struct DataStudioAnalysisSheet: View {
                     message: session.analysisFitAvailability.reason
                 )
             } else {
-                HStack(spacing: 12) {
-                    Picker("Model", selection: modelBinding) {
-                        Text("Linear").tag("linear")
-                        Text("Polynomial 2").tag("polynomial_2")
-                        Text("Polynomial 3").tag("polynomial_3")
-                    }
-                    .pickerStyle(.menu)
-
-                    if let response = session.analysisFitResponse, response.seriesSummaries.count > 1 {
-                        Picker("Series", selection: seriesBinding) {
-                            ForEach(response.seriesSummaries) { summary in
-                                Text(summary.seriesLabel).tag(Optional(summary.seriesID))
-                            }
+                FitModelGrid(
+                    selectedModelID: session.analysisFitOptions.modelID,
+                    isEnabled: session.analysisFitAvailability.isEnabled,
+                    disabledReason: session.analysisFitAvailability.reason,
+                    disabledOptionIDs: ["custom_function"],
+                    optionHelp: { option in
+                        option.isCustom ? "Custom fit setup is available in Plot." : nil
+                    },
+                    select: { option in
+                        guard !option.isCustom else {
+                            return
                         }
-                        .pickerStyle(.menu)
+                        session.updateAnalysisFitModel(option.id)
                     }
-                }
+                )
 
-                if let errorMessage = session.analysisFitErrorMessage {
-                    ErrorStateCard(
-                        title: "Could not analyze the fit",
-                        message: errorMessage,
-                        retryTitle: "Retry"
-                    ) {
+                FitResultSummaryPanel(
+                    isLoading: session.isLoadingAnalysisFit,
+                    errorMessage: session.analysisFitErrorMessage,
+                    rows: session.analysisFitSummaryRows,
+                    warnings: session.analysisFitResponse?.warnings ?? [],
+                    seriesSummaries: session.analysisFitResponse?.seriesSummaries ?? [],
+                    selectedSeriesID: session.analysisSelectedSeriesID,
+                    selectSeries: { session.selectAnalysisSeries(id: $0) },
+                    retry: {
                         session.loadAnalysisFit(offset: session.analysisFitOffset)
                     }
-                } else if session.isLoadingAnalysisFit && session.analysisFitResponse == nil {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                } else if let response = session.analysisFitResponse {
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
-                        ForEach(session.analysisFitSummaryRows, id: \.0) { label, value in
-                            GridRow {
-                                Text(label)
-                                    .foregroundStyle(.secondary)
-                                Text(value)
-                                    .textSelection(.enabled)
-                            }
-                        }
-                    }
-
-                    if !response.warnings.isEmpty {
-                        ForEach(response.warnings, id: \.self) { warning in
-                            Text(warning)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Table(response.seriesSummaries) {
-                        TableColumn("Series") { row in
-                            Text(row.seriesLabel)
-                        }
-                        TableColumn("Equation") { row in
-                            Text(row.equationDisplay)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        TableColumn("R²") { row in
-                            Text(row.rSquared.formatted(.number.precision(.fractionLength(4))))
-                        }
-                        TableColumn("RMSE") { row in
-                            Text(row.rmse.formatted(.number.precision(.fractionLength(4))))
-                        }
-                        TableColumn("Points") { row in
-                            Text("\(row.pointCount)")
-                        }
-                    }
-                    .frame(minHeight: 180)
-
-                    Table(response.rows) {
-                        TableColumn("X") { row in
-                            Text(row.x.formatted(.number.precision(.fractionLength(4))))
-                        }
-                        TableColumn("Y") { row in
-                            Text(row.y.formatted(.number.precision(.fractionLength(4))))
-                        }
-                        TableColumn("Y Fit") { row in
-                            Text(row.yFit.formatted(.number.precision(.fractionLength(4))))
-                        }
-                        TableColumn("Residual") { row in
-                            Text(row.residual.formatted(.number.precision(.fractionLength(4))))
-                        }
-                    }
-                    .frame(minHeight: 220)
-
-                    HStack {
-                        Button("Previous") {
-                            session.pageAnalysisFit(by: -1)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!session.canPageAnalysisFitBackward)
-
-                        Button("Next") {
-                            session.pageAnalysisFit(by: 1)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!session.canPageAnalysisFitForward)
-
-                        Spacer()
-
-                        Text(session.analysisFitPageSummary)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    EmptyStateCard(title: "No fit analysis")
-                }
+                )
             }
         }
     }
@@ -315,20 +237,6 @@ struct DataStudioAnalysisSheet: View {
         Binding(
             get: { session.analysisTarget },
             set: { session.selectAnalysisTarget($0) }
-        )
-    }
-
-    private var modelBinding: Binding<String> {
-        Binding(
-            get: { session.analysisFitOptions.modelID },
-            set: { session.updateAnalysisFitModel($0) }
-        )
-    }
-
-    private var seriesBinding: Binding<String?> {
-        Binding(
-            get: { session.analysisSelectedSeriesID },
-            set: { session.selectAnalysisSeries(id: $0) }
         )
     }
 

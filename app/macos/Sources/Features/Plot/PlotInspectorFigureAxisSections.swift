@@ -132,32 +132,7 @@ extension PlotInspectorView {
     }
 
     var fitOverlaySection: some View {
-        InspectorSection(title: "Fit Overlay") {
-            AdaptiveInspectorControlRow(title: "Visible") {
-                Toggle("", isOn: fitEnabledBinding)
-                    .labelsHidden()
-                    .disabled(!session.fitOverlayAvailability.isEnabled)
-                    .help(session.fitOverlayAvailability.reason ?? "Show the selected fit model on the figure.")
-            }
-
-            AdaptiveInspectorControlRow(title: "Model") {
-                Picker("", selection: fitModelBinding) {
-                    Text("Linear").tag("linear")
-                    Text("Polynomial 2").tag("polynomial_2")
-                    Text("Polynomial 3").tag("polynomial_3")
-                    Text("Exponential").tag("exponential")
-                    Text("Logarithmic").tag("logarithmic")
-                    Text("Power Law").tag("power_law")
-                    Text("Gaussian").tag("gaussian")
-                    Text("Logistic").tag("logistic")
-                    Text("Custom").tag("custom_function")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .disabled(!session.fitAnalysisAvailability.isEnabled)
-                .help(session.fitAnalysisAvailability.reason ?? "Choose the shared fit model.")
-            }
-        }
+        FitModelInspectorSection(session: session)
     }
 
     var seriesSection: some View {

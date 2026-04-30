@@ -5,38 +5,42 @@ struct PlotSelectedLayerEditorView: View {
     let selection: PlotLayerSelection?
 
     var body: some View {
-        InspectorSection(title: editorTitle) {
-            switch selection {
-            case .fitOverlay:
-                fitOverlayEditor
-            case .function(let id):
-                if session.analyticalLayers.contains(where: { $0.id == id }) {
-                    functionLayerEditor(id: id)
-                } else {
+        if case .fitOverlay = selection {
+            FitModelInspectorSection(session: session)
+        } else {
+            InspectorSection(title: editorTitle) {
+                switch selection {
+                case .fitOverlay:
+                    EmptyView()
+                case .function(let id):
+                    if session.analyticalLayers.contains(where: { $0.id == id }) {
+                        functionLayerEditor(id: id)
+                    } else {
+                        InspectorEmptyState(message: "Select a layer")
+                    }
+                case .referenceGuide(let id):
+                    if session.referenceGuides.contains(where: { $0.id == id }) {
+                        referenceGuideEditor(id: id)
+                    } else {
+                        InspectorEmptyState(message: "Select a layer")
+                    }
+                case .textAnnotation(let id):
+                    if session.textAnnotations.contains(where: { $0.id == id }) {
+                        textAnnotationEditor(id: id)
+                    } else {
+                        InspectorEmptyState(message: "Select a layer")
+                    }
+                case .shapeAnnotation(let id):
+                    if session.shapeAnnotations.contains(where: { $0.id == id }) {
+                        shapeAnnotationEditor(id: id)
+                    } else {
+                        InspectorEmptyState(message: "Select a layer")
+                    }
+                case .series(let id):
+                    seriesEditor(id: id)
+                case nil:
                     InspectorEmptyState(message: "Select a layer")
                 }
-            case .referenceGuide(let id):
-                if session.referenceGuides.contains(where: { $0.id == id }) {
-                    referenceGuideEditor(id: id)
-                } else {
-                    InspectorEmptyState(message: "Select a layer")
-                }
-            case .textAnnotation(let id):
-                if session.textAnnotations.contains(where: { $0.id == id }) {
-                    textAnnotationEditor(id: id)
-                } else {
-                    InspectorEmptyState(message: "Select a layer")
-                }
-            case .shapeAnnotation(let id):
-                if session.shapeAnnotations.contains(where: { $0.id == id }) {
-                    shapeAnnotationEditor(id: id)
-                } else {
-                    InspectorEmptyState(message: "Select a layer")
-                }
-            case .series(let id):
-                seriesEditor(id: id)
-            case nil:
-                InspectorEmptyState(message: "Select a layer")
             }
         }
     }
@@ -57,34 +61,6 @@ struct PlotSelectedLayerEditorView: View {
             return "Legend"
         case nil:
             return "Edit"
-        }
-    }
-
-    private var fitOverlayEditor: some View {
-        Group {
-            AdaptiveInspectorControlRow(title: "Visible") {
-                Toggle("", isOn: fitEnabledBinding)
-                    .labelsHidden()
-                    .disabled(!session.fitOverlayAvailability.isEnabled)
-                    .help(session.fitOverlayAvailability.reason ?? "Show fit overlay.")
-            }
-            AdaptiveInspectorControlRow(title: "Model") {
-                Picker("", selection: fitModelBinding) {
-                    Text("Linear").tag("linear")
-                    Text("Polynomial 2").tag("polynomial_2")
-                    Text("Polynomial 3").tag("polynomial_3")
-                    Text("Exponential").tag("exponential")
-                    Text("Logarithmic").tag("logarithmic")
-                    Text("Power Law").tag("power_law")
-                    Text("Gaussian").tag("gaussian")
-                    Text("Logistic").tag("logistic")
-                    Text("Custom").tag("custom_function")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .disabled(!session.fitAnalysisAvailability.isEnabled)
-                .help(session.fitAnalysisAvailability.reason ?? "Choose the fit model.")
-            }
         }
     }
 
@@ -347,20 +323,6 @@ struct PlotSelectedLayerEditorView: View {
             .disabled(!session.resetSeriesOrderAvailability.isEnabled)
             .help(session.resetSeriesOrderAvailability.reason ?? "Reset legend ordering.")
         }
-    }
-
-    private var fitEnabledBinding: Binding<Bool> {
-        boolBinding(
-            get: { session.fitOptions.enabled },
-            set: { session.updateFitEnabled($0) }
-        )
-    }
-
-    private var fitModelBinding: Binding<String> {
-        stringBinding(
-            get: { session.fitOptions.modelID },
-            set: { session.updateFitModel($0) }
-        )
     }
 
     private func functionLayer(_ id: String) -> AnalyticalLayerPayload {

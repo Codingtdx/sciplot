@@ -26,13 +26,34 @@ Every development round must update this file.
    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
 3. Sanity-check one user flow in each workbench:
-   - Launcher: choose each module and verify the primary action opens the real module workflow
+   - Launcher: choose each module and verify it opens/focuses the matching singleton module window
    - Plot: Import -> Inspect -> Template -> Refine -> Preflight -> Export
    - Data Studio: Import -> Group Review -> Compare Preview -> Export/Open in Plot
    - Composer: preview/export with layer/hidden/lock semantics
    - Code Console: context bind -> run -> outputs/reveal
 
 ## 3) Decision Records
+
+### 2026-04-30: Launcher module-only entry and card-based Fit inspector
+
+- What changed:
+  - Removed Launcher row trailing `Import/Open`, `Import Raw`, `Import`, and `Bind` text buttons. Launcher rows now only open/focus the target module window.
+  - Replaced the Plot Fit inspector's picker/table-launch flow with an inline card grid for `Linear`, polynomial, exponential, logarithmic, power-law, Gaussian, logistic, and custom fit models.
+  - Added shared `FitModelGrid` / `FitModelCard` / `FitModelGlyph` UI so Data Studio Analysis Fit uses the same visual model selection instead of a separate picker.
+  - Kept Data Workbook as the detailed data view, but removed `Open Fit Table` as the default Fit inspector action. Inspector Fit now shows compact equation, R2, RMSE, points, warnings, and series chips inline.
+  - Custom fit no longer sends an invalid backend request on card click. Plot expands an inline custom function form until expression and parameters are valid; Data Studio keeps custom disabled with help until it owns a real custom editor.
+
+- Design rationale:
+  - Launcher should not be a second action bar. Import/bind state, replacement confirmations, and failures belong to the module window that owns them.
+  - Fit models are a small, high-value mutually exclusive choice set. Large visual cards reduce menu hunting and avoid text-heavy inspector interactions while keeping all real fit semantics in the backend.
+  - The abstract glyphs are intentionally presentation-only. They hint at model shape without becoming a second plotting or fitting engine.
+
+- Verification to refresh for this round:
+  - `.venv/bin/python scripts/check_macos_gui_presentation.py`
+  - `.venv/bin/python -m pytest tests`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
+  - `.venv/bin/python scripts/blocking_gate.py`
 
 ### 2026-04-29: Plot import ownership, Legend visibility, rounded surfaces, and abstract app icon
 

@@ -62,7 +62,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.selectedWorkbench, .plot)
     }
 
-    func testLauncherStartsPresentedAndRoutesModuleActionsToRealSessions() {
+    func testLauncherRowsOnlyRequestModuleWindows() {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
 
         XCTAssertNil(model.requestedWorkbenchWindow)
@@ -71,24 +71,24 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.requestedWorkbenchWindow, .composer)
 
         model.showLauncher()
-        model.beginLauncherPrimaryAction(for: .plot)
+        model.enterWorkbench(.plot)
         XCTAssertEqual(model.requestedWorkbenchWindow, .plot)
-        XCTAssertTrue(model.plotSession.isImporterPresented)
+        XCTAssertFalse(model.plotSession.isImporterPresented)
 
         model.showLauncher()
-        model.beginLauncherPrimaryAction(for: .dataStudio)
+        model.enterWorkbench(.dataStudio)
         XCTAssertEqual(model.requestedWorkbenchWindow, .dataStudio)
-        XCTAssertEqual(model.dataStudioSession.importFlow, .wizard(step: .kind))
+        XCTAssertEqual(model.dataStudioSession.importFlow, .idle)
 
         model.showLauncher()
-        model.beginLauncherPrimaryAction(for: .composer)
+        model.enterWorkbench(.composer)
         XCTAssertEqual(model.requestedWorkbenchWindow, .composer)
-        XCTAssertTrue(model.composerSession.isImportMenuPresented)
+        XCTAssertFalse(model.composerSession.isImportMenuPresented)
 
         model.showLauncher()
-        model.beginLauncherPrimaryAction(for: .codeConsole)
+        model.enterWorkbench(.codeConsole)
         XCTAssertEqual(model.requestedWorkbenchWindow, .codeConsole)
-        XCTAssertTrue(model.codeConsoleSession.isImporterPresented)
+        XCTAssertFalse(model.codeConsoleSession.isImporterPresented)
     }
 
     func testNewProjectClearsPlotStateAndRequestsLauncher() {
