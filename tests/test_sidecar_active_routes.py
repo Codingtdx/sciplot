@@ -6,7 +6,7 @@ import pandas as pd
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from app.sidecar.server import app
+from app.sidecar.server import CRITICAL_SIDECAR_ROUTES, app
 
 client = TestClient(app)
 
@@ -32,6 +32,7 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/fit-analysis") in signatures
     assert ("POST", "/save-project") in signatures
     assert ("POST", "/open-project") in signatures
+    assert ("POST", "/preflight-render") in signatures
     assert ("POST", "/code-console/context") in signatures
     assert ("POST", "/code-console/run") in signatures
     assert ("POST", "/render-preview") in signatures
@@ -43,9 +44,12 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/data-studio/template-recommendations") in signatures
     assert ("POST", "/data-studio/build-workbook") in signatures
     assert ("POST", "/data-studio/import-workbook") in signatures
+    assert ("POST", "/data-studio/workbook-preview") in signatures
+    assert ("POST", "/data-studio/comparison-context") in signatures
     assert ("POST", "/data-studio/comparison-preview") in signatures
     assert ("POST", "/data-studio/comparison-export") in signatures
     assert ("POST", "/data-studio/session/normalize") in signatures
+    assert set(CRITICAL_SIDECAR_ROUTES).issubset(signatures)
     assert ("POST", "/recommend-render") not in signatures
     assert ("POST", "/data-studio/source-preview") not in signatures
 

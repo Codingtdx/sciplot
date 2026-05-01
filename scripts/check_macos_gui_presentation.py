@@ -28,7 +28,6 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             'Window("Code Console", id: Workbench.codeConsole.windowSceneID)',
             ".defaultSize(width:",
             ".windowResizability(.contentMinSize)",
-            ".windowStyle(.plain)",
             ".defaultLaunchBehavior(.presented)",
             ".restorationBehavior(.disabled)",
             "@State private var model = SciPlotGodAppState.model",
@@ -38,6 +37,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "openLauncherAfterSceneAttempt",
             "applicationShouldHandleReopen",
             "hasVisibleWindow(id:",
+            ".windowStyle(.plain)",
             "BorderlessLauncherWindow",
             "window.styleMask = [.borderless]",
             "window.isOpaque = false",
@@ -54,6 +54,10 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "applicationDidBecomeActive",
             "openLauncherIfNoVisibleWindows",
             "SciPlotGod debug:",
+            "window.styleMask = [.titled, .closable]",
+            "window.isOpaque = true",
+            "window.backgroundColor = .windowBackgroundColor",
+            "window.hasShadow = true",
         ),
     ),
     SourceCheck(
@@ -61,12 +65,16 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         path="app/macos/Sources/App/RootSplitView.swift",
         required=(
             "struct LauncherWindowRoot",
+            "LauncherSceneWindowRetirer",
             "struct WorkbenchWindowRoot",
             "WorkbenchWindowOpenHandler",
             "bootstrapOnAppear: false",
             ".focusedSceneValue(\\.workbenchCommandContext, workbench)",
             "WorkbenchWindowToolbarContent(",
             "WindowToolbarConfigurator",
+            ".toolbar(removing: .title)",
+            ".toolbarVisibility(.hidden, for: .windowToolbar)",
+            ".containerBackground(.clear, for: .window)",
             "DataStudioWorkbenchView(",
             "ComposerWorkbenchView(",
             "CodeConsoleWorkbenchView(",
@@ -867,6 +875,13 @@ WORKBENCH_ROOTS = (
     "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift",
 )
 
+CENTRAL_STAGE_BACKDROP_FILES = (
+    "app/macos/Sources/Features/Plot/PlotRefineView.swift",
+    "app/macos/Sources/Features/DataStudio/DataStudioPreviewWorkspaceView.swift",
+    "app/macos/Sources/Features/Composer/ComposerWorkbenchView.swift",
+    "app/macos/Sources/Features/CodeConsole/CodeConsoleWorkbenchView.swift",
+)
+
 
 def _read_source(root: Path, relative_path: str) -> str:
     path = root / relative_path
@@ -892,6 +907,59 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         for token in check.forbidden:
             if token in source:
                 issues.append(f"{check.path}: {check.label}: forbidden token still present {token!r}")
+
+    try:
+        launcher_source = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")
+        required_launcher_tokens = (
+            ".windowStyle(.plain)",
+            "BorderlessLauncherWindow",
+            "window.styleMask = [.borderless]",
+            "window.isOpaque = false",
+            "window.backgroundColor = .clear",
+            "window.hasShadow = false",
+        )
+        forbidden_launcher_tokens = (
+            "ManagedLauncherWindow",
+            "window.styleMask = [.titled, .closable]",
+            "window.isOpaque = true",
+            "window.backgroundColor = .windowBackgroundColor",
+            "window.hasShadow = true",
+        )
+        for token in required_launcher_tokens:
+            if token not in launcher_source:
+                issues.append(
+                    "app/macos/Sources/App/SciPlotGodApp.swift: "
+                    f"borderless transparent launcher is missing {token!r}"
+                )
+        for token in forbidden_launcher_tokens:
+            if token in launcher_source:
+                issues.append(
+                    "app/macos/Sources/App/SciPlotGodApp.swift: "
+                    f"borderless transparent launcher must not use outer window chrome token {token!r}"
+                )
+    except AssertionError as error:
+        issues.append(str(error))
+
+    for relative_path in CENTRAL_STAGE_BACKDROP_FILES:
+        try:
+            source = _read_source(root, relative_path)
+        except AssertionError as error:
+            issues.append(str(error))
+            continue
+        if "theme.stageBackground" in source:
+            issues.append(
+                f"{relative_path}: central stage must not draw a rectangular backdrop"
+            )
+
+    try:
+        composer_canvas_source = _read_source(root, "app/macos/Sources/Features/Composer/ComposerCanvasView.swift")
+        if ".shadow(" in composer_canvas_source:
+            issues.append(
+                "app/macos/Sources/Features/Composer/ComposerCanvasView.swift: "
+                "central canvas must not add decorative rectangular shadows"
+            )
+    except AssertionError as error:
+        issues.append(str(error))
 
     try:
         shaped_glass_source = _read_source(root, "app/macos/Sources/Shared/UI/StateViews.swift")

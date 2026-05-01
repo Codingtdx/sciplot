@@ -34,6 +34,76 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(Workbench.codeConsole.windowSceneID, "code-console")
     }
 
+    func testLauncherWindowReuseOnlyAcceptsControlledBorderlessWindow() {
+        let manager = AppWindowManager()
+        let window = NonKeyableLauncherWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 760, height: 460)),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "SciPlot God"
+
+        XCTAssertFalse(manager.canReuseLauncherWindow(window))
+
+        let genericKeyableWindow = KeyableLauncherWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 760, height: 460)),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        genericKeyableWindow.identifier = NSUserInterfaceItemIdentifier("launcher")
+
+        XCTAssertFalse(manager.canReuseLauncherWindow(genericKeyableWindow))
+
+        let controlledWindow = BorderlessLauncherWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 760, height: 460)),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        controlledWindow.identifier = NSUserInterfaceItemIdentifier("launcher")
+
+        XCTAssertTrue(manager.canReuseLauncherWindow(controlledWindow))
+    }
+
+    func testLauncherSceneFallbackDoesNotStealFocusFromVisibleWorkbenchWindow() async throws {
+        let manager = AppWindowManager()
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+        closeLauncherWindows()
+        let workbenchWindow = NSWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 640, height: 420)),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        workbenchWindow.identifier = NSUserInterfaceItemIdentifier(Workbench.plot.windowSceneID)
+        workbenchWindow.title = Workbench.plot.title
+        workbenchWindow.isReleasedWhenClosed = false
+        workbenchWindow.orderFrontRegardless()
+        defer {
+            workbenchWindow.close()
+            closeLauncherWindows()
+        }
+
+        manager.openLauncherAfterSceneAttempt(model: model)
+        try await Task.sleep(nanoseconds: 700_000_000)
+
+        XCTAssertFalse(
+            NSApp.windows.contains { window in
+                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot God")
+            },
+            "Automatic Launcher fallback should not present over an already visible workbench window."
+        )
+        XCTAssertTrue(workbenchWindow.isVisible)
+    }
+
+    private func closeLauncherWindows() {
+        NSApp.windows
+            .filter { $0.identifier?.rawValue == "launcher" || $0.title == "SciPlot God" }
+            .forEach { $0.close() }
+    }
+
     func testAppearanceModeStorageAndPreferredColorSchemeMapping() {
         XCTAssertEqual(AppAppearanceMode.storageKey, "appAppearanceMode")
         XCTAssertEqual(AppAppearanceMode.allCases.map(\.rawValue), ["system", "light", "dark"])
@@ -366,25 +436,7 @@ final class AppModelTests: XCTestCase {
 
         let requestCounter = RequestCounter()
         let healthData = Data(#"{"status":"ok","version":"5.0.0"}"#.utf8)
-        let openAPIData = Data(
-            """
-            {
-              "paths": {
-                "/meta": { "get": {} },
-                "/plot-contract": { "get": {} },
-                "/data-studio/templates": { "get": {} },
-                "/source-table-preview": { "post": {} },
-                "/data-studio/template-preview": { "post": {} },
-                "/data-studio/template-recommendations": { "post": {} },
-                "/data-studio/build-workbook": { "post": {} },
-                "/inspect-file": { "post": {} },
-                "/code-console/context": { "post": {} },
-                "/code-console/run": { "post": {} },
-                "/compose-preview": { "post": {} }
-              }
-            }
-            """.utf8
-        )
+        let openAPIData = TestPayloads.compatibleOpenAPIData()
         let metaData = try encodeJSON(TestPayloads.meta())
         let contractData = try encodeJSON(TestPayloads.contract())
         let inspectData = try encodeJSON(TestPayloads.inspectFile(path: "/tmp/runtime-chain.csv"))
@@ -505,6 +557,16 @@ final class AppModelTests: XCTestCase {
         )!
         return (response, body)
     }
+}
+
+private final class NonKeyableLauncherWindow: NSWindow {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+private final class KeyableLauncherWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 private final class RequestCounter {

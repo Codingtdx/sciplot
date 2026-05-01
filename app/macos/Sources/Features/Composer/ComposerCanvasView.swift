@@ -180,7 +180,6 @@ private struct ComposerCanvasBoard: View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(Color.black.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.025), radius: 5, y: 2)
     }
 }
 
@@ -343,7 +342,6 @@ private struct ComposerPlacedPanelView: View {
         .frame(width: rect.width, height: rect.height)
         .position(rect.center)
         .contentShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(isSelected ? 0.08 : 0.03), radius: 10, y: 6)
         .animation(MotionTokens.selection, value: isSelected)
     }
 

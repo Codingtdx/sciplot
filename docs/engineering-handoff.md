@@ -6039,3 +6039,91 @@ Use this block for every new round:
   - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`: passed, 210 tests.
   - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix.
   - Manual smoke: launched the debug app, opened Plot, imported `/private/tmp/sciplot_inner_beta_manual/curve_core_advanced.csv`, created a text annotation on the canvas, and confirmed the selected annotation no longer shows the old circular marker.
+
+## 2026-05-01 - Launcher Chrome And Inner Beta Guards
+
+- Scope:
+  - Fixed the native Launcher chrome so the supported app entry surface presents as a borderless, transparent, no-shadow glass welcome surface instead of a titled outer window shell.
+  - Tightened workbench window roots so module windows keep the independent singleton scene model and do not reintroduce old global split-shell chrome.
+  - Expanded critical sidecar route guards to cover retained render, Composer export, Data Studio import/preview/compare/export, and session-normalize endpoints used by the current inner beta surface.
+  - Strengthened macOS GUI presentation checks for borderless Launcher behavior, central stage backdrop rules, and removed rectangular decorative shadows from the Composer canvas path.
+  - Fixed the review-found Launcher focus retry issue by making automatic scene/startup Launcher fallback skip when a module window is already visible, while keeping explicit `Launcher` / `New Project` commands as immediate user-requested opens.
+  - Added/updated AppModel, SidecarRuntime, active route, and presentation guard tests for the above.
+
+- User-visible impact:
+  - Launcher opens as the supported app entry surface with quieter native glass presentation.
+  - `Command-1/2/3/4` continues to open/focus the four independent module windows.
+  - The app-managed sidecar now fails faster if a retained core route is missing, reducing the chance that an incompatible local sidecar silently serves a partial inner beta surface.
+
+- Boundaries:
+  - No `src/plot_contract.json` change.
+  - No public sidecar schema shape change and no `.sciplotgod` bundle format change.
+  - No `nature` style metrics, render semantics, or Python plotting behavior changed.
+  - This round is readiness hardening and presentation guard work, not a new feature expansion.
+
+- Risks:
+  - The critical route list is intentionally stricter; any future route rename or removal must update the app factory guard and active-route tests in the same round.
+  - Borderless Launcher behavior relies on AppKit window customization staying attached to the Launcher scene only.
+  - Launcher window behavior now has two paths: automatic fallback is guarded by visible module windows, while explicit user commands still force-open the Launcher.
+  - GUI presentation checks remain source-structure guardrails; they do not replace real desktop smoke evidence.
+
+- Rollback points:
+  - Launcher/window scene hardening:
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/SciPlotGodApp.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/App/RootSplitView.swift`
+  - Sidecar critical route hardening:
+    - `/Users/dongxutian/Documents/codegod/app/sidecar/server.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Sources/Infrastructure/SidecarRuntime.swift`
+  - Presentation and route guards:
+    - `/Users/dongxutian/Documents/codegod/scripts/check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_check_macos_gui_presentation.py`
+    - `/Users/dongxutian/Documents/codegod/tests/test_sidecar_active_routes.py`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/AppModelTests.swift`
+    - `/Users/dongxutian/Documents/codegod/app/macos/Tests/SidecarRuntimeTests.swift`
+
+- Decision Record:
+  - Why:
+    - Inner beta readiness should fail on a missing retained endpoint at sidecar startup, not later as a confusing partial UI failure.
+    - The Launcher is the supported native entry surface, so it needs its own guardrails rather than inheriting generic titled-window chrome.
+    - Presentation guardrails catch accidental restoration of old shell/backdrop patterns before screenshots or manual QA.
+  - Rejected alternatives:
+    - Relying only on port availability: rejected because a reachable but stale sidecar can still be incompatible.
+    - Leaving Launcher chrome as a normal titled window: rejected because it conflicts with the current app entry model and recent visual direction.
+    - Replacing source guardrails with a second screenshot pipeline: rejected because xcresult attachments already own visual QA artifacts.
+  - Current boundaries:
+    - The route guard validates route presence only; request/response compatibility remains covered by schema tests and sidecar client/runtime probes.
+    - Real manual smoke evidence is still required for strict inner beta sign-off.
+
+- Validation:
+  - Review follow-up verification:
+    - Added `testLauncherSceneFallbackDoesNotStealFocusFromVisibleWorkbenchWindow`; confirmed it failed before the fix because automatic Launcher fallback presented over a visible Plot window, then passed after the guarded fallback change.
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests -only-testing:SciPlotGodMacTests/SidecarRuntimeTests`: passed, 29 tests.
+    - `.venv/bin/python -m pytest tests/test_sidecar_active_routes.py tests/test_check_macos_gui_presentation.py -q`: passed, 9 tests.
+    - `.venv/bin/python -m ruff check .`: passed.
+    - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`: passed, no issues in 48 source files.
+    - `.venv/bin/python -m pytest tests`: passed, 285 tests, 5 warnings.
+    - `.venv/bin/python scripts/smoke_check.py`: passed.
+    - `.venv/bin/python scripts/check_macos_gui_presentation.py`: passed.
+    - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test`: passed, 216 tests.
+    - `git diff --check`: passed.
+    - Computer Use desktop check: launched the debug app, clicked Plot immediately from Launcher, waited past the delayed startup retry window, and confirmed the focused window remained `Plot` rather than returning to Launcher.
+  - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual/evidence.json --require-all`: passed.
+  - `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual/evidence.json`: passed automated matrix and strict manual evidence on 2026-05-01.
+  - Gate details from the strict run:
+    - `clean_repo`: passed.
+    - `ruff`: passed.
+    - `mypy`: passed, no issues in 48 source files.
+    - `pytest`: passed, 285 tests, 5 warnings.
+    - `smoke_check`: passed.
+    - `macos_gui_presentation`: passed.
+    - `xcodebuild build`: passed.
+    - `xcodebuild test`: passed, 215 tests.
+  - Desktop UI spot check and manual smoke with Computer Use on 2026-05-01:
+    - Launched `/Users/dongxutian/Documents/codegod/app/macos/.derivedData/Build/Products/Debug/SciPlot God.app`.
+    - Captured the Launcher and confirmed module rows were visible.
+    - Opened Plot from Launcher.
+    - Verified `Command-2`, `Command-3`, `Command-4`, and `Command-1` focus/open Data Studio, Composer, Code Console, and Plot respectively.
+    - Completed `plot_import_preview_export`: Plot toolbar import, live preview, and PDF export.
+    - Completed `data_studio_import_open_plot`: Data Studio raw import with built-in Tensile recommendation, workbook save, and Open in Plot handoff.
+    - Completed `overlay_drag_save_reopen`: Plot text annotation placement, drag, project save, project reopen, and persisted annotation check.
+  - Manual evidence files are stored under `/tmp/sciplot_inner_beta_manual/` for this local sign-off run.

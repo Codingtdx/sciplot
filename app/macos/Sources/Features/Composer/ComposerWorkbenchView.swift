@@ -104,12 +104,9 @@ private struct ComposerProWorkspace: View {
 
 private struct ComposerCanvasStageView: View {
     let session: ComposerSession
-    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ZStack(alignment: .top) {
-            theme.stageBackground
-
             ComposerCanvasView(session: session)
                 .padding(28)
 

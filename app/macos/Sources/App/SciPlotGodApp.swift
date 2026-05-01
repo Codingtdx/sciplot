@@ -83,9 +83,10 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            AppWindowManager.shared.openLauncher(model: SciPlotGodAppState.model)
-        }
+        AppWindowManager.shared.openLauncherAfterSceneAttempt(
+            model: SciPlotGodAppState.model,
+            delays: [0.8, 1.6]
+        )
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -103,9 +104,12 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
     private var controllers: [String: NSWindowController] = [:]
 
-    func openLauncherAfterSceneAttempt(model: AppModel) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            if !self.hasVisibleWindow(id: "launcher", title: "SciPlot God") {
+    func openLauncherAfterSceneAttempt(model: AppModel, delays: [TimeInterval] = [0.05, 0.2, 0.55]) {
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard !self.hasVisibleWorkbenchWindow() else {
+                    return
+                }
                 self.openLauncher(model: model)
             }
         }
@@ -121,15 +125,15 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
     func openLauncher(model: AppModel) {
         let id = "launcher"
+        retireUnusableLauncherWindows()
+
         if let controller = controllers[id], let window = controller.window {
             configureLauncherWindow(window)
             present(window)
             return
         }
 
-        if let existingWindow = NSApp.windows.first(where: { window in
-            window.identifier?.rawValue == id || window.title == "SciPlot God"
-        }) {
+        if let existingWindow = NSApp.windows.first(where: canReuseLauncherWindow) {
             configureLauncherWindow(existingWindow)
             present(existingWindow)
             return
@@ -226,9 +230,38 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
     private func present(_ window: NSWindow) {
         NSApp.setActivationPolicy(.regular)
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        window.makeMain()
+        window.makeKey()
+    }
+
+    func canReuseLauncherWindow(_ window: NSWindow) -> Bool {
+        isLauncherWindowCandidate(window)
+            && window is BorderlessLauncherWindow
+            && window.canBecomeKey
+            && window.canBecomeMain
+    }
+
+    private func isLauncherWindowCandidate(_ window: NSWindow) -> Bool {
+        window.identifier?.rawValue == "launcher" || window.title == "SciPlot God"
+    }
+
+    private func retireUnusableLauncherWindows() {
+        NSApp.windows
+            .filter(isLauncherWindowCandidate)
+            .filter { !canReuseLauncherWindow($0) }
+            .forEach(retireUnmanagedLauncherWindow)
+    }
+
+    func retireUnmanagedLauncherWindow(_ window: NSWindow) {
+        guard isLauncherWindowCandidate(window), !canReuseLauncherWindow(window) else {
+            return
+        }
+        window.orderOut(nil)
+        window.close()
     }
 
     private func hasVisibleWindow(id: String, title: String? = nil) -> Bool {
@@ -236,10 +269,27 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
             guard window.isVisible else {
                 return false
             }
+            if isLauncherWindowCandidate(window) {
+                return canReuseLauncherWindow(window)
+            }
             if window.identifier?.rawValue == id {
                 return true
             }
             return title.map { window.title == $0 } ?? false
+        }
+    }
+
+    private func hasVisibleWorkbenchWindow() -> Bool {
+        let workbenchIDs = Set(Workbench.allCases.map(\.windowSceneID))
+        let workbenchTitles = Set(Workbench.allCases.map(\.title))
+        return NSApp.windows.contains { window in
+            guard window.isVisible, !window.isMiniaturized, !isLauncherWindowCandidate(window) else {
+                return false
+            }
+            if let identifier = window.identifier?.rawValue, workbenchIDs.contains(identifier) {
+                return true
+            }
+            return workbenchTitles.contains(window.title)
         }
     }
 
@@ -272,7 +322,23 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
     }
 }
 
-private final class BorderlessLauncherWindow: NSWindow {
+final class BorderlessLauncherWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func isAccessibilityElement() -> Bool {
+        true
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        .window
+    }
+
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? {
+        .standardWindow
+    }
+
+    override func accessibilityTitle() -> String? {
+        title
+    }
 }

@@ -99,23 +99,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: """
-                    {
-                      "paths": {
-                        "/meta": { "get": {} },
-                        "/plot-contract": { "get": {} },
-                        "/data-studio/templates": { "get": {} },
-                        "/source-table-preview": { "post": {} },
-                        "/data-studio/template-preview": { "post": {} },
-                        "/data-studio/template-recommendations": { "post": {} },
-                        "/data-studio/build-workbook": { "post": {} },
-                        "/inspect-file": { "post": {} },
-                        "/code-console/context": { "post": {} },
-                        "/code-console/run": { "post": {} },
-                        "/compose-preview": { "post": {} }
-                      }
-                    }
-                    """
+                    body: TestPayloads.compatibleOpenAPIJSON()
                 )
             case "/meta":
                 return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
@@ -187,6 +171,70 @@ final class SidecarRuntimeTests: XCTestCase {
     }
 
     @MainActor
+    func testEnsureRunningFailsWhenOpenAPIMissesInnerBetaCoreRoute() async throws {
+        let repoRoot = try makeRepositoryFixture(includePythonStub: true)
+        let bundleURL = try makeAppBundleFixture(
+            at: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+            infoValues: [:]
+        )
+        guard let bundle = Bundle(url: bundleURL) else {
+            XCTFail("Expected test app bundle to load")
+            return
+        }
+        FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
+
+        let metaData = try encodeJSON(TestPayloads.meta())
+        let contractData = try encodeJSON(TestPayloads.contract())
+        let missingRoute = SidecarRouteSignature(method: "POST", path: "/render-preview")
+        let session = makeStubbedSession { request in
+            switch request.url?.path {
+            case "/health":
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: #"{"status":"ok","version":"5.0.0"}"#
+                )
+            case "/openapi.json":
+                return Self.jsonResponse(
+                    request: request,
+                    statusCode: 200,
+                    body: TestPayloads.compatibleOpenAPIJSON(excluding: [missingRoute])
+                )
+            case "/meta":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
+            case "/plot-contract":
+                return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: contractData, as: UTF8.self))
+            default:
+                throw URLError(.badURL)
+            }
+        }
+
+        let runtime = SidecarRuntime(
+            locator: RepoLocator(fileManager: .default, bundle: bundle),
+            session: session,
+            startupTimeoutNanoseconds: 100_000_000,
+            probeIntervalNanoseconds: 10_000_000
+        )
+
+        do {
+            try await runtime.ensureRunning()
+            XCTFail("Expected startup failure")
+        } catch {
+            guard case let SidecarError.startupFailed(detail) = error else {
+                XCTFail("Unexpected error: \(error)")
+                return
+            }
+            XCTAssertTrue(detail.contains("POST /render-preview"))
+        }
+        XCTAssertTrue(
+            runtime.logs.contains(where: { $0.contains("Missing required routes: POST /render-preview") }),
+            "Expected runtime logs to name the missing inner-beta core route."
+        )
+    }
+
+    @MainActor
     func testEnsureRunningSkipsFullCompatibilityProbeWithinHealthCacheWindow() async throws {
         let repoRoot = try makeRepositoryFixture(includePythonStub: true)
         let bundleURL = try makeAppBundleFixture(
@@ -219,23 +267,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: """
-                    {
-                      "paths": {
-                        "/meta": { "get": {} },
-                        "/plot-contract": { "get": {} },
-                        "/data-studio/templates": { "get": {} },
-                        "/source-table-preview": { "post": {} },
-                        "/data-studio/template-preview": { "post": {} },
-                        "/data-studio/template-recommendations": { "post": {} },
-                        "/data-studio/build-workbook": { "post": {} },
-                        "/inspect-file": { "post": {} },
-                        "/code-console/context": { "post": {} },
-                        "/code-console/run": { "post": {} },
-                        "/compose-preview": { "post": {} }
-                      }
-                    }
-                    """
+                    body: TestPayloads.compatibleOpenAPIJSON()
                 )
             case "/meta":
                 return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))
@@ -307,23 +339,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: """
-                    {
-                      "paths": {
-                        "/meta": { "get": {} },
-                        "/plot-contract": { "get": {} },
-                        "/data-studio/templates": { "get": {} },
-                        "/source-table-preview": { "post": {} },
-                        "/data-studio/template-preview": { "post": {} },
-                        "/data-studio/template-recommendations": { "post": {} },
-                        "/data-studio/build-workbook": { "post": {} },
-                        "/inspect-file": { "post": {} },
-                        "/code-console/context": { "post": {} },
-                        "/code-console/run": { "post": {} },
-                        "/compose-preview": { "post": {} }
-                      }
-                    }
-                    """
+                    body: TestPayloads.compatibleOpenAPIJSON()
                 )
             case "/meta":
                 return Self.jsonResponse(request: request, statusCode: 200, body: String(decoding: metaData, as: UTF8.self))

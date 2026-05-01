@@ -21,13 +21,23 @@ CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/fit-analysis"),
     ("POST", "/save-project"),
     ("POST", "/open-project"),
+    ("POST", "/preflight-render"),
+    ("POST", "/render-preview"),
+    ("POST", "/export-render"),
     ("POST", "/code-console/context"),
     ("POST", "/code-console/run"),
     ("POST", "/compose-preview"),
+    ("POST", "/compose-export"),
     ("GET", "/data-studio/templates"),
     ("POST", "/data-studio/template-preview"),
     ("POST", "/data-studio/template-recommendations"),
     ("POST", "/data-studio/build-workbook"),
+    ("POST", "/data-studio/import-workbook"),
+    ("POST", "/data-studio/workbook-preview"),
+    ("POST", "/data-studio/comparison-context"),
+    ("POST", "/data-studio/comparison-preview"),
+    ("POST", "/data-studio/comparison-export"),
+    ("POST", "/data-studio/session/normalize"),
 )
 
 

@@ -69,12 +69,9 @@ private struct CodeConsoleProWorkspace: View {
 
 private struct CodeConsoleRunStageView: View {
     @Bindable var session: CodeConsoleSession
-    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         ZStack(alignment: .top) {
-            theme.stageBackground
-
             CodeConsoleRunWorkspaceView(session: session)
                 .padding(.horizontal, 18)
                 .padding(.top, 54)

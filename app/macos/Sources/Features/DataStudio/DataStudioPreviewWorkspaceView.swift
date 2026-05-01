@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DataStudioPreviewWorkspaceView: View {
     @Bindable var session: DataStudioSession
-    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -18,8 +17,6 @@ struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var previewStage: some View {
         ZStack(alignment: .top) {
-            theme.stageBackground
-
             stageContent
 
             if let warning = session.previewWarning {
@@ -140,4 +137,3 @@ struct DataStudioInlinePreviewBanner: View {
         )
     }
 }
-

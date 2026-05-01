@@ -65,9 +65,15 @@ struct LauncherWindowRoot {
         AppWindowSharedChrome(model: model, bootstrapOnAppear: false) {
             LauncherView(model: model)
         }
+            .toolbar(removing: .title)
+            .toolbarVisibility(.hidden, for: .windowToolbar)
+            .containerBackground(.clear, for: .window)
+            .background(WindowToolbarConfigurator())
+            .background(LauncherSceneWindowRetirer())
             .modifier(WorkbenchWindowOpenHandler(model: model))
     }
 }
+private struct LauncherSceneWindowRetirer {}
 struct WorkbenchWindowRoot {
     let workbench: Workbench
     var body: some View {
@@ -261,6 +267,7 @@ struct PlotSelectedLayerEditorView {
 PlotPreviewStage(session: session)
 PlotInteractivePreviewSurface(session: session, preview: preview)
 ProgressView()
+previewSurface
 struct PlotStageDiagnosticBanner {
     let shape = RoundedRectangle(cornerRadius: 14)
 }
@@ -549,6 +556,91 @@ def test_gui_presentation_checks_report_forbidden_card_grammar(tmp_path: Path) -
     issues = check_macos_gui_presentation.run_checks(tmp_path)
 
     assert any("PlotTemplateCard" in issue for issue in issues)
+
+
+def test_gui_presentation_checks_reject_launcher_outer_window_chrome(tmp_path: Path) -> None:
+    _write_sources(
+        tmp_path,
+        {
+            "app/macos/Sources/App/SciPlotGodApp.swift": """
+import SwiftUI
+@main
+struct SciPlotGodApp: App {
+    @State private var model = SciPlotGodAppState.model
+    @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
+    var appearanceMode: AppAppearanceMode { .system }
+    var body: some Scene {
+        WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
+            .defaultSize(width: 760, height: 460)
+            .windowResizability(.contentSize)
+            .defaultLaunchBehavior(.presented)
+            .restorationBehavior(.disabled)
+            .commands { AppCommands(model: model, appearanceModeRawValue: appearanceModeRawValueBinding) }
+        Window("Plot", id: Workbench.plot.windowSceneID) {
+            WorkbenchWindowRoot(workbench: .plot, model: model)
+        }
+        Window("Data Studio", id: Workbench.dataStudio.windowSceneID) {
+            WorkbenchWindowRoot(workbench: .dataStudio, model: model)
+        }
+        Window("Composer", id: Workbench.composer.windowSceneID) {
+            WorkbenchWindowRoot(workbench: .composer, model: model)
+        }
+        Window("Code Console", id: Workbench.codeConsole.windowSceneID) {
+            WorkbenchWindowRoot(workbench: .codeConsole, model: model)
+        }
+    }
+}
+private enum SciPlotGodAppState { static let model = AppModel() }
+enum AppAppearanceMode {
+    static let storageKey = "appAppearanceMode"
+    static let system = AppAppearanceMode()
+    var rawValue: String { "system" }
+    var preferredColorScheme: ColorScheme? { nil }
+}
+final class AppWindowManager {
+    func openLauncherAfterSceneAttempt() {}
+    func applicationShouldHandleReopen() {}
+    func hasVisibleWindow(id: String) -> Bool { false }
+    func configureLauncherWindow(_ window: NSWindow) {
+        window.styleMask = [.titled, .closable]
+        window.isOpaque = true
+        window.backgroundColor = .windowBackgroundColor
+        window.hasShadow = true
+    }
+}
+final class BorderlessLauncherWindow {}
+"""
+        },
+    )
+
+    issues = check_macos_gui_presentation.run_checks(tmp_path)
+
+    assert any("borderless transparent launcher" in issue for issue in issues)
+
+
+def test_gui_presentation_checks_reject_central_stage_backdrops(tmp_path: Path) -> None:
+    _write_sources(
+        tmp_path,
+        {
+            "app/macos/Sources/Features/Plot/PlotRefineView.swift": """
+PlotPreviewStage(session: session)
+PlotInteractivePreviewSurface(session: session, preview: preview)
+ProgressView()
+theme.stageBackground
+previewSurface
+struct PlotStageDiagnosticBanner {
+    let shape = RoundedRectangle(cornerRadius: 14)
+}
+private struct PlotEmptyPreviewPage {
+    let shape = RoundedRectangle(cornerRadius: 8)
+}
+"""
+        },
+    )
+
+    issues = check_macos_gui_presentation.run_checks(tmp_path)
+
+    assert any("central stage must not draw a rectangular backdrop" in issue for issue in issues)
 
 
 def test_gui_presentation_checks_reject_button_like_text_overlay_marker(tmp_path: Path) -> None:

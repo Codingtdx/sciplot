@@ -8,10 +8,14 @@ struct LauncherWindowRoot: View {
         AppWindowSharedChrome(model: model, bootstrapOnAppear: false) {
             LauncherView(model: model)
         }
+        .onAppear {
+            AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+        }
         .toolbar(removing: .title)
         .toolbarVisibility(.hidden, for: .windowToolbar)
         .containerBackground(.clear, for: .window)
         .background(WindowToolbarConfigurator())
+        .background(LauncherSceneWindowRetirer())
     }
 }
 
@@ -202,7 +206,7 @@ private struct WorkbenchWindowActionGroup: View {
             Button {
                 model.newProject()
                 openWindow(id: "launcher")
-                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+                AppWindowManager.shared.openLauncher(model: model)
             } label: {
                 Image(systemName: "document.badge.plus")
             }
@@ -211,7 +215,7 @@ private struct WorkbenchWindowActionGroup: View {
             Button {
                 model.showLauncher()
                 openWindow(id: "launcher")
-                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+                AppWindowManager.shared.openLauncher(model: model)
             } label: {
                 Image(systemName: "square.grid.2x2")
             }
@@ -261,5 +265,22 @@ private struct WindowToolbarConfigurator: NSViewRepresentable {
         toolbar.autosavesConfiguration = false
         toolbar.displayMode = .iconOnly
         toolbar.sizeMode = .regular
+    }
+}
+
+private struct LauncherSceneWindowRetirer: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        for delay in [0.0, 0.05, 0.2, 0.6, 1.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let window = view.window else {
+                    return
+                }
+                AppWindowManager.shared.retireUnmanagedLauncherWindow(window)
+            }
+        }
     }
 }

@@ -51,7 +51,7 @@ struct AppCommands: Commands {
             Button("New Project") {
                 model.newProject()
                 openWindow(id: "launcher")
-                AppWindowManager.shared.openLauncherAfterSceneAttempt(model: model)
+                AppWindowManager.shared.openLauncher(model: model)
             }
             .keyboardShortcut("n", modifiers: [.command])
 

@@ -4,6 +4,49 @@ import Foundation
 enum TestPayloads {
     static let pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9oNnfdcAAAAASUVORK5CYII="
     static let pdfBase64 = "JVBERi0xLjEKMSAwIG9iajw8Pj5lbmRvYmoKMiAwIG9iajw8IC9UeXBlIC9DYXRhbG9nIC9QYWdlcyAzIDAgUiA+PmVuZG9iagozIDAgb2JqPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFs0IDAgUl0gL0NvdW50IDEgPj5lbmRvYmoKNCAwIG9iajw8IC9UeXBlIC9QYWdlIC9QYXJlbnQgMyAwIFIgL01lZGlhQm94IFswIDAgNzIgNzJdID4+ZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxMCAwMDAwMCBuIAowMDAwMDAwMDMwIDAwMDAwIG4gCjAwMDAwMDAwODEgMDAwMDAgbiAKMDAwMDAwMDEzOCAwMDAwMCBuIAp0cmFpbGVyPDwgL1NpemUgNSAvUm9vdCAyIDAgUiA+PgpzdGFydHhyZWYKMjA5CiUlRU9GCg=="
+    static let compatibleOpenAPIRoutes: [SidecarRouteSignature] = [
+        .init(method: "GET", path: "/health"),
+        .init(method: "GET", path: "/meta"),
+        .init(method: "GET", path: "/plot-contract"),
+        .init(method: "POST", path: "/inspect-file"),
+        .init(method: "POST", path: "/source-table-preview"),
+        .init(method: "POST", path: "/fit-analysis"),
+        .init(method: "POST", path: "/save-project"),
+        .init(method: "POST", path: "/open-project"),
+        .init(method: "POST", path: "/preflight-render"),
+        .init(method: "POST", path: "/render-preview"),
+        .init(method: "POST", path: "/export-render"),
+        .init(method: "POST", path: "/code-console/context"),
+        .init(method: "POST", path: "/code-console/run"),
+        .init(method: "POST", path: "/compose-preview"),
+        .init(method: "POST", path: "/compose-export"),
+        .init(method: "GET", path: "/data-studio/templates"),
+        .init(method: "POST", path: "/data-studio/template-preview"),
+        .init(method: "POST", path: "/data-studio/template-recommendations"),
+        .init(method: "POST", path: "/data-studio/build-workbook"),
+        .init(method: "POST", path: "/data-studio/import-workbook"),
+        .init(method: "POST", path: "/data-studio/workbook-preview"),
+        .init(method: "POST", path: "/data-studio/comparison-context"),
+        .init(method: "POST", path: "/data-studio/comparison-preview"),
+        .init(method: "POST", path: "/data-studio/comparison-export"),
+        .init(method: "POST", path: "/data-studio/session/normalize"),
+    ]
+
+    static func compatibleOpenAPIJSON(excluding excludedRoutes: Set<SidecarRouteSignature> = []) -> String {
+        var paths: [String: [String: [String: String]]] = [:]
+        for route in compatibleOpenAPIRoutes where !excludedRoutes.contains(route) {
+            var methods = paths[route.path] ?? [:]
+            methods[route.method.lowercased()] = [:]
+            paths[route.path] = methods
+        }
+        let payload = ["paths": paths]
+        let data = try! JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func compatibleOpenAPIData(excluding excludedRoutes: Set<SidecarRouteSignature> = []) -> Data {
+        Data(compatibleOpenAPIJSON(excluding: excludedRoutes).utf8)
+    }
 
     static let sharedAvailablePalettes = [
         "colorblind_safe",
