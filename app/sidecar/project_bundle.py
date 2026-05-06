@@ -12,6 +12,11 @@ from pathlib import Path
 from app.sidecar.schemas_render import (
     AnalyticalLayerPayload,
     AxisBreakPayload,
+    CodeConsoleProjectGeneratedFilePayload,
+    CodeConsoleProjectManualBindingPayload,
+    CodeConsoleProjectPayload,
+    ComposerProjectPanelPayload,
+    ComposerProjectPayload,
     DataStudioProjectPayload,
     DataStudioProjectWorkbookPayload,
     DataTransformPayload,
@@ -37,13 +42,16 @@ from src.rendering.fit_analysis import normalize_fit_options_payload
 from src.rendering.options import validate_template_name
 from src.rendering.template_lifecycle import resolve_template_id
 
-_PROJECT_VERSION = 1
+_PROJECT_VERSION = 2
 _PROJECT_MEMBER = "project.json"
 _ARTIFACT_MANIFEST_MEMBER = "artifacts/manifest.json"
 _PLOT_SOURCE_DIR = "sources/plot/primary"
 _LEGACY_PLOT_SOURCE_DIR = "sources/primary"
 _DATA_STUDIO_WORKBOOK_DIR = "sources/data_studio/workbooks"
-_SUPPORTED_WORKBENCHES = {"plot", "data_studio"}
+_COMPOSER_PANEL_DIR = "sources/composer/panels"
+_CODE_CONSOLE_MANUAL_DIR = "sources/code_console/manual"
+_CODE_CONSOLE_LATEST_RUN_DIR = "artifacts/code_console/latest_run"
+_SUPPORTED_WORKBENCHES = {"plot", "data_studio", "composer", "code_console"}
 
 
 def _mapping(value: object) -> Mapping[str, object] | None:
@@ -222,6 +230,10 @@ def _normalize_selected_workbench(payload: Mapping[str, object]) -> str:
     selected = _string_or_none(payload.get("selected_workbench"))
     if selected in _SUPPORTED_WORKBENCHES:
         return selected
+    if _mapping(payload.get("code_console")) is not None:
+        return "code_console"
+    if _mapping(payload.get("composer")) is not None:
+        return "composer"
     if _mapping(payload.get("data_studio")) is not None and _mapping(payload.get("plot")) is None:
         return "data_studio"
     if _mapping(payload.get("plot")) is not None:
@@ -363,6 +375,41 @@ def _normalize_data_studio_project_payload(
     )
 
 
+def _normalize_composer_project_payload(composer_map: Mapping[str, object]) -> ComposerProjectPayload:
+    return ComposerProjectPayload.model_validate(
+        {
+            "session_kind": composer_map.get("session_kind", "composer"),
+            "version": _int_value(composer_map.get("version"), _PROJECT_VERSION),
+            "project": composer_map.get("project") or {},
+            "embedded_panels": list(_iter_values(composer_map.get("embedded_panels"))),
+            "project_display_name": _string_or_none(composer_map.get("project_display_name")),
+        }
+    )
+
+
+def _normalize_code_console_project_payload(
+    code_console_map: Mapping[str, object],
+) -> CodeConsoleProjectPayload:
+    return CodeConsoleProjectPayload.model_validate(
+        {
+            "session_kind": code_console_map.get("session_kind", "code_console"),
+            "version": _int_value(code_console_map.get("version"), _PROJECT_VERSION),
+            "selected_source_kind": _string_or_none(code_console_map.get("selected_source_kind")),
+            "selected_sheet": code_console_map.get("selected_sheet", 0),
+            "editor_text": str(code_console_map.get("editor_text") or ""),
+            "prompt_text": str(code_console_map.get("prompt_text") or ""),
+            "starter_code": str(code_console_map.get("starter_code") or ""),
+            "manual_binding": code_console_map.get("manual_binding"),
+            "latest_run": code_console_map.get("latest_run"),
+            "embedded_generated_files": list(_iter_values(code_console_map.get("embedded_generated_files"))),
+            "selected_generated_file_path": _string_or_none(
+                code_console_map.get("selected_generated_file_path")
+            ),
+            "project_display_name": _string_or_none(code_console_map.get("project_display_name")),
+        }
+    )
+
+
 def normalize_project_payload(
     payload: Mapping[str, object],
     *,
@@ -372,31 +419,50 @@ def normalize_project_payload(
     artifacts = dict(_mapping(payload.get("artifacts")) or {})
     if not artifacts.get("manifest_relpath"):
         artifacts["manifest_relpath"] = _ARTIFACT_MANIFEST_MEMBER
-    if selected_workbench == "plot":
+
+    plot_map = _mapping(payload.get("plot"))
+    data_studio_map = _mapping(payload.get("data_studio"))
+    composer_map = _mapping(payload.get("composer"))
+    code_console_map = _mapping(payload.get("code_console"))
+
+    plot_payload: PlotProjectPayload | None = None
+    if plot_map is not None:
         if source_path is None:
             raise ValueError("Plot projects require the current source file path.")
-        plot_map = _mapping(payload.get("plot"))
-        if plot_map is None:
-            raise ValueError("Project payload must include a plot section.")
-        return ProjectBundlePayload(
-            version=_int_value(payload.get("version"), _PROJECT_VERSION),
-            selected_workbench="plot",
-            plot=_normalize_plot_project_payload(plot_map, source_path=source_path),
-            data_studio=None,
-            composer=None,
-            code_console=None,
-            artifacts=artifacts,
-        )
-    data_studio_map = _mapping(payload.get("data_studio"))
-    if data_studio_map is None:
-        raise ValueError("Project payload must include a Data Studio section.")
+        plot_payload = _normalize_plot_project_payload(plot_map, source_path=source_path)
+
+    data_studio_payload = (
+        _normalize_data_studio_project_payload(data_studio_map)
+        if data_studio_map is not None
+        else None
+    )
+    composer_payload = (
+        _normalize_composer_project_payload(composer_map)
+        if composer_map is not None
+        else None
+    )
+    code_console_payload = (
+        _normalize_code_console_project_payload(code_console_map)
+        if code_console_map is not None
+        else None
+    )
+
+    selected_payloads = {
+        "plot": plot_payload,
+        "data_studio": data_studio_payload,
+        "composer": composer_payload,
+        "code_console": code_console_payload,
+    }
+    if selected_payloads[selected_workbench] is None:
+        raise ValueError("Project payload must include the selected workbench section.")
+
     return ProjectBundlePayload(
-        version=_int_value(payload.get("version"), _PROJECT_VERSION),
-        selected_workbench="data_studio",
-        plot=None,
-        data_studio=_normalize_data_studio_project_payload(data_studio_map),
-        composer=None,
-        code_console=None,
+        version=_PROJECT_VERSION,
+        selected_workbench=selected_workbench,
+        plot=plot_payload,
+        data_studio=data_studio_payload,
+        composer=composer_payload,
+        code_console=code_console_payload,
         artifacts=artifacts,
     )
 
@@ -449,15 +515,20 @@ def save_project_bundle(
     saved_at = datetime.now(UTC).isoformat()
     archive_entries: list[tuple[str, bytes]] = []
     manifest_entries: list[dict[str, object]] = []
+    payload_updates: dict[str, object] = {
+        "artifacts": {
+            **normalized_payload.artifacts,
+            "manifest_relpath": _ARTIFACT_MANIFEST_MEMBER,
+        }
+    }
+    seen_members: set[str] = set()
 
-    if normalized_payload.selected_workbench == "plot":
+    if normalized_payload.plot is not None:
         if source_path is None:
             raise ValueError("Plot projects require a source file.")
         plot_payload = normalized_payload.plot
-        if plot_payload is None:
-            raise ValueError("Project payload is missing the plot section.")
         source_bytes = source_path.read_bytes()
-        embedded_source_relpath = _unique_bundle_member(_PLOT_SOURCE_DIR, source_path.name, seen=set())
+        embedded_source_relpath = _unique_bundle_member(_PLOT_SOURCE_DIR, source_path.name, seen=seen_members)
         normalized_plot_payload = plot_payload.model_copy(
             update={
                 "source_filename": source_path.name,
@@ -482,26 +553,16 @@ def save_project_bundle(
                 "size_bytes": len(source_bytes),
             }
         )
-        saved_payload = normalized_payload.model_copy(
-            update={
-                "plot": normalized_plot_payload,
-                "artifacts": {
-                    **normalized_payload.artifacts,
-                    "manifest_relpath": _ARTIFACT_MANIFEST_MEMBER,
-                },
-            }
-        )
-    else:
+        payload_updates["plot"] = normalized_plot_payload
+
+    if normalized_payload.data_studio is not None:
         data_studio_payload = normalized_payload.data_studio
-        if data_studio_payload is None:
-            raise ValueError("Project payload is missing the Data Studio section.")
         resolved_workbook_paths = [
             normalize_path(workbook_path)
             for workbook_path in data_studio_payload.workbook_paths
         ]
         if not resolved_workbook_paths:
             raise ValueError("Import workbook groups before saving a Data Studio project.")
-        seen_members: set[str] = set()
         embedded_workbooks: list[DataStudioProjectWorkbookPayload] = []
         for workbook_path in resolved_workbook_paths:
             workbook_bytes = workbook_path.read_bytes()
@@ -527,22 +588,119 @@ def save_project_bundle(
             )
         source_provenance = dict(data_studio_payload.source_provenance)
         source_provenance.setdefault("saved_at", saved_at)
-        saved_payload = normalized_payload.model_copy(
+        payload_updates["data_studio"] = data_studio_payload.model_copy(
             update={
-                "data_studio": data_studio_payload.model_copy(
-                    update={
-                        "workbook_paths": [str(path) for path in resolved_workbook_paths],
-                        "embedded_workbooks": embedded_workbooks,
-                        "project_display_name": data_studio_payload.project_display_name or project_path.stem,
-                        "source_provenance": source_provenance,
-                    }
-                ),
-                "artifacts": {
-                    **normalized_payload.artifacts,
-                    "manifest_relpath": _ARTIFACT_MANIFEST_MEMBER,
-                },
+                "workbook_paths": [str(path) for path in resolved_workbook_paths],
+                "embedded_workbooks": embedded_workbooks,
+                "project_display_name": data_studio_payload.project_display_name or project_path.stem,
+                "source_provenance": source_provenance,
             }
         )
+
+    if normalized_payload.composer is not None:
+        composer_payload = normalized_payload.composer
+        embedded_panels: list[ComposerProjectPanelPayload] = []
+        for panel in composer_payload.project.panels:
+            panel_path = normalize_path(panel.file_path)
+            panel_bytes = panel_path.read_bytes()
+            member_path = _unique_bundle_member(_COMPOSER_PANEL_DIR, panel_path.name, seen=seen_members)
+            panel_sha256 = _sha256_bytes(panel_bytes)
+            embedded_panels.append(
+                ComposerProjectPanelPayload(
+                    panel_id=panel.id,
+                    panel_filename=panel_path.name,
+                    embedded_panel_relpath=member_path,
+                    panel_sha256=panel_sha256,
+                    original_panel_path=str(panel_path),
+                    saved_panel_mtime_ns=panel_path.stat().st_mtime_ns,
+                )
+            )
+            archive_entries.append((member_path, panel_bytes))
+            manifest_entries.append(
+                {
+                    "path": member_path,
+                    "kind": "composer_panel",
+                    "panel_id": panel.id,
+                    "sha256": panel_sha256,
+                    "size_bytes": len(panel_bytes),
+                }
+            )
+        payload_updates["composer"] = composer_payload.model_copy(
+            update={
+                "embedded_panels": embedded_panels,
+                "project_display_name": composer_payload.project_display_name or project_path.stem,
+            }
+        )
+
+    if normalized_payload.code_console is not None:
+        code_console_payload = normalized_payload.code_console
+        manual_binding = code_console_payload.manual_binding
+        normalized_manual_binding: CodeConsoleProjectManualBindingPayload | None = manual_binding
+        if manual_binding is not None and manual_binding.original_source_path:
+            manual_path = normalize_path(manual_binding.original_source_path)
+            manual_bytes = manual_path.read_bytes()
+            member_path = _unique_bundle_member(_CODE_CONSOLE_MANUAL_DIR, manual_path.name, seen=seen_members)
+            manual_sha256 = _sha256_bytes(manual_bytes)
+            normalized_manual_binding = manual_binding.model_copy(
+                update={
+                    "source_filename": manual_path.name,
+                    "embedded_source_relpath": member_path,
+                    "source_sha256": manual_sha256,
+                    "original_source_path": str(manual_path),
+                    "saved_source_mtime_ns": manual_path.stat().st_mtime_ns,
+                }
+            )
+            archive_entries.append((member_path, manual_bytes))
+            manifest_entries.append(
+                {
+                    "path": member_path,
+                    "kind": "code_console_manual_source",
+                    "sha256": manual_sha256,
+                    "size_bytes": len(manual_bytes),
+                }
+            )
+
+        embedded_generated_files: list[CodeConsoleProjectGeneratedFilePayload] = []
+        if code_console_payload.latest_run is not None:
+            for generated_file in code_console_payload.latest_run.generated_files:
+                generated_path = normalize_path(generated_file.path)
+                if not generated_path.exists():
+                    continue
+                generated_bytes = generated_path.read_bytes()
+                member_path = _unique_bundle_member(
+                    _CODE_CONSOLE_LATEST_RUN_DIR,
+                    generated_path.name,
+                    seen=seen_members,
+                )
+                generated_sha256 = _sha256_bytes(generated_bytes)
+                embedded_generated_files.append(
+                    CodeConsoleProjectGeneratedFilePayload(
+                        original_path=str(generated_path),
+                        embedded_file_relpath=member_path,
+                        file_sha256=generated_sha256,
+                        name=generated_file.name or generated_path.name,
+                        file_type=generated_file.file_type,
+                        size_bytes=len(generated_bytes),
+                    )
+                )
+                archive_entries.append((member_path, generated_bytes))
+                manifest_entries.append(
+                    {
+                        "path": member_path,
+                        "kind": "code_console_generated_file",
+                        "sha256": generated_sha256,
+                        "size_bytes": len(generated_bytes),
+                    }
+                )
+        payload_updates["code_console"] = code_console_payload.model_copy(
+            update={
+                "manual_binding": normalized_manual_binding,
+                "embedded_generated_files": embedded_generated_files,
+                "project_display_name": code_console_payload.project_display_name or project_path.stem,
+            }
+        )
+
+    saved_payload = normalized_payload.model_copy(update=payload_updates)
 
     project_json = json.dumps(
         saved_payload.model_dump(mode="json"),
@@ -615,6 +773,88 @@ def _remap_workbook_paths(
     return remapped
 
 
+def _remap_composer_paths(
+    composer_map: Mapping[str, object],
+    *,
+    panel_id_lookup: Mapping[str, str],
+    path_lookup: Mapping[str, str],
+    embedded_panels: list[ComposerProjectPanelPayload],
+) -> dict[str, object]:
+    remapped = dict(composer_map)
+    project_map = dict(_mapping(composer_map.get("project")) or {})
+    panels: list[dict[str, object]] = []
+    for item in _iter_values(project_map.get("panels")):
+        item_map = _mapping(item)
+        if item_map is None:
+            continue
+        panel = dict(item_map)
+        panel_id = _string_or_none(panel.get("id"))
+        raw_path = _string_or_none(panel.get("file_path"))
+        restored_path = panel_id_lookup.get(panel_id or "")
+        if restored_path is None and raw_path is not None:
+            restored_path = path_lookup.get(str(Path(raw_path).expanduser()), path_lookup.get(raw_path))
+        if restored_path is not None:
+            panel["file_path"] = restored_path
+        panels.append(panel)
+    project_map["panels"] = panels
+    remapped["project"] = project_map
+    remapped["embedded_panels"] = [panel.model_dump(mode="json") for panel in embedded_panels]
+    return remapped
+
+
+def _remap_code_console_paths(
+    code_console_map: Mapping[str, object],
+    *,
+    manual_binding: CodeConsoleProjectManualBindingPayload | None,
+    generated_path_lookup: Mapping[str, str],
+    embedded_generated_files: list[CodeConsoleProjectGeneratedFilePayload],
+) -> dict[str, object]:
+    remapped = dict(code_console_map)
+    if manual_binding is not None:
+        remapped["manual_binding"] = manual_binding.model_dump(mode="json")
+
+    latest_run_map = _mapping(code_console_map.get("latest_run"))
+    if latest_run_map is not None:
+        remapped_latest_run = dict(latest_run_map)
+        generated_files: list[dict[str, object]] = []
+        for item in _iter_values(latest_run_map.get("generated_files")):
+            item_map = _mapping(item)
+            if item_map is None:
+                continue
+            generated_file = dict(item_map)
+            raw_path = _string_or_none(generated_file.get("path"))
+            restored_path = None
+            if raw_path is not None:
+                restored_path = generated_path_lookup.get(
+                    str(Path(raw_path).expanduser()),
+                    generated_path_lookup.get(raw_path),
+                )
+            if restored_path is None:
+                name = _string_or_none(generated_file.get("name"))
+                if name is not None:
+                    restored_path = generated_path_lookup.get(name)
+            if restored_path is not None:
+                generated_file["path"] = restored_path
+                generated_file["size_bytes"] = Path(restored_path).stat().st_size
+            generated_files.append(generated_file)
+        remapped_latest_run["generated_files"] = generated_files
+        remapped["latest_run"] = remapped_latest_run
+
+    selected_generated_file_path = _string_or_none(code_console_map.get("selected_generated_file_path"))
+    if selected_generated_file_path is not None:
+        restored_selected = generated_path_lookup.get(
+            str(Path(selected_generated_file_path).expanduser()),
+            generated_path_lookup.get(selected_generated_file_path),
+        )
+        if restored_selected is not None:
+            remapped["selected_generated_file_path"] = restored_selected
+
+    remapped["embedded_generated_files"] = [
+        item.model_dump(mode="json") for item in embedded_generated_files
+    ]
+    return remapped
+
+
 def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
     with zipfile.ZipFile(project_path, mode="r") as archive:
         try:
@@ -624,12 +864,16 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
         raw_payload_map = _mapping(raw_payload)
         if raw_payload_map is None:
             raise ValueError("Project bundle project.json must contain an object payload.")
-        selected_workbench = _normalize_selected_workbench(raw_payload_map)
 
-        if selected_workbench == "plot":
-            plot_map = _mapping(raw_payload_map.get("plot"))
-            if plot_map is None:
-                raise ValueError("Project bundle is missing the plot section.")
+        selected_workbench = _normalize_selected_workbench(raw_payload_map)
+        plot_map = _mapping(raw_payload_map.get("plot"))
+        data_studio_map = _mapping(raw_payload_map.get("data_studio"))
+        composer_map = _mapping(raw_payload_map.get("composer"))
+        code_console_map = _mapping(raw_payload_map.get("code_console"))
+
+        plot_materialized: tuple[bytes, str, str, str] | None = None
+        fingerprint_parts: list[str] = []
+        if plot_map is not None:
             embedded_source_relpath = _string_or_none(plot_map.get("embedded_source_relpath"))
             if embedded_source_relpath is None:
                 raise ValueError("Project bundle is missing the embedded Plot source path.")
@@ -637,65 +881,105 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
                 source_bytes = archive.read(embedded_source_relpath)
             except KeyError as exc:
                 raise ValueError("Project bundle is missing the embedded Plot source file.") from exc
-            expected_sha256 = _string_or_none(plot_map.get("source_sha256")) or ""
             actual_sha256 = _sha256_bytes(source_bytes)
+            expected_sha256 = _string_or_none(plot_map.get("source_sha256")) or ""
             if expected_sha256 and actual_sha256 != expected_sha256:
                 raise ValueError("Embedded source checksum does not match the saved project metadata.")
             source_filename = _string_or_none(plot_map.get("source_filename")) or Path(embedded_source_relpath).name
-            restore_dir = prepare_managed_project_restore_dir(project_path, fingerprint=actual_sha256)
-            restored_source_path = restore_dir / source_filename
-            restored_source_path.write_bytes(source_bytes)
-            normalized_payload = normalize_project_payload(raw_payload_map, source_path=restored_source_path)
-            plot_payload = normalized_payload.plot
-            if plot_payload is None:
-                raise ValueError("Project bundle is missing the plot section.")
-            normalized_plot_payload = plot_payload.model_copy(
-                update={
-                    "source_filename": source_filename,
-                    "source_media_type": plot_payload.source_media_type or _media_type_for(restored_source_path),
-                    "embedded_source_relpath": embedded_source_relpath,
-                    "source_sha256": actual_sha256,
-                    "project_display_name": plot_payload.project_display_name or project_path.stem,
-                }
-            )
-            return OpenProjectResponse(
-                project_path=str(project_path),
-                restored_source_path=str(restored_source_path),
-                restored_workbook_paths=[],
-                payload=normalized_payload.model_copy(update={"plot": normalized_plot_payload}),
-            )
-
-        data_studio_map = _mapping(raw_payload_map.get("data_studio"))
-        if data_studio_map is None:
-            raise ValueError("Project bundle is missing the Data Studio section.")
-        saved_workbook_paths = tuple(str(item) for item in _iter_values(data_studio_map.get("workbook_paths")))
-        embedded_workbooks = _parse_embedded_workbooks(
-            data_studio_map,
-            fallback_workbook_paths=saved_workbook_paths,
-        )
-        if not embedded_workbooks:
-            raise ValueError("Project bundle does not contain embedded Data Studio workbooks.")
-
-        materialized_workbooks: list[tuple[DataStudioProjectWorkbookPayload, bytes, str]] = []
-        fingerprint_parts: list[str] = []
-        for embedded_workbook in embedded_workbooks:
-            try:
-                workbook_bytes = archive.read(embedded_workbook.embedded_workbook_relpath)
-            except KeyError as exc:
-                raise ValueError("Project bundle is missing an embedded Data Studio workbook.") from exc
-            actual_sha256 = _sha256_bytes(workbook_bytes)
-            if embedded_workbook.workbook_sha256 and actual_sha256 != embedded_workbook.workbook_sha256:
-                raise ValueError("Embedded workbook checksum does not match the saved project metadata.")
-            materialized_workbooks.append((embedded_workbook, workbook_bytes, actual_sha256))
+            plot_materialized = (source_bytes, actual_sha256, source_filename, embedded_source_relpath)
             fingerprint_parts.append(actual_sha256)
+
+        saved_workbook_paths: tuple[str, ...] = ()
+        materialized_workbooks: list[tuple[DataStudioProjectWorkbookPayload, bytes, str]] = []
+        if data_studio_map is not None:
+            saved_workbook_paths = tuple(str(item) for item in _iter_values(data_studio_map.get("workbook_paths")))
+            embedded_workbooks = _parse_embedded_workbooks(
+                data_studio_map,
+                fallback_workbook_paths=saved_workbook_paths,
+            )
+            for embedded_workbook in embedded_workbooks:
+                try:
+                    workbook_bytes = archive.read(embedded_workbook.embedded_workbook_relpath)
+                except KeyError as exc:
+                    raise ValueError("Project bundle is missing an embedded Data Studio workbook.") from exc
+                actual_sha256 = _sha256_bytes(workbook_bytes)
+                if embedded_workbook.workbook_sha256 and actual_sha256 != embedded_workbook.workbook_sha256:
+                    raise ValueError("Embedded workbook checksum does not match the saved project metadata.")
+                materialized_workbooks.append((embedded_workbook, workbook_bytes, actual_sha256))
+                fingerprint_parts.append(actual_sha256)
+
+        materialized_panels: list[tuple[ComposerProjectPanelPayload, bytes, str]] = []
+        if composer_map is not None:
+            for item in _iter_values(composer_map.get("embedded_panels")):
+                item_map = _mapping(item)
+                if item_map is None:
+                    continue
+                embedded_panel = ComposerProjectPanelPayload.model_validate(item_map)
+                try:
+                    panel_bytes = archive.read(embedded_panel.embedded_panel_relpath)
+                except KeyError as exc:
+                    raise ValueError("Project bundle is missing an embedded Composer panel.") from exc
+                actual_sha256 = _sha256_bytes(panel_bytes)
+                if embedded_panel.panel_sha256 and actual_sha256 != embedded_panel.panel_sha256:
+                    raise ValueError("Embedded Composer panel checksum does not match the saved project metadata.")
+                materialized_panels.append((embedded_panel, panel_bytes, actual_sha256))
+                fingerprint_parts.append(actual_sha256)
+
+        manual_binding: CodeConsoleProjectManualBindingPayload | None = None
+        manual_materialized: tuple[bytes, str] | None = None
+        materialized_generated_files: list[tuple[CodeConsoleProjectGeneratedFilePayload, bytes, str]] = []
+        if code_console_map is not None:
+            manual_binding_map = _mapping(code_console_map.get("manual_binding"))
+            if manual_binding_map is not None:
+                raw_manual_binding = CodeConsoleProjectManualBindingPayload.model_validate(manual_binding_map)
+                try:
+                    manual_bytes = archive.read(raw_manual_binding.embedded_source_relpath)
+                except KeyError as exc:
+                    raise ValueError("Project bundle is missing the embedded Code Console source file.") from exc
+                actual_sha256 = _sha256_bytes(manual_bytes)
+                if raw_manual_binding.source_sha256 and actual_sha256 != raw_manual_binding.source_sha256:
+                    raise ValueError("Embedded Code Console source checksum does not match the saved project metadata.")
+                manual_binding = raw_manual_binding.model_copy(update={"source_sha256": actual_sha256})
+                manual_materialized = (manual_bytes, actual_sha256)
+                fingerprint_parts.append(actual_sha256)
+
+            for item in _iter_values(code_console_map.get("embedded_generated_files")):
+                item_map = _mapping(item)
+                if item_map is None:
+                    continue
+                embedded_generated_file = CodeConsoleProjectGeneratedFilePayload.model_validate(item_map)
+                try:
+                    generated_bytes = archive.read(embedded_generated_file.embedded_file_relpath)
+                except KeyError as exc:
+                    raise ValueError("Project bundle is missing an embedded Code Console generated file.") from exc
+                actual_sha256 = _sha256_bytes(generated_bytes)
+                if embedded_generated_file.file_sha256 and actual_sha256 != embedded_generated_file.file_sha256:
+                    raise ValueError(
+                        "Embedded Code Console generated file checksum does not match the saved project metadata."
+                    )
+                materialized_generated_files.append((embedded_generated_file, generated_bytes, actual_sha256))
+                fingerprint_parts.append(actual_sha256)
 
         restore_dir = prepare_managed_project_restore_dir(
             project_path,
-            fingerprint=_sha256_text("||".join(sorted(fingerprint_parts))),
+            fingerprint=_sha256_text("||".join(sorted(fingerprint_parts)) or project_path.name),
         )
         seen_restore_names: set[str] = set()
+        restored_source_path: Path | None = None
+
+        if plot_materialized is not None:
+            source_bytes, actual_sha256, source_filename, _ = plot_materialized
+            restored_source_path = restore_dir / _unique_restore_name(source_filename, seen=seen_restore_names)
+            restored_source_path.write_bytes(source_bytes)
+            plot_map = {
+                **plot_map,
+                "source_filename": source_filename,
+                "source_sha256": actual_sha256,
+                "project_display_name": _string_or_none(plot_map.get("project_display_name")) or project_path.stem,
+            }
+
         restored_workbook_paths: list[str] = []
-        path_lookup: dict[str, str] = {}
+        workbook_path_lookup: dict[str, str] = {}
         normalized_embedded_workbooks: list[DataStudioProjectWorkbookPayload] = []
         for index, (embedded_workbook, workbook_bytes, actual_sha256) in enumerate(materialized_workbooks):
             restore_name = _unique_restore_name(embedded_workbook.workbook_filename, seen=seen_restore_names)
@@ -704,48 +988,140 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
             restored_workbook_paths.append(str(restored_workbook_path))
             if embedded_workbook.original_workbook_path:
                 expanded_original_path = str(Path(embedded_workbook.original_workbook_path).expanduser())
-                path_lookup[expanded_original_path] = str(restored_workbook_path)
-                path_lookup[embedded_workbook.original_workbook_path] = str(restored_workbook_path)
+                workbook_path_lookup[expanded_original_path] = str(restored_workbook_path)
+                workbook_path_lookup[embedded_workbook.original_workbook_path] = str(restored_workbook_path)
             if index < len(saved_workbook_paths):
-                path_lookup[str(Path(saved_workbook_paths[index]).expanduser())] = str(restored_workbook_path)
-                path_lookup[saved_workbook_paths[index]] = str(restored_workbook_path)
+                workbook_path_lookup[str(Path(saved_workbook_paths[index]).expanduser())] = str(restored_workbook_path)
+                workbook_path_lookup[saved_workbook_paths[index]] = str(restored_workbook_path)
             normalized_embedded_workbooks.append(
                 embedded_workbook.model_copy(update={"workbook_sha256": actual_sha256})
             )
 
-        remapped_data_studio_map = _remap_workbook_paths(
-            data_studio_map,
-            path_lookup=path_lookup,
-            restored_workbook_paths=restored_workbook_paths,
-        )
-        remapped_data_studio_map["embedded_workbooks"] = [
-            workbook.model_dump(mode="json") for workbook in normalized_embedded_workbooks
-        ]
+        if data_studio_map is not None:
+            data_studio_map = _remap_workbook_paths(
+                data_studio_map,
+                path_lookup=workbook_path_lookup,
+                restored_workbook_paths=restored_workbook_paths,
+            )
+            data_studio_map["embedded_workbooks"] = [
+                workbook.model_dump(mode="json") for workbook in normalized_embedded_workbooks
+            ]
+
+        panel_id_lookup: dict[str, str] = {}
+        panel_path_lookup: dict[str, str] = {}
+        normalized_embedded_panels: list[ComposerProjectPanelPayload] = []
+        for embedded_panel, panel_bytes, actual_sha256 in materialized_panels:
+            restore_name = _unique_restore_name(embedded_panel.panel_filename, seen=seen_restore_names)
+            restored_panel_path = restore_dir / restore_name
+            restored_panel_path.write_bytes(panel_bytes)
+            panel_id_lookup[embedded_panel.panel_id] = str(restored_panel_path)
+            if embedded_panel.original_panel_path:
+                panel_path_lookup[str(Path(embedded_panel.original_panel_path).expanduser())] = str(restored_panel_path)
+                panel_path_lookup[embedded_panel.original_panel_path] = str(restored_panel_path)
+            normalized_embedded_panels.append(
+                embedded_panel.model_copy(update={"panel_sha256": actual_sha256})
+            )
+        if composer_map is not None:
+            composer_map = _remap_composer_paths(
+                composer_map,
+                panel_id_lookup=panel_id_lookup,
+                path_lookup=panel_path_lookup,
+                embedded_panels=normalized_embedded_panels,
+            )
+
+        normalized_manual_binding = manual_binding
+        if manual_binding is not None and manual_materialized is not None:
+            manual_bytes, actual_sha256 = manual_materialized
+            restore_name = _unique_restore_name(manual_binding.source_filename, seen=seen_restore_names)
+            restored_manual_path = restore_dir / restore_name
+            restored_manual_path.write_bytes(manual_bytes)
+            normalized_manual_binding = manual_binding.model_copy(
+                update={
+                    "original_source_path": str(restored_manual_path),
+                    "source_sha256": actual_sha256,
+                    "saved_source_mtime_ns": restored_manual_path.stat().st_mtime_ns,
+                }
+            )
+
+        generated_path_lookup: dict[str, str] = {}
+        normalized_embedded_generated_files: list[CodeConsoleProjectGeneratedFilePayload] = []
+        for embedded_generated_file, generated_bytes, actual_sha256 in materialized_generated_files:
+            restore_name = _unique_restore_name(embedded_generated_file.name, seen=seen_restore_names)
+            restored_generated_path = restore_dir / restore_name
+            restored_generated_path.write_bytes(generated_bytes)
+            if embedded_generated_file.original_path:
+                generated_path_lookup[str(Path(embedded_generated_file.original_path).expanduser())] = str(
+                    restored_generated_path
+                )
+                generated_path_lookup[embedded_generated_file.original_path] = str(restored_generated_path)
+            generated_path_lookup[embedded_generated_file.name] = str(restored_generated_path)
+            normalized_embedded_generated_files.append(
+                embedded_generated_file.model_copy(
+                    update={
+                        "file_sha256": actual_sha256,
+                        "size_bytes": len(generated_bytes),
+                    }
+                )
+            )
+        if code_console_map is not None:
+            code_console_map = _remap_code_console_paths(
+                code_console_map,
+                manual_binding=normalized_manual_binding,
+                generated_path_lookup=generated_path_lookup,
+                embedded_generated_files=normalized_embedded_generated_files,
+            )
+
         normalized_payload = normalize_project_payload(
             {
                 "version": raw_payload_map.get("version", _PROJECT_VERSION),
-                "selected_workbench": "data_studio",
-                "plot": None,
-                "data_studio": remapped_data_studio_map,
-                "composer": raw_payload_map.get("composer"),
-                "code_console": raw_payload_map.get("code_console"),
+                "selected_workbench": selected_workbench,
+                "plot": plot_map,
+                "data_studio": data_studio_map,
+                "composer": composer_map,
+                "code_console": code_console_map,
                 "artifacts": raw_payload_map.get("artifacts"),
-            }
+            },
+            source_path=restored_source_path,
         )
-        data_studio_payload = normalized_payload.data_studio
-        if data_studio_payload is None:
-            raise ValueError("Project bundle is missing the Data Studio section.")
-        normalized_data_studio_payload = data_studio_payload.model_copy(
-            update={
-                "embedded_workbooks": normalized_embedded_workbooks,
-                "project_display_name": data_studio_payload.project_display_name or project_path.stem,
-            }
-        )
+
+        payload_updates: dict[str, object] = {}
+        if normalized_payload.plot is not None and restored_source_path is not None:
+            payload_updates["plot"] = normalized_payload.plot.model_copy(
+                update={
+                    "source_media_type": (
+                        normalized_payload.plot.source_media_type or _media_type_for(restored_source_path)
+                    ),
+                    "project_display_name": normalized_payload.plot.project_display_name or project_path.stem,
+                }
+            )
+        if normalized_payload.data_studio is not None:
+            payload_updates["data_studio"] = normalized_payload.data_studio.model_copy(
+                update={
+                    "embedded_workbooks": normalized_embedded_workbooks,
+                    "project_display_name": normalized_payload.data_studio.project_display_name or project_path.stem,
+                }
+            )
+        if normalized_payload.composer is not None:
+            payload_updates["composer"] = normalized_payload.composer.model_copy(
+                update={
+                    "embedded_panels": normalized_embedded_panels,
+                    "project_display_name": normalized_payload.composer.project_display_name or project_path.stem,
+                }
+            )
+        if normalized_payload.code_console is not None:
+            payload_updates["code_console"] = normalized_payload.code_console.model_copy(
+                update={
+                    "manual_binding": normalized_manual_binding,
+                    "embedded_generated_files": normalized_embedded_generated_files,
+                    "project_display_name": normalized_payload.code_console.project_display_name or project_path.stem,
+                }
+            )
+
         return OpenProjectResponse(
             project_path=str(project_path),
-            restored_source_path=None,
+            restored_source_path=str(restored_source_path) if restored_source_path is not None else None,
             restored_workbook_paths=restored_workbook_paths,
-            payload=normalized_payload.model_copy(update={"data_studio": normalized_data_studio_payload}),
+            payload=normalized_payload.model_copy(update=payload_updates),
         )
 
 

@@ -645,7 +645,7 @@ extension PlotSession {
             return nil
         }
         return ProjectBundlePayload(
-            version: 1,
+            version: 2,
             selectedWorkbench: "plot",
             plot: PlotProjectPayload(
                 sessionKind: "plot",

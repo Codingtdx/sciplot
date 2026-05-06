@@ -70,6 +70,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command])
 
+            Button("Open Project…") {
+                model.openProjectFromPanel()
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+
             Button("Save Project…") {
                 let workbench = commandWorkbench
                 Task { await model.saveProject(for: workbench) }

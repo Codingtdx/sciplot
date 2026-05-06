@@ -9,6 +9,7 @@ final class DataStudioSession {
     typealias ComparisonFigureFormatChooser = @MainActor (_ title: String, _ message: String) -> ExportGraphicFormat?
     typealias ComparisonOutputMaterializer = @MainActor (_ sourceURLs: [URL], _ format: ExportGraphicFormat) throws -> [URL]
     typealias ProjectSaveChooser = @MainActor (_ suggestedName: String) -> URL?
+    typealias OpenProjectDocumentHandler = @MainActor (_ url: URL) async -> Void
     typealias OpenInPlotHandler = @MainActor (
         _ url: URL,
         _ sheet: SheetValue,
@@ -28,6 +29,7 @@ final class DataStudioSession {
     @ObservationIgnored let chooseComparisonFigureFormat: ComparisonFigureFormatChooser
     @ObservationIgnored let materializeComparisonOutputs: ComparisonOutputMaterializer
     @ObservationIgnored let chooseProjectSaveLocation: ProjectSaveChooser
+    @ObservationIgnored var openProjectDocumentHandler: OpenProjectDocumentHandler?
     @ObservationIgnored let asyncCoordination = AsyncCoordination()
     @ObservationIgnored var importPanelPresentationRevision = 0
     @ObservationIgnored weak var undoManager: UndoManager?

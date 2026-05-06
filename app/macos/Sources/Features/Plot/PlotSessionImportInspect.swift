@@ -13,7 +13,13 @@ extension PlotSession {
 
     func handleImportedDocument(_ url: URL) {
         if url.pathExtension.lowercased() == "sciplotgod" {
-            Task { await openProject(url) }
+            Task {
+                if let openProjectDocumentHandler {
+                    await openProjectDocumentHandler(url)
+                } else {
+                    await openProject(url)
+                }
+            }
             return
         }
         importFile(url)

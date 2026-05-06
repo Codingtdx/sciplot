@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field, model_validator
 
@@ -12,6 +12,7 @@ from app.sidecar.schemas_common import (
     SubmissionReportResponse,
     serialize_dataclass,
 )
+from app.sidecar.schemas_composer import ComposerRequest
 from src import plot_style
 
 
@@ -521,13 +522,89 @@ class DataStudioProjectPayload(StrictModel):
     source_provenance: dict[str, Any] = Field(default_factory=dict)
 
 
+class ComposerProjectPanelPayload(StrictModel):
+    panel_id: str
+    panel_filename: str
+    embedded_panel_relpath: str
+    panel_sha256: str
+    original_panel_path: str | None = None
+    saved_panel_mtime_ns: int | None = None
+
+
+class ComposerProjectPayload(StrictModel):
+    session_kind: str = "composer"
+    version: int = 2
+    project: ComposerRequest = Field(default_factory=ComposerRequest)
+    embedded_panels: list[ComposerProjectPanelPayload] = Field(default_factory=list)
+    project_display_name: str | None = None
+
+
+class CodeConsoleProjectManualBindingPayload(StrictModel):
+    source_filename: str
+    embedded_source_relpath: str
+    source_sha256: str
+    original_source_path: str | None = None
+    saved_source_mtime_ns: int | None = None
+    sheet: str | int = 0
+    template_id: str | None = None
+    render_options: RenderOptionsPayload = Field(default_factory=RenderOptionsPayload)
+    title: str = "Imported file"
+
+
+class CodeConsoleProjectGeneratedFilePayload(StrictModel):
+    original_path: str | None = None
+    embedded_file_relpath: str
+    file_sha256: str
+    name: str
+    file_type: str
+    size_bytes: int
+
+
+class CodeConsoleGeneratedFileSnapshotPayload(StrictModel):
+    path: str
+    name: str
+    file_type: str
+    size_bytes: int
+
+
+class CodeConsoleRunSnapshotPayload(StrictModel):
+    status: Literal["succeeded", "failed", "timed_out"]
+    exit_code: int | None = None
+    duration_seconds: float
+    stdout: str = ""
+    stderr: str = ""
+    run_dir: str = ""
+    output_dir: str = ""
+    script_path: str = ""
+    prompt_path: str = ""
+    context_path: str = ""
+    stdout_path: str = ""
+    stderr_path: str = ""
+    generated_files: list[CodeConsoleGeneratedFileSnapshotPayload] = Field(default_factory=list)
+
+
+class CodeConsoleProjectPayload(StrictModel):
+    session_kind: str = "code_console"
+    version: int = 2
+    selected_source_kind: str | None = None
+    selected_sheet: str | int = 0
+    editor_text: str = ""
+    prompt_text: str = ""
+    starter_code: str = ""
+    manual_binding: CodeConsoleProjectManualBindingPayload | None = None
+    latest_run: CodeConsoleRunSnapshotPayload | None = None
+    embedded_generated_files: list[CodeConsoleProjectGeneratedFilePayload] = Field(default_factory=list)
+    selected_generated_file_path: str | None = None
+    project_display_name: str | None = None
+
+
 class ProjectBundlePayload(StrictModel):
-    version: int = 1
+    version: int = 2
     selected_workbench: str = "plot"
     plot: PlotProjectPayload | None = None
     data_studio: DataStudioProjectPayload | None = None
-    composer: dict[str, Any] | None = None
-    code_console: dict[str, Any] | None = None
+    composer: ComposerProjectPayload | None = None
+    code_console: CodeConsoleProjectPayload | None = None
     artifacts: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -692,6 +769,13 @@ SourceTablePreviewResponse.model_rebuild()
 
 
 __all__ = [
+    "CodeConsoleGeneratedFileSnapshotPayload",
+    "CodeConsoleProjectGeneratedFilePayload",
+    "CodeConsoleProjectManualBindingPayload",
+    "CodeConsoleProjectPayload",
+    "CodeConsoleRunSnapshotPayload",
+    "ComposerProjectPanelPayload",
+    "ComposerProjectPayload",
     "DataStudioProjectPayload",
     "DataStudioProjectWorkbookPayload",
     "DataTransformPayload",

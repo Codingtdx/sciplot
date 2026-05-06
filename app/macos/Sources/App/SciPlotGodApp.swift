@@ -96,6 +96,18 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
         }
         return true
     }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Task { @MainActor in
+            for url in urls {
+                if url.pathExtension.lowercased() == "sciplotgod" {
+                    await SciPlotGodAppState.model.openProjectDocument(url)
+                } else {
+                    SciPlotGodAppState.model.openPlotDocument(url)
+                }
+            }
+        }
+    }
 }
 
 @MainActor

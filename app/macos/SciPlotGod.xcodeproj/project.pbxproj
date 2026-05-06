@@ -29,6 +29,7 @@
 		C00000000000000000000051 /* Sources/Features/Composer/ComposerSessionImportExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000051 /* Sources/Features/Composer/ComposerSessionImportExport.swift */; };
 		C00000000000000000000052 /* Sources/Features/Composer/ComposerSessionSelectionPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000052 /* Sources/Features/Composer/ComposerSessionSelectionPlacement.swift */; };
 		C00000000000000000000053 /* Sources/Features/Composer/ComposerSessionPreviewUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000053 /* Sources/Features/Composer/ComposerSessionPreviewUndo.swift */; };
+		C00000000000000000000097 /* Sources/Features/Composer/ComposerSessionProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000097 /* Sources/Features/Composer/ComposerSessionProject.swift */; };
 		C00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */; };
 		C00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */; };
 		C00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */; };
@@ -139,6 +140,7 @@
 		B00000000000000000000051 /* Sources/Features/Composer/ComposerSessionImportExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSessionImportExport.swift; sourceTree = "<group>"; };
 		B00000000000000000000052 /* Sources/Features/Composer/ComposerSessionSelectionPlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSessionSelectionPlacement.swift; sourceTree = "<group>"; };
 		B00000000000000000000053 /* Sources/Features/Composer/ComposerSessionPreviewUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSessionPreviewUndo.swift; sourceTree = "<group>"; };
+		B00000000000000000000097 /* Sources/Features/Composer/ComposerSessionProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Composer/ComposerSessionProject.swift; sourceTree = "<group>"; };
 		B00000000000000000000017 /* Sources/Features/Plot/PlotImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotImportView.swift; sourceTree = "<group>"; };
 		B00000000000000000000018 /* Sources/Features/Plot/PlotInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotInspectorView.swift; sourceTree = "<group>"; };
 		B00000000000000000000081 /* Sources/Features/Plot/PlotDataWorkbookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/Plot/PlotDataWorkbookSheet.swift; sourceTree = "<group>"; };
@@ -269,6 +271,7 @@
 				B00000000000000000000051 /* Sources/Features/Composer/ComposerSessionImportExport.swift */,
 				B00000000000000000000052 /* Sources/Features/Composer/ComposerSessionSelectionPlacement.swift */,
 				B00000000000000000000053 /* Sources/Features/Composer/ComposerSessionPreviewUndo.swift */,
+				B00000000000000000000097 /* Sources/Features/Composer/ComposerSessionProject.swift */,
 				B00000000000000000000044 /* Sources/Features/Composer/ComposerSessionTypes.swift */,
 				B0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift */,
 				B0000000000000000000003E /* Sources/Features/DataStudio/DataStudioSession.swift */,
@@ -475,6 +478,7 @@
 				C00000000000000000000051 /* Sources/Features/Composer/ComposerSessionImportExport.swift in Sources */,
 				C00000000000000000000052 /* Sources/Features/Composer/ComposerSessionSelectionPlacement.swift in Sources */,
 				C00000000000000000000053 /* Sources/Features/Composer/ComposerSessionPreviewUndo.swift in Sources */,
+				C00000000000000000000097 /* Sources/Features/Composer/ComposerSessionProject.swift in Sources */,
 				C00000000000000000000044 /* Sources/Features/Composer/ComposerSessionTypes.swift in Sources */,
 				C0000000000000000000000F /* Sources/Features/Composer/ComposerWorkbenchView.swift in Sources */,
 				C00000000000000000000030 /* Sources/Features/Composer/ComposerPanelThumbnailView.swift in Sources */,

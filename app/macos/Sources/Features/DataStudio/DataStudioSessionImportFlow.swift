@@ -79,7 +79,11 @@ extension DataStudioSession {
 
     func handleImportedFiles(_ urls: [URL]) async {
         if let projectURL = urls.first(where: { $0.pathExtension.lowercased() == "sciplotgod" }) {
-            await openProject(projectURL)
+            if let openProjectDocumentHandler {
+                await openProjectDocumentHandler(projectURL)
+            } else {
+                await openProject(projectURL)
+            }
             return
         }
         switch pendingImportKind {

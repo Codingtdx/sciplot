@@ -10,6 +10,7 @@ final class ComposerSession {
 
     struct RuntimeState {
         var selectionAnchorCell: ComposerGridCell?
+        var lastSavedProjectSnapshot: ProjectSnapshot?
     }
 
     @MainActor

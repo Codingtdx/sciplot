@@ -483,22 +483,177 @@ final class CodeConsoleSession {
         }
     }
 
-    private func scheduleContextRefresh() {
+    struct ProjectSnapshot: Equatable {
+        let selectedSourceKind: String?
+        let selectedSheet: SheetValue
+        let editorText: String
+        let manualBinding: CodeConsoleProjectManualBindingPayload?
+        let latestRun: CodeConsoleRunSnapshotPayload?
+        let selectedGeneratedFilePath: String?
+    }
+
+    var currentProjectSnapshot: ProjectSnapshot? {
+        guard hasProjectContent else {
+            return nil
+        }
+        return ProjectSnapshot(
+            selectedSourceKind: selectedBinding?.sourceKind.rawValue,
+            selectedSheet: selectedSheet,
+            editorText: editorText,
+            manualBinding: manualBindingProjectPayload(),
+            latestRun: latestRunSnapshot(),
+            selectedGeneratedFilePath: selectedGeneratedFilePath
+        )
+    }
+
+    var isProjectDirty: Bool {
+        guard let currentProjectSnapshot else {
+            return false
+        }
+        guard let lastSavedProjectSnapshot = runtimeState.lastSavedProjectSnapshot else {
+            return true
+        }
+        return currentProjectSnapshot != lastSavedProjectSnapshot
+    }
+
+    var hasProjectContent: Bool {
+        runtimeState.manualBinding != nil
+            || !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || latestRunResponse != nil
+    }
+
+    func buildProjectPayload(projectDisplayName: String?) -> CodeConsoleProjectPayload? {
+        guard hasProjectContent else {
+            return nil
+        }
+        return CodeConsoleProjectPayload(
+            sessionKind: "code_console",
+            version: 2,
+            selectedSourceKind: selectedBinding?.sourceKind.rawValue,
+            selectedSheet: selectedSheet,
+            editorText: editorText,
+            promptText: promptText,
+            starterCode: starterCode,
+            manualBinding: manualBindingProjectPayload(),
+            latestRun: latestRunSnapshot(),
+            embeddedGeneratedFiles: [],
+            selectedGeneratedFilePath: selectedGeneratedFilePath,
+            projectDisplayName: projectDisplayName
+        )
+    }
+
+    func emptyProjectPayload(projectDisplayName: String?) -> CodeConsoleProjectPayload {
+        CodeConsoleProjectPayload(
+            sessionKind: "code_console",
+            version: 2,
+            selectedSourceKind: nil,
+            selectedSheet: .index(0),
+            editorText: "",
+            promptText: "",
+            starterCode: "",
+            manualBinding: nil,
+            latestRun: nil,
+            embeddedGeneratedFiles: [],
+            selectedGeneratedFilePath: nil,
+            projectDisplayName: projectDisplayName
+        )
+    }
+
+    func restoreProjectPayload(
+        _ payload: CodeConsoleProjectPayload,
+        plot: PlotSession,
+        dataStudio: DataStudioSession
+    ) {
+        asyncCoordination.context.cancel()
+        runtimeState.manualBinding = payload.manualBinding.map(bindingOption(from:))
+        selectedBindingID = nil
+        refreshContext(plot: plot, dataStudio: dataStudio)
+        asyncCoordination.context.cancel()
+
+        if let selectedSourceKind = payload.selectedSourceKind,
+           let restoredBinding = availableBindings.first(where: {
+               normalizedSourceKind($0.sourceKind.rawValue) == normalizedSourceKind(selectedSourceKind)
+           })
+        {
+            selectedBindingID = restoredBinding.id
+        } else {
+            selectedBindingID = availableBindings.first?.id
+        }
+
+        selectedSheet = payload.selectedSheet
+        editorText = payload.editorText
+        promptText = payload.promptText
+        starterCode = payload.starterCode
+        latestRunResponse = payload.latestRun.map(runResponse(from:))
+        selectedGeneratedFilePath = payload.selectedGeneratedFilePath
+            ?? latestRunResponse?.generatedFiles.first?.path
+        userExportURLs = []
+        errorMessage = nil
+        refreshBoundContext()
+        if selectedBinding != nil {
+            scheduleContextRefresh(preserveRunState: true, preserveEditorText: true)
+        }
+        runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+    }
+
+    func markProjectSaved(_ payload: CodeConsoleProjectPayload?) {
+        if let payload {
+            promptText = payload.promptText
+            starterCode = payload.starterCode
+        }
+        runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
+    }
+
+    func newSession() {
+        asyncCoordination.context.cancel()
+        runtimeState.manualBinding = nil
+        runtimeState.lastSavedProjectSnapshot = nil
+        availableBindings = []
+        selectedBindingID = nil
+        selectedSheet = .index(0)
+        editorText = ""
+        promptText = ""
+        starterCode = ""
+        boundContext = []
+        contextResponse = nil
+        latestRunResponse = nil
+        selectedGeneratedFilePath = nil
+        errorMessage = nil
+        isImporterPresented = false
+        isRefreshingContext = false
+        isRunning = false
+        userExportURLs = []
+    }
+
+    private func scheduleContextRefresh(
+        preserveRunState: Bool = false,
+        preserveEditorText: Bool = false
+    ) {
         asyncCoordination.context.schedule(delayNanoseconds: contextRefreshDebounceNanoseconds) { [weak self] revision in
             guard let self else {
                 return
             }
-            await self.loadContext(revision: revision)
+            await self.loadContext(
+                revision: revision,
+                preserveRunState: preserveRunState,
+                preserveEditorText: preserveEditorText
+            )
         }
     }
 
-    private func loadContext(revision: Int) async {
+    private func loadContext(
+        revision: Int,
+        preserveRunState: Bool = false,
+        preserveEditorText: Bool = false
+    ) async {
         guard let client, let request = currentContextRequest() else {
             return
         }
 
         isRefreshingContext = true
-        clearRunState()
+        if !preserveRunState {
+            clearRunState()
+        }
         defer {
             if asyncCoordination.context.isLatest(revision) {
                 isRefreshingContext = false
@@ -515,7 +670,9 @@ final class CodeConsoleSession {
             promptText = response.promptText
             let previousStarterCode = starterCode
             starterCode = response.starterCode
-            if editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editorText == previousStarterCode {
+            if !preserveEditorText,
+               editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editorText == previousStarterCode
+            {
                 editorText = response.starterCode
             }
             refreshBoundContext()
@@ -656,6 +813,108 @@ final class CodeConsoleSession {
         "\(kind.rawValue)::\(url.standardizedFileURL.path)"
     }
 
+    private func normalizedSourceKind(_ rawValue: String) -> String {
+        switch rawValue {
+        case "data_studio", "dataStudio":
+            return "dataStudio"
+        case "code_console", "codeConsole":
+            return "codeConsole"
+        case "imported_file", "importedFile":
+            return "importedFile"
+        default:
+            return rawValue
+        }
+    }
+
+    private func manualBindingProjectPayload() -> CodeConsoleProjectManualBindingPayload? {
+        guard let manualBinding = runtimeState.manualBinding else {
+            return nil
+        }
+        let url = manualBinding.sourceURL
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?
+            .timeIntervalSince1970
+        return CodeConsoleProjectManualBindingPayload(
+            sourceFilename: url.lastPathComponent,
+            embeddedSourceRelpath: "sources/code_console/manual/\(url.lastPathComponent)",
+            sourceSHA256: "",
+            originalSourcePath: url.path,
+            savedSourceMtimeNs: mtime.map { Int($0 * 1_000_000_000) },
+            sheet: manualBinding.sheet,
+            templateID: manualBinding.templateID,
+            renderOptions: manualBinding.renderOptions,
+            title: manualBinding.title
+        )
+    }
+
+    private func latestRunSnapshot() -> CodeConsoleRunSnapshotPayload? {
+        guard let latestRunResponse else {
+            return nil
+        }
+        return CodeConsoleRunSnapshotPayload(
+            status: latestRunResponse.status,
+            exitCode: latestRunResponse.exitCode,
+            durationSeconds: latestRunResponse.durationSeconds,
+            stdout: latestRunResponse.stdout,
+            stderr: latestRunResponse.stderr,
+            runDir: latestRunResponse.runDir,
+            outputDir: latestRunResponse.outputDir,
+            scriptPath: latestRunResponse.scriptPath,
+            promptPath: latestRunResponse.promptPath,
+            contextPath: latestRunResponse.contextPath,
+            stdoutPath: latestRunResponse.stdoutPath,
+            stderrPath: latestRunResponse.stderrPath,
+            generatedFiles: latestRunResponse.generatedFiles.map {
+                CodeConsoleGeneratedFileSnapshotPayload(
+                    path: $0.path,
+                    name: $0.name,
+                    fileType: $0.fileType,
+                    sizeBytes: $0.sizeBytes
+                )
+            }
+        )
+    }
+
+    private func bindingOption(
+        from payload: CodeConsoleProjectManualBindingPayload
+    ) -> CodeConsoleBindingOption {
+        let sourcePath = payload.originalSourcePath ?? payload.sourceFilename
+        let sourceURL = URL(fileURLWithPath: sourcePath)
+        return CodeConsoleBindingOption(
+            id: bindingID(kind: .importedFile, url: sourceURL),
+            sourceKind: .importedFile,
+            sourceURL: sourceURL,
+            sheet: payload.sheet,
+            title: payload.title,
+            templateID: payload.templateID,
+            renderOptions: payload.renderOptions
+        )
+    }
+
+    private func runResponse(from payload: CodeConsoleRunSnapshotPayload) -> CodeConsoleRunResponse {
+        CodeConsoleRunResponse(
+            status: payload.status,
+            exitCode: payload.exitCode,
+            durationSeconds: payload.durationSeconds,
+            stdout: payload.stdout,
+            stderr: payload.stderr,
+            runDir: payload.runDir,
+            outputDir: payload.outputDir,
+            scriptPath: payload.scriptPath,
+            promptPath: payload.promptPath,
+            contextPath: payload.contextPath,
+            stdoutPath: payload.stdoutPath,
+            stderrPath: payload.stderrPath,
+            generatedFiles: payload.generatedFiles.map {
+                CodeConsoleGeneratedFileResponse(
+                    path: $0.path,
+                    name: $0.name,
+                    fileType: $0.fileType,
+                    sizeBytes: $0.sizeBytes
+                )
+            }
+        )
+    }
+
     private var refreshPromptAvailability: ActionAvailability {
         if isRefreshingContext {
             return .disabled("Wait for the current context refresh to finish.")
@@ -725,6 +984,7 @@ private extension CodeConsoleSession {
     struct RuntimeState {
         var defaultRenderOptions = RenderOptionsPayload()
         var manualBinding: CodeConsoleBindingOption?
+        var lastSavedProjectSnapshot: ProjectSnapshot?
     }
 
     @MainActor

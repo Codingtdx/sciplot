@@ -188,34 +188,42 @@ extension DataStudioSession {
         }
     }
 
+    func buildDataStudioProjectPayload(
+        from session: DataStudioSessionResponse,
+        projectDisplayName: String?
+    ) -> DataStudioProjectPayload {
+        DataStudioProjectPayload(
+            sessionKind: "data_studio",
+            version: session.version,
+            selectedTemplateID: session.selectedTemplateID,
+            workbookPaths: session.workbookPaths,
+            selectedWorkbookID: session.selectedWorkbookID,
+            primaryWorkbookID: session.primaryWorkbookID,
+            selectedRecipeID: session.selectedRecipeID,
+            comparisonRecipeIDs: session.comparisonRecipeIDs,
+            selectedFigureFamilyID: session.selectedFigureFamilyID,
+            selectedFigureTemplateID: session.selectedFigureTemplateID,
+            groupStates: session.groupStates,
+            specimenStates: session.specimenStates,
+            figurePreferences: session.figurePreferences,
+            importedPaths: session.importedPaths,
+            templateDraftPath: session.templateDraftPath,
+            embeddedWorkbooks: [],
+            projectDisplayName: projectDisplayName
+                ?? projectURL?.deletingPathExtension().lastPathComponent
+                ?? focusedWorkbook?.workbookURL.deletingPathExtension().lastPathComponent,
+            sourceProvenance: [
+                "imported_paths": .array(importedSourceURLs.map { .string($0.path) }),
+            ]
+        )
+    }
+
     func buildProjectPayload(from session: DataStudioSessionResponse) -> ProjectBundlePayload {
         ProjectBundlePayload(
-            version: 1,
+            version: 2,
             selectedWorkbench: "data_studio",
             plot: nil,
-            dataStudio: DataStudioProjectPayload(
-                sessionKind: "data_studio",
-                version: session.version,
-                selectedTemplateID: session.selectedTemplateID,
-                workbookPaths: session.workbookPaths,
-                selectedWorkbookID: session.selectedWorkbookID,
-                primaryWorkbookID: session.primaryWorkbookID,
-                selectedRecipeID: session.selectedRecipeID,
-                comparisonRecipeIDs: session.comparisonRecipeIDs,
-                selectedFigureFamilyID: session.selectedFigureFamilyID,
-                selectedFigureTemplateID: session.selectedFigureTemplateID,
-                groupStates: session.groupStates,
-                specimenStates: session.specimenStates,
-                figurePreferences: session.figurePreferences,
-                importedPaths: session.importedPaths,
-                templateDraftPath: session.templateDraftPath,
-                embeddedWorkbooks: [],
-                projectDisplayName: projectURL?.deletingPathExtension().lastPathComponent
-                    ?? focusedWorkbook?.workbookURL.deletingPathExtension().lastPathComponent,
-                sourceProvenance: [
-                    "imported_paths": .array(importedSourceURLs.map { .string($0.path) }),
-                ]
-            ),
+            dataStudio: buildDataStudioProjectPayload(from: session, projectDisplayName: nil),
             composer: nil,
             codeConsole: nil,
             artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]

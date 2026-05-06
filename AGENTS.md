@@ -117,9 +117,14 @@
   - `project.json`
   - `sources/plot/primary/<original-filename>` 可选
   - `sources/data_studio/workbooks/<original-filename>` 一个或多个，可选
+  - `sources/composer/panels/<original-filename>` 一个或多个，可选
+  - `sources/code_console/manual/<original-filename>` 可选，仅用于 Code Console 手动导入绑定
+  - `artifacts/code_console/latest_run/<original-filename>` 一个或多个，可选，仅用于恢复最近运行输出连续性
   - `artifacts/manifest.json`
 - Plot 项目恢复必须以 bundle 内嵌 raw source 为真相源；不能依赖原始绝对路径仍然存在。
 - Data Studio 项目恢复必须以 bundle 内嵌 workbook 为真相源；`imported_paths` 和 raw file path 只做 provenance，不能参与恢复真相源。
+- Composer 项目恢复必须以 bundle 内嵌 panel graph/asset 为真相源；panel 原始路径只做 provenance。
+- Code Console 手动导入绑定恢复必须以 bundle 内嵌 manual source 为真相源；Plot/Data Studio 绑定应引用同一工程内恢复后的模块源；latest run artifacts 只用于 UI 连续性，不是重新运行的真相源。
 
 ## 桌面运行时约束（macOS）
 
@@ -139,7 +144,7 @@
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
 - Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。Plot 已有内容时，导入/打开新输入的替换确认必须挂在 Plot 窗口本身；即使入口来自 Launcher，也不得让 Launcher 承载 Plot-specific confirmation。
 - `New Project` 是返回 Launcher 的显式入口：它先清空当前 Plot session 与 pending replacement，再打开/聚焦 Launcher。普通 Plot 导入新文件不得把用户带回初始界面。
-- Data Studio 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
+- Data Studio / Composer / Code Console 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
 - Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
 - Data Studio `Save Project…` / `Save Project As…` 同样走命令菜单，不新增第二套 toolbar 主入口。
 - toolbar `Help` 是唯一帮助主入口，必须打开 app-level `Quick Help`（按 workbench 提供精简动作提示）；不得恢复各 workbench 长文 `GuideSheet` 或流程说明卡片。

@@ -780,3 +780,223 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
     figure_preference = payload["payload"]["data_studio"]["figure_preferences"][0]
     assert figure_preference["selected_template_id"] == "scatter"
     assert figure_preference["fit_options_by_template"]["scatter"]["model_id"] == "polynomial_2"
+
+
+def test_open_legacy_plot_project_migrates_to_v2_payload(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "legacy-curve.sciplotgod"
+    _curve_csv(source_path)
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": _project_payload(source_path),
+        },
+    )
+    assert save_response.status_code == 200
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+
+    assert open_response.status_code == 200
+    payload = open_response.json()["payload"]
+    assert payload["version"] == 2
+    assert payload["selected_workbench"] == "plot"
+    assert payload["plot"]["selected_template_id"] == "scatter_fit"
+
+
+def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Path) -> None:
+    plot_source_path = tmp_path / "curve.csv"
+    data_studio_workbook_path, workbook_payload = _build_data_studio_workbook(tmp_path, "V2 Group")
+    composer_panel_path = tmp_path / "panel.pdf"
+    code_console_source_path = tmp_path / "manual.csv"
+    code_console_pdf_path = tmp_path / "console-output.pdf"
+    project_path = tmp_path / "four-module.sciplotgod"
+    _curve_csv(plot_source_path)
+    _curve_csv(code_console_source_path)
+    composer_panel_path.write_bytes(b"%PDF-1.4\n%composer panel\n")
+    code_console_pdf_path.write_bytes(b"%PDF-1.4\n%console output\n")
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(plot_source_path),
+            "payload": {
+                "version": 2,
+                "selected_workbench": "code_console",
+                "plot": {
+                    "session_kind": "plot",
+                    "source_filename": plot_source_path.name,
+                    "source_media_type": "text/csv",
+                    "embedded_source_relpath": f"sources/plot/primary/{plot_source_path.name}",
+                    "source_sha256": "",
+                    "sheet": 0,
+                    "selected_template_id": "curve",
+                    "render_options": {
+                        "style_preset": "nature",
+                        "palette_preset": "colorblind_safe",
+                        "visual_theme_id": "clean_light",
+                    },
+                    "fit_options": {"enabled": True, "model_id": "linear"},
+                    "project_display_name": "Four Module",
+                    "source_provenance": {"original_input_path": str(plot_source_path)},
+                },
+                "data_studio": {
+                    "session_kind": "data_studio",
+                    "version": 1,
+                    "selected_template_id": tensile_builtin.TENSILE_TEMPLATE_ID,
+                    "workbook_paths": [str(data_studio_workbook_path)],
+                    "selected_workbook_id": workbook_payload["workbook_id"],
+                    "primary_workbook_id": workbook_payload["workbook_id"],
+                    "selected_recipe_id": "representative_curve",
+                    "comparison_recipe_ids": ["representative_curve"],
+                    "selected_figure_family_id": "representative_curve",
+                    "selected_figure_template_id": "curve",
+                    "group_states": [
+                        {
+                            "workbook_path": str(data_studio_workbook_path),
+                            "display_name": "V2 Group",
+                            "include_in_compare": True,
+                            "sort_order": 0,
+                        }
+                    ],
+                    "specimen_states": [],
+                    "figure_preferences": [],
+                    "imported_paths": [],
+                    "template_draft_path": None,
+                    "embedded_workbooks": [],
+                    "project_display_name": "Four Module",
+                    "source_provenance": {},
+                },
+                "composer": {
+                    "session_kind": "composer",
+                    "version": 2,
+                    "project": {
+                        "version": 2,
+                        "mode": "composer",
+                        "canvas_width_mm": 180.0,
+                        "canvas_height_mm": 170.0,
+                        "grid_mm": 0.5,
+                        "layout_grid": {
+                            "columns": 3,
+                            "rows": 3,
+                            "cell_width_mm": 60.0,
+                            "cell_height_mm": 55.0,
+                            "frame_x_mm": 0.0,
+                            "frame_y_mm": 2.5,
+                            "frame_width_mm": 180.0,
+                            "frame_height_mm": 165.0,
+                        },
+                        "regions": [],
+                        "panels": [
+                            {
+                                "id": "panel-1",
+                                "file_path": str(composer_panel_path),
+                                "page_index": 0,
+                                "x_mm": 0.0,
+                                "y_mm": 2.5,
+                                "w_mm": 60.0,
+                                "h_mm": 55.0,
+                                "locked": False,
+                                "hidden": False,
+                                "label": "A",
+                                "kind": "graph",
+                                "z_index": 0,
+                                "group_id": None,
+                                "region_id": None,
+                                "slot_id": None,
+                                "crop_rect": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0},
+                            }
+                        ],
+                        "texts": [],
+                        "auto_labels": True,
+                    },
+                    "embedded_panels": [],
+                    "project_display_name": "Four Module",
+                },
+                "code_console": {
+                    "session_kind": "code_console",
+                    "version": 2,
+                    "selected_source_kind": "imported_file",
+                    "selected_sheet": 0,
+                    "editor_text": "print('hello')",
+                    "prompt_text": "Prompt snapshot",
+                    "starter_code": "from src.code_console_runtime import console",
+                    "manual_binding": {
+                        "source_filename": code_console_source_path.name,
+                        "embedded_source_relpath": f"sources/code_console/manual/{code_console_source_path.name}",
+                        "source_sha256": "",
+                        "original_source_path": str(code_console_source_path),
+                        "sheet": 0,
+                        "template_id": None,
+                        "render_options": {
+                            "style_preset": "nature",
+                            "palette_preset": "colorblind_safe",
+                            "visual_theme_id": "clean_light",
+                        },
+                        "title": "Imported file",
+                    },
+                    "latest_run": {
+                        "status": "succeeded",
+                        "exit_code": 0,
+                        "duration_seconds": 0.5,
+                        "stdout": "Generated",
+                        "stderr": "",
+                        "run_dir": "",
+                        "output_dir": "",
+                        "script_path": "",
+                        "prompt_path": "",
+                        "context_path": "",
+                        "stdout_path": "",
+                        "stderr_path": "",
+                        "generated_files": [
+                            {
+                                "path": str(code_console_pdf_path),
+                                "name": code_console_pdf_path.name,
+                                "file_type": "pdf",
+                                "size_bytes": code_console_pdf_path.stat().st_size,
+                            }
+                        ],
+                    },
+                    "embedded_generated_files": [],
+                    "selected_generated_file_path": str(code_console_pdf_path),
+                    "project_display_name": "Four Module",
+                },
+                "artifacts": {},
+            },
+        },
+    )
+
+    assert save_response.status_code == 200, save_response.text
+    with zipfile.ZipFile(project_path) as archive:
+        names = set(archive.namelist())
+        assert f"sources/plot/primary/{plot_source_path.name}" in names
+        assert f"sources/data_studio/workbooks/{data_studio_workbook_path.name}" in names
+        assert f"sources/composer/panels/{composer_panel_path.name}" in names
+        assert f"sources/code_console/manual/{code_console_source_path.name}" in names
+        assert f"artifacts/code_console/latest_run/{code_console_pdf_path.name}" in names
+
+    plot_source_path.unlink()
+    data_studio_workbook_path.unlink()
+    composer_panel_path.unlink()
+    code_console_source_path.unlink()
+    code_console_pdf_path.unlink()
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+
+    assert open_response.status_code == 200, open_response.text
+    payload = open_response.json()
+    project_payload = payload["payload"]
+    assert project_payload["version"] == 2
+    assert project_payload["selected_workbench"] == "code_console"
+    assert Path(payload["restored_source_path"]).exists()
+    assert Path(payload["restored_workbook_paths"][0]).exists()
+    assert Path(project_payload["composer"]["project"]["panels"][0]["file_path"]).exists()
+    assert project_payload["composer"]["project"]["panels"][0]["file_path"] != str(composer_panel_path)
+    restored_manual = project_payload["code_console"]["manual_binding"]
+    assert Path(restored_manual["original_source_path"]).exists()
+    restored_generated = project_payload["code_console"]["latest_run"]["generated_files"][0]
+    assert Path(restored_generated["path"]).exists()
+    assert project_payload["code_console"]["selected_generated_file_path"] == restored_generated["path"]

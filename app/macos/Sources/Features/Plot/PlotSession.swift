@@ -49,6 +49,7 @@ final class PlotSession {
     @ObservationIgnored let chooseExportDestination: PlotExportDestinationChooser
     @ObservationIgnored let materializeExport: PlotExportMaterializer
     @ObservationIgnored let chooseProjectSaveLocation: PlotProjectSaveChooser
+    @ObservationIgnored var openProjectDocumentHandler: ((URL) async -> Void)?
     @ObservationIgnored var runtimeState = RuntimeState()
     @ObservationIgnored let asyncCoordination = AsyncCoordination()
     @ObservationIgnored weak var undoManager: UndoManager?

@@ -1335,13 +1335,119 @@ struct DataStudioProjectPayload: Codable, Equatable, Sendable {
     }
 }
 
+struct ComposerProjectPanelPayload: Codable, Equatable, Sendable {
+    let panelID: String
+    let panelFilename: String
+    let embeddedPanelRelpath: String
+    let panelSHA256: String
+    let originalPanelPath: String?
+    let savedPanelMtimeNs: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case panelID = "panelId"
+        case panelFilename
+        case embeddedPanelRelpath
+        case panelSHA256 = "panelSha256"
+        case originalPanelPath
+        case savedPanelMtimeNs
+    }
+}
+
+struct ComposerProjectPayload: Codable, Equatable, Sendable {
+    var sessionKind: String = "composer"
+    var version: Int = 2
+    var project: ComposerRequestPayload = .init()
+    var embeddedPanels: [ComposerProjectPanelPayload] = []
+    var projectDisplayName: String?
+}
+
+struct CodeConsoleProjectManualBindingPayload: Codable, Equatable, Sendable {
+    let sourceFilename: String
+    let embeddedSourceRelpath: String
+    let sourceSHA256: String
+    let originalSourcePath: String?
+    let savedSourceMtimeNs: Int?
+    let sheet: SheetValue
+    let templateID: String?
+    let renderOptions: RenderOptionsPayload
+    let title: String
+
+    enum CodingKeys: String, CodingKey {
+        case sourceFilename
+        case embeddedSourceRelpath
+        case sourceSHA256 = "sourceSha256"
+        case originalSourcePath
+        case savedSourceMtimeNs
+        case sheet
+        case templateID = "templateId"
+        case renderOptions
+        case title
+    }
+}
+
+struct CodeConsoleProjectGeneratedFilePayload: Codable, Equatable, Sendable {
+    let originalPath: String?
+    let embeddedFileRelpath: String
+    let fileSHA256: String
+    let name: String
+    let fileType: String
+    let sizeBytes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case originalPath
+        case embeddedFileRelpath
+        case fileSHA256 = "fileSha256"
+        case name
+        case fileType
+        case sizeBytes
+    }
+}
+
+struct CodeConsoleGeneratedFileSnapshotPayload: Codable, Equatable, Sendable {
+    let path: String
+    let name: String
+    let fileType: String
+    let sizeBytes: Int
+}
+
+struct CodeConsoleRunSnapshotPayload: Codable, Equatable, Sendable {
+    let status: String
+    let exitCode: Int?
+    let durationSeconds: Double
+    let stdout: String
+    let stderr: String
+    let runDir: String
+    let outputDir: String
+    let scriptPath: String
+    let promptPath: String
+    let contextPath: String
+    let stdoutPath: String
+    let stderrPath: String
+    let generatedFiles: [CodeConsoleGeneratedFileSnapshotPayload]
+}
+
+struct CodeConsoleProjectPayload: Codable, Equatable, Sendable {
+    var sessionKind: String = "code_console"
+    var version: Int = 2
+    var selectedSourceKind: String?
+    var selectedSheet: SheetValue = .index(0)
+    var editorText: String = ""
+    var promptText: String = ""
+    var starterCode: String = ""
+    var manualBinding: CodeConsoleProjectManualBindingPayload?
+    var latestRun: CodeConsoleRunSnapshotPayload?
+    var embeddedGeneratedFiles: [CodeConsoleProjectGeneratedFilePayload] = []
+    var selectedGeneratedFilePath: String?
+    var projectDisplayName: String?
+}
+
 struct ProjectBundlePayload: Codable, Equatable, Sendable {
     let version: Int
     let selectedWorkbench: String
     let plot: PlotProjectPayload?
     let dataStudio: DataStudioProjectPayload?
-    let composer: JSONValue?
-    let codeConsole: JSONValue?
+    let composer: ComposerProjectPayload?
+    let codeConsole: CodeConsoleProjectPayload?
     let artifacts: [String: JSONValue]
 }
 

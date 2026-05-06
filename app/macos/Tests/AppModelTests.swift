@@ -168,6 +168,15 @@ final class AppModelTests: XCTestCase {
         model.plotSession.isDataWorkbookPresented = true
         model.plotSession.errorMessage = "Old error"
         model.plotSession.selectedPlotAdjustmentCategory = .legend
+        model.dataStudioSession.workbooks = [
+            DataStudioWorkbookItem(
+                id: "workbook-1",
+                response: TestPayloads.dataStudioWorkbook(path: "/tmp/prepared.xlsx", label: "Prepared")
+            ),
+        ]
+        model.composerSession.project = TestPayloads.composerProject()
+        model.codeConsoleSession.editorText = "print('keep me until reset')"
+        model.codeConsoleSession.latestRunResponse = TestPayloads.codeConsoleRun()
 
         model.openInPlot(
             inputURL: URL(fileURLWithPath: "/tmp/prepared.xlsx"),
@@ -185,7 +194,151 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.plotSession.isDataWorkbookPresented)
         XCTAssertNil(model.plotSession.errorMessage)
         XCTAssertEqual(model.plotSession.selectedPlotAdjustmentCategory, .figure)
+        XCTAssertTrue(model.dataStudioSession.workbooks.isEmpty)
+        XCTAssertTrue(model.composerSession.project.panels.isEmpty)
+        XCTAssertTrue(model.codeConsoleSession.editorText.isEmpty)
+        XCTAssertNil(model.codeConsoleSession.latestRunResponse)
         XCTAssertNil(model.requestedWorkbenchWindow)
+    }
+
+    func testProjectSaveAvailabilityUsesAnyDurableModuleContent() {
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+
+        XCTAssertFalse(model.saveProjectAvailability(for: .codeConsole).isEnabled)
+
+        model.composerSession.project = TestPayloads.composerProject()
+
+        XCTAssertTrue(model.saveProjectAvailability(for: .plot).isEnabled)
+        XCTAssertTrue(model.saveProjectAvailability(for: .codeConsole).isEnabled)
+    }
+
+    func testAppModelSavesAggregateComposerAndCodeConsoleProjectPayload() async {
+        let client = MockSidecarClient()
+        let destinationURL = URL(fileURLWithPath: "/tmp/four-module.sciplotgod")
+        let model = AppModel(
+            runtime: SidecarRuntime(),
+            client: client,
+            chooseProjectSaveLocation: { _ in destinationURL }
+        )
+        model.composerSession.project = TestPayloads.composerProject()
+        model.codeConsoleSession.importFile(URL(fileURLWithPath: "/tmp/manual.csv"))
+        model.codeConsoleSession.editorText = "print('saved editor')"
+        model.codeConsoleSession.latestRunResponse = TestPayloads.codeConsoleRun()
+        client.saveProjectHandler = { request in
+            SaveProjectResponse(projectPath: request.projectPath, payload: request.payload)
+        }
+
+        await model.saveProjectAs(for: .codeConsole)
+
+        XCTAssertEqual(client.saveProjectRequests.count, 1)
+        let request = client.saveProjectRequests[0]
+        XCTAssertEqual(request.projectPath, destinationURL.path)
+        XCTAssertNil(request.sourcePath)
+        XCTAssertEqual(request.payload.version, 2)
+        XCTAssertEqual(request.payload.selectedWorkbench, "code_console")
+        XCTAssertEqual(request.payload.composer?.project.panels.first?.filePath, "/tmp/panel.pdf")
+        XCTAssertEqual(request.payload.codeConsole?.manualBinding?.originalSourcePath, "/tmp/manual.csv")
+        XCTAssertEqual(request.payload.codeConsole?.editorText, "print('saved editor')")
+        XCTAssertEqual(request.payload.codeConsole?.latestRun?.generatedFiles.first?.path, "/tmp/code_console/run-1/outputs/sample.pdf")
+        XCTAssertEqual(model.projectURL, destinationURL)
+        XCTAssertFalse(model.isProjectDirty)
+    }
+
+    func testOpenProjectRestoresComposerAndCodeConsoleAndFocusesSavedWorkbench() async throws {
+        let client = MockSidecarClient()
+        let model = AppModel(runtime: SidecarRuntime(), client: client)
+        var composerProject = TestPayloads.composerProject()
+        composerProject.panels[0].filePath = "/tmp/restored/panel.pdf"
+        let manualBinding = CodeConsoleProjectManualBindingPayload(
+            sourceFilename: "manual.csv",
+            embeddedSourceRelpath: "sources/code_console/manual/manual.csv",
+            sourceSHA256: "abc123",
+            originalSourcePath: "/tmp/restored/manual.csv",
+            savedSourceMtimeNs: 123,
+            sheet: .name("Manual"),
+            templateID: "curve",
+            renderOptions: RenderOptionsPayload(size: "single_panel"),
+            title: "Restored manual"
+        )
+        let runSnapshot = CodeConsoleRunSnapshotPayload(
+            status: "succeeded",
+            exitCode: 0,
+            durationSeconds: 0.5,
+            stdout: "ok",
+            stderr: "",
+            runDir: "/tmp/restored/run",
+            outputDir: "/tmp/restored/run/outputs",
+            scriptPath: "/tmp/restored/run/user_code.py",
+            promptPath: "/tmp/restored/run/prompt.txt",
+            contextPath: "/tmp/restored/run/context.json",
+            stdoutPath: "/tmp/restored/run/stdout.txt",
+            stderrPath: "/tmp/restored/run/stderr.txt",
+            generatedFiles: [
+                .init(path: "/tmp/restored/run/outputs/figure.pdf", name: "figure.pdf", fileType: "pdf", sizeBytes: 2048),
+            ]
+        )
+        client.openProjectResponse = OpenProjectResponse(
+            projectPath: "/tmp/restored.sciplotgod",
+            restoredSourcePath: nil,
+            restoredWorkbookPaths: [],
+            payload: ProjectBundlePayload(
+                version: 2,
+                selectedWorkbench: "code_console",
+                plot: nil,
+                dataStudio: nil,
+                composer: ComposerProjectPayload(
+                    sessionKind: "composer",
+                    version: 2,
+                    project: composerProject,
+                    embeddedPanels: [],
+                    projectDisplayName: "restored"
+                ),
+                codeConsole: CodeConsoleProjectPayload(
+                    sessionKind: "code_console",
+                    version: 2,
+                    selectedSourceKind: "imported_file",
+                    selectedSheet: .name("Manual"),
+                    editorText: "print('restored editor')",
+                    promptText: "saved prompt",
+                    starterCode: "saved starter",
+                    manualBinding: manualBinding,
+                    latestRun: runSnapshot,
+                    embeddedGeneratedFiles: [],
+                    selectedGeneratedFilePath: "/tmp/restored/run/outputs/figure.pdf",
+                    projectDisplayName: "restored"
+                ),
+                artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]
+            )
+        )
+        client.codeConsoleContextHandler = { request in
+            let base = TestPayloads.codeConsoleContext(path: request.inputPath)
+            return CodeConsoleContextResponse(
+                contextID: "ctx_restored",
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                sheetNames: base.sheetNames,
+                inspection: base.inspection,
+                dataset: base.dataset,
+                template: request.template ?? base.template,
+                options: request.options,
+                promptText: "refreshed prompt",
+                starterCode: "refreshed starter",
+                sourceKind: request.sourceKind,
+                sourceLabel: request.sourceLabel
+            )
+        }
+
+        await model.openProjectDocument(URL(fileURLWithPath: "/tmp/restored.sciplotgod"))
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(model.selectedWorkbench, .codeConsole)
+        XCTAssertEqual(model.requestedWorkbenchWindow, .codeConsole)
+        XCTAssertEqual(model.composerSession.project.panels.first?.filePath, "/tmp/restored/panel.pdf")
+        XCTAssertEqual(model.codeConsoleSession.selectedFileURL?.path, "/tmp/restored/manual.csv")
+        XCTAssertEqual(model.codeConsoleSession.selectedSheet, .name("Manual"))
+        XCTAssertEqual(model.codeConsoleSession.editorText, "print('restored editor')")
+        XCTAssertEqual(model.codeConsoleSession.latestRunResponse?.generatedFiles.first?.path, "/tmp/restored/run/outputs/figure.pdf")
+        XCTAssertFalse(model.isProjectDirty)
     }
 
     func testPlotDataWorkbookToolbarActionOpensSourceDataTab() {

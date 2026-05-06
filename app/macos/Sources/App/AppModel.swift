@@ -9,6 +9,15 @@ final class AppModel {
         let base: any SidecarClienting
     }
 
+    typealias AppProjectSaveChooser = @MainActor (_ suggestedName: String) -> URL?
+
+    struct ProjectSnapshot: Equatable {
+        let plot: PlotSession.ProjectSnapshot?
+        let dataStudio: DataStudioSession.ProjectSnapshot?
+        let composer: ComposerSession.ProjectSnapshot?
+        let codeConsole: CodeConsoleSession.ProjectSnapshot?
+    }
+
     enum PendingPlotReplacementAction {
         case importFromFilesystem
         case openPlotDocument(URL)
@@ -21,8 +30,11 @@ final class AppModel {
     let dataStudioSession: DataStudioSession
     let composerSession: ComposerSession
     let codeConsoleSession: CodeConsoleSession
+    @ObservationIgnored let chooseProjectSaveLocation: AppProjectSaveChooser
 
     var selectedWorkbench: Workbench = .plot
+    var projectURL: URL?
+    var isSavingProject = false
     var requestedWorkbenchWindow: Workbench?
     var columnVisibility: NavigationSplitViewVisibility = .all
     var inspectorPresented = true
@@ -37,6 +49,7 @@ final class AppModel {
     var bootstrapErrorMessage: String?
     var hasBootstrapped = false
     var isPlotReplacementConfirmationPresented = false
+    @ObservationIgnored var lastSavedProjectSnapshot: ProjectSnapshot?
 
     var activeExportAvailability: ActionAvailability {
         exportAvailability(for: selectedWorkbench)
@@ -76,15 +89,27 @@ final class AppModel {
         saveProjectAvailability(for: selectedWorkbench)
     }
 
-    func saveProjectAvailability(for workbench: Workbench) -> ActionAvailability {
-        switch workbench {
-        case .plot:
-            return plotSession.saveProjectAvailability
-        case .dataStudio:
-            return dataStudioSession.saveProjectAvailability
-        case .composer, .codeConsole:
-            return .disabled("Project files are not available for this workbench.")
+    func saveProjectAvailability(for _: Workbench) -> ActionAvailability {
+        if isSavingProject {
+            return .disabled("Project save is already in progress.")
         }
+        if plotSession.hasSessionContent {
+            guard plotSession.currentProjectSnapshot != nil else {
+                return .disabled(plotSession.saveProjectAvailability.reason ?? "Finish Plot setup before saving the project.")
+            }
+            guard !plotSession.needsInspection else {
+                return .disabled("Wait for inspect to finish before saving the project.")
+            }
+        }
+        if dataStudioSession.hasSessionContent {
+            guard dataStudioSession.currentProjectSnapshot != nil else {
+                return .disabled(dataStudioSession.saveProjectAvailability.reason ?? "Finish Data Studio setup before saving the project.")
+            }
+        }
+        guard hasAnyDurableProjectContent else {
+            return .disabled("Add content in any module before saving a project.")
+        }
+        return .enabled()
     }
 
     var activeExportCommandTitle: String {
@@ -147,7 +172,13 @@ final class AppModel {
 
     @ObservationIgnored private var pendingPlotReplacementAction: PendingPlotReplacementAction?
 
-    init(runtime: SidecarRuntime, client: (any SidecarClienting)? = nil) {
+    init(
+        runtime: SidecarRuntime,
+        client: (any SidecarClienting)? = nil,
+        chooseProjectSaveLocation: @escaping AppProjectSaveChooser = {
+            NativePanels.chooseAppProjectSaveLocation(suggestedName: $0)
+        }
+    ) {
         self.runtime = runtime
         let resolvedClient = client ?? SidecarClient(runtime: runtime)
         self.client = resolvedClient
@@ -155,6 +186,7 @@ final class AppModel {
         self.dataStudioSession = DataStudioSession()
         self.composerSession = ComposerSession()
         self.codeConsoleSession = CodeConsoleSession()
+        self.chooseProjectSaveLocation = chooseProjectSaveLocation
 
         plotSession.configure(client: resolvedClient)
         dataStudioSession.configure(client: resolvedClient)
@@ -163,6 +195,12 @@ final class AppModel {
 
         dataStudioSession.openInPlotHandler = { [weak self] url, sheet, templateID, options, fitOptions in
             self?.openInPlot(inputURL: url, sheet: sheet, templateID: templateID, options: options, fitOptions: fitOptions)
+        }
+        dataStudioSession.openProjectDocumentHandler = { [weak self] url in
+            await self?.openProjectDocument(url)
+        }
+        plotSession.openProjectDocumentHandler = { [weak self] url in
+            await self?.openProjectDocument(url)
         }
     }
 
@@ -212,7 +250,12 @@ final class AppModel {
 
     func newProject() {
         cancelPendingPlotReplacement()
+        projectURL = nil
+        lastSavedProjectSnapshot = nil
         plotSession.newSession()
+        dataStudioSession.newSession()
+        composerSession.newSession()
+        codeConsoleSession.newSession()
         selectedWorkbench = .plot
         requestedWorkbenchWindow = nil
         refreshCodeConsoleContext()
@@ -266,15 +309,11 @@ final class AppModel {
     }
 
     func saveProject(for workbench: Workbench) async {
-        switch workbench {
-        case .plot:
-            await plotSession.saveProject()
-        case .dataStudio:
-            await dataStudioSession.saveProject()
-        case .composer, .codeConsole:
+        if let projectURL {
+            await saveProject(to: projectURL, selectedWorkbench: workbench)
             return
         }
-        refreshCodeConsoleContext()
+        await saveProjectAs(for: workbench)
     }
 
     func saveProjectAs() async {
@@ -282,15 +321,41 @@ final class AppModel {
     }
 
     func saveProjectAs(for workbench: Workbench) async {
-        switch workbench {
-        case .plot:
-            await plotSession.saveProjectAs()
-        case .dataStudio:
-            await dataStudioSession.saveProjectAs()
-        case .composer, .codeConsole:
+        guard saveProjectAvailability(for: workbench).isEnabled else {
             return
         }
-        refreshCodeConsoleContext()
+        guard let destinationURL = chooseProjectSaveLocation(suggestedProjectFilename(for: workbench)) else {
+            return
+        }
+        await saveProject(to: destinationURL, selectedWorkbench: workbench)
+    }
+
+    func openProjectFromPanel() {
+        guard let url = NativePanels.chooseProjectOpenLocation() else {
+            return
+        }
+        Task { await openProjectDocument(url) }
+    }
+
+    func saveProject(to destinationURL: URL, selectedWorkbench workbench: Workbench) async {
+        guard let payload = await buildAppProjectPayload(
+            selectedWorkbench: workbench,
+            projectDisplayName: destinationURL.deletingPathExtension().lastPathComponent
+        ) else {
+            setProjectError("Add content in any module before saving a project.", for: workbench)
+            return
+        }
+        guard let selectedSourcePath = payload.plot.flatMap({ _ in plotSession.selectedFileURL?.path }) else {
+            if payload.plot != nil {
+                setProjectError("Plot projects require a source file.", for: workbench)
+                return
+            }
+            isSavingProject = true
+            await submitProjectSave(destinationURL: destinationURL, sourcePath: nil, payload: payload, workbench: workbench)
+            return
+        }
+        isSavingProject = true
+        await submitProjectSave(destinationURL: destinationURL, sourcePath: selectedSourcePath, payload: payload, workbench: workbench)
     }
 
     func showHelpForActiveWorkbench() {
@@ -469,7 +534,7 @@ final class AppModel {
         }
         Task {
             if url.pathExtension.lowercased() == "sciplotgod" {
-                await plotSession.openProject(url)
+                await openProjectDocument(url)
             } else {
                 plotSession.importFile(url)
             }
@@ -480,28 +545,262 @@ final class AppModel {
     func openProjectDocument(_ url: URL) async {
         do {
             let response = try await client.openProject(.init(projectPath: url.path))
-            switch response.payload.selectedWorkbench {
-            case "data_studio":
-                selectedWorkbench = .dataStudio
-                requestOpenWindow(for: .dataStudio)
-                await dataStudioSession.restoreProject(from: response)
-            default:
-                selectedWorkbench = .plot
-                requestOpenWindow(for: .plot)
-                await plotSession.restoreProject(from: response)
-            }
+            await restoreProject(from: response)
         } catch {
             if isUserCancellationError(error) {
                 return
             }
             if url.pathExtension.lowercased() == "sciplotgod" {
-                switch selectedWorkbench {
-                case .dataStudio:
-                    dataStudioSession.errorMessage = error.localizedDescription
-                default:
-                    plotSession.errorMessage = error.localizedDescription
-                }
+                setProjectError(error.localizedDescription, for: selectedWorkbench)
             }
+        }
+    }
+
+    var hasAnyDurableProjectContent: Bool {
+        plotSession.currentProjectSnapshot != nil
+            || dataStudioSession.currentProjectSnapshot != nil
+            || composerSession.currentProjectSnapshot != nil
+            || codeConsoleSession.currentProjectSnapshot != nil
+    }
+
+    func currentProjectSnapshot(selectedWorkbench _: Workbench) -> ProjectSnapshot? {
+        guard hasAnyDurableProjectContent else {
+            return nil
+        }
+        return ProjectSnapshot(
+            plot: plotSession.currentProjectSnapshot,
+            dataStudio: dataStudioSession.currentProjectSnapshot,
+            composer: composerSession.currentProjectSnapshot,
+            codeConsole: codeConsoleSession.currentProjectSnapshot
+        )
+    }
+
+    var isProjectDirty: Bool {
+        guard let currentProjectSnapshot = currentProjectSnapshot(selectedWorkbench: selectedWorkbench) else {
+            return false
+        }
+        guard let lastSavedProjectSnapshot else {
+            return true
+        }
+        return currentProjectSnapshot != lastSavedProjectSnapshot
+    }
+
+    func buildAppProjectPayload(
+        selectedWorkbench requestedWorkbench: Workbench,
+        projectDisplayName: String? = nil
+    ) async -> ProjectBundlePayload? {
+        let projectDisplayName = projectDisplayName ?? projectURL?.deletingPathExtension().lastPathComponent
+        let plotPayload = plotSession.buildProjectPayload()?.plot
+        let dataStudioPayload: DataStudioProjectPayload?
+        if dataStudioSession.currentProjectSnapshot != nil {
+            guard let normalizedSession = await dataStudioSession.normalizeSessionPayload() else {
+                return nil
+            }
+            dataStudioPayload = dataStudioSession.buildDataStudioProjectPayload(
+                from: normalizedSession,
+                projectDisplayName: projectDisplayName
+            )
+        } else {
+            dataStudioPayload = nil
+        }
+
+        var composerPayload = composerSession.buildProjectPayload(projectDisplayName: projectDisplayName)
+        var codeConsolePayload = codeConsoleSession.buildProjectPayload(projectDisplayName: projectDisplayName)
+        var selectedProjectWorkbench = requestedWorkbench
+
+        switch requestedWorkbench {
+        case .plot:
+            if plotPayload == nil {
+                selectedProjectWorkbench = firstWorkbenchWithPayload(
+                    plot: plotPayload,
+                    dataStudio: dataStudioPayload,
+                    composer: composerPayload,
+                    codeConsole: codeConsolePayload
+                ) ?? .plot
+            }
+        case .dataStudio:
+            if dataStudioPayload == nil {
+                selectedProjectWorkbench = firstWorkbenchWithPayload(
+                    plot: plotPayload,
+                    dataStudio: dataStudioPayload,
+                    composer: composerPayload,
+                    codeConsole: codeConsolePayload
+                ) ?? .dataStudio
+            }
+        case .composer:
+            if composerPayload == nil {
+                composerPayload = composerSession.emptyProjectPayload(projectDisplayName: projectDisplayName)
+            }
+        case .codeConsole:
+            if codeConsolePayload == nil {
+                codeConsolePayload = codeConsoleSession.emptyProjectPayload(projectDisplayName: projectDisplayName)
+            }
+        }
+
+        guard plotPayload != nil
+            || dataStudioPayload != nil
+            || composerPayload != nil
+            || codeConsolePayload != nil
+        else {
+            return nil
+        }
+
+        return ProjectBundlePayload(
+            version: 2,
+            selectedWorkbench: sidecarWorkbenchID(for: selectedProjectWorkbench),
+            plot: plotPayload,
+            dataStudio: dataStudioPayload,
+            composer: composerPayload,
+            codeConsole: codeConsolePayload,
+            artifacts: ["manifest_relpath": .string("artifacts/manifest.json")]
+        )
+    }
+
+    func restoreProject(from response: OpenProjectResponse) async {
+        let projectURL = URL(fileURLWithPath: response.projectPath)
+        if response.payload.plot != nil {
+            await plotSession.restoreProject(from: response)
+        } else {
+            plotSession.newSession()
+        }
+
+        if response.payload.dataStudio != nil {
+            await dataStudioSession.restoreProject(from: response)
+        } else {
+            dataStudioSession.newSession()
+        }
+
+        if let composerPayload = response.payload.composer {
+            composerSession.restoreProjectPayload(composerPayload)
+        } else {
+            composerSession.newSession()
+        }
+
+        refreshCodeConsoleContext()
+        if let codeConsolePayload = response.payload.codeConsole {
+            codeConsoleSession.restoreProjectPayload(
+                codeConsolePayload,
+                plot: plotSession,
+                dataStudio: dataStudioSession
+            )
+        } else {
+            codeConsoleSession.newSession()
+            refreshCodeConsoleContext()
+        }
+
+        self.projectURL = projectURL
+        plotSession.projectURL = projectURL
+        dataStudioSession.projectURL = projectURL
+        let restoredWorkbench = workbench(fromSidecarID: response.payload.selectedWorkbench)
+        selectedWorkbench = restoredWorkbench
+        requestOpenWindow(for: restoredWorkbench)
+        lastSavedProjectSnapshot = currentProjectSnapshot(selectedWorkbench: restoredWorkbench)
+    }
+
+    private func submitProjectSave(
+        destinationURL: URL,
+        sourcePath: String?,
+        payload: ProjectBundlePayload,
+        workbench: Workbench
+    ) async {
+        defer { isSavingProject = false }
+        do {
+            let response = try await client.saveProject(
+                .init(projectPath: destinationURL.path, sourcePath: sourcePath, payload: payload)
+            )
+            applySavedProjectResponse(response, selectedWorkbench: workbench)
+        } catch {
+            if isUserCancellationError(error) {
+                return
+            }
+            setProjectError(error.localizedDescription, for: workbench)
+        }
+    }
+
+    private func applySavedProjectResponse(_ response: SaveProjectResponse, selectedWorkbench workbench: Workbench) {
+        let savedURL = URL(fileURLWithPath: response.projectPath)
+        projectURL = savedURL
+        if let plotPayload = response.payload.plot {
+            plotSession.applyNormalizedProjectState(plotPayload, projectURL: savedURL, scheduleRefresh: false)
+        } else {
+            plotSession.projectURL = savedURL
+        }
+        if let dataStudioPayload = response.payload.dataStudio {
+            dataStudioSession.projectURL = savedURL
+            dataStudioSession.runtimeState.lastSavedProjectSnapshot = dataStudioSession.projectSnapshot(from: dataStudioPayload)
+        } else {
+            dataStudioSession.projectURL = savedURL
+        }
+        composerSession.markProjectSaved(response.payload.composer)
+        codeConsoleSession.markProjectSaved(response.payload.codeConsole)
+        lastSavedProjectSnapshot = currentProjectSnapshot(selectedWorkbench: workbench)
+    }
+
+    private func suggestedProjectFilename(for workbench: Workbench) -> String {
+        if let projectURL {
+            return projectURL.lastPathComponent
+        }
+        switch workbench {
+        case .plot:
+            return plotSession.suggestedProjectFilename
+        case .dataStudio:
+            return dataStudioSession.suggestedProjectFilename
+        case .composer:
+            return "composer-project.sciplotgod"
+        case .codeConsole:
+            return "code-console-project.sciplotgod"
+        }
+    }
+
+    private func firstWorkbenchWithPayload(
+        plot: PlotProjectPayload?,
+        dataStudio: DataStudioProjectPayload?,
+        composer: ComposerProjectPayload?,
+        codeConsole: CodeConsoleProjectPayload?
+    ) -> Workbench? {
+        if plot != nil { return .plot }
+        if dataStudio != nil { return .dataStudio }
+        if composer != nil { return .composer }
+        if codeConsole != nil { return .codeConsole }
+        return nil
+    }
+
+    private func sidecarWorkbenchID(for workbench: Workbench) -> String {
+        switch workbench {
+        case .plot:
+            return "plot"
+        case .dataStudio:
+            return "data_studio"
+        case .composer:
+            return "composer"
+        case .codeConsole:
+            return "code_console"
+        }
+    }
+
+    private func workbench(fromSidecarID rawValue: String) -> Workbench {
+        switch rawValue {
+        case "data_studio", "dataStudio":
+            return .dataStudio
+        case "composer":
+            return .composer
+        case "code_console", "codeConsole":
+            return .codeConsole
+        default:
+            return .plot
+        }
+    }
+
+    private func setProjectError(_ message: String, for workbench: Workbench) {
+        switch workbench {
+        case .plot:
+            plotSession.errorMessage = message
+        case .dataStudio:
+            dataStudioSession.errorMessage = message
+        case .composer:
+            composerSession.errorMessage = message
+        case .codeConsole:
+            codeConsoleSession.errorMessage = message
         }
     }
 
