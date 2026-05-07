@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import scienceplots  # noqa: F401
@@ -166,6 +167,34 @@ def _palette_from_contract(name: str) -> PaletteSpec:
     )
 
 
+def _style_with_overrides(
+    style_spec: JournalStyleSpec,
+    overrides: Mapping[str, Mapping[str, object]] | None,
+) -> JournalStyleSpec:
+    if not overrides:
+        return style_spec
+    typography = style_spec.typography
+    stroke = style_spec.stroke
+    spacing = style_spec.spacing
+    annotation = style_spec.annotation
+    for group, values in overrides.items():
+        if group == "typography":
+            typography = replace(typography, **cast(Any, dict(values)))
+        elif group == "stroke":
+            stroke = replace(stroke, **cast(Any, dict(values)))
+        elif group == "spacing":
+            spacing = replace(spacing, **cast(Any, dict(values)))
+        elif group == "annotation":
+            annotation = replace(annotation, **cast(Any, dict(values)))
+    return replace(
+        style_spec,
+        typography=typography,
+        stroke=stroke,
+        spacing=spacing,
+        annotation=annotation,
+    )
+
+
 STYLE_PRESETS: dict[str, JournalStyleSpec] = {
     name: _style_from_contract(name)
     for name in style_names()
@@ -180,6 +209,7 @@ PALETTE_PRESETS: dict[str, PaletteSpec] = {
 
 _CURRENT_STYLE_PRESET = DEFAULT_STYLE_PRESET
 _CURRENT_PALETTE_PRESET = DEFAULT_PALETTE_PRESET
+_CURRENT_CUSTOM_PALETTE_COLORS: tuple[str, ...] | None = None
 
 
 def normalize_style_preset(style_preset: str | None) -> str:
@@ -247,6 +277,13 @@ def get_categorical_palette(
     *,
     n_colors: int | None = None,
 ) -> list[tuple[float, float, float]]:
+    if _CURRENT_CUSTOM_PALETTE_COLORS and (
+        palette_preset is None or palette_preset == _CURRENT_PALETTE_PRESET
+    ):
+        colors = _CURRENT_CUSTOM_PALETTE_COLORS
+        if n_colors is None or n_colors <= len(colors):
+            return sns.color_palette(colors, n_colors=n_colors)
+        return sns.color_palette(colors, n_colors=n_colors)
     spec = get_palette_spec(palette_preset)
     colors = spec.categorical
     if n_colors is None or n_colors <= len(colors):
@@ -278,16 +315,20 @@ def apply_style(
     style_preset: str = DEFAULT_STYLE_PRESET,
     palette_preset: str = DEFAULT_PALETTE_PRESET,
     *,
+    hard_overrides: Mapping[str, Mapping[str, object]] | None = None,
+    palette_colors: tuple[str, ...] | list[str] | None = None,
     soft_overrides: Mapping[str, object] | None = None,
 ) -> None:
-    global _CURRENT_STYLE_PRESET, _CURRENT_PALETTE_PRESET
+    global _CURRENT_CUSTOM_PALETTE_COLORS, _CURRENT_PALETTE_PRESET, _CURRENT_STYLE_PRESET
 
     normalized_style = normalize_style_preset(style_preset)
-    style_spec = get_style_spec(normalized_style)
+    style_spec = _style_with_overrides(get_style_spec(normalized_style), hard_overrides)
     palette_spec = get_palette_spec(palette_preset)
+    resolved_palette = list(palette_colors) if palette_colors else palette_spec.categorical
 
     _CURRENT_STYLE_PRESET = normalized_style
     _CURRENT_PALETTE_PRESET = palette_preset
+    _CURRENT_CUSTOM_PALETTE_COLORS = tuple(palette_colors) if palette_colors else None
 
     # The contract owns the public publication profiles. Hard style metrics live
     # here, while visual themes remain the soft-variation layer on top.
@@ -295,7 +336,7 @@ def apply_style(
     sns.set_theme(
         context="paper",
         style="ticks",
-        palette=palette_spec.categorical,
+        palette=resolved_palette,
         rc={
             "figure.dpi": style_spec.export.figure_dpi,
             "savefig.dpi": style_spec.export.savefig_dpi,

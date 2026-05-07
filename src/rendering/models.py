@@ -39,6 +39,8 @@ class RenderOptions:
     y_label_override: str | None = None
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
+    custom_theme_id: str | None = None
+    custom_theme_draft: Mapping[str, Any] | None = None
     fit_options: dict[str, Any] | None = None
     extra_x_axis: Mapping[str, Any] | None = None
     extra_y_axis: Mapping[str, Any] | None = None

@@ -58,6 +58,7 @@ final class PlotSession {
 
     var isImporterPresented = false
     var isDataWorkbookPresented = false
+    var isStyleStudioPresented = false
     var selectedFileURL: URL?
     var projectURL: URL?
     var selectedSheet: SheetValue = .index(0)
@@ -85,6 +86,11 @@ final class PlotSession {
     var fitAnalysisErrorMessage: String?
     var isLoadingSourceTable = false
     var isLoadingFitAnalysis = false
+    var plotThemes: [PlotThemeSummaryResponse] = []
+    var styleStudioWarnings: [String] = []
+    var styleStudioErrorMessage: String?
+    var isPreviewingStyleStudioDraft = false
+    var isSavingStyleStudioTheme = false
     var sourceTableOffset = 0
     var fitAnalysisOffset = 0
     var fitAnalysisSelectedSeriesID: String?
@@ -241,6 +247,16 @@ final class PlotSession {
 
     func dismissDataWorkbook() {
         isDataWorkbookPresented = false
+    }
+
+    func showStyleStudio() {
+        styleStudioErrorMessage = nil
+        isStyleStudioPresented = true
+        Task { await loadPlotThemes() }
+    }
+
+    func dismissStyleStudio() {
+        isStyleStudioPresented = false
     }
 }
 

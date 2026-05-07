@@ -69,6 +69,8 @@ def options_from_payload(
         palette_preset=payload.palette_preset,
         use_sidecar=payload.use_sidecar,
         visual_theme_id=payload.visual_theme_id,
+        custom_theme_id=payload.custom_theme_id,
+        custom_theme_draft=payload.custom_theme_draft,
         extra_x_axis=payload.extra_x_axis.model_dump(mode="json") if payload.extra_x_axis else None,
         extra_y_axis=payload.extra_y_axis.model_dump(mode="json") if payload.extra_y_axis else None,
         x_axis_breaks=(

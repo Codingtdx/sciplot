@@ -10,12 +10,18 @@ from app.sidecar.routes_code_console import create_code_console_router
 from app.sidecar.routes_composer import create_composer_router
 from app.sidecar.routes_data_studio import create_data_studio_router
 from app.sidecar.routes_meta import create_meta_router
+from app.sidecar.routes_plot_themes import create_plot_themes_router
 from app.sidecar.routes_render import create_render_router
 
 CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/health"),
     ("GET", "/meta"),
     ("GET", "/plot-contract"),
+    ("GET", "/plot-themes"),
+    ("POST", "/plot-themes/preview"),
+    ("POST", "/plot-themes"),
+    ("PUT", "/plot-themes/{theme_id:path}"),
+    ("DELETE", "/plot-themes/{theme_id:path}"),
     ("POST", "/inspect-file"),
     ("POST", "/source-table-preview"),
     ("POST", "/fit-analysis"),
@@ -86,6 +92,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(create_meta_router())
+    application.include_router(create_plot_themes_router())
     application.include_router(create_render_router())
     application.include_router(create_code_console_router())
     application.include_router(create_data_studio_router())

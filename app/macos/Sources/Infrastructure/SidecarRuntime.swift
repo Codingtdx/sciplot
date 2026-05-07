@@ -28,6 +28,11 @@ final class SidecarRuntime {
     @ObservationIgnored private let requiredRoutes: Set<SidecarRouteSignature> = [
         .init(method: "GET", path: "/meta"),
         .init(method: "GET", path: "/plot-contract"),
+        .init(method: "GET", path: "/plot-themes"),
+        .init(method: "POST", path: "/plot-themes/preview"),
+        .init(method: "POST", path: "/plot-themes"),
+        .init(method: "PUT", path: "/plot-themes/{theme_id}"),
+        .init(method: "DELETE", path: "/plot-themes/{theme_id}"),
         .init(method: "POST", path: "/inspect-file"),
         .init(method: "POST", path: "/source-table-preview"),
         .init(method: "POST", path: "/fit-analysis"),

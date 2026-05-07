@@ -5,6 +5,11 @@ protocol SidecarClienting: AnyObject {
     func fetchHealth() async throws -> HealthResponse
     func fetchMeta() async throws -> SidecarMetaResponse
     func fetchPlotContract() async throws -> PlotContractResponse
+    func fetchPlotThemes() async throws -> PlotThemeListResponse
+    func previewPlotTheme(_ request: PlotThemePreviewRequest) async throws -> PlotThemePreviewResponse
+    func savePlotTheme(_ request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse
+    func updatePlotTheme(themeID: String, request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse
+    func deletePlotTheme(themeID: String) async throws
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse
     func recommendDataStudioTemplates(_ request: DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse
     func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse
@@ -66,6 +71,26 @@ final class SidecarClient: SidecarClienting {
 
     func fetchPlotContract() async throws -> PlotContractResponse {
         try await get("plot-contract")
+    }
+
+    func fetchPlotThemes() async throws -> PlotThemeListResponse {
+        try await get("plot-themes")
+    }
+
+    func previewPlotTheme(_ request: PlotThemePreviewRequest) async throws -> PlotThemePreviewResponse {
+        try await post("plot-themes/preview", body: request)
+    }
+
+    func savePlotTheme(_ request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse {
+        try await post("plot-themes", body: request)
+    }
+
+    func updatePlotTheme(themeID: String, request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse {
+        try await put("plot-themes/\(themeID)", body: request)
+    }
+
+    func deletePlotTheme(themeID: String) async throws {
+        let _: StatusResponse = try await delete("plot-themes/\(themeID)", responseType: StatusResponse.self)
     }
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {

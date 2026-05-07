@@ -49,7 +49,11 @@ extension PlotInspectorView {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.palettePreset },
                                 set: { newValue in
-                                    session.updateRenderOptions(policy: .immediate) { $0.palettePreset = newValue }
+                                    session.updateRenderOptions(policy: .immediate) {
+                                        $0.palettePreset = newValue
+                                        $0.customThemeID = nil
+                                        $0.customThemeDraft = nil
+                                    }
                                 }
                             )) {
                                 ForEach(session.availablePalettes) { palette in
@@ -70,7 +74,11 @@ extension PlotInspectorView {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.visualThemeID ?? session.defaultThemeID(for: template, styleID: session.renderOptions.stylePreset) ?? themes.first?.id ?? "" },
                                 set: { newValue in
-                                    session.updateRenderOptions(policy: .immediate) { $0.visualThemeID = newValue.isEmpty ? nil : newValue }
+                                    session.updateRenderOptions(policy: .immediate) {
+                                        $0.visualThemeID = newValue.isEmpty ? nil : newValue
+                                        $0.customThemeID = nil
+                                        $0.customThemeDraft = nil
+                                    }
                                 }
                             )) {
                                 ForEach(themes) { theme in
@@ -84,6 +92,16 @@ extension PlotInspectorView {
                         AdaptiveInspectorTextRow(title: "Background", value: theme.label)
                     }
                 }
+
+                Button {
+                    session.showStyleStudio()
+                } label: {
+                    Label("Style Studio...", systemImage: "paintpalette")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(session.client == nil)
+                .help(session.client == nil ? "The sidecar is not ready yet." : "Create a custom plot theme from the current Plot style.")
 
                 if showsPlotOptionsAdvancedControls {
                     DisclosureGroup("Advanced", isExpanded: $isPlotOptionsAdvancedExpanded) {

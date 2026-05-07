@@ -9,6 +9,7 @@ from src import plot_style
 from src.plot_style import save_pdf
 from src.rendering.analytical_layers import apply_analytical_layers
 from src.rendering.axis_breaks import apply_axis_breaks
+from src.rendering.custom_theme_store import resolve_custom_theme
 from src.rendering.extra_axes import apply_extra_axes
 from src.rendering.fit_analysis import fit_options_from_payload
 from src.rendering.models import RenderedPlot, RenderOptions, TemplateName
@@ -53,21 +54,36 @@ def build_rendered_plots_from_options(
         input_path=input_path,
         sheet=sheet,
     )
-    style_bundle = DEFAULT_STYLE_COMPOSER.compose(options.style_preset, options.visual_theme_id)
-    plot_style.apply_style(
-        style_bundle.publication_profile_id,
-        options.palette_preset,
-        soft_overrides=style_bundle.resolved_soft,
+    custom_theme = resolve_custom_theme(options.custom_theme_id, options.custom_theme_draft)
+    style_bundle = DEFAULT_STYLE_COMPOSER.compose(
+        options.style_preset,
+        options.visual_theme_id,
+        custom_theme=custom_theme,
     )
-    renderer = TEMPLATE_RENDERERS[resolved_template]
-    rendered_plots = renderer.render(input_path, sheet, options)
-    return [
-        apply_text_annotations(
-            apply_shape_annotations(
-                apply_reference_guides(
-                    apply_analytical_layers(
-                        apply_extra_axes(
-                            apply_axis_breaks(rendered, options=options),
+    resolved_palette_preset = (
+        custom_theme.palette_preset
+        if custom_theme is not None and custom_theme.palette_preset
+        else options.palette_preset
+    )
+    try:
+        plot_style.apply_style(
+            style_bundle.publication_profile_id,
+            resolved_palette_preset,
+            hard_overrides=style_bundle.hard_overrides,
+            palette_colors=style_bundle.palette_colors,
+            soft_overrides=style_bundle.resolved_soft,
+        )
+        renderer = TEMPLATE_RENDERERS[resolved_template]
+        rendered_plots = renderer.render(input_path, sheet, options)
+        return [
+            apply_text_annotations(
+                apply_shape_annotations(
+                    apply_reference_guides(
+                        apply_analytical_layers(
+                            apply_extra_axes(
+                                apply_axis_breaks(rendered, options=options),
+                                options=options,
+                            ),
                             options=options,
                         ),
                         options=options,
@@ -75,11 +91,11 @@ def build_rendered_plots_from_options(
                     options=options,
                 ),
                 options=options,
-            ),
-            options=options,
-        )
-        for rendered in rendered_plots
-    ]
+            )
+            for rendered in rendered_plots
+        ]
+    finally:
+        plot_style.apply_style(style_bundle.publication_profile_id, resolved_palette_preset)
 
 
 def build_rendered_plots(

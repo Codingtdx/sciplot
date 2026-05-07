@@ -112,6 +112,42 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
     }
 
+    func testStyleStudioDraftAndSaveRefreshPreviewWithCustomThemePayload() async throws {
+        let client = MockSidecarClient()
+        let draft = CustomPlotThemePackagePayload(
+            id: "user/nature_plus",
+            label: "Nature Plus",
+            baseStyleID: "nature",
+            palettePreset: "colorblind_safe",
+            visualThemeID: "clean_light",
+            palette: CustomPlotThemePalettePayload(categorical: ["#0ea5e9", "#f97316"]),
+            hardOverrides: ["typography": ["font_size_pt": .number(7.2)]],
+            softOverrides: ["axes.grid": .bool(true)],
+            expertRcParams: ["grid.linestyle": .string(":")]
+        )
+        client.plotThemePreviewResponse = PlotThemePreviewResponse(theme: draft, blockedKeys: [], warnings: [])
+        client.plotThemeSaveResponse = PlotThemeSaveResponse(theme: draft, blockedKeys: [], warnings: [])
+
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        await session.applyStyleStudioDraft(draft)
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 3.0)
+        XCTAssertEqual(session.renderOptions.customThemeDraft?.id, "user/nature_plus")
+        XCTAssertEqual(client.renderRequests.last?.options.customThemeDraft?.id, "user/nature_plus")
+
+        await session.saveStyleStudioTheme(draft)
+
+        XCTAssertEqual(client.plotThemeSaveRequests.last?.theme.id, "user/nature_plus")
+        XCTAssertEqual(session.renderOptions.customThemeID, "user/nature_plus")
+        XCTAssertEqual(session.renderOptions.customThemeDraft?.id, "user/nature_plus")
+    }
+
     func testProjectDirtyTracksDurablePlotStateOnly() async throws {
         let client = MockSidecarClient()
         client.saveProjectHandler = { request in

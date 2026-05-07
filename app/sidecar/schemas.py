@@ -92,6 +92,15 @@ from app.sidecar.schemas_meta import (
     PlotContractResponse,
     VisualThemeResponse,
 )
+from app.sidecar.schemas_plot_themes import (
+    CustomPlotThemePackagePayload,
+    PlotThemeListResponse,
+    PlotThemePreviewRequest,
+    PlotThemePreviewResponse,
+    PlotThemeSaveRequest,
+    PlotThemeSaveResponse,
+    PlotThemeSummaryResponse,
+)
 from app.sidecar.schemas_render import (
     CodeConsoleGeneratedFileSnapshotPayload,
     CodeConsoleProjectGeneratedFilePayload,
@@ -148,6 +157,7 @@ __all__ = [
     "ComposerPreviewResponse",
     "ComposerProjectResponse",
     "ComposerRequest",
+    "CustomPlotThemePackagePayload",
     "DataStudioBuildWorkbookRequest",
     "DataStudioBindingSuggestionResponse",
     "DataStudioComparisonContextResponse",
@@ -211,6 +221,12 @@ __all__ = [
     "PlotCandidateRolesResponse",
     "PlotColumnProfileResponse",
     "PlotDatasetPreviewResponse",
+    "PlotThemeListResponse",
+    "PlotThemePreviewRequest",
+    "PlotThemePreviewResponse",
+    "PlotThemeSaveRequest",
+    "PlotThemeSaveResponse",
+    "PlotThemeSummaryResponse",
     "PlotProjectPayload",
     "PlotProjectSourceProvenancePayload",
     "PreflightRenderResponse",

@@ -1,5 +1,116 @@
 import Foundation
 
+struct CustomPlotThemePalettePayload: Codable, Equatable, Sendable {
+    var categorical: [String]
+
+    init(categorical: [String] = []) {
+        self.categorical = categorical
+    }
+}
+
+struct CustomPlotThemePackagePayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String
+    var label: String
+    var baseStyleID: String
+    var palettePreset: String?
+    var visualThemeID: String?
+    var palette: CustomPlotThemePalettePayload
+    var hardOverrides: [String: [String: JSONValue]]
+    var softOverrides: [String: JSONValue]
+    var expertRcParams: [String: JSONValue]
+
+    init(
+        id: String,
+        label: String,
+        baseStyleID: String = "nature",
+        palettePreset: String? = nil,
+        visualThemeID: String? = nil,
+        palette: CustomPlotThemePalettePayload = .init(),
+        hardOverrides: [String: [String: JSONValue]] = [:],
+        softOverrides: [String: JSONValue] = [:],
+        expertRcParams: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.label = label
+        self.baseStyleID = baseStyleID
+        self.palettePreset = palettePreset
+        self.visualThemeID = visualThemeID
+        self.palette = palette
+        self.hardOverrides = hardOverrides
+        self.softOverrides = softOverrides
+        self.expertRcParams = expertRcParams
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case baseStyleID = "baseStyleId"
+        case palettePreset
+        case visualThemeID = "visualThemeId"
+        case palette
+        case hardOverrides
+        case softOverrides
+        case expertRcParams = "expertRcparams"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        baseStyleID = try container.decodeIfPresent(String.self, forKey: .baseStyleID) ?? "nature"
+        palettePreset = try container.decodeIfPresent(String.self, forKey: .palettePreset)
+        visualThemeID = try container.decodeIfPresent(String.self, forKey: .visualThemeID)
+        palette = try container.decodeIfPresent(CustomPlotThemePalettePayload.self, forKey: .palette) ?? .init()
+        hardOverrides = try container.decodeIfPresent([String: [String: JSONValue]].self, forKey: .hardOverrides) ?? [:]
+        softOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .softOverrides) ?? [:]
+        expertRcParams = try container.decodeIfPresent([String: JSONValue].self, forKey: .expertRcParams) ?? [:]
+    }
+}
+
+struct PlotThemeSummaryResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let builtin: Bool
+    let baseStyleID: String
+    let palettePreset: String?
+    let visualThemeID: String?
+    let swatches: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case builtin
+        case baseStyleID = "baseStyleId"
+        case palettePreset
+        case visualThemeID = "visualThemeId"
+        case swatches
+    }
+}
+
+struct PlotThemeListResponse: Codable, Equatable, Sendable {
+    let themes: [PlotThemeSummaryResponse]
+}
+
+struct PlotThemePreviewRequest: Codable, Equatable, Sendable {
+    let theme: CustomPlotThemePackagePayload
+}
+
+struct PlotThemePreviewResponse: Codable, Equatable, Sendable {
+    let theme: CustomPlotThemePackagePayload
+    let blockedKeys: [String]
+    let warnings: [String]
+}
+
+struct PlotThemeSaveRequest: Codable, Equatable, Sendable {
+    let theme: CustomPlotThemePackagePayload
+}
+
+struct PlotThemeSaveResponse: Codable, Equatable, Sendable {
+    let theme: CustomPlotThemePackagePayload
+    let blockedKeys: [String]
+    let warnings: [String]
+}
+
 struct ExtraAxisPayload: Codable, Equatable, Sendable {
     var enabled: Bool
     var position: String
@@ -581,6 +692,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var palettePreset: String
     var useSidecar: Bool?
     var visualThemeID: String?
+    var customThemeID: String?
+    var customThemeDraft: CustomPlotThemePackagePayload?
     var extraXAxis: ExtraAxisPayload?
     var extraYAxis: ExtraAxisPayload?
     var xAxisBreaks: [AxisBreakPayload]?
@@ -614,6 +727,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         palettePreset: String = "colorblind_safe",
         useSidecar: Bool? = nil,
         visualThemeID: String? = nil,
+        customThemeID: String? = nil,
+        customThemeDraft: CustomPlotThemePackagePayload? = nil,
         extraXAxis: ExtraAxisPayload? = nil,
         extraYAxis: ExtraAxisPayload? = nil,
         xAxisBreaks: [AxisBreakPayload]? = nil,
@@ -646,6 +761,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.palettePreset = palettePreset
         self.useSidecar = useSidecar
         self.visualThemeID = visualThemeID
+        self.customThemeID = customThemeID
+        self.customThemeDraft = customThemeDraft
         self.extraXAxis = extraXAxis
         self.extraYAxis = extraYAxis
         self.xAxisBreaks = xAxisBreaks
@@ -680,6 +797,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case palettePreset
         case useSidecar
         case visualThemeID = "visualThemeId"
+        case customThemeID = "customThemeId"
+        case customThemeDraft
         case extraXAxis
         case extraYAxis
         case xAxisBreaks
@@ -717,6 +836,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         palettePreset = try container.decodeIfPresent(String.self, forKey: .palettePreset) ?? "colorblind_safe"
         useSidecar = try container.decodeIfPresent(Bool.self, forKey: .useSidecar)
         visualThemeID = try container.decodeIfPresent(String.self, forKey: .visualThemeID)
+        customThemeID = try container.decodeIfPresent(String.self, forKey: .customThemeID)
+        customThemeDraft = try container.decodeIfPresent(CustomPlotThemePackagePayload.self, forKey: .customThemeDraft)
         extraXAxis = try container.decodeIfPresent(ExtraAxisPayload.self, forKey: .extraXAxis)
         extraYAxis = try container.decodeIfPresent(ExtraAxisPayload.self, forKey: .extraYAxis)
         xAxisBreaks = try container.decodeIfPresent([AxisBreakPayload].self, forKey: .xAxisBreaks)
@@ -782,6 +903,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encode(palettePreset, forKey: .palettePreset)
         try container.encodeIfPresent(useSidecar, forKey: .useSidecar)
         try container.encodeIfPresent(visualThemeID, forKey: .visualThemeID)
+        try container.encodeIfPresent(customThemeID, forKey: .customThemeID)
+        try container.encodeIfPresent(customThemeDraft, forKey: .customThemeDraft)
         try container.encodeIfPresent(extraXAxis, forKey: .extraXAxis)
         try container.encodeIfPresent(extraYAxis, forKey: .extraYAxis)
         try container.encodeIfPresent(xAxisBreaks, forKey: .xAxisBreaks)

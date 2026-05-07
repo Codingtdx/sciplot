@@ -10,6 +10,17 @@ final class MockSidecarClient: SidecarClienting {
     var healthResponse = HealthResponse(status: "ok", version: "5.0.0")
     var metaResponse = TestPayloads.meta()
     var contractResponse = TestPayloads.contract()
+    var plotThemesResponse = PlotThemeListResponse(themes: [])
+    var plotThemePreviewResponse = PlotThemePreviewResponse(
+        theme: CustomPlotThemePackagePayload(id: "user/mock_theme", label: "Mock Theme"),
+        blockedKeys: [],
+        warnings: []
+    )
+    var plotThemeSaveResponse = PlotThemeSaveResponse(
+        theme: CustomPlotThemePackagePayload(id: "user/mock_theme", label: "Mock Theme"),
+        blockedKeys: [],
+        warnings: []
+    )
     var dataStudioTemplatesResponse = TestPayloads.dataStudioTemplateList()
     var dataStudioTemplateRecommendationsResponse = TestPayloads.dataStudioTemplateRecommendations()
     var dataStudioTemplatePreviewResponse = TestPayloads.dataStudioTemplatePreview()
@@ -37,6 +48,10 @@ final class MockSidecarClient: SidecarClienting {
     var importedComposerProject = TestPayloads.composerProject()
     var metaHandler: (() async throws -> SidecarMetaResponse)?
     var plotContractHandler: (() async throws -> PlotContractResponse)?
+    var plotThemesHandler: (() async throws -> PlotThemeListResponse)?
+    var plotThemePreviewHandler: ((PlotThemePreviewRequest) async throws -> PlotThemePreviewResponse)?
+    var plotThemeSaveHandler: ((PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse)?
+    var plotThemeUpdateHandler: ((String, PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse)?
     var dataStudioTemplateListHandler: (() async throws -> DataStudioTemplateListResponse)?
     var dataStudioTemplateRecommendationsHandler: ((DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse)?
     var dataStudioTemplatePreviewHandler: ((DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse)?
@@ -61,6 +76,10 @@ final class MockSidecarClient: SidecarClienting {
     var exportHandler: ((ExportRenderRequest) async throws -> ExportRenderResponse)?
 
     private(set) var inspectRequests: [FileRequest] = []
+    private(set) var plotThemePreviewRequests: [PlotThemePreviewRequest] = []
+    private(set) var plotThemeSaveRequests: [PlotThemeSaveRequest] = []
+    private(set) var plotThemeUpdateRequests: [(String, PlotThemeSaveRequest)] = []
+    private(set) var plotThemeDeleteIDs: [String] = []
     private(set) var dataStudioTemplateRecommendationRequests: [DataStudioTemplateRecommendationsRequest] = []
     private(set) var dataStudioTemplatePreviewRequests: [DataStudioTemplatePreviewRequest] = []
     private(set) var dataStudioCreateTemplateRequests: [DataStudioCreateTemplateRequest] = []
@@ -103,6 +122,41 @@ final class MockSidecarClient: SidecarClienting {
             return try await plotContractHandler()
         }
         return contractResponse
+    }
+
+    func fetchPlotThemes() async throws -> PlotThemeListResponse {
+        if let plotThemesHandler {
+            return try await plotThemesHandler()
+        }
+        return plotThemesResponse
+    }
+
+    func previewPlotTheme(_ request: PlotThemePreviewRequest) async throws -> PlotThemePreviewResponse {
+        plotThemePreviewRequests.append(request)
+        if let plotThemePreviewHandler {
+            return try await plotThemePreviewHandler(request)
+        }
+        return plotThemePreviewResponse
+    }
+
+    func savePlotTheme(_ request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse {
+        plotThemeSaveRequests.append(request)
+        if let plotThemeSaveHandler {
+            return try await plotThemeSaveHandler(request)
+        }
+        return plotThemeSaveResponse
+    }
+
+    func updatePlotTheme(themeID: String, request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse {
+        plotThemeUpdateRequests.append((themeID, request))
+        if let plotThemeUpdateHandler {
+            return try await plotThemeUpdateHandler(themeID, request)
+        }
+        return plotThemeSaveResponse
+    }
+
+    func deletePlotTheme(themeID: String) async throws {
+        plotThemeDeleteIDs.append(themeID)
     }
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {

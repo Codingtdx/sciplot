@@ -38,6 +38,8 @@ from src.data_studio.models import serialize_model
 from src.data_studio.session import normalize_session_payload as normalize_data_studio_session_payload
 from src.infrastructure.persistence.plot_projects import prepare_managed_project_restore_dir
 from src.rendering.constants import DEFAULT_SIZE_BY_TEMPLATE
+from src.rendering.custom_theme_store import load_custom_theme, theme_member_filename
+from src.rendering.custom_themes import custom_theme_to_payload
 from src.rendering.fit_analysis import normalize_fit_options_payload
 from src.rendering.options import validate_template_name
 from src.rendering.template_lifecycle import resolve_template_id
@@ -51,6 +53,7 @@ _DATA_STUDIO_WORKBOOK_DIR = "sources/data_studio/workbooks"
 _COMPOSER_PANEL_DIR = "sources/composer/panels"
 _CODE_CONSOLE_MANUAL_DIR = "sources/code_console/manual"
 _CODE_CONSOLE_LATEST_RUN_DIR = "artifacts/code_console/latest_run"
+_CUSTOM_THEME_DIR = "artifacts/custom_themes"
 _SUPPORTED_WORKBENCHES = {"plot", "data_studio", "composer", "code_console"}
 
 
@@ -173,6 +176,8 @@ def _normalize_render_options(
         palette_preset=resolved_options.palette_preset,
         use_sidecar=payload.use_sidecar,
         visual_theme_id=resolved_options.visual_theme_id,
+        custom_theme_id=resolved_options.custom_theme_id,
+        custom_theme_draft=resolved_options.custom_theme_draft,
         extra_x_axis=(
             ExtraAxisPayload.model_validate(resolved_options.extra_x_axis)
             if resolved_options.extra_x_axis is not None
@@ -481,6 +486,99 @@ def _manifest_payload(
     }
 
 
+def _render_option_custom_theme_ids(payload: ProjectBundlePayload) -> tuple[str, ...]:
+    theme_ids: list[str] = []
+
+    def append_from_options(options: RenderOptionsPayload | None) -> None:
+        if options is not None and options.custom_theme_id:
+            theme_ids.append(options.custom_theme_id)
+
+    def append_from_raw_options(options: object) -> None:
+        options_map = _mapping(options)
+        if options_map is None:
+            return
+        theme_id = _string_or_none(options_map.get("custom_theme_id"))
+        if theme_id is not None:
+            theme_ids.append(theme_id)
+
+    if payload.plot is not None:
+        append_from_options(payload.plot.render_options)
+    if payload.data_studio is not None:
+        for preference in payload.data_studio.figure_preferences:
+            preference_map = _mapping(preference)
+            if preference_map is None:
+                continue
+            options_by_template = _mapping(preference_map.get("options_by_template")) or {}
+            for options in options_by_template.values():
+                append_from_raw_options(options)
+    if payload.code_console is not None and payload.code_console.manual_binding is not None:
+        append_from_options(payload.code_console.manual_binding.render_options)
+    return tuple(dict.fromkeys(theme_ids))
+
+
+def _theme_payload_for_render_options(options: RenderOptionsPayload) -> dict[str, object] | None:
+    if options.custom_theme_draft is not None:
+        return dict(options.custom_theme_draft)
+    if not options.custom_theme_id:
+        return None
+    return custom_theme_to_payload(load_custom_theme(options.custom_theme_id))
+
+
+def _theme_payload_for_raw_render_options(options: object) -> dict[str, object] | None:
+    options_map = _mapping(options)
+    if options_map is None:
+        return None
+    return _theme_payload_for_render_options(RenderOptionsPayload.model_validate(options_map))
+
+
+def _embed_custom_theme_drafts(payload: ProjectBundlePayload) -> ProjectBundlePayload:
+    updates: dict[str, object] = {}
+    if payload.plot is not None:
+        theme_payload = _theme_payload_for_render_options(payload.plot.render_options)
+        if theme_payload is not None:
+            updates["plot"] = payload.plot.model_copy(
+                update={
+                    "render_options": payload.plot.render_options.model_copy(
+                        update={"custom_theme_draft": theme_payload}
+                    )
+                }
+            )
+    if payload.data_studio is not None:
+        preferences: list[dict[str, object]] = []
+        changed = False
+        for preference in payload.data_studio.figure_preferences:
+            preference_map = dict(_mapping(preference) or {})
+            options_by_template = dict(_mapping(preference_map.get("options_by_template")) or {})
+            normalized_options_by_template: dict[str, object] = {}
+            for template_id, options in options_by_template.items():
+                options_map = _mapping(options)
+                theme_payload = _theme_payload_for_raw_render_options(options)
+                if options_map is not None and theme_payload is not None:
+                    normalized_options_by_template[str(template_id)] = RenderOptionsPayload.model_validate(
+                        options_map
+                    ).model_copy(update={"custom_theme_draft": theme_payload}).model_dump(mode="json")
+                    changed = True
+                else:
+                    normalized_options_by_template[str(template_id)] = options
+            if changed:
+                preference_map["options_by_template"] = normalized_options_by_template
+            preferences.append(preference_map)
+        if changed:
+            updates["data_studio"] = payload.data_studio.model_copy(update={"figure_preferences": preferences})
+    if payload.code_console is not None and payload.code_console.manual_binding is not None:
+        theme_payload = _theme_payload_for_render_options(payload.code_console.manual_binding.render_options)
+        if theme_payload is not None:
+            manual_binding = payload.code_console.manual_binding.model_copy(
+                update={
+                    "render_options": payload.code_console.manual_binding.render_options.model_copy(
+                        update={"custom_theme_draft": theme_payload}
+                    )
+                }
+            )
+            updates["code_console"] = payload.code_console.model_copy(update={"manual_binding": manual_binding})
+    return payload.model_copy(update=updates) if updates else payload
+
+
 def _unique_bundle_member(base_dir: str, filename: str, *, seen: set[str]) -> str:
     stem = Path(filename).stem or "item"
     suffix = Path(filename).suffix
@@ -700,7 +798,53 @@ def save_project_bundle(
             }
         )
 
-    saved_payload = normalized_payload.model_copy(update=payload_updates)
+    saved_payload = _embed_custom_theme_drafts(normalized_payload.model_copy(update=payload_updates))
+
+    embedded_theme_ids: set[str] = set()
+    for theme_id in _render_option_custom_theme_ids(saved_payload):
+        if theme_id in embedded_theme_ids:
+            continue
+        embedded_theme_ids.add(theme_id)
+        theme_payload: dict[str, object] | None = None
+        if saved_payload.plot is not None and saved_payload.plot.render_options.custom_theme_id == theme_id:
+            theme_payload = saved_payload.plot.render_options.custom_theme_draft
+        if theme_payload is None and saved_payload.data_studio is not None:
+            for preference in saved_payload.data_studio.figure_preferences:
+                preference_map = _mapping(preference)
+                if preference_map is None:
+                    continue
+                options_by_template = _mapping(preference_map.get("options_by_template")) or {}
+                for options in options_by_template.values():
+                    options_map = _mapping(options)
+                    if options_map is None or _string_or_none(options_map.get("custom_theme_id")) != theme_id:
+                        continue
+                    draft = _mapping(options_map.get("custom_theme_draft"))
+                    if draft is not None:
+                        theme_payload = dict(draft)
+                        break
+                if theme_payload is not None:
+                    break
+        if (
+            theme_payload is None
+            and saved_payload.code_console is not None
+            and saved_payload.code_console.manual_binding is not None
+            and saved_payload.code_console.manual_binding.render_options.custom_theme_id == theme_id
+        ):
+            theme_payload = saved_payload.code_console.manual_binding.render_options.custom_theme_draft
+        if theme_payload is None:
+            continue
+        theme_json = json.dumps(theme_payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+        member_path = f"{_CUSTOM_THEME_DIR}/{theme_member_filename(theme_id)}"
+        archive_entries.append((member_path, theme_json))
+        manifest_entries.append(
+            {
+                "path": member_path,
+                "kind": "custom_plot_theme",
+                "theme_id": theme_id,
+                "sha256": _sha256_bytes(theme_json),
+                "size_bytes": len(theme_json),
+            }
+        )
 
     project_json = json.dumps(
         saved_payload.model_dump(mode="json"),
@@ -855,6 +999,38 @@ def _remap_code_console_paths(
     return remapped
 
 
+def _custom_theme_payloads_from_archive(archive: zipfile.ZipFile) -> dict[str, dict[str, object]]:
+    themes: dict[str, dict[str, object]] = {}
+    for name in archive.namelist():
+        if not name.startswith(f"{_CUSTOM_THEME_DIR}/") or not name.endswith(".json"):
+            continue
+        payload = json.loads(archive.read(name).decode("utf-8"))
+        payload_map = _mapping(payload)
+        if payload_map is None:
+            continue
+        theme_id = _string_or_none(payload_map.get("id"))
+        if theme_id is not None:
+            themes[theme_id] = dict(payload_map)
+    return themes
+
+
+def _restore_custom_theme_draft_in_render_options(
+    render_options: object,
+    *,
+    embedded_themes: Mapping[str, dict[str, object]],
+) -> object:
+    options_map = _mapping(render_options)
+    if options_map is None:
+        return render_options
+    theme_id = _string_or_none(options_map.get("custom_theme_id"))
+    if theme_id is None or options_map.get("custom_theme_draft") is not None:
+        return render_options
+    theme_payload = embedded_themes.get(theme_id)
+    if theme_payload is None:
+        return render_options
+    return {**options_map, "custom_theme_draft": theme_payload}
+
+
 def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
     with zipfile.ZipFile(project_path, mode="r") as archive:
         try:
@@ -870,6 +1046,50 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
         data_studio_map = _mapping(raw_payload_map.get("data_studio"))
         composer_map = _mapping(raw_payload_map.get("composer"))
         code_console_map = _mapping(raw_payload_map.get("code_console"))
+        embedded_custom_themes = _custom_theme_payloads_from_archive(archive)
+
+        if plot_map is not None:
+            plot_map = {
+                **plot_map,
+                "render_options": _restore_custom_theme_draft_in_render_options(
+                    plot_map.get("render_options"),
+                    embedded_themes=embedded_custom_themes,
+                ),
+            }
+        if data_studio_map is not None:
+            figure_preferences: list[object] = []
+            for preference in _iter_values(data_studio_map.get("figure_preferences")):
+                preference_map = _mapping(preference)
+                if preference_map is None:
+                    figure_preferences.append(preference)
+                    continue
+                options_by_template = _mapping(preference_map.get("options_by_template")) or {}
+                figure_preferences.append(
+                    {
+                        **preference_map,
+                        "options_by_template": {
+                            str(template_id): _restore_custom_theme_draft_in_render_options(
+                                options,
+                                embedded_themes=embedded_custom_themes,
+                            )
+                            for template_id, options in options_by_template.items()
+                        },
+                    }
+                )
+            data_studio_map = {**data_studio_map, "figure_preferences": figure_preferences}
+        if code_console_map is not None:
+            manual_binding_map = _mapping(code_console_map.get("manual_binding"))
+            if manual_binding_map is not None:
+                code_console_map = {
+                    **code_console_map,
+                    "manual_binding": {
+                        **manual_binding_map,
+                        "render_options": _restore_custom_theme_draft_in_render_options(
+                            manual_binding_map.get("render_options"),
+                            embedded_themes=embedded_custom_themes,
+                        ),
+                    },
+                }
 
         plot_materialized: tuple[bytes, str, str, str] | None = None
         fingerprint_parts: list[str] = []

@@ -146,6 +146,8 @@ class RenderOptionsPayload(StrictModel):
     palette_preset: str = plot_style.DEFAULT_PALETTE_PRESET
     use_sidecar: bool | None = None
     visual_theme_id: str | None = None
+    custom_theme_id: str | None = None
+    custom_theme_draft: dict[str, Any] | None = None
     extra_x_axis: ExtraAxisPayload | None = None
     extra_y_axis: ExtraAxisPayload | None = None
     x_axis_breaks: list[AxisBreakPayload] | None = None

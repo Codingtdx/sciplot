@@ -11,6 +11,7 @@ from pathlib import Path
 from src import plot_style
 from src.core.application.render import template_identity
 from src.plot_contract import CONTRACT_PATH, load_plot_contract, template_contract
+from src.rendering.custom_theme_store import resolve_custom_theme
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 
 
@@ -140,12 +141,22 @@ def theme_layer(options: object) -> dict[str, object]:
     palette_preset = str(option_data.get("palette_preset") or plot_style.DEFAULT_PALETTE_PRESET)
     visual_theme_raw = option_data.get("visual_theme_id")
     visual_theme_id = str(visual_theme_raw) if isinstance(visual_theme_raw, str) and visual_theme_raw.strip() else None
-    bundle = DEFAULT_STYLE_COMPOSER.compose(style_preset, visual_theme_id)
+    custom_theme_raw = option_data.get("custom_theme_id")
+    custom_theme_id = (
+        str(custom_theme_raw).strip() if isinstance(custom_theme_raw, str) and custom_theme_raw.strip() else None
+    )
+    custom_theme_draft = option_data.get("custom_theme_draft")
+    custom_theme = resolve_custom_theme(
+        custom_theme_id,
+        custom_theme_draft if isinstance(custom_theme_draft, dict) else None,
+    )
+    bundle = DEFAULT_STYLE_COMPOSER.compose(style_preset, visual_theme_id, custom_theme=custom_theme)
     return {
         "publication_profile_id": bundle.publication_profile_id,
         "style_preset": style_preset,
         "palette_preset": palette_preset,
         "visual_theme_id": visual_theme_id,
+        "custom_theme_id": bundle.custom_theme_id,
         "soft_overrides": bundle.resolved_soft,
         "blocked_soft_overrides": list(bundle.blocked_soft_keys),
         "protected_keys": list(bundle.protected_keys),

@@ -168,6 +168,138 @@ extension PlotSession {
         }
     }
 
+    func loadPlotThemes() async {
+        guard let client else {
+            styleStudioErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        do {
+            plotThemes = try await client.fetchPlotThemes().themes
+        } catch {
+            styleStudioErrorMessage = error.localizedDescription
+        }
+    }
+
+    func applyStyleStudioDraft(_ draft: CustomPlotThemePackagePayload) async {
+        guard let client else {
+            styleStudioErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        isPreviewingStyleStudioDraft = true
+        styleStudioErrorMessage = nil
+        defer { isPreviewingStyleStudioDraft = false }
+
+        do {
+            let response = try await client.previewPlotTheme(.init(theme: draft))
+            styleStudioWarnings = response.warnings
+            applyResolvedStyleStudioTheme(response.theme, savedThemeID: nil)
+        } catch {
+            styleStudioErrorMessage = error.localizedDescription
+        }
+    }
+
+    func saveStyleStudioTheme(_ draft: CustomPlotThemePackagePayload) async {
+        guard let client else {
+            styleStudioErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        isSavingStyleStudioTheme = true
+        styleStudioErrorMessage = nil
+        defer { isSavingStyleStudioTheme = false }
+
+        do {
+            let response = try await client.savePlotTheme(.init(theme: draft))
+            styleStudioWarnings = response.warnings
+            applyResolvedStyleStudioTheme(response.theme, savedThemeID: response.theme.id)
+            upsertPlotThemeSummary(for: response.theme, builtin: false)
+        } catch {
+            styleStudioErrorMessage = error.localizedDescription
+        }
+    }
+
+    func updateStyleStudioTheme(_ draft: CustomPlotThemePackagePayload) async {
+        guard let client else {
+            styleStudioErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        isSavingStyleStudioTheme = true
+        styleStudioErrorMessage = nil
+        defer { isSavingStyleStudioTheme = false }
+
+        do {
+            let response = try await client.updatePlotTheme(themeID: draft.id, request: .init(theme: draft))
+            styleStudioWarnings = response.warnings
+            applyResolvedStyleStudioTheme(response.theme, savedThemeID: response.theme.id)
+            upsertPlotThemeSummary(for: response.theme, builtin: false)
+        } catch {
+            styleStudioErrorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteStyleStudioTheme(id: String) async {
+        guard let client else {
+            styleStudioErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        do {
+            try await client.deletePlotTheme(themeID: id)
+            plotThemes.removeAll { $0.id == id }
+            if renderOptions.customThemeID == id {
+                updateRenderOptions(policy: .immediate) {
+                    $0.customThemeID = nil
+                    $0.customThemeDraft = nil
+                }
+            }
+        } catch {
+            styleStudioErrorMessage = error.localizedDescription
+        }
+    }
+
+    func applySavedPlotTheme(_ theme: PlotThemeSummaryResponse) {
+        updateRenderOptions(policy: .immediate) { options in
+            options.stylePreset = theme.baseStyleID
+            if let palettePreset = theme.palettePreset {
+                options.palettePreset = palettePreset
+            }
+            if let visualThemeID = theme.visualThemeID {
+                options.visualThemeID = visualThemeID
+            }
+            options.customThemeID = theme.builtin ? nil : theme.id
+            options.customThemeDraft = nil
+        }
+    }
+
+    private func applyResolvedStyleStudioTheme(_ theme: CustomPlotThemePackagePayload, savedThemeID: String?) {
+        updateRenderOptions(policy: .immediate) { options in
+            options.stylePreset = theme.baseStyleID
+            if let palettePreset = theme.palettePreset {
+                options.palettePreset = palettePreset
+            }
+            if let visualThemeID = theme.visualThemeID {
+                options.visualThemeID = visualThemeID
+            }
+            options.customThemeID = savedThemeID
+            options.customThemeDraft = theme
+        }
+    }
+
+    private func upsertPlotThemeSummary(for theme: CustomPlotThemePackagePayload, builtin: Bool) {
+        let summary = PlotThemeSummaryResponse(
+            id: theme.id,
+            label: theme.label,
+            builtin: builtin,
+            baseStyleID: theme.baseStyleID,
+            palettePreset: theme.palettePreset,
+            visualThemeID: theme.visualThemeID,
+            swatches: theme.palette.categorical
+        )
+        if let index = plotThemes.firstIndex(where: { $0.id == theme.id }) {
+            plotThemes[index] = summary
+        } else {
+            plotThemes.append(summary)
+        }
+    }
+
     func revealCurrentSource() {
         guard let selectedFileURL else {
             return
@@ -440,6 +572,8 @@ extension PlotSession {
             options.stylePreset = styleID
             options.palettePreset = recommendedPalette(for: styleID, template: template)
             options.visualThemeID = styleRecommendedThemeID(for: styleID)
+            options.customThemeID = nil
+            options.customThemeDraft = nil
         }
     }
 

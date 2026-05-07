@@ -6127,3 +6127,27 @@ Use this block for every new round:
     - Completed `data_studio_import_open_plot`: Data Studio raw import with built-in Tensile recommendation, workbook save, and Open in Plot handoff.
     - Completed `overlay_drag_save_reopen`: Plot text annotation placement, drag, project save, project reopen, and persisted annotation check.
   - Manual evidence files are stored under `/tmp/sciplot_inner_beta_manual/` for this local sign-off run.
+
+## 2026-05-06 - Plot Style Studio Custom Theme Layer
+
+- Scope:
+  - Added a Plot-first `Style Studio...` entry in the Plot `Figure` inspector for creating, previewing, saving, updating, and deleting custom plot theme packages.
+  - Added sidecar `/plot-themes*` endpoints plus typed schema/validation for custom theme packages, including palette swatches, curated hard overrides, soft visual overrides, and allowlisted expert rcParams.
+  - Extended render options with `custom_theme_id` and `custom_theme_draft`; preview, export manifest, Plot, Data Studio figure preferences, Code Console manual binding, and `.sciplotgod` save/open now share the same sidecar-resolved theme payload path.
+
+- Boundaries:
+  - Built-in `style_preset` contract semantics are unchanged.
+  - `nature` remains frozen; custom themes derive from a public base style and cannot overwrite built-in style IDs.
+  - Expert matplotlib access is allowlist-only. Protected or unsupported keys are blocked and returned as warnings/errors by sidecar validation.
+  - Composer does not recolor or reinterpret imported panels.
+
+- Recovery behavior:
+  - User themes are saved to the app support theme library.
+  - When a project uses a custom theme, `.sciplotgod` embeds the normalized package under `artifacts/custom_themes/<theme-id>.json`.
+  - Opening a project on another machine restores the embedded custom theme as `custom_theme_draft` even if the local user theme library does not contain it.
+
+- Validation:
+  - `.venv/bin/python -m pytest tests/test_plot_themes.py -q`: passed, 6 tests, including a direct rendered-series color assertion for custom palette overrides.
+  - `xcodebuild test -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -only-testing:SciPlotGodMacTests/SidecarRuntimeTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderOptionsKeepsCustomPlotTheme -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodePlotThemeEndpointResponses -only-testing:SciPlotGodMacTests/PlotSessionTests/testStyleStudioDraftAndSaveRefreshPreviewWithCustomThemePayload`: passed, 11 tests.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed on 2026-05-06; clean repo guard, ruff, mypy, 293 pytest tests, smoke check, macOS presentation guard, Xcode build, and 222 Xcode tests were all green.
+  - Computer-use smoke: passed Plot launch/import, `Style Studio...` open, palette/font/grid live draft edits, preview recolor, and theme save. The temporary smoke theme was removed from the local app-support library afterward.

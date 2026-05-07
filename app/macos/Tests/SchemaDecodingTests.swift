@@ -223,6 +223,63 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.interactionMetadata?.axes.first?.bboxPixels.width, 980)
     }
 
+    func testDecodeRenderOptionsKeepsCustomPlotTheme() throws {
+        let payload = """
+        {
+          "style_preset": "nature",
+          "palette_preset": "colorblind_safe",
+          "visual_theme_id": "clean_light",
+          "custom_theme_id": "user/nature_plus",
+          "custom_theme_draft": {
+            "id": "user/nature_plus",
+            "label": "Nature Plus",
+            "base_style_id": "nature",
+            "palette_preset": "colorblind_safe",
+            "visual_theme_id": "clean_light",
+            "palette": {"categorical": ["#0ea5e9", "#f97316"]},
+            "hard_overrides": {"typography": {"font_size_pt": 7.2}},
+            "soft_overrides": {"axes.grid": true},
+            "expert_rcparams": {"grid.linestyle": ":"}
+          }
+        }
+        """
+
+        let response = try decoder.decode(RenderOptionsPayload.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.customThemeID, "user/nature_plus")
+        XCTAssertEqual(response.customThemeDraft?.id, "user/nature_plus")
+        XCTAssertEqual(response.customThemeDraft?.palette.categorical, ["#0ea5e9", "#f97316"])
+        XCTAssertEqual(response.customThemeDraft?.hardOverrides["typography"]?["font_size_pt"], .number(7.2))
+        XCTAssertEqual(response.customThemeDraft?.softOverrides["axes.grid"], .bool(true))
+        XCTAssertEqual(response.customThemeDraft?.expertRcParams["grid.linestyle"], .string(":"))
+    }
+
+    func testDecodePlotThemeEndpointResponses() throws {
+        let payload = """
+        {
+          "theme": {
+            "id": "user/nature_plus",
+            "label": "Nature Plus",
+            "base_style_id": "nature",
+            "palette_preset": "colorblind_safe",
+            "visual_theme_id": "clean_light",
+            "palette": {"categorical": ["#0ea5e9"]},
+            "hard_overrides": {},
+            "soft_overrides": {},
+            "expert_rcparams": {}
+          },
+          "blocked_keys": ["font.size"],
+          "warnings": ["Blocked unsupported or protected custom theme keys: font.size."]
+        }
+        """
+
+        let response = try decoder.decode(PlotThemePreviewResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.theme.id, "user/nature_plus")
+        XCTAssertEqual(response.blockedKeys, ["font.size"])
+        XCTAssertEqual(response.warnings.count, 1)
+    }
+
     func testDecodeDataStudioTemplatePreviewPayloadUsesTemplateID() throws {
         let payload = """
         {
