@@ -138,6 +138,7 @@ class RenderOptionsPayload(StrictModel):
     x_tick_edge_labels: str | None = None
     y_tick_edge_labels: str | None = None
     series_order: list[str] | None = None
+    legend_position: str | None = None
     x_label_override: str | None = None
     y_label_override: str | None = None
     baseline: str | None = None

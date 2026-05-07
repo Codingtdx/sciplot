@@ -89,7 +89,7 @@ final class CodeConsoleSessionTests: XCTestCase {
         plot.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
         plot.selectedSheet = .name("Representative_Curve")
         plot.selectedTemplateID = "curve"
-        plot.renderOptions.size = "single_panel"
+        plot.renderOptions.size = "60x55"
 
         let dataStudio = DataStudioSession()
         dataStudio.workbooks = [

@@ -23,6 +23,14 @@ EXPECTED_STYLE_IDS = {
 
 EXPECTED_PUBLICATION_STYLE_IDS = {"nature", "acs", "science", "wiley", "elsevier"}
 EXPECTED_LEGACY_DISPLAY_STYLE_IDS = {"editorial", "presentation", "poster"}
+EXPECTED_FIGURE_SIZE_IDS = {
+    "60x55",
+    "120x55",
+    "180x55",
+    "60x110",
+    "120x110",
+    "180x110",
+}
 
 
 class PlotContractTests(unittest.TestCase):
@@ -96,8 +104,12 @@ class PlotContractTests(unittest.TestCase):
         self.assertTrue(removed_template_ids.isdisjoint({item["id"] for item in meta["templates"]}))
         self.assertEqual(
             {item["id"] for item in meta["sizes"]},
-            set(contract.size_presets.keys()),
+            EXPECTED_FIGURE_SIZE_IDS,
         )
+        self.assertEqual(set(contract.size_presets.keys()), EXPECTED_FIGURE_SIZE_IDS)
+        self.assertEqual(contract.size_presets["120x110"].label, "Large 120 x 110 mm")
+        self.assertEqual(contract.size_presets["120x110"].width_mm, 120.0)
+        self.assertEqual(contract.size_presets["120x110"].height_mm, 110.0)
         self.assertEqual(
             {item["id"] for item in meta["palettes"]},
             set(contract.palettes.keys()),
@@ -114,6 +126,8 @@ class PlotContractTests(unittest.TestCase):
             self.assertEqual(template["presentation_kind"], contract.templates[template["id"]].presentation_kind)
 
         for template in contract.templates.values():
+            if "size" in template.editable_options:
+                self.assertEqual(set(template.allowed_sizes), EXPECTED_FIGURE_SIZE_IDS)
             self.assertEqual(set(template.available_styles), EXPECTED_STYLE_IDS)
             self.assertIsNotNone(template.default_options.get("style_preset"))
             self.assertIsNotNone(template.default_options.get("palette_preset"))

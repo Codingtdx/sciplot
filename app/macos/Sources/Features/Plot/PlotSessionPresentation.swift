@@ -789,16 +789,8 @@ extension PlotSession {
             .sorted { $0.key < $1.key }
     }
 
-    func templateThumbnailAspectRatio(for templateID: String) -> CGFloat {
-        guard let summary = templateSummary(for: templateID),
-              let size = metadata?.sizes.first(where: { $0.id == summary.defaultSize })
-        else {
-            return 60.0 / 55.0
-        }
-        guard size.heightMm > 0 else {
-            return 60.0 / 55.0
-        }
-        return CGFloat(size.widthMm / size.heightMm)
+    func templateThumbnailAspectRatio(for _: String) -> CGFloat {
+        return 60.0 / 55.0
     }
 
     func thumbnailKind(for templateID: String) -> PlotTemplateThumbnailKind {

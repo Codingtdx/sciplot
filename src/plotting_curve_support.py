@@ -249,15 +249,43 @@ _TENSILE_COMPACT_LEGEND_DEFAULT_ORDER = (
 )
 
 
-def _legend_candidate_specs(*, inset_fraction: float) -> dict[str, tuple[tuple[float, float], dict[str, object]]]:
-    inset = inset_fraction
+def _legend_inset_pair(inset_fraction: float | tuple[float, float]) -> tuple[float, float]:
+    if isinstance(inset_fraction, tuple):
+        return inset_fraction
+    return inset_fraction, inset_fraction
+
+
+def absolute_legend_inset_fractions(
+    *,
+    width_mm: float,
+    height_mm: float,
+    left_margin_mm: float,
+    right_margin_mm: float,
+    bottom_margin_mm: float,
+    top_margin_mm: float,
+    default: float | None = None,
+) -> tuple[float, float]:
+    spacing = plot_style.current_spacing()
+    base_inset = _current_legend_inset(default)
+    base_axis_width_mm = max(1.0, spacing.panel_width_mm - spacing.left_margin_mm - spacing.right_margin_mm)
+    base_axis_height_mm = max(1.0, spacing.panel_height_mm - spacing.bottom_margin_mm - spacing.top_margin_mm)
+    axis_width_mm = max(1.0, width_mm - left_margin_mm - right_margin_mm)
+    axis_height_mm = max(1.0, height_mm - bottom_margin_mm - top_margin_mm)
+    return (base_inset * base_axis_width_mm / axis_width_mm, base_inset * base_axis_height_mm / axis_height_mm)
+
+
+def _legend_candidate_specs(
+    *,
+    inset_fraction: float | tuple[float, float],
+) -> dict[str, tuple[tuple[float, float], dict[str, object]]]:
+    inset_x, inset_y = _legend_inset_pair(inset_fraction)
     return {
-        "upper_left": ((inset, 1.0 - inset), {"loc": "upper left", "alignment": "left"}),
-        "lower_left": ((inset, inset), {"loc": "lower left", "alignment": "left"}),
-        "upper_right": ((1.0 - inset, 1.0 - inset), {"loc": "upper right", "alignment": "right"}),
-        "lower_right": ((1.0 - inset, inset), {"loc": "lower right", "alignment": "right"}),
-        "upper_center": ((0.5, 1.0 - inset), {"loc": "upper center", "alignment": "center"}),
-        "lower_center": ((0.5, inset), {"loc": "lower center", "alignment": "center"}),
+        "upper_left": ((inset_x, 1.0 - inset_y), {"loc": "upper left", "alignment": "left"}),
+        "lower_left": ((inset_x, inset_y), {"loc": "lower left", "alignment": "left"}),
+        "upper_right": ((1.0 - inset_x, 1.0 - inset_y), {"loc": "upper right", "alignment": "right"}),
+        "lower_right": ((1.0 - inset_x, inset_y), {"loc": "lower right", "alignment": "right"}),
+        "upper_center": ((0.5, 1.0 - inset_y), {"loc": "upper center", "alignment": "center"}),
+        "lower_center": ((0.5, inset_y), {"loc": "lower center", "alignment": "center"}),
     }
 
 
@@ -265,7 +293,7 @@ def _ordered_legend_candidates(
     *,
     candidate_order: tuple[str, ...],
     bias_step: float,
-    inset_fraction: float,
+    inset_fraction: float | tuple[float, float],
 ) -> list[LayoutCandidate]:
     specs = _legend_candidate_specs(inset_fraction=inset_fraction)
     candidates: list[LayoutCandidate] = []
@@ -327,7 +355,7 @@ def legend_layout_candidates(
     *,
     preserve_stress_label: bool,
     compact: bool,
-    inset_fraction: float,
+    inset_fraction: float | tuple[float, float],
 ) -> list[LayoutCandidate]:
     policy = curve_legend_policy(preserve_stress_label=preserve_stress_label, compact=compact)
     return _ordered_legend_candidates(
@@ -336,19 +364,37 @@ def legend_layout_candidates(
         inset_fraction=inset_fraction,
     )
 
+
 def _current_legend_inset(default: float | None = None) -> float:
     if default is not None:
         return default
     return plot_style.current_spacing().legend_inset_fraction
 
-def _legend_kwargs(legend_mode: LegendMode) -> dict[str, object]:
+
+def _legend_kwargs(
+    legend_mode: LegendMode,
+    *,
+    inset_fraction: float | tuple[float, float] = INSIDE_LEGEND_INSET_FRACTION,
+) -> dict[str, object]:
     if legend_mode == "none":
         return {}
     if legend_mode == "outside":
         return {"loc": "upper left", "bbox_to_anchor": (1.02, 1.0), "borderaxespad": 0.0}
     if legend_mode == "inside_forced":
         return {"loc": "upper right"}
+    if legend_mode.startswith("inside_"):
+        candidate_id = legend_mode.removeprefix("inside_")
+        candidate = _legend_candidate_specs(inset_fraction=inset_fraction).get(candidate_id)
+        if candidate is not None:
+            anchor, payload = candidate
+            return {
+                "loc": str(payload.get("loc", "upper right")),
+                "bbox_to_anchor": anchor,
+                "borderaxespad": 0.0,
+                "alignment": str(payload.get("alignment", "right")),
+            }
     return {"loc": "upper right"}
+
 
 def _infer_markevery(length: int) -> int | None:
     if length <= 20:

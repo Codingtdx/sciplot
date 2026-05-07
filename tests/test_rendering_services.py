@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import fitz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -46,6 +47,47 @@ def _primary_and_secondary_axes(plot) -> list[object]:
         if axis not in axes:
             axes.append(axis)
     return axes
+
+
+def _axis_bbox_mm(fig: plt.Figure) -> dict[str, float]:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox = fig.axes[0].get_window_extent(renderer=renderer)
+    figure_width_px = float(fig.bbox.width)
+    figure_height_px = float(fig.bbox.height)
+    px_to_mm = 25.4 / float(fig.dpi)
+    return {
+        "left": bbox.x0 * px_to_mm,
+        "right": (figure_width_px - bbox.x1) * px_to_mm,
+        "bottom": bbox.y0 * px_to_mm,
+        "top": (figure_height_px - bbox.y1) * px_to_mm,
+    }
+
+
+def _legend_bbox_mm(fig: plt.Figure) -> dict[str, float]:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend = fig.axes[0].get_legend()
+    assert legend is not None
+    bbox = legend.get_window_extent(renderer=renderer)
+    figure_width_px = float(fig.bbox.width)
+    px_to_mm = 25.4 / float(fig.dpi)
+    return {
+        "left": bbox.x0 * px_to_mm,
+        "right": (figure_width_px - bbox.x1) * px_to_mm,
+    }
+
+
+def _assert_pdf_media_box_mm(path: Path, *, width_mm: float, height_mm: float) -> None:
+    document = fitz.open(path)
+    try:
+        page = document.load_page(0)
+        actual_width_mm = float(page.rect.width) * 25.4 / 72.0
+        actual_height_mm = float(page.rect.height) * 25.4 / 72.0
+    finally:
+        document.close()
+    assert actual_width_mm == pytest.approx(width_mm, abs=0.08)
+    assert actual_height_mm == pytest.approx(height_mm, abs=0.08)
 
 
 def _write_curve_table(path: Path) -> Path:
@@ -786,6 +828,90 @@ def test_resolve_render_options_uses_contract_reverse_x_default_when_unspecified
     options = resolve_render_options(template="segmented_stacked_curve")
 
     assert options.reverse_x is True
+
+
+@pytest.mark.parametrize(
+    ("template", "writer", "size", "kwargs"),
+    [
+        ("curve", _write_curve_table, "120x110", {}),
+        ("bar", _write_replicate_table, "180x110", {}),
+        ("heatmap", _write_heatmap_table, "120x110", {}),
+        ("segmented_stacked_curve", _write_curve_table, "180x110", {"use_sidecar": False}),
+    ],
+)
+def test_render_options_accept_global_figure_sizes_for_size_enabled_templates(
+    tmp_path: Path,
+    template: str,
+    writer,
+    size: str,
+    kwargs: dict[str, object],
+) -> None:
+    input_path = writer(tmp_path / f"{template}.csv")
+
+    options = resolve_render_options(template=template, size=size, **kwargs)
+    preflight = preflight_render_request(template, input_path, 0, options)
+
+    assert preflight.errors == ()
+    rendered = build_rendered_plots(template, input_path, size=size, **kwargs)
+    try:
+        assert rendered
+        for plot in rendered:
+            assert plot.figure.get_figwidth() * 25.4 == pytest.approx(options.width_mm, abs=0.08)
+            assert plot.figure.get_figheight() * 25.4 == pytest.approx(options.height_mm, abs=0.08)
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_exported_pdf_media_box_matches_selected_figure_size(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    output_path = tmp_path / "large-figure.pdf"
+
+    rendered = build_rendered_plots("curve", input_path, size="120x110")
+    try:
+        rendered[0].figure.savefig(output_path, format="pdf", bbox_inches=None, pad_inches=0.0)
+    finally:
+        close_rendered_plots(rendered)
+
+    _assert_pdf_media_box_mm(output_path, width_mm=120.0, height_mm=110.0)
+
+
+def test_axis_frame_margins_stay_absolute_across_figure_sizes(tmp_path: Path) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
+
+    small = build_rendered_plots("curve", input_path, size="60x110")
+    large = build_rendered_plots("curve", input_path, size="120x110")
+    try:
+        small_bbox = _axis_bbox_mm(small[0].figure)
+        large_bbox = _axis_bbox_mm(large[0].figure)
+
+        assert large_bbox["left"] == pytest.approx(small_bbox["left"], abs=0.25)
+        assert large_bbox["right"] == pytest.approx(small_bbox["right"], abs=0.25)
+        assert large_bbox["top"] == pytest.approx(small_bbox["top"], abs=0.25)
+        assert large_bbox["bottom"] == pytest.approx(small_bbox["bottom"], abs=0.25)
+    finally:
+        close_rendered_plots([*small, *large])
+
+
+@pytest.mark.parametrize(
+    ("legend_position", "edge"),
+    [("upper_left", "left"), ("upper_right", "right")],
+)
+def test_forced_legend_position_aligns_by_absolute_inset_across_figure_sizes(
+    tmp_path: Path,
+    legend_position: str,
+    edge: str,
+) -> None:
+    input_path = _write_dense_curve_table(tmp_path / "dense_curve.csv")
+
+    small = build_rendered_plots("curve", input_path, size="60x110", legend_position=legend_position)
+    large = build_rendered_plots("curve", input_path, size="120x110", legend_position=legend_position)
+    try:
+        small_legend = _legend_bbox_mm(small[0].figure)
+        large_legend = _legend_bbox_mm(large[0].figure)
+
+        assert large_legend[edge] == pytest.approx(small_legend[edge], abs=0.25)
+    finally:
+        close_rendered_plots([*small, *large])
 
 
 def test_tensile_curve_defaults_to_linear_but_allows_log_override(tmp_path: Path) -> None:

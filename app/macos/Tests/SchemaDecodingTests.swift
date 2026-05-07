@@ -254,6 +254,22 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.customThemeDraft?.expertRcParams["grid.linestyle"], .string(":"))
     }
 
+    func testDecodeRenderOptionsKeepsLegendPosition() throws {
+        let payload = """
+        {
+          "size": "120x110",
+          "style_preset": "nature",
+          "palette_preset": "colorblind_safe",
+          "legend_position": "upper_left"
+        }
+        """
+
+        let response = try decoder.decode(RenderOptionsPayload.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.size, "120x110")
+        XCTAssertEqual(response.legendPosition, "upper_left")
+    }
+
     func testDecodePlotThemeEndpointResponses() throws {
         let payload = """
         {
@@ -516,7 +532,7 @@ final class SchemaDecodingTests: XCTestCase {
             "palette_preset": "colorblind_safe"
           },
           "size_presets": {
-            "single_panel": {
+            "60x55": {
               "label": "Single Panel",
               "width_mm": 60,
               "height_mm": 55
@@ -530,8 +546,8 @@ final class SchemaDecodingTests: XCTestCase {
               "description": "Continuous curve template.",
               "category": "curve",
               "presentation_kind": "curve",
-              "default_size": "single_panel",
-              "allowed_sizes": ["single_panel"],
+              "default_size": "60x55",
+              "allowed_sizes": ["60x55"],
               "editable_options": ["size", "xscale", "yscale"],
               "default_options": {},
               "available_styles": ["nature"],
@@ -544,8 +560,8 @@ final class SchemaDecodingTests: XCTestCase {
         """
 
         let response = try decoder.decode(PlotContractResponse.self, from: Data(payload.utf8))
-        XCTAssertEqual(response.sizePresets["single_panel"]?.widthMm, 60)
-        XCTAssertEqual(response.sizePresets["single_panel"]?.heightMm, 55)
+        XCTAssertEqual(response.sizePresets["60x55"]?.widthMm, 60)
+        XCTAssertEqual(response.sizePresets["60x55"]?.heightMm, 55)
         XCTAssertEqual(response.templates["curve"]?.presentationKind, "curve")
     }
 

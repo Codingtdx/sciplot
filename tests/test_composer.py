@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 
 import fitz
+import pytest
 from PIL import Image
 
 from src.composer import (
@@ -162,6 +163,34 @@ def test_import_graph_pdf_spans_two_cells_for_120x55(tmp_path: Path) -> None:
     assert project.regions[0].row_span == 1
     assert project.panels[0].region_id == project.regions[0].id
     assert round(project.panels[0].w_mm, 1) == 120.0
+
+
+@pytest.mark.parametrize(
+    ("width_mm", "height_mm", "expected_cols", "expected_rows", "expected_slot_kind"),
+    [
+        (120.0, 110.0, 2, 2, None),
+        (180.0, 55.0, 3, 1, None),
+        (180.0, 110.0, 3, 2, None),
+    ],
+)
+def test_import_graph_pdf_matches_extended_plot_grid_sizes(
+    tmp_path: Path,
+    width_mm: float,
+    height_mm: float,
+    expected_cols: int,
+    expected_rows: int,
+    expected_slot_kind: str | None,
+) -> None:
+    graph_path = _write_pdf(tmp_path / f"plot-{int(width_mm)}x{int(height_mm)}.pdf", width_mm, height_mm)
+
+    project = import_panels_from_paths(ComposerProject(), [graph_path], kind="graph")
+
+    assert len(project.regions) == 1
+    assert project.regions[0].col_span == expected_cols
+    assert project.regions[0].row_span == expected_rows
+    assert project.regions[0].slot_kind == expected_slot_kind
+    assert round(project.panels[0].w_mm, 1) == width_mm
+    assert round(project.panels[0].h_mm, 1) == height_mm
 
 
 def test_import_wide_nmr_creates_structure_slot(tmp_path: Path) -> None:

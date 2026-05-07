@@ -20,13 +20,13 @@ from src.plotting_curve_support import (
     MARKER_STYLE_CYCLE,
     _baseline_correct_series,
     _compute_stacked_axis_limits,
-    _current_legend_inset,
     _infer_markevery,
     _legend_kwargs,
     _place_series_edge_labels,
     _prepare_stacked_layout,
     _stack_retry_scales,
     _validate_curve_series_input,
+    absolute_legend_inset_fractions,
     legend_layout_candidates,
 )
 from src.plotting_primitives import (
@@ -44,7 +44,7 @@ from src.plotting_primitives import (
 
 
 def _legend_candidates(
-    inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+    inset_fraction: float | tuple[float, float] = INSIDE_LEGEND_INSET_FRACTION,
 ) -> list[tuple[str, tuple[float, float], str]]:
     compatibility: list[tuple[str, tuple[float, float], str]] = []
     for candidate in legend_layout_candidates(
@@ -135,7 +135,7 @@ def _legend_kwargs_from_candidate(
 def choose_legend_corner_with_policy(
     ax: plt.Axes,
     series_list: Sequence[CurveSeries],
-    inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+    inset_fraction: float | tuple[float, float] = INSIDE_LEGEND_INSET_FRACTION,
     *,
     preserve_stress_label: bool = False,
 ) -> tuple[dict[str, object], float, object]:
@@ -173,7 +173,7 @@ def choose_legend_corner_with_policy(
 def choose_legend_corner(
     ax: plt.Axes,
     series_list: Sequence[CurveSeries],
-    inset_fraction: float = INSIDE_LEGEND_INSET_FRACTION,
+    inset_fraction: float | tuple[float, float] = INSIDE_LEGEND_INSET_FRACTION,
     *,
     preserve_stress_label: bool = False,
 ) -> tuple[dict[str, object], float]:
@@ -253,6 +253,15 @@ def plot_curves(
         right_margin_mm=resolved_right_margin_mm,
         bottom_margin_mm=resolved_bottom_margin_mm,
         top_margin_mm=resolved_top_margin_mm,
+    )
+    legend_inset = absolute_legend_inset_fractions(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+        default=legend_inset_fraction,
     )
     palette = plot_style.get_categorical_palette(n_colors=len(series_list))
     markers = marker_style_cycle or MARKER_STYLE_CYCLE
@@ -384,7 +393,7 @@ def plot_curves(
         legend_kwargs, _overlap_score, legend_corner_decision = choose_legend_corner_with_policy(
             ax,
             plotted_series,
-            inset_fraction=_current_legend_inset(legend_inset_fraction),
+            inset_fraction=legend_inset,
             preserve_stress_label=preserve_stress_label,
         )
         record_layout_decision(
@@ -394,7 +403,10 @@ def plot_curves(
         )
         ax.legend(**legend_kwargs)
     elif series_label_mode != "edge" and legend_mode != "none":
-        ax.legend(**_legend_kwargs(legend_mode))
+        legend_kwargs = _legend_kwargs(legend_mode, inset_fraction=legend_inset)
+        if "bbox_to_anchor" in legend_kwargs:
+            legend_kwargs["bbox_transform"] = ax.transAxes
+        ax.legend(**legend_kwargs)
 
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))
@@ -483,6 +495,15 @@ def plot_scatter(
         bottom_margin_mm=resolved_bottom_margin_mm,
         top_margin_mm=resolved_top_margin_mm,
     )
+    legend_inset = absolute_legend_inset_fractions(
+        width_mm=resolved_width_mm,
+        height_mm=resolved_height_mm,
+        left_margin_mm=resolved_left_margin_mm,
+        right_margin_mm=resolved_right_margin_mm,
+        bottom_margin_mm=resolved_bottom_margin_mm,
+        top_margin_mm=resolved_top_margin_mm,
+        default=legend_inset_fraction,
+    )
     palette = plot_style.get_categorical_palette(n_colors=len(series_list))
 
     for color, series in zip(palette, series_list, strict=True):
@@ -530,7 +551,7 @@ def plot_scatter(
         legend_kwargs, _overlap_score, legend_corner_decision = choose_legend_corner_with_policy(
             ax,
             series_list,
-            inset_fraction=_current_legend_inset(legend_inset_fraction),
+            inset_fraction=legend_inset,
             preserve_stress_label=preserve_stress_label,
         )
         record_layout_decision(
@@ -540,7 +561,10 @@ def plot_scatter(
         )
         ax.legend(**legend_kwargs)
     elif legend_mode != "none":
-        ax.legend(**_legend_kwargs(legend_mode))
+        legend_kwargs = _legend_kwargs(legend_mode, inset_fraction=legend_inset)
+        if "bbox_to_anchor" in legend_kwargs:
+            legend_kwargs["bbox_transform"] = ax.transAxes
+        ax.legend(**legend_kwargs)
 
     if visible_xticks is not None:
         ax.xaxis.set_major_locator(FixedLocator(np.asarray(visible_xticks, dtype=float)))

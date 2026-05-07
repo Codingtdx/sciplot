@@ -193,7 +193,7 @@ final class PlotSessionTests: XCTestCase {
             sheet: .name("RestoredSheet"),
             fitOptions: FitOptionsPayload(enabled: true, modelID: "polynomial_2"),
             renderOptions: RenderOptionsPayload(
-                size: "single_panel",
+                size: "60x55",
                 stylePreset: "presentation",
                 palettePreset: "shine",
                 visualThemeID: "shine",
@@ -359,7 +359,7 @@ final class PlotSessionTests: XCTestCase {
     func testOpenProjectWithCoreAdvancedStateKeepsTransformAwareInspectAndWorkbookRequests() async throws {
         let client = MockSidecarClient()
         let restoredOptions = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "nature",
             palettePreset: "colorblind_safe",
             visualThemeID: "clean_light",
@@ -515,7 +515,7 @@ final class PlotSessionTests: XCTestCase {
     func testOpenProjectWithFunctionCurveAxesAndAnalyticalLayerRestoresPreviewState() async throws {
         let client = MockSidecarClient()
         let restoredOptions = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "nature",
             palettePreset: "colorblind_safe",
             visualThemeID: "clean_light",
@@ -607,7 +607,7 @@ final class PlotSessionTests: XCTestCase {
     func testOpenProjectWithAxisBreaksRestoresPreviewState() async throws {
         let client = MockSidecarClient()
         let restoredOptions = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "editorial",
             palettePreset: "roma",
             visualThemeID: "roma",
@@ -1955,6 +1955,42 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.visualThemeID, "soft_grid")
     }
 
+    func testFigureSizeCatalogIsGlobalAndTemplateSwitchPreservesManualSize() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertEqual(
+            session.allowedSizes.map(\.id),
+            ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"]
+        )
+
+        session.updateRenderOptions(policy: .immediate) { $0.size = "120x110" }
+        session.chooseTemplate("bar")
+
+        XCTAssertEqual(session.selectedTemplateID, "bar")
+        XCTAssertEqual(session.renderOptions.size, "120x110")
+    }
+
+    func testLegendPositionReachesPreviewRequest() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.updateRenderOptions(policy: .immediate) { $0.legendPosition = "upper_left" }
+        await waitUntil({ client.renderRequests.contains(where: { $0.options.legendPosition == "upper_left" }) }, timeout: 2.0)
+
+        XCTAssertEqual(session.renderOptions.legendPosition, "upper_left")
+    }
+
     func testInspectionCancellationDoesNotSurfaceError() async {
         let client = MockSidecarClient()
         client.inspectHandler = { _ in
@@ -1999,7 +2035,7 @@ final class PlotSessionTests: XCTestCase {
 
         session.applyExternalRenderOptions(
             RenderOptionsPayload(
-                size: "single_panel",
+                size: "60x55",
                 stylePreset: "nature",
                 palettePreset: "infographic",
                 visualThemeID: nil
@@ -2011,7 +2047,7 @@ final class PlotSessionTests: XCTestCase {
 
         session.applyExternalRenderOptions(
             RenderOptionsPayload(
-                size: "single_panel",
+                size: "60x55",
                 stylePreset: "nature",
                 palettePreset: "macarons",
                 visualThemeID: "infographic"

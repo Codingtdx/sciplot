@@ -6,7 +6,7 @@ extension PlotInspectorView {
         if let template = session.selectedTemplateSummary {
             InspectorSection(title: styleSectionTitle) {
                 if session.editableOptionIDs.contains("size") && session.allowedSizes.count > 1 {
-                    AdaptiveInspectorControlRow(title: "Canvas") {
+                    AdaptiveInspectorControlRow(title: "Figure Size") {
                         Picker("", selection: sizeBinding(defaultSize: template.defaultSize)) {
                             ForEach(session.allowedSizes) { size in
                                 Text(size.label).tag(size.id)
@@ -17,7 +17,7 @@ extension PlotInspectorView {
                     }
                 } else {
                     AdaptiveInspectorTextRow(
-                        title: "Canvas",
+                        title: "Figure Size",
                         value: sizeLabel(for: template.defaultSize)
                     )
                 }
@@ -164,6 +164,27 @@ extension PlotInspectorView {
             if session.seriesOrderLabels.isEmpty {
                 InspectorEmptyState(message: "No legend entries")
             } else {
+                if session.editableOptionIDs.contains("legend_position") {
+                    AdaptiveInspectorControlRow(title: "Position") {
+                        Picker("", selection: stringBinding(
+                            get: { session.renderOptions.legendPosition ?? "auto" },
+                            set: { newValue in
+                                session.updateRenderOptions(policy: .immediate) {
+                                    $0.legendPosition = newValue == "auto" ? nil : newValue
+                                }
+                            }
+                        )) {
+                            Text("Auto").tag("auto")
+                            Text("Upper Left").tag("upper_left")
+                            Text("Upper Right").tag("upper_right")
+                            Text("Lower Left").tag("lower_left")
+                            Text("Lower Right").tag("lower_right")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                }
+
                 SortableSeriesListView(
                     title: "Legend order",
                     rows: session.seriesOrderRows,

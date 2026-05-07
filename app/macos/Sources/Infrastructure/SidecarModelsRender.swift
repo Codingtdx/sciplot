@@ -684,6 +684,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var xTickEdgeLabels: String?
     var yTickEdgeLabels: String?
     var seriesOrder: [String]?
+    var legendPosition: String?
     var xLabelOverride: String?
     var yLabelOverride: String?
     var baseline: String?
@@ -719,6 +720,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         xTickEdgeLabels: String? = nil,
         yTickEdgeLabels: String? = nil,
         seriesOrder: [String]? = nil,
+        legendPosition: String? = nil,
         xLabelOverride: String? = nil,
         yLabelOverride: String? = nil,
         baseline: String? = nil,
@@ -753,6 +755,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.xTickEdgeLabels = xTickEdgeLabels
         self.yTickEdgeLabels = yTickEdgeLabels
         self.seriesOrder = seriesOrder
+        self.legendPosition = legendPosition
         self.xLabelOverride = xLabelOverride
         self.yLabelOverride = yLabelOverride
         self.baseline = baseline
@@ -789,6 +792,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case xTickEdgeLabels
         case yTickEdgeLabels
         case seriesOrder
+        case legendPosition
         case xLabelOverride
         case yLabelOverride
         case baseline
@@ -828,6 +832,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         xTickEdgeLabels = try container.decodeIfPresent(String.self, forKey: .xTickEdgeLabels)
         yTickEdgeLabels = try container.decodeIfPresent(String.self, forKey: .yTickEdgeLabels)
         seriesOrder = try container.decodeIfPresent([String].self, forKey: .seriesOrder)
+        legendPosition = try container.decodeIfPresent(String.self, forKey: .legendPosition)
         xLabelOverride = try container.decodeIfPresent(String.self, forKey: .xLabelOverride)
         yLabelOverride = try container.decodeIfPresent(String.self, forKey: .yLabelOverride)
         baseline = try container.decodeIfPresent(String.self, forKey: .baseline)
@@ -895,6 +900,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(xTickEdgeLabels, forKey: .xTickEdgeLabels)
         try container.encodeIfPresent(yTickEdgeLabels, forKey: .yTickEdgeLabels)
         try container.encodeIfPresent(seriesOrder, forKey: .seriesOrder)
+        try container.encodeIfPresent(legendPosition, forKey: .legendPosition)
         try container.encodeIfPresent(xLabelOverride, forKey: .xLabelOverride)
         try container.encodeIfPresent(yLabelOverride, forKey: .yLabelOverride)
         try container.encodeIfPresent(baseline, forKey: .baseline)

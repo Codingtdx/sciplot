@@ -437,6 +437,7 @@ def _render_curve_candidate(
         autofixes.append("direct_series_labels")
     if compact_legend:
         autofixes.append("compact_inside_legend")
+    forced_legend_mode = _legend_mode_for_position(options.legend_position)
 
     if scatter:
         fig, ax = plot_scatter(
@@ -447,7 +448,11 @@ def _render_curve_candidate(
             width_mm=options.width_mm,
             height_mm=options.height_mm,
             reverse_x=options.reverse_x,
-            legend_mode="none" if direct_label_side is not None or compact_legend else "inside_best",
+            legend_mode=(
+                "none"
+                if direct_label_side is not None or compact_legend
+                else forced_legend_mode
+            ),
             legend_expand_axes=str(base_kwargs.get("legend_expand_axes", "xy")),
             marker_size=14.0
             * (combined_fix.collection_size_scale if combined_fix.collection_size_scale != 1.0 else 1.0),
@@ -499,7 +504,7 @@ def _render_curve_candidate(
             legend_mode=(
                 "none"
                 if direct_label_side is not None or compact_legend
-                else str(base_kwargs.get("legend_mode", "inside_best"))
+                else forced_legend_mode
             ),
             legend_expand_axes=str(base_kwargs.get("legend_expand_axes", "xy")),
             preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
@@ -577,6 +582,13 @@ def _with_manual_axis_overrides(
             y_override,
         )
     return resolved
+
+
+def _legend_mode_for_position(position: str | None) -> str:
+    cleaned = (position or "auto").strip().lower()
+    if cleaned in {"upper_left", "upper_right", "lower_left", "lower_right"}:
+        return f"inside_{cleaned}"
+    return "inside_best"
 
 
 def _ensure_known_series_order(series_list, series_order) -> None:
@@ -681,6 +693,7 @@ def _render_curve_like_plot(
         preserve_stress_label=preserve_stress_label,
     )
     supports_direct_labels = secondary_binding is None and not (preserve_stress_label and len(series_list) >= 4)
+    forced_legend = options.legend_position != "auto"
     candidates = [
         _render_curve_candidate(
             filename=filename,
@@ -694,7 +707,7 @@ def _render_curve_like_plot(
             base_kwargs=resolved_kwargs,
         )
     ]
-    if secondary_binding is None and _prefer_compact_legend(options, len(series_list)):
+    if not forced_legend and secondary_binding is None and _prefer_compact_legend(options, len(series_list)):
         candidates.append(
             _render_curve_candidate(
                 filename=filename,
@@ -708,7 +721,12 @@ def _render_curve_like_plot(
                 base_kwargs=resolved_kwargs,
             )
         )
-    if supports_direct_labels and _prefer_direct_labels(options, len(series_list)) and len(series_list) > 1:
+    if (
+        not forced_legend
+        and supports_direct_labels
+        and _prefer_direct_labels(options, len(series_list))
+        and len(series_list) > 1
+    ):
         for side in ("left", "right"):
             candidates.append(
                 _render_curve_candidate(

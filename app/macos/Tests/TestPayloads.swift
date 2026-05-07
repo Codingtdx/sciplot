@@ -215,8 +215,12 @@ enum TestPayloads {
             version: 1,
             defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizes: [
-                .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
-                .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
+                .init(id: "60x55", label: "Single 60 x 55 mm", widthMm: 60, heightMm: 55),
+                .init(id: "120x55", label: "Wide 120 x 55 mm", widthMm: 120, heightMm: 55),
+                .init(id: "180x55", label: "Full row 180 x 55 mm", widthMm: 180, heightMm: 55),
+                .init(id: "60x110", label: "Tall 60 x 110 mm", widthMm: 60, heightMm: 110),
+                .init(id: "120x110", label: "Large 120 x 110 mm", widthMm: 120, heightMm: 110),
+                .init(id: "180x110", label: "Full tall 180 x 110 mm", widthMm: 180, heightMm: 110),
             ],
             styles: styleCatalog(),
             palettes: paletteCatalog(),
@@ -227,8 +231,8 @@ enum TestPayloads {
                     description: "Continuous curve template.",
                     category: "curve",
                     presentationKind: "curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -245,6 +249,8 @@ enum TestPayloads {
                         "extra_y_axis",
                         "x_axis_breaks",
                         "y_axis_breaks",
+                        "series_order",
+                        "legend_position",
                         "style_preset",
                         "palette_preset",
                     ],
@@ -266,8 +272,8 @@ enum TestPayloads {
                     description: "Curve template with translucent area fill.",
                     category: "curve",
                     presentationKind: "area_curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -303,8 +309,8 @@ enum TestPayloads {
                     description: "Curve template with stepped interpolation.",
                     category: "curve",
                     presentationKind: "step_line",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -342,8 +348,8 @@ enum TestPayloads {
                     description: "Bounded function-layer curve template.",
                     category: "curve",
                     presentationKind: "function_curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -382,8 +388,8 @@ enum TestPayloads {
                     description: "Stacked curve template with translucent filled bands.",
                     category: "curve",
                     presentationKind: "stacked_area",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "reverse_x",
@@ -410,8 +416,8 @@ enum TestPayloads {
                     description: "Bar comparison template.",
                     category: "stats",
                     presentationKind: "bar",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_tick_density",
@@ -437,8 +443,8 @@ enum TestPayloads {
                     description: "Box comparison template.",
                     category: "stats",
                     presentationKind: "box",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_min",
@@ -466,8 +472,8 @@ enum TestPayloads {
                     description: "Box comparison template with strip overlay.",
                     category: "stats",
                     presentationKind: "box_strip",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_min",
@@ -496,8 +502,8 @@ enum TestPayloads {
                     description: "Smoothed density areas with outline overlays.",
                     category: "stats",
                     presentationKind: "density_area",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "x_min",
@@ -513,6 +519,7 @@ enum TestPayloads {
                         "x_axis_breaks",
                         "y_axis_breaks",
                         "series_order",
+                        "legend_position",
                         "style_preset",
                         "palette_preset",
                     ],
@@ -530,7 +537,7 @@ enum TestPayloads {
                 ),
             ],
             templateIds: ["curve", "area_curve", "step_line", "function_curve", "stacked_area", "bar", "box", "box_strip", "density_area"],
-            sizeIds: ["single_panel", "double_panel"],
+            sizeIds: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
             palettePresetIds: sharedAvailablePalettes,
             visualThemes: visualThemeCatalog()
         )
@@ -541,8 +548,12 @@ enum TestPayloads {
             version: 1,
             defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizes: [
-                .init(id: "single_panel", label: "Single Panel", widthMm: 60, heightMm: 55),
-                .init(id: "double_panel", label: "Double Panel", widthMm: 120, heightMm: 55),
+                .init(id: "60x55", label: "Single 60 x 55 mm", widthMm: 60, heightMm: 55),
+                .init(id: "120x55", label: "Wide 120 x 55 mm", widthMm: 120, heightMm: 55),
+                .init(id: "180x55", label: "Full row 180 x 55 mm", widthMm: 180, heightMm: 55),
+                .init(id: "60x110", label: "Tall 60 x 110 mm", widthMm: 60, heightMm: 110),
+                .init(id: "120x110", label: "Large 120 x 110 mm", widthMm: 120, heightMm: 110),
+                .init(id: "180x110", label: "Full tall 180 x 110 mm", widthMm: 180, heightMm: 110),
             ],
             styles: styleCatalog(),
             palettes: paletteCatalog(),
@@ -553,8 +564,8 @@ enum TestPayloads {
                     description: "Continuous curve template.",
                     category: "curve",
                     presentationKind: "curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -589,7 +600,7 @@ enum TestPayloads {
                 ),
             ],
             templateIds: ["curve"],
-            sizeIds: ["single_panel", "double_panel"],
+            sizeIds: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
             palettePresetIds: sharedAvailablePalettes,
             visualThemes: visualThemeCatalog()
         )
@@ -600,7 +611,12 @@ enum TestPayloads {
             version: 1,
             defaults: .init(stylePreset: "nature", palettePreset: "colorblind_safe"),
             sizePresets: [
-                "single_panel": .init(label: "Single Panel", widthMm: 60, heightMm: 55),
+                "60x55": .init(label: "Single 60 x 55 mm", widthMm: 60, heightMm: 55),
+                "120x55": .init(label: "Wide 120 x 55 mm", widthMm: 120, heightMm: 55),
+                "180x55": .init(label: "Full row 180 x 55 mm", widthMm: 180, heightMm: 55),
+                "60x110": .init(label: "Tall 60 x 110 mm", widthMm: 60, heightMm: 110),
+                "120x110": .init(label: "Large 120 x 110 mm", widthMm: 120, heightMm: 110),
+                "180x110": .init(label: "Full tall 180 x 110 mm", widthMm: 180, heightMm: 110),
             ],
             styles: [
                 "nature": .string("Nature"),
@@ -625,8 +641,8 @@ enum TestPayloads {
                     description: "Continuous curve template.",
                     category: "curve",
                     presentationKind: "curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -643,6 +659,8 @@ enum TestPayloads {
                         "extra_y_axis",
                         "x_axis_breaks",
                         "y_axis_breaks",
+                        "series_order",
+                        "legend_position",
                         "style_preset",
                         "palette_preset",
                     ],
@@ -661,8 +679,8 @@ enum TestPayloads {
                     description: "Curve template with translucent area fill.",
                     category: "curve",
                     presentationKind: "area_curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -695,8 +713,8 @@ enum TestPayloads {
                     description: "Curve template with stepped interpolation.",
                     category: "curve",
                     presentationKind: "step_line",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -731,8 +749,8 @@ enum TestPayloads {
                     description: "Bounded function-layer curve template.",
                     category: "curve",
                     presentationKind: "function_curve",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "xscale",
@@ -768,8 +786,8 @@ enum TestPayloads {
                     description: "Stacked curve template with translucent filled bands.",
                     category: "curve",
                     presentationKind: "stacked_area",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "reverse_x",
@@ -793,8 +811,8 @@ enum TestPayloads {
                     description: "Bar comparison template.",
                     category: "stats",
                     presentationKind: "bar",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_tick_density",
@@ -817,8 +835,8 @@ enum TestPayloads {
                     description: "Box comparison template.",
                     category: "stats",
                     presentationKind: "box",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_min",
@@ -843,8 +861,8 @@ enum TestPayloads {
                     description: "Box comparison template with strip overlay.",
                     category: "stats",
                     presentationKind: "box_strip",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "y_min",
@@ -870,8 +888,8 @@ enum TestPayloads {
                     description: "Smoothed density areas with outline overlays.",
                     category: "stats",
                     presentationKind: "density_area",
-                    defaultSize: "single_panel",
-                    allowedSizes: ["single_panel", "double_panel"],
+                    defaultSize: "60x55",
+                    allowedSizes: ["60x55", "120x55", "180x55", "60x110", "120x110", "180x110"],
                     editableOptions: [
                         "size",
                         "x_min",
@@ -1013,7 +1031,7 @@ enum TestPayloads {
             dataset: inspectFile(path: path).dataset,
             template: "curve",
             options: .init(
-                size: "single_panel",
+                size: "60x55",
                 stylePreset: "nature",
                 palettePreset: "colorblind_safe",
                 visualThemeID: "clean_light"
@@ -1178,7 +1196,7 @@ enum TestPayloads {
             lifecyclePolicy: "stable",
             implementationID: "curve",
             sheet: .name("Representative_Curve"),
-            options: RenderOptionsPayload(size: "single_panel", xscale: "linear", yscale: "linear"),
+            options: RenderOptionsPayload(size: "60x55", xscale: "linear", yscale: "linear"),
             preflight: .init(
                 template: "curve",
                 requestedTemplateID: "curve",
@@ -1333,7 +1351,7 @@ enum TestPayloads {
         sheet: SheetValue = .name("Representative_Curve"),
         fitOptions: FitOptionsPayload = FitOptionsPayload(),
         renderOptions: RenderOptionsPayload = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "nature",
             palettePreset: "colorblind_safe",
             visualThemeID: "clean_light"
@@ -1951,7 +1969,7 @@ enum TestPayloads {
                     selectedTemplateID: "curve",
                     optionsByTemplate: [
                         "curve": RenderOptionsPayload(
-                            size: "single_panel",
+                            size: "60x55",
                             stylePreset: "nature",
                             palettePreset: "colorblind_safe",
                             visualThemeID: "clean_light"

@@ -24,6 +24,7 @@ from src.rendering.themes import visual_theme_ids
 
 _VALID_TICK_DENSITIES = frozenset({"auto", "sparse", "dense"})
 _VALID_TICK_EDGE_LABELS = frozenset({"auto", "hide_min", "hide_max", "hide_both"})
+_VALID_LEGEND_POSITIONS = frozenset({"auto", "upper_left", "upper_right", "lower_left", "lower_right"})
 
 
 def validate_template_name(template: str) -> str:
@@ -41,13 +42,17 @@ def resolve_size(
     resolved_template_id: str | None = None,
 ) -> tuple[float, float]:
     effective_template = resolved_template_id or resolve_template_id(template)
-    spec = template_contract(effective_template)
     chosen = size_text or DEFAULT_SIZE_BY_TEMPLATE[effective_template]
-    if chosen not in spec.allowed_sizes:
-        raise ValueError(
-            f"Template `{template}` does not support size `{chosen}`. Supported sizes: {', '.join(spec.allowed_sizes)}"
+    try:
+        size_spec = size_preset_contract(chosen)
+    except ValueError as exc:
+        available = ", ".join(
+            size_preset_contract(size_id).label
+            for size_id in template_contract(effective_template).allowed_sizes
         )
-    size_spec = size_preset_contract(chosen)
+        raise ValueError(
+            f"Unknown figure size `{chosen}` for template `{template}`. Supported sizes: {available}"
+        ) from exc
     return size_spec.width_mm, size_spec.height_mm
 
 
@@ -102,6 +107,26 @@ def _normalize_series_order(
         seen.add(key)
         cleaned.append(label)
     return tuple(cleaned) if cleaned else None
+
+
+def _normalize_legend_position(
+    template: str,
+    value: str | None,
+    *,
+    resolved_template_id: str | None = None,
+) -> str:
+    if value is None:
+        return "auto"
+    cleaned = str(value).strip().lower()
+    if not cleaned:
+        return "auto"
+    if cleaned not in _VALID_LEGEND_POSITIONS:
+        raise ValueError(
+            f"`legend_position` must be one of {', '.join(sorted(_VALID_LEGEND_POSITIONS))}."
+        )
+    if cleaned != "auto":
+        _ensure_template_option_supported(template, "legend_position", resolved_template_id=resolved_template_id)
+    return cleaned
 
 
 def _normalize_label_override(value: str | None) -> str | None:
@@ -161,6 +186,7 @@ def resolve_render_options(
     x_tick_edge_labels: str | None = None,
     y_tick_edge_labels: str | None = None,
     series_order: list[str] | tuple[str, ...] | None = None,
+    legend_position: str | None = None,
     x_label_override: str | None = None,
     y_label_override: str | None = None,
     baseline: str | None = None,
@@ -321,6 +347,11 @@ def resolve_render_options(
         series_order=_normalize_series_order(
             template,
             series_order,
+            resolved_template_id=contract_template,
+        ),
+        legend_position=_normalize_legend_position(
+            template,
+            legend_position,
             resolved_template_id=contract_template,
         ),
         x_label_override=_normalize_label_override(x_label_override),

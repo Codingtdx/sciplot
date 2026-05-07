@@ -335,11 +335,15 @@ extension PlotSession {
         await asyncCoordination.preview.wait()
     }
 
-    func setTemplate(_ templateID: String, shouldResetRenderOptions: Bool) {
+    func setTemplate(
+        _ templateID: String,
+        shouldResetRenderOptions: Bool,
+        preservingSize preservedSize: String? = nil
+    ) {
         let migratedTemplateID = migrateLegacyTemplateID(templateID) ?? templateID
         selectedTemplateID = migratedTemplateID
         if shouldResetRenderOptions {
-            resetRenderOptions(for: migratedTemplateID)
+            resetRenderOptions(for: migratedTemplateID, preservingSize: preservedSize)
         }
         invalidateSubmissionArtifacts()
         errorMessage = nil
@@ -425,16 +429,20 @@ extension PlotSession {
         )
     }
 
-    func resetRenderOptions(for templateID: String) {
+    func resetRenderOptions(for templateID: String, preservingSize preservedSize: String? = nil) {
         let template = metadata?.templates.first { $0.id == templateID }
         let recommendationSummary = recommendedPreviewConfigSummary(for: templateID)
         let resolvedStyle = defaultStyle(
             for: template,
             recommendedStyleID: recommendationSummary["style_preset"]?.stringValue
         )
+        let validSizeIDs = Set(template?.allowedSizes ?? [])
+        let resolvedSize = preservedSize.flatMap { validSizeIDs.contains($0) ? $0 : nil }
+            ?? recommendationSummary["size"]?.stringValue
+            ?? template?.defaultSize
 
         renderOptions = RenderOptionsPayload(
-            size: recommendationSummary["size"]?.stringValue ?? template?.defaultSize,
+            size: resolvedSize,
             xscale: recommendationSummary["xscale"]?.stringValue,
             yscale: recommendationSummary["yscale"]?.stringValue,
             reverseX: recommendationSummary["reverse_x"]?.boolValue ?? false,
@@ -583,6 +591,9 @@ extension PlotSession {
         resolved.yAxisBreaks = normalizedAxisBreaks(resolved.yAxisBreaks)
 
         if let template = selectedTemplateSummary {
+            if let size = resolved.size, !template.allowedSizes.contains(size) {
+                resolved.size = template.defaultSize
+            }
             if !template.availableStyles.contains(resolved.stylePreset) {
                 resolved.stylePreset = defaultStyle(for: template)
             }
@@ -622,6 +633,9 @@ extension PlotSession {
             }
             if !template.editableOptions.contains("y_axis_breaks") || (resolved.yscale ?? "linear") != "linear" {
                 resolved.yAxisBreaks = nil
+            }
+            if !template.editableOptions.contains("legend_position") {
+                resolved.legendPosition = nil
             }
         } else if let metadata {
             let validStyles = Set(metadata.styles.map(\.id))

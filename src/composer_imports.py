@@ -50,7 +50,8 @@ def match_graph_pdf_span(
         if width_ok and height_ok:
             return col_span, row_span, slot_kind
     raise ValueError(
-        "Graph mode only accepts 60x55, 120x55, or 60x110 mm SciPlot God PDFs. "
+        "Graph mode only accepts 60x55, 120x55, 180x55, 60x110, 120x110, or 180x110 mm "
+        "SciPlot God PDFs. "
         "Use asset mode instead."
     )
 

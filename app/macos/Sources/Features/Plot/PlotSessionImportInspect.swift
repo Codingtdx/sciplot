@@ -116,7 +116,11 @@ extension PlotSession {
             return
         }
         let previousSnapshot = undoSnapshot()
-        setTemplate(migratedTemplateID, shouldResetRenderOptions: true)
+        setTemplate(
+            migratedTemplateID,
+            shouldResetRenderOptions: true,
+            preservingSize: renderOptions.size
+        )
         schedulePreviewRefresh(policy: .immediate)
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Change Template")
     }

@@ -21,6 +21,14 @@ EXPECTED_STYLE_IDS = {
     "presentation",
     "poster",
 }
+EXPECTED_FIGURE_SIZE_IDS = {
+    "60x55",
+    "120x55",
+    "180x55",
+    "60x110",
+    "120x110",
+    "180x110",
+}
 
 
 def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
@@ -36,6 +44,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     }
     assert meta.template_ids
     assert meta.visual_themes
+    assert {item.id for item in meta.sizes} == EXPECTED_FIGURE_SIZE_IDS
     assert {item.id for item in meta.styles} == EXPECTED_STYLE_IDS
     assert {item.id for item in meta.styles if item.display_group == "publication"} == {
         "nature",
@@ -76,7 +85,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert contract_response.status_code == 200, contract_response.text
     contract = PlotContractResponse.model_validate(contract_response.json())
     assert contract.templates
-    assert contract.size_presets
+    assert set(contract.size_presets.keys()) == EXPECTED_FIGURE_SIZE_IDS
     assert set(contract.styles.keys()) == EXPECTED_STYLE_IDS
     assert removed_template_ids.isdisjoint(contract.templates)
     assert {"area_curve", "step_line", "stacked_area", "density_area"}.issubset(contract.templates)

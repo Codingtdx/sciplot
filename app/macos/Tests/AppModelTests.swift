@@ -321,7 +321,7 @@ final class AppModelTests: XCTestCase {
             savedSourceMtimeNs: 123,
             sheet: .name("Manual"),
             templateID: "curve",
-            renderOptions: RenderOptionsPayload(size: "single_panel"),
+            renderOptions: RenderOptionsPayload(size: "60x55"),
             title: "Restored manual"
         )
         let runSnapshot = CodeConsoleRunSnapshotPayload(
@@ -452,7 +452,7 @@ final class AppModelTests: XCTestCase {
             inputURL: workbookURL,
             sheet: .name("Representative_Curve"),
             templateID: "curve",
-            options: RenderOptionsPayload(size: "single_panel")
+            options: RenderOptionsPayload(size: "60x55")
         )
         try? await Task.sleep(nanoseconds: 20_000_000)
 

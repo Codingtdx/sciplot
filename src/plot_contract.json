@@ -45,18 +45,33 @@
   },
   "size_presets": {
     "60x55": {
-      "label": "60 x 55 mm",
+      "label": "Single 60 x 55 mm",
       "width_mm": 60.0,
       "height_mm": 55.0
     },
     "120x55": {
-      "label": "120 x 55 mm",
+      "label": "Wide 120 x 55 mm",
       "width_mm": 120.0,
       "height_mm": 55.0
     },
+    "180x55": {
+      "label": "Full row 180 x 55 mm",
+      "width_mm": 180.0,
+      "height_mm": 55.0
+    },
     "60x110": {
-      "label": "60 x 110 mm",
+      "label": "Tall 60 x 110 mm",
       "width_mm": 60.0,
+      "height_mm": 110.0
+    },
+    "120x110": {
+      "label": "Large 120 x 110 mm",
+      "width_mm": 120.0,
+      "height_mm": 110.0
+    },
+    "180x110": {
+      "label": "Full tall 180 x 110 mm",
+      "width_mm": 180.0,
       "height_mm": 110.0
     }
   },
@@ -976,7 +991,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -996,6 +1015,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -1050,7 +1070,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1123,7 +1147,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1143,6 +1171,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -1199,7 +1228,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1217,6 +1250,7 @@
         "extra_x_axis",
         "extra_y_axis",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -1271,7 +1305,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1291,6 +1329,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -1345,7 +1384,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1404,7 +1447,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1462,7 +1509,12 @@
       "category": "wide_nmr",
       "default_size": "60x110",
       "allowed_sizes": [
-        "60x110"
+        "60x55",
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1525,7 +1577,12 @@
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
-        "60x55"
+        "60x55",
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1586,7 +1643,12 @@
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
-        "60x55"
+        "60x55",
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1648,7 +1710,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1709,7 +1775,12 @@
       "category": "single_panel",
       "default_size": "60x55",
       "allowed_sizes": [
-        "60x55"
+        "60x55",
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1771,7 +1842,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1833,7 +1908,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1895,7 +1974,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -1957,7 +2040,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2025,7 +2112,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2093,7 +2184,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2113,6 +2208,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -2167,7 +2263,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2187,6 +2287,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -2241,7 +2342,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2261,6 +2366,7 @@
         "x_axis_breaks",
         "y_axis_breaks",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -2315,7 +2421,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2333,6 +2443,7 @@
         "extra_x_axis",
         "extra_y_axis",
         "series_order",
+        "legend_position",
         "style_preset",
         "palette_preset"
       ],
@@ -2387,7 +2498,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2447,7 +2562,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2508,7 +2627,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2565,7 +2688,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",
@@ -2619,7 +2746,11 @@
       "default_size": "60x55",
       "allowed_sizes": [
         "60x55",
-        "120x55"
+        "120x55",
+        "180x55",
+        "60x110",
+        "120x110",
+        "180x110"
       ],
       "editable_options": [
         "size",

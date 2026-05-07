@@ -112,7 +112,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         importedPlotSession.selectedSheet = .name("Representative_Curve")
         importedPlotSession.selectedTemplateID = "area_curve"
         importedPlotSession.renderOptions = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "presentation",
             palettePreset: "shine",
             visualThemeID: "macarons"
@@ -170,7 +170,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                 selectedTemplateID: "box",
                 optionsByTemplate: [
                     "box": RenderOptionsPayload(
-                        size: "single_panel",
+                        size: "60x55",
                         stylePreset: "presentation",
                         palettePreset: "shine",
                         visualThemeID: "macarons"
@@ -182,7 +182,7 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         figureSession.selectedFigureFamilyID = "strength"
         figureSession.syncFigureSelection()
         figureSession.plotSession.renderOptions = RenderOptionsPayload(
-            size: "single_panel",
+            size: "60x55",
             stylePreset: "presentation",
             palettePreset: "shine",
             visualThemeID: "macarons"

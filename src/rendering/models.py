@@ -35,6 +35,7 @@ class RenderOptions:
     x_tick_edge_labels: str | None = None
     y_tick_edge_labels: str | None = None
     series_order: tuple[str, ...] | None = None
+    legend_position: str = "auto"
     x_label_override: str | None = None
     y_label_override: str | None = None
     use_sidecar: bool | None = None

@@ -23,7 +23,10 @@ GRAPH_SIZE_TOLERANCE_MM = 1.2
 GRAPH_SIZE_RULES: tuple[tuple[float, float, int, int, str | None], ...] = (
     (60.0, 55.0, 1, 1, None),
     (120.0, 55.0, 2, 1, None),
+    (180.0, 55.0, 3, 1, None),
     (60.0, 110.0, 1, 2, "structure"),
+    (120.0, 110.0, 2, 2, None),
+    (180.0, 110.0, 3, 2, None),
 )
 
 

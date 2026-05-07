@@ -2024,7 +2024,7 @@ final class DataStudioSessionTests: XCTestCase {
                 .init(
                     familyID: "strength",
                     selectedTemplateID: "box",
-                    optionsByTemplate: ["box": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe")],
+                    optionsByTemplate: ["box": RenderOptionsPayload(size: "60x55", stylePreset: "nature", palettePreset: "colorblind_safe")],
                     fitOptionsByTemplate: [:]
                 ),
             ],
@@ -2138,7 +2138,7 @@ final class DataStudioSessionTests: XCTestCase {
                 .init(
                     familyID: "representative_curve",
                     selectedTemplateID: "curve",
-                    optionsByTemplate: ["curve": RenderOptionsPayload(size: "single_panel", stylePreset: "nature", palettePreset: "colorblind_safe", visualThemeID: "roma")],
+                    optionsByTemplate: ["curve": RenderOptionsPayload(size: "60x55", stylePreset: "nature", palettePreset: "colorblind_safe", visualThemeID: "roma")],
                     fitOptionsByTemplate: ["curve": FitOptionsPayload(enabled: true, modelID: "polynomial_2")]
                 ),
             ],
