@@ -98,6 +98,70 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(workbenchWindow.isVisible)
     }
 
+    func testLauncherSceneFallbackDoesNotStealFocusWhenWorkbenchAppearsBeforeRetry() async throws {
+        let manager = AppWindowManager()
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+        closeLauncherWindows()
+
+        manager.openLauncherAfterSceneAttempt(model: model, delays: [0.2])
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let workbenchWindow = NSWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 640, height: 420)),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        workbenchWindow.identifier = NSUserInterfaceItemIdentifier(Workbench.plot.windowSceneID)
+        workbenchWindow.title = Workbench.plot.title
+        workbenchWindow.isReleasedWhenClosed = false
+        workbenchWindow.orderFrontRegardless()
+        defer {
+            workbenchWindow.close()
+            closeLauncherWindows()
+        }
+
+        try await Task.sleep(nanoseconds: 250_000_000)
+
+        XCTAssertFalse(
+            NSApp.windows.contains { window in
+                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot God")
+            },
+            "Delayed Launcher fallback should not present after a workbench window becomes visible."
+        )
+        XCTAssertTrue(workbenchWindow.isVisible)
+    }
+
+    func testLauncherSceneFallbackDoesNotReconfigureAlreadyVisibleLauncherWindow() async throws {
+        let manager = AppWindowManager()
+        let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
+        closeLauncherWindows()
+
+        let launcherWindow = BorderlessLauncherWindow(
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 720, height: 420)),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        launcherWindow.identifier = NSUserInterfaceItemIdentifier("launcher")
+        launcherWindow.title = "SciPlot God"
+        launcherWindow.isReleasedWhenClosed = false
+        launcherWindow.orderFrontRegardless()
+        defer {
+            launcherWindow.close()
+            closeLauncherWindows()
+        }
+
+        manager.openLauncherAfterSceneAttempt(model: model, delays: [0.05])
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        XCTAssertEqual(
+            launcherWindow.contentView?.bounds.size ?? .zero,
+            CGSize(width: 720, height: 420),
+            "Visible reusable Launcher windows should be treated as already managed by the fallback path."
+        )
+    }
+
     private func closeLauncherWindows() {
         NSApp.windows
             .filter { $0.identifier?.rawValue == "launcher" || $0.title == "SciPlot God" }

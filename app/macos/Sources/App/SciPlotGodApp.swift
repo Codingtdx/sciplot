@@ -119,7 +119,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
     func openLauncherAfterSceneAttempt(model: AppModel, delays: [TimeInterval] = [0.05, 0.2, 0.55]) {
         for delay in delays {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard !self.hasVisibleWorkbenchWindow() else {
+                guard self.shouldOpenLauncherFallback() else {
                     return
                 }
                 self.openLauncher(model: model)
@@ -302,6 +302,16 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
                 return true
             }
             return workbenchTitles.contains(window.title)
+        }
+    }
+
+    private func shouldOpenLauncherFallback() -> Bool {
+        !hasVisibleWorkbenchWindow() && !hasVisibleReusableLauncherWindow()
+    }
+
+    private func hasVisibleReusableLauncherWindow() -> Bool {
+        NSApp.windows.contains { window in
+            window.isVisible && !window.isMiniaturized && canReuseLauncherWindow(window)
         }
     }
 
