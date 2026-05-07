@@ -32,6 +32,7 @@ class MetaStyleResponse(StrictModel):
     id: str
     label: str
     public: bool
+    display_group: str = "publication"
     description: str
     hard_constraints: bool
     preset_note: str

@@ -1827,21 +1827,58 @@ struct MetaStyleResponse: Codable, Equatable, Sendable, Identifiable {
     let id: String
     let label: String
     let `public`: Bool
+    let displayGroup: String
     let description: String
     let hardConstraints: Bool
     let presetNote: String
     let recommendedPalettePreset: String
     let recommendedVisualThemeID: String?
 
+    init(
+        id: String,
+        label: String,
+        `public`: Bool,
+        displayGroup: String = "publication",
+        description: String,
+        hardConstraints: Bool,
+        presetNote: String,
+        recommendedPalettePreset: String,
+        recommendedVisualThemeID: String?
+    ) {
+        self.id = id
+        self.label = label
+        self.public = `public`
+        self.displayGroup = displayGroup
+        self.description = description
+        self.hardConstraints = hardConstraints
+        self.presetNote = presetNote
+        self.recommendedPalettePreset = recommendedPalettePreset
+        self.recommendedVisualThemeID = recommendedVisualThemeID
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case label
         case `public`
+        case displayGroup
         case description
         case hardConstraints
         case presetNote
         case recommendedPalettePreset
         case recommendedVisualThemeID = "recommendedVisualThemeId"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        self.public = try container.decode(Bool.self, forKey: .public)
+        displayGroup = try container.decodeIfPresent(String.self, forKey: .displayGroup) ?? "publication"
+        description = try container.decode(String.self, forKey: .description)
+        hardConstraints = try container.decode(Bool.self, forKey: .hardConstraints)
+        presetNote = try container.decode(String.self, forKey: .presetNote)
+        recommendedPalettePreset = try container.decode(String.self, forKey: .recommendedPalettePreset)
+        recommendedVisualThemeID = try container.decodeIfPresent(String.self, forKey: .recommendedVisualThemeID)
     }
 }
 

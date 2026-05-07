@@ -24,22 +24,28 @@ extension PlotInspectorView {
 
                 if !session.availableStyles.isEmpty {
                     if session.availableStyles.count > 1 {
-                        AdaptiveInspectorControlRow(title: "Theme") {
+                        AdaptiveInspectorControlRow(title: "Publication Style") {
                             Picker("", selection: stringBinding(
                                 get: { session.renderOptions.stylePreset },
                                 set: { newValue in
                                     session.selectStylePreset(newValue)
                                 }
                             )) {
-                                ForEach(session.availableStyles) { style in
+                                ForEach(session.publicationStyles) { style in
                                     Text(style.label).tag(style.id)
+                                }
+                                if !session.legacyDisplayStyles.isEmpty {
+                                    Divider()
+                                    ForEach(session.legacyDisplayStyles) { style in
+                                        Text("Legacy / \(style.label)").tag(style.id)
+                                    }
                                 }
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
                         }
                     } else if let style = session.availableStyles.first {
-                        AdaptiveInspectorTextRow(title: "Theme", value: style.label)
+                        AdaptiveInspectorTextRow(title: "Publication Style", value: style.label)
                     }
                 }
 

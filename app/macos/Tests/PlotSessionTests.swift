@@ -1927,6 +1927,34 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
     }
 
+    func testPublicationStylesSurfacePublisherStylesBeforeLegacyDisplayStyles() async throws {
+        let session = PlotSession()
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        XCTAssertEqual(session.publicationStyles.map(\.id), ["nature", "acs", "science", "wiley", "elsevier"])
+        XCTAssertEqual(session.legacyDisplayStyles.map(\.id), ["editorial", "presentation", "poster"])
+    }
+
+    func testPublisherStyleSelectionAppliesContractRecommendedPaletteAndBackground() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.selectStylePreset("acs")
+        XCTAssertEqual(session.renderOptions.stylePreset, "acs")
+        XCTAssertEqual(session.renderOptions.palettePreset, "okabe_ito")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
+
+        session.selectStylePreset("elsevier")
+        XCTAssertEqual(session.renderOptions.stylePreset, "elsevier")
+        XCTAssertEqual(session.renderOptions.palettePreset, "muted")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "soft_grid")
+    }
+
     func testInspectionCancellationDoesNotSurfaceError() async {
         let client = MockSidecarClient()
         client.inspectHandler = { _ in

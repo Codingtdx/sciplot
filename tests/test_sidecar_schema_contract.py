@@ -11,6 +11,16 @@ from app.sidecar.server import app
 client = TestClient(app)
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "tensile_raw"
+EXPECTED_STYLE_IDS = {
+    "nature",
+    "acs",
+    "science",
+    "wiley",
+    "elsevier",
+    "editorial",
+    "presentation",
+    "poster",
+}
 
 
 def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
@@ -26,10 +36,33 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     }
     assert meta.template_ids
     assert meta.visual_themes
-    assert {item.id for item in meta.styles} == {"nature", "editorial", "presentation", "poster"}
+    assert {item.id for item in meta.styles} == EXPECTED_STYLE_IDS
+    assert {item.id for item in meta.styles if item.display_group == "publication"} == {
+        "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
+    }
+    assert {item.id for item in meta.styles if item.display_group == "legacy_display"} == {
+        "editorial",
+        "presentation",
+        "poster",
+    }
     assert meta.styles[0].recommended_palette_preset
     assert any(item.recommended_visual_theme_id == "clean_light" for item in meta.styles if item.id == "nature")
-    assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.palettes})
+    assert {
+        "infographic",
+        "roma",
+        "macarons",
+        "shine",
+        "vintage",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete",
+    }.issubset({item.id for item in meta.palettes})
     assert {"infographic", "roma", "macarons", "shine", "vintage"}.issubset({item.id for item in meta.visual_themes})
     assert removed_template_ids.isdisjoint(meta.template_ids)
     assert removed_template_ids.isdisjoint({item.id for item in meta.templates})
@@ -44,10 +77,13 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     contract = PlotContractResponse.model_validate(contract_response.json())
     assert contract.templates
     assert contract.size_presets
-    assert set(contract.styles.keys()) == {"nature", "editorial", "presentation", "poster"}
+    assert set(contract.styles.keys()) == EXPECTED_STYLE_IDS
     assert removed_template_ids.isdisjoint(contract.templates)
     assert {"area_curve", "step_line", "stacked_area", "density_area"}.issubset(contract.templates)
     assert contract.aliases["style_presets"]["default"] == "nature"
+    assert contract.aliases["style_presets"]["jacs"] == "acs"
+    assert contract.aliases["style_presets"]["aaas"] == "science"
+    assert contract.aliases["style_presets"]["advanced_materials"] == "wiley"
     assert all(template["presentation_kind"] for template in contract.templates.values())
 
 

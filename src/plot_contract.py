@@ -101,6 +101,7 @@ class ExportContract:
 class StyleContract:
     label: str
     public: bool
+    display_group: str
     description: str
     hard_constraints: bool
     preset_note: str
@@ -208,6 +209,7 @@ def load_plot_contract() -> PlotContract:
             key: StyleContract(
                 label=value["label"],
                 public=bool(value["public"]),
+                display_group=str(value.get("display_group", "publication")),
                 description=value["description"],
                 hard_constraints=bool(value["hard_constraints"]),
                 preset_note=value["preset_note"],
@@ -455,6 +457,7 @@ def meta_payload() -> dict[str, Any]:
                 "id": key,
                 "label": value.label,
                 "public": value.public,
+                "display_group": value.display_group,
                 "description": value.description,
                 "hard_constraints": value.hard_constraints,
                 "preset_note": value.preset_note,

@@ -10,7 +10,10 @@
       "lab_default": "nature",
       "science_editorial": "nature",
       "jacs_analytical": "nature",
-      "advanced_materials_spacious": "nature"
+      "advanced_materials_spacious": "nature",
+      "jacs": "acs",
+      "aaas": "science",
+      "advanced_materials": "wiley"
     }
   },
   "global_frame": {
@@ -249,6 +252,227 @@
         "color_space": "RGB",
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      },
+      "display_group": "publication"
+    },
+    "acs": {
+      "label": "ACS",
+      "public": true,
+      "display_group": "publication",
+      "description": "ACS-inspired compact publication style with Helvetica/Arial lettering and conservative line weights.",
+      "hard_constraints": false,
+      "preset_note": "Approximate ACS/JACS graph metrics: legible small lettering, clear symbols, and lines kept above hairline weight.",
+      "recommended_palette_preset": "okabe_ito",
+      "recommended_visual_theme_id": "clean_light",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.2,
+        "panel_label_size_pt": 8.6,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.4,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.3,
+        "line_alpha": 0.94,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.32,
+        "max_fill_alpha": 0.42,
+        "marker_size_pt": 3.6
+      },
+      "spacing": {
+        "axes_labelpad": 2.2,
+        "xtick_major_pad": 1.5,
+        "ytick_major_pad": 1.5,
+        "legend_inset_fraction": 0.028
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "science": {
+      "label": "Science",
+      "public": true,
+      "display_group": "publication",
+      "description": "Science/AAAS-inspired compact publication style with restrained strokes and minimal visual decoration.",
+      "hard_constraints": false,
+      "preset_note": "Conservative Science-style profile: keep figures simple, readable, and lightly colored.",
+      "recommended_palette_preset": "colorblind_safe",
+      "recommended_visual_theme_id": "clean_light",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.2,
+        "panel_label_size_pt": 8.6,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.3,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.25,
+        "line_alpha": 0.94,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.32,
+        "max_fill_alpha": 0.42,
+        "marker_size_pt": 3.5
+      },
+      "spacing": {
+        "axes_labelpad": 2.2,
+        "xtick_major_pad": 1.5,
+        "ytick_major_pad": 1.5,
+        "legend_inset_fraction": 0.028
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "wiley": {
+      "label": "Wiley",
+      "public": true,
+      "display_group": "publication",
+      "description": "Wiley-inspired publication style with slightly roomier text and balanced muted colors.",
+      "hard_constraints": false,
+      "preset_note": "Approximate Wiley journal figure profile: prioritize readable words and symbols at final figure size.",
+      "recommended_palette_preset": "tol_muted",
+      "recommended_visual_theme_id": "clean_light",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.2,
+        "legend_font_size_pt": 6.4,
+        "panel_label_size_pt": 8.8,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.05,
+        "tick_width_pt": 1.05,
+        "tick_length_pt": 3.6,
+        "minor_tick_width_pt": 0.85,
+        "minor_tick_length_pt": 2.1,
+        "line_width_pt": 1.4,
+        "line_alpha": 0.94,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.3,
+        "max_fill_alpha": 0.4,
+        "marker_size_pt": 3.8
+      },
+      "spacing": {
+        "axes_labelpad": 2.3,
+        "xtick_major_pad": 1.6,
+        "ytick_major_pad": 1.6,
+        "legend_inset_fraction": 0.028
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
+      }
+    },
+    "elsevier": {
+      "label": "Elsevier",
+      "public": true,
+      "display_group": "publication",
+      "description": "Elsevier-inspired publication style centered on 7 pt lettering and uniform artwork proportions.",
+      "hard_constraints": false,
+      "preset_note": "Approximate Elsevier graph profile: standard fonts, uniform sizing, and readable line/symbol hierarchy.",
+      "recommended_palette_preset": "muted",
+      "recommended_visual_theme_id": "soft_grid",
+      "typography": {
+        "font_family": [
+          "Arial",
+          "Helvetica",
+          "DejaVu Sans"
+        ],
+        "font_size_pt": 7.0,
+        "legend_font_size_pt": 6.2,
+        "panel_label_size_pt": 8.6,
+        "panel_label_weight": "bold"
+      },
+      "stroke": {
+        "axis_linewidth_pt": 1.0,
+        "tick_width_pt": 1.0,
+        "tick_length_pt": 3.4,
+        "minor_tick_width_pt": 0.8,
+        "minor_tick_length_pt": 2.0,
+        "line_width_pt": 1.3,
+        "line_alpha": 0.94,
+        "marker_alpha": 0.96,
+        "fill_alpha": 0.32,
+        "max_fill_alpha": 0.42,
+        "marker_size_pt": 3.6
+      },
+      "spacing": {
+        "axes_labelpad": 2.2,
+        "xtick_major_pad": 1.5,
+        "ytick_major_pad": 1.5,
+        "legend_inset_fraction": 0.028
+      },
+      "annotation": {
+        "legend_frameon": false,
+        "legend_tightness": "tight",
+        "label_tightness": "tight"
+      },
+      "export": {
+        "figure_dpi": 150,
+        "savefig_dpi": 300,
+        "savefig_format": "pdf",
+        "pdf_fonttype": 42,
+        "ps_fonttype": 42,
+        "color_space": "RGB",
+        "vector_preferred": true,
+        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
       }
     },
     "editorial": {
@@ -303,7 +527,8 @@
         "color_space": "RGB",
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      }
+      },
+      "display_group": "legacy_display"
     },
     "presentation": {
       "label": "Presentation",
@@ -357,7 +582,8 @@
         "color_space": "RGB",
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      }
+      },
+      "display_group": "legacy_display"
     },
     "poster": {
       "label": "Poster",
@@ -411,7 +637,8 @@
         "color_space": "RGB",
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      }
+      },
+      "display_group": "legacy_display"
     }
   },
   "palettes": {
@@ -598,7 +825,7 @@
     },
     "okabe_ito": {
       "label": "Okabe-Ito",
-      "public": false,
+      "public": true,
       "description": "Okabe-Ito: a classic colorblind-friendly scientific palette.",
       "categorical": [
         "#000000",
@@ -615,7 +842,7 @@
     },
     "tol_muted": {
       "label": "Tol Muted",
-      "public": false,
+      "public": true,
       "description": "Paul Tol muted: low-stimulation, balanced categorical colors.",
       "categorical": [
         "#332288",
@@ -646,6 +873,99 @@
       ],
       "sequential": "rocket",
       "diverging": "Spectral"
+    },
+    "tableau_10": {
+      "label": "Tableau 10",
+      "public": true,
+      "description": "Matplotlib Tableau 10 categorical cycle for broad software compatibility.",
+      "categorical": [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf"
+      ],
+      "sequential": "viridis",
+      "diverging": "coolwarm"
+    },
+    "seaborn_pastel": {
+      "label": "Seaborn Pastel",
+      "public": true,
+      "description": "Soft Seaborn pastel cycle for low-contrast categorical figures.",
+      "categorical": [
+        "#a1c9f4",
+        "#ffb482",
+        "#8de5a1",
+        "#ff9f9b",
+        "#d0bbff",
+        "#debb9b",
+        "#fab0e4",
+        "#cfcfcf",
+        "#fffea3",
+        "#b9f2f0"
+      ],
+      "sequential": "crest",
+      "diverging": "vlag"
+    },
+    "seaborn_dark": {
+      "label": "Seaborn Dark",
+      "public": true,
+      "description": "Darker Seaborn categorical cycle for stronger contrast on light figure surfaces.",
+      "categorical": [
+        "#001c7f",
+        "#b1400d",
+        "#12711c",
+        "#8c0800",
+        "#591e71",
+        "#592f0d",
+        "#a23582",
+        "#3c3c3c",
+        "#b8850a",
+        "#006374"
+      ],
+      "sequential": "mako",
+      "diverging": "icefire"
+    },
+    "primer_accessible": {
+      "label": "Primer Accessible",
+      "public": true,
+      "description": "GitHub Primer-inspired accessible role colors for technical plots and dashboards.",
+      "categorical": [
+        "#0969da",
+        "#1a7f37",
+        "#bf8700",
+        "#bc4c00",
+        "#cf222e",
+        "#8250df",
+        "#bf3989",
+        "#57606a"
+      ],
+      "sequential": "Blues",
+      "diverging": "RdBu"
+    },
+    "viridis_discrete": {
+      "label": "Viridis Discrete",
+      "public": true,
+      "description": "Discrete samples from viridis for perceptually ordered categorical sequences.",
+      "categorical": [
+        "#440154",
+        "#482878",
+        "#3e4989",
+        "#31688e",
+        "#26828e",
+        "#1f9e89",
+        "#35b779",
+        "#6ece58",
+        "#b5de2b",
+        "#fde725"
+      ],
+      "sequential": "viridis",
+      "diverging": "viridis"
     }
   },
   "templates": {
@@ -690,6 +1010,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -703,7 +1027,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -752,6 +1083,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -765,7 +1100,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -815,6 +1157,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -828,7 +1174,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -878,6 +1231,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -891,7 +1248,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -941,6 +1305,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -954,7 +1322,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -990,6 +1365,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1003,7 +1382,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "non_blank_pdf"
@@ -1038,6 +1424,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1051,7 +1441,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "non_blank_pdf"
@@ -1087,6 +1484,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1100,7 +1501,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "wide_nmr_horizontal_alignment",
@@ -1137,6 +1545,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1150,7 +1562,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1187,6 +1606,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1200,7 +1623,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1238,6 +1668,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1251,7 +1685,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1288,6 +1729,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1301,7 +1746,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1339,6 +1791,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1352,7 +1808,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1390,6 +1853,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1403,7 +1870,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1441,6 +1915,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1454,7 +1932,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1498,6 +1983,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1511,7 +2000,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1555,6 +2051,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1568,7 +2068,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1620,6 +2127,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1633,7 +2144,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1683,6 +2201,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1696,7 +2218,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1746,6 +2275,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1759,7 +2292,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1807,6 +2347,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1820,7 +2364,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1853,6 +2404,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1866,7 +2421,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1906,6 +2468,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1919,7 +2485,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",
@@ -1953,6 +2526,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -1966,7 +2543,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "non_blank_pdf"
@@ -1996,6 +2580,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -2009,7 +2597,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "non_blank_pdf"
@@ -2041,6 +2636,10 @@
       },
       "available_styles": [
         "nature",
+        "acs",
+        "science",
+        "wiley",
+        "elsevier",
         "editorial",
         "presentation",
         "poster"
@@ -2054,7 +2653,14 @@
         "roma",
         "macarons",
         "shine",
-        "vintage"
+        "vintage",
+        "okabe_ito",
+        "tol_muted",
+        "tableau_10",
+        "seaborn_pastel",
+        "seaborn_dark",
+        "primer_accessible",
+        "viridis_discrete"
       ],
       "hard_rules": [
         "single_panel_axis_frame",

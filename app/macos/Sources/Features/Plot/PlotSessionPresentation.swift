@@ -528,6 +528,14 @@ extension PlotSession {
         return (metadata?.styles ?? []).filter { selectedTemplateSummary.availableStyles.contains($0.id) }
     }
 
+    var publicationStyles: [MetaStyleResponse] {
+        availableStyles.filter { $0.displayGroup == "publication" }
+    }
+
+    var legacyDisplayStyles: [MetaStyleResponse] {
+        availableStyles.filter { $0.displayGroup == "legacy_display" }
+    }
+
     var availablePalettes: [MetaPaletteResponse] {
         guard let selectedTemplateSummary else {
             return metadata?.palettes ?? []

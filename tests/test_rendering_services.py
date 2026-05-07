@@ -408,6 +408,33 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize(
+    ("style_id", "expected_palette", "expected_theme"),
+    [
+        ("acs", "okabe_ito", "clean_light"),
+        ("science", "colorblind_safe", "clean_light"),
+        ("wiley", "tol_muted", "clean_light"),
+        ("elsevier", "muted", "soft_grid"),
+    ],
+)
+def test_resolve_render_options_accepts_publisher_publication_styles(
+    tmp_path: Path,
+    style_id: str,
+    expected_palette: str,
+    expected_theme: str,
+) -> None:
+    input_path = _write_curve_table(tmp_path / f"{style_id}.csv")
+
+    options = resolve_render_options(template="curve", style_preset=style_id)
+    preflight = preflight_render_request("curve", input_path, 0, options)
+
+    assert options.style_preset == style_id
+    assert options.palette_preset == expected_palette
+    assert options.visual_theme_id == expected_theme
+    assert preflight.submission_report is not None
+    assert preflight.submission_report.style_preset == style_id
+
+
+@pytest.mark.parametrize(
     ("writer", "filename", "expected_model", "expected_shapes"),
     [
         (_write_curve_table, "curve.csv", "curve_table", ("curve_like",)),
@@ -571,6 +598,11 @@ def test_resolve_render_options_uses_style_recommended_theme_and_palette_when_st
     assert options.style_preset == "poster"
     assert options.palette_preset == "shine"
     assert options.visual_theme_id == "shine"
+
+    acs_options = resolve_render_options(template="curve", style_preset="acs")
+    assert acs_options.style_preset == "acs"
+    assert acs_options.palette_preset == "okabe_ito"
+    assert acs_options.visual_theme_id == "clean_light"
 
 
 def test_resolve_render_options_accepts_extra_axes_payloads() -> None:
