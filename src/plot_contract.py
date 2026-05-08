@@ -86,6 +86,14 @@ class AnnotationContract:
 
 
 @dataclass(frozen=True)
+class AxisFrameContract:
+    left: bool
+    bottom: bool
+    top: bool
+    right: bool
+
+
+@dataclass(frozen=True)
 class ExportContract:
     figure_dpi: int
     savefig_dpi: int
@@ -111,6 +119,7 @@ class StyleContract:
     stroke: StrokeContract
     spacing: SpacingContract
     annotation: AnnotationContract
+    axis_frame: AxisFrameContract
     export: ExportContract
 
 
@@ -225,6 +234,7 @@ def load_plot_contract() -> PlotContract:
                 stroke=StrokeContract(**value["stroke"]),
                 spacing=SpacingContract(**value["spacing"]),
                 annotation=AnnotationContract(**value["annotation"]),
+                axis_frame=AxisFrameContract(**value["axis_frame"]),
                 export=ExportContract(**value["export"]),
             )
             for key, value in raw["styles"].items()
@@ -565,6 +575,13 @@ def render_contract_markdown(contract: PlotContract | None = None) -> str:
                 (
                     f"- Recommended visual theme: "
                     f"`{style_spec.recommended_visual_theme_id or 'None'}`"
+                ),
+                (
+                    "- Axis frame: "
+                    f"left=`{style_spec.axis_frame.left}`, "
+                    f"bottom=`{style_spec.axis_frame.bottom}`, "
+                    f"top=`{style_spec.axis_frame.top}`, "
+                    f"right=`{style_spec.axis_frame.right}`"
                 ),
                 f"- Preset note: {style_spec.preset_note}",
                 "",

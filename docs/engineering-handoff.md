@@ -6151,3 +6151,37 @@ Use this block for every new round:
   - `xcodebuild test -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -only-testing:SciPlotGodMacTests/SidecarRuntimeTests -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodeRenderOptionsKeepsCustomPlotTheme -only-testing:SciPlotGodMacTests/SchemaDecodingTests/testDecodePlotThemeEndpointResponses -only-testing:SciPlotGodMacTests/PlotSessionTests/testStyleStudioDraftAndSaveRefreshPreviewWithCustomThemePayload`: passed, 11 tests.
   - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed on 2026-05-06; clean repo guard, ruff, mypy, 293 pytest tests, smoke check, macOS presentation guard, Xcode build, and 222 Xcode tests were all green.
   - Computer-use smoke: passed Plot launch/import, `Style Studio...` open, palette/font/grid live draft edits, preview recolor, and theme save. The temporary smoke theme was removed from the local app-support library afterward.
+
+## 2026-05-08 - Publisher Aesthetic Calibration
+
+- Scope:
+  - Moved axis spine visibility into the publication style contract as `axis_frame.left/bottom/top/right`.
+  - Kept `nature` frozen with the existing open-axis behavior.
+  - Changed `elsevier` from `soft_grid` to `clean_light` and gave it full top/right boxed axes for a more conservative Elsevier/Cell Press-like graph surface.
+  - Kept `acs`, `science`, and `wiley` on white `clean_light` surfaces with open axes; Wiley keeps its slightly heavier line and type hierarchy without inventing a separate boxed style.
+  - Added `axes.spines.left/bottom/top/right` to protected matplotlib rcParams so visual themes and expert rcParams cannot silently redefine publication frames.
+  - Regenerated `docs/plot_contract.md` from the typed contract so the current public styles and size presets are documented from the same source of truth.
+
+- Research basis:
+  - Elsevier artwork guidance emphasizes uniform appearance, final text sizing, and line-art readability; it does not support a decorative paper/grid default.
+  - ACS/JACS guidance supports Helvetica/Arial lettering, visible minimum line weights, and color used for clarity/accessibility rather than decoration.
+  - Wiley guidance centers readable figure text and standard 80-180 mm artwork widths; no stable decorative background requirement was found.
+  - Nature Methods axis/grid guidance supports the conservative baseline of white surfaces, low visual scaffolding, and grid use only when it helps navigation.
+  - Science public author pages were not reliably fetchable in this environment, so `science` remains a conservative high-impact-journal profile rather than a claimed exact compliance preset.
+
+- Boundaries:
+  - No new public style IDs such as `jacs`, `advanced_materials`, or `cell_press`; current evidence does not justify maintaining fake journal substyles.
+  - No `.sciplotgod` bundle change and no new public render option.
+  - macOS still consumes style/palette/theme recommendations from `/meta`/contract; there is no second style constant table in the UI.
+
+- Follow-up product ideas:
+  - Journal Proof checks: a pre-export report for font size, boxed/open axis frame, line weight, color contrast, and final mm size against a selected publisher profile.
+  - Palette contrast checker: WCAG-style contrast and colorblind simulation warnings for line/marker palettes.
+  - Legend/direct-label strategy scoring: warn when legends crowd data, suggest direct labels, and score top-left/top-right alignment choices for multi-panel figures.
+  - Style preview matrix: render the same sample plot across publisher styles, palettes, and visual themes so users can compare aesthetics before applying.
+
+- Validation:
+  - `.venv/bin/python -m pytest tests/test_plot_contract.py tests/test_rendering_services.py tests/test_plot_themes.py tests/test_sidecar_schema_contract.py -q`: passed, 45 tests.
+  - `xcodebuild test -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData -only-testing:SciPlotGodMacTests/PlotSessionTests/testPublisherStyleSelectionAppliesContractRecommendedPaletteAndBackground`: passed, 1 test.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed on 2026-05-08; clean repo, ruff, mypy, 312 pytest tests, smoke check, macOS presentation guard, Xcode build, and 229 Xcode tests were all green.
+  - Computer-use smoke on 2026-05-08: launched the debug app, opened Plot, imported `examples/curve_table.csv`, switched Elsevier and confirmed `Muted + Clean Light`, white/no-grid preview, and visible top/right spines; switched ACS, Science, and Wiley and confirmed recommended palettes plus preview refresh.

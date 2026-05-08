@@ -83,6 +83,14 @@ class AnnotationSpec:
 
 
 @dataclass(frozen=True)
+class AxisFrameSpec:
+    left: bool
+    bottom: bool
+    top: bool
+    right: bool
+
+
+@dataclass(frozen=True)
 class ExportSpec:
     figure_dpi: int
     savefig_dpi: int
@@ -104,6 +112,7 @@ class JournalStyleSpec:
     stroke: StrokeSpec
     spacing: SpacingSpec
     annotation: AnnotationSpec
+    axis_frame: AxisFrameSpec
     export: ExportSpec
 
 
@@ -152,6 +161,7 @@ def _style_from_contract(name: str) -> JournalStyleSpec:
             legend_inset_fraction=spec.spacing.legend_inset_fraction,
         ),
         annotation=AnnotationSpec(**spec.annotation.__dict__),
+        axis_frame=AxisFrameSpec(**spec.axis_frame.__dict__),
         export=ExportSpec(**spec.export.__dict__),
     )
 
@@ -364,8 +374,10 @@ def apply_style(
             "axes.labelweight": "normal",
             "axes.titleweight": "normal",
             "axes.linewidth": style_spec.stroke.axis_linewidth_pt,
-            "axes.spines.top": False,
-            "axes.spines.right": False,
+            "axes.spines.left": style_spec.axis_frame.left,
+            "axes.spines.bottom": style_spec.axis_frame.bottom,
+            "axes.spines.top": style_spec.axis_frame.top,
+            "axes.spines.right": style_spec.axis_frame.right,
             "xtick.direction": "out",
             "ytick.direction": "out",
             "xtick.major.width": style_spec.stroke.tick_width_pt,

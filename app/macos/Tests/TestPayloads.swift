@@ -138,7 +138,7 @@ enum TestPayloads {
                 hardConstraints: false,
                 presetNote: "Publisher-inspired preset",
                 recommendedPalettePreset: "muted",
-                recommendedVisualThemeID: "soft_grid"
+                recommendedVisualThemeID: "clean_light"
             ),
             .init(
                 id: "editorial",

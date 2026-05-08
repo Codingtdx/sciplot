@@ -29,7 +29,44 @@
 - Hard constraints: `True`
 - Recommended palette: `colorblind_safe`
 - Recommended visual theme: `clean_light`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
 - Preset note: Built around the current public Nature image constraints.
+
+### `acs` / ACS
+
+- Description: ACS-inspired compact publication style with Helvetica/Arial lettering and conservative line weights.
+- Hard constraints: `False`
+- Recommended palette: `okabe_ito`
+- Recommended visual theme: `clean_light`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
+- Preset note: Approximate ACS/JACS graph metrics: legible small lettering, clear symbols, and lines kept above hairline weight.
+
+### `science` / Science
+
+- Description: Science/AAAS-inspired compact publication style with restrained strokes and minimal visual decoration.
+- Hard constraints: `False`
+- Recommended palette: `colorblind_safe`
+- Recommended visual theme: `clean_light`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
+- Preset note: Conservative Science-style profile: keep figures simple, readable, and lightly colored.
+
+### `wiley` / Wiley
+
+- Description: Wiley-inspired publication style with slightly roomier text and balanced muted colors.
+- Hard constraints: `False`
+- Recommended palette: `tol_muted`
+- Recommended visual theme: `clean_light`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
+- Preset note: Approximate Wiley journal figure profile: prioritize readable words and symbols at final figure size.
+
+### `elsevier` / Elsevier
+
+- Description: Elsevier-inspired publication style centered on 7 pt lettering and uniform artwork proportions.
+- Hard constraints: `False`
+- Recommended palette: `muted`
+- Recommended visual theme: `clean_light`
+- Axis frame: left=`True`, bottom=`True`, top=`True`, right=`True`
+- Preset note: Approximate Elsevier graph profile: standard fonts, uniform sizing, and readable line/symbol hierarchy.
 
 ### `editorial` / Editorial
 
@@ -37,6 +74,7 @@
 - Hard constraints: `False`
 - Recommended palette: `roma`
 - Recommended visual theme: `roma`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
 - Preset note: A balanced paper-first preset with relaxed typography and stroke sizing.
 
 ### `presentation` / Presentation
@@ -45,6 +83,7 @@
 - Hard constraints: `False`
 - Recommended palette: `infographic`
 - Recommended visual theme: `presentation_like`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
 - Preset note: Optimized for talk-friendly readability while keeping the same physical panel frame.
 
 ### `poster` / Poster
@@ -53,6 +92,7 @@
 - Hard constraints: `False`
 - Recommended palette: `shine`
 - Recommended visual theme: `shine`
+- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
 - Preset note: The loosest public preset, intended for display contexts rather than Nature-tight print metrics.
 
 ## Templates
@@ -71,8 +111,8 @@
 - Category: `single_panel`
 - Presentation kind: `curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Standard single-panel curve plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -82,7 +122,7 @@
 - Category: `single_panel`
 - Presentation kind: `function_curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `analytical_layers`, `style_preset`, `palette_preset`
 - Description: Curve plot with bounded analytic function layers sampled from safe math expressions.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -93,8 +133,8 @@
 - Category: `single_panel`
 - Presentation kind: `point_line`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Standard single-panel curve plot with markers.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: `multi_output_bundle_notice`
@@ -104,8 +144,8 @@
 - Category: `single_panel`
 - Presentation kind: `area_curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel line chart with a translucent area fill, inspired by ECharts area-line patterns.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -115,8 +155,8 @@
 - Category: `single_panel`
 - Presentation kind: `step_line`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel step-line chart for abrupt state changes, inspired by ECharts step-line patterns.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -126,7 +166,7 @@
 - Category: `stacked_spectrum`
 - Presentation kind: `stacked_curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-column stacked curves for spectrum-like figures.
 - Hard rules: `non_blank_pdf`
@@ -137,7 +177,7 @@
 - Category: `stacked_spectrum`
 - Presentation kind: `stacked_area`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`
 - Description: Single-column stacked curves with translucent area fills for layered spectrum-like comparisons.
 - Hard rules: `non_blank_pdf`
@@ -148,7 +188,7 @@
 - Category: `wide_nmr`
 - Presentation kind: `segmented_stacked_curve`
 - Default size: `60x110`
-- Allowed sizes: `60x110`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `reverse_x`, `baseline`, `series_order`, `style_preset`, `palette_preset`, `use_sidecar`
 - Description: Wide NMR double-height panel with left/right/bottom alignment and a reserved structure area on top.
 - Hard rules: `wide_nmr_horizontal_alignment`, `wide_nmr_structure_reserve`, `wide_nmr_segment_alignment`, `non_blank_pdf`
@@ -159,7 +199,7 @@
 - Category: `single_panel`
 - Presentation kind: `bar`
 - Default size: `60x55`
-- Allowed sizes: `60x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical bar chart with summary bars and error bars only.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -170,7 +210,7 @@
 - Category: `single_panel`
 - Presentation kind: `box`
 - Default size: `60x55`
-- Allowed sizes: `60x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical box plot summary without raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -181,7 +221,7 @@
 - Category: `single_panel`
 - Presentation kind: `box_strip`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Box plot with deterministic strip-point overlay emphasis.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -192,7 +232,7 @@
 - Category: `single_panel`
 - Presentation kind: `violin`
 - Default size: `60x55`
-- Allowed sizes: `60x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Statistical violin plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -203,7 +243,7 @@
 - Category: `single_panel`
 - Presentation kind: `violin_box`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Violin distribution with a compact box-summary overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -214,7 +254,7 @@
 - Category: `single_panel`
 - Presentation kind: `point_error`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Group means as points with deterministic error bars and optional raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -225,7 +265,7 @@
 - Category: `single_panel`
 - Presentation kind: `lollipop_error`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `y_tick_density`, `y_tick_edge_labels`, `series_order`, `style_preset`, `palette_preset`
 - Description: Group means as lollipop stems with deterministic error bars and optional raw-point overlays.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -236,7 +276,7 @@
 - Category: `single_panel`
 - Presentation kind: `histogram_density`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `style_preset`, `palette_preset`
 - Description: Density-normalized histogram overlays with deterministic smoothed density lines.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -247,7 +287,7 @@
 - Category: `single_panel`
 - Presentation kind: `density_area`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `style_preset`, `palette_preset`
 - Description: Smoothed distribution density areas with outline overlays for clearer replicate comparisons.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -258,8 +298,8 @@
 - Category: `single_panel`
 - Presentation kind: `scatter`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -269,8 +309,8 @@
 - Category: `single_panel`
 - Presentation kind: `bubble_scatter`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with deterministic bubble-size encoding from signal magnitude.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -280,8 +320,8 @@
 - Category: `single_panel`
 - Presentation kind: `scatter_fit`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `x_axis_breaks`, `y_axis_breaks`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel scatter plot with a deterministic linear fit overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -291,8 +331,8 @@
 - Category: `single_panel`
 - Presentation kind: `mean_band`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
-- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `style_preset`, `palette_preset`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
+- Editable options: `size`, `xscale`, `yscale`, `reverse_x`, `x_min`, `x_max`, `y_min`, `y_max`, `x_tick_density`, `x_tick_edge_labels`, `y_tick_density`, `y_tick_edge_labels`, `extra_x_axis`, `extra_y_axis`, `series_order`, `legend_position`, `style_preset`, `palette_preset`
 - Description: Single-panel curve plot with a replicate mean band overlay.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
 - Soft rules: None
@@ -302,7 +342,7 @@
 - Category: `heatmap`
 - Presentation kind: `heatmap`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `show_colorbar`, `style_preset`, `palette_preset`
 - Description: Heatmap with the main frame aligned to standard single-panel plots and an independent top colorbar.
 - Hard rules: `single_panel_axis_frame`, `heatmap_main_frame`, `heatmap_horizontal_colorbar`, `heatmap_colorbar_inside_canvas`, `non_blank_pdf`
@@ -313,7 +353,7 @@
 - Category: `heatmap`
 - Presentation kind: `contour_field`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `show_colorbar`, `x_min`, `x_max`, `y_min`, `y_max`, `style_preset`, `palette_preset`
 - Description: Scalar field rendered as filled contours from matrix or XYZ-long data.
 - Hard rules: `single_panel_axis_frame`, `non_blank_pdf`
@@ -324,7 +364,7 @@
 - Category: `single_panel`
 - Presentation kind: `polar_curve`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `y_min`, `y_max`, `series_order`, `style_preset`, `palette_preset`
 - Description: Theta-radius data rendered on a polar axis for radial curves and scatter-like traces.
 - Hard rules: `non_blank_pdf`
@@ -335,7 +375,7 @@
 - Category: `table`
 - Presentation kind: `table`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `style_preset`, `palette_preset`
 - Description: Compact table output for small data tables and summary command-style figures.
 - Hard rules: `non_blank_pdf`
@@ -346,7 +386,7 @@
 - Category: `heatmap`
 - Presentation kind: `annotated_heatmap`
 - Default size: `60x55`
-- Allowed sizes: `60x55`, `120x55`
+- Allowed sizes: `60x55`, `120x55`, `180x55`, `60x110`, `120x110`, `180x110`
 - Editable options: `size`, `show_colorbar`, `style_preset`, `palette_preset`
 - Description: Heatmap with cell annotations layered on top of the matrix.
 - Hard rules: `single_panel_axis_frame`, `heatmap_main_frame`, `heatmap_horizontal_colorbar`, `heatmap_colorbar_inside_canvas`, `non_blank_pdf`

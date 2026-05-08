@@ -1952,7 +1952,7 @@ final class PlotSessionTests: XCTestCase {
         session.selectStylePreset("elsevier")
         XCTAssertEqual(session.renderOptions.stylePreset, "elsevier")
         XCTAssertEqual(session.renderOptions.palettePreset, "muted")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "soft_grid")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
     }
 
     func testFigureSizeCatalogIsGlobalAndTemplateSwitchPreservesManualSize() async throws {

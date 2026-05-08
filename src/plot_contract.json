@@ -223,6 +223,12 @@
       "preset_note": "Built around the current public Nature image constraints.",
       "recommended_palette_preset": "colorblind_safe",
       "recommended_visual_theme_id": "clean_light",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -279,6 +285,12 @@
       "preset_note": "Approximate ACS/JACS graph metrics: legible small lettering, clear symbols, and lines kept above hairline weight.",
       "recommended_palette_preset": "okabe_ito",
       "recommended_visual_theme_id": "clean_light",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -334,6 +346,12 @@
       "preset_note": "Conservative Science-style profile: keep figures simple, readable, and lightly colored.",
       "recommended_palette_preset": "colorblind_safe",
       "recommended_visual_theme_id": "clean_light",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -389,6 +407,12 @@
       "preset_note": "Approximate Wiley journal figure profile: prioritize readable words and symbols at final figure size.",
       "recommended_palette_preset": "tol_muted",
       "recommended_visual_theme_id": "clean_light",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -443,7 +467,13 @@
       "hard_constraints": false,
       "preset_note": "Approximate Elsevier graph profile: standard fonts, uniform sizing, and readable line/symbol hierarchy.",
       "recommended_palette_preset": "muted",
-      "recommended_visual_theme_id": "soft_grid",
+      "recommended_visual_theme_id": "clean_light",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": true,
+        "right": true
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -498,6 +528,12 @@
       "preset_note": "A balanced paper-first preset with relaxed typography and stroke sizing.",
       "recommended_palette_preset": "roma",
       "recommended_visual_theme_id": "roma",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -553,6 +589,12 @@
       "preset_note": "Optimized for talk-friendly readability while keeping the same physical panel frame.",
       "recommended_palette_preset": "infographic",
       "recommended_visual_theme_id": "presentation_like",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",
@@ -608,6 +650,12 @@
       "preset_note": "The loosest public preset, intended for display contexts rather than Nature-tight print metrics.",
       "recommended_palette_preset": "shine",
       "recommended_visual_theme_id": "shine",
+      "axis_frame": {
+        "left": true,
+        "bottom": true,
+        "top": false,
+        "right": false
+      },
       "typography": {
         "font_family": [
           "Arial",

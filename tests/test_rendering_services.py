@@ -455,7 +455,7 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
         ("acs", "okabe_ito", "clean_light"),
         ("science", "colorblind_safe", "clean_light"),
         ("wiley", "tol_muted", "clean_light"),
-        ("elsevier", "muted", "soft_grid"),
+        ("elsevier", "muted", "clean_light"),
     ],
 )
 def test_resolve_render_options_accepts_publisher_publication_styles(
@@ -526,6 +526,7 @@ def test_style_composer_filters_contract_protected_theme_overrides(monkeypatch: 
             description="Inject protected and unprotected overrides.",
             soft_overrides={
                 "lines.linewidth": 9.9,
+                "axes.spines.top": True,
                 "axes.facecolor": "#f7f7f7",
             },
         ),
@@ -534,7 +535,7 @@ def test_style_composer_filters_contract_protected_theme_overrides(monkeypatch: 
     bundle = DEFAULT_STYLE_COMPOSER.compose("default", theme_id)
 
     assert bundle.resolved_soft == {"axes.facecolor": "#f7f7f7"}
-    assert bundle.blocked_soft_keys == ("lines.linewidth",)
+    assert bundle.blocked_soft_keys == ("axes.spines.top", "lines.linewidth")
 
 
 def test_visual_theme_soft_overrides_layer_on_top_of_publication_profile() -> None:
@@ -590,6 +591,21 @@ def test_visual_themes_never_override_protected_publication_rcparams() -> None:
                 assert not (set(overrides) & set(protected_keys))
                 plot_style.apply_style(style_id, "colorblind_safe", soft_overrides=overrides)
                 assert _snapshot(protected_keys) == baseline
+    finally:
+        plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
+
+
+def test_elsevier_publication_style_uses_full_boxed_axis_frame() -> None:
+    try:
+        plot_style.apply_style("nature", "colorblind_safe")
+        assert rcParams["axes.spines.top"] is False
+        assert rcParams["axes.spines.right"] is False
+
+        plot_style.apply_style("elsevier", "muted")
+        assert rcParams["axes.spines.left"] is True
+        assert rcParams["axes.spines.bottom"] is True
+        assert rcParams["axes.spines.top"] is True
+        assert rcParams["axes.spines.right"] is True
     finally:
         plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
 

@@ -68,7 +68,7 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(contract.styles["wiley"].recommended_palette_preset, "tol_muted")
         self.assertEqual(contract.styles["wiley"].recommended_visual_theme_id, "clean_light")
         self.assertEqual(contract.styles["elsevier"].recommended_palette_preset, "muted")
-        self.assertEqual(contract.styles["elsevier"].recommended_visual_theme_id, "soft_grid")
+        self.assertEqual(contract.styles["elsevier"].recommended_visual_theme_id, "clean_light")
         self.assertEqual(contract.styles["editorial"].recommended_palette_preset, "roma")
         self.assertEqual(contract.styles["editorial"].display_group, "legacy_display")
         self.assertEqual(contract.styles["presentation"].recommended_visual_theme_id, "presentation_like")
@@ -174,6 +174,26 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(contract_dict["styles"]["nature"]["recommended_visual_theme_id"], "clean_light")
         self.assertEqual(contract_dict["styles"]["acs"]["display_group"], "publication")
         self.assertEqual(contract_dict["styles"]["poster"]["display_group"], "legacy_display")
+        self.assertEqual(
+            contract_dict["styles"]["elsevier"]["axis_frame"],
+            {"left": True, "bottom": True, "top": True, "right": True},
+        )
+
+    def test_public_styles_declare_axis_frame_in_contract(self) -> None:
+        contract = load_plot_contract()
+        open_axis = {"left": True, "bottom": True, "top": False, "right": False}
+
+        for style_id, style_spec in contract.styles.items():
+            self.assertIsNotNone(style_spec.axis_frame, style_id)
+
+        self.assertEqual(contract.styles["nature"].axis_frame.__dict__, open_axis)
+        self.assertEqual(contract.styles["acs"].axis_frame.__dict__, open_axis)
+        self.assertEqual(contract.styles["science"].axis_frame.__dict__, open_axis)
+        self.assertEqual(contract.styles["wiley"].axis_frame.__dict__, open_axis)
+        self.assertEqual(
+            contract.styles["elsevier"].axis_frame.__dict__,
+            {"left": True, "bottom": True, "top": True, "right": True},
+        )
 
     def test_nature_publication_style_remains_frozen(self) -> None:
         nature = load_plot_contract().styles["nature"]
@@ -193,6 +213,7 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(nature.spacing.xtick_major_pad, 1.4)
         self.assertEqual(nature.spacing.ytick_major_pad, 1.4)
         self.assertEqual(nature.annotation.legend_frameon, False)
+        self.assertEqual(nature.axis_frame.__dict__, {"left": True, "bottom": True, "top": False, "right": False})
 
     def test_new_publication_aliases_normalize_without_reusing_legacy_alias_ids(self) -> None:
         self.assertEqual(normalize_style_alias("jacs"), "acs")

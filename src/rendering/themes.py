@@ -44,6 +44,10 @@ _PROTECTED_RCPARAM_KEYS: frozenset[str] = frozenset(
         "ytick.minor.size",
         "lines.linewidth",
         "lines.markersize",
+        "axes.spines.left",
+        "axes.spines.bottom",
+        "axes.spines.top",
+        "axes.spines.right",
     }
 )
 
