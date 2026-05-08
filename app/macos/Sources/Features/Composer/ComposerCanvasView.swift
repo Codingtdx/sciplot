@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ComposerCanvasView: View {
     @Bindable var session: ComposerSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     @State private var hoveredDropTarget: ComposerPlacementTarget?
     @State private var activeQuickActionToken: String?
@@ -13,7 +14,7 @@ struct ComposerCanvasView: View {
             let quickActionContext = boardQuickActionContext()
 
             ZStack(alignment: .topLeading) {
-                ComposerCanvasBoard(metrics: metrics)
+                ComposerCanvasBoard(metrics: metrics, theme: theme)
 
                 ForEach(session.allGridCells) { cell in
                     ComposerCanvasCellView(
@@ -167,10 +168,11 @@ struct ComposerCanvasView: View {
 
 private struct ComposerCanvasBoard: View {
     let metrics: ComposerCanvasMetrics
+    let theme: ProWorkspaceTheme
 
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Color(nsColor: .textBackgroundColor))
+            .fill(theme.documentSurfaceFill)
             .frame(
                 width: metrics.frameRect.width,
                 height: metrics.frameRect.height
@@ -178,7 +180,7 @@ private struct ComposerCanvasBoard: View {
             .position(metrics.frameRect.center)
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    .stroke(theme.hairline, lineWidth: 1)
             )
     }
 }

@@ -12,19 +12,19 @@ struct DataStudioWorkbenchView: View {
             DataStudioGroupRailView(session: session)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 12)
-                .padding(.vertical, 12)
+                .padding(.leading, ProWorkspaceMetrics.stagePadding)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             DataStudioPreviewWorkspaceView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             if isInspectorPresented {
                 DataStudioPreparationInspectorView(session: session)
-                    .frame(width: 340)
+                    .inspectorColumnWidth()
                     .frame(maxHeight: .infinity)
                     .padding(.trailing, 10)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, ProWorkspaceMetrics.stagePadding)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }

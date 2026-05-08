@@ -159,21 +159,10 @@ private struct PlotReplacementConfirmationHost: ViewModifier {
 private struct WorkbenchWindowToolbarContent: ToolbarContent {
     let workbench: Workbench
     @Bindable var model: AppModel
-
-    var body: some ToolbarContent {
-        ToolbarItem(id: "workbenchActionGroup", placement: .primaryAction) {
-            WorkbenchWindowActionGroup(workbench: workbench, model: model)
-        }
-    }
-}
-
-private struct WorkbenchWindowActionGroup: View {
-    let workbench: Workbench
-    @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
 
-    var body: some View {
-        HStack(spacing: 8) {
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 model.beginImport(for: workbench)
             } label: {
@@ -198,11 +187,11 @@ private struct WorkbenchWindowActionGroup: View {
                 .disabled(!model.plotSession.dataWorkbookAvailability.isEnabled)
                 .help(model.plotSession.dataWorkbookAvailability.reason ?? "Open Data Workbook")
             }
+        }
 
-            Divider()
-                .frame(height: 18)
-                .padding(.horizontal, 2)
+        ToolbarSpacer(.fixed, placement: .primaryAction)
 
+        ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 model.newProject()
                 openWindow(id: "launcher")
@@ -235,7 +224,6 @@ private struct WorkbenchWindowActionGroup: View {
             }
             .help(model.isInspectorPresented(for: workbench) ? "Hide Inspector" : "Show Inspector")
         }
-        .controlSize(.regular)
     }
 }
 

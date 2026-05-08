@@ -19,6 +19,13 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         XCTAssertEqual(ProWorkspaceTheme(colorScheme: .dark), .dark)
     }
 
+    func testProWorkspaceMetricsUsePlotLedCompactModuleRails() {
+        XCTAssertEqual(ProWorkspaceMetrics.panelSpacing, 12)
+        XCTAssertEqual(ProWorkspaceMetrics.leftRailMinWidth, 280)
+        XCTAssertEqual(ProWorkspaceMetrics.leftRailIdealWidth, 300)
+        XCTAssertEqual(ProWorkspaceMetrics.leftRailMaxWidth, 330)
+    }
+
     @MainActor
     func testQuickLookThumbnailModelClearsPreviousImageWhenStartingNewLoad() async {
         let firstURL = URL(fileURLWithPath: "/tmp/first.pdf")

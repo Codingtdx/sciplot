@@ -41,24 +41,24 @@ private struct CodeConsoleProWorkspace: View {
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
             CodeConsoleSourceRailView(session: session)
-                .padding(12)
+                .padding(ProWorkspaceMetrics.stagePadding)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
                 .proGlassPanel(theme: theme)
-                .padding(.leading, 12)
-                .padding(.vertical, 12)
+                .padding(.leading, ProWorkspaceMetrics.stagePadding)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             CodeConsoleRunStageView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             if isInspectorPresented {
                 CodeConsoleContextView(session: session)
-                    .frame(width: 340)
+                    .inspectorColumnWidth()
                     .frame(maxHeight: .infinity)
                     .proGlassPanel(theme: theme)
                     .padding(.trailing, 10)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, ProWorkspaceMetrics.stagePadding)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -69,13 +69,15 @@ private struct CodeConsoleProWorkspace: View {
 
 private struct CodeConsoleRunStageView: View {
     @Bindable var session: CodeConsoleSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         ZStack(alignment: .top) {
             CodeConsoleRunWorkspaceView(session: session)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, ProWorkspaceMetrics.stageContentPadding)
                 .padding(.top, 54)
-                .padding(.bottom, 18)
+                .padding(.bottom, ProWorkspaceMetrics.stageContentPadding)
 
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
@@ -85,7 +87,11 @@ private struct CodeConsoleRunStageView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+        .background(theme.previewSurround, in: shape)
+        .clipShape(shape)
+        .overlay {
+            shape.stroke(theme.hairline, lineWidth: 0.8)
+        }
     }
 }
 
@@ -106,10 +112,13 @@ struct CodeConsoleRunWorkspaceView: View {
 
 private struct CodeConsoleSourceRailView: View {
     @Bindable var session: CodeConsoleSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             WorkbenchRailTitle(title: "Bound Context", trailing: "\(session.availableBindings.count)")
+
+            sheetPicker
 
             List(selection: selectedBindingSelection) {
                 ForEach(session.availableBindings) { binding in
@@ -119,14 +128,23 @@ private struct CodeConsoleSourceRailView: View {
             }
             .listStyle(.inset(alternatesRowBackgrounds: false))
             .scrollContentBackground(.hidden)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
 
-            Divider()
+    private var sheetPicker: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tablecells")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
 
             Picker("Sheet", selection: selectedSheetSelection) {
                 ForEach(session.availableSheets, id: \.self) { sheet in
                     Text(sheet.displayName).tag(sheet)
                 }
             }
+            .labelsHidden()
             .pickerStyle(.menu)
             .controlSize(.small)
             .disabled(session.availableBindings.isEmpty || session.availableSheets.count < 2)
@@ -136,7 +154,9 @@ private struct CodeConsoleSourceRailView: View {
                     : "Choose the sheet used to refresh the Code Console context."
             )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .proGlassRow(theme: theme, cornerRadius: ProCornerPolicy.row)
     }
 
     private var selectedBindingSelection: Binding<String?> {

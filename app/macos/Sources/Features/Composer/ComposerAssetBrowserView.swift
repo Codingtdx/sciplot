@@ -100,13 +100,13 @@ private struct ComposerLibraryRow: View {
     let onDragEnded: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             ComposerPanelThumbnailView(
                 url: URL(fileURLWithPath: panel.filePath),
-                size: CGSize(width: 70, height: 54),
+                size: CGSize(width: 62, height: 48),
                 cornerRadius: 10
             )
-            .frame(width: 70, height: 54)
+            .frame(width: 62, height: 48)
             .opacity(panel.hidden ? 0.45 : 1.0)
             .contentShape(RoundedRectangle(cornerRadius: 10))
             .simultaneousGesture(
@@ -129,18 +129,18 @@ private struct ComposerLibraryRow: View {
                 .frame(width: 132, height: 96)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .top, spacing: 6) {
                     Text(fileName)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
                         .multilineTextAlignment(.leading)
 
                     Spacer(minLength: 8)
 
                     if !resolvedLabel.isEmpty {
                         Text(resolvedLabel)
-                        .font(.caption.weight(.bold))
+                            .font(.caption2.weight(.bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(.background, in: Capsule())
@@ -170,7 +170,7 @@ private struct ComposerLibraryRow: View {
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 1)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

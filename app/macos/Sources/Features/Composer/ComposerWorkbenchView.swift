@@ -76,24 +76,24 @@ private struct ComposerProWorkspace: View {
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
             ComposerAssetBrowserView(session: session)
-                .padding(12)
+                .padding(ProWorkspaceMetrics.stagePadding)
                 .frame(width: ProWorkspaceMetrics.leftRailIdealWidth)
                 .frame(maxHeight: .infinity, alignment: .topLeading)
                 .proGlassPanel(theme: theme)
-                .padding(.leading, 12)
-                .padding(.vertical, 12)
+                .padding(.leading, ProWorkspaceMetrics.stagePadding)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             ComposerCanvasStageView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             if isInspectorPresented {
                 ComposerInspectorView(session: session)
-                    .frame(width: 340)
+                    .inspectorColumnWidth()
                     .frame(maxHeight: .infinity)
                     .proGlassPanel(theme: theme)
                     .padding(.trailing, 10)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, ProWorkspaceMetrics.stagePadding)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -104,11 +104,13 @@ private struct ComposerProWorkspace: View {
 
 private struct ComposerCanvasStageView: View {
     let session: ComposerSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
         ZStack(alignment: .top) {
             ComposerCanvasView(session: session)
-                .padding(28)
+                .padding(ProWorkspaceMetrics.stageContentPadding)
 
             if let errorMessage = session.errorMessage {
                 DiagnosticIssueCard(message: DiagnosticMessage(detail: errorMessage))
@@ -118,6 +120,10 @@ private struct ComposerCanvasStageView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous))
+        .background(theme.previewSurround, in: shape)
+        .clipShape(shape)
+        .overlay {
+            shape.stroke(theme.hairline, lineWidth: 0.8)
+        }
     }
 }

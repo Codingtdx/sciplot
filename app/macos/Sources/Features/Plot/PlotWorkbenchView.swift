@@ -72,28 +72,28 @@ private struct PlotPixelmatorWorkspace: View {
     var body: some View {
         HStack(spacing: ProWorkspaceMetrics.panelSpacing) {
             PlotSourceTypePanel(session: session)
-                .frame(width: 278)
+                .frame(width: ProWorkspaceMetrics.plotSourcePanelWidth)
                 .frame(maxHeight: .infinity)
-                .padding(.leading, 12)
-                .padding(.vertical, 12)
+                .padding(.leading, ProWorkspaceMetrics.stagePadding)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             PlotRefineView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
 
             if isInspectorPresented {
                 PlotAdjustmentInspector(session: session)
-                    .frame(width: 340)
+                    .inspectorColumnWidth()
                     .frame(maxHeight: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, ProWorkspaceMetrics.stagePadding)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
 
             PlotAdjustmentRail(session: session)
-                .frame(width: 54)
+                .frame(width: ProWorkspaceMetrics.adjustmentRailOuterWidth)
                 .frame(maxHeight: .infinity)
                 .padding(.trailing, 10)
-                .padding(.vertical, 12)
+                .padding(.vertical, ProWorkspaceMetrics.stagePadding)
         }
         .animation(MotionTokens.selection, value: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

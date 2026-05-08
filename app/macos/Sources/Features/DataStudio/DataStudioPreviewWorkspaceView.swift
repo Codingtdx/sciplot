@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DataStudioPreviewWorkspaceView: View {
     @Bindable var session: DataStudioSession
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(spacing: ProWorkspaceMetrics.panelSpacing) {
@@ -43,14 +44,24 @@ struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var stageContent: some View {
         if session.orderedGroups.isEmpty {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            emptyStage(title: "No workbook groups", systemImage: "tablecells")
         } else if session.includedGroups.isEmpty {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            emptyStage(title: "No included groups", systemImage: "checklist")
         } else {
             PlotRefineView(session: session.plotSession)
         }
+    }
+
+    private func emptyStage(title: String, systemImage: String) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
+                .fill(theme.previewSurround)
+
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
 }
@@ -58,6 +69,7 @@ struct DataStudioPreviewWorkspaceView: View {
 struct DataStudioFocusedWorkbookStrip: View {
     @Bindable var session: DataStudioSession
     let workbook: DataStudioWorkbookItem
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -94,10 +106,7 @@ struct DataStudioFocusedWorkbookStrip: View {
             }
         }
         .padding(14)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
-        )
+        .proGlassPanel(theme: theme, cornerRadius: ProWorkspaceMetrics.outerCornerRadius)
     }
 
     private var displayedMetrics: [DataStudioMetricSummaryResponse] {

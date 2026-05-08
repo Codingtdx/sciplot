@@ -5,9 +5,10 @@ struct CodeConsoleOutputsView: View {
     @Bindable var session: CodeConsoleSession
     var quickLookThumbnailModel: QuickLookThumbnailModel? = nil
     var quickLookLoadsOnAppear = true
+    @Environment(\.proWorkspaceTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: ProWorkspaceMetrics.panelSpacing) {
             WorkbenchRailTitle(title: "Outputs")
 
             if session.isRunning {
@@ -159,11 +160,7 @@ struct CodeConsoleOutputsView: View {
             }
             .frame(minHeight: 90, maxHeight: 140)
             .padding(10)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.secondary.opacity(0.12), lineWidth: 1)
-            )
+            .proEditorSurface(theme: theme, cornerRadius: ProCornerPolicy.row)
         }
     }
 }

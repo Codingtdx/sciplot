@@ -14,7 +14,7 @@ struct DataStudioGroupRailView: View {
                         session.applySuggestedExclusionsToAllWorkbooks()
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.mini)
                     .disabled(!autoKeepAvailability.isEnabled)
                     .help(autoKeepAvailability.reason ?? session.autoKeepAllHelp)
                 }

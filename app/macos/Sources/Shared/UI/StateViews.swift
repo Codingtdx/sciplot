@@ -60,11 +60,18 @@ enum InspectorColumnLayoutPolicy {
 
 enum ProWorkspaceMetrics {
     static let panelSpacing: CGFloat = 12
+    static let stagePadding: CGFloat = 12
+    static let stageContentPadding: CGFloat = 18
+    static let editorCardPadding: CGFloat = 12
+    static let commandStripSpacing: CGFloat = 6
     static let outerCornerRadius: CGFloat = 22
     static let innerCornerRadius: CGFloat = 12
+    static let editorCardCornerRadius: CGFloat = 14
+    static let plotSourcePanelWidth: CGFloat = 278
     static let leftRailMinWidth: CGFloat = 280
-    static let leftRailIdealWidth: CGFloat = 320
-    static let leftRailMaxWidth: CGFloat = 360
+    static let leftRailIdealWidth: CGFloat = 300
+    static let leftRailMaxWidth: CGFloat = 330
+    static let adjustmentRailOuterWidth: CGFloat = 54
 }
 
 enum ProCornerPolicy {
@@ -108,6 +115,33 @@ enum ProWorkspaceTheme: Equatable, Sendable {
             return Color.white.opacity(0.74)
         case .dark:
             return Color.white.opacity(0.045)
+        }
+    }
+
+    var editorFill: Color {
+        switch self {
+        case .light:
+            return Color.white.opacity(0.78)
+        case .dark:
+            return Color.white.opacity(0.060)
+        }
+    }
+
+    var editorInsetFill: Color {
+        switch self {
+        case .light:
+            return Color.white.opacity(0.62)
+        case .dark:
+            return Color.black.opacity(0.18)
+        }
+    }
+
+    var documentSurfaceFill: Color {
+        switch self {
+        case .light:
+            return Color(nsColor: .textBackgroundColor)
+        case .dark:
+            return Color.white.opacity(0.050)
         }
     }
 
@@ -223,6 +257,26 @@ extension View {
             .background(isSelected ? theme.selectedRowFill : theme.rowFill, in: shape)
             .clipShape(shape)
             .glassEffect(.regular.interactive(), in: shape)
+    }
+
+    func proEditorSurface(
+        theme: ProWorkspaceTheme,
+        cornerRadius: CGFloat = ProWorkspaceMetrics.editorCardCornerRadius
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(theme.editorFill, in: shape)
+            .overlay {
+                shape.stroke(theme.hairline, lineWidth: 0.8)
+            }
+    }
+
+    func inspectorColumnWidth(
+        min: CGFloat = InspectorColumnLayoutPolicy.minWidth,
+        ideal: CGFloat = InspectorColumnLayoutPolicy.idealWidth,
+        max: CGFloat = InspectorColumnLayoutPolicy.maxWidth
+    ) -> some View {
+        frame(minWidth: min, idealWidth: ideal, maxWidth: max)
     }
 }
 
@@ -348,11 +402,13 @@ struct WorkbenchRailTitle: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(.headline)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
             Spacer(minLength: 8)
             if let trailing, !trailing.isEmpty {
                 Text(trailing)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
         }
