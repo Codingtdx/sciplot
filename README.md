@@ -127,9 +127,9 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 ## Plot Contract Semantics
 
-- Public plotting styles are `nature`, `editorial`, `presentation`, and `poster`.
+- Public plotting styles are `nature`, `acs`, `science`, `wiley`, and `elsevier`.
 - `nature` remains the frozen publication profile and the default global style.
-- Legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, and `advanced_materials_spacious` are ingress-only compatibility aliases and must normalize immediately to `nature`.
+- Legacy style ids such as `default`, `lab_default`, `science_editorial`, `jacs_analytical`, `advanced_materials_spacious`, `editorial`, `presentation`, and `poster` are ingress-only compatibility aliases and must normalize immediately to `nature`.
 - `style_preset` is the primary visual direction. Each public style now declares contract-owned `recommended_palette_preset` and `recommended_visual_theme_id`, so choosing a style seeds its recommended palette/background pair while still allowing later independent overrides.
 - `palette_preset` and `visual_theme_id` remain independent public controls. Templates still publish `default_options`, but those defaults must stay aligned with the selected style's recommended palette/theme bundle instead of drifting into a second recommendation system.
 - Public palette/theme catalogs now include the ECharts-inspired `infographic`, `roma`, `macarons`, `shine`, and `vintage` options. `theme` stays a soft visual layer only; hard typography/stroke changes belong to `style_preset`.

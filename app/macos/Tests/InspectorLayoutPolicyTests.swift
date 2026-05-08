@@ -113,9 +113,9 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         importedPlotSession.selectedTemplateID = "area_curve"
         importedPlotSession.renderOptions = RenderOptionsPayload(
             size: "60x55",
-            stylePreset: "presentation",
-            palettePreset: "shine",
-            visualThemeID: "macarons"
+            stylePreset: "acs",
+            palettePreset: "okabe_ito",
+            visualThemeID: "clean_light"
         )
         importedPlotSession.sourceTableResponse = TestPayloads.sourceTablePreview(path: "/tmp/imported-curve.csv")
         importedPlotSession.fitAnalysisResponse = TestPayloads.fitAnalysis(path: "/tmp/imported-curve.csv")
@@ -171,9 +171,9 @@ final class InspectorLayoutPolicyTests: XCTestCase {
                 optionsByTemplate: [
                     "box": RenderOptionsPayload(
                         size: "60x55",
-                        stylePreset: "presentation",
-                        palettePreset: "shine",
-                        visualThemeID: "macarons"
+                        stylePreset: "wiley",
+                        palettePreset: "tol_muted",
+                        visualThemeID: "clean_light"
                     ),
                 ],
                 fitOptionsByTemplate: [:]
@@ -183,9 +183,9 @@ final class InspectorLayoutPolicyTests: XCTestCase {
         figureSession.syncFigureSelection()
         figureSession.plotSession.renderOptions = RenderOptionsPayload(
             size: "60x55",
-            stylePreset: "presentation",
-            palettePreset: "shine",
-            visualThemeID: "macarons"
+            stylePreset: "wiley",
+            palettePreset: "tol_muted",
+            visualThemeID: "clean_light"
         )
 
         let codeConsoleSession = CodeConsoleSession()

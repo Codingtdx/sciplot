@@ -78,9 +78,6 @@ enum TestPayloads {
         "science",
         "wiley",
         "elsevier",
-        "editorial",
-        "presentation",
-        "poster",
     ]
 
     static func styleCatalog() -> [MetaStyleResponse] {
@@ -139,39 +136,6 @@ enum TestPayloads {
                 presetNote: "Publisher-inspired preset",
                 recommendedPalettePreset: "muted",
                 recommendedVisualThemeID: "clean_light"
-            ),
-            .init(
-                id: "editorial",
-                label: "Editorial",
-                public: true,
-                displayGroup: "legacy_display",
-                description: "Balanced research style with slightly larger typography.",
-                hardConstraints: false,
-                presetNote: "Paper-first relaxed preset",
-                recommendedPalettePreset: "roma",
-                recommendedVisualThemeID: "roma"
-            ),
-            .init(
-                id: "presentation",
-                label: "Presentation",
-                public: true,
-                displayGroup: "legacy_display",
-                description: "Slide-friendly style with larger labels and strokes.",
-                hardConstraints: false,
-                presetNote: "Talk-friendly preset",
-                recommendedPalettePreset: "infographic",
-                recommendedVisualThemeID: "presentation_like"
-            ),
-            .init(
-                id: "poster",
-                label: "Poster",
-                public: true,
-                displayGroup: "legacy_display",
-                description: "Large-format display style with the boldest metrics.",
-                hardConstraints: false,
-                presetNote: "Display-focused preset",
-                recommendedPalettePreset: "shine",
-                recommendedVisualThemeID: "shine"
             ),
         ]
     }
@@ -292,9 +256,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -331,9 +295,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("editorial"),
-                        "palette_preset": .string("roma"),
-                        "visual_theme_id": .string("roma"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -399,9 +363,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -524,9 +488,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -620,9 +584,10 @@ enum TestPayloads {
             ],
             styles: [
                 "nature": .string("Nature"),
-                "editorial": .string("Editorial"),
-                "presentation": .string("Presentation"),
-                "poster": .string("Poster"),
+                "acs": .string("ACS"),
+                "science": .string("Science"),
+                "wiley": .string("Wiley"),
+                "elsevier": .string("Elsevier"),
             ],
             palettes: [
                 "colorblind_safe": .string("Colorblind Safe"),
@@ -699,9 +664,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -735,9 +700,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("editorial"),
-                        "palette_preset": .string("roma"),
-                        "visual_theme_id": .string("roma"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -797,9 +762,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,
@@ -905,9 +870,9 @@ enum TestPayloads {
                         "palette_preset",
                     ],
                     defaultOptions: [
-                        "style_preset": .string("presentation"),
-                        "palette_preset": .string("infographic"),
-                        "visual_theme_id": .string("presentation_like"),
+                        "style_preset": .string("nature"),
+                        "palette_preset": .string("colorblind_safe"),
+                        "visual_theme_id": .string("clean_light"),
                     ],
                     availableStyles: sharedAvailableStyles,
                     availablePalettes: sharedAvailablePalettes,

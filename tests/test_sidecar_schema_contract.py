@@ -17,9 +17,6 @@ EXPECTED_STYLE_IDS = {
     "science",
     "wiley",
     "elsevier",
-    "editorial",
-    "presentation",
-    "poster",
 }
 EXPECTED_FIGURE_SIZE_IDS = {
     "60x55",
@@ -53,11 +50,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
         "wiley",
         "elsevier",
     }
-    assert {item.id for item in meta.styles if item.display_group == "legacy_display"} == {
-        "editorial",
-        "presentation",
-        "poster",
-    }
+    assert {item.id for item in meta.styles if item.display_group == "legacy_display"} == set()
     assert meta.styles[0].recommended_palette_preset
     assert any(item.recommended_visual_theme_id == "clean_light" for item in meta.styles if item.id == "nature")
     assert {
@@ -93,6 +86,9 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert contract.aliases["style_presets"]["jacs"] == "acs"
     assert contract.aliases["style_presets"]["aaas"] == "science"
     assert contract.aliases["style_presets"]["advanced_materials"] == "wiley"
+    assert contract.aliases["style_presets"]["editorial"] == "nature"
+    assert contract.aliases["style_presets"]["presentation"] == "nature"
+    assert contract.aliases["style_presets"]["poster"] == "nature"
     assert all(template["presentation_kind"] for template in contract.templates.values())
 
 

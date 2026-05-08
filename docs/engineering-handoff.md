@@ -6185,3 +6185,16 @@ Use this block for every new round:
   - `xcodebuild test -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData -only-testing:SciPlotGodMacTests/PlotSessionTests/testPublisherStyleSelectionAppliesContractRecommendedPaletteAndBackground`: passed, 1 test.
   - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed on 2026-05-08; clean repo, ruff, mypy, 312 pytest tests, smoke check, macOS presentation guard, Xcode build, and 229 Xcode tests were all green.
   - Computer-use smoke on 2026-05-08: launched the debug app, opened Plot, imported `examples/curve_table.csv`, switched Elsevier and confirmed `Muted + Clean Light`, white/no-grid preview, and visible top/right spines; switched ACS, Science, and Wiley and confirmed recommended palettes plus preview refresh.
+
+## 2026-05-08 - Legacy Display Styles Removed
+
+- Scope:
+  - Removed `editorial`, `presentation`, and `poster` from the public `style_preset` contract surface.
+  - Kept the removed IDs as input-only aliases to `nature` so older payloads normalize safely without being emitted by `/meta`, `/plot-contract`, smoke manifests, or macOS style pickers.
+  - Updated all public templates to expose only `Nature`, `ACS`, `Science`, `Wiley`, and `Elsevier`; templates that previously defaulted to a removed display style now default to `nature + colorblind_safe + clean_light`.
+  - Removed the macOS `Legacy / ...` picker section and refreshed test fixtures/smoke style matrices to use publisher styles only.
+
+- Boundaries:
+  - `nature` remains frozen.
+  - No bundle schema change; removed style IDs are migration aliases, not saved public choices.
+  - macOS continues to consume style, palette, and theme metadata from the sidecar contract.

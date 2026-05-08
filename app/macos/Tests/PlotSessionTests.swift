@@ -194,9 +194,9 @@ final class PlotSessionTests: XCTestCase {
             fitOptions: FitOptionsPayload(enabled: true, modelID: "polynomial_2"),
             renderOptions: RenderOptionsPayload(
                 size: "60x55",
-                stylePreset: "presentation",
-                palettePreset: "shine",
-                visualThemeID: "shine",
+                stylePreset: "acs",
+                palettePreset: "okabe_ito",
+                visualThemeID: "clean_light",
                 extraXAxis: ExtraAxisPayload(
                     enabled: true,
                     position: "top",
@@ -307,9 +307,9 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedFileURL?.path, "/tmp/restored/project-source.csv")
         XCTAssertEqual(session.selectedSheet, .name("RestoredSheet"))
         XCTAssertEqual(session.selectedTemplateID, "area_curve")
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "shine")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "shine")
+        XCTAssertEqual(session.renderOptions.stylePreset, "acs")
+        XCTAssertEqual(session.renderOptions.palettePreset, "okabe_ito")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
         XCTAssertEqual(
             session.renderOptions.extraXAxis,
             ExtraAxisPayload(enabled: true, position: "top", title: "Gallons", dataValue: 3.78541, displayValue: 1.0)
@@ -608,9 +608,9 @@ final class PlotSessionTests: XCTestCase {
         let client = MockSidecarClient()
         let restoredOptions = RenderOptionsPayload(
             size: "60x55",
-            stylePreset: "editorial",
-            palettePreset: "roma",
-            visualThemeID: "roma",
+            stylePreset: "wiley",
+            palettePreset: "tol_muted",
+            visualThemeID: "clean_light",
             xAxisBreaks: [
                 AxisBreakPayload(id: "x-gap", enabled: true, start: 0.8, end: 1.2, displayMode: "split")
             ],
@@ -1868,19 +1868,19 @@ final class PlotSessionTests: XCTestCase {
         await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
         session.chooseTemplate("area_curve")
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
 
         session.chooseTemplate("stacked_area")
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
 
         session.chooseTemplate("step_line")
-        XCTAssertEqual(session.renderOptions.stylePreset, "editorial")
-        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
     }
 
     func testTemplateResetAppliesIndependentDefaultsForNewDensityAreaTemplate() async throws {
@@ -1894,9 +1894,9 @@ final class PlotSessionTests: XCTestCase {
 
         session.chooseTemplate("density_area")
 
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+        XCTAssertEqual(session.renderOptions.stylePreset, "nature")
+        XCTAssertEqual(session.renderOptions.palettePreset, "colorblind_safe")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
     }
 
     func testThemeSelectionAppliesRecommendedPaletteAndBackgroundWhileAllowingIndependentOverrides() async throws {
@@ -1908,31 +1908,31 @@ final class PlotSessionTests: XCTestCase {
         session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
         await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
 
-        session.selectStylePreset("presentation")
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
-        XCTAssertEqual(session.renderOptions.palettePreset, "infographic")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "presentation_like")
+        session.selectStylePreset("elsevier")
+        XCTAssertEqual(session.renderOptions.stylePreset, "elsevier")
+        XCTAssertEqual(session.renderOptions.palettePreset, "muted")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
 
         session.updateRenderOptions(policy: .immediate) {
             $0.palettePreset = "vintage"
             $0.visualThemeID = "roma"
         }
-        XCTAssertEqual(session.renderOptions.stylePreset, "presentation")
+        XCTAssertEqual(session.renderOptions.stylePreset, "elsevier")
         XCTAssertEqual(session.renderOptions.palettePreset, "vintage")
         XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
 
-        session.selectStylePreset("editorial")
-        XCTAssertEqual(session.renderOptions.stylePreset, "editorial")
-        XCTAssertEqual(session.renderOptions.palettePreset, "roma")
-        XCTAssertEqual(session.renderOptions.visualThemeID, "roma")
+        session.selectStylePreset("acs")
+        XCTAssertEqual(session.renderOptions.stylePreset, "acs")
+        XCTAssertEqual(session.renderOptions.palettePreset, "okabe_ito")
+        XCTAssertEqual(session.renderOptions.visualThemeID, "clean_light")
     }
 
-    func testPublicationStylesSurfacePublisherStylesBeforeLegacyDisplayStyles() async throws {
+    func testPublicationStylesSurfaceOnlyPublisherStyles() async throws {
         let session = PlotSession()
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
         XCTAssertEqual(session.publicationStyles.map(\.id), ["nature", "acs", "science", "wiley", "elsevier"])
-        XCTAssertEqual(session.legacyDisplayStyles.map(\.id), ["editorial", "presentation", "poster"])
+        XCTAssertFalse(session.availableStyles.contains { $0.displayGroup == "legacy_display" })
     }
 
     func testPublisherStyleSelectionAppliesContractRecommendedPaletteAndBackground() async throws {

@@ -49,7 +49,7 @@
 - typed loader：`src/plot_contract.py`
 - sidecar `/meta`、`/plot-contract`、渲染/预检/smoke 一律消费同一份契约。
 - GUI 不得维护模板、尺寸、palette/style、本地默认值的第二套常量。
-- public `style_preset` 当前允许：`nature`、`editorial`、`presentation`、`poster`。
+- public `style_preset` 当前允许：`nature`、`acs`、`science`、`wiley`、`elsevier`。
 - `nature` 是冻结 public style：
   - legacy style alias 仍然一律归一化到 `nature`；
   - `nature` 的字体、字号、线宽、间距、axis frame、导出规格不可漂移。
@@ -65,7 +65,7 @@
   - 任何 `severity=error` 且 `passed=false` 的 validation 必须让 smoke 命令退出非零；
   - `non_blank_pdf` 只用于真实 PDF 非空/可 rasterize 检查；axis break / guide / annotation / shape overlay 应用 smoke-local 直接断言或专属验证语义，不要复用 `non_blank_pdf`；
   - 不要因为新增模板或 catalog 扩面而删弱这组 matrix。
-- 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
+- 旧 style id（`default`、`lab_default`、`science_editorial`、`jacs_analytical`、`advanced_materials_spacious`、`editorial`、`presentation`、`poster`）只能在入口兼容层被接受，并且必须立刻归一化成 `nature`，不能再向外发射。
 - public template surface 只能暴露显式模板；`scatter_with_fit`、`replicate_curves_with_band`、`grouped_bar_error`、`grouped_bar_compare`、`distribution_compare` 都只能作为入口兼容 id，不能再出现在 `/meta`、`/plot-contract`、recommendation、Data Studio recipe/export、macOS gallery 或持久化状态里。
 - 当前 public template 扩面已包含 `area_curve`、`step_line`、`stacked_area`、`density_area`、`function_curve`、`contour_field`、`polar_curve`、`table_figure`；它们必须继续走显式 contract/catalog/recommendation/render/output-naming 路径，不能退化成隐藏 alias。
 - 模板的展示元数据（例如 macOS gallery thumbnail kind）必须由 contract `/meta` 提供并由前端直接消费；禁止再按 template id 字符串做本地猜测。

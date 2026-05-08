@@ -1418,9 +1418,9 @@ def _style_theme_template_matrix(
             "curve",
             tensile_path,
             {
-                "style_preset": "presentation",
-                "palette_preset": "infographic",
-                "visual_theme_id": "presentation_like",
+                "style_preset": "acs",
+                "palette_preset": "okabe_ito",
+                "visual_theme_id": "clean_light",
             },
         ),
         (
@@ -1432,9 +1432,9 @@ def _style_theme_template_matrix(
             "area_curve",
             tensile_path,
             {
-                "style_preset": "presentation",
-                "palette_preset": "infographic",
-                "visual_theme_id": "presentation_like",
+                "style_preset": "science",
+                "palette_preset": "tableau_10",
+                "visual_theme_id": "clean_light",
             },
         ),
         (
@@ -1445,7 +1445,7 @@ def _style_theme_template_matrix(
         (
             "step_line",
             tensile_path,
-            {"style_preset": "editorial", "palette_preset": "roma", "visual_theme_id": "roma"},
+            {"style_preset": "wiley", "palette_preset": "tol_muted", "visual_theme_id": "clean_light"},
         ),
         (
             "bar",
@@ -1455,7 +1455,7 @@ def _style_theme_template_matrix(
         (
             "bar",
             replicate_path,
-            {"style_preset": "poster", "palette_preset": "shine", "visual_theme_id": "shine"},
+            {"style_preset": "elsevier", "palette_preset": "muted", "visual_theme_id": "clean_light"},
         ),
         (
             "scatter",
@@ -1466,9 +1466,9 @@ def _style_theme_template_matrix(
             "scatter",
             tensile_path,
             {
-                "style_preset": "presentation",
-                "palette_preset": "infographic",
-                "visual_theme_id": "presentation_like",
+                "style_preset": "acs",
+                "palette_preset": "okabe_ito",
+                "visual_theme_id": "clean_light",
             },
         ),
         (
@@ -1479,7 +1479,7 @@ def _style_theme_template_matrix(
         (
             "heatmap",
             heatmap_path,
-            {"style_preset": "poster", "palette_preset": "shine", "visual_theme_id": "shine"},
+            {"style_preset": "elsevier", "palette_preset": "muted", "visual_theme_id": "clean_light"},
         ),
     ]
 

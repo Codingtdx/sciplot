@@ -13,7 +13,10 @@
       "advanced_materials_spacious": "nature",
       "jacs": "acs",
       "aaas": "science",
-      "advanced_materials": "wiley"
+      "advanced_materials": "wiley",
+      "editorial": "nature",
+      "presentation": "nature",
+      "poster": "nature"
     }
   },
   "global_frame": {
@@ -519,189 +522,6 @@
         "vector_preferred": true,
         "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
       }
-    },
-    "editorial": {
-      "label": "Editorial",
-      "public": true,
-      "description": "Balanced research style with slightly larger text and a lighter stroke hierarchy than Nature.",
-      "hard_constraints": false,
-      "preset_note": "A balanced paper-first preset with relaxed typography and stroke sizing.",
-      "recommended_palette_preset": "roma",
-      "recommended_visual_theme_id": "roma",
-      "axis_frame": {
-        "left": true,
-        "bottom": true,
-        "top": false,
-        "right": false
-      },
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 7.0,
-        "legend_font_size_pt": 6.2,
-        "panel_label_size_pt": 8.6,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 1.0,
-        "tick_width_pt": 1.0,
-        "tick_length_pt": 3.4,
-        "minor_tick_width_pt": 0.8,
-        "minor_tick_length_pt": 2.0,
-        "line_width_pt": 1.35,
-        "line_alpha": 0.94,
-        "marker_alpha": 0.96,
-        "fill_alpha": 0.32,
-        "max_fill_alpha": 0.42,
-        "marker_size_pt": 3.7
-      },
-      "spacing": {
-        "axes_labelpad": 2.2,
-        "xtick_major_pad": 1.5,
-        "ytick_major_pad": 1.5,
-        "legend_inset_fraction": 0.028
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "tight",
-        "label_tightness": "tight"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      },
-      "display_group": "legacy_display"
-    },
-    "presentation": {
-      "label": "Presentation",
-      "public": true,
-      "description": "Slide-friendly figure style with larger labels, longer ticks, and bolder data strokes.",
-      "hard_constraints": false,
-      "preset_note": "Optimized for talk-friendly readability while keeping the same physical panel frame.",
-      "recommended_palette_preset": "infographic",
-      "recommended_visual_theme_id": "presentation_like",
-      "axis_frame": {
-        "left": true,
-        "bottom": true,
-        "top": false,
-        "right": false
-      },
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 7.8,
-        "legend_font_size_pt": 6.9,
-        "panel_label_size_pt": 9.4,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 1.1,
-        "tick_width_pt": 1.1,
-        "tick_length_pt": 3.9,
-        "minor_tick_width_pt": 0.9,
-        "minor_tick_length_pt": 2.3,
-        "line_width_pt": 1.55,
-        "line_alpha": 0.95,
-        "marker_alpha": 0.96,
-        "fill_alpha": 0.3,
-        "max_fill_alpha": 0.4,
-        "marker_size_pt": 4.3
-      },
-      "spacing": {
-        "axes_labelpad": 2.5,
-        "xtick_major_pad": 1.8,
-        "ytick_major_pad": 1.8,
-        "legend_inset_fraction": 0.032
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "tight",
-        "label_tightness": "tight"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      },
-      "display_group": "legacy_display"
-    },
-    "poster": {
-      "label": "Poster",
-      "public": true,
-      "description": "Large-format display style with the strongest type and stroke hierarchy in the public catalog.",
-      "hard_constraints": false,
-      "preset_note": "The loosest public preset, intended for display contexts rather than Nature-tight print metrics.",
-      "recommended_palette_preset": "shine",
-      "recommended_visual_theme_id": "shine",
-      "axis_frame": {
-        "left": true,
-        "bottom": true,
-        "top": false,
-        "right": false
-      },
-      "typography": {
-        "font_family": [
-          "Arial",
-          "Helvetica",
-          "DejaVu Sans"
-        ],
-        "font_size_pt": 8.6,
-        "legend_font_size_pt": 7.5,
-        "panel_label_size_pt": 10.2,
-        "panel_label_weight": "bold"
-      },
-      "stroke": {
-        "axis_linewidth_pt": 1.2,
-        "tick_width_pt": 1.2,
-        "tick_length_pt": 4.4,
-        "minor_tick_width_pt": 1.0,
-        "minor_tick_length_pt": 2.6,
-        "line_width_pt": 1.8,
-        "line_alpha": 0.96,
-        "marker_alpha": 0.97,
-        "fill_alpha": 0.28,
-        "max_fill_alpha": 0.38,
-        "marker_size_pt": 4.9
-      },
-      "spacing": {
-        "axes_labelpad": 2.8,
-        "xtick_major_pad": 2.1,
-        "ytick_major_pad": 2.1,
-        "legend_inset_fraction": 0.036
-      },
-      "annotation": {
-        "legend_frameon": false,
-        "legend_tightness": "tight",
-        "label_tightness": "tight"
-      },
-      "export": {
-        "figure_dpi": 150,
-        "savefig_dpi": 300,
-        "savefig_format": "pdf",
-        "pdf_fonttype": 42,
-        "ps_fonttype": 42,
-        "color_space": "RGB",
-        "vector_preferred": true,
-        "accessibility_note": "Sans-serif, 5-7 pt text, RGB, vector PDF, avoid red-green conflicts."
-      },
-      "display_group": "legacy_display"
     }
   },
   "palettes": {
@@ -1081,10 +901,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1158,10 +975,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1237,10 +1051,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1307,19 +1118,16 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "presentation",
-        "palette_preset": "infographic",
-        "visual_theme_id": "presentation_like"
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1386,19 +1194,16 @@
         "xscale": "linear",
         "yscale": "linear",
         "reverse_x": false,
-        "style_preset": "editorial",
-        "palette_preset": "roma",
-        "visual_theme_id": "roma"
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1459,10 +1264,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1513,19 +1315,16 @@
         "size": "60x55",
         "reverse_x": false,
         "baseline": "none",
-        "style_preset": "presentation",
-        "palette_preset": "infographic",
-        "visual_theme_id": "presentation_like"
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1587,10 +1386,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1653,10 +1449,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1719,10 +1512,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1785,10 +1575,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1851,10 +1638,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1917,10 +1701,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -1983,10 +1764,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2049,10 +1827,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2121,10 +1896,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2184,19 +1956,16 @@
       ],
       "default_options": {
         "size": "60x55",
-        "style_preset": "presentation",
-        "palette_preset": "infographic",
-        "visual_theme_id": "presentation_like"
+        "style_preset": "nature",
+        "palette_preset": "colorblind_safe",
+        "visual_theme_id": "clean_light"
       },
       "available_styles": [
         "nature",
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2274,10 +2043,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2353,10 +2119,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2432,10 +2195,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2509,10 +2269,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2570,10 +2327,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2638,10 +2392,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2700,10 +2451,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2758,10 +2506,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",
@@ -2818,10 +2563,7 @@
         "acs",
         "science",
         "wiley",
-        "elsevier",
-        "editorial",
-        "presentation",
-        "poster"
+        "elsevier"
       ],
       "available_palettes": [
         "colorblind_safe",

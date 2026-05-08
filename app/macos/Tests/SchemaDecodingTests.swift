@@ -593,14 +593,14 @@ final class SchemaDecodingTests: XCTestCase {
               "recommended_visual_theme_id": "clean_light"
             },
             {
-              "id": "editorial",
-              "label": "Editorial",
+              "id": "acs",
+              "label": "ACS",
               "public": true,
-              "description": "Editorial style",
+              "description": "ACS publication style",
               "hard_constraints": false,
-              "preset_note": "Relaxed preset",
-              "recommended_palette_preset": "roma",
-              "recommended_visual_theme_id": "roma"
+              "preset_note": "ACS",
+              "recommended_palette_preset": "okabe_ito",
+              "recommended_visual_theme_id": "clean_light"
             }
           ],
           "palettes": [
@@ -630,11 +630,11 @@ final class SchemaDecodingTests: XCTestCase {
               "allowed_sizes": ["60x55"],
               "editable_options": ["size", "style_preset", "palette_preset"],
               "default_options": {
-                "style_preset": "presentation",
-                "palette_preset": "roma",
-                "visual_theme_id": "roma"
+                "style_preset": "acs",
+                "palette_preset": "okabe_ito",
+                "visual_theme_id": "clean_light"
               },
-              "available_styles": ["nature", "editorial", "presentation"],
+              "available_styles": ["nature", "acs"],
               "available_palettes": ["colorblind_safe", "roma", "macarons", "shine"],
               "canonical_id": "curve",
               "role": "canonical",
@@ -671,9 +671,9 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.palettePresetIds, ["colorblind_safe", "roma", "macarons", "shine"])
         XCTAssertEqual(response.visualThemes.first?.id, "clean_light")
         XCTAssertEqual(response.templates.first?.presentationKind, "curve")
-        XCTAssertEqual(response.templates.first?.defaultOptions["style_preset"]?.stringValue, "presentation")
-        XCTAssertEqual(response.templates.first?.defaultOptions["palette_preset"]?.stringValue, "roma")
-        XCTAssertEqual(response.templates.first?.defaultOptions["visual_theme_id"]?.stringValue, "roma")
+        XCTAssertEqual(response.templates.first?.defaultOptions["style_preset"]?.stringValue, "acs")
+        XCTAssertEqual(response.templates.first?.defaultOptions["palette_preset"]?.stringValue, "okabe_ito")
+        XCTAssertEqual(response.templates.first?.defaultOptions["visual_theme_id"]?.stringValue, "clean_light")
         XCTAssertEqual(response.styles.first?.recommendedPalettePreset, "colorblind_safe")
         XCTAssertEqual(response.styles.first?.recommendedVisualThemeID, "clean_light")
     }
@@ -1162,9 +1162,9 @@ final class SchemaDecodingTests: XCTestCase {
               "sheet": 0,
               "selected_template_id": "step_line",
               "render_options": {
-                "style_preset": "editorial",
-                "palette_preset": "roma",
-                "visual_theme_id": "roma",
+                "style_preset": "wiley",
+                "palette_preset": "tol_muted",
+                "visual_theme_id": "clean_light",
                 "x_axis_breaks": [
                   {
                     "id": "x-gap",

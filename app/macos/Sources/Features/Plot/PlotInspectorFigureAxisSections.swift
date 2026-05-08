@@ -34,12 +34,6 @@ extension PlotInspectorView {
                                 ForEach(session.publicationStyles) { style in
                                     Text(style.label).tag(style.id)
                                 }
-                                if !session.legacyDisplayStyles.isEmpty {
-                                    Divider()
-                                    ForEach(session.legacyDisplayStyles) { style in
-                                        Text("Legacy / \(style.label)").tag(style.id)
-                                    }
-                                }
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)

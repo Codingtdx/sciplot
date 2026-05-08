@@ -68,33 +68,6 @@
 - Axis frame: left=`True`, bottom=`True`, top=`True`, right=`True`
 - Preset note: Approximate Elsevier graph profile: standard fonts, uniform sizing, and readable line/symbol hierarchy.
 
-### `editorial` / Editorial
-
-- Description: Balanced research style with slightly larger text and a lighter stroke hierarchy than Nature.
-- Hard constraints: `False`
-- Recommended palette: `roma`
-- Recommended visual theme: `roma`
-- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
-- Preset note: A balanced paper-first preset with relaxed typography and stroke sizing.
-
-### `presentation` / Presentation
-
-- Description: Slide-friendly figure style with larger labels, longer ticks, and bolder data strokes.
-- Hard constraints: `False`
-- Recommended palette: `infographic`
-- Recommended visual theme: `presentation_like`
-- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
-- Preset note: Optimized for talk-friendly readability while keeping the same physical panel frame.
-
-### `poster` / Poster
-
-- Description: Large-format display style with the strongest type and stroke hierarchy in the public catalog.
-- Hard constraints: `False`
-- Recommended palette: `shine`
-- Recommended visual theme: `shine`
-- Axis frame: left=`True`, bottom=`True`, top=`False`, right=`False`
-- Preset note: The loosest public preset, intended for display contexts rather than Nature-tight print metrics.
-
 ## Templates
 
 ## QA Profiles

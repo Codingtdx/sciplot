@@ -16,13 +16,9 @@ EXPECTED_STYLE_IDS = {
     "science",
     "wiley",
     "elsevier",
-    "editorial",
-    "presentation",
-    "poster",
 }
 
 EXPECTED_PUBLICATION_STYLE_IDS = {"nature", "acs", "science", "wiley", "elsevier"}
-EXPECTED_LEGACY_DISPLAY_STYLE_IDS = {"editorial", "presentation", "poster"}
 EXPECTED_FIGURE_SIZE_IDS = {
     "60x55",
     "120x55",
@@ -54,10 +50,7 @@ class PlotContractTests(unittest.TestCase):
             {item["id"] for item in meta["styles"] if item["display_group"] == "publication"},
             EXPECTED_PUBLICATION_STYLE_IDS,
         )
-        self.assertEqual(
-            {item["id"] for item in meta["styles"] if item["display_group"] == "legacy_display"},
-            EXPECTED_LEGACY_DISPLAY_STYLE_IDS,
-        )
+        self.assertEqual({item["id"] for item in meta["styles"] if item["display_group"] == "legacy_display"}, set())
         self.assertEqual(contract.styles["nature"].recommended_palette_preset, "colorblind_safe")
         self.assertEqual(contract.styles["nature"].recommended_visual_theme_id, "clean_light")
         self.assertEqual(contract.styles["nature"].display_group, "publication")
@@ -69,9 +62,6 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(contract.styles["wiley"].recommended_visual_theme_id, "clean_light")
         self.assertEqual(contract.styles["elsevier"].recommended_palette_preset, "muted")
         self.assertEqual(contract.styles["elsevier"].recommended_visual_theme_id, "clean_light")
-        self.assertEqual(contract.styles["editorial"].recommended_palette_preset, "roma")
-        self.assertEqual(contract.styles["editorial"].display_group, "legacy_display")
-        self.assertEqual(contract.styles["presentation"].recommended_visual_theme_id, "presentation_like")
         self.assertTrue(
             {
                 "infographic",
@@ -168,12 +158,14 @@ class PlotContractTests(unittest.TestCase):
                 "jacs": "acs",
                 "aaas": "science",
                 "advanced_materials": "wiley",
+                "editorial": "nature",
+                "presentation": "nature",
+                "poster": "nature",
             },
         )
         self.assertEqual(contract_dict["styles"]["nature"]["recommended_palette_preset"], "colorblind_safe")
         self.assertEqual(contract_dict["styles"]["nature"]["recommended_visual_theme_id"], "clean_light")
         self.assertEqual(contract_dict["styles"]["acs"]["display_group"], "publication")
-        self.assertEqual(contract_dict["styles"]["poster"]["display_group"], "legacy_display")
         self.assertEqual(
             contract_dict["styles"]["elsevier"]["axis_frame"],
             {"left": True, "bottom": True, "top": True, "right": True},
@@ -222,6 +214,9 @@ class PlotContractTests(unittest.TestCase):
         self.assertEqual(normalize_style_alias("jacs_analytical"), "nature")
         self.assertEqual(normalize_style_alias("science_editorial"), "nature")
         self.assertEqual(normalize_style_alias("advanced_materials_spacious"), "nature")
+        self.assertEqual(normalize_style_alias("editorial"), "nature")
+        self.assertEqual(normalize_style_alias("presentation"), "nature")
+        self.assertEqual(normalize_style_alias("poster"), "nature")
 
     def test_tick_label_controls_are_exposed_only_on_supported_axes(self) -> None:
         contract = load_plot_contract()

@@ -434,7 +434,7 @@ def test_curve_inspect_preflight_and_render_filenames_match(tmp_path: Path) -> N
         close_rendered_plots(rendered)
 
 
-def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> None:
+def test_resolve_render_options_normalizes_removed_legacy_style_preset(tmp_path: Path) -> None:
     input_path = _write_curve_table(tmp_path / "curve.csv")
 
     options = resolve_render_options(
@@ -444,9 +444,9 @@ def test_resolve_render_options_accepts_public_style_preset(tmp_path: Path) -> N
     )
     preflight = preflight_render_request("curve", input_path, 0, options)
 
-    assert options.style_preset == "editorial"
+    assert options.style_preset == "nature"
     assert preflight.submission_report is not None
-    assert preflight.submission_report.style_preset == "editorial"
+    assert preflight.submission_report.style_preset == "nature"
 
 
 @pytest.mark.parametrize(
@@ -614,20 +614,20 @@ def test_public_template_contract_lint_passes() -> None:
     assert lint_public_template_contract() == ()
 
 
-def test_public_styles_can_change_hard_typography_and_stroke_metrics() -> None:
+def test_public_publisher_styles_can_change_hard_typography_and_stroke_metrics() -> None:
     try:
         plot_style.apply_style("nature", "colorblind_safe")
         nature_font_size = float(rcParams["font.size"])
         nature_line_width = float(rcParams["lines.linewidth"])
 
-        plot_style.apply_style("presentation", "colorblind_safe")
-        presentation_font_size = float(rcParams["font.size"])
-        presentation_line_width = float(rcParams["lines.linewidth"])
+        plot_style.apply_style("wiley", "tol_muted")
+        wiley_font_size = float(rcParams["font.size"])
+        wiley_line_width = float(rcParams["lines.linewidth"])
     finally:
         plot_style.apply_style(plot_style.DEFAULT_STYLE_PRESET, plot_style.DEFAULT_PALETTE_PRESET)
 
-    assert presentation_font_size > nature_font_size
-    assert presentation_line_width > nature_line_width
+    assert wiley_font_size > nature_font_size
+    assert wiley_line_width > nature_line_width
 
 
 def test_resolve_render_options_accepts_visual_theme_id(tmp_path: Path) -> None:
@@ -651,16 +651,24 @@ def test_resolve_render_options_uses_template_recommended_theme_and_palette_defa
 
 
 def test_resolve_render_options_uses_style_recommended_theme_and_palette_when_style_changes() -> None:
-    options = resolve_render_options(template="curve", style_preset="poster")
+    options = resolve_render_options(template="curve", style_preset="elsevier")
 
-    assert options.style_preset == "poster"
-    assert options.palette_preset == "shine"
-    assert options.visual_theme_id == "shine"
+    assert options.style_preset == "elsevier"
+    assert options.palette_preset == "muted"
+    assert options.visual_theme_id == "clean_light"
 
     acs_options = resolve_render_options(template="curve", style_preset="acs")
     assert acs_options.style_preset == "acs"
     assert acs_options.palette_preset == "okabe_ito"
     assert acs_options.visual_theme_id == "clean_light"
+
+
+@pytest.mark.parametrize("removed_style_id", ["editorial", "presentation", "poster"])
+def test_removed_legacy_display_style_ids_are_input_compat_only(removed_style_id: str) -> None:
+    options = resolve_render_options(template="curve", style_preset=removed_style_id)
+
+    assert options.style_preset == "nature"
+    assert removed_style_id not in plot_style.list_public_style_presets()
 
 
 def test_resolve_render_options_accepts_extra_axes_payloads() -> None:

@@ -532,10 +532,6 @@ extension PlotSession {
         availableStyles.filter { $0.displayGroup == "publication" }
     }
 
-    var legacyDisplayStyles: [MetaStyleResponse] {
-        availableStyles.filter { $0.displayGroup == "legacy_display" }
-    }
-
     var availablePalettes: [MetaPaletteResponse] {
         guard let selectedTemplateSummary else {
             return metadata?.palettes ?? []
