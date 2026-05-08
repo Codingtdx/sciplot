@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from src.code_console_runner import DEFAULT_RUNNER_MANAGER
 from src.infrastructure.persistence.code_console_runs import prepare_managed_code_console_run_dir
 from src.infrastructure.runtime_cache import LRUCache
@@ -196,12 +198,232 @@ def _safe_sample_rows(
     return safe_rows
 
 
-def _series_hint(inspection: dict[str, Any]) -> str:
-    recommendation = inspection.get("recommendation", {})
-    template = recommendation.get("template")
-    if template:
-        return f"Preferred built-in template: `{template}`."
-    return "No built-in template recommendation is available."
+def _safe_column_profiles(
+    dataset: dict[str, Any] | None,
+    *,
+    limit_cols: int = 12,
+) -> list[dict[str, object]]:
+    if not dataset:
+        return []
+    profiles = dataset.get("column_profiles", [])
+    safe_profiles: list[dict[str, object]] = []
+    for profile in profiles[:limit_cols]:
+        if not isinstance(profile, dict):
+            continue
+        safe_profiles.append(
+            {
+                "name": profile.get("name"),
+                "inferred_type": profile.get("inferred_type"),
+                "non_empty_count": profile.get("non_empty_count"),
+                "missing_count": profile.get("missing_count"),
+                "min_value": profile.get("min_value"),
+                "max_value": profile.get("max_value"),
+                "header_preview": profile.get("header_preview", []),
+            }
+        )
+    return safe_profiles
+
+
+def _ranked_template_hint(inspection: dict[str, Any]) -> str:
+    recommendations = inspection.get("recommendations", [])
+    if isinstance(recommendations, list) and recommendations:
+        lines = ["Ranked template candidates:"]
+        for index, item in enumerate(recommendations[:5], start=1):
+            if not isinstance(item, dict):
+                continue
+            template_id = item.get("template_id")
+            if not template_id:
+                continue
+            score = item.get("score")
+            reason = str(item.get("reason") or item.get("suitability_hint") or "").strip()
+            score_fragment = f" score={score}" if score is not None else ""
+            reason_fragment = f" — {reason}" if reason else ""
+            lines.append(f"{index}. {template_id}{score_fragment}{reason_fragment}")
+        if len(lines) > 1:
+            return "\n".join(lines)
+
+    if inspection.get("model") == "raw_table":
+        return (
+            "Raw table fallback: no Plot template recommendation was available. "
+            "Use the column profiles and sample rows to write a custom figure."
+        )
+    return "No ranked template candidates are available for this context."
+
+
+def _cell_to_prompt_value(value: object) -> object:
+    if value is None:
+        return None
+    if hasattr(value, "item") and not isinstance(value, (str, bytes)):
+        try:
+            value = value.item()
+        except Exception:
+            pass
+    try:
+        if bool(pd.isna(value)):
+            return None
+    except Exception:
+        pass
+    return value
+
+
+def _string_or_none(value: object) -> str | None:
+    value = _cell_to_prompt_value(value)
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
+def _numeric_or_none(value: object) -> float | int | None:
+    value = _cell_to_prompt_value(value)
+    if value is None:
+        return None
+    try:
+        numeric = float(str(value))
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(numeric):
+        return None
+    return int(numeric) if numeric.is_integer() else round(numeric, 6)
+
+
+def _raw_table_column_name(raw: pd.DataFrame, index: int) -> str:
+    preview = [
+        _string_or_none(raw.iloc[row_index, index])
+        for row_index in range(min(3, raw.shape[0]))
+    ]
+    labels = [value for value in preview if value]
+    return " | ".join(labels) if labels else f"Column {index + 1}"
+
+
+def _raw_table_column_profiles(raw: pd.DataFrame, *, limit: int = 24) -> list[dict[str, object]]:
+    profiles: list[dict[str, object]] = []
+    for index in range(min(raw.shape[1], limit)):
+        series = raw.iloc[:, index]
+        numeric = pd.to_numeric(series, errors="coerce")
+        non_empty = sum(_string_or_none(value) is not None for value in series.tolist())
+        missing = int(len(series) - non_empty)
+        numeric_values = numeric.dropna()
+        if numeric_values.empty:
+            inferred_type = "text"
+            min_value = None
+            max_value = None
+        elif numeric_values.shape[0] == non_empty:
+            inferred_type = "numeric"
+            min_value = _numeric_or_none(numeric_values.min())
+            max_value = _numeric_or_none(numeric_values.max())
+        else:
+            inferred_type = "mixed"
+            min_value = _numeric_or_none(numeric_values.min())
+            max_value = _numeric_or_none(numeric_values.max())
+        profiles.append(
+            {
+                "name": _raw_table_column_name(raw, index),
+                "header_preview": [
+                    _string_or_none(raw.iloc[row_index, index])
+                    for row_index in range(min(3, raw.shape[0]))
+                ],
+                "inferred_type": inferred_type,
+                "non_empty_count": int(non_empty),
+                "missing_count": missing,
+                "min_value": min_value,
+                "max_value": max_value,
+            }
+        )
+    return profiles
+
+
+def _raw_table_candidate_roles(profiles: list[dict[str, object]]) -> dict[str, list[str]]:
+    labels = [str(profile["name"]) for profile in profiles if profile.get("name")]
+    numeric = [
+        str(profile["name"])
+        for profile in profiles
+        if profile.get("name") and profile.get("inferred_type") in {"numeric", "mixed"}
+    ]
+    return {
+        "x": [],
+        "y": [],
+        "z": [],
+        "group": [],
+        "sample": [],
+        "value": numeric,
+        "metric": [],
+        "label": labels,
+        "series": [],
+    }
+
+
+def _raw_table_dataset_payload(input_path: Path, sheet: str | int, raw: pd.DataFrame) -> dict[str, Any]:
+    working_raw = raw.dropna(axis=1, how="all")
+    profiles = _raw_table_column_profiles(working_raw)
+    dataset_hash = _stable_json_hash(
+        {
+            "input_path": str(input_path),
+            "input_mtime_ns": input_path.stat().st_mtime_ns,
+            "sheet": str(sheet),
+            "raw_rows": int(raw.shape[0]),
+            "raw_cols": int(raw.shape[1]),
+        }
+    )
+    dataset_id = f"raw_{dataset_hash[:16]}"
+    quality_flags: list[str] = []
+    if working_raw.shape[1] != raw.shape[1]:
+        quality_flags.append("empty_columns_dropped")
+    if any(profile.get("inferred_type") == "mixed" for profile in profiles[:8]):
+        quality_flags.append("type_ambiguity")
+    quality_flags.append("code_console_raw_table_fallback")
+    return {
+        "dataset_id": dataset_id,
+        "source_path": str(input_path),
+        "sheet": sheet,
+        "model": "raw_table",
+        "raw_rows": int(raw.shape[0]),
+        "raw_cols": int(raw.shape[1]),
+        "column_profiles": profiles,
+        "candidate_roles": _raw_table_candidate_roles(profiles),
+        "data_shapes": ["table"],
+        "semantic_signals": [
+            "Raw table fallback: standard Plot inspection did not recognize this table.",
+            "The Code Console can still load the raw dataframe for custom Python plotting.",
+            "Use column profiles and sample rows to decide how to parse or reshape the data.",
+        ],
+        "quality_flags": quality_flags,
+        "sample_rows": dataframe_sample_rows(raw),
+    }
+
+
+def _raw_table_inspection_payload() -> dict[str, Any]:
+    return {
+        "model": "raw_table",
+        "model_label": "Raw table (Code Console fallback)",
+        "recommendations": [],
+        "primary_recommendation": [],
+        "alternative_recommendations": [],
+        "advanced_templates": [],
+        "recommendation_confidence": 0.0,
+        "recommendation_summary": (
+            "Code Console raw-table fallback is active because Plot inspection did not "
+            "produce a supported template recommendation."
+        ),
+        "warnings": [
+            "This dataset has no automatic Plot template recommendation; "
+            "external AI code must choose the plotting semantics."
+        ],
+        "signals": [
+            "Raw table fallback keeps the dataset available for custom Python code.",
+        ],
+    }
+
+
+def _first_recommendation_payload(inspection: dict[str, Any]) -> dict[str, Any] | None:
+    for key in ("recommendations", "primary_recommendation"):
+        items = inspection.get(key, [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and item.get("template_id"):
+                return item
+    return None
 
 
 def _build_prompt(
@@ -220,7 +442,12 @@ def _build_prompt(
         "palette_preset": context.options["palette_preset"],
         "size": context.options["size"],
         "visual_theme_id": context.options.get("visual_theme_id"),
+        "raw_rows": dataset.get("raw_rows"),
+        "raw_cols": dataset.get("raw_cols"),
+        "data_shapes": dataset.get("data_shapes", []),
         "semantic_signals": dataset.get("semantic_signals", []),
+        "quality_flags": dataset.get("quality_flags", []),
+        "column_profiles": _safe_column_profiles(dataset),
         "candidate_roles": dataset.get("candidate_roles", {}),
         "sample_rows": _safe_sample_rows(dataset),
     }
@@ -238,8 +465,10 @@ def _build_prompt(
         - The script will run with the repo root as the working directory.
         - Read the already selected dataset at `{context.input_path}` and sheet `{context.sheet}`.
         - Use repo-native helpers so the figure keeps SciPlot God styling.
+        - Treat the user's separate figure description as the custom plotting request.
         - External AI should handle fitting / derived analysis / custom overlays, not restyle the whole figure system.
         - Save every generated file inside `OUTPUT_DIR` only.
+        - Do not write files outside `OUTPUT_DIR`; use `console.output_path(...)` helpers when needed.
         - Print a short textual summary of what the script generated.
 
         Use this helper API:
@@ -258,7 +487,8 @@ def _build_prompt(
         - Palette preset: `{context.options["palette_preset"]}`
         - Size preset: `{context.options["size"]}`
         - Visual theme: `{context.options.get("visual_theme_id") or "none"}`
-        - {_series_hint(context.inspection)}
+
+        {_ranked_template_hint(context.inspection)}
 
         {source_line}Context snapshot:
         ```json
@@ -305,22 +535,41 @@ def _build_code_console_context_uncached(
 ) -> CodeConsoleResolvedContext:
     resolved_input_path = input_path.expanduser().resolve()
     resolved_sheet = coerce_sheet(str(sheet))
-    inspection = inspect_input_file(resolved_input_path, resolved_sheet)
-    normalized_dataset = build_normalized_dataset(resolved_input_path, resolved_sheet, model=inspection.model)
-    raw = read_raw_table_cached(resolved_input_path, resolved_sheet).dropna(axis=1, how="all")
-    dataset_payload = {
-        **normalized_dataset_payload(normalized_dataset),
-        "sample_rows": dataframe_sample_rows(raw),
-    }
-    top_recommendation = (
-        inspection.recommendations[0]
-        if inspection.recommendations
-        else (inspection.primary_recommendation[0] if inspection.primary_recommendation else None)
+    try:
+        inspection = inspect_input_file(resolved_input_path, resolved_sheet)
+        normalized_dataset = build_normalized_dataset(
+            resolved_input_path,
+            resolved_sheet,
+            model=inspection.model,
+        )
+        raw = read_raw_table_cached(resolved_input_path, resolved_sheet).dropna(axis=1, how="all")
+        dataset_payload = {
+            **normalized_dataset_payload(normalized_dataset),
+            "sample_rows": dataframe_sample_rows(raw),
+        }
+        inspection_payload = _json_ready(inspection)
+        fallback_template = None
+    except Exception as inspection_error:
+        try:
+            raw = read_raw_table_cached(resolved_input_path, resolved_sheet)
+        except Exception as raw_error:
+            raise inspection_error from raw_error
+        inspection_payload = _raw_table_inspection_payload()
+        dataset_payload = _raw_table_dataset_payload(resolved_input_path, resolved_sheet, raw)
+        fallback_template = "table_figure"
+
+    top_recommendation = _first_recommendation_payload(inspection_payload)
+    recommended_size = (
+        top_recommendation.get("preview_config_summary", {}).get("size")
+        if top_recommendation is not None
+        else None
     )
-    if top_recommendation is None:
-        raise ValueError("Inspection did not return any template recommendations.")
-    recommended_size = top_recommendation.preview_config_summary.get("size")
-    resolved_template = validate_template_name(template or top_recommendation.template_id)
+    resolved_template = validate_template_name(
+        template
+        or (str(top_recommendation["template_id"]) if top_recommendation is not None else None)
+        or fallback_template
+        or "table_figure"
+    )
     resolved_render_options = resolve_render_options(
         template=resolved_template,
         size=size or (str(recommended_size) if recommended_size is not None else None),
@@ -357,7 +606,7 @@ def _build_code_console_context_uncached(
         input_mtime_ns=input_mtime_ns,
         sheet=resolved_sheet,
         sheet_names=tuple(list_sheet_names(resolved_input_path)),
-        inspection=_json_ready(inspection),
+        inspection=inspection_payload,
         dataset=_json_ready(dataset_payload),
         template=resolved_template,
         options=options,

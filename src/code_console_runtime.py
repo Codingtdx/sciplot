@@ -156,6 +156,24 @@ class CodeConsoleRuntimeContext:
         return read_raw_table_cached(self.input_path, self.sheet).copy()
 
     def load_normalized_dataset_payload(self) -> dict[str, Any]:
+        if self.model == "raw_table":
+            if self.dataset is not None:
+                return dict(self.dataset)
+            raw = self.load_raw_dataframe().dropna(axis=1, how="all")
+            return {
+                "dataset_id": "raw_table",
+                "source_path": str(self.input_path),
+                "sheet": self.sheet,
+                "model": "raw_table",
+                "raw_rows": int(raw.shape[0]),
+                "raw_cols": int(raw.shape[1]),
+                "column_profiles": [],
+                "candidate_roles": {},
+                "data_shapes": ["table"],
+                "semantic_signals": ["Raw table fallback context."],
+                "quality_flags": ["code_console_raw_table_fallback"],
+                "sample_rows": dataframe_sample_rows(raw),
+            }
         normalized = build_normalized_dataset(self.input_path, self.sheet, model=self.model)
         raw = self.load_raw_dataframe().dropna(axis=1, how="all")
         return {

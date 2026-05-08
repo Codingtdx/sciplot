@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import sys
 import traceback
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -38,6 +39,7 @@ def _execute_code_in_worker(
     exit_code: int | None = 0
     try:
         source = Path(script_path).read_text(encoding="utf-8")
+        sys.modules.pop("src.code_console_runtime", None)
         globals_dict: dict[str, Any] = {
             "__name__": "__main__",
             "__file__": script_path,
@@ -129,4 +131,3 @@ __all__ = [
     "PersistentCodeConsoleRunner",
     "RunnerExecutionResult",
 ]
-

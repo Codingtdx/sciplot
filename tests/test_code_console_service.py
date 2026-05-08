@@ -61,6 +61,25 @@ def test_code_console_context_id_is_stable_and_invalidates_on_mtime(tmp_path: Pa
     assert third.context_id != first.context_id
 
 
+def test_code_console_prompt_uses_ranked_recommendations(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+
+    context = build_code_console_context(
+        input_path=input_path,
+        sheet=0,
+        template="curve",
+        size=None,
+        style_preset=None,
+        palette_preset=None,
+        visual_theme_id=None,
+    )
+
+    assert "Ranked template candidates:" in context.prompt_text
+    assert "1. curve" in context.prompt_text
+    assert "No built-in template recommendation is available." not in context.prompt_text
+
+
 def test_code_console_run_falls_back_to_subprocess_when_runner_fails(
     tmp_path: Path,
     monkeypatch,
