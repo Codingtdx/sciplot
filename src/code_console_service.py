@@ -500,23 +500,98 @@ def _build_prompt(
 
 def _build_starter_code(*, context: CodeConsoleResolvedContext) -> str:
     output_stem = slugify_label(context.input_path.stem) or "code_console_output"
+    title = json.dumps(str(context.inspection.get("model_label") or "Code Console"))
     return textwrap.dedent(
         f"""
         from src.code_console_runtime import console
+        import pandas as pd
 
         df = console.load_raw_dataframe()
         normalized = console.load_normalized_dataset_payload()
+        profiles = normalized.get("column_profiles", [])
+
+        def column_label(column):
+            columns = list(df.columns)
+            try:
+                index = columns.index(column)
+            except ValueError:
+                try:
+                    index = int(column)
+                except (TypeError, ValueError):
+                    index = -1
+            if 0 <= index < len(profiles):
+                return str(profiles[index].get("name") or f"Column {{index + 1}}")
+            return str(column)
+
+        profile_rows = [
+            {{
+                "column": item.get("name"),
+                "inferred_type": item.get("inferred_type"),
+                "non_empty_count": item.get("non_empty_count"),
+                "missing_count": item.get("missing_count"),
+                "min_value": item.get("min_value"),
+                "max_value": item.get("max_value"),
+            }}
+            for item in profiles
+            if isinstance(item, dict)
+        ]
+        profile_frame = pd.DataFrame(profile_rows)
 
         fig, ax = console.new_figure()
+        numeric_frame = df.apply(pd.to_numeric, errors="coerce")
+        numeric_columns = [
+            column
+            for column in numeric_frame.columns
+            if numeric_frame[column].dropna().shape[0] >= 2
+        ]
 
-        # Replace this placeholder plot with fitted data / derived overlays from the external AI.
-        ax.plot([0, 1], [0, 1])
-        ax.set_title("{context.inspection.get("model_label", "Code Console")}")
+        plotted = 0
+        if len(numeric_columns) >= 2:
+            if len(numeric_columns) % 2 == 0:
+                pairs = list(zip(numeric_columns[0::2], numeric_columns[1::2]))
+            else:
+                pairs = [(numeric_columns[0], column) for column in numeric_columns[1:]]
+            first_x = None
+            for x_column, y_column in pairs[:4]:
+                x_values = numeric_frame[x_column]
+                y_values = numeric_frame[y_column]
+                mask = x_values.notna() & y_values.notna()
+                if int(mask.sum()) < 2:
+                    continue
+                ax.plot(
+                    x_values[mask],
+                    y_values[mask],
+                    marker="o",
+                    linewidth=1.2,
+                    label=column_label(y_column),
+                )
+                first_x = first_x if first_x is not None else x_column
+                plotted += 1
+            ax.set_xlabel(column_label(first_x if first_x is not None else numeric_columns[0]))
+            ax.set_ylabel("Value")
+            if plotted > 1:
+                ax.legend(frameon=False)
+        elif profile_rows:
+            compact = profile_frame.head(8)
+            ax.bar(
+                range(len(compact)),
+                compact["non_empty_count"].fillna(0),
+            )
+            ax.set_xticks(range(len(compact)))
+            ax.set_xticklabels(compact["column"].fillna("Column"), rotation=45, ha="right")
+            ax.set_ylabel("Non-empty cells")
+            plotted = len(compact)
+        else:
+            ax.text(0.5, 0.5, "No plottable columns detected", ha="center", va="center")
+            ax.set_axis_off()
+
+        ax.set_title({title})
 
         console.save_figure(fig, "{output_stem}")
+        console.write_dataframe(profile_frame, "{output_stem}_data_profile.csv", index=False)
         console.write_json(normalized, "{output_stem}_normalized_dataset.json")
 
-        print(f"Generated {{len(df)}} raw rows and saved outputs to {{console.output_dir}}")
+        print(f"Plotted {{plotted}} series from {{len(df)}} raw rows; outputs saved to {{console.output_dir}}")
         """
     ).strip()
 

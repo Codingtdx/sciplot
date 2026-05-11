@@ -34,6 +34,39 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-05-10: Next development readiness pass, starter-code polish, distribution gate, and honest manual-evidence blocker
+
+- What changed:
+  - Replaced the Code Console starter script placeholder diagonal line with a context-aware starter that profiles columns, plots numeric pairs when available, writes a data-profile CSV, and still saves the normalized dataset JSON through the repo-native runtime.
+  - Added benchmark budget/trend helpers to `scripts/benchmark_workbench_perf.py`, plus `docs/performance/benchmark-budgets.json` for the current sidecar hot-path budget gate.
+  - Added `scripts/check_macos_distribution_readiness.py` and `docs/macos-distribution-readiness.md` so local unsigned, developer-signed beta, and notarized beta readiness are machine-readable instead of only implied by Xcode settings.
+  - Strengthened Data Studio heterogeneous import coverage so rheology template recommendation, draft preview, saved-template workbook build, and unknown-source no-recommendation stay aligned in one sidecar regression.
+  - Attempted strict inner-beta desktop evidence with Computer Use. The app process launched, but Computer Use could not capture the SciPlot God window (`cgWindowNotFound`), so all three required manual checks were recorded as `blocked` with evidence rather than marked passed.
+
+- User-visible impact:
+  - Code Console starter output is now a useful first run instead of an obviously fake placeholder plot.
+  - Maintainers can distinguish local debug readiness from signed/notarized beta readiness before trying to distribute the app.
+
+- Decision Record:
+  - First-principles motivation: the next round should convert readiness advice into executable guardrails without changing public plot contract semantics or re-opening deleted routes.
+  - Chose budget checks as an opt-in benchmark layer instead of adding them to the default blocking gate, because the sample count and host variability make them useful regression signals but too noisy for every local edit.
+  - Chose an honest blocked manual-evidence bundle over synthetic proof. A running process without a capturable window is not an interactive desktop pass.
+
+- Risks and rollback points:
+  - Code Console starter behavior rollback point: `src/code_console_service.py`.
+  - Benchmark budget rollback points: `scripts/benchmark_workbench_perf.py` and `docs/performance/benchmark-budgets.json`.
+  - Distribution readiness rollback points: `scripts/check_macos_distribution_readiness.py` and `docs/macos-distribution-readiness.md`.
+  - Data Studio guardrail rollback point: `tests/test_sidecar_data_studio.py`.
+
+- Actual regression results:
+  - `.venv/bin/python -m pytest tests/test_code_console_service.py tests/test_sidecar_code_console.py tests/test_benchmark_workbench_perf.py tests/test_macos_distribution_readiness.py tests/test_sidecar_data_studio.py::test_data_studio_template_recommendations_prefer_user_template_for_matching_rheology_source -q`: passed, 17 tests.
+  - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 5 --warmup 1 --output /tmp/sciplotgod-benchmark-readiness.json --budget-file docs/performance/benchmark-budgets.json --fail-on-budget`: passed; all budget results passed.
+  - `.venv/bin/python scripts/check_macos_distribution_readiness.py --require-mode local_unsigned`: passed.
+  - `.venv/bin/python scripts/check_macos_distribution_readiness.py --require-mode developer_signed_beta`: failed as expected with signed-beta blockers: code signing disabled, hardened runtime disabled, no development team.
+  - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual_20260510_130424/evidence.json`: passed schema validation for blocked evidence.
+  - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual_20260510_130424/evidence.json --require-all`: failed as expected because all three strict manual checks are blocked, not passed.
+  - `.venv/bin/python scripts/blocking_gate.py --skip-manual-checklist`: passed automated matrix. Gate details: `clean_repo`, whole-repo `ruff`, `mypy`, pytest 324 tests, `smoke_check`, `macos_gui_presentation`, `xcodebuild build`, and `xcodebuild test` 230 tests all passed.
+
 ### 2026-04-30: Review cleanup, whole-repo gate, async latest requests, and cold/hot benchmark
 
 - What changed:

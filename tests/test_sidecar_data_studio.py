@@ -238,44 +238,45 @@ def test_data_studio_template_recommendations_prefer_user_template_for_matching_
     assert preview_payload["segments"], "Expected segmented rheology preview."
     segment = preview_payload["segments"][0]
 
+    template_draft = {
+        "label": "Rheology Frequency Sweep",
+        "template_id": "user/rheology_frequency",
+        "description": "Recommendation regression fixture.",
+        "output_kind": "curve_metrics",
+        "comparison_enabled": False,
+        "source_format": {
+            "encoding": preview_payload["encoding"],
+            "delimiter": preview_payload["delimiter"],
+            "sheet_name": preview_payload["sheet"],
+        },
+        "segment_policy": "series_per_segment",
+        "segment_selectors": [
+            {
+                "id": segment["id"],
+                "label": segment["label"],
+                "result_label": segment["result_label"],
+                "interval_index": segment["interval_index"],
+                "header_row_index": segment["header_row_index"],
+                "unit_row_index": segment["unit_row_index"],
+                "data_start_row_index": segment["data_start_row_index"],
+            }
+        ],
+        "field_bindings": [
+            {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
+            {"id": "y1", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
+            {"id": "y2", "role": "curve_y", "label": "Loss Modulus", "column_name": "Loss Modulus"},
+        ],
+        "match_conditions": [
+            {
+                "text_contains": ["angular frequency", "storage modulus", "loss modulus"],
+                "field_kinds": ["curve_x", "curve_y"],
+                "minimum_score": 0.3,
+            }
+        ],
+    }
     created = client.post(
         "/data-studio/templates",
-        json={
-            "label": "Rheology Frequency Sweep",
-            "template_id": "user/rheology_frequency",
-            "description": "Recommendation regression fixture.",
-            "output_kind": "curve_metrics",
-            "comparison_enabled": False,
-            "source_format": {
-                "encoding": preview_payload["encoding"],
-                "delimiter": preview_payload["delimiter"],
-                "sheet_name": preview_payload["sheet"],
-            },
-            "segment_policy": "series_per_segment",
-            "segment_selectors": [
-                {
-                    "id": segment["id"],
-                    "label": segment["label"],
-                    "result_label": segment["result_label"],
-                    "interval_index": segment["interval_index"],
-                    "header_row_index": segment["header_row_index"],
-                    "unit_row_index": segment["unit_row_index"],
-                    "data_start_row_index": segment["data_start_row_index"],
-                }
-            ],
-            "field_bindings": [
-                {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
-                {"id": "y1", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
-                {"id": "y2", "role": "curve_y", "label": "Loss Modulus", "column_name": "Loss Modulus"},
-            ],
-            "match_conditions": [
-                {
-                    "text_contains": ["angular frequency", "storage modulus", "loss modulus"],
-                    "field_kinds": ["curve_x", "curve_y"],
-                    "minimum_score": 0.3,
-                }
-            ],
-        },
+        json=template_draft,
     )
     assert created.status_code == 200, created.text
 
@@ -287,6 +288,39 @@ def test_data_studio_template_recommendations_prefer_user_template_for_matching_
     matches = recommended.json()["matches"]
     assert matches
     assert matches[0]["template_id"] == "user/rheology_frequency"
+
+    preview = client.post(
+        "/data-studio/template-preview",
+        json={
+            "source_path": str(RHEOLOGY_FIXTURE),
+            "template": template_draft,
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    preview_payload = preview.json()
+    assert preview_payload["series_count"] >= 2
+    assert preview_payload["errors"] == []
+
+    workbook = client.post(
+        "/data-studio/build-workbook",
+        json={
+            "file_paths": [str(RHEOLOGY_FIXTURE)],
+            "output_path": str(tmp_path / "rheology_frequency.xlsx"),
+            "template_id": "user/rheology_frequency",
+            "group_name": "Rheology",
+        },
+    )
+    assert workbook.status_code == 200, workbook.text
+    assert workbook.json()["preferred_sheet"] == "All_Curves"
+
+    unknown_path = tmp_path / "unknown_notes.csv"
+    unknown_path.write_text("note,value\nalpha,beta\n", encoding="utf-8")
+    unknown = client.post(
+        "/data-studio/template-recommendations",
+        json={"source_path": str(unknown_path)},
+    )
+    assert unknown.status_code == 200, unknown.text
+    assert unknown.json()["matches"] == []
 
 
 def test_data_studio_template_create_round_trips_comparison_enabled_and_rejects_missing_metric_when_enabled(

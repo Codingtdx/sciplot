@@ -65,6 +65,8 @@ def test_code_console_context_returns_prompt_and_starter_code(tmp_path: Path) ->
     assert payload["inspection"]["model"] == "curve_table"
     assert "src.code_console_runtime" in payload["prompt_text"]
     assert "console.save_figure" in payload["starter_code"]
+    assert "Replace this placeholder plot" not in payload["starter_code"]
+    assert "data_profile" in payload["starter_code"]
 
 
 def test_code_console_context_falls_back_to_raw_table_for_unrecognized_inputs(tmp_path: Path) -> None:

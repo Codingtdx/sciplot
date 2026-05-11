@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -99,6 +100,79 @@ def _bench_hot_and_cold(
             run_once=run_once,
         ),
     }
+
+
+def _numeric_metric(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def evaluate_budgets(
+    measurements: dict[str, dict[str, float | int]],
+    budgets: dict[str, dict[str, float | int]],
+) -> list[dict[str, object]]:
+    results: list[dict[str, object]] = []
+    for operation, operation_budgets in budgets.items():
+        current_metrics = measurements.get(operation, {})
+        for metric, limit_value in operation_budgets.items():
+            current = _numeric_metric(current_metrics.get(metric))
+            limit = _numeric_metric(limit_value)
+            if current is None or limit is None:
+                status = "missing"
+            elif current <= limit:
+                status = "passed"
+            else:
+                status = "failed"
+            results.append(
+                {
+                    "operation": operation,
+                    "metric": metric,
+                    "current": current,
+                    "budget": limit,
+                    "status": status,
+                }
+            )
+    return results
+
+
+def compare_measurements(
+    current: dict[str, dict[str, float | int]],
+    baseline: dict[str, dict[str, float | int]],
+    *,
+    max_regression_fraction: float,
+) -> list[dict[str, object]]:
+    comparisons: list[dict[str, object]] = []
+    for operation, current_metrics in current.items():
+        baseline_metrics = baseline.get(operation, {})
+        for metric, current_value in current_metrics.items():
+            current_number = _numeric_metric(current_value)
+            baseline_number = _numeric_metric(baseline_metrics.get(metric))
+            if current_number is None or baseline_number is None or baseline_number <= 0:
+                continue
+            delta = round(current_number - baseline_number, 6)
+            relative_delta = round(delta / baseline_number, 6)
+            if relative_delta <= max_regression_fraction:
+                continue
+            comparisons.append(
+                {
+                    "operation": operation,
+                    "metric": metric,
+                    "baseline": round(baseline_number, 6),
+                    "current": round(current_number, 6),
+                    "delta": delta,
+                    "relative_delta": relative_delta,
+                    "status": "regressed",
+                }
+            )
+    return comparisons
+
+
+def _load_measurements_report(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if "measurements" in payload and isinstance(payload["measurements"], dict):
+        return payload
+    raise ValueError(f"Benchmark report is missing measurements: {path}")
 
 
 def clear_sidecar_hot_path_caches() -> None:
@@ -272,7 +346,7 @@ def run_benchmark(*, samples: int, warmup: int) -> dict[str, object]:
         }
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Benchmark sidecar hot paths for first-principles optimization.")
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--warmup", type=int, default=3)
@@ -281,13 +355,45 @@ def main() -> None:
         type=Path,
         default=Path(f"docs/performance/benchmark-{datetime.now(UTC).date().isoformat()}.json"),
     )
-    args = parser.parse_args()
+    parser.add_argument("--budget-file", type=Path, help="JSON file mapping operation metrics to budget ceilings.")
+    parser.add_argument("--fail-on-budget", action="store_true", help="Exit non-zero when any budget is exceeded.")
+    parser.add_argument("--compare-to", type=Path, help="Previous benchmark report to compare against.")
+    parser.add_argument("--max-regression-fraction", type=float, default=0.25)
+    parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Exit non-zero when comparison flags regressions.",
+    )
+    args = parser.parse_args(argv)
 
     report = run_benchmark(samples=args.samples, warmup=args.warmup)
+    exit_code = 0
+    if args.budget_file:
+        budgets = json.loads(args.budget_file.read_text(encoding="utf-8"))
+        budget_results = evaluate_budgets(report["measurements"], budgets)
+        report["budget_results"] = budget_results
+        failed_budgets = [item for item in budget_results if item["status"] in {"failed", "missing"}]
+        if failed_budgets:
+            print(f"[bench] budget issues: {json.dumps(failed_budgets, ensure_ascii=False)}", flush=True)
+            if args.fail_on_budget:
+                exit_code = 2
+    if args.compare_to:
+        baseline_report = _load_measurements_report(args.compare_to)
+        comparison_results = compare_measurements(
+            report["measurements"],
+            baseline_report["measurements"],
+            max_regression_fraction=args.max_regression_fraction,
+        )
+        report["comparison_results"] = comparison_results
+        if comparison_results:
+            print(f"[bench] regressions: {json.dumps(comparison_results, ensure_ascii=False)}", flush=True)
+            if args.fail_on_regression:
+                exit_code = 2
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[bench] report written: {args.output}", flush=True)
+    return exit_code
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

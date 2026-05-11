@@ -175,6 +175,11 @@ When behavior is a contract change, update contract first, regenerate docs, then
   - `.venv/bin/python -m pytest tests`
 - Smoke:
   - `.venv/bin/python scripts/smoke_check.py`
+- Performance budget check:
+  - `.venv/bin/python scripts/benchmark_workbench_perf.py --samples 5 --warmup 1 --output /tmp/sciplotgod-benchmark.json --budget-file docs/performance/benchmark-budgets.json --fail-on-budget`
+- macOS distribution readiness:
+  - `.venv/bin/python scripts/check_macos_distribution_readiness.py`
+  - `.venv/bin/python scripts/check_macos_distribution_readiness.py --require-mode developer_signed_beta`
 - macOS GUI smoke/fingerprint guardrails:
   - Launcher, independent module-window roots, Plot empty/imported workspace, imported-state Plot inspector, Plot data workbook, and Data Studio figure inspector snapshots are part of the canonical `InspectorLayoutPolicyTests` matrix and should keep exporting xcresult attachments for artifact-based visual QA.
 - macOS build:
@@ -186,6 +191,7 @@ When behavior is a contract change, update contract first, regenerate docs, then
 
 - Product architecture: `docs/product-architecture.md`
 - Maintenance governance: `docs/maintenance-governance.md`
+- macOS distribution readiness: `docs/macos-distribution-readiness.md`
 - Plot contract doc (generated): `docs/plot_contract.md`
 - Contributor/agent rules: `AGENTS.md`
 - Engineering handoff + runbook: `docs/engineering-handoff.md`

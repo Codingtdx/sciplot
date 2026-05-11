@@ -1,0 +1,32 @@
+{
+  "plot.preview.cold": {
+    "p95": 0.75
+  },
+  "plot.preview.hot": {
+    "p95": 0.01
+  },
+  "plot.export.cold": {
+    "p95": 0.75
+  },
+  "plot.export.hot": {
+    "p95": 0.75
+  },
+  "data_studio.context.cold": {
+    "p95": 0.05
+  },
+  "data_studio.context.hot": {
+    "p95": 0.05
+  },
+  "data_studio.preview.cold": {
+    "p95": 0.75
+  },
+  "data_studio.preview.hot": {
+    "p95": 0.01
+  },
+  "code_console.run.cold": {
+    "p95": 0.1
+  },
+  "code_console.run.hot": {
+    "p95": 0.1
+  }
+}

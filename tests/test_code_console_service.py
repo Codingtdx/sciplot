@@ -80,6 +80,37 @@ def test_code_console_prompt_uses_ranked_recommendations(tmp_path: Path) -> None
     assert "No built-in template recommendation is available." not in context.prompt_text
 
 
+def test_code_console_starter_code_is_context_aware_and_executable(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _make_curve_csv(input_path)
+    context = build_code_console_context(
+        input_path=input_path,
+        sheet=0,
+        template="curve",
+        size=None,
+        style_preset=None,
+        palette_preset=None,
+        visual_theme_id=None,
+    )
+
+    assert "Replace this placeholder plot" not in context.starter_code
+    assert "ax.plot([0, 1], [0, 1])" not in context.starter_code
+    assert "data_profile" in context.starter_code
+
+    result = run_code_console_script(
+        context_id=context.context_id,
+        code=context.starter_code,
+        timeout_seconds=20,
+    )
+
+    assert result.status == "succeeded"
+    generated_names = {item.name for item in result.generated_files}
+    assert f"{input_path.stem}.pdf" in generated_names
+    assert f"{input_path.stem}_data_profile.csv" in generated_names
+    assert f"{input_path.stem}_normalized_dataset.json" in generated_names
+    assert "Plotted" in result.stdout
+
+
 def test_code_console_run_falls_back_to_subprocess_when_runner_fails(
     tmp_path: Path,
     monkeypatch,
