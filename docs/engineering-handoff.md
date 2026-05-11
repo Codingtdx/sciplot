@@ -34,6 +34,45 @@ Every development round must update this file.
 
 ## 3) Decision Records
 
+### 2026-05-11: Strict inner-beta manual evidence refresh
+
+- What changed:
+  - Refreshed strict inner-beta desktop evidence on `codex/inner-beta-manual-evidence`.
+  - Built and launched the debug app through `Launch_Plotter.command`, then captured real macOS window evidence with Computer Use plus desktop screenshots.
+  - Recorded a fresh evidence bundle at `/tmp/sciplot_inner_beta_manual_20260511_105710/evidence.json`.
+  - Completed `plot_import_preview_export` by importing `examples/curve_table.csv`, verifying the Plot live preview, and exporting an editable PDF through the native export flow.
+  - Completed `data_studio_import_open_plot` by importing `tests/fixtures/data_studio_import_v2/rheology/PA_240.csv`, accepting the recommended `Freq` parse template, saving the workbook, and following the no-comparison auto Open in Plot replacement confirmation to a Plot preview.
+  - Completed `overlay_drag_save_reopen` with a richer `.sciplotgod` seed created through `/save-project`: the project includes `data_variables`, `data_transforms`, polynomial fit, reference guides, text annotation, and shape annotation. The `Saved note` annotation was dragged in the real Plot window, saved with `Command-S`, reopened, and verified visually.
+  - Stabilized automatic Launcher fallback so a module window that appears during launch-settling prevents the Launcher from being opened over it.
+
+- Decision Record:
+  - First-principles motivation: strict inner-beta admission needs current, auditable desktop evidence, not only a historical pass or an automated render/project route check.
+  - Chose Computer Use as the primary path because the current environment could capture the SciPlot God Launcher and module windows. The previous `cgWindowNotFound` blocker did not reproduce in this run.
+  - Used the sidecar `/save-project` schema only to prepare a richer overlay seed; the actual open, drag, save, reopen, and screenshot evidence was collected through the real macOS app.
+  - The Data Studio rheology sample had no supported comparison recipe, so the valid product path was the existing no-comparison auto Open in Plot flow rather than an enabled manual `Open in Plot` button.
+  - The first strict gate run exposed an existing AppKit launch race in `AppModelTests.testLauncherSceneFallbackDoesNotStealFocusWhenWorkbenchAppearsBeforeRetry`: a scheduled Launcher fallback could still present while a workbench window was settling. The fix keeps the fallback conservative by checking once, waiting a short settle interval, then checking again against active workbench windows before opening Launcher.
+
+- Risks and rollback points:
+  - Launcher fallback rollback point: `app/macos/Sources/App/SciPlotGodApp.swift`.
+
+- Evidence artifacts:
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/plot_preview.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/plot_import_preview_export.pdf`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/data_studio_imported_workbook.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/data_studio_opened_in_plot.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/data_studio_import_open_plot.xlsx`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/overlay_before_drag.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/overlay_after_drag.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/overlay_reopened_project.png`
+  - `/tmp/sciplot_inner_beta_manual_20260511_105710/overlay_richer_seed.sciplotgod`
+
+- Validation:
+  - `.venv/bin/python scripts/manual_smoke_evidence.py validate --input /tmp/sciplot_inner_beta_manual_20260511_105710/evidence.json --require-all` passed.
+  - Initial `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual_20260511_105710/evidence.json` failed only at `xcodebuild test` due the Launcher fallback race above; Python tests were `324 passed`.
+  - `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS,arch=arm64' -derivedDataPath app/macos/.derivedData test -only-testing:SciPlotGodMacTests/AppModelTests/testLauncherSceneFallbackDoesNotStealFocusWhenWorkbenchAppearsBeforeRetry` passed after the fix.
+  - `git diff --check` passed.
+  - Final `.venv/bin/python scripts/blocking_gate.py --require-manual --manual-evidence /tmp/sciplot_inner_beta_manual_20260511_105710/evidence.json` passed: ruff, mypy, `pytest 324 passed`, smoke, macOS presentation, Xcode build, `xcodebuild test 230 passed`, and all three manual smoke checks confirmed.
+
 ### 2026-05-10: Next development readiness pass, starter-code polish, distribution gate, and honest manual-evidence blocker
 
 - What changed:

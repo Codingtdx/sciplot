@@ -113,17 +113,27 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class AppWindowManager: NSObject, NSWindowDelegate {
     static let shared = AppWindowManager()
+    private static let launcherFallbackSettleDelay: TimeInterval = 0.05
 
     private var controllers: [String: NSWindowController] = [:]
 
     func openLauncherAfterSceneAttempt(model: AppModel, delays: [TimeInterval] = [0.05, 0.2, 0.55]) {
         for delay in delays {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard self.shouldOpenLauncherFallback() else {
-                    return
-                }
-                self.openLauncher(model: model)
+                self.openLauncherFallbackAfterSettleIfNeeded(model: model)
             }
+        }
+    }
+
+    private func openLauncherFallbackAfterSettleIfNeeded(model: AppModel) {
+        guard shouldOpenLauncherFallback() else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.launcherFallbackSettleDelay) {
+            guard self.shouldOpenLauncherFallback() else {
+                return
+            }
+            self.openLauncher(model: model)
         }
     }
 
@@ -291,11 +301,11 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
         }
     }
 
-    private func hasVisibleWorkbenchWindow() -> Bool {
+    private func hasActiveWorkbenchWindow() -> Bool {
         let workbenchIDs = Set(Workbench.allCases.map(\.windowSceneID))
         let workbenchTitles = Set(Workbench.allCases.map(\.title))
         return NSApp.windows.contains { window in
-            guard window.isVisible, !window.isMiniaturized, !isLauncherWindowCandidate(window) else {
+            guard !window.isMiniaturized, !isLauncherWindowCandidate(window) else {
                 return false
             }
             if let identifier = window.identifier?.rawValue, workbenchIDs.contains(identifier) {
@@ -306,7 +316,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
     }
 
     private func shouldOpenLauncherFallback() -> Bool {
-        !hasVisibleWorkbenchWindow() && !hasVisibleReusableLauncherWindow()
+        !hasActiveWorkbenchWindow() && !hasVisibleReusableLauncherWindow()
     }
 
     private func hasVisibleReusableLauncherWindow() -> Bool {
