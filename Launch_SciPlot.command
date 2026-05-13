@@ -4,10 +4,10 @@ set -euo pipefail
 
 PROJECT_DIR="${0:A:h}"
 MACOS_DIR="$PROJECT_DIR/app/macos"
-PROJECT_FILE="$MACOS_DIR/SciPlotGod.xcodeproj"
-SCHEME="SciPlotGodMac"
+PROJECT_FILE="$MACOS_DIR/SciPlot.xcodeproj"
+SCHEME="SciPlotMac"
 DERIVED_DATA="$MACOS_DIR/.derivedData"
-APP_PATH="$DERIVED_DATA/Build/Products/Debug/SciPlot God.app"
+APP_PATH="$DERIVED_DATA/Build/Products/Debug/SciPlot.app"
 PYTHON_BIN="$PROJECT_DIR/.venv/bin/python"
 
 cd "$PROJECT_DIR"
@@ -30,7 +30,7 @@ fi
 if ! command -v xcodebuild >/dev/null 2>&1; then
   echo "Error: xcodebuild is unavailable."
   echo "Current developer directory: $(xcode-select -p 2>/dev/null || echo unavailable)"
-  echo "Please install/select a full Xcode toolchain, then rerun Launch_Plotter.command."
+  echo "Please install/select a full Xcode toolchain, then rerun Launch_SciPlot.command."
   echo "Press Enter to close..."
   read
   exit 1
@@ -46,7 +46,7 @@ if ! xcodebuild \
   build; then
   echo
   echo "Native macOS build failed."
-  echo "Please fix the Xcode/macOS toolchain or project configuration and rerun Launch_Plotter.command."
+  echo "Please fix the Xcode/macOS toolchain or project configuration and rerun Launch_SciPlot.command."
   echo "Press Enter to close..."
   read
   exit 1

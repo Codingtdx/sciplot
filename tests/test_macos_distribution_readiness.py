@@ -5,7 +5,7 @@ from pathlib import Path
 from scripts import check_macos_distribution_readiness as readiness
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = ROOT / "app" / "macos" / "SciPlotGod.xcodeproj" / "project.pbxproj"
+PROJECT = ROOT / "app" / "macos" / "SciPlot.xcodeproj" / "project.pbxproj"
 INFO_PLIST = ROOT / "app" / "macos" / "Info.plist"
 
 
@@ -14,7 +14,7 @@ def test_distribution_readiness_reports_local_dev_as_supported() -> None:
 
     local = next(item for item in report["modes"] if item["id"] == "local_unsigned")
     assert local["status"] == "passed"
-    assert report["bundle_identifier"] == "com.codegod.desktop"
+    assert report["bundle_identifier"] == "io.github.codingtdx.sciplot.desktop"
 
 
 def test_distribution_readiness_flags_signed_beta_blockers() -> None:

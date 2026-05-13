@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.sidecar import APP_VERSION
 from app.sidecar.schemas import HealthResponse, MetaResponse, PlotContractResponse
 from src.plot_contract import meta_payload, plot_contract_dict
 from src.rendering.constants import PALETTE_PRESET_CHOICES, SIZE_CHOICES, TEMPLATE_CHOICES
@@ -14,7 +15,7 @@ def create_meta_router() -> APIRouter:
 
     @router.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
-        return HealthResponse(status="ok", version="5.0.0")
+        return HealthResponse(status="ok", version=APP_VERSION)
 
     @router.get("/meta", response_model=MetaResponse)
     def meta() -> MetaResponse:

@@ -1,4 +1,4 @@
-# SciPlot God Plot Contract
+# SciPlot Plot Contract
 
 - Version: `3`
 - Default style: `nature`

@@ -55,6 +55,15 @@ _CODE_CONSOLE_MANUAL_DIR = "sources/code_console/manual"
 _CODE_CONSOLE_LATEST_RUN_DIR = "artifacts/code_console/latest_run"
 _CUSTOM_THEME_DIR = "artifacts/custom_themes"
 _SUPPORTED_WORKBENCHES = {"plot", "data_studio", "composer", "code_console"}
+PROJECT_FILE_EXTENSION = ".sciplot"
+
+
+def is_supported_project_path(path: Path) -> bool:
+    return path.suffix.lower() == PROJECT_FILE_EXTENSION
+
+
+def project_extension_error() -> str:
+    return f"Project file must use the {PROJECT_FILE_EXTENSION} extension."
 
 
 def _mapping(value: object) -> Mapping[str, object] | None:
@@ -862,7 +871,7 @@ def save_project_bundle(
     project_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         prefix=f"{project_path.stem}_",
-        suffix=project_path.suffix or ".sciplotgod",
+        suffix=project_path.suffix or PROJECT_FILE_EXTENSION,
         dir=project_path.parent,
         delete=False,
     ) as temporary_file:
@@ -1347,14 +1356,17 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
 
 def normalize_project_path(path_text: str) -> Path:
     path = normalize_path(path_text)
-    if path.suffix.lower() != ".sciplotgod":
-        raise ValueError("Project file must use the .sciplotgod extension.")
+    if not is_supported_project_path(path):
+        raise ValueError(project_extension_error())
     return path
 
 
 __all__ = [
+    "PROJECT_FILE_EXTENSION",
+    "is_supported_project_path",
     "normalize_project_path",
     "normalize_project_payload",
     "open_project_bundle",
+    "project_extension_error",
     "save_project_bundle",
 ]

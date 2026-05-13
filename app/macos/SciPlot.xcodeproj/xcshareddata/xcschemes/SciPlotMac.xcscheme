@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000006"
-               BuildableName = "SciPlot God.app"
-               BlueprintName = "SciPlotGodMac"
-               ReferencedContainer = "container:SciPlotGod.xcodeproj">
+               BuildableName = "SciPlot.app"
+               BlueprintName = "SciPlotMac"
+               ReferencedContainer = "container:SciPlot.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -29,9 +29,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000007"
-               BuildableName = "SciPlotGodMacTests.xctest"
-               BlueprintName = "SciPlotGodMacTests"
-               ReferencedContainer = "container:SciPlotGod.xcodeproj">
+               BuildableName = "SciPlotMacTests.xctest"
+               BlueprintName = "SciPlotMacTests"
+               ReferencedContainer = "container:SciPlot.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -47,9 +47,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000007"
-               BuildableName = "SciPlotGodMacTests.xctest"
-               BlueprintName = "SciPlotGodMacTests"
-               ReferencedContainer = "container:SciPlotGod.xcodeproj">
+               BuildableName = "SciPlotMacTests.xctest"
+               BlueprintName = "SciPlotMacTests"
+               ReferencedContainer = "container:SciPlot.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A00000000000000000000006"
-            BuildableName = "SciPlot God.app"
-            BlueprintName = "SciPlotGodMac"
-            ReferencedContainer = "container:SciPlotGod.xcodeproj">
+            BuildableName = "SciPlot.app"
+            BlueprintName = "SciPlotMac"
+            ReferencedContainer = "container:SciPlot.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +86,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A00000000000000000000006"
-            BuildableName = "SciPlot God.app"
-            BlueprintName = "SciPlotGodMac"
-            ReferencedContainer = "container:SciPlotGod.xcodeproj">
+            BuildableName = "SciPlot.app"
+            BlueprintName = "SciPlotMac"
+            ReferencedContainer = "container:SciPlot.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

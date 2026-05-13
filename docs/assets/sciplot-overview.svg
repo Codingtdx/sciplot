@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">SciPlot overview</title>
+  <desc id="desc">A visual overview of SciPlot turning raw scientific data into figures, workbooks, composed panels, and code-driven outputs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfdf9"/>
+      <stop offset="0.48" stop-color="#edf7f6"/>
+      <stop offset="1" stop-color="#f6f2ff"/>
+    </linearGradient>
+    <linearGradient id="stream" x1="120" y1="0" x2="1040" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07886f"/>
+      <stop offset="0.46" stop-color="#0878d7"/>
+      <stop offset="1" stop-color="#7659d6"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#eef5ff" stop-opacity="0.74"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#1f2b45" flood-opacity="0.14"/>
+    </filter>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#27465d" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <g opacity="0.55">
+    <path d="M82 492 C266 386, 342 235, 504 282 S758 514, 944 348 S1101 182, 1192 217" fill="none" stroke="#07886f" stroke-opacity="0.18" stroke-width="42" stroke-linecap="round"/>
+    <path d="M66 520 C248 412, 358 248, 516 294 S756 507, 944 335 S1095 178, 1194 207" fill="none" stroke="#7659d6" stroke-opacity="0.16" stroke-width="22" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(78 72)">
+    <text x="0" y="0" fill="#142235" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="62" font-weight="760">SciPlot</text>
+    <text x="3" y="42" fill="#4b5f73" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20">Scientific plotting workspace for publication figures, clean workbooks, panels, and controlled code outputs.</text>
+  </g>
+
+  <g transform="translate(78 178)" filter="url(#shadow)">
+    <rect width="250" height="274" rx="18" fill="url(#glass)" stroke="#d5e2ea"/>
+    <text x="26" y="42" fill="#25394f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="700">Raw data</text>
+    <text x="26" y="72" fill="#5f7382" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">CSV, Excel, tables, spectra</text>
+    <g transform="translate(26 104)">
+      <rect width="198" height="118" rx="10" fill="#ffffff" stroke="#cbd8df"/>
+      <g stroke="#d8e3e8" stroke-width="1">
+        <path d="M0 29h198M0 58h198M0 87h198"/>
+        <path d="M50 0v118M100 0v118M150 0v118"/>
+      </g>
+      <g fill="#0b806b">
+        <rect x="12" y="14" width="24" height="4" rx="2"/>
+        <rect x="62" y="42" width="24" height="4" rx="2"/>
+        <rect x="112" y="72" width="24" height="4" rx="2"/>
+        <rect x="162" y="100" width="24" height="4" rx="2"/>
+      </g>
+      <path d="M14 96 C43 72, 64 79, 88 56 S143 26, 184 24" fill="none" stroke="#0878d7" stroke-width="5" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <g transform="translate(386 210)">
+    <path d="M0 100 C90 30, 178 33, 270 100" fill="none" stroke="url(#stream)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M260 100 l-34 -22 m34 22 l-34 22" fill="none" stroke="#7659d6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(28 132)">
+      <rect width="70" height="30" rx="15" fill="#e7f6f0" stroke="#b8dece"/>
+      <text x="35" y="20" text-anchor="middle" fill="#176b59" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">inspect</text>
+    </g>
+    <g transform="translate(112 132)">
+      <rect width="86" height="30" rx="15" fill="#edf3ff" stroke="#c8d9f5"/>
+      <text x="43" y="20" text-anchor="middle" fill="#215d9f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">normalize</text>
+    </g>
+    <g transform="translate(213 132)">
+      <rect width="72" height="30" rx="15" fill="#f1edff" stroke="#d8cdf9"/>
+      <text x="36" y="20" text-anchor="middle" fill="#6649b5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">render</text>
+    </g>
+  </g>
+
+  <g transform="translate(650 156)" filter="url(#shadow)">
+    <rect width="474" height="326" rx="22" fill="#ffffff" stroke="#d7e3ea"/>
+    <text x="28" y="46" fill="#25394f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="750">Publication-ready outputs</text>
+    <text x="28" y="75" fill="#607283" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">One source-controlled project bundle: .sciplot</text>
+
+    <g transform="translate(28 104)">
+      <rect width="198" height="174" rx="14" fill="#fbfcfe" stroke="#d9e4eb"/>
+      <path d="M30 132H168M42 140V26" stroke="#9fb1bc" stroke-width="2" stroke-linecap="round"/>
+      <path d="M42 118 C74 92, 93 102, 120 70 S148 42, 166 38" fill="none" stroke="#0878d7" stroke-width="6" stroke-linecap="round"/>
+      <path d="M43 104 C70 114, 91 80, 119 88 S148 108, 166 78" fill="none" stroke="#0b806b" stroke-width="5" stroke-linecap="round"/>
+      <g fill="#ffffff" stroke="#0878d7" stroke-width="3">
+        <circle cx="72" cy="92" r="6"/>
+        <circle cx="120" cy="70" r="6"/>
+        <circle cx="166" cy="38" r="6"/>
+      </g>
+      <text x="24" y="160" fill="#53677a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">Plot</text>
+    </g>
+
+    <g transform="translate(250 104)">
+      <rect width="196" height="76" rx="14" fill="#f8fbfb" stroke="#d9e4eb"/>
+      <rect x="22" y="20" width="40" height="36" rx="6" fill="#dff4eb"/>
+      <rect x="76" y="20" width="40" height="36" rx="6" fill="#e4efff"/>
+      <rect x="130" y="20" width="40" height="36" rx="6" fill="#f1edff"/>
+      <text x="22" y="68" fill="#53677a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">Data Studio</text>
+    </g>
+
+    <g transform="translate(250 202)">
+      <rect width="88" height="76" rx="14" fill="#fbfbfd" stroke="#d9e4eb"/>
+      <rect x="18" y="18" width="22" height="22" rx="4" fill="#e4efff" stroke="#c0d4ef"/>
+      <rect x="48" y="18" width="22" height="22" rx="4" fill="#f1edff" stroke="#d8cdf9"/>
+      <rect x="18" y="46" width="52" height="10" rx="5" fill="#dff4eb"/>
+      <text x="18" y="68" fill="#53677a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">Composer</text>
+    </g>
+
+    <g transform="translate(358 202)">
+      <rect width="88" height="76" rx="14" fill="#fbfbfd" stroke="#d9e4eb"/>
+      <path d="M22 24 l14 14 -14 14M42 52 h24" fill="none" stroke="#7659d6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="15" y="68" fill="#53677a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">Code</text>
+    </g>
+  </g>
+
+  <g transform="translate(80 548)">
+    <rect width="1040" height="1" fill="#cddbe2"/>
+    <text x="0" y="38" fill="#6a7b89" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">0.1.0-beta source preview</text>
+    <text x="870" y="38" fill="#6a7b89" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">macOS + FastAPI + Python rendering</text>
+  </g>
+</svg>

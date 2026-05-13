@@ -101,7 +101,7 @@ enum NativePanels {
 
     static func chooseAppProjectSaveLocation(suggestedName: String) -> URL? {
         chooseSaveLocation(
-            title: "Save SciPlot God Project",
+            title: "Save SciPlot Project",
             message: "Save the current module content into one self-contained project file.",
             suggestedName: suggestedName,
             allowedContentTypes: [FileTypeCatalog.plotProject],
@@ -111,8 +111,8 @@ enum NativePanels {
 
     static func chooseProjectOpenLocation() -> URL? {
         let panel = NSOpenPanel()
-        panel.title = "Open SciPlot God Project"
-        panel.message = "Choose a .sciplotgod project file."
+        panel.title = "Open SciPlot Project"
+        panel.message = "Choose a .sciplot project file."
         panel.allowedContentTypes = [FileTypeCatalog.plotProject]
         panel.canChooseFiles = true
         panel.canChooseDirectories = false

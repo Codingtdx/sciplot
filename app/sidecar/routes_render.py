@@ -9,8 +9,10 @@ from typing import cast
 from fastapi import APIRouter
 
 from app.sidecar.project_bundle import (
+    is_supported_project_path,
     normalize_project_path,
     open_project_bundle,
+    project_extension_error,
     save_project_bundle,
 )
 from app.sidecar.schemas import (
@@ -268,8 +270,8 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
     def save_project(request: SaveProjectRequest) -> SaveProjectResponse:
         try:
             project_path = Path(request.project_path).expanduser()
-            if project_path.suffix.lower() != ".sciplotgod":
-                raise ValueError("Project file must use the .sciplotgod extension.")
+            if not is_supported_project_path(project_path):
+                raise ValueError(project_extension_error())
             return save_project_bundle(
                 project_path=project_path,
                 source_path=normalize_path(request.source_path) if request.source_path else None,
@@ -464,17 +466,17 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 submission_payload = serialize_dataclass(submission_report)
                 artifact_paths: list[Path] = []
                 for filename, payload in (
-                    ("codegod_normalized_options.json", normalized_options_payload),
-                    ("codegod_inspection.json", inspection_payload),
-                    ("codegod_preflight.json", serialize_dataclass(preflight)),
-                    ("codegod_submission_report.json", submission_payload),
+                    ("sciplot_normalized_options.json", normalized_options_payload),
+                    ("sciplot_inspection.json", inspection_payload),
+                    ("sciplot_preflight.json", serialize_dataclass(preflight)),
+                    ("sciplot_submission_report.json", submission_payload),
                 ):
                     artifact_path = output_dir / filename
                     existed_before = artifact_path.exists()
                     artifact_paths.append(write_json_artifact(output_dir, filename, payload))
                     if not existed_before:
                         created_paths.append(artifact_path)
-                manifest_path = output_dir / "codegod_manifest.json"
+                manifest_path = output_dir / "sciplot_manifest.json"
                 manifest_existed_before = manifest_path.exists()
                 manifest_payload = bundle_manifest_payload(
                     input_path=input_path,
@@ -491,7 +493,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                 )
                 manifest_path = write_json_artifact(
                     output_dir,
-                    "codegod_manifest.json",
+                    "sciplot_manifest.json",
                     manifest_payload,
                 )
                 artifact_paths.append(manifest_path)

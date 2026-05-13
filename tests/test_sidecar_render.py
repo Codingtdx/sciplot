@@ -405,7 +405,7 @@ def test_transform_options_stay_consistent_across_render_routes(tmp_path: Path) 
     export_dir = tmp_path / "export"
     export_response = client.post("/export-render", json={**render_request, "output_dir": str(export_dir)})
     assert export_response.status_code == 200, export_response.text
-    inspection_artifact = export_dir / "codegod_inspection.json"
+    inspection_artifact = export_dir / "sciplot_inspection.json"
     assert inspection_artifact.exists()
     inspection_artifact_payload = json.loads(inspection_artifact.read_text(encoding="utf-8"))
     assert inspection_artifact_payload["recommendation_summary"] == "Recommendations are based on transformed data."

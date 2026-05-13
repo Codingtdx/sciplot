@@ -357,9 +357,9 @@ final class DataStudioSession {
             return projectURL.lastPathComponent
         }
         if let focusedWorkbook {
-            return focusedWorkbook.workbookURL.deletingPathExtension().lastPathComponent + ".sciplotgod"
+            return focusedWorkbook.workbookURL.deletingPathExtension().lastPathComponent + ".sciplot"
         }
-        return "data-studio-project.sciplotgod"
+        return "data-studio-project.sciplot"
     }
 }
 

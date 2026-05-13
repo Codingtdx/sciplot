@@ -16,14 +16,14 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>SciPlot God Project</string>
+			<string>SciPlot Project</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.codegod.project</string>
+				<string>io.github.codingtdx.sciplot.project</string>
 			</array>
 		</dict>
 	</array>
@@ -45,18 +45,18 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>SciPlot God Project</string>
+			<string>SciPlot Project</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.codegod.project</string>
+			<string>io.github.codingtdx.sciplot.project</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>sciplotgod</string>
+					<string>sciplot</string>
 				</array>
 				<key>public.mime-type</key>
 				<array>
-					<string>application/vnd.codegod.project</string>
+					<string>application/vnd.sciplot.project</string>
 				</array>
 			</dict>
 		</dict>
@@ -68,7 +68,7 @@
 			<key>UTTypeDescription</key>
 			<string>Composer Panel Drag Payload</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.codegod.composer-panel-drag</string>
+			<string>io.github.codingtdx.sciplot.composer-panel-drag</string>
 		</dict>
 	</array>
 </dict>

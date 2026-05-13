@@ -78,7 +78,7 @@ extension DataStudioSession {
     }
 
     func handleImportedFiles(_ urls: [URL]) async {
-        if let projectURL = urls.first(where: { $0.pathExtension.lowercased() == "sciplotgod" }) {
+        if let projectURL = urls.first(where: { FileTypeCatalog.isProjectURL($0) }) {
             if let openProjectDocumentHandler {
                 await openProjectDocumentHandler(projectURL)
             } else {

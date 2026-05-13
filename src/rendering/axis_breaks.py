@@ -14,12 +14,12 @@ from src import plot_style
 from src.rendering.advanced_plot_axes import mark_primary_axis, primary_axis
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
 
-_X_BREAK_ATTR = "_sciplotgod_x_axis_break_spec"
-_Y_BREAK_ATTR = "_sciplotgod_y_axis_break_spec"
-_X_PANEL_AXES_ATTR = "_sciplotgod_x_axis_break_panel_axes"
-_Y_PANEL_AXES_ATTR = "_sciplotgod_y_axis_break_panel_axes"
-_X_PANEL_RANGE_ATTR = "_sciplotgod_x_axis_break_panel_range"
-_Y_PANEL_RANGE_ATTR = "_sciplotgod_y_axis_break_panel_range"
+_X_BREAK_ATTR = "_sciplot_x_axis_break_spec"
+_Y_BREAK_ATTR = "_sciplot_y_axis_break_spec"
+_X_PANEL_AXES_ATTR = "_sciplot_x_axis_break_panel_axes"
+_Y_PANEL_AXES_ATTR = "_sciplot_y_axis_break_panel_axes"
+_X_PANEL_RANGE_ATTR = "_sciplot_x_axis_break_panel_range"
+_Y_PANEL_RANGE_ATTR = "_sciplot_y_axis_break_panel_range"
 _BREAK_GAP_FRACTION = 0.055
 _BREAK_PANEL_GAP_FRACTION = 0.045
 _VALID_BREAK_DISPLAY_MODES = frozenset({"compress", "split"})

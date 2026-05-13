@@ -13,7 +13,7 @@ from src.rendering.custom_themes import (
     normalize_custom_theme_package,
 )
 
-USER_THEME_DIR = Path.home() / "Library" / "Application Support" / "SciPlot God" / "plot_themes"
+USER_THEME_DIR = Path.home() / "Library" / "Application Support" / "SciPlot" / "plot_themes"
 
 
 def _theme_filename(theme_id: str) -> str:

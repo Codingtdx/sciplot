@@ -2,11 +2,11 @@
 
 Date: 2026-04-29
 
-This note describes the supported macOS frontend direction for SciPlot God. It is meant as a handoff guide: use it to understand why the UI is arranged this way, then apply the same principles to future changes without copying any one screenshot literally.
+This note describes the supported macOS frontend direction for SciPlot. It is meant as a handoff guide: use it to understand why the UI is arranged this way, then apply the same principles to future changes without copying any one screenshot literally.
 
 ## Product Shape
 
-SciPlot God starts with a lightweight `Launcher` welcome surface. It opens or focuses four singleton module windows: `Plot`, `Data Studio`, `Composer`, and `Code Console`.
+SciPlot starts with a lightweight `Launcher` welcome surface. It opens or focuses four singleton module windows: `Plot`, `Data Studio`, `Composer`, and `Code Console`.
 
 The module windows are not tabs inside a global workbench. Each module owns its own window and toolbar context. `Command-1/2/3/4` opens or focuses the matching module, while menu commands route through the currently focused module context.
 
@@ -128,7 +128,7 @@ Avoid:
 
 ## App Icon
 
-The app icon lives in `app/macos/Assets.xcassets/AppIcon.appiconset`. The source artwork is `docs/assets/sciplot-god-app-icon.svg`, and `scripts/generate_app_icon.py` regenerates the PNG sizes.
+The app icon lives in `app/macos/Assets.xcassets/AppIcon.appiconset`. The source artwork is `docs/assets/sciplot-app-icon.svg`, and `scripts/generate_app_icon.py` regenerates the PNG sizes.
 
 The concept is an abstract native-style glass squircle with a luminous data-flow curve, small data nodes, and a very soft field/ring hint. It intentionally avoids a literal document, white chart page, window shell, or text so the Dock and App Switcher versions read as an app icon rather than a screenshot.
 

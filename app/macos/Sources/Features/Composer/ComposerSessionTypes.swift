@@ -109,7 +109,7 @@ struct ComposerPanelDragPayload: Codable, Hashable, Sendable, Transferable {
 }
 
 extension UTType {
-    static let composerPanelDragPayload = UTType(exportedAs: "com.codegod.composer-panel-drag")
+    static let composerPanelDragPayload = UTType(exportedAs: "io.github.codingtdx.sciplot.composer-panel-drag")
 }
 
 struct ComposerBoardOrderingKey: Comparable {

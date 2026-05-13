@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PROJECT = ROOT / "app" / "macos" / "SciPlotGod.xcodeproj" / "project.pbxproj"
+DEFAULT_PROJECT = ROOT / "app" / "macos" / "SciPlot.xcodeproj" / "project.pbxproj"
 DEFAULT_INFO_PLIST = ROOT / "app" / "macos" / "Info.plist"
 DEFAULT_EXPORT_OPTIONS = ROOT / "app" / "macos" / "ExportOptions.plist"
-APP_BUNDLE_ID = "com.codegod.desktop"
+APP_BUNDLE_ID = "io.github.codingtdx.sciplot.desktop"
 
 
 def _parse_build_settings(settings_text: str) -> dict[str, str]:

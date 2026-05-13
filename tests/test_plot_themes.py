@@ -182,7 +182,7 @@ def test_project_bundle_embeds_custom_theme_used_by_plot(tmp_path: Path, monkeyp
     custom_theme_store.save_custom_theme(_theme_payload(), overwrite=True)
 
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve.sciplotgod"
+    project_path = tmp_path / "curve.sciplot"
     _curve_csv(source_path)
 
     save_response = client.post(

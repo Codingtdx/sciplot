@@ -194,7 +194,7 @@ def run_benchmark(*, samples: int, warmup: int) -> dict[str, object]:
     from app.sidecar.server import app
 
     fixture_dir = REPO_ROOT / "tests" / "fixtures" / "tensile_raw"
-    with tempfile.TemporaryDirectory(prefix="codegod_bench_") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="sciplot_bench_") as temp_dir:
         tmp_root = Path(temp_dir)
         curve_csv = tmp_root / "curve.csv"
         _curve_fixture(curve_csv)

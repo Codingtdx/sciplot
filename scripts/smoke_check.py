@@ -2471,7 +2471,7 @@ def _run_smoke_workspace(base: Path) -> Path:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the SciPlot God public-surface smoke matrix.")
+    parser = argparse.ArgumentParser(description="Run the SciPlot public-surface smoke matrix.")
     return parser.parse_args(argv)
 
 

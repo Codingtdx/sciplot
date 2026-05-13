@@ -174,7 +174,7 @@ def test_source_table_preview_returns_headers_and_rows(tmp_path: Path) -> None:
 
 def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_delete(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve.sciplotgod"
+    project_path = tmp_path / "curve.sciplot"
     _curve_csv(source_path)
     original_bytes = source_path.read_bytes()
 
@@ -289,9 +289,52 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
     assert restored_source_path.read_bytes() == original_bytes
 
 
+def test_save_open_project_roundtrip_accepts_sciplot_extension(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve.sciplot"
+    _curve_csv(source_path)
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": _project_payload(source_path),
+        },
+    )
+
+    assert save_response.status_code == 200, save_response.text
+    assert project_path.exists()
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+
+    assert open_response.status_code == 200, open_response.text
+    payload = open_response.json()
+    assert payload["project_path"] == str(project_path)
+    assert payload["payload"]["plot"]["selected_template_id"] == "scatter_fit"
+
+
+def test_save_project_rejects_non_sciplot_extension(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve.project"
+    _curve_csv(source_path)
+
+    response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": _project_payload(source_path),
+        },
+    )
+
+    assert response.status_code == 400
+    assert ".sciplot extension" in response.json()["detail"]
+
+
 def test_open_project_reports_checksum_mismatch(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve.sciplotgod"
+    project_path = tmp_path / "curve.sciplot"
     _curve_csv(source_path)
 
     save_response = client.post(
@@ -323,7 +366,7 @@ def test_open_project_reports_checksum_mismatch(tmp_path: Path) -> None:
 
 def test_save_open_project_roundtrip_preserves_extra_y_series_assignment(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve-series-axis.sciplotgod"
+    project_path = tmp_path / "curve-series-axis.sciplot"
     _curve_csv(source_path)
 
     payload = _project_payload(source_path)
@@ -370,7 +413,7 @@ def test_save_open_project_roundtrip_preserves_extra_y_series_assignment(tmp_pat
 
 def test_save_open_project_roundtrip_preserves_axis_breaks(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve-axis-breaks.sciplotgod"
+    project_path = tmp_path / "curve-axis-breaks.sciplot"
     _curve_csv(source_path)
 
     payload = _project_payload(source_path)
@@ -436,7 +479,7 @@ def test_save_open_project_roundtrip_preserves_axis_breaks(tmp_path: Path) -> No
 
 def test_save_open_project_roundtrip_preserves_analytical_layers(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve-function.sciplotgod"
+    project_path = tmp_path / "curve-function.sciplot"
     _curve_csv(source_path)
 
     payload = _project_payload(source_path)
@@ -488,7 +531,7 @@ def test_save_open_project_roundtrip_preserves_analytical_layers(tmp_path: Path)
 
 def test_save_open_project_roundtrip_preserves_data_transforms(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve-transform.sciplotgod"
+    project_path = tmp_path / "curve-transform.sciplot"
     _curve_csv(source_path)
 
     payload = _project_payload(source_path)
@@ -543,7 +586,7 @@ def test_save_open_project_roundtrip_preserves_data_transforms(tmp_path: Path) -
 
 def test_save_open_project_roundtrip_preserves_core_advanced_plot_state(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "curve-core-advanced.sciplotgod"
+    project_path = tmp_path / "curve-core-advanced.sciplot"
     _curve_csv(source_path)
 
     payload = _project_payload(source_path)
@@ -702,7 +745,7 @@ def test_fit_analysis_matches_scatter_fit_equation_label(tmp_path: Path) -> None
 def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_path: Path) -> None:
     workbook_path, workbook_payload = _build_data_studio_workbook(tmp_path, "Roundtrip Group")
     imported_source = FIXTURE_DIR / "BlendSet_A.csv"
-    project_path = tmp_path / "roundtrip-data-studio.sciplotgod"
+    project_path = tmp_path / "roundtrip-data-studio.sciplot"
 
     save_response = client.post(
         "/save-project",
@@ -784,7 +827,7 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
 
 def test_open_legacy_plot_project_migrates_to_v2_payload(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
-    project_path = tmp_path / "legacy-curve.sciplotgod"
+    project_path = tmp_path / "legacy-curve.sciplot"
     _curve_csv(source_path)
 
     save_response = client.post(
@@ -812,7 +855,7 @@ def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Pat
     composer_panel_path = tmp_path / "panel.pdf"
     code_console_source_path = tmp_path / "manual.csv"
     code_console_pdf_path = tmp_path / "console-output.pdf"
-    project_path = tmp_path / "four-module.sciplotgod"
+    project_path = tmp_path / "four-module.sciplot"
     _curve_csv(plot_source_path)
     _curve_csv(code_console_source_path)
     composer_panel_path.write_bytes(b"%PDF-1.4\n%composer panel\n")

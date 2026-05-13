@@ -1,5 +1,8 @@
 .venv/
 .venv-*/
+.env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
 .mypy_cache/
@@ -10,6 +13,9 @@ __pycache__/
 .coverage.*
 htmlcov/
 figures/
+*.log
+dist/
+build/
 .DS_Store
 plots/
 .plot_wizard_state.json

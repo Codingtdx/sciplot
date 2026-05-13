@@ -9,7 +9,7 @@ from platformdirs import user_data_path
 
 from src.text_normalization import slugify_label
 
-APP_NAME = "SciPlot God"
+APP_NAME = "SciPlot"
 _APP_AUTHOR = False
 _CODE_CONSOLE_RUN_RETENTION = 20
 

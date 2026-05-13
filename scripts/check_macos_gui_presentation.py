@@ -19,9 +19,9 @@ class SourceCheck:
 PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     SourceCheck(
         label="app scene exposes launcher plus singleton workbench windows",
-        path="app/macos/Sources/App/SciPlotGodApp.swift",
+        path="app/macos/Sources/App/SciPlotApp.swift",
         required=(
-            'WindowGroup("SciPlot God", id: "launcher")',
+            'WindowGroup("SciPlot", id: "launcher")',
             'Window("Plot", id: Workbench.plot.windowSceneID)',
             'Window("Data Studio", id: Workbench.dataStudio.windowSceneID)',
             'Window("Composer", id: Workbench.composer.windowSceneID)',
@@ -30,7 +30,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             ".windowResizability(.contentMinSize)",
             ".defaultLaunchBehavior(.presented)",
             ".restorationBehavior(.disabled)",
-            "@State private var model = SciPlotGodAppState.model",
+            "@State private var model = SciPlotAppState.model",
             "final class AppWindowManager",
             "AppAppearanceMode",
             "preferredColorScheme",
@@ -53,7 +53,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             ".defaultSize(width: 700",
             "applicationDidBecomeActive",
             "openLauncherIfNoVisibleWindows",
-            "SciPlotGod debug:",
+            "SciPlot debug:",
             "window.styleMask = [.titled, .closable]",
             "window.isOpaque = true",
             "window.backgroundColor = .windowBackgroundColor",
@@ -85,7 +85,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
             "WorkbenchContentShell",
             "WorkbenchTwoPaneWindow",
             "InspectorChromeRoot",
-            'Text("SciPlot God")',
+            'Text("SciPlot")',
             "WorkbenchSegmentedPicker",
             'Picker("Workbench"',
             "ActiveWorkbenchToolbarContent",
@@ -272,7 +272,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
     ),
     SourceCheck(
         label="macOS app icon asset catalog is configured",
-        path="app/macos/SciPlotGod.xcodeproj/project.pbxproj",
+        path="app/macos/SciPlot.xcodeproj/project.pbxproj",
         required=(
             "Assets.xcassets",
             "Assets.xcassets in Resources",
@@ -822,7 +822,7 @@ PRESENTATION_CHECKS: tuple[SourceCheck, ...] = (
         label="UI/UX audit report documents the post-implementation review",
         path="docs/ui-ux-audit-2026-04-29.md",
         required=(
-            "# SciPlot God UI/UX Audit",
+            "# SciPlot UI/UX Audit",
             "Pixelmator Pro",
             "DataGraph",
             "Origin",
@@ -909,7 +909,7 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                 issues.append(f"{check.path}: {check.label}: forbidden token still present {token!r}")
 
     try:
-        launcher_source = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")
+        launcher_source = _read_source(root, "app/macos/Sources/App/SciPlotApp.swift")
         required_launcher_tokens = (
             ".windowStyle(.plain)",
             "BorderlessLauncherWindow",
@@ -928,13 +928,13 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         for token in required_launcher_tokens:
             if token not in launcher_source:
                 issues.append(
-                    "app/macos/Sources/App/SciPlotGodApp.swift: "
+                    "app/macos/Sources/App/SciPlotApp.swift: "
                     f"borderless transparent launcher is missing {token!r}"
                 )
         for token in forbidden_launcher_tokens:
             if token in launcher_source:
                 issues.append(
-                    "app/macos/Sources/App/SciPlotGodApp.swift: "
+                    "app/macos/Sources/App/SciPlotApp.swift: "
                     f"borderless transparent launcher must not use outer window chrome token {token!r}"
                 )
     except AssertionError as error:
@@ -1024,25 +1024,25 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
                     "app/macos/Assets.xcassets/AppIcon.appiconset: "
                     f"referenced icon image is missing {filename!r}"
                 )
-        if not (root / "docs/assets/sciplot-god-app-icon.svg").exists():
-            issues.append("docs/assets/sciplot-god-app-icon.svg: source icon artwork is missing")
+        if not (root / "docs/assets/sciplot-app-icon.svg").exists():
+            issues.append("docs/assets/sciplot-app-icon.svg: source icon artwork is missing")
         else:
-            icon_source = _read_source(root, "docs/assets/sciplot-god-app-icon.svg")
+            icon_source = _read_source(root, "docs/assets/sciplot-app-icon.svg")
             for old_shell_token in ('<rect x="224" y="214"', 'width="576" height="610"', "white figure page"):
                 if old_shell_token in icon_source:
                     issues.append(
-                        "docs/assets/sciplot-god-app-icon.svg: "
+                        "docs/assets/sciplot-app-icon.svg: "
                         "app icon must be an abstract native mark, not the old white chart page shell"
                     )
     except AssertionError as error:
         issues.append(str(error))
 
     try:
-        app_scene = _read_source(root, "app/macos/Sources/App/SciPlotGodApp.swift")
+        app_scene = _read_source(root, "app/macos/Sources/App/SciPlotApp.swift")
         command_attachment_count = app_scene.count("AppCommands(model: model")
         if command_attachment_count != 1:
             issues.append(
-                "app/macos/Sources/App/SciPlotGodApp.swift: "
+                "app/macos/Sources/App/SciPlotApp.swift: "
                 f"AppCommands must be attached exactly once; found {command_attachment_count}"
             )
 
@@ -1177,10 +1177,10 @@ def run_checks(root: Path = REPO_ROOT) -> list[str]:
         issues.append(f"app/macos/Sources/Features/Plot/PlotRefineView.swift: preview shadow check failed: {error}")
 
     try:
-        project_source = _read_source(root, "app/macos/SciPlotGod.xcodeproj/project.pbxproj")
+        project_source = _read_source(root, "app/macos/SciPlot.xcodeproj/project.pbxproj")
         if "PlotOverlayTransformControls.swift" in project_source:
             issues.append(
-                "app/macos/SciPlotGod.xcodeproj/project.pbxproj: "
+                "app/macos/SciPlot.xcodeproj/project.pbxproj: "
                 "stale PlotOverlayTransformControls source must not be part of the build"
             )
         if (root / "app/macos/Sources/Features/Plot/PlotOverlayTransformControls.swift").exists():

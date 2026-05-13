@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 final class InspectorLayoutPolicyTests: XCTestCase {
     func testUnifiedInspectorColumnWidthPolicyStaysStable() {

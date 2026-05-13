@@ -1,4 +1,4 @@
-# SciPlot God 开发入口说明
+# SciPlot 开发入口说明
 
 这个仓库已经收敛为单一受支持桌面链路：`app/macos + app/sidecar + src/*`。  
 以后不管是人还是 AI，先看本文件，再改代码。
@@ -113,7 +113,7 @@
 - filtered workbook 必须保持标准 Data Studio sheet 结构、支持再次 import / specimen filter；曲线 sheet 当前保留到小数点后四位，specimen / summary / replicate 数值表保留到小数点后两位。不要在 comparison workbook 上偷偷做第二套数值格式规则。
 - sidecar endpoint 必须返回显式 response model，禁止裸 dict。
 - 项目文件保存/打开必须经过 sidecar schema 校验迁移层（`/save-project`、`/open-project`）。
-- `.sciplotgod` 是 app-level 自包含单文件 bundle，当前固定结构为：
+- `.sciplot` 是 app-level 自包含单文件 bundle，当前固定结构为：
   - `project.json`
   - `sources/plot/primary/<original-filename>` 可选
   - `sources/data_studio/workbooks/<original-filename>` 一个或多个，可选
@@ -136,15 +136,15 @@
 - 模块主动作统一归属原生 window toolbar 的 primary action group，并在视觉上锚定右上角：`Import/Open`、`Export`、`New Project`、`Launcher`、`Help`、`Inspector` 不得回流到左侧选择面板或 inspector body。Plot 额外允许一个 toolbar `Data Workbook` 图标按钮，默认打开 `Source Data`。
 - 外观策略固定为 app-wide `Follow System / Light / Dark`，入口在 `View > Appearance`。浅色主题走接近 Codex 的近白/暖白 Pro workspace，不要回到大面积冷灰底；深色主题保持当前专业 dark workspace。
 - 自定义 Liquid Glass panel / rail / row 必须走共享 shaped helper（当前在 `app/macos/Sources/Shared/UI/StateViews.swift` 的 `proGlassPanel` / `proGlassRail` / `proGlassRow`），让填色、裁切、描边和 `glassEffect` 使用同一个圆角形状；禁止在模块主 panel 上恢复裸 `.background(theme.panelFill)` 或 `.background(theme.rowFill)` 方形托底。
-- macOS 前端交接说明见 `docs/macos-frontend-design.md`。应用图标资产在 `app/macos/Assets.xcassets/AppIcon.appiconset`，源稿在 `docs/assets/sciplot-god-app-icon.svg`，可用 `scripts/generate_app_icon.py` 重新生成 PNG 尺寸；图标方向是抽象玻璃数据流符号，不是白色图表页或窗口套壳。
+- macOS 前端交接说明见 `docs/macos-frontend-design.md`。应用图标资产在 `app/macos/Assets.xcassets/AppIcon.appiconset`，源稿在 `docs/assets/sciplot-app-icon.svg`，可用 `scripts/generate_app_icon.py` 重新生成 PNG 尺寸；图标方向是抽象玻璃数据流符号，不是白色图表页或窗口套壳。
 - sidecar 策略是 app-managed ownership：
   - 不能只靠端口连通判断可用；
   - `/meta` 或 `/plot-contract` payload 不兼容时必须替换 sidecar；
   - 由 repo `.venv` 启动兼容 sidecar。
 - 文件选择、保存、Finder reveal 必须通过明确 runtime 入口，失败需可见报错，禁止静默吞错。
-- Plot 文件打开必须同时接受源数据文件和 `.sciplotgod`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。Plot 已有内容时，导入/打开新输入的替换确认必须挂在 Plot 窗口本身；即使入口来自 Launcher，也不得让 Launcher 承载 Plot-specific confirmation。
+- Plot 文件打开必须同时接受源数据文件和 `.sciplot`；选到项目文件时必须恢复保存时的 Plot durable state，并重新走正常 inspect/preview 链路。Plot 已有内容时，导入/打开新输入的替换确认必须挂在 Plot 窗口本身；即使入口来自 Launcher，也不得让 Launcher 承载 Plot-specific confirmation。
 - `New Project` 是返回 Launcher 的显式入口：它先清空当前 Plot session 与 pending replacement，再打开/聚焦 Launcher。普通 Plot 导入新文件不得把用户带回初始界面。
-- Data Studio / Composer / Code Console 也必须支持打开/保存 `.sciplotgod`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
+- Data Studio / Composer / Code Console 也必须支持打开/保存 `.sciplot`；打开项目时按 `selected_workbench` 回到对应工作台，而不是默认落回 Plot。
 - Plot `Save Project…` / `Save Project As…` 先挂命令菜单，不新增第二套 toolbar 主入口。
 - Data Studio `Save Project…` / `Save Project As…` 同样走命令菜单，不新增第二套 toolbar 主入口。
 - toolbar `Help` 是唯一帮助主入口，必须打开 app-level `Quick Help`（按 workbench 提供精简动作提示）；不得恢复各 workbench 长文 `GuideSheet` 或流程说明卡片。
@@ -332,8 +332,8 @@
 - `.venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering`
 - `.venv/bin/python -m pytest tests`
 - `.venv/bin/python scripts/smoke_check.py`
-- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
-- `xcodebuild -project app/macos/SciPlotGod.xcodeproj -scheme SciPlotGodMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
+- `xcodebuild -project app/macos/SciPlot.xcodeproj -scheme SciPlotMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData build`
+- `xcodebuild -project app/macos/SciPlot.xcodeproj -scheme SciPlotMac -destination 'platform=macOS' -derivedDataPath app/macos/.derivedData test`
 
 ## 常见坑
 
@@ -343,7 +343,7 @@
 - 不要在 sidecar 增加“先兼容旧接口再说”的 fallback。
 - 不要把 contract 常量复制到第二份文件。
 - 不要绕开 schema 校验层直接读写项目 JSON。
-- 不要把 `.sciplotgod` 实现成只记绝对路径的轻量链接文件；它必须嵌入 Plot 当前绑定的原始源文件字节。
+- 不要把 `.sciplot` 实现成只记绝对路径的轻量链接文件；它必须嵌入 Plot 当前绑定的原始源文件字节。
 - 不要把 legacy style/template alias 当成新的 public product 语义重新暴露出来。
 - 不要把 Data Studio import 重新拆回多 sheet 串联弹窗。
 - 不要做“按钮可点但 guard-return 无反馈”的 silent no-op 交互。

@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import PDFKit
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class PlotSessionTests: XCTestCase {
@@ -162,10 +162,10 @@ final class PlotSessionTests: XCTestCase {
 
         XCTAssertTrue(session.isProjectDirty)
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplot"))
 
         XCTAssertFalse(session.isProjectDirty)
-        XCTAssertEqual(session.projectURL?.path, "/tmp/sample.sciplotgod")
+        XCTAssertEqual(session.projectURL?.path, "/tmp/sample.sciplot")
 
         session.showDataWorkbook()
         session.sourceTableOffset = 50
@@ -177,7 +177,7 @@ final class PlotSessionTests: XCTestCase {
 
         XCTAssertTrue(session.isProjectDirty)
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/sample.sciplot"))
         XCTAssertFalse(session.isProjectDirty)
 
         session.updateFitEnabled(true)
@@ -268,7 +268,7 @@ final class PlotSessionTests: XCTestCase {
             )
         )
         client.openProjectResponse = TestPayloads.openProjectResponse(
-            projectPath: "/tmp/curve.sciplotgod",
+            projectPath: "/tmp/curve.sciplot",
             restoredSourcePath: "/tmp/restored/project-source.csv",
             payload: restoredPayload
         )
@@ -299,11 +299,11 @@ final class PlotSessionTests: XCTestCase {
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.openProject(URL(fileURLWithPath: "/tmp/curve.sciplotgod"))
+        await session.openProject(URL(fileURLWithPath: "/tmp/curve.sciplot"))
         await waitUntil({ session.previewResponse?.previews.first?.filename == "restored_preview.pdf" }, timeout: 2.0)
 
-        XCTAssertEqual(client.openProjectRequests.first?.projectPath, "/tmp/curve.sciplotgod")
-        XCTAssertEqual(session.projectURL?.path, "/tmp/curve.sciplotgod")
+        XCTAssertEqual(client.openProjectRequests.first?.projectPath, "/tmp/curve.sciplot")
+        XCTAssertEqual(session.projectURL?.path, "/tmp/curve.sciplot")
         XCTAssertEqual(session.selectedFileURL?.path, "/tmp/restored/project-source.csv")
         XCTAssertEqual(session.selectedSheet, .name("RestoredSheet"))
         XCTAssertEqual(session.selectedTemplateID, "area_curve")
@@ -443,7 +443,7 @@ final class PlotSessionTests: XCTestCase {
             renderOptions: restoredOptions
         )
         client.openProjectResponse = TestPayloads.openProjectResponse(
-            projectPath: "/tmp/core-advanced.sciplotgod",
+            projectPath: "/tmp/core-advanced.sciplot",
             restoredSourcePath: "/tmp/restored/core-advanced.csv",
             payload: restoredPayload
         )
@@ -474,7 +474,7 @@ final class PlotSessionTests: XCTestCase {
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.openProject(URL(fileURLWithPath: "/tmp/core-advanced.sciplotgod"))
+        await session.openProject(URL(fileURLWithPath: "/tmp/core-advanced.sciplot"))
         await waitUntil({ session.previewResponse?.previews.first?.filename == "core_advanced_preview.pdf" }, timeout: 2.0)
 
         XCTAssertEqual(client.inspectRequests.last?.inputPath, "/tmp/restored/core-advanced.csv")
@@ -558,7 +558,7 @@ final class PlotSessionTests: XCTestCase {
             renderOptions: restoredOptions
         )
         client.openProjectResponse = TestPayloads.openProjectResponse(
-            projectPath: "/tmp/function-advanced.sciplotgod",
+            projectPath: "/tmp/function-advanced.sciplot",
             restoredSourcePath: "/tmp/restored/function-advanced.csv",
             payload: restoredPayload
         )
@@ -589,7 +589,7 @@ final class PlotSessionTests: XCTestCase {
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.openProject(URL(fileURLWithPath: "/tmp/function-advanced.sciplotgod"))
+        await session.openProject(URL(fileURLWithPath: "/tmp/function-advanced.sciplot"))
         await waitUntil({ session.previewResponse?.previews.first?.filename == "function_advanced_preview.pdf" }, timeout: 2.0)
 
         XCTAssertEqual(session.selectedTemplateID, "function_curve")
@@ -627,7 +627,7 @@ final class PlotSessionTests: XCTestCase {
             renderOptions: restoredOptions
         )
         client.openProjectResponse = TestPayloads.openProjectResponse(
-            projectPath: "/tmp/axis-breaks.sciplotgod",
+            projectPath: "/tmp/axis-breaks.sciplot",
             restoredSourcePath: "/tmp/restored/axis-breaks.csv",
             payload: restoredPayload
         )
@@ -658,7 +658,7 @@ final class PlotSessionTests: XCTestCase {
         session.configure(client: client)
         session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
 
-        await session.openProject(URL(fileURLWithPath: "/tmp/axis-breaks.sciplotgod"))
+        await session.openProject(URL(fileURLWithPath: "/tmp/axis-breaks.sciplot"))
         await waitUntil({ session.previewResponse?.previews.first?.filename == "axis_breaks_preview.pdf" }, timeout: 2.0)
 
         XCTAssertEqual(session.selectedTemplateID, "step_line")
@@ -775,7 +775,7 @@ final class PlotSessionTests: XCTestCase {
         session.updateFitModel("polynomial_3")
         await waitUntil({ client.renderRequests.last?.fitOptions.modelID == "polynomial_3" }, timeout: 2.0)
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/fit.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/fit.sciplot"))
         XCTAssertEqual(
             client.saveProjectRequests.last?.payload.plot?.fitOptions,
             FitOptionsPayload(enabled: true, modelID: "polynomial_3")
@@ -903,7 +903,7 @@ final class PlotSessionTests: XCTestCase {
             timeout: 2.0
         )
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/guides.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/guides.sciplot"))
         XCTAssertEqual(
             client.saveProjectRequests.last?.payload.plot?.renderOptions.referenceGuides,
             [
@@ -961,7 +961,7 @@ final class PlotSessionTests: XCTestCase {
             timeout: 2.0
         )
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/functions.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/functions.sciplot"))
         XCTAssertEqual(
             client.saveProjectRequests.last?.payload.plot?.renderOptions.analyticalLayers,
             [
@@ -1080,7 +1080,7 @@ final class PlotSessionTests: XCTestCase {
             $0.lower = 1.0
             $0.upper = 2.0
         }
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/transforms.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/transforms.sciplot"))
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.column, "X")
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataTransforms?.first?.filterOperator, "between")
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.dataVariables?.first?.id, "scale")
@@ -1216,7 +1216,7 @@ final class PlotSessionTests: XCTestCase {
             timeout: 2.0
         )
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/extra-axes.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/extra-axes.sciplot"))
         XCTAssertEqual(
             client.saveProjectRequests.last?.payload.plot?.renderOptions.extraXAxis,
             ExtraAxisPayload(enabled: true, position: "top", title: "Gallons", dataValue: 3.78541, displayValue: 1.0)
@@ -1274,7 +1274,7 @@ final class PlotSessionTests: XCTestCase {
             timeout: 2.0
         )
 
-        await session.saveProject(to: URL(fileURLWithPath: "/tmp/annotations.sciplotgod"))
+        await session.saveProject(to: URL(fileURLWithPath: "/tmp/annotations.sciplot"))
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.count, 1)
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.text, "Peak")
         XCTAssertEqual(client.saveProjectRequests.last?.payload.plot?.renderOptions.textAnnotations?.first?.x, 1.5)

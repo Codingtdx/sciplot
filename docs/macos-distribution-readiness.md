@@ -1,6 +1,6 @@
 # macOS Distribution Readiness
 
-SciPlot God is currently configured for local developer-machine runs. The app target uses disabled code signing and no hardened runtime, which is acceptable for `Launch_Plotter.command` and automated macOS tests but not for sharing a beta app with external users.
+SciPlot is currently configured for local developer-machine runs. The app target uses disabled code signing and no hardened runtime, which is acceptable for `Launch_SciPlot.command` and automated macOS tests but not for sharing a beta app with external users.
 
 ## Supported Modes
 

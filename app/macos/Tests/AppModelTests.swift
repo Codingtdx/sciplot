@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class AppModelTests: XCTestCase {
@@ -42,7 +42,7 @@ final class AppModelTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
-        window.title = "SciPlot God"
+        window.title = "SciPlot"
 
         XCTAssertFalse(manager.canReuseLauncherWindow(window))
 
@@ -91,7 +91,7 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertFalse(
             NSApp.windows.contains { window in
-                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot God")
+                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot")
             },
             "Automatic Launcher fallback should not present over an already visible workbench window."
         )
@@ -125,7 +125,7 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertFalse(
             NSApp.windows.contains { window in
-                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot God")
+                window.isVisible && (window.identifier?.rawValue == "launcher" || window.title == "SciPlot")
             },
             "Delayed Launcher fallback should not present after a workbench window becomes visible."
         )
@@ -144,7 +144,7 @@ final class AppModelTests: XCTestCase {
             defer: false
         )
         launcherWindow.identifier = NSUserInterfaceItemIdentifier("launcher")
-        launcherWindow.title = "SciPlot God"
+        launcherWindow.title = "SciPlot"
         launcherWindow.isReleasedWhenClosed = false
         launcherWindow.orderFrontRegardless()
         defer {
@@ -164,8 +164,25 @@ final class AppModelTests: XCTestCase {
 
     private func closeLauncherWindows() {
         NSApp.windows
-            .filter { $0.identifier?.rawValue == "launcher" || $0.title == "SciPlot God" }
+            .filter { $0.identifier?.rawValue == "launcher" || $0.title == "SciPlot" }
             .forEach { $0.close() }
+    }
+
+    private func waitUntil(
+        _ condition: @escaping () -> Bool,
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return
+            }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for AppModel state", file: file, line: line)
     }
 
     func testAppearanceModeStorageAndPreferredColorSchemeMapping() {
@@ -278,7 +295,7 @@ final class AppModelTests: XCTestCase {
 
     func testAppModelSavesAggregateComposerAndCodeConsoleProjectPayload() async {
         let client = MockSidecarClient()
-        let destinationURL = URL(fileURLWithPath: "/tmp/four-module.sciplotgod")
+        let destinationURL = URL(fileURLWithPath: "/tmp/four-module.sciplot")
         let model = AppModel(
             runtime: SidecarRuntime(),
             client: client,
@@ -342,7 +359,7 @@ final class AppModelTests: XCTestCase {
             ]
         )
         client.openProjectResponse = OpenProjectResponse(
-            projectPath: "/tmp/restored.sciplotgod",
+            projectPath: "/tmp/restored.sciplot",
             restoredSourcePath: nil,
             restoredWorkbookPaths: [],
             payload: ProjectBundlePayload(
@@ -392,7 +409,7 @@ final class AppModelTests: XCTestCase {
             )
         }
 
-        await model.openProjectDocument(URL(fileURLWithPath: "/tmp/restored.sciplotgod"))
+        await model.openProjectDocument(URL(fileURLWithPath: "/tmp/restored.sciplot"))
         try? await Task.sleep(nanoseconds: 180_000_000)
 
         XCTAssertEqual(model.selectedWorkbench, .codeConsole)
@@ -440,8 +457,7 @@ final class AppModelTests: XCTestCase {
         model.dataStudioSession.chooseImportKind(.rawFiles)
         XCTAssertEqual(model.dataStudioSession.importFlow, .idle)
 
-        try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertEqual(model.dataStudioSession.importFlow, .importer(kind: .rawFiles))
+        await waitUntil({ model.dataStudioSession.importFlow == .importer(kind: .rawFiles) }, timeout: 2.0)
     }
 
     func testOpenInPlotSeedsPlotSessionAndContext() async {
@@ -488,7 +504,7 @@ final class AppModelTests: XCTestCase {
         let model = AppModel(runtime: SidecarRuntime(), client: MockSidecarClient())
         model.plotSession.importFile(URL(fileURLWithPath: "/tmp/existing.csv"))
 
-        model.openPlotDocument(URL(fileURLWithPath: "/tmp/next.sciplotgod"))
+        model.openPlotDocument(URL(fileURLWithPath: "/tmp/next.sciplot"))
 
         XCTAssertEqual(model.selectedWorkbench, .plot)
         XCTAssertEqual(model.requestedWorkbenchWindow, .plot)
@@ -643,7 +659,7 @@ final class AppModelTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: ["RepoRootHint": repoRoot.path]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -652,7 +668,7 @@ final class AppModelTests: XCTestCase {
         FileManager.default.changeCurrentDirectoryPath(repoRoot.path)
 
         let requestCounter = RequestCounter()
-        let healthData = Data(#"{"status":"ok","version":"5.0.0"}"#.utf8)
+        let healthData = Data(#"{"status":"ok","version":"0.1.0-beta"}"#.utf8)
         let openAPIData = TestPayloads.compatibleOpenAPIData()
         let metaData = try encodeJSON(TestPayloads.meta())
         let contractData = try encodeJSON(TestPayloads.contract())
@@ -727,7 +743,7 @@ final class AppModelTests: XCTestCase {
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
 
-        let executableURL = macOS.appendingPathComponent("SciPlot God", isDirectory: false)
+        let executableURL = macOS.appendingPathComponent("SciPlot", isDirectory: false)
         try "#!/bin/sh\nexit 0\n".write(to: executableURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
@@ -735,9 +751,9 @@ final class AppModelTests: XCTestCase {
         )
 
         var info: [String: String] = [
-            "CFBundleExecutable": "SciPlot God",
-            "CFBundleIdentifier": "com.codegod.desktop.tests.fixture",
-            "CFBundleName": "SciPlot God",
+            "CFBundleExecutable": "SciPlot",
+            "CFBundleIdentifier": "io.github.codingtdx.sciplot.desktop.tests.fixture",
+            "CFBundleName": "SciPlot",
             "CFBundlePackageType": "APPL",
         ]
         info.merge(infoValues) { _, new in new }

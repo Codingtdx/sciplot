@@ -2,13 +2,13 @@ import AppKit
 import SwiftUI
 
 @main
-struct SciPlotGodApp: App {
+struct SciPlotApp: App {
     @NSApplicationDelegateAdaptor(AppActivationDelegate.self) private var appDelegate
-    @State private var model = SciPlotGodAppState.model
+    @State private var model = SciPlotAppState.model
     @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
 
     var body: some Scene {
-        WindowGroup("SciPlot God", id: "launcher") {
+        WindowGroup("SciPlot", id: "launcher") {
             LauncherWindowRoot(model: model)
                 .frame(width: 760, height: 460)
                 .preferredColorScheme(appearanceMode.preferredColorScheme)
@@ -72,7 +72,7 @@ struct SciPlotGodApp: App {
 }
 
 @MainActor
-private enum SciPlotGodAppState {
+private enum SciPlotAppState {
     static let model = AppModel()
 }
 
@@ -84,14 +84,14 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppWindowManager.shared.openLauncherAfterSceneAttempt(
-            model: SciPlotGodAppState.model,
+            model: SciPlotAppState.model,
             delays: [0.8, 1.6]
         )
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            AppWindowManager.shared.openLauncher(model: SciPlotGodAppState.model)
+            AppWindowManager.shared.openLauncher(model: SciPlotAppState.model)
             return false
         }
         return true
@@ -100,10 +100,10 @@ final class AppActivationDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         Task { @MainActor in
             for url in urls {
-                if url.pathExtension.lowercased() == "sciplotgod" {
-                    await SciPlotGodAppState.model.openProjectDocument(url)
+                if FileTypeCatalog.isProjectURL(url) {
+                    await SciPlotAppState.model.openProjectDocument(url)
                 } else {
-                    SciPlotGodAppState.model.openPlotDocument(url)
+                    SciPlotAppState.model.openPlotDocument(url)
                 }
             }
         }
@@ -188,7 +188,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
         NSApp.windows
             .first { window in
-                window.identifier?.rawValue == "launcher" || window.title == "SciPlot God"
+                window.identifier?.rawValue == "launcher" || window.title == "SciPlot"
             }?
             .close()
     }
@@ -268,7 +268,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
     }
 
     private func isLauncherWindowCandidate(_ window: NSWindow) -> Bool {
-        window.identifier?.rawValue == "launcher" || window.title == "SciPlot God"
+        window.identifier?.rawValue == "launcher" || window.title == "SciPlot"
     }
 
     private func retireUnusableLauncherWindows() {
@@ -327,7 +327,7 @@ final class AppWindowManager: NSObject, NSWindowDelegate {
 
     private func configureLauncherWindow(_ window: NSWindow) {
         window.identifier = NSUserInterfaceItemIdentifier("launcher")
-        window.title = "SciPlot God"
+        window.title = "SciPlot"
         window.setContentSize(CGSize(width: 760, height: 460))
         window.minSize = CGSize(width: 760, height: 460)
         window.maxSize = CGSize(width: 760, height: 460)

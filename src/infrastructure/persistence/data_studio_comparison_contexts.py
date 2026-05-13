@@ -10,7 +10,7 @@ from platformdirs import user_cache_path
 
 from src.data_studio.models import DataStudioGroupState, DataStudioSpecimenState
 
-APP_NAME = "SciPlot God"
+APP_NAME = "SciPlot"
 _APP_AUTHOR = False
 _DATA_STUDIO_COMPARISON_CONTEXT_RETENTION = 20
 

@@ -480,7 +480,7 @@ final class AppModel {
             plotSession.isImporterPresented = true
         case let .openPlotDocument(url):
             Task {
-                if url.pathExtension.lowercased() == "sciplotgod" {
+                if FileTypeCatalog.isProjectURL(url) {
                     await openProjectDocument(url)
                 } else {
                     selectedWorkbench = .plot
@@ -533,7 +533,7 @@ final class AppModel {
             return
         }
         Task {
-            if url.pathExtension.lowercased() == "sciplotgod" {
+            if FileTypeCatalog.isProjectURL(url) {
                 await openProjectDocument(url)
             } else {
                 plotSession.importFile(url)
@@ -550,7 +550,7 @@ final class AppModel {
             if isUserCancellationError(error) {
                 return
             }
-            if url.pathExtension.lowercased() == "sciplotgod" {
+            if FileTypeCatalog.isProjectURL(url) {
                 setProjectError(error.localizedDescription, for: selectedWorkbench)
             }
         }
@@ -746,9 +746,9 @@ final class AppModel {
         case .dataStudio:
             return dataStudioSession.suggestedProjectFilename
         case .composer:
-            return "composer-project.sciplotgod"
+            return "composer-project.sciplot"
         case .codeConsole:
-            return "code-console-project.sciplotgod"
+            return "code-console-project.sciplot"
         }
     }
 

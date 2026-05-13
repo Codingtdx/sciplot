@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 final class SchemaDecodingTests: XCTestCase {
     private let decoder: JSONDecoder = {
@@ -710,7 +710,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeSaveProjectResponsePreservesPlotSourceSHA256() throws {
         let payload = """
         {
-          "project_path": "/tmp/sample.sciplotgod",
+          "project_path": "/tmp/sample.sciplot",
           "payload": {
             "version": 1,
             "selected_workbench": "plot",
@@ -758,7 +758,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeOpenProjectResponsePreservesEmbeddedWorkbookSHA256() throws {
         let payload = """
         {
-          "project_path": "/tmp/data_studio.sciplotgod",
+          "project_path": "/tmp/data_studio.sciplot",
           "restored_source_path": null,
           "restored_workbook_paths": ["/tmp/E4_9_1.xlsx"],
           "payload": {
@@ -816,7 +816,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeSaveProjectResponsePreservesCoreAdvancedPlotState() throws {
         let payload = """
         {
-          "project_path": "/tmp/core-advanced.sciplotgod",
+          "project_path": "/tmp/core-advanced.sciplot",
           "payload": {
             "version": 1,
             "selected_workbench": "plot",
@@ -940,7 +940,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeOpenProjectResponsePreservesCoreAdvancedPlotState() throws {
         let payload = """
         {
-          "project_path": "/tmp/core-advanced.sciplotgod",
+          "project_path": "/tmp/core-advanced.sciplot",
           "restored_source_path": "/tmp/restored/sample.csv",
           "restored_workbook_paths": [],
           "payload": {
@@ -1067,7 +1067,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeSaveProjectResponsePreservesFunctionCurveAxesAndAnalyticalLayers() throws {
         let payload = """
         {
-          "project_path": "/tmp/function-advanced.sciplotgod",
+          "project_path": "/tmp/function-advanced.sciplot",
           "payload": {
             "version": 1,
             "selected_workbench": "plot",
@@ -1147,7 +1147,7 @@ final class SchemaDecodingTests: XCTestCase {
     func testDecodeOpenProjectResponsePreservesAxisBreaks() throws {
         let payload = """
         {
-          "project_path": "/tmp/axis-breaks.sciplotgod",
+          "project_path": "/tmp/axis-breaks.sciplot",
           "restored_source_path": "/tmp/restored/axis-breaks.csv",
           "restored_workbook_paths": [],
           "payload": {

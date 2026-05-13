@@ -7,15 +7,15 @@ from scripts import check_macos_gui_presentation
 
 def _write_sources(root: Path, overrides: dict[str, str] | None = None) -> None:
     sources = {
-        "app/macos/Sources/App/SciPlotGodApp.swift": """
+        "app/macos/Sources/App/SciPlotApp.swift": """
 import SwiftUI
 @main
-struct SciPlotGodApp: App {
-    @State private var model = SciPlotGodAppState.model
+struct SciPlotApp: App {
+    @State private var model = SciPlotAppState.model
     @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
     var appearanceMode: AppAppearanceMode { .system }
     var body: some Scene {
-        WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
+        WindowGroup("SciPlot", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 1520, height: 900)
             .windowResizability(.contentMinSize)
             .windowStyle(.plain)
@@ -37,7 +37,7 @@ struct SciPlotGodApp: App {
         }
     }
 }
-private enum SciPlotGodAppState {
+private enum SciPlotAppState {
     static let model = AppModel()
 }
 enum AppAppearanceMode {
@@ -385,7 +385,7 @@ extension View {
     }
 }
 """,
-        "app/macos/SciPlotGod.xcodeproj/project.pbxproj": """
+        "app/macos/SciPlot.xcodeproj/project.pbxproj": """
 Assets.xcassets
 Assets.xcassets in Resources
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
@@ -408,7 +408,7 @@ Sources/Features/Plot/PlotInteractivePreviewOverlay.swift
   ]
 }
 """,
-        "docs/assets/sciplot-god-app-icon.svg": "<svg />\n",
+        "docs/assets/sciplot-app-icon.svg": "<svg />\n",
         "docs/macos-frontend-design.md": """
 # macOS Frontend Design Handoff
 
@@ -508,7 +508,7 @@ App Icon
             "Button(\"Reveal Source\") {}\n"
         ),
         "docs/ui-ux-audit-2026-04-29.md": (
-            "# SciPlot God UI/UX Audit\n"
+            "# SciPlot UI/UX Audit\n"
             "Pixelmator Pro\nDataGraph\nOrigin\nPrism\nFigma\nKeynote\nVS Code\nJupyter\n"
             "Reasonable\nNeeds attention\n"
         ),
@@ -562,15 +562,15 @@ def test_gui_presentation_checks_reject_launcher_outer_window_chrome(tmp_path: P
     _write_sources(
         tmp_path,
         {
-            "app/macos/Sources/App/SciPlotGodApp.swift": """
+            "app/macos/Sources/App/SciPlotApp.swift": """
 import SwiftUI
 @main
-struct SciPlotGodApp: App {
-    @State private var model = SciPlotGodAppState.model
+struct SciPlotApp: App {
+    @State private var model = SciPlotAppState.model
     @AppStorage(AppAppearanceMode.storageKey) private var appearanceModeRawValue = AppAppearanceMode.system.rawValue
     var appearanceMode: AppAppearanceMode { .system }
     var body: some Scene {
-        WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
+        WindowGroup("SciPlot", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 760, height: 460)
             .windowResizability(.contentSize)
             .defaultLaunchBehavior(.presented)
@@ -590,7 +590,7 @@ struct SciPlotGodApp: App {
         }
     }
 }
-private enum SciPlotGodAppState { static let model = AppModel() }
+private enum SciPlotAppState { static let model = AppModel() }
 enum AppAppearanceMode {
     static let storageKey = "appAppearanceMode"
     static let system = AppAppearanceMode()
@@ -671,13 +671,13 @@ def test_gui_presentation_checks_reject_duplicate_app_commands(tmp_path: Path) -
     _write_sources(
         tmp_path,
         {
-            "app/macos/Sources/App/SciPlotGodApp.swift": """
+            "app/macos/Sources/App/SciPlotApp.swift": """
 import SwiftUI
 @main
-struct SciPlotGodApp: App {
+struct SciPlotApp: App {
     @State private var model = AppModel()
     var body: some Scene {
-        WindowGroup("SciPlot God", id: "launcher") { LauncherWindowRoot(model: model) }
+        WindowGroup("SciPlot", id: "launcher") { LauncherWindowRoot(model: model) }
             .defaultSize(width: 1520, height: 900)
             .windowResizability(.contentMinSize)
             .defaultLaunchBehavior(.presented)

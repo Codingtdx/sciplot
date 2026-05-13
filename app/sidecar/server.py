@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
+from app.sidecar import APP_VERSION
 from app.sidecar.routes_code_console import create_code_console_router
 from app.sidecar.routes_composer import create_composer_router
 from app.sidecar.routes_data_studio import create_data_studio_router
@@ -80,8 +81,8 @@ async def sidecar_lifespan(application: FastAPI):
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="SciPlot God Sidecar",
-        version="5.0.0",
+        title="SciPlot Sidecar",
+        version=APP_VERSION,
         lifespan=sidecar_lifespan,
     )
     application.add_middleware(

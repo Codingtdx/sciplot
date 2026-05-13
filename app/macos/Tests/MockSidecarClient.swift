@@ -1,5 +1,5 @@
 import Foundation
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class MockSidecarClient: SidecarClienting {
@@ -7,7 +7,7 @@ final class MockSidecarClient: SidecarClienting {
         case unimplemented(String)
     }
 
-    var healthResponse = HealthResponse(status: "ok", version: "5.0.0")
+    var healthResponse = HealthResponse(status: "ok", version: "0.1.0-beta")
     var metaResponse = TestPayloads.meta()
     var contractResponse = TestPayloads.contract()
     var plotThemesResponse = PlotThemeListResponse(themes: [])

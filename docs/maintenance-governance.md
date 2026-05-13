@@ -1,6 +1,6 @@
-# SciPlot God Maintenance Governance
+# SciPlot Maintenance Governance
 
-This document is the maintainer-facing governance guide for SciPlot God.
+This document is the maintainer-facing governance guide for SciPlot.
 
 It is intended for two audiences:
 

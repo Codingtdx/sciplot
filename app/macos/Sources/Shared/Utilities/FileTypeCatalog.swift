@@ -1,7 +1,9 @@
+import Foundation
 import UniformTypeIdentifiers
 
 enum FileTypeCatalog {
-    static let plotProject = UTType(exportedAs: "com.codegod.project")
+    static let projectExtension = "sciplot"
+    static let plotProject = UTType(exportedAs: "io.github.codingtdx.sciplot.project")
     static let csv = UTType(filenameExtension: "csv") ?? .data
     static let txt = UTType(filenameExtension: "txt") ?? .data
     static let tsv = UTType(filenameExtension: "tsv") ?? .data
@@ -21,4 +23,8 @@ enum FileTypeCatalog {
     static let composerImports = [pdf, png, jpeg, webP, tiff]
     static let composerExport = [pdf, tiff]
     static let workbookExport = [xlsx]
+
+    static func isProjectURL(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == projectExtension
+    }
 }

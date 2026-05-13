@@ -1,5 +1,5 @@
 import Foundation
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 enum TestPayloads {
     static let pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9oNnfdcAAAAASUVORK5CYII="
@@ -1002,7 +1002,7 @@ enum TestPayloads {
                 visualThemeID: "clean_light"
             ),
             promptText: """
-            Write one Python script for the SciPlot God Code Console.
+            Write one Python script for the SciPlot Code Console.
             Use: from src.code_console_runtime import console
             """,
             starterCode: """
@@ -1350,7 +1350,7 @@ enum TestPayloads {
     }
 
     static func saveProjectResponse(
-        projectPath: String = "/tmp/sample.sciplotgod",
+        projectPath: String = "/tmp/sample.sciplot",
         payload: ProjectBundlePayload? = nil
     ) -> SaveProjectResponse {
         SaveProjectResponse(
@@ -1360,7 +1360,7 @@ enum TestPayloads {
     }
 
     static func openProjectResponse(
-        projectPath: String = "/tmp/sample.sciplotgod",
+        projectPath: String = "/tmp/sample.sciplot",
         restoredSourcePath: String = "/tmp/restored/sample.csv",
         payload: ProjectBundlePayload? = nil
     ) -> OpenProjectResponse {

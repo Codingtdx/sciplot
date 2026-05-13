@@ -6,9 +6,9 @@ from matplotlib.axes import Axes
 
 from src.rendering.models import RenderedPlot
 
-PRIMARY_AXIS_GID = "sciplotgod-primary-axis"
-EXTRA_X_AXIS_GID = "sciplotgod-extra-x-axis"
-EXTRA_Y_AXIS_GID = "sciplotgod-extra-y-axis"
+PRIMARY_AXIS_GID = "sciplot-primary-axis"
+EXTRA_X_AXIS_GID = "sciplot-extra-x-axis"
+EXTRA_Y_AXIS_GID = "sciplot-extra-y-axis"
 
 
 def mark_primary_axis(ax: Axes) -> None:

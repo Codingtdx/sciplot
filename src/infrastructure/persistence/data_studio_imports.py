@@ -8,7 +8,7 @@ from platformdirs import user_data_path
 
 from src.text_normalization import slugify_label
 
-APP_NAME = "SciPlot God"
+APP_NAME = "SciPlot"
 _APP_AUTHOR = False
 _DATA_STUDIO_IMPORT_RETENTION = 20
 

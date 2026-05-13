@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 final class SidecarRuntimeTests: XCTestCase {
     private var originalWorkingDirectory: String = FileManager.default.currentDirectoryPath
@@ -18,7 +18,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -37,7 +37,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: ["RepoRootHint": repoRoot.path]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -56,7 +56,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: repoRoot
                 .appendingPathComponent("app/macos/.derivedData/Build/Products/Debug", isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -76,7 +76,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -93,7 +93,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: #"{"status":"ok","version":"5.0.0"}"#
+                    body: #"{"status":"ok","version":"0.1.0-beta"}"#
                 )
             case "/openapi.json":
                 return Self.jsonResponse(
@@ -131,7 +131,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -176,7 +176,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -194,7 +194,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: #"{"status":"ok","version":"5.0.0"}"#
+                    body: #"{"status":"ok","version":"0.1.0-beta"}"#
                 )
             case "/openapi.json":
                 return Self.jsonResponse(
@@ -240,7 +240,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -260,7 +260,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: #"{"status":"ok","version":"5.0.0"}"#
+                    body: #"{"status":"ok","version":"0.1.0-beta"}"#
                 )
             case "/openapi.json":
                 openAPIRequestCount += 1
@@ -303,7 +303,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let bundleURL = try makeAppBundleFixture(
             at: FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                .appendingPathComponent("SciPlot God.app", isDirectory: true),
+                .appendingPathComponent("SciPlot.app", isDirectory: true),
             infoValues: [:]
         )
         guard let bundle = Bundle(url: bundleURL) else {
@@ -332,7 +332,7 @@ final class SidecarRuntimeTests: XCTestCase {
                 return Self.jsonResponse(
                     request: request,
                     statusCode: 200,
-                    body: #"{"status":"ok","version":"5.0.0"}"#
+                    body: #"{"status":"ok","version":"0.1.0-beta"}"#
                 )
             case "/openapi.json":
                 openAPIRequestCount += 1
@@ -402,7 +402,7 @@ final class SidecarRuntimeTests: XCTestCase {
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
 
-        let executableURL = macOS.appendingPathComponent("SciPlot God", isDirectory: false)
+        let executableURL = macOS.appendingPathComponent("SciPlot", isDirectory: false)
         try "#!/bin/sh\nexit 0\n".write(to: executableURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
@@ -410,9 +410,9 @@ final class SidecarRuntimeTests: XCTestCase {
         )
 
         var info: [String: String] = [
-            "CFBundleExecutable": "SciPlot God",
-            "CFBundleIdentifier": "com.codegod.desktop.tests.fixture",
-            "CFBundleName": "SciPlot God",
+            "CFBundleExecutable": "SciPlot",
+            "CFBundleIdentifier": "io.github.codingtdx.sciplot.desktop.tests.fixture",
+            "CFBundleName": "SciPlot",
             "CFBundlePackageType": "APPL",
         ]
         info.merge(infoValues) { _, new in new }

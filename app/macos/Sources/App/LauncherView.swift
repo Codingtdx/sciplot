@@ -75,7 +75,7 @@ private struct LauncherWelcomeSurface: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("SciPlot God")
+                Text("SciPlot")
                     .font(.largeTitle.weight(.semibold))
 
                 Text("Choose a module")

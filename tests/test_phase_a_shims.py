@@ -8,4 +8,4 @@ def test_make_plot_entrypoint_exposes_cli_main() -> None:
 
 
 def test_sidecar_entrypoint_exposes_active_app() -> None:
-    assert app.title == "SciPlot God Sidecar"
+    assert app.title == "SciPlot Sidecar"

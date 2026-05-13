@@ -458,13 +458,13 @@ def _build_prompt(
     )
     return textwrap.dedent(
         f"""
-        Write one Python script for the SciPlot God Code Console.
+        Write one Python script for the SciPlot Code Console.
 
         Requirements:
         - Return Python code only. Do not wrap the answer in markdown fences.
         - The script will run with the repo root as the working directory.
         - Read the already selected dataset at `{context.input_path}` and sheet `{context.sheet}`.
-        - Use repo-native helpers so the figure keeps SciPlot God styling.
+        - Use repo-native helpers so the figure keeps SciPlot styling.
         - Treat the user's separate figure description as the custom plotting request.
         - External AI should handle fitting / derived analysis / custom overlays, not restyle the whole figure system.
         - Save every generated file inside `OUTPUT_DIR` only.

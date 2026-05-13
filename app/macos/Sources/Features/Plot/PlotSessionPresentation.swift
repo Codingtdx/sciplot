@@ -39,9 +39,9 @@ extension PlotSession {
             return projectURL.lastPathComponent
         }
         if let selectedFileURL {
-            return selectedFileURL.deletingPathExtension().lastPathComponent + ".sciplotgod"
+            return selectedFileURL.deletingPathExtension().lastPathComponent + ".sciplot"
         }
-        return "plot-project.sciplotgod"
+        return "plot-project.sciplot"
     }
 
     var dataWorkbookAvailability: ActionAvailability {

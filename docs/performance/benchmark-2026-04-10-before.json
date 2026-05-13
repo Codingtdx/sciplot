@@ -3,10 +3,10 @@
   "samples": 30,
   "warmup": 5,
   "fixtures": {
-    "curve_csv": "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_w2gihk26/curve.csv",
+    "curve_csv": "/tmp/sciplot_bench_sample/curve.csv",
     "workbooks": [
-      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_w2gihk26/left.xlsx",
-      "/var/folders/z9/xtwtcbsd3f180s1zv06739940000gn/T/codegod_bench_w2gihk26/right.xlsx"
+      "/tmp/sciplot_bench_sample/left.xlsx",
+      "/tmp/sciplot_bench_sample/right.xlsx"
     ]
   },
   "measurements": {

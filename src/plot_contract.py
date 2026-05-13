@@ -508,7 +508,7 @@ def meta_payload() -> dict[str, Any]:
 def render_contract_markdown(contract: PlotContract | None = None) -> str:
     resolved = contract or load_plot_contract()
     lines = [
-        "# SciPlot God Plot Contract",
+        "# SciPlot Plot Contract",
         "",
         f"- Version: `{resolved.version}`",
         f"- Default style: `{resolved.defaults.style_preset}`",

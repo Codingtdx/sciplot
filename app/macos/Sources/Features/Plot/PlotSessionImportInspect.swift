@@ -12,7 +12,7 @@ extension PlotSession {
     }
 
     func handleImportedDocument(_ url: URL) {
-        if url.pathExtension.lowercased() == "sciplotgod" {
+        if FileTypeCatalog.isProjectURL(url) {
             Task {
                 if let openProjectDocumentHandler {
                     await openProjectDocumentHandler(url)

@@ -1,5 +1,5 @@
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class WorkspaceBridgeTests: XCTestCase {

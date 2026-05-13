@@ -1,4 +1,4 @@
-# SciPlot God Product Architecture
+# SciPlot Product Architecture
 
 This document is the canonical app-level product architecture reference for future design and engineering work.
 
@@ -6,7 +6,7 @@ It is written for continuity, not marketing.
 
 ## Product Definition
 
-SciPlot God is a desktop workflow system for turning scientific data into publication-ready figures, cleaned data workbooks, composed multi-panel layouts, and controlled code-driven outputs.
+SciPlot is a desktop workflow system for turning scientific data into publication-ready figures, cleaned data workbooks, composed multi-panel layouts, and controlled code-driven outputs.
 
 The retained app model contains four primary workbenches:
 

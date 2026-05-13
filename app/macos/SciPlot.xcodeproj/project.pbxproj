@@ -10,7 +10,7 @@
 		C00000000000000000000001 /* Sources/App/AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* Sources/App/AppCommands.swift */; };
 		C00000000000000000000002 /* Sources/App/AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* Sources/App/AppModel.swift */; };
 		C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Sources/App/RootSplitView.swift */; };
-		C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */; };
+		C00000000000000000000004 /* Sources/App/SciPlotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Sources/App/SciPlotApp.swift */; };
 		C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Sources/App/Workbench.swift */; };
 		C00000000000000000000079 /* Sources/App/QuickHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */; };
 		C00000000000000000000080 /* Sources/App/LauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000080 /* Sources/App/LauncherView.swift */; };
@@ -113,7 +113,7 @@
 			containerPortal = A00000000000000000000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A00000000000000000000006;
-			remoteInfo = SciPlotGodMac;
+			remoteInfo = SciPlotMac;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -121,7 +121,7 @@
 		B00000000000000000000001 /* Sources/App/AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/AppCommands.swift; sourceTree = "<group>"; };
 		B00000000000000000000002 /* Sources/App/AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/AppModel.swift; sourceTree = "<group>"; };
 		B00000000000000000000003 /* Sources/App/RootSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/RootSplitView.swift; sourceTree = "<group>"; };
-		B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/SciPlotGodApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 /* Sources/App/SciPlotApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/SciPlotApp.swift; sourceTree = "<group>"; };
 		B00000000000000000000005 /* Sources/App/Workbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/Workbench.swift; sourceTree = "<group>"; };
 		B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/QuickHelpSheet.swift; sourceTree = "<group>"; };
 		B00000000000000000000080 /* Sources/App/LauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/App/LauncherView.swift; sourceTree = "<group>"; };
@@ -216,8 +216,8 @@
 		B00000000000000000000092 /* Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionSpecimenPresentation.swift; sourceTree = "<group>"; };
 		B00000000000000000000093 /* Sources/Features/DataStudio/DataStudioSessionImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionImportFlow.swift; sourceTree = "<group>"; };
 		B00000000000000000000094 /* Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/Features/DataStudio/DataStudioSessionTemplateDraft.swift; sourceTree = "<group>"; };
-		A00000000000000000000008 /* SciPlot God.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot God.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		A00000000000000000000009 /* SciPlotGodMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotGodMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000008 /* SciPlot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SciPlot.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000009 /* SciPlotMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SciPlotMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -254,7 +254,7 @@
 				B00000000000000000000001 /* Sources/App/AppCommands.swift */,
 				B00000000000000000000002 /* Sources/App/AppModel.swift */,
 				B00000000000000000000003 /* Sources/App/RootSplitView.swift */,
-				B00000000000000000000004 /* Sources/App/SciPlotGodApp.swift */,
+				B00000000000000000000004 /* Sources/App/SciPlotApp.swift */,
 				B00000000000000000000005 /* Sources/App/Workbench.swift */,
 				B00000000000000000000079 /* Sources/App/QuickHelpSheet.swift */,
 				B00000000000000000000080 /* Sources/App/LauncherView.swift */,
@@ -362,8 +362,8 @@
 		A00000000000000000000005 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A00000000000000000000008 /* SciPlot God.app */,
-				A00000000000000000000009 /* SciPlotGodMacTests.xctest */,
+				A00000000000000000000008 /* SciPlot.app */,
+				A00000000000000000000009 /* SciPlotMacTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -371,9 +371,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A00000000000000000000006 /* SciPlotGodMac */ = {
+		A00000000000000000000006 /* SciPlotMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotGodMac" */;
+			buildConfigurationList = A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotMac" */;
 			buildPhases = (
 				A0000000000000000000000A /* Sources */,
 				A0000000000000000000000B /* Frameworks */,
@@ -383,14 +383,14 @@
 			);
 			dependencies = (
 			);
-			name = SciPlotGodMac;
-			productName = "SciPlot God";
-			productReference = A00000000000000000000008 /* SciPlot God.app */;
+			name = SciPlotMac;
+			productName = "SciPlot";
+			productReference = A00000000000000000000008 /* SciPlot.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A00000000000000000000007 /* SciPlotGodMacTests */ = {
+		A00000000000000000000007 /* SciPlotMacTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotGodMacTests" */;
+			buildConfigurationList = A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotMacTests" */;
 			buildPhases = (
 				A0000000000000000000000D /* Sources */,
 				A0000000000000000000000E /* Frameworks */,
@@ -400,9 +400,9 @@
 			dependencies = (
 				A0000000000000000000001B /* PBXTargetDependency */,
 			);
-			name = SciPlotGodMacTests;
-			productName = SciPlotGodMacTests;
-			productReference = A00000000000000000000009 /* SciPlotGodMacTests.xctest */;
+			name = SciPlotMacTests;
+			productName = SciPlotMacTests;
+			productReference = A00000000000000000000009 /* SciPlotMacTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -424,7 +424,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A00000000000000000000011 /* Build configuration list for PBXProject "SciPlotGod" */;
+			buildConfigurationList = A00000000000000000000011 /* Build configuration list for PBXProject "SciPlot" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -437,8 +437,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A00000000000000000000006 /* SciPlotGodMac */,
-				A00000000000000000000007 /* SciPlotGodMacTests */,
+				A00000000000000000000006 /* SciPlotMac */,
+				A00000000000000000000007 /* SciPlotMacTests */,
 			);
 		};
 /* End PBXProject section */
@@ -462,7 +462,7 @@
 				C00000000000000000000001 /* Sources/App/AppCommands.swift in Sources */,
 				C00000000000000000000002 /* Sources/App/AppModel.swift in Sources */,
 				C00000000000000000000003 /* Sources/App/RootSplitView.swift in Sources */,
-				C00000000000000000000004 /* Sources/App/SciPlotGodApp.swift in Sources */,
+				C00000000000000000000004 /* Sources/App/SciPlotApp.swift in Sources */,
 				C00000000000000000000005 /* Sources/App/Workbench.swift in Sources */,
 				C00000000000000000000079 /* Sources/App/QuickHelpSheet.swift in Sources */,
 				C00000000000000000000080 /* Sources/App/LauncherView.swift in Sources */,
@@ -571,7 +571,7 @@
 /* Begin PBXTargetDependency section */
 		A0000000000000000000001B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A00000000000000000000006 /* SciPlotGodMac */;
+			target = A00000000000000000000006 /* SciPlotMac */;
 			targetProxy = A0000000000000000000001A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -605,7 +605,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
+				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				INFOPLIST_KEY_RepoRootHint = "$(PROJECT_DIR)/../..";
@@ -614,9 +614,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop;
-				PRODUCT_MODULE_NAME = SciPlotGodMac;
-				PRODUCT_NAME = "SciPlot God";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.codingtdx.sciplot.desktop;
+				PRODUCT_MODULE_NAME = SciPlotMac;
+				PRODUCT_NAME = "SciPlot";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -634,7 +634,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot God";
+				INFOPLIST_KEY_CFBundleDisplayName = "SciPlot";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHighResolutionCapable = YES;
 				INFOPLIST_KEY_RepoRootHint = "$(PROJECT_DIR)/../..";
@@ -643,9 +643,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop;
-				PRODUCT_MODULE_NAME = SciPlotGodMac;
-				PRODUCT_NAME = "SciPlot God";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.codingtdx.sciplot.desktop;
+				PRODUCT_MODULE_NAME = SciPlotMac;
+				PRODUCT_NAME = "SciPlot";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -666,14 +666,14 @@
 					"@loader_path/../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop.tests;
-				PRODUCT_MODULE_NAME = SciPlotGodMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.codingtdx.sciplot.desktop.tests;
+				PRODUCT_MODULE_NAME = SciPlotMacTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot God.app/Contents/MacOS/SciPlot God";
-				TEST_TARGET_NAME = SciPlotGodMac;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot.app/Contents/MacOS/SciPlot";
+				TEST_TARGET_NAME = SciPlotMac;
 			};
 			name = Debug;
 		};
@@ -690,21 +690,21 @@
 					"@loader_path/../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.codegod.desktop.tests;
-				PRODUCT_MODULE_NAME = SciPlotGodMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.codingtdx.sciplot.desktop.tests;
+				PRODUCT_MODULE_NAME = SciPlotMacTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot God.app/Contents/MacOS/SciPlot God";
-				TEST_TARGET_NAME = SciPlotGodMac;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SciPlot.app/Contents/MacOS/SciPlot";
+				TEST_TARGET_NAME = SciPlotMac;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A00000000000000000000011 /* Build configuration list for PBXProject "SciPlotGod" */ = {
+		A00000000000000000000011 /* Build configuration list for PBXProject "SciPlot" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A00000000000000000000014 /* Debug */,
@@ -713,7 +713,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotGodMac" */ = {
+		A00000000000000000000012 /* Build configuration list for PBXNativeTarget "SciPlotMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A00000000000000000000016 /* Debug */,
@@ -722,7 +722,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotGodMacTests" */ = {
+		A00000000000000000000013 /* Build configuration list for PBXNativeTarget "SciPlotMacTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A00000000000000000000018 /* Debug */,

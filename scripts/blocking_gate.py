@@ -49,9 +49,9 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
         (
             "xcodebuild",
             "-project",
-            "app/macos/SciPlotGod.xcodeproj",
+            "app/macos/SciPlot.xcodeproj",
             "-scheme",
-            "SciPlotGodMac",
+            "SciPlotMac",
             "-destination",
             "platform=macOS,arch=arm64",
             "-derivedDataPath",
@@ -64,9 +64,9 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
         (
             "xcodebuild",
             "-project",
-            "app/macos/SciPlotGod.xcodeproj",
+            "app/macos/SciPlot.xcodeproj",
             "-scheme",
-            "SciPlotGodMac",
+            "SciPlotMac",
             "-destination",
             "platform=macOS,arch=arm64",
             "-derivedDataPath",

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class DataStudioSessionTests: XCTestCase {
@@ -2045,7 +2045,7 @@ final class DataStudioSessionTests: XCTestCase {
     }
 
     func testSaveProjectPersistsNormalizedDataStudioPayloadAndClearsDirty() async {
-        let destinationURL = URL(fileURLWithPath: "/tmp/data-studio-project.sciplotgod")
+        let destinationURL = URL(fileURLWithPath: "/tmp/data-studio-project.sciplot")
         let client = MockSidecarClient()
         client.dataStudioImportWorkbookHandler = { request in
             TestPayloads.dataStudioImportWorkbook(
@@ -2147,7 +2147,7 @@ final class DataStudioSessionTests: XCTestCase {
         )
         let payloadBuilder = DataStudioSession()
         let response = OpenProjectResponse(
-            projectPath: "/tmp/restored.sciplotgod",
+            projectPath: "/tmp/restored.sciplot",
             restoredSourcePath: nil,
             restoredWorkbookPaths: [restoredWorkbookPath],
             payload: payloadBuilder.buildProjectPayload(from: projectSession)
@@ -2159,7 +2159,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         await session.restoreProject(from: response)
 
-        XCTAssertEqual(session.projectURL?.path, "/tmp/restored.sciplotgod")
+        XCTAssertEqual(session.projectURL?.path, "/tmp/restored.sciplot")
         XCTAssertEqual(session.focusedWorkbook?.response.workbookPath, restoredWorkbookPath)
         XCTAssertEqual(session.selectedFigureFamilyID, "representative_curve")
         XCTAssertEqual(session.currentFigureTemplateID, "curve")

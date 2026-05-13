@@ -12,7 +12,7 @@ enum SidecarError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .repoNotFound:
-            return "Could not locate the SciPlot God repository root from the native app."
+            return "Could not locate the SciPlot repository root from the native app."
         case let .pythonNotFound(url):
             return "Could not find the repo virtual environment Python at \(url.path)."
         case let .startupFailed(message):

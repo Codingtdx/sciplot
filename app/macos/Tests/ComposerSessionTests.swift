@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import SciPlotGodMac
+@testable import SciPlotMac
 
 @MainActor
 final class ComposerSessionTests: XCTestCase {

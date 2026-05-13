@@ -1,4 +1,4 @@
-# SciPlot God UI/UX Audit
+# SciPlot UI/UX Audit
 
 Date: 2026-04-29
 
