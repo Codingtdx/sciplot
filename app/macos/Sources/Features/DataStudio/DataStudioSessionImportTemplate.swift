@@ -42,6 +42,7 @@ extension DataStudioSession {
             secondaryCurveSuggestions: [],
             advancedCandidates: [],
             selectedSummaryItems: selectedTemplateSummaryItems,
+            validationItems: templateValidationItems,
             saveTemplateAvailability: createTemplateSaveAvailability,
             saveTemplateAndContinueAvailability: createTemplateSaveAndContinueAvailability
         )
@@ -143,6 +144,42 @@ extension DataStudioSession {
         default:
             return "\(templatePreview.seriesCount) curves resolved."
         }
+    }
+
+    var templateValidationItems: [DataStudioTemplateSummaryItem] {
+        guard let templatePreview else {
+            return [
+                .init(id: "status", title: "Status", value: "Preview not run"),
+            ]
+        }
+
+        var items: [DataStudioTemplateSummaryItem] = []
+        if !templatePreview.errors.isEmpty {
+            items.append(.init(id: "errors", title: "Errors", value: templatePreview.errors.joined(separator: " ")))
+        }
+        if !templatePreview.missingRoles.isEmpty {
+            items.append(.init(id: "missing_roles", title: "Missing Roles", value: templatePreview.missingRoles.joined(separator: ", ")))
+        }
+        items.append(.init(id: "samples", title: "Samples", value: "\(templatePreview.parsedSampleCount) parsed / \(templatePreview.failedSampleCount) failed"))
+        switch templatePreview.outputKind {
+        case "metric_table":
+            items.append(.init(id: "metrics", title: "Metrics", value: "\(templatePreview.metricCount)"))
+        case "matrix_heatmap":
+            items.append(.init(id: "matrix_rows", title: "Matrix Rows", value: "\(templatePreview.matrixRowCount)"))
+        default:
+            items.append(.init(id: "curves", title: "Curves", value: "\(templatePreview.seriesCount)"))
+            items.append(.init(id: "metrics", title: "Metrics", value: "\(templatePreview.metricCount)"))
+        }
+        if !templatePreview.segments.isEmpty {
+            items.append(.init(id: "segments", title: "Segments", value: "\(templatePreview.segments.count)"))
+        }
+        if !templatePreview.warnings.isEmpty {
+            items.append(.init(id: "warnings", title: "Warnings", value: templatePreview.warnings.joined(separator: " ")))
+        }
+        if items.isEmpty {
+            items.append(.init(id: "status", title: "Status", value: "Ready"))
+        }
+        return items
     }
 
     var canGoBackInImportWizard: Bool {

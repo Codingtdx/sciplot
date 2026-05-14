@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 extension DataStudioSession {
     func beginCreateTemplateEditor() {
@@ -6,7 +8,7 @@ extension DataStudioSession {
             errorMessage = "Import a sample source file before creating a parse template."
             return
         }
-        templatePreview = nil
+        invalidateTemplatePreview()
         importFlow = .wizard(step: .createTemplate)
     }
 
@@ -35,6 +37,10 @@ extension DataStudioSession {
         importFlow = .idle
         await Task.yield()
         await buildWorkbookFromPendingRawFiles(templateID: template.id)
+    }
+
+    func previewTemplateDraft() async {
+        _ = await previewCurrentTemplateDraft()
     }
 
     func dismissImportResolver() {
@@ -103,7 +109,7 @@ extension DataStudioSession {
         if outputKind != "curve_metrics" || !templateDraftComparisonEnabled {
             showAdvancedCandidates = false
         }
-        templatePreview = nil
+        invalidateTemplatePreview()
     }
 
     func setTemplateComparisonEnabled(_ isEnabled: Bool) {
@@ -114,12 +120,12 @@ extension DataStudioSession {
         if !isEnabled {
             showAdvancedCandidates = false
         }
-        templatePreview = nil
+        invalidateTemplatePreview()
     }
 
     func setDraftXColumn(_ columnName: String?) {
         templateDraftXColumnName = columnName
-        templatePreview = nil
+        invalidateTemplatePreview()
     }
 
     func setDraftYColumn(_ columnName: String, isSelected: Bool) {
@@ -133,13 +139,15 @@ extension DataStudioSession {
         } else {
             templateDraftYColumnNames.removeAll { $0 == columnName }
             templateDraftSampleNameByYColumn.removeValue(forKey: columnName)
+            templateDraftBindingLabelByColumn.removeValue(forKey: columnName)
+            templateDraftUnitHintByColumn.removeValue(forKey: columnName)
         }
-        templatePreview = nil
+        invalidateTemplatePreview()
     }
 
     func setDraftSampleName(_ value: String, forYColumn columnName: String) {
         templateDraftSampleNameByYColumn[columnName] = value
-        templatePreview = nil
+        invalidateTemplatePreview()
     }
 
     func setDraftMetricColumn(_ columnName: String, isSelected: Bool) {
@@ -150,6 +158,35 @@ extension DataStudioSession {
         } else {
             templateDraftMetricColumnNames.removeAll { $0 == columnName }
         }
+        invalidateTemplatePreview()
+    }
+
+    func updateTemplateSourceFormat(encoding: String?, delimiter: String?, sheetName: String?) {
+        templateDraftSourceEncoding = normalizedOptional(encoding) ?? ""
+        templateDraftSourceDelimiter = normalizedOptional(delimiter) ?? ""
+        templateDraftSourceSheetName = normalizedOptional(sheetName) ?? ""
+        invalidateTemplatePreview()
+    }
+
+    func setTemplateSegmentPolicy(_ policy: String) {
+        guard templateDraftSegmentPolicy != policy else {
+            return
+        }
+        templateDraftSegmentPolicy = policy
+        invalidateTemplatePreview()
+    }
+
+    func setDraftBindingLabel(_ value: String, forColumn columnName: String) {
+        templateDraftBindingLabelByColumn[columnName] = value
+        invalidateTemplatePreview()
+    }
+
+    func setDraftUnitHint(_ value: String, forColumn columnName: String) {
+        templateDraftUnitHintByColumn[columnName] = value
+        invalidateTemplatePreview()
+    }
+
+    func invalidateTemplatePreview() {
         templatePreview = nil
     }
 
@@ -231,8 +268,134 @@ extension DataStudioSession {
             try await client.deleteDataStudioTemplate(templateID: selectedTemplate.id)
             templates.removeAll { $0.id == selectedTemplate.id }
             if selectedTemplateID == selectedTemplate.id {
-                selectedTemplateID = templates.first?.id
+                selectedTemplateID = nil
             }
+        } catch {
+            if isUserCancellationError(error) {
+                return
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func duplicateSelectedTemplate() async {
+        guard let client, let selectedTemplate else {
+            errorMessage = "Choose a parse template before duplicating."
+            return
+        }
+        let request = createTemplateRequest(from: selectedTemplate, label: "\(selectedTemplate.label) Copy")
+        errorMessage = nil
+        do {
+            let template = try await client.createDataStudioTemplate(request)
+            if let index = templates.firstIndex(where: { $0.id == template.id }) {
+                templates[index] = template
+            } else {
+                templates.append(template)
+            }
+            selectedTemplateID = template.id
+            templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        } catch {
+            if isUserCancellationError(error) {
+                return
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func createTemplateRequest(
+        from template: DataStudioTemplateResponse,
+        label: String
+    ) -> DataStudioCreateTemplateRequest {
+        DataStudioCreateTemplateRequest(
+            label: label,
+            templateID: nil,
+            description: template.description,
+            outputKind: template.outputKind,
+            comparisonEnabled: template.comparisonEnabled,
+            sourceFormat: template.sourceFormat,
+            segmentPolicy: template.segmentPolicy,
+            segmentSelectors: template.segmentSelectors,
+            fieldBindings: template.fieldBindings,
+            matchConditions: template.matchConditions
+        )
+    }
+
+    func chooseTemplateJSONOpenLocation() -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "Import Parse Template"
+        panel.message = "Choose a Data Studio v2 template JSON file."
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    func exportSelectedTemplateJSON() {
+        guard let selectedTemplate else {
+            errorMessage = "Choose a parse template before exporting."
+            return
+        }
+        guard let destinationURL = NativePanels.chooseSaveLocation(
+            title: "Export Parse Template",
+            message: "Choose where to write the selected parse template JSON.",
+            suggestedName: "\(stableColumnToken(selectedTemplate.label)).json",
+            allowedContentTypes: [.json],
+            prompt: "Export"
+        ) else {
+            return
+        }
+        do {
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(selectedTemplate)
+            try data.write(to: destinationURL, options: .atomic)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func importTemplateJSON() async {
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
+            return
+        }
+        guard let sourceURL = chooseTemplateJSONOpenLocation() else {
+            return
+        }
+        do {
+            let data = try Data(contentsOf: sourceURL)
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let request: DataStudioCreateTemplateRequest
+            if let decodedRequest = try? decoder.decode(DataStudioCreateTemplateRequest.self, from: data) {
+                request = DataStudioCreateTemplateRequest(
+                    label: decodedRequest.label,
+                    templateID: nil,
+                    description: decodedRequest.description,
+                    outputKind: decodedRequest.outputKind,
+                    comparisonEnabled: decodedRequest.comparisonEnabled,
+                    sourceFormat: decodedRequest.sourceFormat,
+                    segmentPolicy: decodedRequest.segmentPolicy,
+                    segmentSelectors: decodedRequest.segmentSelectors,
+                    fieldBindings: decodedRequest.fieldBindings,
+                    matchConditions: decodedRequest.matchConditions
+                )
+            } else {
+                let template = try decoder.decode(DataStudioTemplateResponse.self, from: data)
+                request = createTemplateRequest(from: template, label: template.label)
+            }
+            let imported = try await client.createDataStudioTemplate(request)
+            if let index = templates.firstIndex(where: { $0.id == imported.id }) {
+                templates[index] = imported
+            } else {
+                templates.append(imported)
+            }
+            selectedTemplateID = imported.id
+            templates.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+            errorMessage = nil
         } catch {
             if isUserCancellationError(error) {
                 return
@@ -261,6 +424,20 @@ extension DataStudioSession {
         return .enabled()
     }
 
+    var duplicateSelectedTemplateAvailability: ActionAvailability {
+        guard selectedTemplate != nil else {
+            return .disabled("Choose a parse template before duplicating.")
+        }
+        return .enabled()
+    }
+
+    var exportSelectedTemplateAvailability: ActionAvailability {
+        guard selectedTemplate != nil else {
+            return .disabled("Choose a parse template before exporting.")
+        }
+        return .enabled()
+    }
+
     var createTemplateSaveAvailability: ActionAvailability {
         let trimmedLabel = templateDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedLabel.isEmpty {
@@ -268,6 +445,63 @@ extension DataStudioSession {
         }
         guard sourcePreview != nil else {
             return .disabled("Import a source file before saving the parse template.")
+        }
+        if let validatedTemplateDraftRequest {
+            guard let currentRequest = draftTemplateRequest(label: trimmedLabel),
+                  templatePreview != nil,
+                  currentRequest == validatedTemplateDraftRequest
+            else {
+                return .disabled("Preview the current template mapping before saving it.")
+            }
+        }
+        switch templateDraftOutputKind {
+        case "metric_table":
+            if templateDraftMetricColumnNames.isEmpty {
+                return .disabled("Choose at least one metric column.")
+            }
+        case "matrix_heatmap":
+            if templateDraftXColumnName == nil || templateDraftYColumnNames.isEmpty || templateDraftMetricColumnNames.isEmpty {
+                return .disabled("Choose X, Y, and value columns.")
+            }
+        default:
+            if templateDraftXColumnName == nil {
+                return .disabled("Choose an X column.")
+            }
+            if templateDraftYColumnNames.isEmpty {
+                return .disabled("Choose at least one Y column.")
+            }
+            if templateDraftOutputKind == "curve_metrics",
+               templateDraftComparisonEnabled,
+               templateDraftMetricColumnNames.isEmpty
+            {
+                return .disabled("Enable Comparison needs at least one metric column.")
+            }
+        }
+        guard let request = draftTemplateRequest(label: trimmedLabel) else {
+            return .disabled(errorMessage ?? "Complete the parse template mapping before saving it.")
+        }
+        guard let templatePreview,
+              let validatedTemplateDraftRequest,
+              validatedTemplateDraftRequest == request
+        else {
+            return .disabled("Preview the current template mapping before saving it.")
+        }
+        if !templatePreview.errors.isEmpty {
+            return .disabled(templatePreview.errors.joined(separator: " "))
+        }
+        if !templatePreview.missingRoles.isEmpty {
+            return .disabled("Missing required roles: \(templatePreview.missingRoles.joined(separator: ", ")).")
+        }
+        return .enabled()
+    }
+
+    var previewTemplateDraftAvailability: ActionAvailability {
+        let trimmedLabel = templateDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedLabel.isEmpty {
+            return .disabled("Provide a parse template name before previewing it.")
+        }
+        guard sourcePreview != nil else {
+            return .disabled("Import a source file before previewing the parse template.")
         }
         switch templateDraftOutputKind {
         case "metric_table":
@@ -300,34 +534,23 @@ extension DataStudioSession {
     }
 
     func createTemplateFromDraft() async -> DataStudioTemplateResponse? {
-        guard let sourceURL = importedSourceURLs.first, let client else {
-            errorMessage = "Import a sample source file before saving a new parse template."
+        guard let client else {
+            errorMessage = "The sidecar is not ready yet."
             return nil
         }
-        let label = templateDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !label.isEmpty else {
-            errorMessage = "Provide a parse template name before saving it."
+        let availability = createTemplateSaveAvailability
+        guard availability.isEnabled else {
+            errorMessage = availability.reason
             return nil
         }
-        guard let request = draftTemplateRequest(label: label) else {
+        guard let request = validatedTemplateDraftRequest else {
+            errorMessage = "Preview the current template mapping before saving it."
             return nil
         }
         currentActivity = .creatingTemplate
         errorMessage = nil
         defer { currentActivity = .idle }
         do {
-            let preview = try await client.previewDataStudioTemplate(
-                .init(sourcePath: sourceURL.path, template: request)
-            )
-            templatePreview = preview
-            if !preview.errors.isEmpty {
-                errorMessage = preview.errors.joined(separator: " ")
-                return nil
-            }
-            if !preview.missingRoles.isEmpty {
-                errorMessage = "Missing required roles: \(preview.missingRoles.joined(separator: ", "))."
-                return nil
-            }
             let template = try await client.createDataStudioTemplate(request)
             if let index = templates.firstIndex(where: { $0.id == template.id }) {
                 templates[index] = template
@@ -345,6 +568,47 @@ extension DataStudioSession {
         }
     }
 
+    func previewCurrentTemplateDraft() async -> DataStudioCreateTemplateRequest? {
+        guard let sourceURL = importedSourceURLs.first, let client else {
+            errorMessage = "Import a sample source file before previewing the parse template."
+            return nil
+        }
+        let label = templateDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty else {
+            errorMessage = "Provide a parse template name before previewing it."
+            return nil
+        }
+        guard let request = draftTemplateRequest(label: label) else {
+            return nil
+        }
+        validatedTemplateDraftRequest = nil
+        currentActivity = .creatingTemplate
+        errorMessage = nil
+        defer { currentActivity = .idle }
+        do {
+            let preview = try await client.previewDataStudioTemplate(
+                .init(sourcePath: sourceURL.path, template: request)
+            )
+            templatePreview = preview
+            if !preview.errors.isEmpty {
+                errorMessage = preview.errors.joined(separator: " ")
+                return nil
+            }
+            if !preview.missingRoles.isEmpty {
+                errorMessage = "Missing required roles: \(preview.missingRoles.joined(separator: ", "))."
+                return nil
+            }
+            validatedTemplateDraftRequest = request
+            return request
+        } catch {
+            if isUserCancellationError(error) {
+                return nil
+            }
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func draftTemplateRequest(label: String) -> DataStudioCreateTemplateRequest? {
         guard let sourcePreview else {
             errorMessage = "Import a source file before saving the parse template."
@@ -352,6 +616,9 @@ extension DataStudioSession {
         }
         var bindings: [DataStudioTemplateFieldBindingResponse] = []
         let segmentSelectors = draftSegmentSelectors(from: sourcePreview)
+        let sourceEncoding = normalizedOptional(templateDraftSourceEncoding)
+        let sourceDelimiter = normalizedOptional(templateDraftSourceDelimiter)
+        let sourceSheet = normalizedOptional(templateDraftSourceSheetName)
         switch templateDraftOutputKind {
         case "metric_table":
             for columnName in templateDraftMetricColumnNames {
@@ -408,11 +675,11 @@ extension DataStudioSession {
             outputKind: templateDraftOutputKind,
             comparisonEnabled: templateDraftOutputKind == "curve_metrics" ? templateDraftComparisonEnabled : true,
             sourceFormat: .init(
-                encoding: sourcePreview.encoding,
-                delimiter: sourcePreview.delimiter,
-                sheetName: sourcePreview.sheet.displayString
+                encoding: sourceEncoding ?? sourcePreview.encoding,
+                delimiter: sourceDelimiter ?? sourcePreview.delimiter,
+                sheetName: sourceSheet ?? sourcePreview.sheet.displayString
             ),
-            segmentPolicy: segmentSelectors.isEmpty ? "single_table" : "series_per_segment",
+            segmentPolicy: templateDraftSegmentPolicy,
             segmentSelectors: segmentSelectors,
             fieldBindings: bindings,
             matchConditions: draftMatchConditions(from: sourcePreview)
@@ -428,7 +695,10 @@ extension DataStudioSession {
         if preview.segments.isEmpty {
             return []
         }
-        return preview.segments.map(selector(from:))
+        if templateDraftSegmentPolicy == "series_per_segment" {
+            return preview.segments.map(selector(from:))
+        }
+        return [selector(from: preview.segments[0])]
     }
 
     func selector(from segment: SourceTableSegmentResponse) -> DataStudioTemplateSegmentSelectorResponse {
@@ -453,11 +723,12 @@ extension DataStudioSession {
         sampleName: String? = nil,
         optional: Bool = false
     ) -> DataStudioTemplateFieldBindingResponse {
-        DataStudioTemplateFieldBindingResponse(
+        let resolvedLabel = normalizedOptional(templateDraftBindingLabelByColumn[columnName]) ?? label
+        return DataStudioTemplateFieldBindingResponse(
             id: "\(idPrefix)_\(stableColumnToken(columnName))",
             role: role,
-            label: label,
-            sheetName: sourcePreview?.sheet.displayString,
+            label: resolvedLabel,
+            sheetName: normalizedOptional(templateDraftSourceSheetName) ?? sourcePreview?.sheet.displayString,
             blockID: selectedPreviewSegmentID,
             columnName: columnName,
             columnIndex: nil,
@@ -483,7 +754,15 @@ extension DataStudioSession {
     }
 
     func unitHint(for columnName: String) -> String? {
-        guard let profile = sourcePreview?.columnProfiles.first(where: { $0.name == columnName }) else {
+        if let custom = normalizedOptional(templateDraftUnitHintByColumn[columnName]) {
+            return custom
+        }
+        return detectedUnitHint(for: columnName)
+    }
+
+    func detectedUnitHint(for columnName: String, in preview: SourceTablePreviewResponse? = nil) -> String? {
+        let activePreview = preview ?? sourcePreview
+        guard let profile = activePreview?.columnProfiles.first(where: { $0.name == columnName }) else {
             return nil
         }
         guard profile.headerPreview.count > 1 else {
@@ -493,12 +772,17 @@ extension DataStudioSession {
     }
 
     func configureDraftDefaults(from preview: SourceTablePreviewResponse, sampleURL: URL) {
-        templatePreview = nil
+        invalidateTemplatePreview()
+        validatedTemplateDraftRequest = nil
         templateDraftLabel = inferGroupName(from: importedSourceURLs.isEmpty ? [sampleURL] : importedSourceURLs)
         templateDraftDescription = "Template created from \(sampleURL.lastPathComponent)."
         templateDraftOutputKind = "curve_metrics"
         templateDraftComparisonEnabled = false
         showAdvancedCandidates = false
+        templateDraftSourceEncoding = preview.encoding ?? ""
+        templateDraftSourceDelimiter = preview.delimiter ?? ""
+        templateDraftSourceSheetName = preview.sheet.displayString
+        templateDraftSegmentPolicy = preview.segments.isEmpty ? "single_table" : "series_per_segment"
         let availableNames = preview.columnHeaders.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         templateDraftXColumnName = preview.detectedXLabel ?? preview.candidateRoles.x.first ?? availableNames.first
         let xName = templateDraftXColumnName
@@ -512,6 +796,20 @@ extension DataStudioSession {
             uniqueKeysWithValues: templateDraftYColumnNames.map { ($0, defaultSampleName) }
         )
         templateDraftMetricColumnNames = Array(preview.candidateRoles.metric.prefix(4))
+        templateDraftBindingLabelByColumn = Dictionary(uniqueKeysWithValues: availableNames.map { ($0, $0) })
+        templateDraftUnitHintByColumn = Dictionary(
+            uniqueKeysWithValues: availableNames.compactMap { columnName in
+                guard let unit = detectedUnitHint(for: columnName, in: preview) else {
+                    return nil
+                }
+                return (columnName, unit)
+            }
+        )
+    }
+
+    func normalizedOptional(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     func rankedRecommendedMatches(

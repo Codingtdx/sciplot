@@ -227,8 +227,32 @@ def test_plot_curve_log_axis_keeps_decade_labels_but_can_extend_display_range() 
 
 
 def test_normalize_unit_formats_generic_exponents_with_mathtext() -> None:
-    assert normalize_unit("kJ/m2") == r"kJ/m$^{2}$"
+    assert normalize_unit("kJ/m2") == r"kJ$\cdot$m$^{-2}$"
     assert normalize_unit("J g-1 K-1") == r"J g$^{-1}$ K$^{-1}$"
+    assert normalize_unit("m²") == r"m$^{2}$"
+    assert normalize_unit("m^2") == r"m$^{2}$"
+    assert normalize_unit("cm-1") == r"cm$^{-1}$"
+    assert normalize_unit("cm⁻¹") == r"cm$^{-1}$"
+    assert normalize_unit("s-1") == r"s$^{-1}$"
+    assert normalize_unit("kg m-3") == r"kg m$^{-3}$"
+    assert normalize_unit("mol L-1") == r"mol L$^{-1}$"
+    assert normalize_unit("W m-1 K-1") == r"W m$^{-1}$ K$^{-1}$"
+    assert normalize_unit("m/s") == r"m$\cdot$s$^{-1}$"
+    assert normalize_unit("m/s2") == r"m$\cdot$s$^{-2}$"
+    assert normalize_unit("mm^2/s") == r"mm$^{2}\cdot$s$^{-1}$"
+    assert normalize_unit("W/m/K") == r"W$\cdot$m$^{-1}\cdot$K$^{-1}$"
+    assert normalize_unit("N/mm2") == r"N$\cdot$mm$^{-2}$"
+    assert normalize_unit("µmol L-1") == r"μmol L$^{-1}$"
+    assert normalize_unit("mL min-1") == r"mL min$^{-1}$"
+    assert normalize_unit("A cm-2") == r"A cm$^{-2}$"
+    assert normalize_unit("J mol-1 K-1") == r"J mol$^{-1}$ K$^{-1}$"
+    assert normalize_unit("Ω cm") == "Ω cm"
+
+
+def test_normalize_unit_formats_middle_dot_compound_units_with_mathtext() -> None:
+    assert normalize_unit("kg·m−3") == r"kg$\cdot$m$^{-3}$"
+    assert normalize_unit("mol·L^-1") == r"mol$\cdot$L$^{-1}$"
+    assert normalize_unit("W·m−1·K−1") == r"W$\cdot$m$^{-1}\cdot$K$^{-1}$"
 
 
 def test_plot_curve_axis_labels_restore_unit_superscripts() -> None:
@@ -246,7 +270,7 @@ def test_plot_curve_axis_labels_restore_unit_superscripts() -> None:
 
     fig, ax = plot_curves(series, legend_mode="none")
     try:
-        assert ax.get_ylabel() == r"Energy Density (kJ/m$^{2}$)"
+        assert ax.get_ylabel() == r"Energy Density (kJ$\cdot$m$^{-2}$)"
     finally:
         plt.close(fig)
 

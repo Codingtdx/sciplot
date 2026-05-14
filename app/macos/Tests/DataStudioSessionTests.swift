@@ -145,6 +145,17 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertTrue(session.templates.isEmpty)
     }
 
+    func testRefreshTemplatesDoesNotSilentlySelectFirstTemplate() async {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+
+        await session.refreshTemplates()
+
+        XCTAssertEqual(session.templates.count, 2)
+        XCTAssertNil(session.selectedTemplateID)
+    }
+
     func testCancelledImportAfterKindSelectionEndsImportFlow() async {
         let session = DataStudioSession()
 
@@ -678,7 +689,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertNil(session.errorMessage)
     }
 
-    func testDeleteSelectedTemplateRemovesUserTemplateAndSelectsFallback() async {
+    func testDeleteSelectedTemplateRemovesUserTemplateAndClearsSelection() async {
         let client = MockSidecarClient()
         let session = DataStudioSession()
         session.configure(client: client)
@@ -689,7 +700,8 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(client.dataStudioDeleteTemplateIDs, ["user/custom_curve"])
         XCTAssertFalse(session.templates.contains(where: { $0.id == "user/custom_curve" }))
-        XCTAssertEqual(session.selectedTemplateID, "builtin/tensile")
+        XCTAssertNil(session.selectedTemplateID)
+        XCTAssertFalse(session.resolverPresentation.useSelectedTemplateAvailability.isEnabled)
         XCTAssertNil(session.errorMessage)
     }
 
@@ -737,6 +749,7 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.templateDraftOutputKind, "curve_metrics")
         XCTAssertFalse(session.templateDraftComparisonEnabled)
 
+        await session.previewTemplateDraft()
         await session.saveTemplateDraft()
 
         XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
@@ -746,6 +759,45 @@ final class DataStudioSessionTests: XCTestCase {
             "raw_a"
         )
         XCTAssertFalse(client.dataStudioCreateTemplateRequests[0].fieldBindings.contains(where: { $0.role == "metric" }))
+    }
+
+    func testPreviewTemplateDraftShowsNormalizedOutputBeforeSaving() async {
+        let client = MockSidecarClient()
+        client.dataStudioTemplatePreviewResponse = DataStudioTemplatePreviewResponse(
+            templateID: "draft/template",
+            outputKind: "curve_metrics",
+            parsedSampleCount: 1,
+            failedSampleCount: 0,
+            seriesCount: 2,
+            metricCount: 1,
+            matrixRowCount: 0,
+            missingRoles: [],
+            warnings: ["Ignored one blank row."],
+            errors: [],
+            segments: [
+                .init(id: "sheet::main", label: "Main table", curveCount: 2, metricCount: 1, rowCount: 42),
+            ]
+        )
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.beginCreateTemplateEditor()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        session.templateDraftLabel = "Previewable Template"
+        session.templateDraftMetricColumnNames = ["Stress"]
+
+        await session.previewTemplateDraft()
+
+        XCTAssertEqual(client.dataStudioTemplatePreviewRequests.count, 1)
+        XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 0)
+        XCTAssertEqual(session.templatePreview?.seriesCount, 2)
+        let validation = Dictionary(uniqueKeysWithValues: session.templateEditorPresentation.validationItems.map { ($0.title, $0.value) })
+        XCTAssertEqual(validation["Curves"], "2")
+        XCTAssertEqual(validation["Metrics"], "1")
+        XCTAssertEqual(validation["Segments"], "1")
+        XCTAssertEqual(validation["Warnings"], "Ignored one blank row.")
     }
 
     func testEnableComparisonRequiresMetricColumnAndRecoversAfterMetricSelection() async {
@@ -767,6 +819,12 @@ final class DataStudioSessionTests: XCTestCase {
         )
 
         session.templateDraftMetricColumnNames = ["Stress"]
+        XCTAssertFalse(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+        XCTAssertEqual(
+            session.templateEditorPresentation.saveTemplateAvailability.reason,
+            "Preview the current template mapping before saving it."
+        )
+        await session.previewTemplateDraft()
         XCTAssertTrue(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
     }
 
@@ -782,6 +840,7 @@ final class DataStudioSessionTests: XCTestCase {
         session.templateDraftLabel = "Custom Sample Name Template"
         session.setDraftSampleName("E0", forYColumn: "Stress")
 
+        await session.previewTemplateDraft()
         await session.saveTemplateDraft()
 
         XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
@@ -844,6 +903,7 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 20_000_000)
         session.templateDraftLabel = "My Template"
 
+        await session.previewTemplateDraft()
         await session.saveTemplateDraft()
         try? await Task.sleep(nanoseconds: 20_000_000)
 
@@ -872,6 +932,7 @@ final class DataStudioSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 20_000_000)
         session.templateDraftLabel = "My Template"
 
+        await session.previewTemplateDraft()
         await session.saveTemplateAndContinueImport()
 
         XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
@@ -879,6 +940,79 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "user/new_template")
         assertImportFlow(session, equals: .idle)
         XCTAssertEqual(session.orderedGroups.count, 1)
+    }
+
+    func testTemplateDraftMustHaveCurrentSuccessfulPreviewBeforeSaving() async {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.beginCreateTemplateEditor()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        session.templateDraftLabel = "Preview Gated Template"
+
+        XCTAssertFalse(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+        XCTAssertEqual(
+            session.templateEditorPresentation.saveTemplateAvailability.reason,
+            "Preview the current template mapping before saving it."
+        )
+
+        await session.previewTemplateDraft()
+        XCTAssertTrue(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+
+        session.setDraftYColumn("Stress", isSelected: false)
+        XCTAssertFalse(session.templateEditorPresentation.saveTemplateAvailability.isEnabled)
+        XCTAssertEqual(
+            session.templateEditorPresentation.saveTemplateAvailability.reason,
+            "Preview the current template mapping before saving it."
+        )
+
+        await session.saveTemplateDraft()
+        XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 0)
+    }
+
+    func testTemplateDraftCarriesSourceSetupAndCustomBindingLabels() async {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+        session.beginCreateTemplateEditor()
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        session.updateTemplateSourceFormat(encoding: "utf-16", delimiter: ";", sheetName: "Raw")
+        session.setTemplateSegmentPolicy("series_per_segment")
+        session.setDraftBindingLabel("Elapsed", forColumn: "Strain")
+        session.setDraftUnitHint("min", forColumn: "Strain")
+        session.setDraftBindingLabel("Load", forColumn: "Stress")
+        session.setDraftUnitHint("N/mm2", forColumn: "Stress")
+
+        let request = session.draftTemplateRequest(label: "Configured Template")
+        XCTAssertEqual(request?.sourceFormat.encoding, "utf-16")
+        XCTAssertEqual(request?.sourceFormat.delimiter, ";")
+        XCTAssertEqual(request?.sourceFormat.sheetName, "Raw")
+        XCTAssertEqual(request?.segmentPolicy, "series_per_segment")
+        XCTAssertEqual(request?.fieldBindings.first(where: { $0.role == "curve_x" })?.label, "Elapsed")
+        XCTAssertEqual(request?.fieldBindings.first(where: { $0.role == "curve_x" })?.unitHint, "min")
+        XCTAssertEqual(request?.fieldBindings.first(where: { $0.role == "curve_y" })?.label, "Load")
+        XCTAssertEqual(request?.fieldBindings.first(where: { $0.role == "curve_y" })?.unitHint, "N/mm2")
+    }
+
+    func testDuplicateSelectedTemplateCreatesUserTemplateCopy() async {
+        let client = MockSidecarClient()
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.templates = TestPayloads.dataStudioTemplateList().templates
+        session.selectedTemplateID = "user/custom_curve"
+
+        await session.duplicateSelectedTemplate()
+
+        XCTAssertEqual(client.dataStudioCreateTemplateRequests.count, 1)
+        XCTAssertEqual(client.dataStudioCreateTemplateRequests.first?.label, "Custom Curve Template Copy")
+        XCTAssertNil(client.dataStudioCreateTemplateRequests.first?.templateID)
     }
 
     func testUsingSelectedTemplateFromResolverBuildsWorkbook() async {

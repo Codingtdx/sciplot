@@ -41,6 +41,9 @@ struct PlotWorkbenchView: View {
         .sheet(isPresented: bindingForStyleStudio) {
             PlotStyleStudioSheet(session: session)
         }
+        .sheet(isPresented: bindingForScientificTextDictionary) {
+            PlotScientificTextDictionarySheet(session: session)
+        }
     }
 
     private var bindingForImporter: Binding<Bool> {
@@ -61,6 +64,13 @@ struct PlotWorkbenchView: View {
         Binding(
             get: { session.isStyleStudioPresented },
             set: { session.isStyleStudioPresented = $0 }
+        )
+    }
+
+    private var bindingForScientificTextDictionary: Binding<Bool> {
+        Binding(
+            get: { session.isScientificTextDictionaryPresented },
+            set: { session.isScientificTextDictionaryPresented = $0 }
         )
     }
 }
@@ -97,6 +107,304 @@ private struct PlotPixelmatorWorkspace: View {
         }
         .animation(MotionTokens.selection, value: isInspectorPresented)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct PlotScientificTextDictionarySheet: View {
+    @Bindable var session: PlotSession
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    @State private var previewTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            HStack(spacing: 0) {
+                rulesList
+                    .frame(width: 280)
+                Divider()
+                editorPane
+                    .frame(minWidth: 360, maxWidth: .infinity)
+                Divider()
+                previewPane
+                    .frame(width: 340)
+            }
+        }
+        .frame(minWidth: 980, minHeight: 580)
+        .task {
+            await session.loadScientificTextRules()
+        }
+        .onDisappear {
+            previewTask?.cancel()
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text("Scientific Text Dictionary")
+                .font(.title3.weight(.semibold))
+            if session.isLoadingScientificTextRules || session.isSavingScientificTextRule {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Spacer()
+            Button("Preview") {
+                Task { await session.previewScientificTextRuleDraft() }
+            }
+            .disabled(!canPreviewDraft)
+            Button("Save Rule") {
+                Task { await session.saveScientificTextRuleDraft() }
+            }
+            .keyboardShortcut("s", modifiers: [.command])
+            .disabled(!session.scientificTextRuleSaveAvailability.isEnabled)
+            .help(session.scientificTextRuleSaveAvailability.reason ?? "Save this scientific text rule.")
+            Button("Done") {
+                dismiss()
+            }
+            .keyboardShortcut(.defaultAction)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+
+    private var rulesList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Rules")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    session.beginNewScientificTextRule()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.borderless)
+                .help("Create a new unit rule.")
+            }
+
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(filteredRules) { rule in
+                        Button {
+                            session.selectScientificTextRule(id: rule.id)
+                        } label: {
+                            ScientificTextRuleRow(
+                                rule: rule,
+                                isSelected: session.selectedScientificTextRuleID == rule.id
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Button(role: .destructive) {
+                if let id = session.selectedScientificTextRuleID {
+                    Task { await session.deleteScientificTextRule(id: id) }
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(session.selectedScientificTextRuleID == nil)
+            .help("Delete the selected user rule.")
+        }
+        .padding(16)
+    }
+
+    private var editorPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                InspectorSection(title: "Rule") {
+                    AdaptiveInspectorControlRow(title: "Kind") {
+                        Picker("", selection: kindBinding) {
+                            Text("Unit").tag("unit")
+                            Text("Label").tag("label")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
+                    }
+                    AdaptiveInspectorControlRow(title: "Input") {
+                        TextField("Raw text", text: inputBinding)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 210)
+                    }
+                    AdaptiveInspectorControlRow(title: "Output") {
+                        TextField("Replacement", text: outputBinding)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 210)
+                    }
+                    AdaptiveInspectorControlRow(title: "Enabled") {
+                        Toggle("", isOn: enabledBinding)
+                            .labelsHidden()
+                    }
+                }
+            }
+            .padding(18)
+        }
+    }
+
+    private var previewPane: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Preview")
+                .font(.headline)
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let preview = session.scientificTextRulePreview {
+                        LabeledContent("Automatic") {
+                            Text(preview.automaticOutput)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        LabeledContent("Effective") {
+                            Text(preview.effectiveOutput)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        if !preview.errors.isEmpty {
+                            Label(preview.errors.joined(separator: " "), systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !preview.warnings.isEmpty {
+                            Label(preview.warnings.joined(separator: " "), systemImage: "info.circle")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text("Preview not run")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let error = session.scientificTextDictionaryErrorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(18)
+    }
+
+    private var filteredRules: [ScientificTextRuleResponse] {
+        let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else {
+            return session.scientificTextRules
+        }
+        return session.scientificTextRules.filter { rule in
+            rule.input.lowercased().contains(needle)
+                || rule.output.lowercased().contains(needle)
+                || rule.kind.lowercased().contains(needle)
+        }
+    }
+
+    private var canPreviewDraft: Bool {
+        !session.scientificTextRuleDraft.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !session.scientificTextRuleDraft.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var kindBinding: Binding<String> {
+        Binding(
+            get: { session.scientificTextRuleDraft.kind },
+            set: {
+                session.scientificTextRuleDraft.kind = $0
+                invalidateAndSchedulePreview()
+            }
+        )
+    }
+
+    private var inputBinding: Binding<String> {
+        Binding(
+            get: { session.scientificTextRuleDraft.input },
+            set: {
+                session.scientificTextRuleDraft.input = $0
+                invalidateAndSchedulePreview()
+            }
+        )
+    }
+
+    private var outputBinding: Binding<String> {
+        Binding(
+            get: { session.scientificTextRuleDraft.output },
+            set: {
+                session.scientificTextRuleDraft.output = $0
+                invalidateAndSchedulePreview()
+            }
+        )
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { session.scientificTextRuleDraft.enabled },
+            set: {
+                session.scientificTextRuleDraft.enabled = $0
+                invalidateAndSchedulePreview()
+            }
+        )
+    }
+
+    private func invalidateAndSchedulePreview() {
+        session.scientificTextRulePreview = nil
+        previewTask?.cancel()
+        guard canPreviewDraft else {
+            return
+        }
+        previewTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            await session.previewScientificTextRuleDraft()
+        }
+    }
+}
+
+private struct ScientificTextRuleRow: View {
+    let rule: ScientificTextRuleResponse
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(rule.kind == "label" ? "Label" : "Unit")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !rule.enabled {
+                    Text("Disabled")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(rule.input)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+            Text(rule.output)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.55) : Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 

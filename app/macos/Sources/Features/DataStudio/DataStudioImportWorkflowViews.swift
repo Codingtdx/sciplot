@@ -108,6 +108,7 @@ private struct DataStudioImportChooserSheet: View {
 private struct DataStudioImportResolverSheet: View {
     @Bindable var session: DataStudioSession
     @State private var renameDraft = ""
+    @State private var templateSearchText = ""
     @State private var isDeleteConfirmationPresented = false
 
     private var presentation: DataStudioResolverPresentation {
@@ -120,14 +121,14 @@ private struct DataStudioImportResolverSheet: View {
 
             Divider()
 
-            if presentation.recommendedMatches.isEmpty && presentation.otherTemplates.isEmpty {
+            if filteredRecommendedMatches.isEmpty && filteredOtherTemplates.isEmpty {
                 ContentUnavailableView("No Parse Templates", systemImage: "questionmark.folder")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(selection: selectedTemplateBinding) {
-                    if !presentation.recommendedMatches.isEmpty {
+                    if !filteredRecommendedMatches.isEmpty {
                         Section("Recommended Templates") {
-                            ForEach(presentation.recommendedMatches) { match in
+                            ForEach(filteredRecommendedMatches) { match in
                                 DataStudioResolverTemplateRow(
                                     title: match.label,
                                     family: match.family,
@@ -138,9 +139,9 @@ private struct DataStudioImportResolverSheet: View {
                         }
                     }
 
-                    if !presentation.otherTemplates.isEmpty {
+                    if !filteredOtherTemplates.isEmpty {
                         Section("Other Available Templates") {
-                            ForEach(presentation.otherTemplates) { template in
+                            ForEach(filteredOtherTemplates) { template in
                                 DataStudioResolverTemplateRow(
                                     title: template.label,
                                     family: template.family,
@@ -218,6 +219,9 @@ private struct DataStudioImportResolverSheet: View {
                     .font(.title3.weight(.semibold))
                     .lineLimit(1)
             }
+
+            TextField("Search Templates", text: $templateSearchText)
+                .textFieldStyle(.roundedBorder)
         }
         .padding(20)
     }
@@ -229,22 +233,47 @@ private struct DataStudioImportResolverSheet: View {
                     .textFieldStyle(.roundedBorder)
                     .disabled(!presentation.renameTemplateAvailability.isEnabled)
 
-                HStack(spacing: 10) {
-                    Button("Rename") {
-                        Task { await session.renameSelectedTemplate(to: renameDraft) }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!presentation.renameTemplateAvailability.isEnabled)
-                    .help(presentation.renameTemplateAvailability.reason ?? "Rename the selected parse template.")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Button("Rename") {
+                            Task { await session.renameSelectedTemplate(to: renameDraft) }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!presentation.renameTemplateAvailability.isEnabled)
+                        .help(presentation.renameTemplateAvailability.reason ?? "Rename the selected parse template.")
 
-                    Button("Delete", role: .destructive) {
-                        isDeleteConfirmationPresented = true
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!presentation.deleteTemplateAvailability.isEnabled)
-                    .help(presentation.deleteTemplateAvailability.reason ?? "Delete the selected parse template.")
+                        Button("Duplicate") {
+                            Task { await session.duplicateSelectedTemplate() }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!session.duplicateSelectedTemplateAvailability.isEnabled)
+                        .help(session.duplicateSelectedTemplateAvailability.reason ?? "Duplicate the selected parse template.")
 
-                    Spacer()
+                        Button("Delete", role: .destructive) {
+                            isDeleteConfirmationPresented = true
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!presentation.deleteTemplateAvailability.isEnabled)
+                        .help(presentation.deleteTemplateAvailability.reason ?? "Delete the selected parse template.")
+
+                        Spacer()
+                    }
+
+                    HStack(spacing: 10) {
+                        Button("Import JSON") {
+                            Task { await session.importTemplateJSON() }
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button("Export JSON") {
+                            session.exportSelectedTemplateJSON()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!session.exportSelectedTemplateAvailability.isEnabled)
+                        .help(session.exportSelectedTemplateAvailability.reason ?? "Export the selected parse template.")
+
+                        Spacer()
+                    }
                 }
             }
         }
@@ -261,6 +290,28 @@ private struct DataStudioImportResolverSheet: View {
             get: { session.selectedTemplateID },
             set: { session.selectedTemplateID = $0 }
         )
+    }
+
+    private var filteredRecommendedMatches: [DataStudioTemplateMatchResponse] {
+        let needle = templateSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else {
+            return presentation.recommendedMatches
+        }
+        return presentation.recommendedMatches.filter { match in
+            match.label.lowercased().contains(needle) || match.family.lowercased().contains(needle)
+        }
+    }
+
+    private var filteredOtherTemplates: [DataStudioTemplateResponse] {
+        let needle = templateSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else {
+            return presentation.otherTemplates
+        }
+        return presentation.otherTemplates.filter { template in
+            template.label.lowercased().contains(needle)
+                || template.family.lowercased().contains(needle)
+                || template.id.lowercased().contains(needle)
+        }
     }
 }
 

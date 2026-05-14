@@ -818,6 +818,54 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.count, initialRenderCount)
     }
 
+    func testScientificTextDictionaryLifecycleUsesSidecarClient() async throws {
+        let client = MockSidecarClient()
+        client.scientificTextRulesResponse = ScientificTextRuleListResponse(
+            rules: [
+                ScientificTextRuleResponse(
+                    id: "unit/counts_s",
+                    kind: "unit",
+                    input: "counts/s",
+                    output: "cps",
+                    enabled: true,
+                    canonicalInput: "counts/s"
+                ),
+            ]
+        )
+        client.scientificTextRulePreviewResponse = ScientificTextRulePreviewResponse(
+            rule: ScientificTextRuleResponse(
+                id: "unit/counts_s",
+                kind: "unit",
+                input: "counts/s",
+                output: "cps",
+                enabled: true,
+                canonicalInput: "counts/s"
+            ),
+            automaticOutput: #"counts$\cdot$s$^{-1}$"#,
+            effectiveOutput: "cps",
+            errors: [],
+            warnings: []
+        )
+        let session = PlotSession()
+        session.configure(client: client)
+
+        session.showScientificTextDictionary()
+        XCTAssertTrue(session.isScientificTextDictionaryPresented)
+        await session.loadScientificTextRules()
+
+        XCTAssertEqual(session.scientificTextRules.map(\.id), ["unit/counts_s"])
+        session.scientificTextRuleDraft = .init(kind: "unit", input: "counts/s", output: "cps", enabled: true)
+        await session.previewScientificTextRuleDraft()
+        XCTAssertEqual(client.scientificTextRulePreviewRequests.map(\.input), ["counts/s"])
+        XCTAssertTrue(session.scientificTextRuleSaveAvailability.isEnabled)
+
+        await session.saveScientificTextRuleDraft()
+        XCTAssertEqual(client.scientificTextRuleSaveRequests.map(\.input), ["counts/s"])
+
+        await session.deleteScientificTextRule(id: "unit/counts_s")
+        XCTAssertEqual(client.scientificTextRuleDeleteIDs, ["unit/counts_s"])
+    }
+
     func testFunctionToolShortcutRoutesToFunctionAdjustmentWhenTemplateSupportsIt() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

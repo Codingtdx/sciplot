@@ -101,6 +101,12 @@ from app.sidecar.schemas_plot_themes import (
     PlotThemeSaveResponse,
     PlotThemeSummaryResponse,
 )
+from app.sidecar.schemas_scientific_text import (
+    ScientificTextRuleListResponse,
+    ScientificTextRulePayload,
+    ScientificTextRulePreviewResponse,
+    ScientificTextRuleResponse,
+)
 from app.sidecar.schemas_render import (
     CodeConsoleGeneratedFileSnapshotPayload,
     CodeConsoleProjectGeneratedFilePayload,
@@ -242,6 +248,10 @@ __all__ = [
     "RenderRequest",
     "SaveProjectRequest",
     "SaveProjectResponse",
+    "ScientificTextRuleListResponse",
+    "ScientificTextRulePayload",
+    "ScientificTextRulePreviewResponse",
+    "ScientificTextRuleResponse",
     "SourceTablePreviewRequest",
     "SourceTablePreviewResponse",
     "StrictModel",

@@ -23,10 +23,13 @@ struct DataStudioCreateTemplateEditorSheet: View {
 
             HSplitView {
                 sourceColumn
-                    .frame(minWidth: 380, idealWidth: 430, maxWidth: 500, maxHeight: .infinity)
+                    .frame(minWidth: 360, idealWidth: 410, maxWidth: 480, maxHeight: .infinity)
 
-                editorColumn
-                    .frame(minWidth: 470, maxWidth: .infinity, maxHeight: .infinity)
+                roleMappingColumn
+                    .frame(minWidth: 420, idealWidth: 470, maxWidth: .infinity, maxHeight: .infinity)
+
+                validationColumn
+                    .frame(minWidth: 300, idealWidth: 330, maxWidth: 380, maxHeight: .infinity)
             }
 
             Divider()
@@ -57,7 +60,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                 .help(editorPresentation.saveTemplateAndContinueAvailability.reason ?? "Save and build the workbook.")
             }
         }
-        .frame(minWidth: 980, idealWidth: 1060, minHeight: 660, idealHeight: 720)
+        .frame(minWidth: 1120, idealWidth: 1210, minHeight: 660, idealHeight: 720)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -77,6 +80,25 @@ struct DataStudioCreateTemplateEditorSheet: View {
     private var sourceColumn: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let preview {
+                GroupBox("Source Setup") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("Segment Policy", selection: segmentPolicyBinding) {
+                            Text("Single Table").tag("single_table")
+                            Text("Series per Segment").tag("series_per_segment")
+                        }
+                        .pickerStyle(.segmented)
+
+                        TextField("Sheet", text: sourceSheetBinding)
+                            .textFieldStyle(.roundedBorder)
+                        HStack(spacing: 10) {
+                            TextField("Encoding", text: sourceEncodingBinding)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Delimiter", text: sourceDelimiterBinding)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+                }
+
                 if !preview.segments.isEmpty {
                     GroupBox("Segments") {
                         List(selection: segmentSelectionBinding) {
@@ -115,10 +137,10 @@ struct DataStudioCreateTemplateEditorSheet: View {
         .padding(18)
     }
 
-    private var editorColumn: some View {
+    private var roleMappingColumn: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                GroupBox("Template") {
+                DataStudioTemplateBuilderCard(title: "Template", systemImage: "doc.badge.gearshape") {
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("Template Name", text: $session.templateDraftLabel)
                             .textFieldStyle(.roundedBorder)
@@ -138,7 +160,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                     }
                 }
 
-                GroupBox("Roles") {
+                DataStudioTemplateBuilderCard(title: "Role Mapping", systemImage: "point.3.connected.trianglepath.dotted") {
                     VStack(alignment: .leading, spacing: 14) {
                         if session.templateDraftOutputKind != "metric_table" {
                             Picker("X", selection: xColumnBinding) {
@@ -155,7 +177,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                                 selected: session.templateDraftYColumnNames.first,
                                 action: { column in
                                     session.templateDraftYColumnNames = [column]
-                                    session.templatePreview = nil
+                                    session.invalidateTemplatePreview()
                                 }
                             )
                             DataStudioSingleColumnSelector(
@@ -164,7 +186,7 @@ struct DataStudioCreateTemplateEditorSheet: View {
                                 selected: session.templateDraftMetricColumnNames.first,
                                 action: { column in
                                     session.templateDraftMetricColumnNames = [column]
-                                    session.templatePreview = nil
+                                    session.invalidateTemplatePreview()
                                 }
                             )
                         } else {
@@ -220,10 +242,50 @@ struct DataStudioCreateTemplateEditorSheet: View {
                                 }
                             }
                         }
+
+                        if !boundColumns.isEmpty {
+                            GroupBox("Labels and Units") {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(boundColumns, id: \.self) { column in
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(column)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                            HStack(spacing: 8) {
+                                                TextField(
+                                                    "Output Label",
+                                                    text: Binding(
+                                                        get: { session.templateDraftBindingLabelByColumn[column] ?? column },
+                                                        set: { session.setDraftBindingLabel($0, forColumn: column) }
+                                                    )
+                                                )
+                                                .textFieldStyle(.roundedBorder)
+                                                TextField(
+                                                    "Unit Hint",
+                                                    text: Binding(
+                                                        get: { session.templateDraftUnitHintByColumn[column] ?? "" },
+                                                        set: { session.setDraftUnitHint($0, forColumn: column) }
+                                                    )
+                                                )
+                                                .textFieldStyle(.roundedBorder)
+                                                .frame(width: 110)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
+            .padding(18)
+        }
+    }
 
-                GroupBox("Selected") {
+    private var validationColumn: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                DataStudioTemplateBuilderCard(title: "Selected Roles", systemImage: "checklist") {
                     if editorPresentation.selectedSummaryItems.isEmpty {
                         Text("No roles selected")
                             .foregroundStyle(.secondary)
@@ -239,9 +301,34 @@ struct DataStudioCreateTemplateEditorSheet: View {
                     }
                 }
 
-                if let summary = editorPresentation.previewCaption {
-                    Label(summary, systemImage: session.templatePreview?.errors.isEmpty == false ? "exclamationmark.triangle" : "checkmark.circle")
-                        .foregroundStyle(session.templatePreview?.errors.isEmpty == false ? .orange : .secondary)
+                DataStudioTemplateBuilderCard(title: "Normalized Preview", systemImage: "tablecells.badge.ellipsis") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Button {
+                            Task { await session.previewTemplateDraft() }
+                        } label: {
+                            Label("Preview Template", systemImage: "play.rectangle")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!session.previewTemplateDraftAvailability.isEnabled)
+                        .help(session.previewTemplateDraftAvailability.reason ?? "Validate the current mapping against the source preview.")
+
+                        if let summary = editorPresentation.previewCaption {
+                            Label(
+                                summary,
+                                systemImage: session.templatePreview?.errors.isEmpty == false ? "exclamationmark.triangle" : "checkmark.circle"
+                            )
+                            .foregroundStyle(session.templatePreview?.errors.isEmpty == false ? .orange : .secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(editorPresentation.validationItems) { item in
+                                LabeledContent(item.title) {
+                                    Text(item.value)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding(18)
@@ -252,6 +339,52 @@ struct DataStudioCreateTemplateEditorSheet: View {
         Binding(
             get: { session.selectedPreviewSegmentID },
             set: { session.selectPreviewSegment(id: $0) }
+        )
+    }
+
+    private var segmentPolicyBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftSegmentPolicy },
+            set: { session.setTemplateSegmentPolicy($0) }
+        )
+    }
+
+    private var sourceEncodingBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftSourceEncoding },
+            set: {
+                session.updateTemplateSourceFormat(
+                    encoding: $0,
+                    delimiter: session.templateDraftSourceDelimiter,
+                    sheetName: session.templateDraftSourceSheetName
+                )
+            }
+        )
+    }
+
+    private var sourceDelimiterBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftSourceDelimiter },
+            set: {
+                session.updateTemplateSourceFormat(
+                    encoding: session.templateDraftSourceEncoding,
+                    delimiter: $0,
+                    sheetName: session.templateDraftSourceSheetName
+                )
+            }
+        )
+    }
+
+    private var sourceSheetBinding: Binding<String> {
+        Binding(
+            get: { session.templateDraftSourceSheetName },
+            set: {
+                session.updateTemplateSourceFormat(
+                    encoding: session.templateDraftSourceEncoding,
+                    delimiter: session.templateDraftSourceDelimiter,
+                    sheetName: $0
+                )
+            }
         )
     }
 
@@ -283,6 +416,47 @@ struct DataStudioCreateTemplateEditorSheet: View {
     private var selectableMetricColumns: [String] {
         columns.filter { column in
             column != session.templateDraftXColumnName && !session.templateDraftYColumnNames.contains(column)
+        }
+    }
+
+    private var boundColumns: [String] {
+        var result: [String] = []
+        func append(_ column: String?) {
+            guard let column, !column.isEmpty, !result.contains(column) else {
+                return
+            }
+            result.append(column)
+        }
+        append(session.templateDraftXColumnName)
+        session.templateDraftYColumnNames.forEach { append($0) }
+        session.templateDraftMetricColumnNames.forEach { append($0) }
+        return result
+    }
+}
+
+private struct DataStudioTemplateBuilderCard<Content: View>: View {
+    let title: String
+    let systemImage: String
+    private let content: Content
+
+    init(title: String, systemImage: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.systemImage = systemImage
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+
+            content
+        }
+        .padding(14)
+        .background(.quinary.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
     }
 }

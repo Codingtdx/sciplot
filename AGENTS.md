@@ -74,7 +74,12 @@
 ## Sidecar 与前端边界
 
 - Plot 检查与推荐统一走 `POST /inspect-file`。
-- Plot live preview 统一走 `POST /render-preview` 返回的 `PreviewItemResponse`：`png_base64` 优先用于 GUI bitmap live preview，`pdf_base64` 必须继续保留为权威精确预览/导出兜底，`interaction_metadata` 只允许提供 PNG 像素空间的 figure/axis bbox 与数据范围来辅助 Swift 交互映射。禁止把绘图语义重写到 Swift Charts/Canvas 形成第二套渲染规则。
+- Plot live preview 默认仍消费 `POST /render-preview` 返回的 `PreviewItemResponse`：`png_base64` 用于 GUI bitmap preview，`pdf_base64` 必须继续保留为权威精确预览/导出兜底。允许新增 Hybrid Native realtime preview，但必须受 contract/schema 驱动并逐模板准入：
+  - v1 native realtime scope 仅限 `curve / point_line / scatter / area_curve / step_line / function_curve`；
+  - native preview 可用 SwiftUI Canvas/自定义 view 渲染受支持曲线族、文字、guide、shape、legend 和轴交互，但不得维护模板、尺寸、style、palette、theme 的第二套本地默认值；
+  - 拖拽/双击编辑必须写回现有 typed payload（例如 `render_options.reference_guides / text_annotations / shape_annotations / analytical_layers / extra_y_axis`，以及显式新增的 typed series style payload），不能写入游离 view state；
+  - 后端 inspect、数据变换、fit/function 计算、preflight、save/open project、PDF/TIFF export 仍是权威路径；native preview 只提供发布级近似和实时交互，松手后必须可由后端预览/导出校正；
+  - unsupported template、缺失 interaction/vector metadata、启用尚未准入的 broken-axis/advanced feature 时必须回退到 backend bitmap/PDF preview，而不是猜测渲染。
 - Plot / Data Studio 原始表格分析统一走 `POST /source-table-preview`，按分页返回列头、rows、检测到的 encoding/delimiter/segments、column profiles、候选角色和检测到的 x/y/z 标签；预览参数允许 `encoding/delimiter/header_row(_index)/unit_row(_index)/data_start_row(_index)/segment_id`，Plot `Transformed` 预览可额外携带 typed `options.data_variables / options.data_transforms`。不要把全量 workbook 表格塞回 inspect/session payload。
 - Plot `POST /inspect-file` 可选携带 typed `options.data_variables / options.data_transforms` 以做 transform-aware inspect/recommendation；有 transforms 时识别必须基于变换后的表，因此 derived/pivot/aggregate 之后的数据可以直接进入同一 ranked recommendation payload，不要求原始 raw shape 先被识别；无 options 时必须保持快速原始导入推荐路径，不得把高级数据引擎变成普通导入的隐性成本。
 - Plot 推荐必须识别 DataGraph-inspired advanced input shapes：XYZ long table 或 matrix scalar field 可推荐 `contour_field`，theta/radius 曲线可推荐 `polar_curve`，小型 mixed table 可推荐 `table_figure`。这些推荐必须继续走 `POST /inspect-file` 的 ranked recommendation payload，不得在 macOS 侧按列名重建第二套高级模板判断。
@@ -183,7 +188,7 @@
 - Plot 必须使用 Pixelmator-Pro 语法的四区布局：左侧数据/图型面板，中间白色 figure/page preview，右侧深色 glass adjustment inspector，最右侧竖向调整分类栏。
 - Plot 左侧 `PlotSourceTypePanel` 只负责“选哪张表、画成什么图”：顶部一个紧凑 sheet picker；下方只显示 `session.templateGalleryItems` 的 5 个推荐图型大缩略图卡；`More` 打开 `PlotTypeChooserSheet`，用搜索 + `session.plotTypeItems` 选择全部兼容图型。左侧不得显示文件名、Import/Open、`Data Tables`、`Source Data`、`Transformed`、`Variables`、`Fit` 常驻入口、layer/object 列表、fit/function/guide/text/shape overlay 行、`Source` / `Objects` / `Templates` 分区说明文案、`No source` 空说明、假工具或前端本地业务判断。
 - Plot 最右侧 `PlotAdjustmentRail` 是绘图调整分类入口，不是对象创建工具条。固定顺序为 `Figure`、`Axes`、`Legend`、`Guides`、`Fit`、`Functions`、`Annotations`、`Advanced Axes`；点击只切换右侧 inspector category，禁止弹出快捷菜单。`Legend` 里的图例排序是该分类的主功能，必须直接可见，不得藏进 `Advanced`。`Data Cursor` 在 preview hit-testing metadata 存在前不得进入该栏。
-- 右侧 adjustment inspector 负责精确科研参数编辑。Reference guide / region、text/shape annotation 的默认创建路径是先在 inspector 内选择小型图形 mode card，再在中央 preview 的 `InteractivePlotOverlay` 上点击或拖拽放置；创建后自动选中对象，并通过右侧 Axis + Value、Start/End、label、visible 等精确输入继续编辑。Swift overlay 只能画 hover/selection/handle/draft affordance 并写回现有 typed payload，禁止重画科研图、引入第二套坐标轴语义或用 popover 作为默认创建流。Function layer 暂时保持 inspector-first，因为表达式解析和采样归后端负责。
+- 右侧 adjustment inspector 负责精确科研参数编辑。Reference guide / region、text/shape annotation 的默认创建路径是先在 inspector 内选择小型图形 mode card，再在中央 preview 上点击或拖拽放置；创建后自动选中对象，并通过右侧 Axis + Value、Start/End、label、visible 等精确输入继续编辑。Hybrid Native realtime 模式允许中央 preview 直接渲染与命中 v1 curve-family 对象，并允许双击线条弹出小型 series popover，同时同步右侧 inspector 的完整 Series 编辑；所有编辑必须落到 typed render payload，不能引入未受 contract/schema 管控的第二套坐标轴、样式或数据语义。Function layer 的表达式解析和采样仍归后端共享表达式引擎负责。
 - Plot `Data Workbook` 是 utility affordance，不是一级工作流阶段：
   - toolbar `Data Workbook` 图标是默认打开入口，并默认落到 `Source Data`；左侧 `PlotSourceTypePanel` 不再拆出 workbook tab 入口
   - v1 只读，不做 inline cell editing

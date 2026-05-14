@@ -36,6 +36,8 @@ _UNIT_BASE_TOKENS = frozenset(
         "v",
         "w",
         "wb",
+        "wh",
+        "ω",
     }
 )
 _SI_PREFIXES = ("da", "y", "z", "a", "f", "p", "n", "u", "µ", "m", "c", "d", "h", "k", "M", "G", "T")
@@ -49,6 +51,8 @@ def _unit_mathtext_source(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.translate(_SUBSCRIPT_MAP).translate(_SUPERSCRIPT_MAP)
     normalized = normalized.replace("−", "-").replace("–", "-").replace("—", "-")
+    normalized = normalized.replace("·", ".").replace("⋅", ".").replace("•", ".").replace("∙", ".")
+    normalized = normalized.replace("*", ".")
     return _clean_text(normalized)
 
 
@@ -63,22 +67,70 @@ def _looks_like_unit_symbol(token: str) -> bool:
     return False
 
 
-def _format_unit_token_mathtext(token: str) -> str:
-    match = re.fullmatch(r"(?P<base>[A-Za-zµμΩ°%]+)(?P<exp>(?:\^-?\d+)|(?:-?\d+))", token)
+def _unit_token_parts(token: str) -> tuple[str, int | None] | None:
+    match = re.fullmatch(r"(?P<base>[A-Za-zµμΩ°%]+)(?P<exp>(?:\^-?\d+)|(?:-?\d+))?", token)
     if match is None:
-        return token
+        return None
     base = match.group("base")
-    exponent = match.group("exp").lstrip("^")
     if not _looks_like_unit_symbol(base):
-        return token
+        return None
+    raw_exponent = match.group("exp")
+    exponent = int(raw_exponent.lstrip("^")) if raw_exponent else None
+    return base, exponent
+
+
+def _format_unit_piece_mathtext(base: str, exponent: int | None) -> str:
+    if exponent is None or exponent == 1:
+        return base
     return f"{base}$^{{{exponent}}}$"
+
+
+def _format_unit_token_mathtext(token: str) -> str:
+    parts = _unit_token_parts(token)
+    if parts is None:
+        return token
+    base, exponent = parts
+    if exponent is None:
+        return token
+    return _format_unit_piece_mathtext(base, exponent)
 
 
 def _format_generic_unit_mathtext(text: str) -> str:
     source = _unit_mathtext_source(text)
-    tokens = re.split(r"([/.\s]+)", source)
-    formatted = [_format_unit_token_mathtext(token) if token else token for token in tokens]
-    return "".join(formatted)
+    tokens = [token for token in re.split(r"([/.\s]+)", source) if token]
+    formatted: list[str] = []
+    denominator_depth = 0
+    pending_delimiter = ""
+    for token in tokens:
+        if re.fullmatch(r"[/.\s]+", token):
+            if "/" in token:
+                denominator_depth += token.count("/")
+                pending_delimiter = "."
+            elif "." in token:
+                pending_delimiter = "."
+            else:
+                pending_delimiter = " "
+            continue
+
+        parts = _unit_token_parts(token)
+        if pending_delimiter and formatted:
+            formatted.append(_format_unit_delimiter_mathtext(pending_delimiter))
+        if parts is None:
+            formatted.append(token)
+        else:
+            base, exponent = parts
+            if denominator_depth:
+                exponent = -(exponent if exponent is not None else 1)
+            formatted.append(_format_unit_piece_mathtext(base, exponent))
+        pending_delimiter = ""
+
+    return "".join(formatted).replace(r"}$$\cdot$", r"}\cdot$")
+
+
+def _format_unit_delimiter_mathtext(token: str) -> str:
+    if "." in token:
+        return r"$\cdot$"
+    return token
 
 
 def canonicalize_token(text: str) -> str:
@@ -163,6 +215,7 @@ _UNIT_ALIASES = {
     "ppm": "ppm",
     "[ppm]": "ppm",
     "a.u.": "a.u.",
+    "a.u": "a.u.",
     "au": "a.u.",
     "arb. units": "a.u.",
     "arbitrary units": "a.u.",
@@ -179,7 +232,7 @@ _UNIT_ALIASES = {
     "rad s−1": r"rad$\cdot$s$^{-1}$",
     "mpa.s": r"mPa$\cdot$s",
     "mpa s": r"mPa$\cdot$s",
-    "mpa/s": "MPa/s",
+    "mpa/s": r"MPa$\cdot$s$^{-1}$",
     "pa.s": r"Pa$\cdot$s",
     "pa s": r"Pa$\cdot$s",
     "cm-1": r"cm$^{-1}$",
@@ -210,7 +263,16 @@ LABEL_ALIASES = {canonicalize_token(key): value for key, value in _LABEL_ALIASES
 UNIT_ALIASES = {canonicalize_token(key): value for key, value in _UNIT_ALIASES.items()}
 
 
-def normalize_label(text: str) -> str:
+def _lookup_user_rule(kind: str, canonical: str) -> str | None:
+    try:
+        from src.scientific_text_rules import lookup_scientific_text_rule
+
+        return lookup_scientific_text_rule(kind, canonical)
+    except Exception:
+        return None
+
+
+def normalize_label_without_user_rules(text: str) -> str:
     cleaned = _clean_text(text or "")
     if not cleaned:
         return ""
@@ -220,7 +282,17 @@ def normalize_label(text: str) -> str:
     return _title_case_preserving_acronyms(cleaned)
 
 
-def normalize_unit(text: str) -> str:
+def normalize_label(text: str) -> str:
+    cleaned = _clean_text(text or "")
+    if not cleaned:
+        return ""
+    canonical = canonicalize_token(cleaned)
+    if user_value := _lookup_user_rule("label", canonical):
+        return user_value
+    return normalize_label_without_user_rules(cleaned)
+
+
+def normalize_unit_without_user_rules(text: str) -> str:
     cleaned = _clean_text(text or "")
     if not cleaned:
         return ""
@@ -231,6 +303,16 @@ def normalize_unit(text: str) -> str:
     if cleaned.startswith("[") and cleaned.endswith("]") and len(cleaned) > 2:
         cleaned = _clean_text(cleaned[1:-1])
     return _format_generic_unit_mathtext(cleaned)
+
+
+def normalize_unit(text: str) -> str:
+    cleaned = _clean_text(text or "")
+    if not cleaned:
+        return ""
+    canonical = canonicalize_token(cleaned)
+    if user_value := _lookup_user_rule("unit", canonical):
+        return user_value
+    return normalize_unit_without_user_rules(cleaned)
 
 
 def slugify_label(text: str) -> str:

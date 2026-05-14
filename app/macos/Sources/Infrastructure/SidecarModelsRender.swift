@@ -111,6 +111,52 @@ struct PlotThemeSaveResponse: Codable, Equatable, Sendable {
     let warnings: [String]
 }
 
+struct ScientificTextRulePayload: Codable, Equatable, Sendable {
+    var id: String?
+    var kind: String
+    var input: String
+    var output: String
+    var enabled: Bool
+    var canonicalInput: String?
+
+    init(
+        id: String? = nil,
+        kind: String = "unit",
+        input: String = "",
+        output: String = "",
+        enabled: Bool = true,
+        canonicalInput: String? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.input = input
+        self.output = output
+        self.enabled = enabled
+        self.canonicalInput = canonicalInput
+    }
+}
+
+struct ScientificTextRuleResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let input: String
+    let output: String
+    let enabled: Bool
+    let canonicalInput: String
+}
+
+struct ScientificTextRuleListResponse: Codable, Equatable, Sendable {
+    let rules: [ScientificTextRuleResponse]
+}
+
+struct ScientificTextRulePreviewResponse: Codable, Equatable, Sendable {
+    let rule: ScientificTextRuleResponse
+    let automaticOutput: String
+    let effectiveOutput: String
+    let errors: [String]
+    let warnings: [String]
+}
+
 struct ExtraAxisPayload: Codable, Equatable, Sendable {
     var enabled: Bool
     var position: String

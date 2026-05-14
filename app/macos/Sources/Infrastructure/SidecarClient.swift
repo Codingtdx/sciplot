@@ -10,6 +10,11 @@ protocol SidecarClienting: AnyObject {
     func savePlotTheme(_ request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse
     func updatePlotTheme(themeID: String, request: PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse
     func deletePlotTheme(themeID: String) async throws
+    func fetchScientificTextRules() async throws -> ScientificTextRuleListResponse
+    func previewScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRulePreviewResponse
+    func saveScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRuleResponse
+    func updateScientificTextRule(ruleID: String, request: ScientificTextRulePayload) async throws -> ScientificTextRuleResponse
+    func deleteScientificTextRule(ruleID: String) async throws
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse
     func recommendDataStudioTemplates(_ request: DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse
     func previewDataStudioTemplate(_ request: DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse
@@ -91,6 +96,26 @@ final class SidecarClient: SidecarClienting {
 
     func deletePlotTheme(themeID: String) async throws {
         let _: StatusResponse = try await delete("plot-themes/\(themeID)", responseType: StatusResponse.self)
+    }
+
+    func fetchScientificTextRules() async throws -> ScientificTextRuleListResponse {
+        try await get("scientific-text/rules")
+    }
+
+    func previewScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRulePreviewResponse {
+        try await post("scientific-text/rules/preview", body: request)
+    }
+
+    func saveScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRuleResponse {
+        try await post("scientific-text/rules", body: request)
+    }
+
+    func updateScientificTextRule(ruleID: String, request: ScientificTextRulePayload) async throws -> ScientificTextRuleResponse {
+        try await put("scientific-text/rules/\(ruleID)", body: request)
+    }
+
+    func deleteScientificTextRule(ruleID: String) async throws {
+        let _: StatusResponse = try await delete("scientific-text/rules/\(ruleID)", responseType: StatusResponse.self)
     }
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {

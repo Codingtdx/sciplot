@@ -52,6 +52,13 @@ final class DataStudioSession {
     var templateDraftYColumnNames: [String] = []
     var templateDraftMetricColumnNames: [String] = []
     var templateDraftSampleNameByYColumn: [String: String] = [:]
+    var templateDraftBindingLabelByColumn: [String: String] = [:]
+    var templateDraftUnitHintByColumn: [String: String] = [:]
+    var templateDraftSourceEncoding = ""
+    var templateDraftSourceDelimiter = ""
+    var templateDraftSourceSheetName = ""
+    var templateDraftSegmentPolicy = "single_table"
+    var validatedTemplateDraftRequest: DataStudioCreateTemplateRequest?
     var selectedPreviewSegmentID: String?
 
     var importFlow: DataStudioImportFlowState = .idle
@@ -177,10 +184,10 @@ final class DataStudioSession {
         do {
             let response = try await client.fetchDataStudioTemplates()
             templates = response.templates.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
-            if selectedTemplateID == nil {
-                selectedTemplateID = templates.first?.id
-            } else if !templates.contains(where: { $0.id == selectedTemplateID }) {
-                selectedTemplateID = templates.first?.id
+            if let selectedTemplateID,
+               !templates.contains(where: { $0.id == selectedTemplateID })
+            {
+                self.selectedTemplateID = nil
             }
         } catch {
             if isUserCancellationError(error) {
@@ -282,6 +289,13 @@ final class DataStudioSession {
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []
         templateDraftSampleNameByYColumn = [:]
+        templateDraftBindingLabelByColumn = [:]
+        templateDraftUnitHintByColumn = [:]
+        templateDraftSourceEncoding = ""
+        templateDraftSourceDelimiter = ""
+        templateDraftSourceSheetName = ""
+        templateDraftSegmentPolicy = "single_table"
+        validatedTemplateDraftRequest = nil
         selectedPreviewSegmentID = nil
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil

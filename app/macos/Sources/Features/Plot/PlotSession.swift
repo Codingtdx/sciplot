@@ -59,6 +59,7 @@ final class PlotSession {
     var isImporterPresented = false
     var isDataWorkbookPresented = false
     var isStyleStudioPresented = false
+    var isScientificTextDictionaryPresented = false
     var selectedFileURL: URL?
     var projectURL: URL?
     var selectedSheet: SheetValue = .index(0)
@@ -91,6 +92,13 @@ final class PlotSession {
     var styleStudioErrorMessage: String?
     var isPreviewingStyleStudioDraft = false
     var isSavingStyleStudioTheme = false
+    var scientificTextRules: [ScientificTextRuleResponse] = []
+    var selectedScientificTextRuleID: String?
+    var scientificTextRuleDraft = ScientificTextRulePayload()
+    var scientificTextRulePreview: ScientificTextRulePreviewResponse?
+    var scientificTextDictionaryErrorMessage: String?
+    var isLoadingScientificTextRules = false
+    var isSavingScientificTextRule = false
     var sourceTableOffset = 0
     var fitAnalysisOffset = 0
     var fitAnalysisSelectedSeriesID: String?
@@ -138,6 +146,27 @@ final class PlotSession {
         }
         guard !needsInspection else {
             return .disabled("Wait for inspect to finish before saving the project.")
+        }
+        return .enabled()
+    }
+
+    var scientificTextRuleSaveAvailability: ActionAvailability {
+        if isSavingScientificTextRule {
+            return .disabled("Scientific text rule save is already in progress.")
+        }
+        let input = scientificTextRuleDraft.input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let output = scientificTextRuleDraft.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else {
+            return .disabled("Provide the source text before saving.")
+        }
+        guard !output.isEmpty else {
+            return .disabled("Provide the replacement text before saving.")
+        }
+        guard let scientificTextRulePreview, scientificTextRulePreviewMatchesDraft(scientificTextRulePreview) else {
+            return .disabled("Preview the current text rule before saving it.")
+        }
+        if !scientificTextRulePreview.errors.isEmpty {
+            return .disabled(scientificTextRulePreview.errors.joined(separator: " "))
         }
         return .enabled()
     }
@@ -257,6 +286,133 @@ final class PlotSession {
 
     func dismissStyleStudio() {
         isStyleStudioPresented = false
+    }
+
+    func showScientificTextDictionary() {
+        scientificTextDictionaryErrorMessage = nil
+        isScientificTextDictionaryPresented = true
+        Task { await loadScientificTextRules() }
+    }
+
+    func dismissScientificTextDictionary() {
+        isScientificTextDictionaryPresented = false
+    }
+
+    func loadScientificTextRules() async {
+        guard let client else {
+            scientificTextDictionaryErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        isLoadingScientificTextRules = true
+        defer { isLoadingScientificTextRules = false }
+        do {
+            scientificTextRules = try await client.fetchScientificTextRules().rules
+        } catch {
+            scientificTextDictionaryErrorMessage = error.localizedDescription
+        }
+    }
+
+    func beginNewScientificTextRule(kind: String = "unit") {
+        selectedScientificTextRuleID = nil
+        scientificTextRuleDraft = ScientificTextRulePayload(kind: kind, input: "", output: "", enabled: true)
+        scientificTextRulePreview = nil
+        scientificTextDictionaryErrorMessage = nil
+    }
+
+    func selectScientificTextRule(id: String?) {
+        selectedScientificTextRuleID = id
+        guard let id, let rule = scientificTextRules.first(where: { $0.id == id }) else {
+            beginNewScientificTextRule()
+            return
+        }
+        scientificTextRuleDraft = ScientificTextRulePayload(
+            id: rule.id,
+            kind: rule.kind,
+            input: rule.input,
+            output: rule.output,
+            enabled: rule.enabled,
+            canonicalInput: rule.canonicalInput
+        )
+        scientificTextRulePreview = nil
+        scientificTextDictionaryErrorMessage = nil
+    }
+
+    func previewScientificTextRuleDraft() async {
+        guard let client else {
+            scientificTextDictionaryErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        scientificTextDictionaryErrorMessage = nil
+        do {
+            scientificTextRulePreview = try await client.previewScientificTextRule(scientificTextRuleDraft)
+        } catch {
+            scientificTextDictionaryErrorMessage = error.localizedDescription
+        }
+    }
+
+    func saveScientificTextRuleDraft() async {
+        guard scientificTextRuleSaveAvailability.isEnabled else {
+            return
+        }
+        guard let client else {
+            scientificTextDictionaryErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        isSavingScientificTextRule = true
+        scientificTextDictionaryErrorMessage = nil
+        defer { isSavingScientificTextRule = false }
+        do {
+            let rule: ScientificTextRuleResponse
+            if let selectedScientificTextRuleID {
+                rule = try await client.updateScientificTextRule(
+                    ruleID: selectedScientificTextRuleID,
+                    request: scientificTextRuleDraft
+                )
+            } else {
+                rule = try await client.saveScientificTextRule(scientificTextRuleDraft)
+            }
+            upsertScientificTextRule(rule)
+            selectScientificTextRule(id: rule.id)
+        } catch {
+            scientificTextDictionaryErrorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteScientificTextRule(id: String) async {
+        guard let client else {
+            scientificTextDictionaryErrorMessage = "The sidecar is not ready yet."
+            return
+        }
+        do {
+            try await client.deleteScientificTextRule(ruleID: id)
+            scientificTextRules.removeAll { $0.id == id }
+            if selectedScientificTextRuleID == id {
+                beginNewScientificTextRule()
+            }
+        } catch {
+            scientificTextDictionaryErrorMessage = error.localizedDescription
+        }
+    }
+
+    func scientificTextRulePreviewMatchesDraft(_ preview: ScientificTextRulePreviewResponse) -> Bool {
+        preview.rule.kind == scientificTextRuleDraft.kind
+            && preview.rule.input == scientificTextRuleDraft.input.trimmingCharacters(in: .whitespacesAndNewlines)
+            && preview.rule.output == scientificTextRuleDraft.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            && preview.rule.enabled == scientificTextRuleDraft.enabled
+    }
+
+    private func upsertScientificTextRule(_ rule: ScientificTextRuleResponse) {
+        if let index = scientificTextRules.firstIndex(where: { $0.id == rule.id }) {
+            scientificTextRules[index] = rule
+        } else {
+            scientificTextRules.append(rule)
+        }
+        scientificTextRules.sort {
+            if $0.kind != $1.kind {
+                return $0.kind < $1.kind
+            }
+            return $0.input.localizedCaseInsensitiveCompare($1.input) == .orderedAscending
+        }
     }
 }
 

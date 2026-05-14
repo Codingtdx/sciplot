@@ -21,6 +21,29 @@ final class MockSidecarClient: SidecarClienting {
         blockedKeys: [],
         warnings: []
     )
+    var scientificTextRulesResponse = ScientificTextRuleListResponse(rules: [])
+    var scientificTextRulePreviewResponse = ScientificTextRulePreviewResponse(
+        rule: ScientificTextRuleResponse(
+            id: "unit/mock",
+            kind: "unit",
+            input: "mock",
+            output: "Mock",
+            enabled: true,
+            canonicalInput: "mock"
+        ),
+        automaticOutput: "mock",
+        effectiveOutput: "Mock",
+        errors: [],
+        warnings: []
+    )
+    var scientificTextRuleSaveResponse = ScientificTextRuleResponse(
+        id: "unit/mock",
+        kind: "unit",
+        input: "mock",
+        output: "Mock",
+        enabled: true,
+        canonicalInput: "mock"
+    )
     var dataStudioTemplatesResponse = TestPayloads.dataStudioTemplateList()
     var dataStudioTemplateRecommendationsResponse = TestPayloads.dataStudioTemplateRecommendations()
     var dataStudioTemplatePreviewResponse = TestPayloads.dataStudioTemplatePreview()
@@ -52,6 +75,10 @@ final class MockSidecarClient: SidecarClienting {
     var plotThemePreviewHandler: ((PlotThemePreviewRequest) async throws -> PlotThemePreviewResponse)?
     var plotThemeSaveHandler: ((PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse)?
     var plotThemeUpdateHandler: ((String, PlotThemeSaveRequest) async throws -> PlotThemeSaveResponse)?
+    var scientificTextRulesHandler: (() async throws -> ScientificTextRuleListResponse)?
+    var scientificTextRulePreviewHandler: ((ScientificTextRulePayload) async throws -> ScientificTextRulePreviewResponse)?
+    var scientificTextRuleSaveHandler: ((ScientificTextRulePayload) async throws -> ScientificTextRuleResponse)?
+    var scientificTextRuleUpdateHandler: ((String, ScientificTextRulePayload) async throws -> ScientificTextRuleResponse)?
     var dataStudioTemplateListHandler: (() async throws -> DataStudioTemplateListResponse)?
     var dataStudioTemplateRecommendationsHandler: ((DataStudioTemplateRecommendationsRequest) async throws -> DataStudioTemplateRecommendationsResponse)?
     var dataStudioTemplatePreviewHandler: ((DataStudioTemplatePreviewRequest) async throws -> DataStudioTemplatePreviewResponse)?
@@ -80,6 +107,10 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var plotThemeSaveRequests: [PlotThemeSaveRequest] = []
     private(set) var plotThemeUpdateRequests: [(String, PlotThemeSaveRequest)] = []
     private(set) var plotThemeDeleteIDs: [String] = []
+    private(set) var scientificTextRulePreviewRequests: [ScientificTextRulePayload] = []
+    private(set) var scientificTextRuleSaveRequests: [ScientificTextRulePayload] = []
+    private(set) var scientificTextRuleUpdateRequests: [(String, ScientificTextRulePayload)] = []
+    private(set) var scientificTextRuleDeleteIDs: [String] = []
     private(set) var dataStudioTemplateRecommendationRequests: [DataStudioTemplateRecommendationsRequest] = []
     private(set) var dataStudioTemplatePreviewRequests: [DataStudioTemplatePreviewRequest] = []
     private(set) var dataStudioCreateTemplateRequests: [DataStudioCreateTemplateRequest] = []
@@ -157,6 +188,44 @@ final class MockSidecarClient: SidecarClienting {
 
     func deletePlotTheme(themeID: String) async throws {
         plotThemeDeleteIDs.append(themeID)
+    }
+
+    func fetchScientificTextRules() async throws -> ScientificTextRuleListResponse {
+        if let scientificTextRulesHandler {
+            return try await scientificTextRulesHandler()
+        }
+        return scientificTextRulesResponse
+    }
+
+    func previewScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRulePreviewResponse {
+        scientificTextRulePreviewRequests.append(request)
+        if let scientificTextRulePreviewHandler {
+            return try await scientificTextRulePreviewHandler(request)
+        }
+        return scientificTextRulePreviewResponse
+    }
+
+    func saveScientificTextRule(_ request: ScientificTextRulePayload) async throws -> ScientificTextRuleResponse {
+        scientificTextRuleSaveRequests.append(request)
+        if let scientificTextRuleSaveHandler {
+            return try await scientificTextRuleSaveHandler(request)
+        }
+        return scientificTextRuleSaveResponse
+    }
+
+    func updateScientificTextRule(
+        ruleID: String,
+        request: ScientificTextRulePayload
+    ) async throws -> ScientificTextRuleResponse {
+        scientificTextRuleUpdateRequests.append((ruleID, request))
+        if let scientificTextRuleUpdateHandler {
+            return try await scientificTextRuleUpdateHandler(ruleID, request)
+        }
+        return scientificTextRuleSaveResponse
+    }
+
+    func deleteScientificTextRule(ruleID: String) async throws {
+        scientificTextRuleDeleteIDs.append(ruleID)
     }
 
     func fetchDataStudioTemplates() async throws -> DataStudioTemplateListResponse {

@@ -316,6 +316,13 @@ extension DataStudioSession {
         templateDraftYColumnNames = []
         templateDraftMetricColumnNames = []
         templateDraftSampleNameByYColumn = [:]
+        templateDraftBindingLabelByColumn = [:]
+        templateDraftUnitHintByColumn = [:]
+        templateDraftSourceEncoding = ""
+        templateDraftSourceDelimiter = ""
+        templateDraftSourceSheetName = ""
+        templateDraftSegmentPolicy = "single_table"
+        validatedTemplateDraftRequest = nil
         selectedPreviewSheetName = nil
         selectedPreviewBlockID = nil
         selectedPreviewSegmentID = nil

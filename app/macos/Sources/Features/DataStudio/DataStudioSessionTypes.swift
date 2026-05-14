@@ -316,6 +316,7 @@ struct DataStudioTemplateEditorPresentation: Equatable {
     let secondaryCurveSuggestions: [DataStudioSuggestionCardPresentation]
     let advancedCandidates: [DataStudioFieldCandidateResponse]
     let selectedSummaryItems: [DataStudioTemplateSummaryItem]
+    let validationItems: [DataStudioTemplateSummaryItem]
     let saveTemplateAvailability: ActionAvailability
     let saveTemplateAndContinueAvailability: ActionAvailability
 }

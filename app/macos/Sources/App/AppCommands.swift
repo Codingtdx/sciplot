@@ -33,6 +33,13 @@ struct AppCommands: Commands {
             ForEach(PlotTool.allCases) { tool in
                 plotToolButton(tool)
             }
+            Divider()
+            Button("Scientific Text Dictionary...") {
+                model.requestOpenWindow(for: .plot)
+                openWindow(id: Workbench.plot.windowSceneID)
+                AppWindowManager.shared.openWorkbenchAfterSceneAttempt(.plot, model: model)
+                model.plotSession.showScientificTextDictionary()
+            }
         }
 
         CommandGroup(after: .toolbar) {
