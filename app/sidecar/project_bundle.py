@@ -31,6 +31,7 @@ from app.sidecar.schemas_render import (
     RenderOptionsPayload,
     SaveProjectResponse,
     ShapeAnnotationPayload,
+    SeriesStylePayload,
     TextAnnotationPayload,
 )
 from app.sidecar.server_utils import normalize_path, options_from_payload
@@ -177,6 +178,11 @@ def _normalize_render_options(
         x_tick_edge_labels=resolved_options.x_tick_edge_labels,
         y_tick_edge_labels=resolved_options.y_tick_edge_labels,
         series_order=list(resolved_options.series_order) if resolved_options.series_order is not None else None,
+        series_styles=(
+            [SeriesStylePayload.model_validate(item) for item in resolved_options.series_styles]
+            if resolved_options.series_styles is not None
+            else None
+        ),
         x_label_override=resolved_options.x_label_override,
         y_label_override=resolved_options.y_label_override,
         baseline=resolved_options.baseline,

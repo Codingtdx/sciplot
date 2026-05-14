@@ -510,6 +510,19 @@ extension PlotSession {
         effectiveTemplateID.flatMap(templateSummary(for:))
     }
 
+    var nativeRealtimePreviewAvailability: ActionAvailability {
+        guard let templateID = effectiveTemplateID else {
+            return .disabled("Choose a curve-family template before using native realtime preview.")
+        }
+        guard Self.nativeRealtimePreviewTemplateIDs.contains(templateID) else {
+            return .disabled("This template uses backend preview until native parity is available.")
+        }
+        if hasActiveSplitAxisBreak {
+            return .disabled("Split broken axes use backend preview until native parity is available.")
+        }
+        return .enabled()
+    }
+
     var editableOptionIDs: Set<String> {
         Set(selectedTemplateSummary?.editableOptions ?? [])
     }
@@ -810,6 +823,23 @@ extension PlotSession {
         }
 
         return .enabled()
+    }
+}
+
+extension PlotSession {
+    static let nativeRealtimePreviewTemplateIDs: Set<String> = [
+        "curve",
+        "point_line",
+        "scatter",
+        "area_curve",
+        "step_line",
+        "function_curve",
+    ]
+
+    private var hasActiveSplitAxisBreak: Bool {
+        let xSplit = renderOptions.xAxisBreaks?.contains { $0.enabled && $0.displayMode == "split" } ?? false
+        let ySplit = renderOptions.yAxisBreaks?.contains { $0.enabled && $0.displayMode == "split" } ?? false
+        return xSplit || ySplit
     }
 }
 

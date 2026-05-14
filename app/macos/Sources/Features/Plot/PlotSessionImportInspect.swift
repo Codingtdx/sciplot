@@ -290,6 +290,32 @@ extension PlotSession {
         }
     }
 
+    func openSeriesQuickEditor(seriesID: String) {
+        selectedSeriesQuickEditorID = seriesID
+        canvasInteractionMode = .select
+        selectedPlotAdjustmentCategory = .legend
+        selectPlotLayer(.series(seriesID))
+    }
+
+    func updateSeriesStyle(
+        seriesID: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout SeriesStylePayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var styles = options.seriesStyles ?? []
+            let index = styles.firstIndex { $0.seriesID == seriesID }
+            var style = index.map { styles[$0] } ?? SeriesStylePayload(seriesID: seriesID)
+            mutate(&style)
+            if let index {
+                styles[index] = style
+            } else {
+                styles.append(style)
+            }
+            options.seriesStyles = styles
+        }
+    }
+
     func addReferenceGuide(kind: String, axisTarget: String = "y_primary") {
         updateRenderOptions(policy: .immediate) { options in
             var guides = options.referenceGuides ?? []

@@ -43,6 +43,7 @@ extension PlotInspectorView {
         Group {
             if session.shouldShowSeriesLegendControls {
                 seriesSection
+                selectedSeriesEditor
             } else {
                 InspectorSection(title: "Legend") {
                     InspectorEmptyState(message: "No reorderable legend entries")

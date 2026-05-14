@@ -716,6 +716,32 @@ struct DataVariablePayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct SeriesStylePayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String { seriesID }
+    var seriesID: String
+    var enabled: Bool
+    var color: String?
+    var lineWidth: Double?
+    var marker: String?
+    var yAxisTarget: String?
+
+    init(
+        seriesID: String,
+        enabled: Bool = true,
+        color: String? = nil,
+        lineWidth: Double? = nil,
+        marker: String? = nil,
+        yAxisTarget: String? = nil
+    ) {
+        self.seriesID = seriesID
+        self.enabled = enabled
+        self.color = color
+        self.lineWidth = lineWidth
+        self.marker = marker
+        self.yAxisTarget = yAxisTarget
+    }
+}
+
 struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var size: String?
     var xscale: String?
@@ -751,6 +777,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
     var analyticalLayers: [AnalyticalLayerPayload]?
     var dataVariables: [DataVariablePayload]?
     var dataTransforms: [DataTransformPayload]?
+    var seriesStyles: [SeriesStylePayload]?
 
     init(
         size: String? = nil,
@@ -786,7 +813,8 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         shapeAnnotations: [ShapeAnnotationPayload]? = nil,
         analyticalLayers: [AnalyticalLayerPayload]? = nil,
         dataVariables: [DataVariablePayload]? = nil,
-        dataTransforms: [DataTransformPayload]? = nil
+        dataTransforms: [DataTransformPayload]? = nil,
+        seriesStyles: [SeriesStylePayload]? = nil
     ) {
         self.size = size
         self.xscale = xscale
@@ -822,6 +850,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         self.analyticalLayers = analyticalLayers
         self.dataVariables = dataVariables
         self.dataTransforms = dataTransforms
+        self.seriesStyles = seriesStyles
     }
 
     enum CodingKeys: String, CodingKey {
@@ -861,6 +890,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         case analyticalLayers
         case dataVariables
         case dataTransforms
+        case seriesStyles
     }
 
     init(from decoder: Decoder) throws {
@@ -929,6 +959,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         analyticalLayers = try container.decodeIfPresent([AnalyticalLayerPayload].self, forKey: .analyticalLayers)
         dataVariables = try container.decodeIfPresent([DataVariablePayload].self, forKey: .dataVariables)
         dataTransforms = try container.decodeIfPresent([DataTransformPayload].self, forKey: .dataTransforms)
+        seriesStyles = try container.decodeIfPresent([SeriesStylePayload].self, forKey: .seriesStyles)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -967,6 +998,7 @@ struct RenderOptionsPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(analyticalLayers, forKey: .analyticalLayers)
         try container.encodeIfPresent(dataVariables, forKey: .dataVariables)
         try container.encodeIfPresent(dataTransforms, forKey: .dataTransforms)
+        try container.encodeIfPresent(seriesStyles, forKey: .seriesStyles)
     }
 }
 

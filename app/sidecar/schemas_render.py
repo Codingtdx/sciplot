@@ -124,6 +124,15 @@ class ExtraAxisPayload(StrictModel):
     display_value: float = 1.0
 
 
+class SeriesStylePayload(StrictModel):
+    series_id: str
+    enabled: bool = True
+    color: str | None = None
+    line_width: float | None = None
+    marker: str | None = None
+    y_axis_target: str | None = None
+
+
 class RenderOptionsPayload(StrictModel):
     size: str | None = None
     xscale: str | None = None
@@ -138,6 +147,7 @@ class RenderOptionsPayload(StrictModel):
     x_tick_edge_labels: str | None = None
     y_tick_edge_labels: str | None = None
     series_order: list[str] | None = None
+    series_styles: list[SeriesStylePayload] | None = None
     legend_position: str | None = None
     x_label_override: str | None = None
     y_label_override: str | None = None
@@ -813,6 +823,7 @@ __all__ = [
     "RenderRequest",
     "SaveProjectRequest",
     "SaveProjectResponse",
+    "SeriesStylePayload",
     "SourceTablePreviewRequest",
     "SourceTablePreviewResponse",
     "SourceTableSegmentResponse",

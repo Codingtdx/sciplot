@@ -11,6 +11,7 @@ from matplotlib import rcParams
 from matplotlib.collections import PathCollection, PolyCollection
 from matplotlib.colors import to_hex
 
+from app.sidecar.schemas_render import RenderOptionsPayload as SidecarRenderOptionsPayload
 from src import plot_style
 from src.plot_contract import lint_public_template_contract
 from src.rendering import (
@@ -700,6 +701,27 @@ def test_resolve_render_options_accepts_extra_axes_payloads() -> None:
     assert options.extra_y_axis["binding_mode"] == "conversion"
     assert options.extra_y_axis["series_ids"] == ()
     assert options.extra_y_axis["display_value"] == pytest.approx(1.0)
+
+
+def test_sidecar_render_options_payload_accepts_series_styles() -> None:
+    payload = SidecarRenderOptionsPayload.model_validate(
+        {
+            "series_styles": [
+                {
+                    "series_id": "Sample A",
+                    "enabled": True,
+                    "color": "#d62728",
+                    "line_width": 2.75,
+                    "marker": "square",
+                    "y_axis_target": "primary",
+                }
+            ]
+        }
+    )
+
+    assert payload.series_styles is not None
+    assert payload.series_styles[0].series_id == "Sample A"
+    assert payload.model_dump(mode="json")["series_styles"][0]["line_width"] == pytest.approx(2.75)
 
 
 def test_resolve_render_options_rejects_invalid_extra_axis_position() -> None:
@@ -1438,6 +1460,42 @@ def test_reference_guides_overlay_line_and_band_on_curve(tmp_path: Path) -> None
         assert any(line.get_linestyle() == "--" for line in ax.lines)
         assert ax.patches
         assert {"Target", "Window"} <= {text.get_text() for text in ax.texts}
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_series_styles_override_curve_artist_style_and_visibility(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        legend_position="upper_right",
+        series_styles=[
+            {
+                "series_id": "Sample A",
+                "enabled": True,
+                "color": "#d62728",
+                "line_width": 2.75,
+                "marker": "square",
+            },
+            {
+                "series_id": "Sample B",
+                "enabled": False,
+            },
+        ],
+    )
+    try:
+        ax = rendered[0].figure.axes[0]
+        assert len(ax.lines) >= 2
+        sample_a, sample_b = ax.lines[:2]
+        assert to_hex(sample_a.get_color()) == "#d62728"
+        assert sample_a.get_linewidth() == pytest.approx(2.75)
+        assert sample_a.get_marker() == "s"
+        assert not sample_b.get_visible()
+        legend = ax.get_legend()
+        assert legend is not None
+        assert "Sample B" not in [text.get_text() for text in legend.get_texts()]
     finally:
         close_rendered_plots(rendered)
 

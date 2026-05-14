@@ -61,6 +61,11 @@ def options_from_payload(
         x_tick_edge_labels=payload.x_tick_edge_labels,
         y_tick_edge_labels=payload.y_tick_edge_labels,
         series_order=payload.series_order,
+        series_styles=(
+            [item.model_dump(mode="json") for item in payload.series_styles]
+            if payload.series_styles
+            else None
+        ),
         legend_position=payload.legend_position,
         x_label_override=payload.x_label_override,
         y_label_override=payload.y_label_override,

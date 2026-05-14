@@ -58,7 +58,7 @@ struct PlotSelectedLayerEditorView: View {
         case .shapeAnnotation:
             return "Shape"
         case .series:
-            return "Legend"
+            return "Series"
         case nil:
             return "Edit"
         }
@@ -309,6 +309,40 @@ struct PlotSelectedLayerEditorView: View {
     private func seriesEditor(id: String) -> some View {
         Group {
             AdaptiveInspectorTextRow(title: "Entry", value: id)
+            AdaptiveInspectorControlRow(title: "Visible") {
+                Toggle("", isOn: seriesStyleEnabledBinding(id: id))
+            }
+            AdaptiveInspectorControlRow(title: "Color") {
+                TextField("#1f77b4", text: seriesStyleColorBinding(id: id))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 104)
+            }
+            AdaptiveInspectorControlRow(title: "Line") {
+                TextField("Auto", text: seriesStyleLineWidthBinding(id: id))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+            }
+            AdaptiveInspectorControlRow(title: "Marker") {
+                Picker("", selection: seriesStyleMarkerBinding(id: id)) {
+                    Text("Auto").tag("none")
+                    Text("Circle").tag("circle")
+                    Text("Square").tag("square")
+                    Text("Triangle").tag("triangle")
+                    Text("Diamond").tag("diamond")
+                    Text("X").tag("x")
+                    Text("Plus").tag("plus")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+            AdaptiveInspectorControlRow(title: "Y Axis") {
+                Picker("", selection: seriesStyleYAxisTargetBinding(id: id)) {
+                    Text("Primary").tag("y_primary")
+                    Text("Secondary").tag("y_secondary")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
             SortableSeriesListView(
                 title: "Order",
                 rows: session.seriesOrderRows,
@@ -323,6 +357,60 @@ struct PlotSelectedLayerEditorView: View {
             .disabled(!session.resetSeriesOrderAvailability.isEnabled)
             .help(session.resetSeriesOrderAvailability.reason ?? "Reset legend ordering.")
         }
+    }
+
+    private func seriesStyle(_ id: String) -> SeriesStylePayload {
+        session.renderOptions.seriesStyles?.first(where: { $0.seriesID == id }) ?? SeriesStylePayload(seriesID: id)
+    }
+
+    private func seriesStyleEnabledBinding(id: String) -> Binding<Bool> {
+        boolBinding(
+            get: { seriesStyle(id).enabled },
+            set: { enabled in
+                session.updateSeriesStyle(seriesID: id, policy: .immediate) { $0.enabled = enabled }
+            }
+        )
+    }
+
+    private func seriesStyleColorBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { seriesStyle(id).color ?? "" },
+            set: { color in
+                session.updateSeriesStyle(seriesID: id, policy: .debounced) {
+                    let trimmed = color.trimmingCharacters(in: .whitespacesAndNewlines)
+                    $0.color = trimmed.isEmpty ? nil : trimmed
+                }
+            }
+        )
+    }
+
+    private func seriesStyleLineWidthBinding(id: String) -> Binding<String> {
+        numericTextBinding(
+            get: { seriesStyle(id).lineWidth },
+            set: { lineWidth in
+                session.updateSeriesStyle(seriesID: id, policy: .debounced) { $0.lineWidth = lineWidth }
+            }
+        )
+    }
+
+    private func seriesStyleMarkerBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { seriesStyle(id).marker ?? "none" },
+            set: { marker in
+                session.updateSeriesStyle(seriesID: id, policy: .immediate) {
+                    $0.marker = marker == "none" ? nil : marker
+                }
+            }
+        )
+    }
+
+    private func seriesStyleYAxisTargetBinding(id: String) -> Binding<String> {
+        stringBinding(
+            get: { seriesStyle(id).yAxisTarget ?? "y_primary" },
+            set: { target in
+                session.updateSeriesStyle(seriesID: id, policy: .immediate) { $0.yAxisTarget = target }
+            }
+        )
     }
 
     private func functionLayer(_ id: String) -> AnalyticalLayerPayload {

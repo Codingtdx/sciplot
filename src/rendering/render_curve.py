@@ -57,6 +57,7 @@ from src.rendering.render_curve_support import (
 )
 from src.rendering.render_support import _rendered_plot_with_qa
 from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
+from src.rendering.series_styles import matplotlib_marker_symbol, series_style_by_id
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,74 @@ def _curve_artist_color(artist, *, scatter: bool) -> object:
         if len(colors):
             return tuple(colors[0])
     return artist.get_color()
+
+
+def _styleable_series_artists(ax: Axes, *, scatter: bool) -> list[Any]:
+    if scatter:
+        return [collection for collection in ax.collections if np.asarray(collection.get_offsets()).size]
+    return list(ax.lines)
+
+
+def _rebuild_visible_legend(ax: Axes) -> None:
+    legend = ax.get_legend()
+    if legend is None:
+        return
+    loc = getattr(legend, "_loc", "best")
+    handles, labels = ax.get_legend_handles_labels()
+    visible_items = [
+        (handle, label)
+        for handle, label in zip(handles, labels, strict=False)
+        if label and not label.startswith("_") and getattr(handle, "get_visible", lambda: True)()
+    ]
+    legend.remove()
+    if visible_items:
+        visible_handles, visible_labels = zip(*visible_items, strict=True)
+        ax.legend(list(visible_handles), list(visible_labels), loc=loc)
+
+
+def _apply_series_style_overrides(
+    ax: Axes,
+    *,
+    series_list,
+    options: RenderOptions,
+    scatter: bool,
+) -> tuple[str, ...]:
+    styles = series_style_by_id(options.series_styles)
+    if not styles:
+        return ()
+    series_ids = _series_ids_for_series_list(series_list)
+    artists = _styleable_series_artists(ax, scatter=scatter)
+    applied = False
+
+    for series_id, artist in zip(series_ids, artists, strict=False):
+        style = styles.get(series_id)
+        if style is None:
+            continue
+        artist.set_visible(bool(style.get("enabled", True)))
+        color = style.get("color")
+        if color:
+            if scatter:
+                artist.set_facecolor(color)
+                artist.set_edgecolor(color)
+            else:
+                artist.set_color(color)
+                artist.set_markerfacecolor(color)
+                artist.set_markeredgecolor(color)
+        line_width = style.get("line_width")
+        if line_width is not None:
+            if scatter:
+                artist.set_linewidths([float(line_width)])
+            else:
+                artist.set_linewidth(float(line_width))
+        marker = matplotlib_marker_symbol(style.get("marker"))
+        if marker is not None and not scatter and hasattr(artist, "set_marker"):
+            artist.set_marker(marker)
+        applied = True
+
+    if applied:
+        _rebuild_visible_legend(ax)
+        return ("series_style_overrides",)
+    return ()
 
 
 def _configure_secondary_y_axis(primary_ax: Axes, secondary_ax: Axes, *, position: str) -> None:
@@ -486,6 +555,12 @@ def _render_curve_candidate(
                 preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
             )
         applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=False))
+        applied += _apply_series_style_overrides(
+            ax,
+            series_list=series_list,
+            options=options,
+            scatter=scatter,
+        )
     else:
         marker_size = None
         if show_markers:
@@ -545,6 +620,12 @@ def _render_curve_candidate(
                 preserve_stress_label=bool(base_kwargs.get("preserve_stress_label", False)),
             )
         applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=show_markers))
+        applied += _apply_series_style_overrides(
+            ax,
+            series_list=series_list,
+            options=options,
+            scatter=scatter,
+        )
 
     rendered = _rendered_plot_with_qa(
         filename=filename,

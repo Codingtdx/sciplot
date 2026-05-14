@@ -106,6 +106,7 @@ final class PlotSession {
     var selectedPlotAdjustmentCategory: PlotAdjustmentCategory = .figure
     var canvasInteractionMode: PlotCanvasInteractionMode = .select
     var canvasSelection: PlotCanvasSelection = .figure
+    var selectedSeriesQuickEditorID: String?
     var selectedReferenceGuideID: String?
     var selectedTextAnnotationID: String?
     var selectedShapeAnnotationID: String?

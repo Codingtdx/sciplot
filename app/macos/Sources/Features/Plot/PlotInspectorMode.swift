@@ -506,6 +506,7 @@ extension PlotSession {
         case .layer(let layer):
             selectPlotLayer(layer)
         case .figure, .axis, .dataPipeline:
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
             selectedShapeAnnotationID = nil
@@ -515,6 +516,7 @@ extension PlotSession {
     func selectPlotLayer(_ layer: PlotLayerSelection?) {
         guard let layer else {
             canvasSelection = .figure
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
             selectedShapeAnnotationID = nil
@@ -524,18 +526,27 @@ extension PlotSession {
         canvasSelection = .layer(layer)
         switch layer {
         case .referenceGuide(let id):
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = id
             selectedTextAnnotationID = nil
             selectedShapeAnnotationID = nil
         case .textAnnotation(let id):
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = id
             selectedShapeAnnotationID = nil
         case .shapeAnnotation(let id):
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
             selectedShapeAnnotationID = id
-        case .fitOverlay, .function, .series:
+        case .series(let id):
+            selectedSeriesQuickEditorID = id
+            selectedReferenceGuideID = nil
+            selectedTextAnnotationID = nil
+            selectedShapeAnnotationID = nil
+        case .fitOverlay, .function:
+            selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
             selectedShapeAnnotationID = nil

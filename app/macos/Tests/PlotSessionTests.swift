@@ -2039,6 +2039,65 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.renderOptions.legendPosition, "upper_left")
     }
 
+    func testNativeRealtimePreviewPolicyAllowsOnlyCurveFamilyV1Templates() async throws {
+        let session = PlotSession()
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        for templateID in ["curve", "point_line", "scatter", "area_curve", "step_line", "function_curve"] {
+            session.selectedTemplateID = templateID
+            XCTAssertTrue(
+                session.nativeRealtimePreviewAvailability.isEnabled,
+                "\(templateID) should be native realtime eligible"
+            )
+        }
+
+        for templateID in ["bar", "heatmap", "table_figure"] {
+            session.selectedTemplateID = templateID
+            XCTAssertFalse(
+                session.nativeRealtimePreviewAvailability.isEnabled,
+                "\(templateID) should fall back to backend preview"
+            )
+        }
+    }
+
+    func testSeriesQuickEditorSelectsSeriesLayerAndTracksPopoverState() async throws {
+        let session = PlotSession()
+
+        session.openSeriesQuickEditor(seriesID: "Sample A")
+
+        XCTAssertEqual(session.selectedSeriesQuickEditorID, "Sample A")
+        XCTAssertEqual(session.canvasSelection, .layer(.series("Sample A")))
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .legend)
+    }
+
+    func testSeriesStyleEditsPersistInRenderOptionsAndRefreshPreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.updateSeriesStyle(seriesID: "Sample A", policy: .immediate) {
+            $0.color = "#f97316"
+            $0.lineWidth = 1.7
+            $0.marker = "circle"
+            $0.enabled = true
+            $0.yAxisTarget = "y_primary"
+        }
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 2.0)
+
+        let style = try XCTUnwrap(session.renderOptions.seriesStyles?.first)
+        XCTAssertEqual(style.seriesID, "Sample A")
+        XCTAssertEqual(style.color, "#f97316")
+        XCTAssertEqual(style.lineWidth, 1.7)
+        XCTAssertEqual(style.marker, "circle")
+        XCTAssertEqual(style.yAxisTarget, "y_primary")
+        XCTAssertEqual(client.renderRequests.last?.options.seriesStyles?.first, style)
+    }
+
     func testInspectionCancellationDoesNotSurfaceError() async {
         let client = MockSidecarClient()
         client.inspectHandler = { _ in

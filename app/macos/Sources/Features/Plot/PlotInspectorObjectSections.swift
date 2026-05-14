@@ -37,6 +37,14 @@ extension PlotInspectorView {
     }
 
     @ViewBuilder
+    var selectedSeriesEditor: some View {
+        if case .layer(let selection) = session.canvasSelection,
+           case .series = selection {
+            PlotSelectedLayerEditorView(session: session, selection: selection)
+        }
+    }
+
+    @ViewBuilder
     var selectedAnnotationEditor: some View {
         if case .layer(let selection) = session.canvasSelection {
             switch selection {

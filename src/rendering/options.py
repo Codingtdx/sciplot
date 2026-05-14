@@ -17,6 +17,7 @@ from src.rendering.data_transforms import normalize_data_transforms_payload
 from src.rendering.extra_axes import normalize_extra_axis_payload
 from src.rendering.models import RenderOptions
 from src.rendering.reference_guides import normalize_reference_guides_payload
+from src.rendering.series_styles import normalize_series_styles_payload
 from src.rendering.shape_annotations import normalize_shape_annotations_payload
 from src.rendering.template_lifecycle import is_supported_template_id, resolve_template_id
 from src.rendering.text_annotations import normalize_text_annotations_payload
@@ -186,6 +187,7 @@ def resolve_render_options(
     x_tick_edge_labels: str | None = None,
     y_tick_edge_labels: str | None = None,
     series_order: list[str] | tuple[str, ...] | None = None,
+    series_styles: object | None = None,
     legend_position: str | None = None,
     x_label_override: str | None = None,
     y_label_override: str | None = None,
@@ -295,6 +297,9 @@ def resolve_render_options(
     resolved_analytical_layers = normalize_analytical_layers_payload(analytical_layers)
     if resolved_analytical_layers is not None and "analytical_layers" not in spec.editable_options:
         raise ValueError(f"Template `{template}` does not support option `analytical_layers`.")
+    resolved_series_styles = normalize_series_styles_payload(series_styles)
+    if resolved_series_styles is not None and "series_styles" not in spec.editable_options:
+        raise ValueError(f"Template `{template}` does not support option `series_styles`.")
     if data_variables is not None:
         if not isinstance(data_variables, Sequence) or isinstance(data_variables, (str, bytes, bytearray)):
             raise ValueError("`data_variables` must be a list of mappings.")
@@ -349,6 +354,7 @@ def resolve_render_options(
             series_order,
             resolved_template_id=contract_template,
         ),
+        series_styles=resolved_series_styles,
         legend_position=_normalize_legend_position(
             template,
             legend_position,
