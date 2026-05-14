@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from base64 import b64encode
 from io import BytesIO
 from typing import Any, Literal
@@ -14,6 +15,7 @@ from app.sidecar.schemas_common import (
 )
 from app.sidecar.schemas_composer import ComposerRequest
 from src import plot_style
+from src.rendering.extra_axes import normalize_series_selection_ids
 
 
 class TextAnnotationPayload(StrictModel):
@@ -705,6 +707,134 @@ def _preview_axis_metadata(
     }
 
 
+def _preview_pixel_point(
+    point: tuple[float, float],
+    *,
+    scale: float,
+    figure_height: float,
+) -> list[float]:
+    return [float(point[0] * scale), float((figure_height - point[1]) * scale)]
+
+
+def _preview_bbox_for_points(
+    points: list[tuple[float, float]],
+    *,
+    scale: float,
+    figure_height: float,
+) -> dict[str, float]:
+    if not points:
+        return {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+    x_values = [point[0] for point in points]
+    y_values = [point[1] for point in points]
+    min_x = min(x_values)
+    max_x = max(x_values)
+    min_y = min(y_values)
+    max_y = max(y_values)
+    return {
+        "x": float(min_x * scale),
+        "y": float((figure_height - max_y) * scale),
+        "width": float((max_x - min_x) * scale),
+        "height": float((max_y - min_y) * scale),
+    }
+
+
+def _finite_data_points(raw_points: Any) -> list[tuple[float, float]]:
+    resolved: list[tuple[float, float]] = []
+    for raw_x, raw_y in raw_points:
+        try:
+            x_value = float(raw_x)
+            y_value = float(raw_y)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(x_value) and math.isfinite(y_value):
+            resolved.append((x_value, y_value))
+    return resolved
+
+
+def _downsample_points(points: list[tuple[float, float]], *, limit: int = 512) -> list[tuple[float, float]]:
+    if len(points) <= limit:
+        return points
+    stride = max(int(math.ceil(len(points) / limit)), 1)
+    sampled = points[::stride]
+    if sampled[-1] != points[-1]:
+        sampled.append(points[-1])
+    return sampled
+
+
+def _visible_artist_label(artist: Any) -> str | None:
+    if not bool(getattr(artist, "get_visible", lambda: True)()):
+        return None
+    label = str(getattr(artist, "get_label", lambda: "")() or "").strip()
+    if not label or label.startswith("_"):
+        return None
+    return label
+
+
+def _line_display_points(line: Any) -> list[tuple[float, float]]:
+    data_points = _finite_data_points(zip(line.get_xdata(), line.get_ydata(), strict=False))
+    if not data_points:
+        return []
+    return [tuple(point) for point in line.axes.transData.transform(data_points)]
+
+
+def _collection_display_points(collection: Any) -> list[tuple[float, float]]:
+    offsets = getattr(collection, "get_offsets", lambda: [])()
+    data_points = _finite_data_points(offsets)
+    if not data_points:
+        return []
+    return [tuple(point) for point in collection.axes.transData.transform(data_points)]
+
+
+def _preview_series_artist_metadata(
+    rendered: Any,
+    *,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    artists: list[dict[str, Any]] = []
+    for axis in getattr(rendered.figure, "axes", []):
+        axis_id = axis.get_gid() or f"axis-{rendered.figure.axes.index(axis)}"
+        candidates: list[tuple[str, str, Any, list[tuple[float, float]]]] = []
+        for line in getattr(axis, "lines", []):
+            label = _visible_artist_label(line)
+            if label is None:
+                continue
+            points = _line_display_points(line)
+            if len(points) >= 2:
+                candidates.append(("series_line", label, line, points))
+        for collection in getattr(axis, "collections", []):
+            label = _visible_artist_label(collection)
+            if label is None:
+                continue
+            points = _collection_display_points(collection)
+            if points:
+                candidates.append(("series_points", label, collection, points))
+
+        series_ids = normalize_series_selection_ids(label for _, label, _, _ in candidates)
+        for index, (kind, label, artist, display_points) in enumerate(candidates):
+            sampled_points = _downsample_points(display_points)
+            series_id = series_ids[index] if index < len(series_ids) else label
+            artists.append(
+                {
+                    "id": getattr(artist, "get_gid", lambda: None)() or f"{kind}:{axis_id}:{series_id}",
+                    "kind": kind,
+                    "axis_id": axis_id,
+                    "series_id": series_id,
+                    "label": label,
+                    "bbox_pixels": _preview_bbox_for_points(
+                        display_points,
+                        scale=scale,
+                        figure_height=figure_height,
+                    ),
+                    "points": [
+                        _preview_pixel_point(point, scale=scale, figure_height=figure_height)
+                        for point in sampled_points
+                    ],
+                }
+            )
+    return artists
+
+
 def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, Any] | None:
     figure = getattr(rendered, "figure", None)
     if figure is None or not getattr(figure, "axes", None):
@@ -719,6 +849,7 @@ def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, A
         figure_width = float(width_inches) * float(png_dpi)
         figure_height = float(height_inches) * float(png_dpi)
         return {
+            "schema_version": 1,
             "figure": {
                 "pixel_width": int(round(figure_width)),
                 "pixel_height": int(round(figure_height)),
@@ -733,6 +864,11 @@ def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, A
                 )
                 for axis in figure.axes
             ],
+            "artists": _preview_series_artist_metadata(
+                rendered,
+                scale=scale,
+                figure_height=float(figure.bbox.height),
+            ),
         }
     except Exception:
         return None

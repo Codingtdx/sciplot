@@ -101,6 +101,56 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.candidateRoles.z, ["Intensity"])
     }
 
+    func testDecodePreviewInteractionMetadataWithArtistMap() throws {
+        let payload = """
+        {
+          "filename": "sample_curve.pdf",
+          "pdf_base64": "\(TestPayloads.pdfBase64)",
+          "png_base64": null,
+          "qa": null,
+          "interaction_metadata": {
+            "schema_version": 1,
+            "figure": {
+              "pixel_width": 1000,
+              "pixel_height": 800
+            },
+            "axes": [
+              {
+                "id": "axis-0",
+                "role": "primary",
+                "bbox_pixels": {"x": 100, "y": 120, "width": 760, "height": 520},
+                "x_range": [0, 10],
+                "y_range": [0, 20],
+                "x_scale": "linear",
+                "y_scale": "linear",
+                "x_reversed": false,
+                "y_reversed": false
+              }
+            ],
+            "artists": [
+              {
+                "id": "series:axis-0:Sample A",
+                "kind": "series_line",
+                "axis_id": "axis-0",
+                "series_id": "Sample A",
+                "label": "Sample A",
+                "bbox_pixels": {"x": 120, "y": 220, "width": 700, "height": 260},
+                "points": [[120, 480], [500, 320], [820, 220]]
+              }
+            ]
+          }
+        }
+        """
+
+        let response = try decoder.decode(PreviewItemResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.interactionMetadata?.schemaVersion, 1)
+        XCTAssertEqual(response.interactionMetadata?.figure.pixelWidth, 1000)
+        XCTAssertEqual(response.interactionMetadata?.axes.first?.bboxPixels.width, 760)
+        XCTAssertEqual(response.interactionMetadata?.artists.first?.axisID, "axis-0")
+        XCTAssertEqual(response.interactionMetadata?.artists.first?.seriesID, "Sample A")
+    }
+
     func testDecodeDataStudioWorkbookAndComparisonPayloads() throws {
         let workbookPayload = """
         {

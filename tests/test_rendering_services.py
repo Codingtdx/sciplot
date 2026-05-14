@@ -12,6 +12,7 @@ from matplotlib.collections import PathCollection, PolyCollection
 from matplotlib.colors import to_hex
 
 from app.sidecar.schemas_render import RenderOptionsPayload as SidecarRenderOptionsPayload
+from app.sidecar.schemas_render import rendered_plots_to_preview_payload
 from src import plot_style
 from src.plot_contract import lint_public_template_contract
 from src.rendering import (
@@ -1496,6 +1497,62 @@ def test_series_styles_override_curve_artist_style_and_visibility(tmp_path: Path
         legend = ax.get_legend()
         assert legend is not None
         assert "Sample B" not in [text.get_text() for text in legend.get_texts()]
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_includes_curve_series_geometry(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    rendered = build_rendered_plots("curve", input_path)
+
+    try:
+        previews = rendered_plots_to_preview_payload(rendered)
+        metadata = previews[0].interaction_metadata
+        assert metadata is not None
+        assert metadata["schema_version"] == 1
+        assert metadata["axes"]
+
+        artists = metadata["artists"]
+        sample_a = next(item for item in artists if item["series_id"] == "Sample A")
+        assert sample_a["kind"] == "series_line"
+        assert sample_a["axis_id"] == metadata["axes"][0]["id"]
+        assert sample_a["label"] == "Sample A"
+        assert len(sample_a["points"]) >= 3
+        assert sample_a["bbox_pixels"]["width"] > 0
+        assert sample_a["bbox_pixels"]["height"] > 0
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_omits_hidden_series(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    rendered = build_rendered_plots(
+        "curve",
+        input_path,
+        series_styles=[
+            {"series_id": "Sample B", "enabled": False},
+        ],
+    )
+
+    try:
+        metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+        assert metadata is not None
+        series_ids = {item["series_id"] for item in metadata["artists"] if item["kind"].startswith("series_")}
+        assert "Sample A" in series_ids
+        assert "Sample B" not in series_ids
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_keeps_unsupported_templates_axes_only(tmp_path: Path) -> None:
+    heatmap_path = _write_heatmap_table(tmp_path / "heatmap.csv")
+    rendered = build_rendered_plots("heatmap", heatmap_path)
+
+    try:
+        metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+        assert metadata is not None
+        assert metadata["axes"]
+        assert metadata["artists"] == []
     finally:
         close_rendered_plots(rendered)
 

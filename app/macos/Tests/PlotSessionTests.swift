@@ -2070,6 +2070,90 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedPlotAdjustmentCategory, .legend)
     }
 
+    func testPreviewArtistHitTestingChoosesNearestSeriesFromMetadata() async throws {
+        let metadata = PreviewInteractionMetadata(
+            schemaVersion: 1,
+            figure: PreviewFigureMetadata(pixelWidth: 1000, pixelHeight: 800),
+            axes: [
+                PreviewAxisMetadata(
+                    id: "axis-0",
+                    role: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 100, width: 800, height: 600),
+                    xRange: [0, 10],
+                    yRange: [0, 10],
+                    xScale: "linear",
+                    yScale: "linear",
+                    xReversed: false,
+                    yReversed: false
+                ),
+            ],
+            artists: [
+                PreviewArtistMetadata(
+                    id: "series:Sample A",
+                    kind: "series_line",
+                    axisID: "axis-0",
+                    seriesID: "Sample A",
+                    label: "Sample A",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 800, height: 420),
+                    points: [[120, 620], [500, 420], [880, 210]]
+                ),
+                PreviewArtistMetadata(
+                    id: "series:Sample B",
+                    kind: "series_line",
+                    axisID: "axis-0",
+                    seriesID: "Sample B",
+                    label: "Sample B",
+                    bboxPixels: PreviewBBoxMetadata(x: 120, y: 120, width: 760, height: 140),
+                    points: [[120, 180], [500, 220], [880, 250]]
+                ),
+            ]
+        )
+        let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: CGSize(width: 1000, height: 800))
+
+        let artist = mapper.nearestSeriesArtist(at: CGPoint(x: 505, y: 418), tolerance: 18)
+
+        XCTAssertEqual(artist?.seriesID, "Sample A")
+    }
+
+    func testPreviewDoubleClickOpensSeriesQuickEditorAndSelectsSeries() async throws {
+        let metadata = PreviewInteractionMetadata(
+            schemaVersion: 1,
+            figure: PreviewFigureMetadata(pixelWidth: 1000, pixelHeight: 800),
+            axes: [],
+            artists: [
+                PreviewArtistMetadata(
+                    id: "series:Sample A",
+                    kind: "series_line",
+                    axisID: "axis-0",
+                    seriesID: "Sample A",
+                    label: "Sample A",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 800, height: 420),
+                    points: [[120, 620], [500, 420], [880, 210]]
+                ),
+            ]
+        )
+        let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: CGSize(width: 1000, height: 800))
+        let session = PlotSession()
+
+        let opened = session.openPreviewSeriesQuickEditor(at: CGPoint(x: 500, y: 420), mapper: mapper)
+
+        XCTAssertTrue(opened)
+        XCTAssertEqual(session.selectedSeriesQuickEditorID, "Sample A")
+        XCTAssertEqual(session.canvasSelection, .layer(.series("Sample A")))
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .legend)
+    }
+
+    func testPreviewArtistInteractionFallsBackWhenMetadataIsMissing() async throws {
+        let mapper = PlotPreviewCoordinateMapper(metadata: nil, viewportSize: CGSize(width: 800, height: 600))
+        let session = PlotSession()
+
+        XCTAssertNil(mapper.nearestSeriesArtist(at: CGPoint(x: 300, y: 260), tolerance: 18))
+        XCTAssertFalse(session.selectPreviewSeries(at: CGPoint(x: 300, y: 260), mapper: mapper))
+        XCTAssertFalse(session.openPreviewSeriesQuickEditor(at: CGPoint(x: 300, y: 260), mapper: mapper))
+        XCTAssertEqual(session.canvasSelection, .figure)
+        XCTAssertNil(session.selectedSeriesQuickEditorID)
+    }
+
     func testSeriesStyleEditsPersistInRenderOptionsAndRefreshPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

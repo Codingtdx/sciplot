@@ -52,6 +52,10 @@ struct PlotPreviewCoordinateMapper: Equatable {
         metadata?.axes.first(where: { $0.role == "primary" }) ?? metadata?.axes.first
     }
 
+    var artists: [PreviewArtistMetadata] {
+        metadata?.artists ?? []
+    }
+
     var axisRect: CGRect {
         guard let metadata, let axis = primaryAxis else {
             return imageRect
@@ -115,6 +119,58 @@ struct PlotPreviewCoordinateMapper: Equatable {
             x: rect.minX + CGFloat(clamp(x)) * rect.width,
             y: rect.maxY - CGFloat(clamp(y)) * rect.height
         )
+    }
+
+    func viewPoint(forPixelPoint point: [Double]) -> CGPoint? {
+        guard let metadata, point.count >= 2 else {
+            return nil
+        }
+        let figureWidth = max(CGFloat(metadata.figure.pixelWidth), 1)
+        let figureHeight = max(CGFloat(metadata.figure.pixelHeight), 1)
+        return CGPoint(
+            x: imageRect.minX + CGFloat(point[0]) / figureWidth * imageRect.width,
+            y: imageRect.minY + CGFloat(point[1]) / figureHeight * imageRect.height
+        )
+    }
+
+    func viewPoints(for artist: PreviewArtistMetadata) -> [CGPoint] {
+        artist.points.compactMap { viewPoint(forPixelPoint: $0) }
+    }
+
+    func viewRect(forPixelBBox bbox: PreviewBBoxMetadata) -> CGRect {
+        guard let metadata else {
+            return imageRect
+        }
+        let figureWidth = max(CGFloat(metadata.figure.pixelWidth), 1)
+        let figureHeight = max(CGFloat(metadata.figure.pixelHeight), 1)
+        return CGRect(
+            x: imageRect.minX + CGFloat(bbox.x) / figureWidth * imageRect.width,
+            y: imageRect.minY + CGFloat(bbox.y) / figureHeight * imageRect.height,
+            width: CGFloat(bbox.width) / figureWidth * imageRect.width,
+            height: CGFloat(bbox.height) / figureHeight * imageRect.height
+        )
+    }
+
+    func nearestSeriesArtist(at location: CGPoint, tolerance: CGFloat = 12) -> PreviewArtistMetadata? {
+        var nearest: (artist: PreviewArtistMetadata, distance: CGFloat)?
+        for artist in artists where artist.seriesID != nil {
+            let hitRect = viewRect(forPixelBBox: artist.bboxPixels).insetBy(dx: -tolerance, dy: -tolerance)
+            guard hitRect.contains(location) else {
+                continue
+            }
+            let points = viewPoints(for: artist)
+            guard !points.isEmpty else {
+                continue
+            }
+            let distance = distanceToSeries(location, points: points, kind: artist.kind)
+            guard distance <= tolerance else {
+                continue
+            }
+            if nearest == nil || distance < nearest!.distance {
+                nearest = (artist, distance)
+            }
+        }
+        return nearest?.artist
     }
 
     func rect(for annotation: ShapeAnnotationPayload) -> CGRect? {
@@ -235,6 +291,32 @@ struct PlotPreviewCoordinateMapper: Equatable {
     private func clamp(_ value: Double) -> Double {
         min(max(value, 0), 1)
     }
+
+    private func distanceToSeries(_ location: CGPoint, points: [CGPoint], kind: String) -> CGFloat {
+        if kind == "series_points" || points.count == 1 {
+            return points.map { distance(from: location, to: $0) }.min() ?? .greatestFiniteMagnitude
+        }
+        var nearest = CGFloat.greatestFiniteMagnitude
+        for index in 0..<(points.count - 1) {
+            nearest = min(nearest, distance(from: location, toSegmentFrom: points[index], to: points[index + 1]))
+        }
+        return nearest
+    }
+
+    private func distance(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
+        hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+    }
+
+    private func distance(from point: CGPoint, toSegmentFrom start: CGPoint, to end: CGPoint) -> CGFloat {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let lengthSquared = dx * dx + dy * dy
+        guard lengthSquared > 0 else {
+            return distance(from: point, to: start)
+        }
+        let t = max(0, min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+        return distance(from: point, to: CGPoint(x: start.x + t * dx, y: start.y + t * dy))
+    }
 }
 
 struct InteractivePlotOverlay: View {
@@ -245,6 +327,9 @@ struct InteractivePlotOverlay: View {
     @State private var lastDragDataPoint: PlotCanvasDataPoint?
     @State private var activeHitTarget: PlotOverlayHitTarget?
     @State private var pendingCalloutTarget: PlotCanvasDataPoint?
+    @State private var seriesQuickEditorAnchor: CGPoint?
+    @State private var lastClickLocation: CGPoint?
+    @State private var lastClickTime: Date?
 
     var body: some View {
         Canvas { context, _ in
@@ -254,9 +339,12 @@ struct InteractivePlotOverlay: View {
         }
         .allowsHitTesting(false)
         .overlay {
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(canvasGesture)
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(canvasGesture)
+                seriesQuickEditorAnchorView
+            }
         }
         .animation(.easeOut(duration: 0.12), value: session.canvasSelection.id)
     }
@@ -269,6 +357,29 @@ struct InteractivePlotOverlay: View {
             .onEnded { value in
                 handleDragEnded(value)
             }
+    }
+
+    @ViewBuilder
+    private var seriesQuickEditorAnchorView: some View {
+        if let seriesQuickEditorAnchor, let seriesID = session.selectedSeriesQuickEditorID {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .position(seriesQuickEditorAnchor)
+                .popover(isPresented: seriesQuickEditorPopoverBinding, arrowEdge: .top) {
+                    PlotSeriesQuickEditorPopover(session: session, seriesID: seriesID)
+                }
+        }
+    }
+
+    private var seriesQuickEditorPopoverBinding: Binding<Bool> {
+        Binding(
+            get: { session.selectedSeriesQuickEditorID != nil && seriesQuickEditorAnchor != nil },
+            set: { presented in
+                if !presented {
+                    seriesQuickEditorAnchor = nil
+                }
+            }
+        )
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
@@ -329,11 +440,32 @@ struct InteractivePlotOverlay: View {
         }
 
         if abs(value.translation.width) < 3, abs(value.translation.height) < 3 {
-            if let selection = hitTarget(at: value.location)?.selection {
-                session.selectPlotLayer(selection)
-            } else {
-                session.selectCanvasSelection(.figure)
-            }
+            handleClick(at: value.location)
+        }
+    }
+
+    private func handleClick(at location: CGPoint) {
+        let now = Date()
+        let isDoubleClick = lastClickTime.map { now.timeIntervalSince($0) <= 0.35 } == true
+            && lastClickLocation.map { distance(from: location, to: $0) <= 8 } == true
+
+        if isDoubleClick, session.openPreviewSeriesQuickEditor(at: location, mapper: mapper) {
+            seriesQuickEditorAnchor = location
+            lastClickLocation = nil
+            lastClickTime = nil
+            return
+        }
+
+        lastClickLocation = location
+        lastClickTime = now
+        if let selection = hitTarget(at: location)?.selection {
+            session.selectPlotLayer(selection)
+            seriesQuickEditorAnchor = nil
+        } else if session.selectPreviewSeries(at: location, mapper: mapper) {
+            seriesQuickEditorAnchor = nil
+        } else {
+            session.selectCanvasSelection(.figure)
+            seriesQuickEditorAnchor = nil
         }
     }
 
@@ -435,6 +567,8 @@ struct InteractivePlotOverlay: View {
     private func drawExistingObjects(in context: inout GraphicsContext) {
         let accent = Color.accentColor.opacity(0.78)
         let secondary = Color.secondary.opacity(0.45)
+        drawSelectedSeriesArtist(in: &context)
+
         for guide in session.referenceGuides {
             let selected = session.canvasSelection == .layer(.referenceGuide(guide.id))
             if let rect = mapper.guideRegionRect(for: guide) {
@@ -465,6 +599,33 @@ struct InteractivePlotOverlay: View {
                 drawTextSelection(for: annotation, at: point, in: &context)
             }
         }
+    }
+
+    private func drawSelectedSeriesArtist(in context: inout GraphicsContext) {
+        guard case .layer(.series(let seriesID)) = session.canvasSelection else {
+            return
+        }
+        guard let artist = mapper.artists.first(where: { $0.seriesID == seriesID }) else {
+            return
+        }
+        let points = mapper.viewPoints(for: artist)
+        guard !points.isEmpty else {
+            return
+        }
+        let accent = Color.accentColor.opacity(0.72)
+        if artist.kind == "series_points" {
+            for point in points {
+                let rect = CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)
+                context.stroke(Path(ellipseIn: rect), with: .color(accent), lineWidth: 1.4)
+            }
+            return
+        }
+        var path = Path()
+        path.move(to: points[0])
+        for point in points.dropFirst() {
+            path.addLine(to: point)
+        }
+        context.stroke(path, with: .color(accent), style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
     }
 
     private func drawTextSelection(
@@ -626,6 +787,141 @@ struct InteractivePlotOverlay: View {
 
     private func distance(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
         hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+    }
+}
+
+private struct PlotSeriesQuickEditorPopover: View {
+    @Bindable var session: PlotSession
+    let seriesID: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(.secondary)
+                Text(seriesID)
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+            }
+
+            Toggle("Visible", isOn: visibleBinding)
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Color")
+                        .foregroundStyle(.secondary)
+                    TextField("#1f77b4", text: colorBinding)
+                        .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Width")
+                        .foregroundStyle(.secondary)
+                    TextField("Auto", text: lineWidthBinding)
+                        .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Marker")
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: markerBinding) {
+                        Text("None").tag("none")
+                        Text("Circle").tag("circle")
+                        Text("Square").tag("square")
+                        Text("Diamond").tag("diamond")
+                        Text("Triangle").tag("triangle")
+                    }
+                    .labelsHidden()
+                }
+                GridRow {
+                    Text("Axis")
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: yAxisBinding) {
+                        Text("Primary Y").tag("y_primary")
+                        Text("Secondary Y").tag("y_secondary")
+                    }
+                    .labelsHidden()
+                }
+            }
+
+            Divider()
+
+            Button {
+                session.selectPlotLayer(.series(seriesID))
+                session.selectedPlotAdjustmentCategory = .legend
+            } label: {
+                Label("More", systemImage: "sidebar.right")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(width: 270)
+        .padding(12)
+    }
+
+    private var seriesStyle: SeriesStylePayload {
+        session.renderOptions.seriesStyles?.first(where: { $0.seriesID == seriesID }) ?? SeriesStylePayload(seriesID: seriesID)
+    }
+
+    private var visibleBinding: Binding<Bool> {
+        Binding(
+            get: { seriesStyle.enabled },
+            set: { enabled in
+                session.updateSeriesStyle(seriesID: seriesID, policy: .immediate) { $0.enabled = enabled }
+            }
+        )
+    }
+
+    private var colorBinding: Binding<String> {
+        Binding(
+            get: { seriesStyle.color ?? "" },
+            set: { color in
+                session.updateSeriesStyle(seriesID: seriesID, policy: .debounced) {
+                    let trimmed = color.trimmingCharacters(in: .whitespacesAndNewlines)
+                    $0.color = trimmed.isEmpty ? nil : trimmed
+                }
+            }
+        )
+    }
+
+    private var lineWidthBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let lineWidth = seriesStyle.lineWidth else {
+                    return ""
+                }
+                return String(format: "%.2f", lineWidth)
+            },
+            set: { value in
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard trimmed.isEmpty || Double(trimmed) != nil else {
+                    return
+                }
+                session.updateSeriesStyle(seriesID: seriesID, policy: .debounced) {
+                    $0.lineWidth = trimmed.isEmpty ? nil : Double(trimmed)
+                }
+            }
+        )
+    }
+
+    private var markerBinding: Binding<String> {
+        Binding(
+            get: { seriesStyle.marker ?? "none" },
+            set: { marker in
+                session.updateSeriesStyle(seriesID: seriesID, policy: .immediate) {
+                    $0.marker = marker == "none" ? nil : marker
+                }
+            }
+        )
+    }
+
+    private var yAxisBinding: Binding<String> {
+        Binding(
+            get: { seriesStyle.yAxisTarget ?? "y_primary" },
+            set: { target in
+                session.updateSeriesStyle(seriesID: seriesID, policy: .immediate) {
+                    $0.yAxisTarget = target
+                }
+            }
+        )
     }
 }
 

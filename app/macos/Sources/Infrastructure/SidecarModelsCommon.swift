@@ -73,8 +73,37 @@ struct PreviewItemResponse: Codable, Equatable, Sendable {
 }
 
 struct PreviewInteractionMetadata: Codable, Equatable, Sendable {
+    let schemaVersion: Int?
     let figure: PreviewFigureMetadata
     let axes: [PreviewAxisMetadata]
+    let artists: [PreviewArtistMetadata]
+
+    init(
+        schemaVersion: Int? = nil,
+        figure: PreviewFigureMetadata,
+        axes: [PreviewAxisMetadata],
+        artists: [PreviewArtistMetadata] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.figure = figure
+        self.axes = axes
+        self.artists = artists
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case figure
+        case axes
+        case artists
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
+        figure = try container.decode(PreviewFigureMetadata.self, forKey: .figure)
+        axes = try container.decodeIfPresent([PreviewAxisMetadata].self, forKey: .axes) ?? []
+        artists = try container.decodeIfPresent([PreviewArtistMetadata].self, forKey: .artists) ?? []
+    }
 }
 
 struct PreviewFigureMetadata: Codable, Equatable, Sendable {
@@ -99,4 +128,42 @@ struct PreviewBBoxMetadata: Codable, Equatable, Sendable {
     let y: Double
     let width: Double
     let height: Double
+}
+
+struct PreviewArtistMetadata: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let axisID: String
+    let seriesID: String?
+    let label: String?
+    let bboxPixels: PreviewBBoxMetadata
+    let points: [[Double]]
+
+    init(
+        id: String,
+        kind: String,
+        axisID: String,
+        seriesID: String? = nil,
+        label: String? = nil,
+        bboxPixels: PreviewBBoxMetadata,
+        points: [[Double]]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.axisID = axisID
+        self.seriesID = seriesID
+        self.label = label
+        self.bboxPixels = bboxPixels
+        self.points = points
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case axisID = "axisId"
+        case seriesID = "seriesId"
+        case label
+        case bboxPixels
+        case points
+    }
 }

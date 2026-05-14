@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 extension PlotSession {
     func newSession() {
@@ -295,6 +296,24 @@ extension PlotSession {
         canvasInteractionMode = .select
         selectedPlotAdjustmentCategory = .legend
         selectPlotLayer(.series(seriesID))
+    }
+
+    @discardableResult
+    func selectPreviewSeries(at location: CGPoint, mapper: PlotPreviewCoordinateMapper) -> Bool {
+        guard let seriesID = mapper.nearestSeriesArtist(at: location)?.seriesID else {
+            return false
+        }
+        selectPlotLayer(.series(seriesID))
+        return true
+    }
+
+    @discardableResult
+    func openPreviewSeriesQuickEditor(at location: CGPoint, mapper: PlotPreviewCoordinateMapper) -> Bool {
+        guard let seriesID = mapper.nearestSeriesArtist(at: location)?.seriesID else {
+            return false
+        }
+        openSeriesQuickEditor(seriesID: seriesID)
+        return true
     }
 
     func updateSeriesStyle(
