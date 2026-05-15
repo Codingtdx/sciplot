@@ -31,6 +31,7 @@ from app.sidecar.schemas_render import (
     RenderOptionsPayload,
     SaveProjectResponse,
     ShapeAnnotationPayload,
+    SeriesOffsetPayload,
     SeriesStylePayload,
     TextAnnotationPayload,
 )
@@ -181,6 +182,11 @@ def _normalize_render_options(
         series_styles=(
             [SeriesStylePayload.model_validate(item) for item in resolved_options.series_styles]
             if resolved_options.series_styles is not None
+            else None
+        ),
+        series_offsets=(
+            [SeriesOffsetPayload.model_validate(item) for item in resolved_options.series_offsets]
+            if resolved_options.series_offsets is not None
             else None
         ),
         x_label_override=resolved_options.x_label_override,

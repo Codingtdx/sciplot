@@ -184,6 +184,7 @@ def test_render_preview_returns_interaction_metadata_for_canvas_overlay(tmp_path
 
     assert response.status_code == 200, response.text
     metadata = response.json()["preview"]["interaction_metadata"]
+    assert metadata["schema_version"] == 2
     assert metadata["figure"]["pixel_width"] > 0
     assert metadata["figure"]["pixel_height"] > 0
     primary_axis = next(axis for axis in metadata["axes"] if axis["role"] == "primary")
@@ -193,6 +194,7 @@ def test_render_preview_returns_interaction_metadata_for_canvas_overlay(tmp_path
     assert primary_axis["y_range"][0] < primary_axis["y_range"][1]
     assert primary_axis["x_scale"] in {"linear", "log"}
     assert primary_axis["y_scale"] in {"linear", "log"}
+    assert any(item["kind"].startswith("series_") for item in metadata["objects"])
 
 
 def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:

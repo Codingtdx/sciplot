@@ -109,7 +109,7 @@ final class SchemaDecodingTests: XCTestCase {
           "png_base64": null,
           "qa": null,
           "interaction_metadata": {
-            "schema_version": 1,
+            "schema_version": 2,
             "figure": {
               "pixel_width": 1000,
               "pixel_height": 800
@@ -137,6 +137,18 @@ final class SchemaDecodingTests: XCTestCase {
                 "bbox_pixels": {"x": 120, "y": 220, "width": 700, "height": 260},
                 "points": [[120, 480], [500, 320], [820, 220]]
               }
+            ],
+            "objects": [
+              {
+                "id": "series:axis-0:Sample A",
+                "kind": "series_line",
+                "label": "Sample A",
+                "axis_id": "axis-0",
+                "bbox_pixels": {"x": 120, "y": 220, "width": 700, "height": 260},
+                "points": [[120, 480], [500, 320], [820, 220]],
+                "payload_ref": {"type": "series", "id": "Sample A"},
+                "operations": ["select", "quick_edit", "drag_offset"]
+              }
             ]
           }
         }
@@ -144,11 +156,14 @@ final class SchemaDecodingTests: XCTestCase {
 
         let response = try decoder.decode(PreviewItemResponse.self, from: Data(payload.utf8))
 
-        XCTAssertEqual(response.interactionMetadata?.schemaVersion, 1)
+        XCTAssertEqual(response.interactionMetadata?.schemaVersion, 2)
         XCTAssertEqual(response.interactionMetadata?.figure.pixelWidth, 1000)
         XCTAssertEqual(response.interactionMetadata?.axes.first?.bboxPixels.width, 760)
         XCTAssertEqual(response.interactionMetadata?.artists.first?.axisID, "axis-0")
         XCTAssertEqual(response.interactionMetadata?.artists.first?.seriesID, "Sample A")
+        XCTAssertEqual(response.interactionMetadata?.objects.first?.payloadRef?.type, "series")
+        XCTAssertEqual(response.interactionMetadata?.objects.first?.payloadRef?.id, "Sample A")
+        XCTAssertEqual(response.interactionMetadata?.objects.first?.operations, ["select", "quick_edit", "drag_offset"])
     }
 
     func testDecodeDataStudioWorkbookAndComparisonPayloads() throws {
@@ -318,6 +333,31 @@ final class SchemaDecodingTests: XCTestCase {
 
         XCTAssertEqual(response.size, "120x110")
         XCTAssertEqual(response.legendPosition, "upper_left")
+    }
+
+    func testDecodeRenderOptionsKeepsSeriesOffsets() throws {
+        let payload = """
+        {
+          "style_preset": "nature",
+          "palette_preset": "colorblind_safe",
+          "series_offsets": [
+            {
+              "series_id": "Sample A",
+              "enabled": true,
+              "x_offset": 0.5,
+              "y_offset": -0.25,
+              "y_axis_target": "y_primary"
+            }
+          ]
+        }
+        """
+
+        let response = try decoder.decode(RenderOptionsPayload.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.seriesOffsets?.first?.seriesID, "Sample A")
+        XCTAssertEqual(response.seriesOffsets?.first?.xOffset, 0.5)
+        XCTAssertEqual(response.seriesOffsets?.first?.yOffset, -0.25)
+        XCTAssertEqual(response.seriesOffsets?.first?.yAxisTarget, "y_primary")
     }
 
     func testDecodePlotThemeEndpointResponses() throws {

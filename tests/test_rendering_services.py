@@ -25,6 +25,7 @@ from src.rendering import (
 )
 from src.rendering import themes as rendering_themes
 from src.rendering.render_curve_support import _apply_compact_inside_legend
+from src.rendering.source_table_preview import source_table_preview
 from src.rendering.style_composer import DEFAULT_STYLE_COMPOSER
 from src.rendering.themes import (
     VisualThemeSpec,
@@ -723,6 +724,28 @@ def test_sidecar_render_options_payload_accepts_series_styles() -> None:
     assert payload.series_styles is not None
     assert payload.series_styles[0].series_id == "Sample A"
     assert payload.model_dump(mode="json")["series_styles"][0]["line_width"] == pytest.approx(2.75)
+
+
+def test_sidecar_render_options_payload_accepts_series_offsets() -> None:
+    payload = SidecarRenderOptionsPayload.model_validate(
+        {
+            "series_offsets": [
+                {
+                    "series_id": "Sample A",
+                    "enabled": True,
+                    "x_offset": 0.2,
+                    "y_offset": -0.1,
+                    "y_axis_target": "primary",
+                }
+            ]
+        }
+    )
+
+    assert payload.series_offsets is not None
+    assert payload.series_offsets[0].series_id == "Sample A"
+    dumped = payload.model_dump(mode="json")["series_offsets"][0]
+    assert dumped["x_offset"] == pytest.approx(0.2)
+    assert dumped["y_offset"] == pytest.approx(-0.1)
 
 
 def test_resolve_render_options_rejects_invalid_extra_axis_position() -> None:
@@ -1503,13 +1526,13 @@ def test_series_styles_override_curve_artist_style_and_visibility(tmp_path: Path
 
 def test_preview_interaction_metadata_includes_curve_series_geometry(tmp_path: Path) -> None:
     input_path = _write_curve_table(tmp_path / "curve.csv")
-    rendered = build_rendered_plots("curve", input_path)
+    rendered = build_rendered_plots("curve", input_path, legend_position="upper_right")
 
     try:
         previews = rendered_plots_to_preview_payload(rendered)
         metadata = previews[0].interaction_metadata
         assert metadata is not None
-        assert metadata["schema_version"] == 1
+        assert metadata["schema_version"] == 2
         assert metadata["axes"]
 
         artists = metadata["artists"]
@@ -1520,6 +1543,13 @@ def test_preview_interaction_metadata_includes_curve_series_geometry(tmp_path: P
         assert len(sample_a["points"]) >= 3
         assert sample_a["bbox_pixels"]["width"] > 0
         assert sample_a["bbox_pixels"]["height"] > 0
+
+        objects = metadata["objects"]
+        curve_object = next(item for item in objects if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A")
+        assert curve_object["operations"] == ["select", "quick_edit", "drag_offset"]
+        assert any(item["kind"] == "x_axis" for item in objects)
+        assert any(item["kind"] == "y_axis" for item in objects)
+        assert any(item["kind"] == "legend_entry" and item["label"] == "Sample A" for item in objects)
     finally:
         close_rendered_plots(rendered)
 
@@ -1538,13 +1568,58 @@ def test_preview_interaction_metadata_omits_hidden_series(tmp_path: Path) -> Non
         metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
         assert metadata is not None
         series_ids = {item["series_id"] for item in metadata["artists"] if item["kind"].startswith("series_")}
+        object_series_ids = {
+            item["payload_ref"]["id"]
+            for item in metadata["objects"]
+            if item["kind"].startswith("series_") and item.get("payload_ref", {}).get("type") == "series"
+        }
         assert "Sample A" in series_ids
         assert "Sample B" not in series_ids
+        assert "Sample A" in object_series_ids
+        assert "Sample B" not in object_series_ids
     finally:
         close_rendered_plots(rendered)
 
 
-def test_preview_interaction_metadata_keeps_unsupported_templates_axes_only(tmp_path: Path) -> None:
+def test_preview_interaction_metadata_v2_emits_bar_heatmap_and_table_objects(tmp_path: Path) -> None:
+    cases = [
+        ("bar", _write_replicate_table(tmp_path / "replicates.csv"), "bar"),
+        ("heatmap", _write_heatmap_table(tmp_path / "heatmap.csv"), "heatmap_cell"),
+        ("table_figure", _write_small_table(tmp_path / "summary.csv"), "table_cell"),
+    ]
+
+    for template, input_path, expected_kind in cases:
+        rendered = build_rendered_plots(template, input_path)
+        try:
+            metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+            assert metadata is not None
+            assert metadata["schema_version"] == 2
+            assert metadata["axes"]
+            assert any(item["kind"] == expected_kind for item in metadata["objects"]), template
+        finally:
+            close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_caps_dense_heatmap_cells(tmp_path: Path) -> None:
+    rows = [["X", "Y", "Z"], ["mm", "mm", "a.u."], ["field", "field", "field"]]
+    for x_value in range(60):
+        for y_value in range(60):
+            rows.append([x_value, y_value, x_value + y_value])
+    heatmap_path = tmp_path / "dense-heatmap.csv"
+    pd.DataFrame(rows).to_csv(heatmap_path, header=False, index=False)
+    rendered = build_rendered_plots("heatmap", heatmap_path)
+
+    try:
+        metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+        assert metadata is not None
+        cell_objects = [item for item in metadata["objects"] if item["kind"] == "heatmap_cell"]
+        assert len(cell_objects) == 0
+        assert any(item["kind"] == "heatmap_region" for item in metadata["objects"])
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_keeps_legacy_artists_empty_for_non_curve_templates(tmp_path: Path) -> None:
     heatmap_path = _write_heatmap_table(tmp_path / "heatmap.csv")
     rendered = build_rendered_plots("heatmap", heatmap_path)
 
@@ -1555,6 +1630,42 @@ def test_preview_interaction_metadata_keeps_unsupported_templates_axes_only(tmp_
         assert metadata["artists"] == []
     finally:
         close_rendered_plots(rendered)
+
+
+def test_series_offsets_shift_curve_artists_without_mutating_source_preview(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    baseline = build_rendered_plots("curve", input_path)
+    shifted = build_rendered_plots(
+        "curve",
+        input_path,
+        series_offsets=[
+            {
+                "series_id": "Sample A",
+                "enabled": True,
+                "x_offset": 0.5,
+                "y_offset": 0.25,
+                "y_axis_target": "primary",
+            }
+        ],
+    )
+
+    try:
+        baseline_line = baseline[0].figure.axes[0].lines[0]
+        shifted_line = shifted[0].figure.axes[0].lines[0]
+        np.testing.assert_allclose(shifted_line.get_xdata(), np.asarray(baseline_line.get_xdata()) + 0.5)
+        np.testing.assert_allclose(shifted_line.get_ydata(), np.asarray(baseline_line.get_ydata()) + 0.25)
+
+        raw_preview = source_table_preview(input_path)
+        assert raw_preview.rows[3][0] == "0"
+        assert raw_preview.rows[3][1] == "1.0"
+
+        metadata = rendered_plots_to_preview_payload(shifted)[0].interaction_metadata
+        assert metadata is not None
+        sample_a = next(item for item in metadata["objects"] if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A")
+        assert "drag_offset" in sample_a["operations"]
+    finally:
+        close_rendered_plots(baseline)
+        close_rendered_plots(shifted)
 
 
 def test_reference_line_rejects_non_positive_value_on_log_axis(tmp_path: Path) -> None:

@@ -2115,6 +2115,79 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(artist?.seriesID, "Sample A")
     }
 
+    func testPreviewObjectHitTestingChoosesNearestV2SeriesBeforeLegacyArtists() async throws {
+        let metadata = PreviewInteractionMetadata(
+            schemaVersion: 2,
+            figure: PreviewFigureMetadata(pixelWidth: 1000, pixelHeight: 800),
+            axes: [
+                PreviewAxisMetadata(
+                    id: "axis-0",
+                    role: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 100, width: 800, height: 600),
+                    xRange: [0, 10],
+                    yRange: [0, 10],
+                    xScale: "linear",
+                    yScale: "linear",
+                    xReversed: false,
+                    yReversed: false
+                ),
+            ],
+            artists: [
+                PreviewArtistMetadata(
+                    id: "legacy:Sample A",
+                    kind: "series_line",
+                    axisID: "axis-0",
+                    seriesID: "Sample A",
+                    label: "Sample A",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 100, width: 800, height: 600),
+                    points: [[120, 620], [500, 420], [880, 210]]
+                ),
+            ],
+            objects: [
+                PreviewInteractionObjectMetadata(
+                    id: "series:Sample B",
+                    kind: "series_line",
+                    label: "Sample B",
+                    axisID: "axis-0",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 120, width: 800, height: 160),
+                    points: [[120, 180], [500, 220], [880, 250]],
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "series", id: "Sample B"),
+                    operations: ["select", "quick_edit", "drag_offset"]
+                ),
+            ]
+        )
+        let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: CGSize(width: 1000, height: 800))
+
+        let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: CGPoint(x: 505, y: 220), tolerance: 18)
+
+        XCTAssertEqual(hit?.object.payloadRef?.id, "Sample B")
+    }
+
+    func testPreviewObjectHitTestingFallsBackToLegacyArtistsWhenObjectsMissing() async throws {
+        let metadata = PreviewInteractionMetadata(
+            schemaVersion: 1,
+            figure: PreviewFigureMetadata(pixelWidth: 1000, pixelHeight: 800),
+            axes: [],
+            artists: [
+                PreviewArtistMetadata(
+                    id: "series:Sample A",
+                    kind: "series_line",
+                    axisID: "axis-0",
+                    seriesID: "Sample A",
+                    label: "Sample A",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 800, height: 420),
+                    points: [[120, 620], [500, 420], [880, 210]]
+                ),
+            ]
+        )
+        let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: CGSize(width: 1000, height: 800))
+
+        let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: CGPoint(x: 500, y: 420), tolerance: 18)
+
+        XCTAssertEqual(hit?.object.payloadRef?.id, "Sample A")
+        XCTAssertEqual(hit?.object.operations, ["select", "quick_edit", "drag_offset"])
+    }
+
     func testPreviewDoubleClickOpensSeriesQuickEditorAndSelectsSeries() async throws {
         let metadata = PreviewInteractionMetadata(
             schemaVersion: 1,
@@ -2129,6 +2202,35 @@ final class PlotSessionTests: XCTestCase {
                     label: "Sample A",
                     bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 800, height: 420),
                     points: [[120, 620], [500, 420], [880, 210]]
+                ),
+            ]
+        )
+        let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: CGSize(width: 1000, height: 800))
+        let session = PlotSession()
+
+        let opened = session.openPreviewSeriesQuickEditor(at: CGPoint(x: 500, y: 420), mapper: mapper)
+
+        XCTAssertTrue(opened)
+        XCTAssertEqual(session.selectedSeriesQuickEditorID, "Sample A")
+        XCTAssertEqual(session.canvasSelection, .layer(.series("Sample A")))
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .legend)
+    }
+
+    func testPreviewObjectDoubleClickOpensSeriesQuickEditorAndSelectsSeries() async throws {
+        let metadata = PreviewInteractionMetadata(
+            schemaVersion: 2,
+            figure: PreviewFigureMetadata(pixelWidth: 1000, pixelHeight: 800),
+            axes: [],
+            objects: [
+                PreviewInteractionObjectMetadata(
+                    id: "series:Sample A",
+                    kind: "series_line",
+                    label: "Sample A",
+                    axisID: "axis-0",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 800, height: 420),
+                    points: [[120, 620], [500, 420], [880, 210]],
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "series", id: "Sample A"),
+                    operations: ["select", "quick_edit", "drag_offset"]
                 ),
             ]
         )
@@ -2180,6 +2282,27 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(style.marker, "circle")
         XCTAssertEqual(style.yAxisTarget, "y_primary")
         XCTAssertEqual(client.renderRequests.last?.options.seriesStyles?.first, style)
+    }
+
+    func testSeriesOffsetDragPersistsInRenderOptionsAndRefreshesPreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.commitPreviewSeriesDrag(seriesID: "Sample A", xOffset: 0.5, yOffset: -0.25, policy: .immediate)
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 2.0)
+
+        let offset = try XCTUnwrap(session.renderOptions.seriesOffsets?.first)
+        XCTAssertEqual(offset.seriesID, "Sample A")
+        XCTAssertTrue(offset.enabled)
+        XCTAssertEqual(offset.xOffset, 0.5)
+        XCTAssertEqual(offset.yOffset, -0.25)
+        XCTAssertEqual(client.renderRequests.last?.options.seriesOffsets?.first, offset)
     }
 
     func testInspectionCancellationDoesNotSurfaceError() async {

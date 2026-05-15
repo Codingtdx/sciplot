@@ -9,6 +9,7 @@ extension PlotSession {
         selectedPlotTool = .select
         selectedPlotAdjustmentCategory = .figure
         canvasSelection = .figure
+        selectedPreviewObjectID = nil
         clearPreviewContext(preserveRenderOptions: false)
     }
 
@@ -300,7 +301,7 @@ extension PlotSession {
 
     @discardableResult
     func selectPreviewSeries(at location: CGPoint, mapper: PlotPreviewCoordinateMapper) -> Bool {
-        guard let seriesID = mapper.nearestSeriesArtist(at: location)?.seriesID else {
+        guard let seriesID = PlotInteractionHitTester(mapper: mapper).hitTest(at: location)?.seriesID else {
             return false
         }
         selectPlotLayer(.series(seriesID))
@@ -309,11 +310,52 @@ extension PlotSession {
 
     @discardableResult
     func openPreviewSeriesQuickEditor(at location: CGPoint, mapper: PlotPreviewCoordinateMapper) -> Bool {
-        guard let seriesID = mapper.nearestSeriesArtist(at: location)?.seriesID else {
+        guard let seriesID = PlotInteractionHitTester(mapper: mapper).hitTest(at: location)?.seriesID else {
             return false
         }
         openSeriesQuickEditor(seriesID: seriesID)
         return true
+    }
+
+    @discardableResult
+    func selectPreviewObject(_ object: PreviewInteractionObjectMetadata) -> Bool {
+        selectedPreviewObjectID = object.id
+        if let seriesID = object.seriesID {
+            selectPlotLayer(.series(seriesID))
+            return true
+        }
+
+        switch object.kind {
+        case "x_axis", "x_label":
+            selectedPlotAdjustmentCategory = .axes
+            selectCanvasSelection(.axis(.x))
+        case "y_axis", "y_label", "colorbar":
+            selectedPlotAdjustmentCategory = .axes
+            selectCanvasSelection(.axis(.y))
+        case "axis", "axis_title":
+            selectedPlotAdjustmentCategory = .axes
+            selectCanvasSelection(.axis(.x))
+        case "legend", "legend_entry":
+            selectedPlotAdjustmentCategory = .legend
+            selectCanvasSelection(.figure)
+        default:
+            canvasSelection = .figure
+            selectedSeriesQuickEditorID = nil
+            selectedReferenceGuideID = nil
+            selectedTextAnnotationID = nil
+            selectedShapeAnnotationID = nil
+        }
+        selectedPreviewObjectID = object.id
+        return true
+    }
+
+    @discardableResult
+    func openPreviewObjectQuickEditor(_ object: PreviewInteractionObjectMetadata) -> Bool {
+        if let seriesID = object.seriesID, object.operations.contains("quick_edit") {
+            openSeriesQuickEditor(seriesID: seriesID)
+            return true
+        }
+        return selectPreviewObject(object)
     }
 
     func updateSeriesStyle(
@@ -332,6 +374,38 @@ extension PlotSession {
                 styles.append(style)
             }
             options.seriesStyles = styles
+        }
+    }
+
+    func updateSeriesOffset(
+        seriesID: String,
+        policy: PlotPreviewRefreshPolicy = .immediate,
+        mutate: (inout SeriesOffsetPayload) -> Void
+    ) {
+        updateRenderOptions(policy: policy) { options in
+            var offsets = options.seriesOffsets ?? []
+            let index = offsets.firstIndex { $0.seriesID == seriesID }
+            var offset = index.map { offsets[$0] } ?? SeriesOffsetPayload(seriesID: seriesID)
+            mutate(&offset)
+            if let index {
+                offsets[index] = offset
+            } else {
+                offsets.append(offset)
+            }
+            options.seriesOffsets = offsets
+        }
+    }
+
+    func commitPreviewSeriesDrag(
+        seriesID: String,
+        xOffset: Double,
+        yOffset: Double,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        updateSeriesOffset(seriesID: seriesID, policy: policy) { offset in
+            offset.enabled = true
+            offset.xOffset += xOffset
+            offset.yOffset += yOffset
         }
     }
 
@@ -870,6 +944,7 @@ extension PlotSession {
         selectedPlotTool = .select
         canvasInteractionMode = .select
         canvasSelection = .figure
+        selectedPreviewObjectID = nil
         inspectionResponse = nil
         runtimeState.inspectedInputPath = nil
         runtimeState.inspectedSheet = nil

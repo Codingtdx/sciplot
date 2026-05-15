@@ -884,6 +884,7 @@
         "y_axis_breaks",
         "series_order",
         "series_styles",
+        "series_offsets",
         "legend_position",
         "style_preset",
         "palette_preset"
@@ -959,6 +960,7 @@
         "extra_y_axis",
         "series_order",
         "series_styles",
+        "series_offsets",
         "analytical_layers",
         "style_preset",
         "palette_preset"
@@ -1036,6 +1038,7 @@
         "y_axis_breaks",
         "series_order",
         "series_styles",
+        "series_offsets",
         "legend_position",
         "style_preset",
         "palette_preset"
@@ -1113,6 +1116,7 @@
         "extra_y_axis",
         "series_order",
         "series_styles",
+        "series_offsets",
         "legend_position",
         "style_preset",
         "palette_preset"
@@ -1190,6 +1194,7 @@
         "y_axis_breaks",
         "series_order",
         "series_styles",
+        "series_offsets",
         "legend_position",
         "style_preset",
         "palette_preset"
@@ -2031,6 +2036,7 @@
         "y_axis_breaks",
         "series_order",
         "series_styles",
+        "series_offsets",
         "legend_position",
         "style_preset",
         "palette_preset"

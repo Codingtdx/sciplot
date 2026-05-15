@@ -56,6 +56,10 @@ struct PlotPreviewCoordinateMapper: Equatable {
         metadata?.artists ?? []
     }
 
+    var objects: [PreviewInteractionObjectMetadata] {
+        metadata?.objects ?? []
+    }
+
     var axisRect: CGRect {
         guard let metadata, let axis = primaryAxis else {
             return imageRect
@@ -135,6 +139,10 @@ struct PlotPreviewCoordinateMapper: Equatable {
 
     func viewPoints(for artist: PreviewArtistMetadata) -> [CGPoint] {
         artist.points.compactMap { viewPoint(forPixelPoint: $0) }
+    }
+
+    func viewPoints(for object: PreviewInteractionObjectMetadata) -> [CGPoint] {
+        object.points.compactMap { viewPoint(forPixelPoint: $0) }
     }
 
     func viewRect(forPixelBBox bbox: PreviewBBoxMetadata) -> CGRect {
@@ -319,6 +327,135 @@ struct PlotPreviewCoordinateMapper: Equatable {
     }
 }
 
+struct PlotInteractionHit: Equatable {
+    let object: PreviewInteractionObjectMetadata
+    let distance: CGFloat
+
+    var seriesID: String? {
+        object.seriesID
+    }
+}
+
+extension PreviewInteractionObjectMetadata {
+    var seriesID: String? {
+        guard payloadRef?.type == "series" else {
+            return nil
+        }
+        return payloadRef?.id
+    }
+}
+
+struct PlotInteractionHitTester: Equatable {
+    let mapper: PlotPreviewCoordinateMapper
+
+    func hitTest(at location: CGPoint, tolerance: CGFloat = 12) -> PlotInteractionHit? {
+        if let objectHit = nearestObject(at: location, tolerance: tolerance) {
+            return objectHit
+        }
+        return legacySeriesHit(at: location, tolerance: tolerance)
+    }
+
+    private func nearestObject(at location: CGPoint, tolerance: CGFloat) -> PlotInteractionHit? {
+        var nearest: PlotInteractionHit?
+        for object in mapper.objects {
+            let rect = mapper.viewRect(forPixelBBox: object.bboxPixels)
+            let expandedRect = rect.insetBy(dx: -tolerance, dy: -tolerance)
+            guard expandedRect.contains(location) else {
+                continue
+            }
+            let distance = distanceToObject(location, object: object, rect: rect)
+            guard distance <= tolerance || rect.contains(location) else {
+                continue
+            }
+            if nearest == nil || objectPriority(object) > objectPriority(nearest!.object) || (
+                objectPriority(object) == objectPriority(nearest!.object) && distance < nearest!.distance
+            ) {
+                nearest = PlotInteractionHit(object: object, distance: distance)
+            }
+        }
+        return nearest
+    }
+
+    private func legacySeriesHit(at location: CGPoint, tolerance: CGFloat) -> PlotInteractionHit? {
+        guard let artist = mapper.nearestSeriesArtist(at: location, tolerance: tolerance) else {
+            return nil
+        }
+        let seriesID = artist.seriesID ?? artist.label ?? artist.id
+        return PlotInteractionHit(
+            object: PreviewInteractionObjectMetadata(
+                id: artist.id,
+                kind: artist.kind,
+                label: artist.label,
+                axisID: artist.axisID,
+                bboxPixels: artist.bboxPixels,
+                points: artist.points,
+                payloadRef: PreviewInteractionPayloadRefMetadata(type: "series", id: seriesID),
+                operations: ["select", "quick_edit", "drag_offset"]
+            ),
+            distance: 0
+        )
+    }
+
+    private func distanceToObject(
+        _ location: CGPoint,
+        object: PreviewInteractionObjectMetadata,
+        rect: CGRect
+    ) -> CGFloat {
+        let points = mapper.viewPoints(for: object)
+        if object.kind == "series_points" || object.kind == "heatmap_cell" || object.kind == "table_cell" {
+            if !points.isEmpty {
+                return points.map { distance(from: location, to: $0) }.min() ?? .greatestFiniteMagnitude
+            }
+            return rect.contains(location) ? 0 : distance(from: location, to: nearestPoint(on: rect, from: location))
+        }
+        if object.kind == "series_line", points.count >= 2 {
+            var nearest = CGFloat.greatestFiniteMagnitude
+            for index in 0..<(points.count - 1) {
+                nearest = min(nearest, distance(from: location, toSegmentFrom: points[index], to: points[index + 1]))
+            }
+            return nearest
+        }
+        return rect.contains(location) ? 0 : distance(from: location, to: nearestPoint(on: rect, from: location))
+    }
+
+    private func objectPriority(_ object: PreviewInteractionObjectMetadata) -> Int {
+        switch object.kind {
+        case "text_annotation", "shape_annotation", "reference_guide":
+            return 50
+        case "series_line", "series_points", "bar", "distribution_body":
+            return 40
+        case "legend_entry", "legend":
+            return 30
+        case "x_axis", "y_axis", "axis_title", "x_label", "y_label", "axis", "colorbar":
+            return 20
+        default:
+            return 10
+        }
+    }
+
+    private func nearestPoint(on rect: CGRect, from point: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(point.x, rect.minX), rect.maxX),
+            y: min(max(point.y, rect.minY), rect.maxY)
+        )
+    }
+
+    private func distance(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
+        hypot(lhs.x - rhs.x, lhs.y - rhs.y)
+    }
+
+    private func distance(from point: CGPoint, toSegmentFrom start: CGPoint, to end: CGPoint) -> CGFloat {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let lengthSquared = dx * dx + dy * dy
+        guard lengthSquared > 0 else {
+            return distance(from: point, to: start)
+        }
+        let t = max(0, min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+        return distance(from: point, to: CGPoint(x: start.x + t * dx, y: start.y + t * dy))
+    }
+}
+
 struct InteractivePlotOverlay: View {
     @Bindable var session: PlotSession
     let mapper: PlotPreviewCoordinateMapper
@@ -326,6 +463,9 @@ struct InteractivePlotOverlay: View {
     @State private var dragCurrentLocation: CGPoint?
     @State private var lastDragDataPoint: PlotCanvasDataPoint?
     @State private var activeHitTarget: PlotOverlayHitTarget?
+    @State private var activeInteractionHit: PlotInteractionHit?
+    @State private var seriesDragTranslation: CGSize?
+    @State private var seriesDragDataDelta: PlotCanvasDataPoint?
     @State private var pendingCalloutTarget: PlotCanvasDataPoint?
     @State private var seriesQuickEditorAnchor: CGPoint?
     @State private var lastClickLocation: CGPoint?
@@ -335,6 +475,7 @@ struct InteractivePlotOverlay: View {
         Canvas { context, _ in
             drawExistingObjects(in: &context)
             drawPendingCalloutTarget(in: &context)
+            drawSeriesDragGhost(in: &context)
             drawDraft(in: &context)
         }
         .allowsHitTesting(false)
@@ -396,6 +537,11 @@ struct InteractivePlotOverlay: View {
             activeHitTarget = hitTarget(at: value.startLocation)
             if let selection = activeHitTarget?.selection {
                 session.selectPlotLayer(selection)
+            } else if activeInteractionHit == nil {
+                activeInteractionHit = PlotInteractionHitTester(mapper: mapper).hitTest(at: value.startLocation)
+                if let object = activeInteractionHit?.object {
+                    session.selectPreviewObject(object)
+                }
             }
             lastDragDataPoint = mapper.dataPoint(at: value.startLocation)
         }
@@ -422,7 +568,15 @@ struct InteractivePlotOverlay: View {
             session.selectPlotLayer(.shapeAnnotation(id))
             session.resizeSelectedOverlay(handle: handle, point: currentPoint)
         case nil:
-            break
+            if let seriesID = activeInteractionHit?.seriesID,
+               let startPoint = mapper.dataPoint(at: value.startLocation) {
+                seriesDragTranslation = value.translation
+                seriesDragDataDelta = PlotCanvasDataPoint(
+                    x: currentPoint.x - startPoint.x,
+                    y: currentPoint.y - startPoint.y
+                )
+                session.selectPlotLayer(.series(seriesID))
+            }
         }
     }
 
@@ -432,6 +586,9 @@ struct InteractivePlotOverlay: View {
             dragCurrentLocation = nil
             lastDragDataPoint = nil
             activeHitTarget = nil
+            activeInteractionHit = nil
+            seriesDragTranslation = nil
+            seriesDragDataDelta = nil
         }
 
         if session.canvasInteractionMode.isPlacementMode {
@@ -441,6 +598,14 @@ struct InteractivePlotOverlay: View {
 
         if abs(value.translation.width) < 3, abs(value.translation.height) < 3 {
             handleClick(at: value.location)
+        } else if let seriesID = activeInteractionHit?.seriesID,
+                  let delta = seriesDragDataDelta {
+            session.commitPreviewSeriesDrag(
+                seriesID: seriesID,
+                xOffset: delta.x,
+                yOffset: delta.y,
+                policy: .debounced
+            )
         }
     }
 
@@ -449,17 +614,26 @@ struct InteractivePlotOverlay: View {
         let isDoubleClick = lastClickTime.map { now.timeIntervalSince($0) <= 0.35 } == true
             && lastClickLocation.map { distance(from: location, to: $0) <= 8 } == true
 
-        if isDoubleClick, session.openPreviewSeriesQuickEditor(at: location, mapper: mapper) {
-            seriesQuickEditorAnchor = location
-            lastClickLocation = nil
-            lastClickTime = nil
-            return
+        if isDoubleClick {
+            if let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: location) {
+                if session.openPreviewObjectQuickEditor(hit.object), hit.seriesID != nil {
+                    seriesQuickEditorAnchor = location
+                } else {
+                    seriesQuickEditorAnchor = nil
+                }
+                lastClickLocation = nil
+                lastClickTime = nil
+                return
+            }
         }
 
         lastClickLocation = location
         lastClickTime = now
         if let selection = hitTarget(at: location)?.selection {
             session.selectPlotLayer(selection)
+            seriesQuickEditorAnchor = nil
+        } else if let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: location) {
+            session.selectPreviewObject(hit.object)
             seriesQuickEditorAnchor = nil
         } else if session.selectPreviewSeries(at: location, mapper: mapper) {
             seriesQuickEditorAnchor = nil
@@ -567,6 +741,7 @@ struct InteractivePlotOverlay: View {
     private func drawExistingObjects(in context: inout GraphicsContext) {
         let accent = Color.accentColor.opacity(0.78)
         let secondary = Color.secondary.opacity(0.45)
+        drawSelectedPreviewObject(in: &context)
         drawSelectedSeriesArtist(in: &context)
 
         for guide in session.referenceGuides {
@@ -605,6 +780,10 @@ struct InteractivePlotOverlay: View {
         guard case .layer(.series(let seriesID)) = session.canvasSelection else {
             return
         }
+        if let object = mapper.objects.first(where: { $0.seriesID == seriesID }) {
+            drawInteractionObject(object, in: &context, color: Color.accentColor.opacity(0.72), dashed: true)
+            return
+        }
         guard let artist = mapper.artists.first(where: { $0.seriesID == seriesID }) else {
             return
         }
@@ -626,6 +805,76 @@ struct InteractivePlotOverlay: View {
             path.addLine(to: point)
         }
         context.stroke(path, with: .color(accent), style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
+    }
+
+    private func drawSelectedPreviewObject(in context: inout GraphicsContext) {
+        guard let selectedID = session.selectedPreviewObjectID,
+              let object = mapper.objects.first(where: { $0.id == selectedID }),
+              object.seriesID == nil
+        else {
+            return
+        }
+        drawInteractionObject(object, in: &context, color: Color.accentColor.opacity(0.66), dashed: true)
+    }
+
+    private func drawInteractionObject(
+        _ object: PreviewInteractionObjectMetadata,
+        in context: inout GraphicsContext,
+        color: Color,
+        dashed: Bool
+    ) {
+        let points = mapper.viewPoints(for: object)
+        if object.kind == "series_line", points.count >= 2 {
+            var path = Path()
+            path.move(to: points[0])
+            for point in points.dropFirst() {
+                path.addLine(to: point)
+            }
+            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 2, dash: dashed ? [5, 3] : []))
+            return
+        }
+        if object.kind == "series_points", !points.isEmpty {
+            for point in points {
+                let rect = CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)
+                context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.4)
+            }
+            return
+        }
+        let rect = mapper.viewRect(forPixelBBox: object.bboxPixels)
+        guard rect.width > 0, rect.height > 0 else {
+            return
+        }
+        let path = Path(roundedRect: rect, cornerRadius: 3)
+        context.fill(path, with: .color(color.opacity(0.04)))
+        context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 1.25, dash: dashed ? [4, 3] : []))
+    }
+
+    private func drawSeriesDragGhost(in context: inout GraphicsContext) {
+        guard let hit = activeInteractionHit,
+              let translation = seriesDragTranslation,
+              hit.seriesID != nil
+        else {
+            return
+        }
+        let points = mapper.viewPoints(for: hit.object).map {
+            CGPoint(x: $0.x + translation.width, y: $0.y + translation.height)
+        }
+        guard !points.isEmpty else {
+            return
+        }
+        let color = Color.accentColor.opacity(0.38)
+        if hit.object.kind == "series_points" {
+            for point in points {
+                context.fill(Path(ellipseIn: CGRect(x: point.x - 3.5, y: point.y - 3.5, width: 7, height: 7)), with: .color(color))
+            }
+            return
+        }
+        var path = Path()
+        path.move(to: points[0])
+        for point in points.dropFirst() {
+            path.addLine(to: point)
+        }
+        context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
     }
 
     private func drawTextSelection(
@@ -845,13 +1094,27 @@ private struct PlotSeriesQuickEditorPopover: View {
 
             Divider()
 
-            Button {
-                session.selectPlotLayer(.series(seriesID))
-                session.selectedPlotAdjustmentCategory = .legend
-            } label: {
-                Label("More", systemImage: "sidebar.right")
+            HStack {
+                Button {
+                    session.updateSeriesOffset(seriesID: seriesID, policy: .immediate) {
+                        $0.xOffset = 0
+                        $0.yOffset = 0
+                    }
+                } label: {
+                    Label("Reset Offset", systemImage: "arrow.counterclockwise")
+                }
+                .disabled(seriesOffset.xOffset == 0 && seriesOffset.yOffset == 0)
+
+                Spacer()
+
+                Button {
+                    session.selectPlotLayer(.series(seriesID))
+                    session.selectedPlotAdjustmentCategory = .legend
+                } label: {
+                    Label("More", systemImage: "sidebar.right")
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
         }
         .frame(width: 270)
         .padding(12)
@@ -859,6 +1122,10 @@ private struct PlotSeriesQuickEditorPopover: View {
 
     private var seriesStyle: SeriesStylePayload {
         session.renderOptions.seriesStyles?.first(where: { $0.seriesID == seriesID }) ?? SeriesStylePayload(seriesID: seriesID)
+    }
+
+    private var seriesOffset: SeriesOffsetPayload {
+        session.renderOptions.seriesOffsets?.first(where: { $0.seriesID == seriesID }) ?? SeriesOffsetPayload(seriesID: seriesID)
     }
 
     private var visibleBinding: Binding<Bool> {

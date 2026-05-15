@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from base64 import b64encode
+from collections.abc import Mapping
 from io import BytesIO
 from typing import Any, Literal
 
@@ -135,6 +136,14 @@ class SeriesStylePayload(StrictModel):
     y_axis_target: str | None = None
 
 
+class SeriesOffsetPayload(StrictModel):
+    series_id: str
+    enabled: bool = True
+    x_offset: float = 0.0
+    y_offset: float = 0.0
+    y_axis_target: str | None = None
+
+
 class RenderOptionsPayload(StrictModel):
     size: str | None = None
     xscale: str | None = None
@@ -150,6 +159,7 @@ class RenderOptionsPayload(StrictModel):
     y_tick_edge_labels: str | None = None
     series_order: list[str] | None = None
     series_styles: list[SeriesStylePayload] | None = None
+    series_offsets: list[SeriesOffsetPayload] | None = None
     legend_position: str | None = None
     x_label_override: str | None = None
     y_label_override: str | None = None
@@ -738,6 +748,56 @@ def _preview_bbox_for_points(
     }
 
 
+def _preview_bbox_from_display_bbox(
+    bbox: Any,
+    *,
+    scale: float,
+    figure_height: float,
+) -> dict[str, float]:
+    return {
+        "x": float(bbox.x0 * scale),
+        "y": float((figure_height - bbox.y1) * scale),
+        "width": float(max(bbox.width, 0.0) * scale),
+        "height": float(max(bbox.height, 0.0) * scale),
+    }
+
+
+def _bbox_has_area(bbox: Mapping[str, float]) -> bool:
+    return (
+        math.isfinite(float(bbox.get("x", 0.0)))
+        and math.isfinite(float(bbox.get("y", 0.0)))
+        and float(bbox.get("width", 0.0)) > 0.5
+        and float(bbox.get("height", 0.0)) > 0.5
+    )
+
+
+def _preview_object(
+    *,
+    object_id: str,
+    kind: str,
+    axis_id: str | None,
+    label: str | None,
+    bbox_pixels: Mapping[str, float],
+    points: list[list[float]] | None = None,
+    payload_type: str | None = None,
+    payload_id: str | None = None,
+    operations: list[str] | None = None,
+) -> dict[str, Any]:
+    payload_ref = None
+    if payload_type is not None and payload_id is not None:
+        payload_ref = {"type": payload_type, "id": payload_id}
+    return {
+        "id": object_id,
+        "kind": kind,
+        "label": label,
+        "axis_id": axis_id,
+        "bbox_pixels": dict(bbox_pixels),
+        "points": points or [],
+        "payload_ref": payload_ref,
+        "operations": operations or ["select", "more"],
+    }
+
+
 def _finite_data_points(raw_points: Any) -> list[tuple[float, float]]:
     resolved: list[tuple[float, float]] = []
     for raw_x, raw_y in raw_points:
@@ -835,6 +895,485 @@ def _preview_series_artist_metadata(
     return artists
 
 
+_INTERACTION_CELL_TARGET_LIMIT = 2500
+
+
+def _preview_series_objects(artists: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for artist in artists:
+        series_id = str(artist.get("series_id") or artist.get("label") or "").strip()
+        if not series_id:
+            continue
+        objects.append(
+            _preview_object(
+                object_id=str(artist.get("id") or f"{artist.get('kind')}:{series_id}"),
+                kind=str(artist.get("kind") or "series"),
+                axis_id=str(artist.get("axis_id")) if artist.get("axis_id") is not None else None,
+                label=str(artist.get("label") or series_id),
+                bbox_pixels=artist.get("bbox_pixels") or {},
+                points=list(artist.get("points") or []),
+                payload_type="series",
+                payload_id=series_id,
+                operations=["select", "quick_edit", "drag_offset"],
+            )
+        )
+    return objects
+
+
+def _preview_text_object(
+    *,
+    axis_id: str,
+    kind: str,
+    text_artist: Any,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+    payload_type: str,
+    payload_id: str,
+) -> dict[str, Any] | None:
+    text = str(getattr(text_artist, "get_text", lambda: "")() or "").strip()
+    if not text or not bool(getattr(text_artist, "get_visible", lambda: True)()):
+        return None
+    try:
+        bbox = _preview_bbox_from_display_bbox(
+            text_artist.get_window_extent(renderer=renderer),
+            scale=scale,
+            figure_height=figure_height,
+        )
+    except Exception:
+        return None
+    if not _bbox_has_area(bbox):
+        return None
+    return _preview_object(
+        object_id=f"{kind}:{axis_id}:{payload_id}",
+        kind=kind,
+        axis_id=axis_id,
+        label=text,
+        bbox_pixels=bbox,
+        payload_type=payload_type,
+        payload_id=payload_id,
+        operations=["select", "quick_edit", "more"],
+    )
+
+
+def _preview_axis_objects(
+    rendered: Any,
+    axes_metadata: list[dict[str, Any]],
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    axes = list(getattr(rendered.figure, "axes", []))
+    for index, (axis, axis_metadata) in enumerate(zip(axes, axes_metadata, strict=False)):
+        axis_id = str(axis_metadata.get("id") or axis.get_gid() or f"axis-{index}")
+        role = str(axis_metadata.get("role") or "axis")
+        objects.append(
+            _preview_object(
+                object_id=f"axis:{axis_id}",
+                kind="colorbar" if index > 0 and role != "primary" else "axis",
+                axis_id=axis_id,
+                label=role,
+                bbox_pixels=axis_metadata["bbox_pixels"],
+                payload_type="axis",
+                payload_id=axis_id,
+                operations=["select", "more"],
+            )
+        )
+        for kind, axis_artist, payload_id in (
+            ("x_axis", axis.xaxis, "x"),
+            ("y_axis", axis.yaxis, "y"),
+        ):
+            try:
+                axis_bbox = _preview_bbox_from_display_bbox(
+                    axis_artist.get_tightbbox(renderer=renderer),
+                    scale=scale,
+                    figure_height=figure_height,
+                )
+            except Exception:
+                continue
+            if not _bbox_has_area(axis_bbox):
+                continue
+            objects.append(
+                _preview_object(
+                    object_id=f"{kind}:{axis_id}",
+                    kind=kind,
+                    axis_id=axis_id,
+                    label=payload_id.upper(),
+                    bbox_pixels=axis_bbox,
+                    payload_type="axis",
+                    payload_id=f"{axis_id}:{payload_id}",
+                    operations=["select", "more"],
+                )
+            )
+        for kind, text_artist, payload_id in (
+            ("axis_title", axis.title, "title"),
+            ("x_label", axis.xaxis.label, "x"),
+            ("y_label", axis.yaxis.label, "y"),
+        ):
+            obj = _preview_text_object(
+                axis_id=axis_id,
+                kind=kind,
+                text_artist=text_artist,
+                renderer=renderer,
+                scale=scale,
+                figure_height=figure_height,
+                payload_type="axis_label",
+                payload_id=f"{axis_id}:{payload_id}",
+            )
+            if obj is not None:
+                objects.append(obj)
+
+        legend = axis.get_legend()
+        if legend is None or not bool(getattr(legend, "get_visible", lambda: True)()):
+            continue
+        try:
+            legend_bbox = _preview_bbox_from_display_bbox(
+                legend.get_window_extent(renderer=renderer),
+                scale=scale,
+                figure_height=figure_height,
+            )
+        except Exception:
+            legend_bbox = None
+        if legend_bbox is not None and _bbox_has_area(legend_bbox):
+            objects.append(
+                _preview_object(
+                    object_id=f"legend:{axis_id}",
+                    kind="legend",
+                    axis_id=axis_id,
+                    label="Legend",
+                    bbox_pixels=legend_bbox,
+                    payload_type="legend",
+                    payload_id=axis_id,
+                    operations=["select", "more"],
+                )
+            )
+        for entry_index, text_artist in enumerate(legend.get_texts()):
+            text = str(text_artist.get_text() or "").strip()
+            if not text:
+                continue
+            try:
+                bbox = _preview_bbox_from_display_bbox(
+                    text_artist.get_window_extent(renderer=renderer),
+                    scale=scale,
+                    figure_height=figure_height,
+                )
+            except Exception:
+                continue
+            if not _bbox_has_area(bbox):
+                continue
+            objects.append(
+                _preview_object(
+                    object_id=f"legend_entry:{axis_id}:{entry_index}",
+                    kind="legend_entry",
+                    axis_id=axis_id,
+                    label=text,
+                    bbox_pixels=bbox,
+                    payload_type="series",
+                    payload_id=normalize_series_selection_ids([text])[0],
+                    operations=["select", "quick_edit", "more"],
+                )
+            )
+    return objects
+
+
+def _nearest_tick_label(axis: Any, x_value: float) -> str | None:
+    tick_positions = [float(value) for value in axis.get_xticks()]
+    tick_labels = [str(label.get_text()).strip() for label in axis.get_xticklabels()]
+    candidates = [(position, label) for position, label in zip(tick_positions, tick_labels, strict=False) if label]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda item: abs(item[0] - x_value))[1]
+
+
+def _preview_bar_objects(
+    rendered: Any,
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for axis_index, axis in enumerate(getattr(rendered.figure, "axes", [])):
+        if axis_index > 0:
+            continue
+        axis_id = axis.get_gid() or f"axis-{axis_index}"
+        for patch_index, patch in enumerate(getattr(axis, "patches", [])):
+            if patch.__class__.__name__ == "Cell" or not bool(getattr(patch, "get_visible", lambda: True)()):
+                continue
+            try:
+                display_bbox = patch.get_window_extent(renderer=renderer)
+                bbox = _preview_bbox_from_display_bbox(display_bbox, scale=scale, figure_height=figure_height)
+            except Exception:
+                continue
+            if not _bbox_has_area(bbox):
+                continue
+            axis_bbox = axis.get_window_extent(renderer=renderer)
+            if display_bbox.width >= axis_bbox.width * 0.95 and display_bbox.height >= axis_bbox.height * 0.95:
+                continue
+            label = _visible_artist_label(patch)
+            if label is None:
+                try:
+                    label = _nearest_tick_label(axis, float(patch.get_x() + patch.get_width() / 2.0))
+                except Exception:
+                    label = None
+            object_id = f"bar:{axis_id}:{patch_index}"
+            payload_id = label or object_id
+            objects.append(
+                _preview_object(
+                    object_id=object_id,
+                    kind="bar",
+                    axis_id=axis_id,
+                    label=label,
+                    bbox_pixels=bbox,
+                    payload_type="series",
+                    payload_id=payload_id,
+                    operations=["select", "quick_edit", "more"],
+                )
+            )
+    return objects
+
+
+def _preview_cell_objects_for_paths(
+    *,
+    axis_id: str,
+    kind: str,
+    aggregate_kind: str,
+    payload_type: str,
+    collection: Any,
+    paths: list[Any],
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    if len(paths) > _INTERACTION_CELL_TARGET_LIMIT:
+        try:
+            transform = collection.get_transform()
+            display_points = [
+                tuple(point)
+                for path in paths
+                for point in transform.transform(path.vertices)
+            ]
+            bbox = _preview_bbox_for_points(display_points, scale=scale, figure_height=figure_height)
+        except Exception:
+            bbox = {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+        return [
+            _preview_object(
+                object_id=f"{aggregate_kind}:{axis_id}",
+                kind=aggregate_kind,
+                axis_id=axis_id,
+                label=None,
+                bbox_pixels=bbox,
+                payload_type=payload_type,
+                payload_id=axis_id,
+                operations=["select", "more"],
+            )
+        ]
+
+    objects: list[dict[str, Any]] = []
+    transform = collection.get_transform()
+    for index, path in enumerate(paths):
+        try:
+            display_points = [tuple(point) for point in transform.transform(path.vertices)]
+        except Exception:
+            continue
+        bbox = _preview_bbox_for_points(display_points, scale=scale, figure_height=figure_height)
+        if not _bbox_has_area(bbox):
+            continue
+        object_id = f"{kind}:{axis_id}:{index}"
+        objects.append(
+            _preview_object(
+                object_id=object_id,
+                kind=kind,
+                axis_id=axis_id,
+                label=None,
+                bbox_pixels=bbox,
+                points=[
+                    _preview_pixel_point(point, scale=scale, figure_height=figure_height)
+                    for point in _downsample_points(display_points, limit=12)
+                ],
+                payload_type=payload_type,
+                payload_id=str(index),
+                operations=["select", "more"],
+            )
+        )
+    return objects
+
+
+def _preview_heatmap_and_distribution_objects(
+    rendered: Any,
+    *,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for axis_index, axis in enumerate(getattr(rendered.figure, "axes", [])):
+        if axis_index > 0:
+            continue
+        axis_id = axis.get_gid() or f"axis-{axis_index}"
+        for collection_index, collection in enumerate(getattr(axis, "collections", [])):
+            if not bool(getattr(collection, "get_visible", lambda: True)()):
+                continue
+            class_name = collection.__class__.__name__
+            paths = list(getattr(collection, "get_paths", lambda: [])())
+            if class_name == "QuadMesh" and paths:
+                objects.extend(
+                    _preview_cell_objects_for_paths(
+                        axis_id=axis_id,
+                        kind="heatmap_cell",
+                        aggregate_kind="heatmap_region",
+                        payload_type="heatmap_cell",
+                        collection=collection,
+                        paths=paths,
+                        scale=scale,
+                        figure_height=figure_height,
+                    )
+                )
+            elif class_name in {"PolyCollection", "QuadContourSet"} and paths:
+                objects.extend(
+                    _preview_cell_objects_for_paths(
+                        axis_id=axis_id,
+                        kind="distribution_body",
+                        aggregate_kind="contour_region",
+                        payload_type="artist",
+                        collection=collection,
+                        paths=paths[:1],
+                        scale=scale,
+                        figure_height=figure_height,
+                    )
+                )
+            elif axis.name == "polar" and paths:
+                objects.extend(
+                    _preview_cell_objects_for_paths(
+                        axis_id=axis_id,
+                        kind="polar_region",
+                        aggregate_kind="polar_region",
+                        payload_type="artist",
+                        collection=collection,
+                        paths=paths[:1],
+                        scale=scale,
+                        figure_height=figure_height,
+                    )
+                )
+            for obj in objects[-1:]:
+                if obj["id"].endswith(f":{axis_id}"):
+                    obj["id"] = f"{obj['id']}:{collection_index}"
+    return objects
+
+
+def _preview_table_objects(
+    rendered: Any,
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for axis_index, axis in enumerate(getattr(rendered.figure, "axes", [])):
+        axis_id = axis.get_gid() or f"axis-{axis_index}"
+        tables = list(getattr(axis, "tables", []))
+        for table_index, table in enumerate(tables):
+            cells = list(table.get_celld().items())
+            if len(cells) > _INTERACTION_CELL_TARGET_LIMIT:
+                try:
+                    bbox = _preview_bbox_from_display_bbox(
+                        table.get_window_extent(renderer=renderer),
+                        scale=scale,
+                        figure_height=figure_height,
+                    )
+                except Exception:
+                    bbox = {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+                objects.append(
+                    _preview_object(
+                        object_id=f"table_region:{axis_id}:{table_index}",
+                        kind="table_region",
+                        axis_id=axis_id,
+                        label=None,
+                        bbox_pixels=bbox,
+                        payload_type="table",
+                        payload_id=str(table_index),
+                        operations=["select", "more"],
+                    )
+                )
+                continue
+            for cell_index, ((row, column), cell) in enumerate(cells):
+                try:
+                    bbox = _preview_bbox_from_display_bbox(
+                        cell.get_window_extent(renderer=renderer),
+                        scale=scale,
+                        figure_height=figure_height,
+                    )
+                except Exception:
+                    continue
+                if not _bbox_has_area(bbox):
+                    continue
+                text = str(cell.get_text().get_text() or "").strip()
+                objects.append(
+                    _preview_object(
+                        object_id=f"table_cell:{axis_id}:{row}:{column}",
+                        kind="table_cell",
+                        axis_id=axis_id,
+                        label=text or None,
+                        bbox_pixels=bbox,
+                        payload_type="table_cell",
+                        payload_id=f"{row}:{column}",
+                        operations=["select", "more"],
+                    )
+                )
+    return objects
+
+
+def _preview_interaction_objects(
+    rendered: Any,
+    *,
+    axes_metadata: list[dict[str, Any]],
+    artists: list[dict[str, Any]],
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    objects.extend(_preview_series_objects(artists))
+    objects.extend(
+        _preview_axis_objects(
+            rendered,
+            axes_metadata,
+            renderer=renderer,
+            scale=scale,
+            figure_height=figure_height,
+        )
+    )
+    objects.extend(
+        _preview_bar_objects(
+            rendered,
+            renderer=renderer,
+            scale=scale,
+            figure_height=figure_height,
+        )
+    )
+    objects.extend(
+        _preview_heatmap_and_distribution_objects(
+            rendered,
+            scale=scale,
+            figure_height=figure_height,
+        )
+    )
+    objects.extend(
+        _preview_table_objects(
+            rendered,
+            renderer=renderer,
+            scale=scale,
+            figure_height=figure_height,
+        )
+    )
+    deduped: dict[str, dict[str, Any]] = {}
+    for obj in objects:
+        bbox = obj.get("bbox_pixels") or {}
+        if _bbox_has_area(bbox):
+            deduped[str(obj["id"])] = obj
+    return list(deduped.values())
+
+
 def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, Any] | None:
     figure = getattr(rendered, "figure", None)
     if figure is None or not getattr(figure, "axes", None):
@@ -848,26 +1387,37 @@ def _preview_interaction_metadata(rendered: Any, *, png_dpi: int) -> dict[str, A
         width_inches, height_inches = figure.get_size_inches()
         figure_width = float(width_inches) * float(png_dpi)
         figure_height = float(height_inches) * float(png_dpi)
+        source_figure_height = float(figure.bbox.height)
+        axes_metadata = [
+            _preview_axis_metadata(
+                rendered,
+                axis,
+                renderer=renderer,
+                scale=scale,
+                figure_height=source_figure_height,
+            )
+            for axis in figure.axes
+        ]
+        artists = _preview_series_artist_metadata(
+            rendered,
+            scale=scale,
+            figure_height=source_figure_height,
+        )
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "figure": {
                 "pixel_width": int(round(figure_width)),
                 "pixel_height": int(round(figure_height)),
             },
-            "axes": [
-                _preview_axis_metadata(
-                    rendered,
-                    axis,
-                    renderer=renderer,
-                    scale=scale,
-                    figure_height=float(figure.bbox.height),
-                )
-                for axis in figure.axes
-            ],
-            "artists": _preview_series_artist_metadata(
+            "axes": axes_metadata,
+            "artists": artists,
+            "objects": _preview_interaction_objects(
                 rendered,
+                axes_metadata=axes_metadata,
+                artists=artists,
+                renderer=renderer,
                 scale=scale,
-                figure_height=float(figure.bbox.height),
+                figure_height=source_figure_height,
             ),
         }
     except Exception:
@@ -959,6 +1509,7 @@ __all__ = [
     "RenderRequest",
     "SaveProjectRequest",
     "SaveProjectResponse",
+    "SeriesOffsetPayload",
     "SeriesStylePayload",
     "SourceTablePreviewRequest",
     "SourceTablePreviewResponse",

@@ -66,6 +66,11 @@ def options_from_payload(
             if payload.series_styles
             else None
         ),
+        series_offsets=(
+            [item.model_dump(mode="json") for item in payload.series_offsets]
+            if payload.series_offsets
+            else None
+        ),
         legend_position=payload.legend_position,
         x_label_override=payload.x_label_override,
         y_label_override=payload.y_label_override,

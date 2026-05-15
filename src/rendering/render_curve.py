@@ -57,6 +57,7 @@ from src.rendering.render_curve_support import (
 )
 from src.rendering.render_support import _rendered_plot_with_qa
 from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
+from src.rendering.series_offsets import series_offset_by_id
 from src.rendering.series_styles import matplotlib_marker_symbol, series_style_by_id
 
 
@@ -203,6 +204,54 @@ def _apply_series_style_overrides(
     if applied:
         _rebuild_visible_legend(ax)
         return ("series_style_overrides",)
+    return ()
+
+
+def _apply_series_offsets(
+    ax: Axes,
+    *,
+    series_list,
+    options: RenderOptions,
+    scatter: bool,
+) -> tuple[str, ...]:
+    offsets = series_offset_by_id(options.series_offsets)
+    if not offsets:
+        return ()
+    series_ids = _series_ids_for_series_list(series_list)
+    artists = _styleable_series_artists(ax, scatter=scatter)
+    applied = False
+
+    for series_id, artist in zip(series_ids, artists, strict=False):
+        offset = offsets.get(series_id)
+        if offset is None or not bool(offset.get("enabled", True)):
+            continue
+        try:
+            x_offset = float(offset.get("x_offset", 0.0))
+            y_offset = float(offset.get("y_offset", 0.0))
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(x_offset) or not np.isfinite(y_offset) or (x_offset == 0.0 and y_offset == 0.0):
+            continue
+        if scatter:
+            points = np.asarray(artist.get_offsets(), dtype=float)
+            if points.size == 0:
+                continue
+            shifted = np.array(points, copy=True)
+            shifted[:, 0] = shifted[:, 0] + x_offset
+            shifted[:, 1] = shifted[:, 1] + y_offset
+            artist.set_offsets(shifted)
+        else:
+            x_data = np.asarray(artist.get_xdata(), dtype=float)
+            y_data = np.asarray(artist.get_ydata(), dtype=float)
+            artist.set_xdata(x_data + x_offset)
+            artist.set_ydata(y_data + y_offset)
+        applied = True
+
+    if applied:
+        ax.relim()
+        ax.autoscale_view()
+        _rebuild_visible_legend(ax)
+        return ("series_offsets",)
     return ()
 
 
@@ -561,6 +610,12 @@ def _render_curve_candidate(
             options=options,
             scatter=scatter,
         )
+        applied += _apply_series_offsets(
+            ax,
+            series_list=series_list,
+            options=options,
+            scatter=scatter,
+        )
     else:
         marker_size = None
         if show_markers:
@@ -621,6 +676,12 @@ def _render_curve_candidate(
             )
         applied = apply_curve_autofix(ax, _post_curve_fix(combined_fix, include_line_scale=show_markers))
         applied += _apply_series_style_overrides(
+            ax,
+            series_list=series_list,
+            options=options,
+            scatter=scatter,
+        )
+        applied += _apply_series_offsets(
             ax,
             series_list=series_list,
             options=options,

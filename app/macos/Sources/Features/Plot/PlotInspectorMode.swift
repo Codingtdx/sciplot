@@ -506,6 +506,7 @@ extension PlotSession {
         case .layer(let layer):
             selectPlotLayer(layer)
         case .figure, .axis, .dataPipeline:
+            selectedPreviewObjectID = nil
             selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
@@ -516,6 +517,7 @@ extension PlotSession {
     func selectPlotLayer(_ layer: PlotLayerSelection?) {
         guard let layer else {
             canvasSelection = .figure
+            selectedPreviewObjectID = nil
             selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
@@ -524,6 +526,7 @@ extension PlotSession {
         }
 
         canvasSelection = .layer(layer)
+        selectedPreviewObjectID = nil
         switch layer {
         case .referenceGuide(let id):
             selectedSeriesQuickEditorID = nil

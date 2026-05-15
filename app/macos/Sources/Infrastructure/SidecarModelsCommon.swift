@@ -77,17 +77,20 @@ struct PreviewInteractionMetadata: Codable, Equatable, Sendable {
     let figure: PreviewFigureMetadata
     let axes: [PreviewAxisMetadata]
     let artists: [PreviewArtistMetadata]
+    let objects: [PreviewInteractionObjectMetadata]
 
     init(
         schemaVersion: Int? = nil,
         figure: PreviewFigureMetadata,
         axes: [PreviewAxisMetadata],
-        artists: [PreviewArtistMetadata] = []
+        artists: [PreviewArtistMetadata] = [],
+        objects: [PreviewInteractionObjectMetadata] = []
     ) {
         self.schemaVersion = schemaVersion
         self.figure = figure
         self.axes = axes
         self.artists = artists
+        self.objects = objects
     }
 
     enum CodingKeys: String, CodingKey {
@@ -95,6 +98,7 @@ struct PreviewInteractionMetadata: Codable, Equatable, Sendable {
         case figure
         case axes
         case artists
+        case objects
     }
 
     init(from decoder: Decoder) throws {
@@ -103,6 +107,7 @@ struct PreviewInteractionMetadata: Codable, Equatable, Sendable {
         figure = try container.decode(PreviewFigureMetadata.self, forKey: .figure)
         axes = try container.decodeIfPresent([PreviewAxisMetadata].self, forKey: .axes) ?? []
         artists = try container.decodeIfPresent([PreviewArtistMetadata].self, forKey: .artists) ?? []
+        objects = try container.decodeIfPresent([PreviewInteractionObjectMetadata].self, forKey: .objects) ?? []
     }
 }
 
@@ -165,5 +170,52 @@ struct PreviewArtistMetadata: Codable, Equatable, Sendable, Identifiable {
         case label
         case bboxPixels
         case points
+    }
+}
+
+struct PreviewInteractionPayloadRefMetadata: Codable, Equatable, Sendable {
+    let type: String
+    let id: String
+}
+
+struct PreviewInteractionObjectMetadata: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let label: String?
+    let axisID: String?
+    let bboxPixels: PreviewBBoxMetadata
+    let points: [[Double]]
+    let payloadRef: PreviewInteractionPayloadRefMetadata?
+    let operations: [String]
+
+    init(
+        id: String,
+        kind: String,
+        label: String? = nil,
+        axisID: String? = nil,
+        bboxPixels: PreviewBBoxMetadata,
+        points: [[Double]] = [],
+        payloadRef: PreviewInteractionPayloadRefMetadata? = nil,
+        operations: [String] = ["select", "more"]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.label = label
+        self.axisID = axisID
+        self.bboxPixels = bboxPixels
+        self.points = points
+        self.payloadRef = payloadRef
+        self.operations = operations
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case label
+        case axisID = "axisId"
+        case bboxPixels
+        case points
+        case payloadRef
+        case operations
     }
 }
