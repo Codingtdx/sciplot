@@ -1,6 +1,6 @@
 # SciPlot
 
-![SciPlot overview](docs/assets/sciplot-overview.svg)
+![SciPlot Plot workspace](https://github.com/Codingtdx/sciplot/releases/download/v0.1.0-beta/sciplot-readme-plot-workspace.png)
 
 SciPlot is an open-source scientific plotting workspace for researchers who need to move from raw tables to publication-ready figures without losing control of the data path. It combines a native macOS workspace with a Python rendering sidecar so figure recommendation, data cleanup, preview, export, project save/open, and code-driven analysis all share the same backend contracts.
 
