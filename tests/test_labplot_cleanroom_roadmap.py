@@ -8,6 +8,7 @@ from scripts import blocking_gate
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROADMAP_PATH = REPO_ROOT / "docs" / "labplot-informed-roadmap.md"
+CODE_STUDY_PATH = REPO_ROOT / "docs" / "labplot-technical-borrowing.md"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_labplot_cleanroom.py"
 
 
@@ -38,6 +39,34 @@ def test_labplot_roadmap_records_cleanroom_architecture() -> None:
         "/meta",
         "src/plot_contract.json",
         "UndoManager",
+        "Technical borrowing principles",
+        "not blind copying",
+        "first-principles architecture",
+        "LabPlot code study",
+    )
+    for phrase in required_phrases:
+        assert phrase in text
+
+
+def test_labplot_code_study_records_engineering_translation() -> None:
+    text = CODE_STUDY_PATH.read_text(encoding="utf-8")
+
+    required_phrases = (
+        "AbstractAspect",
+        "aspectcommands",
+        "AbstractFileFilter",
+        "FilterStatus",
+        "XYAnalysisCurve",
+        "recalculateSpecific",
+        "CartesianPlot",
+        "Axis",
+        "FitTest",
+        "NIST",
+        "SciPlot translation",
+        "No LabPlot C++ implementation is vendored",
+        "typed command ledger",
+        "operation result envelope",
+        "fixture-driven numerical tests",
     )
     for phrase in required_phrases:
         assert phrase in text
