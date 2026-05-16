@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+from src.rendering.artist_tags import tag_interaction_artist
 from src.rendering.expression_engine import ExpressionError, evaluate_expression, evaluate_variables
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
 from src.text_normalization import _clean_text
@@ -238,7 +239,7 @@ def apply_analytical_layers(rendered: RenderedPlot, *, options: RenderOptions) -
             and hasattr(secondary, "plot")
             else primary
         )
-        target_axis.plot(
+        (line,) = target_axis.plot(
             x_values[mask],
             y_values[mask],
             label=layer["label"] or layer["expression"],
@@ -246,6 +247,14 @@ def apply_analytical_layers(rendered: RenderedPlot, *, options: RenderOptions) -
             linewidth=1.0,
             alpha=0.92,
             zorder=4.6,
+        )
+        tag_interaction_artist(
+            line,
+            payload_type="analytical_layer",
+            payload_id=layer["id"],
+            kind="analytical_layer",
+            label=layer["label"] or layer["expression"],
+            operations=("select", "quick_edit", "more"),
         )
         applied = True
 

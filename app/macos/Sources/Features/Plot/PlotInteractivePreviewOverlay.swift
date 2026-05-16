@@ -420,7 +420,7 @@ struct PlotInteractionHitTester: Equatable {
 
     private func objectPriority(_ object: PreviewInteractionObjectMetadata) -> Int {
         switch object.kind {
-        case "text_annotation", "shape_annotation", "reference_guide":
+        case "text_annotation", "shape_annotation", "reference_guide", "analytical_layer":
             return 50
         case "series_line", "series_points", "bar", "distribution_body":
             return 40
@@ -468,6 +468,8 @@ struct InteractivePlotOverlay: View {
     @State private var seriesDragDataDelta: PlotCanvasDataPoint?
     @State private var pendingCalloutTarget: PlotCanvasDataPoint?
     @State private var seriesQuickEditorAnchor: CGPoint?
+    @State private var previewObjectQuickEditorAnchor: CGPoint?
+    @State private var hoveredInteractionHit: PlotInteractionHit?
     @State private var lastClickLocation: CGPoint?
     @State private var lastClickTime: Date?
 
@@ -484,7 +486,21 @@ struct InteractivePlotOverlay: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .gesture(canvasGesture)
+                    .focusable()
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            hoveredInteractionHit = PlotInteractionHitTester(mapper: mapper).hitTest(at: location)
+                        case .ended:
+                            hoveredInteractionHit = nil
+                        }
+                    }
+                    .onMoveCommand { direction in
+                        guard let delta = keyboardNudgeDelta(for: direction) else { return }
+                        session.nudgeSelectedPreviewObject(delta: delta, policy: .debounced)
+                    }
                 seriesQuickEditorAnchorView
+                previewObjectQuickEditorAnchorView
             }
         }
         .animation(.easeOut(duration: 0.12), value: session.canvasSelection.id)
@@ -521,6 +537,53 @@ struct InteractivePlotOverlay: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private var previewObjectQuickEditorAnchorView: some View {
+        if let previewObjectQuickEditorAnchor,
+           let objectID = session.selectedPreviewQuickEditorObjectID,
+           let object = mapper.objects.first(where: { $0.id == objectID })
+        {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .position(previewObjectQuickEditorAnchor)
+                .popover(isPresented: previewObjectQuickEditorPopoverBinding, arrowEdge: .top) {
+                    PlotPreviewObjectQuickEditorPopover(session: session, object: object)
+                }
+        }
+    }
+
+    private var previewObjectQuickEditorPopoverBinding: Binding<Bool> {
+        Binding(
+            get: { session.selectedPreviewQuickEditorObjectID != nil && previewObjectQuickEditorAnchor != nil },
+            set: { presented in
+                if !presented {
+                    previewObjectQuickEditorAnchor = nil
+                    session.selectedPreviewQuickEditorObjectID = nil
+                }
+            }
+        )
+    }
+
+    private func keyboardNudgeDelta(for direction: MoveCommandDirection) -> PlotCanvasDataPoint? {
+        guard let axis = mapper.primaryAxis, axis.xRange.count >= 2, axis.yRange.count >= 2 else {
+            return nil
+        }
+        let xStep = max(abs(axis.xRange[1] - axis.xRange[0]) / 100.0, .leastNonzeroMagnitude)
+        let yStep = max(abs(axis.yRange[1] - axis.yRange[0]) / 100.0, .leastNonzeroMagnitude)
+        switch direction {
+        case .left:
+            return PlotCanvasDataPoint(x: axis.xReversed ? xStep : -xStep, y: 0)
+        case .right:
+            return PlotCanvasDataPoint(x: axis.xReversed ? -xStep : xStep, y: 0)
+        case .up:
+            return PlotCanvasDataPoint(x: 0, y: axis.yReversed ? -yStep : yStep)
+        case .down:
+            return PlotCanvasDataPoint(x: 0, y: axis.yReversed ? yStep : -yStep)
+        @unknown default:
+            return nil
+        }
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
@@ -618,8 +681,13 @@ struct InteractivePlotOverlay: View {
             if let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: location) {
                 if session.openPreviewObjectQuickEditor(hit.object), hit.seriesID != nil {
                     seriesQuickEditorAnchor = location
+                    previewObjectQuickEditorAnchor = nil
+                } else if session.selectedPreviewQuickEditorObjectID != nil {
+                    previewObjectQuickEditorAnchor = location
+                    seriesQuickEditorAnchor = nil
                 } else {
                     seriesQuickEditorAnchor = nil
+                    previewObjectQuickEditorAnchor = nil
                 }
                 lastClickLocation = nil
                 lastClickTime = nil
@@ -632,14 +700,18 @@ struct InteractivePlotOverlay: View {
         if let selection = hitTarget(at: location)?.selection {
             session.selectPlotLayer(selection)
             seriesQuickEditorAnchor = nil
+            previewObjectQuickEditorAnchor = nil
         } else if let hit = PlotInteractionHitTester(mapper: mapper).hitTest(at: location) {
             session.selectPreviewObject(hit.object)
             seriesQuickEditorAnchor = nil
+            previewObjectQuickEditorAnchor = nil
         } else if session.selectPreviewSeries(at: location, mapper: mapper) {
             seriesQuickEditorAnchor = nil
+            previewObjectQuickEditorAnchor = nil
         } else {
             session.selectCanvasSelection(.figure)
             seriesQuickEditorAnchor = nil
+            previewObjectQuickEditorAnchor = nil
         }
     }
 
@@ -741,6 +813,7 @@ struct InteractivePlotOverlay: View {
     private func drawExistingObjects(in context: inout GraphicsContext) {
         let accent = Color.accentColor.opacity(0.78)
         let secondary = Color.secondary.opacity(0.45)
+        drawHoveredPreviewObject(in: &context)
         drawSelectedPreviewObject(in: &context)
         drawSelectedSeriesArtist(in: &context)
 
@@ -815,6 +888,16 @@ struct InteractivePlotOverlay: View {
             return
         }
         drawInteractionObject(object, in: &context, color: Color.accentColor.opacity(0.66), dashed: true)
+    }
+
+    private func drawHoveredPreviewObject(in context: inout GraphicsContext) {
+        guard let object = hoveredInteractionHit?.object,
+              object.id != session.selectedPreviewObjectID,
+              object.seriesID == nil || session.canvasSelection.id != "layer:series:\(object.seriesID ?? "")"
+        else {
+            return
+        }
+        drawInteractionObject(object, in: &context, color: Color.accentColor.opacity(0.34), dashed: true)
     }
 
     private func drawInteractionObject(
@@ -1096,10 +1179,7 @@ private struct PlotSeriesQuickEditorPopover: View {
 
             HStack {
                 Button {
-                    session.updateSeriesOffset(seriesID: seriesID, policy: .immediate) {
-                        $0.xOffset = 0
-                        $0.yOffset = 0
-                    }
+                    session.resetSeriesOffset(seriesID: seriesID, policy: .immediate)
                 } label: {
                     Label("Reset Offset", systemImage: "arrow.counterclockwise")
                 }
@@ -1189,6 +1269,276 @@ private struct PlotSeriesQuickEditorPopover: View {
                 }
             }
         )
+    }
+}
+
+private struct PlotPreviewObjectQuickEditorPopover: View {
+    @Bindable var session: PlotSession
+    let object: PreviewInteractionObjectMetadata
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: iconName)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+            }
+
+            if let payloadRef = object.payloadRef {
+                switch payloadRef.type {
+                case "reference_guide":
+                    referenceGuideControls(id: payloadRef.id)
+                case "text_annotation":
+                    textAnnotationControls(id: payloadRef.id)
+                case "shape_annotation":
+                    shapeAnnotationControls(id: payloadRef.id)
+                case "analytical_layer", "function":
+                    analyticalLayerControls(id: payloadRef.id)
+                default:
+                    readOnlySummary(payloadRef: payloadRef)
+                }
+            } else {
+                readOnlySummary(payloadRef: nil)
+            }
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button {
+                    _ = session.selectPreviewObject(object)
+                    session.selectedPreviewQuickEditorObjectID = nil
+                } label: {
+                    Label("More", systemImage: "sidebar.right")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .frame(width: 270)
+        .padding(12)
+    }
+
+    private var title: String {
+        object.label?.isEmpty == false ? object.label! : object.kind.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private var iconName: String {
+        switch object.payloadRef?.type ?? object.kind {
+        case "reference_guide":
+            return "ruler"
+        case "text_annotation":
+            return "text.cursor"
+        case "shape_annotation":
+            return "square.on.circle"
+        case "analytical_layer", "function":
+            return "function"
+        case "table_cell", "table":
+            return "tablecells"
+        case "heatmap_cell":
+            return "grid"
+        default:
+            return "scope"
+        }
+    }
+
+    private func referenceGuideControls(id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Visible", isOn: Binding(
+                get: { referenceGuide(id).enabled },
+                set: { enabled in
+                    session.updateReferenceGuide(id: id, policy: .immediate) { $0.enabled = enabled }
+                }
+            ))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Label")
+                        .foregroundStyle(.secondary)
+                    TextField("Optional", text: optionalStringBinding(
+                        get: { referenceGuide(id).label },
+                        set: { label in
+                            session.updateReferenceGuide(id: id, policy: .debounced) { $0.label = label }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Position")
+                        .foregroundStyle(.secondary)
+                    Text(referenceGuideSummary(id))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                }
+            }
+        }
+    }
+
+    private func textAnnotationControls(id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Visible", isOn: Binding(
+                get: { textAnnotation(id).enabled },
+                set: { enabled in
+                    session.updateTextAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
+                }
+            ))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Text")
+                        .foregroundStyle(.secondary)
+                    TextField("Annotation", text: Binding(
+                        get: { textAnnotation(id).text },
+                        set: { text in
+                            session.updateTextAnnotation(id: id, policy: .debounced) { $0.text = text }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Position")
+                        .foregroundStyle(.secondary)
+                    Text(positionSummary(x: textAnnotation(id).x, y: textAnnotation(id).y))
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func shapeAnnotationControls(id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Visible", isOn: Binding(
+                get: { shapeAnnotation(id).enabled },
+                set: { enabled in
+                    session.updateShapeAnnotation(id: id, policy: .immediate) { $0.enabled = enabled }
+                }
+            ))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Label")
+                        .foregroundStyle(.secondary)
+                    TextField("Optional", text: optionalStringBinding(
+                        get: { shapeAnnotation(id).label },
+                        set: { label in
+                            session.updateShapeAnnotation(id: id, policy: .debounced) { $0.label = label }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Bounds")
+                        .foregroundStyle(.secondary)
+                    Text(shapeSummary(id))
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func analyticalLayerControls(id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Visible", isOn: Binding(
+                get: { analyticalLayer(id).enabled },
+                set: { enabled in
+                    session.updateAnalyticalLayer(id: id, policy: .immediate) { $0.enabled = enabled }
+                }
+            ))
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Label")
+                        .foregroundStyle(.secondary)
+                    TextField("Optional", text: optionalStringBinding(
+                        get: { analyticalLayer(id).label },
+                        set: { label in
+                            session.updateAnalyticalLayer(id: id, policy: .debounced) { $0.label = label }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text("Domain")
+                        .foregroundStyle(.secondary)
+                    Text(positionSummary(x: analyticalLayer(id).xStart, y: analyticalLayer(id).xEnd))
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func readOnlySummary(payloadRef: PreviewInteractionPayloadRefMetadata?) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+            GridRow {
+                Text("Object")
+                    .foregroundStyle(.secondary)
+                Text(object.kind.replacingOccurrences(of: "_", with: " "))
+                    .lineLimit(1)
+            }
+            GridRow {
+                Text("Value")
+                    .foregroundStyle(.secondary)
+                Text(object.label ?? payloadRef?.id ?? "Selection")
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func optionalStringBinding(
+        get: @escaping @MainActor () -> String?,
+        set: @escaping @MainActor (String?) -> Void
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                MainActor.assumeIsolated {
+                    get() ?? ""
+                }
+            },
+            set: { value in
+                MainActor.assumeIsolated {
+                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                    set(trimmed.isEmpty ? nil : trimmed)
+                }
+            }
+        )
+    }
+
+    private func referenceGuide(_ id: String) -> ReferenceGuidePayload {
+        session.referenceGuides.first(where: { $0.id == id }) ?? ReferenceGuidePayload(id: id)
+    }
+
+    private func textAnnotation(_ id: String) -> TextAnnotationPayload {
+        session.textAnnotations.first(where: { $0.id == id }) ?? TextAnnotationPayload(id: id)
+    }
+
+    private func shapeAnnotation(_ id: String) -> ShapeAnnotationPayload {
+        session.shapeAnnotations.first(where: { $0.id == id }) ?? ShapeAnnotationPayload(id: id)
+    }
+
+    private func analyticalLayer(_ id: String) -> AnalyticalLayerPayload {
+        session.analyticalLayers.first(where: { $0.id == id }) ?? AnalyticalLayerPayload(id: id)
+    }
+
+    private func referenceGuideSummary(_ id: String) -> String {
+        let guide = referenceGuide(id)
+        if guide.kind == "band" {
+            return "\(formatted(guide.start))...\(formatted(guide.end))"
+        }
+        return formatted(guide.value)
+    }
+
+    private func shapeSummary(_ id: String) -> String {
+        let shape = shapeAnnotation(id)
+        return "\(formatted(shape.xStart)), \(formatted(shape.yStart)) -> \(formatted(shape.xEnd)), \(formatted(shape.yEnd))"
+    }
+
+    private func positionSummary(x: Double, y: Double) -> String {
+        "\(formatted(x)), \(formatted(y))"
+    }
+
+    private func formatted(_ value: Double?) -> String {
+        guard let value else {
+            return "Auto"
+        }
+        return value.formatted(.number.precision(.fractionLength(0...3)))
     }
 }
 

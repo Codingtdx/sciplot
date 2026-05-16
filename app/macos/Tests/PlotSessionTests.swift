@@ -2245,6 +2245,97 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedPlotAdjustmentCategory, .legend)
     }
 
+    func testPreviewObjectSelectionRoutesTypedPayloadRefsToInspectorCategories() async throws {
+        let session = PlotSession()
+
+        XCTAssertTrue(
+            session.selectPreviewObject(
+                PreviewInteractionObjectMetadata(
+                    id: "reference_guide:guide-y",
+                    kind: "reference_guide",
+                    label: "Yield",
+                    axisID: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 200, width: 400, height: 8),
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "reference_guide", id: "guide-y"),
+                    operations: ["select", "quick_edit", "drag", "more"]
+                )
+            )
+        )
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .guides)
+        XCTAssertEqual(session.canvasSelection, .layer(.referenceGuide("guide-y")))
+        XCTAssertEqual(session.selectedReferenceGuideID, "guide-y")
+
+        XCTAssertTrue(
+            session.selectPreviewObject(
+                PreviewInteractionObjectMetadata(
+                    id: "text_annotation:note-a",
+                    kind: "text_annotation",
+                    label: "Peak",
+                    axisID: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 220, y: 180, width: 60, height: 20),
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "text_annotation", id: "note-a"),
+                    operations: ["select", "quick_edit", "drag", "more"]
+                )
+            )
+        )
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .annotations)
+        XCTAssertEqual(session.canvasSelection, .layer(.textAnnotation("note-a")))
+        XCTAssertEqual(session.selectedTextAnnotationID, "note-a")
+
+        XCTAssertTrue(
+            session.selectPreviewObject(
+                PreviewInteractionObjectMetadata(
+                    id: "shape_annotation:roi-a",
+                    kind: "shape_annotation",
+                    label: "ROI",
+                    axisID: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 240, y: 260, width: 120, height: 80),
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "shape_annotation", id: "roi-a"),
+                    operations: ["select", "quick_edit", "drag", "more"]
+                )
+            )
+        )
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .annotations)
+        XCTAssertEqual(session.canvasSelection, .layer(.shapeAnnotation("roi-a")))
+        XCTAssertEqual(session.selectedShapeAnnotationID, "roi-a")
+
+        XCTAssertTrue(
+            session.selectPreviewObject(
+                PreviewInteractionObjectMetadata(
+                    id: "analytical_layer:fn-a",
+                    kind: "analytical_layer",
+                    label: "Fit",
+                    axisID: "primary",
+                    bboxPixels: PreviewBBoxMetadata(x: 100, y: 150, width: 500, height: 260),
+                    points: [[120, 400], [360, 260], [600, 160]],
+                    payloadRef: PreviewInteractionPayloadRefMetadata(type: "analytical_layer", id: "fn-a"),
+                    operations: ["select", "quick_edit", "more"]
+                )
+            )
+        )
+        XCTAssertEqual(session.selectedPlotAdjustmentCategory, .functions)
+        XCTAssertEqual(session.canvasSelection, .layer(.function("fn-a")))
+    }
+
+    func testPreviewObjectQuickEditorTracksGenericObjectsWithoutEditingRawValues() async throws {
+        let session = PlotSession()
+        let tableCell = PreviewInteractionObjectMetadata(
+            id: "table_cell:primary:1:2",
+            kind: "table_cell",
+            label: "42.0",
+            axisID: "primary",
+            bboxPixels: PreviewBBoxMetadata(x: 120, y: 180, width: 80, height: 28),
+            payloadRef: PreviewInteractionPayloadRefMetadata(type: "table_cell", id: "1:2"),
+            operations: ["select", "more"]
+        )
+
+        XCTAssertTrue(session.openPreviewObjectQuickEditor(tableCell))
+        XCTAssertEqual(session.selectedPreviewObjectID, "table_cell:primary:1:2")
+        XCTAssertEqual(session.selectedPreviewQuickEditorObjectID, "table_cell:primary:1:2")
+        XCTAssertNil(session.selectedSeriesQuickEditorID)
+        XCTAssertEqual(session.canvasSelection, .figure)
+    }
+
     func testPreviewArtistInteractionFallsBackWhenMetadataIsMissing() async throws {
         let mapper = PlotPreviewCoordinateMapper(metadata: nil, viewportSize: CGSize(width: 800, height: 600))
         let session = PlotSession()
@@ -2284,6 +2375,33 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.last?.options.seriesStyles?.first, style)
     }
 
+    func testSeriesOffsetEditorHelpersPersistInRenderOptionsAndRefreshPreview() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        let initialRenderCount = client.renderRequests.count
+        session.setSeriesOffset(seriesID: "Sample A", xOffset: 1.25, yOffset: -0.5, policy: .immediate)
+
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 1 }, timeout: 2.0)
+
+        var offset = try XCTUnwrap(session.renderOptions.seriesOffsets?.first)
+        XCTAssertEqual(offset.seriesID, "Sample A")
+        XCTAssertTrue(offset.enabled)
+        XCTAssertEqual(offset.xOffset, 1.25)
+        XCTAssertEqual(offset.yOffset, -0.5)
+
+        session.resetSeriesOffset(seriesID: "Sample A", policy: .immediate)
+        await waitUntil({ client.renderRequests.count == initialRenderCount + 2 }, timeout: 2.0)
+
+        offset = try XCTUnwrap(session.renderOptions.seriesOffsets?.first)
+        XCTAssertEqual(offset.xOffset, 0.0)
+        XCTAssertEqual(offset.yOffset, 0.0)
+    }
+
     func testSeriesOffsetDragPersistsInRenderOptionsAndRefreshesPreview() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
@@ -2303,6 +2421,26 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(offset.xOffset, 0.5)
         XCTAssertEqual(offset.yOffset, -0.25)
         XCTAssertEqual(client.renderRequests.last?.options.seriesOffsets?.first, offset)
+    }
+
+    func testKeyboardNudgeMovesTypedOverlayAndSeriesOffset() async throws {
+        let session = PlotSession()
+        session.renderOptions.referenceGuides = [
+            ReferenceGuidePayload(id: "guide-y", kind: "line", axisTarget: "y_primary", value: 1.0),
+        ]
+        session.renderOptions.seriesOffsets = [
+            SeriesOffsetPayload(seriesID: "Sample A", xOffset: 0.0, yOffset: 0.0),
+        ]
+
+        session.selectPlotLayer(.referenceGuide("guide-y"))
+        session.nudgeSelectedPreviewObject(delta: PlotCanvasDataPoint(x: 0.0, y: 0.25), policy: .immediate)
+        XCTAssertEqual(session.renderOptions.referenceGuides?.first?.value, 1.25)
+
+        session.selectPlotLayer(.series("Sample A"))
+        session.nudgeSelectedPreviewObject(delta: PlotCanvasDataPoint(x: 0.5, y: -0.25), policy: .immediate)
+        let offset = try XCTUnwrap(session.renderOptions.seriesOffsets?.first)
+        XCTAssertEqual(offset.xOffset, 0.5)
+        XCTAssertEqual(offset.yOffset, -0.25)
     }
 
     func testInspectionCancellationDoesNotSurfaceError() async {

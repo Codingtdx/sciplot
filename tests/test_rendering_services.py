@@ -1600,6 +1600,151 @@ def test_preview_interaction_metadata_v2_emits_bar_heatmap_and_table_objects(tmp
             close_rendered_plots(rendered)
 
 
+def test_preview_interaction_metadata_v2_emits_typed_overlay_objects(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    rendered = build_rendered_plots(
+        "function_curve",
+        input_path,
+        reference_guides=[
+            {
+                "id": "guide-y",
+                "enabled": True,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 1.25,
+                "label": "Yield",
+            },
+        ],
+        text_annotations=[
+            {
+                "id": "note-a",
+                "enabled": True,
+                "text": "Peak",
+                "coordinate_space": "data",
+                "x": 1.0,
+                "y": 1.3,
+            },
+        ],
+        shape_annotations=[
+            {
+                "id": "roi-a",
+                "enabled": True,
+                "kind": "rectangle",
+                "x_start": 0.25,
+                "x_end": 1.25,
+                "y_start": 1.05,
+                "y_end": 1.45,
+                "label": "ROI",
+            },
+        ],
+        analytical_layers=[
+            {
+                "id": "fn-a",
+                "enabled": True,
+                "kind": "function",
+                "expression": "x + 1",
+                "x_start": 0.0,
+                "x_end": 2.0,
+                "sample_count": 20,
+                "label": "Fit",
+            },
+        ],
+    )
+
+    try:
+        metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+        assert metadata is not None
+        objects = metadata["objects"]
+
+        expected_refs = {
+            ("reference_guide", "guide-y"),
+            ("text_annotation", "note-a"),
+            ("shape_annotation", "roi-a"),
+            ("analytical_layer", "fn-a"),
+        }
+        actual_refs = {
+            (item["payload_ref"]["type"], item["payload_ref"]["id"])
+            for item in objects
+            if item.get("payload_ref") is not None
+        }
+        assert expected_refs <= actual_refs
+        for payload_type, payload_id in expected_refs:
+            obj = next(
+                item
+                for item in objects
+                if item.get("payload_ref") == {"type": payload_type, "id": payload_id}
+            )
+            assert obj["bbox_pixels"]["width"] > 0
+            assert obj["bbox_pixels"]["height"] > 0
+            assert "select" in obj["operations"]
+            assert "quick_edit" in obj["operations"]
+    finally:
+        close_rendered_plots(rendered)
+
+
+def test_preview_interaction_metadata_v2_omits_disabled_typed_overlay_objects(tmp_path: Path) -> None:
+    input_path = _write_curve_table(tmp_path / "curve.csv")
+    rendered = build_rendered_plots(
+        "function_curve",
+        input_path,
+        reference_guides=[
+            {
+                "id": "guide-hidden",
+                "enabled": False,
+                "kind": "line",
+                "axis_target": "y_primary",
+                "value": 1.25,
+            },
+        ],
+        text_annotations=[
+            {
+                "id": "note-hidden",
+                "enabled": False,
+                "text": "Hidden",
+                "coordinate_space": "data",
+                "x": 1.0,
+                "y": 1.3,
+            },
+        ],
+        shape_annotations=[
+            {
+                "id": "roi-hidden",
+                "enabled": False,
+                "kind": "rectangle",
+                "x_start": 0.25,
+                "x_end": 1.25,
+                "y_start": 1.05,
+                "y_end": 1.45,
+            },
+        ],
+        analytical_layers=[
+            {
+                "id": "fn-hidden",
+                "enabled": False,
+                "kind": "function",
+                "expression": "x + 1",
+                "x_start": 0.0,
+                "x_end": 2.0,
+            },
+        ],
+    )
+
+    try:
+        metadata = rendered_plots_to_preview_payload(rendered)[0].interaction_metadata
+        assert metadata is not None
+        refs = {
+            (item["payload_ref"]["type"], item["payload_ref"]["id"])
+            for item in metadata["objects"]
+            if item.get("payload_ref") is not None
+        }
+        assert ("reference_guide", "guide-hidden") not in refs
+        assert ("text_annotation", "note-hidden") not in refs
+        assert ("shape_annotation", "roi-hidden") not in refs
+        assert ("analytical_layer", "fn-hidden") not in refs
+    finally:
+        close_rendered_plots(rendered)
+
+
 def test_preview_interaction_metadata_caps_dense_heatmap_cells(tmp_path: Path) -> None:
     rows = [["X", "Y", "Z"], ["mm", "mm", "a.u."], ["field", "field", "field"]]
     for x_value in range(60):

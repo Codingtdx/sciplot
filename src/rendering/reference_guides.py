@@ -7,6 +7,7 @@ from typing import TypedDict
 
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+from src.rendering.artist_tags import tag_interaction_artist
 from src.rendering.axis_breaks import (
     axis_break_panel_axes,
     transform_axis_break_interval_segments,
@@ -268,6 +269,18 @@ def _band_label_center(segments: tuple[tuple[float, float], ...]) -> float | Non
     return (segments[0][0] + segments[-1][1]) / 2.0
 
 
+def _tag_reference_guide_artist(artist: object, guide: ReferenceGuideOptions) -> None:
+    tag_interaction_artist(
+        artist,
+        payload_type="reference_guide",
+        payload_id=guide.id,
+        kind="reference_guide",
+        label=guide.label,
+        operations=("select", "quick_edit", "drag", "more"),
+        part=guide.kind,
+    )
+
+
 def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) -> RenderedPlot:
     guides = tuple(
         guide
@@ -353,7 +366,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         )
                         if overlap is None:
                             continue
-                        draw_axis.axvspan(
+                        span = draw_axis.axvspan(
                             overlap[0],
                             overlap[1],
                             facecolor=color,
@@ -361,6 +374,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                         drawn = True
                     if not drawn:
                         continue
@@ -387,7 +401,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         )
                 elif len(y_panels) > 1:
                     for draw_axis in target_axes:
-                        draw_axis.axvspan(
+                        span = draw_axis.axvspan(
                             guide.start,
                             guide.end,
                             facecolor=color,
@@ -395,6 +409,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                     if guide.label:
                         primary.text(
                             (guide.start + guide.end) / 2.0,
@@ -423,7 +438,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     if not spans:
                         continue
                     for span_start, span_end in spans:
-                        primary.axvspan(
+                        span = primary.axvspan(
                             span_start,
                             span_end,
                             facecolor=color,
@@ -431,6 +446,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                     if guide.label:
                         label_x_value = _band_label_center(spans)
                         if label_x_value is None:
@@ -472,7 +488,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         )
                         if overlap is None:
                             continue
-                        draw_axis.axhspan(
+                        span = draw_axis.axhspan(
                             overlap[0],
                             overlap[1],
                             facecolor=color,
@@ -480,6 +496,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                         drawn = True
                     if not drawn:
                         continue
@@ -506,7 +523,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         )
                 elif len(x_panels) > 1 and guide.axis_target == "y_primary":
                     for draw_axis in target_axes:
-                        draw_axis.axhspan(
+                        span = draw_axis.axhspan(
                             draw_start,
                             draw_end,
                             facecolor=color,
@@ -514,6 +531,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                     if guide.label:
                         primary.text(
                             label_x,
@@ -547,7 +565,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     if not spans:
                         continue
                     for span_start, span_end in spans:
-                        draw_axis.axhspan(
+                        span = draw_axis.axhspan(
                             span_start,
                             span_end,
                             facecolor=color,
@@ -555,6 +573,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                             linewidth=0.0,
                             zorder=0.6,
                         )
+                        _tag_reference_guide_artist(span, guide)
                     if guide.label:
                         label_y_value = _band_label_center(spans)
                         if label_y_value is None:
@@ -596,7 +615,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 if not target_axes:
                     continue
                 for draw_axis in target_axes:
-                    draw_axis.axvline(
+                    line = draw_axis.axvline(
                         guide.value,
                         color=color,
                         linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -605,6 +624,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         label="_nolegend_",
                         zorder=3.6,
                     )
+                    _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     anchor_axis = anchor_axis_for_value(target_axes, axis_name="x", value=guide.value)
                     if anchor_axis is None:
@@ -628,7 +648,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     )
             elif len(y_panels) > 1:
                 for draw_axis in target_axes:
-                    draw_axis.axvline(
+                    line = draw_axis.axvline(
                         guide.value,
                         color=color,
                         linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -637,6 +657,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         label="_nolegend_",
                         zorder=3.6,
                     )
+                    _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     primary.text(
                         guide.value,
@@ -661,7 +682,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 draw_value = transform_axis_break_value(primary, axis_name="x", value=guide.value)
                 if draw_value is None:
                     continue
-                primary.axvline(
+                line = primary.axvline(
                     draw_value,
                     color=color,
                     linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -670,6 +691,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     label="_nolegend_",
                     zorder=3.6,
                 )
+                _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     primary.text(
                         draw_value,
@@ -699,7 +721,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                 if not target_axes:
                     continue
                 for draw_axis in target_axes:
-                    draw_axis.axhline(
+                    line = draw_axis.axhline(
                         draw_value,
                         color=color,
                         linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -708,6 +730,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         label="_nolegend_",
                         zorder=3.6,
                     )
+                    _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     anchor_axis = anchor_axis_for_value(target_axes, axis_name="y", value=draw_value)
                     if anchor_axis is None:
@@ -731,7 +754,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     )
             elif len(x_panels) > 1 and guide.axis_target == "y_primary":
                 for draw_axis in target_axes:
-                    draw_axis.axhline(
+                    line = draw_axis.axhline(
                         draw_value,
                         color=color,
                         linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -740,6 +763,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                         label="_nolegend_",
                         zorder=3.6,
                     )
+                    _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     primary.text(
                         label_x,
@@ -767,7 +791,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     if mapped_value is None:
                         continue
                     draw_value = mapped_value
-                draw_axis.axhline(
+                line = draw_axis.axhline(
                     draw_value,
                     color=color,
                     linewidth=max(0.9, stroke.line_width_pt * 0.85),
@@ -776,6 +800,7 @@ def apply_reference_guides(rendered: RenderedPlot, *, options: RenderOptions) ->
                     label="_nolegend_",
                     zorder=3.6,
                 )
+                _tag_reference_guide_artist(line, guide)
                 if guide.label:
                     primary.text(
                         label_x,

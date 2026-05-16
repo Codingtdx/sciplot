@@ -507,6 +507,7 @@ extension PlotSession {
             selectPlotLayer(layer)
         case .figure, .axis, .dataPipeline:
             selectedPreviewObjectID = nil
+            selectedPreviewQuickEditorObjectID = nil
             selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
@@ -518,6 +519,7 @@ extension PlotSession {
         guard let layer else {
             canvasSelection = .figure
             selectedPreviewObjectID = nil
+            selectedPreviewQuickEditorObjectID = nil
             selectedSeriesQuickEditorID = nil
             selectedReferenceGuideID = nil
             selectedTextAnnotationID = nil
@@ -527,6 +529,7 @@ extension PlotSession {
 
         canvasSelection = .layer(layer)
         selectedPreviewObjectID = nil
+        selectedPreviewQuickEditorObjectID = nil
         switch layer {
         case .referenceGuide(let id):
             selectedSeriesQuickEditorID = nil

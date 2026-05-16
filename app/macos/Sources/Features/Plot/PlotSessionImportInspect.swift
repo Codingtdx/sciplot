@@ -10,6 +10,7 @@ extension PlotSession {
         selectedPlotAdjustmentCategory = .figure
         canvasSelection = .figure
         selectedPreviewObjectID = nil
+        selectedPreviewQuickEditorObjectID = nil
         clearPreviewContext(preserveRenderOptions: false)
     }
 
@@ -100,6 +101,9 @@ extension PlotSession {
         selectedReferenceGuideID = nil
         selectedTextAnnotationID = nil
         selectedShapeAnnotationID = nil
+        selectedPreviewObjectID = nil
+        selectedPreviewQuickEditorObjectID = nil
+        selectedSeriesQuickEditorID = nil
         resetDataWorkbookState()
         if !preserveRenderOptions {
             let defaultStyle = metadata?.defaults.stylePreset ?? "nature"
@@ -293,6 +297,7 @@ extension PlotSession {
     }
 
     func openSeriesQuickEditor(seriesID: String) {
+        selectedPreviewQuickEditorObjectID = nil
         selectedSeriesQuickEditorID = seriesID
         canvasInteractionMode = .select
         selectedPlotAdjustmentCategory = .legend
@@ -319,9 +324,44 @@ extension PlotSession {
 
     @discardableResult
     func selectPreviewObject(_ object: PreviewInteractionObjectMetadata) -> Bool {
-        selectedPreviewObjectID = object.id
-        if let seriesID = object.seriesID {
-            selectPlotLayer(.series(seriesID))
+        selectedPreviewQuickEditorObjectID = nil
+        if let payloadRef = object.payloadRef {
+            switch payloadRef.type {
+            case "series":
+                selectPlotLayer(.series(payloadRef.id))
+            case "reference_guide":
+                selectedPlotAdjustmentCategory = .guides
+                selectPlotLayer(.referenceGuide(payloadRef.id))
+            case "text_annotation":
+                selectedPlotAdjustmentCategory = .annotations
+                selectPlotLayer(.textAnnotation(payloadRef.id))
+            case "shape_annotation":
+                selectedPlotAdjustmentCategory = .annotations
+                selectPlotLayer(.shapeAnnotation(payloadRef.id))
+            case "analytical_layer", "function":
+                selectedPlotAdjustmentCategory = .functions
+                selectPlotLayer(.function(payloadRef.id))
+            case "axis", "axis_label":
+                selectedPlotAdjustmentCategory = .axes
+                let yAxisKinds = ["y_axis", "y_label", "colorbar"]
+                selectCanvasSelection(.axis(yAxisKinds.contains(object.kind) ? .y : .x))
+            case "legend":
+                selectedPlotAdjustmentCategory = .legend
+                selectCanvasSelection(.figure)
+            case "table", "table_cell", "heatmap_cell", "artist":
+                canvasSelection = .figure
+                selectedSeriesQuickEditorID = nil
+                selectedReferenceGuideID = nil
+                selectedTextAnnotationID = nil
+                selectedShapeAnnotationID = nil
+            default:
+                canvasSelection = .figure
+                selectedSeriesQuickEditorID = nil
+                selectedReferenceGuideID = nil
+                selectedTextAnnotationID = nil
+                selectedShapeAnnotationID = nil
+            }
+            selectedPreviewObjectID = object.id
             return true
         }
 
@@ -355,7 +395,13 @@ extension PlotSession {
             openSeriesQuickEditor(seriesID: seriesID)
             return true
         }
-        return selectPreviewObject(object)
+        guard selectPreviewObject(object) else {
+            return false
+        }
+        if object.operations.contains("quick_edit") || object.operations.contains("more") {
+            selectedPreviewQuickEditorObjectID = object.id
+        }
+        return true
     }
 
     func updateSeriesStyle(
@@ -396,6 +442,29 @@ extension PlotSession {
         }
     }
 
+    func setSeriesOffset(
+        seriesID: String,
+        xOffset: Double,
+        yOffset: Double,
+        policy: PlotPreviewRefreshPolicy = .immediate
+    ) {
+        updateSeriesOffset(seriesID: seriesID, policy: policy) { offset in
+            offset.enabled = true
+            offset.xOffset = xOffset
+            offset.yOffset = yOffset
+        }
+    }
+
+    func resetSeriesOffset(
+        seriesID: String,
+        policy: PlotPreviewRefreshPolicy = .immediate
+    ) {
+        updateSeriesOffset(seriesID: seriesID, policy: policy) { offset in
+            offset.xOffset = 0.0
+            offset.yOffset = 0.0
+        }
+    }
+
     func commitPreviewSeriesDrag(
         seriesID: String,
         xOffset: Double,
@@ -406,6 +475,28 @@ extension PlotSession {
             offset.enabled = true
             offset.xOffset += xOffset
             offset.yOffset += yOffset
+        }
+    }
+
+    func nudgeSelectedPreviewObject(
+        delta: PlotCanvasDataPoint,
+        policy: PlotPreviewRefreshPolicy = .debounced
+    ) {
+        guard case .layer(let selection) = canvasSelection else {
+            return
+        }
+        switch selection {
+        case .series(let id):
+            commitPreviewSeriesDrag(seriesID: id, xOffset: delta.x, yOffset: delta.y, policy: policy)
+        case .referenceGuide, .textAnnotation, .shapeAnnotation:
+            moveSelectedOverlay(delta: delta, policy: policy)
+        case .function(let id):
+            updateAnalyticalLayer(id: id, policy: policy) { layer in
+                layer.xStart += delta.x
+                layer.xEnd += delta.x
+            }
+        case .fitOverlay:
+            break
         }
     }
 
@@ -945,6 +1036,8 @@ extension PlotSession {
         canvasInteractionMode = .select
         canvasSelection = .figure
         selectedPreviewObjectID = nil
+        selectedPreviewQuickEditorObjectID = nil
+        selectedSeriesQuickEditorID = nil
         inspectionResponse = nil
         runtimeState.inspectedInputPath = nil
         runtimeState.inspectedSheet = nil

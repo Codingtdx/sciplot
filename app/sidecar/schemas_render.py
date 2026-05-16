@@ -16,6 +16,7 @@ from app.sidecar.schemas_common import (
 )
 from app.sidecar.schemas_composer import ComposerRequest
 from src import plot_style
+from src.rendering.artist_tags import interaction_artist_metadata
 from src.rendering.extra_axes import normalize_series_selection_ids
 
 
@@ -762,6 +763,24 @@ def _preview_bbox_from_display_bbox(
     }
 
 
+def _inflate_degenerate_bbox(
+    bbox: Mapping[str, float],
+    *,
+    min_size: float = 6.0,
+) -> dict[str, float]:
+    x = float(bbox.get("x", 0.0))
+    y = float(bbox.get("y", 0.0))
+    width = float(bbox.get("width", 0.0))
+    height = float(bbox.get("height", 0.0))
+    if width <= 0.5:
+        x -= min_size / 2.0
+        width = min_size
+    if height <= 0.5:
+        y -= min_size / 2.0
+        height = min_size
+    return {"x": x, "y": y, "width": width, "height": height}
+
+
 def _bbox_has_area(bbox: Mapping[str, float]) -> bool:
     return (
         math.isfinite(float(bbox.get("x", 0.0)))
@@ -856,6 +875,8 @@ def _preview_series_artist_metadata(
         axis_id = axis.get_gid() or f"axis-{rendered.figure.axes.index(axis)}"
         candidates: list[tuple[str, str, Any, list[tuple[float, float]]]] = []
         for line in getattr(axis, "lines", []):
+            if interaction_artist_metadata(line) is not None:
+                continue
             label = _visible_artist_label(line)
             if label is None:
                 continue
@@ -863,6 +884,8 @@ def _preview_series_artist_metadata(
             if len(points) >= 2:
                 candidates.append(("series_line", label, line, points))
         for collection in getattr(axis, "collections", []):
+            if interaction_artist_metadata(collection) is not None:
+                continue
             label = _visible_artist_label(collection)
             if label is None:
                 continue
@@ -1078,6 +1101,89 @@ def _preview_axis_objects(
     return objects
 
 
+def _preview_tagged_artist_bbox_and_points(
+    artist: Any,
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> tuple[dict[str, float], list[list[float]]]:
+    if hasattr(artist, "get_xdata") and hasattr(artist, "get_ydata") and hasattr(artist, "axes"):
+        display_points = _line_display_points(artist)
+        bbox = _inflate_degenerate_bbox(
+            _preview_bbox_for_points(
+                display_points,
+                scale=scale,
+                figure_height=figure_height,
+            )
+        )
+        points = [
+            _preview_pixel_point(point, scale=scale, figure_height=figure_height)
+            for point in _downsample_points(display_points)
+        ]
+        return bbox, points
+    try:
+        bbox = _preview_bbox_from_display_bbox(
+            artist.get_window_extent(renderer=renderer),
+            scale=scale,
+            figure_height=figure_height,
+        )
+    except Exception:
+        bbox = {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+    return _inflate_degenerate_bbox(bbox), []
+
+
+def _preview_tagged_interaction_objects(
+    rendered: Any,
+    *,
+    renderer: Any,
+    scale: float,
+    figure_height: float,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for axis_index, axis in enumerate(getattr(rendered.figure, "axes", [])):
+        axis_id = axis.get_gid() or f"axis-{axis_index}"
+        artist_groups = (
+            getattr(axis, "lines", []),
+            getattr(axis, "patches", []),
+            getattr(axis, "texts", []),
+            getattr(axis, "collections", []),
+        )
+        for artists in artist_groups:
+            for artist in artists:
+                metadata = interaction_artist_metadata(artist)
+                if metadata is None or not bool(getattr(artist, "get_visible", lambda: True)()):
+                    continue
+                payload_type = str(metadata.get("payload_type") or "").strip()
+                payload_id = str(metadata.get("payload_id") or "").strip()
+                kind = str(metadata.get("kind") or payload_type or "object").strip()
+                if not payload_type or not payload_id:
+                    continue
+                bbox, points = _preview_tagged_artist_bbox_and_points(
+                    artist,
+                    renderer=renderer,
+                    scale=scale,
+                    figure_height=figure_height,
+                )
+                if not _bbox_has_area(bbox):
+                    continue
+                label = metadata.get("label")
+                objects.append(
+                    _preview_object(
+                        object_id=f"{kind}:{axis_id}:{payload_id}",
+                        kind=kind,
+                        axis_id=axis_id,
+                        label=str(label) if label is not None else None,
+                        bbox_pixels=bbox,
+                        points=points,
+                        payload_type=payload_type,
+                        payload_id=payload_id,
+                        operations=list(metadata.get("operations") or ["select", "more"]),
+                    )
+                )
+    return objects
+
+
 def _nearest_tick_label(axis: Any, x_value: float) -> str | None:
     tick_positions = [float(value) for value in axis.get_xticks()]
     tick_labels = [str(label.get_text()).strip() for label in axis.get_xticklabels()]
@@ -1100,6 +1206,8 @@ def _preview_bar_objects(
             continue
         axis_id = axis.get_gid() or f"axis-{axis_index}"
         for patch_index, patch in enumerate(getattr(axis, "patches", [])):
+            if interaction_artist_metadata(patch) is not None:
+                continue
             if patch.__class__.__name__ == "Cell" or not bool(getattr(patch, "get_visible", lambda: True)()):
                 continue
             try:
@@ -1338,6 +1446,14 @@ def _preview_interaction_objects(
         _preview_axis_objects(
             rendered,
             axes_metadata,
+            renderer=renderer,
+            scale=scale,
+            figure_height=figure_height,
+        )
+    )
+    objects.extend(
+        _preview_tagged_interaction_objects(
+            rendered,
             renderer=renderer,
             scale=scale,
             figure_height=figure_height,

@@ -10,6 +10,7 @@ from matplotlib.patches import Ellipse, Rectangle
 
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+from src.rendering.artist_tags import tag_interaction_artist
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
 from src.rendering.overlay_coordinates import (
     axis_intervals,
@@ -286,6 +287,14 @@ def _draw_region_shape(
                     linewidth=line_width,
                     zorder=3.25,
                 )
+            tag_interaction_artist(
+                patch,
+                payload_type="shape_annotation",
+                payload_id=annotation.id,
+                kind="shape_annotation",
+                label=annotation.label,
+                operations=("select", "quick_edit", "drag", "more"),
+            )
             draw_axis.add_patch(patch)
             drawn_regions.append((draw_axis, x0, x1, y0, y1))
 
@@ -333,13 +342,21 @@ def _draw_horizontal_bracket(
         if x1 <= x0:
             continue
         _, arm_y = pixel_offset_point(draw_axis, x=x0, y=anchor_y, dy=12.0)
-        draw_axis.plot(
+        (line,) = draw_axis.plot(
             [x0, x0, x1, x1],
             [anchor_y, arm_y, arm_y, anchor_y],
             color=color,
             linewidth=line_width,
             alpha=0.9,
             zorder=3.5,
+        )
+        tag_interaction_artist(
+            line,
+            payload_type="shape_annotation",
+            payload_id=annotation.id,
+            kind="shape_annotation",
+            label=annotation.label,
+            operations=("select", "quick_edit", "drag", "more"),
         )
         applied = True
         span = abs(x1 - x0)
@@ -393,13 +410,21 @@ def _draw_vertical_bracket(
         if y1 <= y0:
             continue
         arm_x, _ = pixel_offset_point(draw_axis, x=anchor_x, y=y0, dx=12.0)
-        draw_axis.plot(
+        (line,) = draw_axis.plot(
             [anchor_x, arm_x, arm_x, anchor_x],
             [y0, y0, y1, y1],
             color=color,
             linewidth=line_width,
             alpha=0.9,
             zorder=3.5,
+        )
+        tag_interaction_artist(
+            line,
+            payload_type="shape_annotation",
+            payload_id=annotation.id,
+            kind="shape_annotation",
+            label=annotation.label,
+            operations=("select", "quick_edit", "drag", "more"),
         )
         applied = True
         span = abs(y1 - y0)

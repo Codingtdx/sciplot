@@ -10,6 +10,7 @@ from matplotlib.axes import Axes
 
 from src import plot_style
 from src.rendering.advanced_plot_axes import primary_axis, secondary_y_axis
+from src.rendering.artist_tags import tag_interaction_artist
 from src.rendering.axis_breaks import axis_break_panel_axes
 from src.rendering.extra_axes import extra_axis_binding_mode
 from src.rendering.models import QAReport, RenderedPlot, RenderOptions
@@ -358,7 +359,7 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
                 if y_split_active or not x_split_active:
                     connector_axis = y_axis
                     connector_xycoords = y_axis.transData
-            text_axis.annotate(
+            artist = text_axis.annotate(
                 annotation.text,
                 xy=(connector_x, connector_y),
                 xycoords=connector_xycoords,
@@ -378,10 +379,18 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
                 annotation_clip=clip_on,
                 zorder=4.0,
             )
+            tag_interaction_artist(
+                artist,
+                payload_type="text_annotation",
+                payload_id=annotation.id,
+                kind="text_annotation",
+                label=annotation.text,
+                operations=("select", "quick_edit", "drag", "more"),
+            )
             applied = True
             continue
 
-        text_axis.text(
+        artist = text_axis.text(
             text_x,
             text_y,
             annotation.text,
@@ -393,6 +402,14 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
             clip_on=clip_on,
             bbox=bbox,
             zorder=4.0,
+        )
+        tag_interaction_artist(
+            artist,
+            payload_type="text_annotation",
+            payload_id=annotation.id,
+            kind="text_annotation",
+            label=annotation.text,
+            operations=("select", "quick_edit", "drag", "more"),
         )
         applied = True
 

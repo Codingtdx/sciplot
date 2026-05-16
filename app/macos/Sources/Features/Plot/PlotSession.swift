@@ -107,6 +107,7 @@ final class PlotSession {
     var canvasInteractionMode: PlotCanvasInteractionMode = .select
     var canvasSelection: PlotCanvasSelection = .figure
     var selectedPreviewObjectID: String?
+    var selectedPreviewQuickEditorObjectID: String?
     var selectedSeriesQuickEditorID: String?
     var selectedReferenceGuideID: String?
     var selectedTextAnnotationID: String?

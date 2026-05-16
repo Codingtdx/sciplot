@@ -343,6 +343,23 @@ struct PlotSelectedLayerEditorView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
             }
+            AdaptiveInspectorControlRow(title: "Offset") {
+                Toggle("", isOn: seriesOffsetEnabledBinding(id: id))
+                    .labelsHidden()
+            }
+            axisRangeRow(
+                title: "Offset",
+                lowerTitle: "X",
+                upperTitle: "Y",
+                lowerBinding: seriesOffsetXBinding(id: id),
+                upperBinding: seriesOffsetYBinding(id: id)
+            )
+            Button("Reset Offset") {
+                session.resetSeriesOffset(seriesID: id)
+            }
+            .buttonStyle(.bordered)
+            .disabled(seriesOffset(id).xOffset == 0 && seriesOffset(id).yOffset == 0)
+            .help("Reset the display-only series offset.")
             SortableSeriesListView(
                 title: "Order",
                 rows: session.seriesOrderRows,
@@ -361,6 +378,10 @@ struct PlotSelectedLayerEditorView: View {
 
     private func seriesStyle(_ id: String) -> SeriesStylePayload {
         session.renderOptions.seriesStyles?.first(where: { $0.seriesID == id }) ?? SeriesStylePayload(seriesID: id)
+    }
+
+    private func seriesOffset(_ id: String) -> SeriesOffsetPayload {
+        session.renderOptions.seriesOffsets?.first(where: { $0.seriesID == id }) ?? SeriesOffsetPayload(seriesID: id)
     }
 
     private func seriesStyleEnabledBinding(id: String) -> Binding<Bool> {
@@ -409,6 +430,33 @@ struct PlotSelectedLayerEditorView: View {
             get: { seriesStyle(id).yAxisTarget ?? "y_primary" },
             set: { target in
                 session.updateSeriesStyle(seriesID: id, policy: .immediate) { $0.yAxisTarget = target }
+            }
+        )
+    }
+
+    private func seriesOffsetEnabledBinding(id: String) -> Binding<Bool> {
+        boolBinding(
+            get: { seriesOffset(id).enabled },
+            set: { enabled in
+                session.updateSeriesOffset(seriesID: id, policy: .immediate) { $0.enabled = enabled }
+            }
+        )
+    }
+
+    private func seriesOffsetXBinding(id: String) -> Binding<String> {
+        numericTextBinding(
+            get: { seriesOffset(id).xOffset },
+            set: { value in
+                session.updateSeriesOffset(seriesID: id, policy: .debounced) { $0.xOffset = value ?? 0.0 }
+            }
+        )
+    }
+
+    private func seriesOffsetYBinding(id: String) -> Binding<String> {
+        numericTextBinding(
+            get: { seriesOffset(id).yOffset },
+            set: { value in
+                session.updateSeriesOffset(seriesID: id, policy: .debounced) { $0.yOffset = value ?? 0.0 }
             }
         )
     }
