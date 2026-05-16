@@ -449,6 +449,328 @@ def normalize_style_alias(style_name: str | None) -> str:
     return contract.style_aliases.get(candidate, candidate)
 
 
+def capability_catalog_payload() -> list[dict[str, Any]]:
+    object_schema = {"type": "object"}
+    no_payload_schema = {"type": "object", "additionalProperties": False}
+
+    def capability(
+        *,
+        id: str,
+        label: str,
+        status: str,
+        owner: str,
+        surface: str,
+        help: str,
+        introduced_in: str = "phase_2",
+        typed_payload_schema: dict[str, Any] | None = None,
+        test_requirements: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "id": id,
+            "label": label,
+            "status": status,
+            "owner": owner,
+            "surface": surface,
+            "typed_payload_schema": typed_payload_schema or object_schema,
+            "help": help,
+            "introduced_in": introduced_in,
+            "test_requirements": test_requirements or ["schema_decode", "metadata_presence"],
+        }
+
+    return [
+        {
+            "id": "data_containers",
+            "label": "Data Containers",
+            "description": "Typed table, matrix, transformed view, fit result, and notebook output containers.",
+            "capabilities": [
+                capability(
+                    id="data.table",
+                    label="Table",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Structured tabular source and preview payloads are available through sidecar routes.",
+                ),
+                capability(
+                    id="data.matrix",
+                    label="Matrix",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Matrix/scalar-field containers are planned for contour and heatmap workflows.",
+                ),
+                capability(
+                    id="data.transformed_view",
+                    label="Transformed View",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot",
+                    help="Typed data_variables and data_transforms already produce transformed previews.",
+                ),
+                capability(
+                    id="data.fit_result",
+                    label="Fit Result",
+                    status="experimental",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Fit result payloads exist and will move onto the shared analysis envelope.",
+                ),
+                capability(
+                    id="data.notebook_output",
+                    label="Notebook Output",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="code_console",
+                    help="Code Console generated figures and tables will become graph-addressable outputs.",
+                ),
+            ],
+        },
+        {
+            "id": "plot_objects",
+            "label": "Plot Objects",
+            "description": "Graph-addressable plot scene objects and render payload features.",
+            "capabilities": [
+                capability(
+                    id="plot.series",
+                    label="Series",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Series style, order, and interaction metadata are represented by typed payloads.",
+                ),
+                capability(
+                    id="plot.axis",
+                    label="Axis",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Axis ranges, scales, ticks, extra axes, and breaks are edited through typed payloads.",
+                ),
+                capability(
+                    id="plot.legend",
+                    label="Legend",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Legend behavior is available through plot render options and inspector state.",
+                ),
+                capability(
+                    id="plot.guide.line",
+                    label="Reference Guide",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Reference guide lines and bands are persisted in render_options.reference_guides.",
+                ),
+                capability(
+                    id="plot.annotation.text",
+                    label="Text Annotation",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Text notes and callouts are persisted in render_options.text_annotations.",
+                ),
+                capability(
+                    id="plot.annotation.shape",
+                    label="Shape Annotation",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Shape overlays are persisted in render_options.shape_annotations.",
+                ),
+                capability(
+                    id="plot.layer.function",
+                    label="Function Layer",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot",
+                    help="Function layers use backend expression parsing through analytical_layers.",
+                ),
+                capability(
+                    id="plot.axis.extra",
+                    label="Extra Axis",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    help="Extra x/y axes are persisted through extra_x_axis and extra_y_axis payloads.",
+                ),
+                capability(
+                    id="plot.axis.break",
+                    label="Broken Axis",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot",
+                    help="Broken axis intervals are persisted through x_axis_breaks and y_axis_breaks.",
+                ),
+            ],
+        },
+        {
+            "id": "analysis_operations",
+            "label": "Analysis Operations",
+            "description": "Sidecar-owned numerical operations with a future common result envelope.",
+            "capabilities": [
+                capability(
+                    id="analysis.fit",
+                    label="Fit",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Current fit models are available through POST /fit-analysis.",
+                ),
+                capability(
+                    id="analysis.smoothing",
+                    label="Smoothing",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Smoothing will use SciPlot-owned numerical implementations and fixtures.",
+                ),
+                capability(
+                    id="analysis.fft",
+                    label="FFT",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="FFT and Fourier filtering are planned behind typed analysis operation payloads.",
+                ),
+                capability(
+                    id="analysis.kde",
+                    label="KDE",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="KDE and statistical tests will be added only with numerical fixture coverage.",
+                ),
+            ],
+        },
+        {
+            "id": "import_filters",
+            "label": "Import Filters",
+            "description": "Source preview and import filters with typed options and diagnostics.",
+            "capabilities": [
+                capability(
+                    id="import.csv",
+                    label="CSV/TSV/TXT",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Delimited text import is available through inspect and source preview routes.",
+                ),
+                capability(
+                    id="import.excel",
+                    label="Excel",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="Workbook import is available through current table preview and Data Studio flows.",
+                ),
+                capability(
+                    id="import.hdf5",
+                    label="HDF5",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="HDF5 will be implemented as an explicit import filter with preview diagnostics.",
+                ),
+                capability(
+                    id="import.netcdf",
+                    label="NetCDF",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="plot,data_studio",
+                    help="NetCDF support is planned for matrix/scalar-field workflows.",
+                ),
+            ],
+        },
+        {
+            "id": "export_targets",
+            "label": "Export Targets",
+            "description": "Figure, data, project, comparison, and artifact export targets.",
+            "capabilities": [
+                capability(
+                    id="export.figure.pdf",
+                    label="Figure PDF",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,composer,code_console",
+                    help="PDF figure export is the authoritative vector output path.",
+                ),
+                capability(
+                    id="export.figure.tiff",
+                    label="Figure TIFF",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,composer,code_console",
+                    help="TIFF figure export is the authoritative raster publication output path.",
+                ),
+                capability(
+                    id="export.project_bundle",
+                    label="Project Bundle",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="all",
+                    help=".sciplot project bundles are the app-level self-contained project format.",
+                ),
+                capability(
+                    id="export.artifact_manifest",
+                    label="Artifact Manifest",
+                    status="coming_soon",
+                    owner="sidecar",
+                    surface="all",
+                    help="Manifest-driven artifact sets will unify multi-file export reporting.",
+                ),
+            ],
+        },
+        {
+            "id": "project_bundle_features",
+            "label": "Project Bundle Features",
+            "description": "Project save/open features exposed for compatibility and migration handling.",
+            "capabilities": [
+                capability(
+                    id="project_bundle.document_graph",
+                    label="Document Graph",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="all",
+                    help="Project bundles include an internal document_graph for durable object identity.",
+                ),
+                capability(
+                    id="project_bundle.embedded_sources",
+                    label="Embedded Sources",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="all",
+                    help="Project restore uses embedded bundle sources instead of original absolute paths.",
+                ),
+            ],
+        },
+        {
+            "id": "native_preview_features",
+            "label": "Native Preview Features",
+            "description": "Contract-gated macOS native preview and interaction capabilities.",
+            "capabilities": [
+                capability(
+                    id="native_preview.curve_hit_testing",
+                    label="Curve Hit Testing",
+                    status="experimental",
+                    owner="shared",
+                    surface="plot",
+                    help="Curve hit testing uses backend interaction metadata when available.",
+                ),
+                capability(
+                    id="native_preview.unavailable_fallback",
+                    label="Backend Fallback",
+                    status="enabled",
+                    owner="shared",
+                    surface="plot",
+                    typed_payload_schema=no_payload_schema,
+                    help="Unsupported native preview cases fall back to backend bitmap/PDF preview.",
+                ),
+            ],
+        },
+    ]
+
+
 def meta_payload() -> dict[str, Any]:
     contract = load_plot_contract()
     return {
@@ -502,6 +824,7 @@ def meta_payload() -> dict[str, Any]:
             }
             for key, value in contract.templates.items()
         ],
+        "capability_catalogs": capability_catalog_payload(),
     }
 
 

@@ -789,6 +789,111 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.styles.first?.recommendedVisualThemeID, "clean_light")
     }
 
+    func testDecodeMetaPayloadWithCapabilityCatalogs() throws {
+        let payload = """
+        {
+          "version": 1,
+          "defaults": {
+            "style_preset": "nature",
+            "palette_preset": "colorblind_safe"
+          },
+          "global_frame": {
+            "panel_width_mm": 60,
+            "panel_height_mm": 55,
+            "left_margin_mm": 10,
+            "right_margin_mm": 4,
+            "bottom_margin_mm": 8,
+            "top_margin_mm": 3
+          },
+          "sizes": [],
+          "styles": [],
+          "palettes": [],
+          "templates": [],
+          "template_ids": [],
+          "size_ids": [],
+          "palette_preset_ids": [],
+          "visual_themes": [],
+          "capability_catalogs": [
+            {
+              "id": "plot_objects",
+              "label": "Plot Objects",
+              "description": "Graph-addressable plot object capabilities.",
+              "capabilities": [
+                {
+                  "id": "plot.axis",
+                  "label": "Axis",
+                  "status": "enabled",
+                  "owner": "shared",
+                  "surface": "plot",
+                  "typed_payload_schema": {
+                    "type": "object"
+                  },
+                  "help": "Axes are editable plot objects.",
+                  "introduced_in": "phase_2",
+                  "test_requirements": ["decode"]
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let response = try decoder.decode(SidecarMetaResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.capabilityCatalogs.first?.id, "plot_objects")
+        XCTAssertEqual(response.capabilityCatalogs.first?.capabilities.first?.id, "plot.axis")
+        XCTAssertEqual(response.capabilityCatalogs.first?.capabilities.first?.status, "enabled")
+        XCTAssertEqual(
+            response.capabilityCatalogs.first?.capabilities.first?.typedPayloadSchema["type"]?.stringValue,
+            "object"
+        )
+    }
+
+    func testDecodeProjectBundlePayloadWithDocumentGraph() throws {
+        let payload = """
+        {
+          "version": 2,
+          "selected_workbench": "plot",
+          "plot": null,
+          "data_studio": null,
+          "composer": null,
+          "code_console": null,
+          "artifacts": {},
+          "document_graph": {
+            "schema_version": 1,
+            "nodes": [
+              {
+                "id": "plot:scene",
+                "kind": "plot.scene",
+                "module": "plot",
+                "label": "Plot Scene",
+                "status": "active",
+                "payload": {
+                  "selected_template_id": "curve"
+                }
+              }
+            ],
+            "edges": [],
+            "selected_nodes": {
+              "plot": "plot:scene"
+            },
+            "module_roots": {
+              "plot": "plot:scene"
+            },
+            "capabilities": ["project_bundle.document_graph"],
+            "migration_notes": ["Generated document_graph from project payload v2."]
+          }
+        }
+        """
+
+        let response = try decoder.decode(ProjectBundlePayload.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.documentGraph?.schemaVersion, 1)
+        XCTAssertEqual(response.documentGraph?.nodes.first?.kind, "plot.scene")
+        XCTAssertEqual(response.documentGraph?.nodes.first?.payload["selected_template_id"]?.stringValue, "curve")
+        XCTAssertEqual(response.documentGraph?.moduleRoots["plot"], "plot:scene")
+    }
+
     func testDecodeComposerPreviewPayload() throws {
         let payload = """
         {

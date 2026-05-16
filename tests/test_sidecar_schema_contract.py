@@ -73,6 +73,25 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert all(item.default_options.get("palette_preset") for item in meta.templates)
     assert all(item.default_options.get("visual_theme_id") for item in meta.templates)
     assert all(item.presentation_kind for item in meta.templates)
+    catalog_groups = {group.id: group for group in meta.capability_catalogs}
+    assert {
+        "data_containers",
+        "plot_objects",
+        "analysis_operations",
+        "import_filters",
+        "export_targets",
+        "project_bundle_features",
+        "native_preview_features",
+    }.issubset(catalog_groups)
+    assert any(
+        item.id == "plot.axis" and item.status == "enabled"
+        for item in catalog_groups["plot_objects"].capabilities
+    )
+    assert any(
+        item.id == "analysis.smoothing" and item.status == "coming_soon"
+        for item in catalog_groups["analysis_operations"].capabilities
+    )
+    assert all(item.help for group in catalog_groups.values() for item in group.capabilities)
 
     contract_response = client.get("/plot-contract")
     assert contract_response.status_code == 200, contract_response.text

@@ -624,6 +624,31 @@ class CodeConsoleProjectPayload(StrictModel):
     project_display_name: str | None = None
 
 
+class DocumentGraphNodePayload(StrictModel):
+    id: str
+    kind: str
+    module: str
+    label: str
+    status: str = "active"
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class DocumentGraphEdgePayload(StrictModel):
+    source: str
+    target: str
+    relationship: str
+
+
+class DocumentGraphPayload(StrictModel):
+    schema_version: int = 1
+    nodes: list[DocumentGraphNodePayload] = Field(default_factory=list)
+    edges: list[DocumentGraphEdgePayload] = Field(default_factory=list)
+    selected_nodes: dict[str, str] = Field(default_factory=dict)
+    module_roots: dict[str, str] = Field(default_factory=dict)
+    capabilities: list[str] = Field(default_factory=list)
+    migration_notes: list[str] = Field(default_factory=list)
+
+
 class ProjectBundlePayload(StrictModel):
     version: int = 2
     selected_workbench: str = "plot"
@@ -631,6 +656,7 @@ class ProjectBundlePayload(StrictModel):
     data_studio: DataStudioProjectPayload | None = None
     composer: ComposerProjectPayload | None = None
     code_console: CodeConsoleProjectPayload | None = None
+    document_graph: DocumentGraphPayload | None = None
     artifacts: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -1594,6 +1620,9 @@ __all__ = [
     "DataStudioProjectPayload",
     "DataStudioProjectWorkbookPayload",
     "DataTransformPayload",
+    "DocumentGraphEdgePayload",
+    "DocumentGraphNodePayload",
+    "DocumentGraphPayload",
     "ExportRenderRequest",
     "ExportRenderResponse",
     "FileRequest",

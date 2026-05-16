@@ -1716,6 +1716,31 @@ struct CodeConsoleProjectPayload: Codable, Equatable, Sendable {
     var projectDisplayName: String?
 }
 
+struct DocumentGraphNodePayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let module: String
+    let label: String
+    let status: String
+    let payload: [String: JSONValue]
+}
+
+struct DocumentGraphEdgePayload: Codable, Equatable, Sendable {
+    let source: String
+    let target: String
+    let relationship: String
+}
+
+struct DocumentGraphPayload: Codable, Equatable, Sendable {
+    let schemaVersion: Int
+    let nodes: [DocumentGraphNodePayload]
+    let edges: [DocumentGraphEdgePayload]
+    let selectedNodes: [String: String]
+    let moduleRoots: [String: String]
+    let capabilities: [String]
+    let migrationNotes: [String]
+}
+
 struct ProjectBundlePayload: Codable, Equatable, Sendable {
     let version: Int
     let selectedWorkbench: String
@@ -1723,7 +1748,28 @@ struct ProjectBundlePayload: Codable, Equatable, Sendable {
     let dataStudio: DataStudioProjectPayload?
     let composer: ComposerProjectPayload?
     let codeConsole: CodeConsoleProjectPayload?
+    let documentGraph: DocumentGraphPayload?
     let artifacts: [String: JSONValue]
+
+    init(
+        version: Int,
+        selectedWorkbench: String,
+        plot: PlotProjectPayload?,
+        dataStudio: DataStudioProjectPayload?,
+        composer: ComposerProjectPayload?,
+        codeConsole: CodeConsoleProjectPayload?,
+        documentGraph: DocumentGraphPayload? = nil,
+        artifacts: [String: JSONValue]
+    ) {
+        self.version = version
+        self.selectedWorkbench = selectedWorkbench
+        self.plot = plot
+        self.dataStudio = dataStudio
+        self.composer = composer
+        self.codeConsole = codeConsole
+        self.documentGraph = documentGraph
+        self.artifacts = artifacts
+    }
 }
 
 struct SaveProjectRequest: Codable, Equatable, Sendable {
@@ -2084,6 +2130,25 @@ struct VisualThemeResponse: Codable, Equatable, Sendable, Identifiable {
     let description: String
 }
 
+struct CapabilityCatalogEntryResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let status: String
+    let owner: String
+    let surface: String
+    let typedPayloadSchema: [String: JSONValue]
+    let help: String
+    let introducedIn: String
+    let testRequirements: [String]
+}
+
+struct CapabilityCatalogGroupResponse: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let description: String
+    let capabilities: [CapabilityCatalogEntryResponse]
+}
+
 struct SidecarMetaResponse: Codable, Equatable, Sendable {
     let version: Int
     let defaults: MetaDefaultsResponse
@@ -2095,6 +2160,65 @@ struct SidecarMetaResponse: Codable, Equatable, Sendable {
     let sizeIds: [String]
     let palettePresetIds: [String]
     let visualThemes: [VisualThemeResponse]
+    let capabilityCatalogs: [CapabilityCatalogGroupResponse]
+
+    init(
+        version: Int,
+        defaults: MetaDefaultsResponse,
+        sizes: [MetaSizeResponse],
+        styles: [MetaStyleResponse],
+        palettes: [MetaPaletteResponse],
+        templates: [MetaTemplateSummary],
+        templateIds: [String],
+        sizeIds: [String],
+        palettePresetIds: [String],
+        visualThemes: [VisualThemeResponse],
+        capabilityCatalogs: [CapabilityCatalogGroupResponse] = []
+    ) {
+        self.version = version
+        self.defaults = defaults
+        self.sizes = sizes
+        self.styles = styles
+        self.palettes = palettes
+        self.templates = templates
+        self.templateIds = templateIds
+        self.sizeIds = sizeIds
+        self.palettePresetIds = palettePresetIds
+        self.visualThemes = visualThemes
+        self.capabilityCatalogs = capabilityCatalogs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case defaults
+        case sizes
+        case styles
+        case palettes
+        case templates
+        case templateIds
+        case sizeIds
+        case palettePresetIds
+        case visualThemes
+        case capabilityCatalogs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        defaults = try container.decode(MetaDefaultsResponse.self, forKey: .defaults)
+        sizes = try container.decodeIfPresent([MetaSizeResponse].self, forKey: .sizes) ?? []
+        styles = try container.decodeIfPresent([MetaStyleResponse].self, forKey: .styles) ?? []
+        palettes = try container.decodeIfPresent([MetaPaletteResponse].self, forKey: .palettes) ?? []
+        templates = try container.decodeIfPresent([MetaTemplateSummary].self, forKey: .templates) ?? []
+        templateIds = try container.decodeIfPresent([String].self, forKey: .templateIds) ?? []
+        sizeIds = try container.decodeIfPresent([String].self, forKey: .sizeIds) ?? []
+        palettePresetIds = try container.decodeIfPresent([String].self, forKey: .palettePresetIds) ?? []
+        visualThemes = try container.decodeIfPresent([VisualThemeResponse].self, forKey: .visualThemes) ?? []
+        capabilityCatalogs = try container.decodeIfPresent(
+            [CapabilityCatalogGroupResponse].self,
+            forKey: .capabilityCatalogs
+        ) ?? []
+    }
 }
 
 struct ContractTemplateResponse: Codable, Equatable, Sendable {

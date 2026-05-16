@@ -82,6 +82,8 @@ from app.sidecar.schemas_data_studio import (
     DataStudioWorkbookSampleResponse,
 )
 from app.sidecar.schemas_meta import (
+    CapabilityCatalogEntryResponse,
+    CapabilityCatalogGroupResponse,
     MetaDefaultsResponse,
     MetaGlobalFrameResponse,
     MetaPaletteResponse,
@@ -115,6 +117,9 @@ from app.sidecar.schemas_render import (
     CodeConsoleRunSnapshotPayload,
     ComposerProjectPanelPayload,
     ComposerProjectPayload,
+    DocumentGraphEdgePayload,
+    DocumentGraphNodePayload,
+    DocumentGraphPayload,
     ExportRenderRequest,
     ExportRenderResponse,
     FileRequest,
@@ -147,6 +152,8 @@ from app.sidecar.schemas_render import (
 )
 
 __all__ = [
+    "CapabilityCatalogEntryResponse",
+    "CapabilityCatalogGroupResponse",
     "CodeConsoleContextRequest",
     "CodeConsoleContextResponse",
     "CodeConsoleGeneratedFileResponse",
@@ -211,6 +218,9 @@ __all__ = [
     "DataStudioWorkbookPreviewRequest",
     "DataStudioWorkbookPreviewResponse",
     "DataStudioWorkbookSampleResponse",
+    "DocumentGraphEdgePayload",
+    "DocumentGraphNodePayload",
+    "DocumentGraphPayload",
     "ExportRenderRequest",
     "ExportRenderResponse",
     "FileRequest",

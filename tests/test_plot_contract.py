@@ -126,6 +126,46 @@ class PlotContractTests(unittest.TestCase):
             self.assertEqual(template.default_options.get("palette_preset"), style_spec.recommended_palette_preset)
             self.assertEqual(template.default_options.get("visual_theme_id"), style_spec.recommended_visual_theme_id)
 
+    def test_meta_payload_exposes_labplot_scale_capability_catalogs(self) -> None:
+        meta = meta_payload()
+
+        catalogs = meta["capability_catalogs"]
+        groups = {group["id"]: group for group in catalogs}
+
+        self.assertEqual(
+            set(groups),
+            {
+                "data_containers",
+                "plot_objects",
+                "analysis_operations",
+                "import_filters",
+                "export_targets",
+                "project_bundle_features",
+                "native_preview_features",
+            },
+        )
+        self.assertIn("data.table", {item["id"] for item in groups["data_containers"]["capabilities"]})
+        self.assertIn("plot.axis", {item["id"] for item in groups["plot_objects"]["capabilities"]})
+        self.assertIn("analysis.fit", {item["id"] for item in groups["analysis_operations"]["capabilities"]})
+        self.assertIn("import.csv", {item["id"] for item in groups["import_filters"]["capabilities"]})
+        self.assertIn("export.figure.pdf", {item["id"] for item in groups["export_targets"]["capabilities"]})
+        self.assertIn(
+            "project_bundle.document_graph",
+            {item["id"] for item in groups["project_bundle_features"]["capabilities"]},
+        )
+
+        statuses = {
+            item["status"]
+            for group in catalogs
+            for item in group["capabilities"]
+        }
+        self.assertIn("enabled", statuses)
+        self.assertIn("coming_soon", statuses)
+        for group in catalogs:
+            for capability in group["capabilities"]:
+                self.assertTrue(capability["help"])
+                self.assertIn("type", capability["typed_payload_schema"])
+
     def test_public_template_contract_lint_passes(self) -> None:
         self.assertEqual(lint_public_template_contract(), ())
 

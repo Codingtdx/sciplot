@@ -289,6 +289,45 @@ def test_save_open_project_roundtrip_embeds_source_and_restores_after_source_del
     assert restored_source_path.read_bytes() == original_bytes
 
 
+def test_save_open_project_roundtrip_generates_document_graph(tmp_path: Path) -> None:
+    source_path = tmp_path / "curve.csv"
+    project_path = tmp_path / "curve.sciplot"
+    _curve_csv(source_path)
+
+    save_response = client.post(
+        "/save-project",
+        json={
+            "project_path": str(project_path),
+            "source_path": str(source_path),
+            "payload": _project_payload(source_path),
+        },
+    )
+
+    assert save_response.status_code == 200, save_response.text
+    saved_graph = save_response.json()["payload"]["document_graph"]
+    assert saved_graph["schema_version"] == 1
+    assert saved_graph["module_roots"]["plot"] == "plot:scene"
+    assert "Generated document_graph from project payload v2." in saved_graph["migration_notes"]
+
+    saved_nodes = {node["kind"]: node for node in saved_graph["nodes"]}
+    assert saved_nodes["plot.source"]["id"] == "plot:source:primary"
+    assert saved_nodes["plot.source"]["label"] == source_path.name
+    assert saved_nodes["plot.scene"]["payload"]["selected_template_id"] == "scatter_fit"
+    assert any(
+        node["kind"] == "plot.axis" and node["payload"]["axis"] == "x"
+        for node in saved_graph["nodes"]
+    )
+    assert {node["kind"] for node in saved_graph["nodes"]}.issuperset(
+        {"plot.source", "plot.scene", "plot.axis", "plot.legend", "analysis.fit"}
+    )
+
+    open_response = client.post("/open-project", json={"project_path": str(project_path)})
+
+    assert open_response.status_code == 200, open_response.text
+    restored_graph = open_response.json()["payload"]["document_graph"]
+    assert restored_graph == saved_graph
+
+
 def test_save_open_project_roundtrip_accepts_sciplot_extension(tmp_path: Path) -> None:
     source_path = tmp_path / "curve.csv"
     project_path = tmp_path / "curve.sciplot"

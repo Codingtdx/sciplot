@@ -72,6 +72,25 @@ class VisualThemeResponse(StrictModel):
     description: str
 
 
+class CapabilityCatalogEntryResponse(StrictModel):
+    id: str
+    label: str
+    status: str
+    owner: str
+    surface: str
+    typed_payload_schema: dict[str, Any] = Field(default_factory=dict)
+    help: str
+    introduced_in: str
+    test_requirements: list[str] = Field(default_factory=list)
+
+
+class CapabilityCatalogGroupResponse(StrictModel):
+    id: str
+    label: str
+    description: str
+    capabilities: list[CapabilityCatalogEntryResponse] = Field(default_factory=list)
+
+
 class MetaResponse(StrictModel):
     version: int
     defaults: MetaDefaultsResponse
@@ -84,6 +103,7 @@ class MetaResponse(StrictModel):
     size_ids: list[str] = Field(default_factory=list)
     palette_preset_ids: list[str] = Field(default_factory=list)
     visual_themes: list[VisualThemeResponse] = Field(default_factory=list)
+    capability_catalogs: list[CapabilityCatalogGroupResponse] = Field(default_factory=list)
 
 
 class PlotContractResponse(StrictModel):
@@ -102,6 +122,8 @@ class PlotContractResponse(StrictModel):
 
 
 __all__ = [
+    "CapabilityCatalogEntryResponse",
+    "CapabilityCatalogGroupResponse",
     "MetaDefaultsResponse",
     "MetaGlobalFrameResponse",
     "MetaPaletteResponse",

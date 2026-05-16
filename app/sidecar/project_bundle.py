@@ -21,6 +21,9 @@ from app.sidecar.schemas_render import (
     DataStudioProjectWorkbookPayload,
     DataTransformPayload,
     DataVariablePayload,
+    DocumentGraphEdgePayload,
+    DocumentGraphNodePayload,
+    DocumentGraphPayload,
     ExtraAxisPayload,
     FitOptionsPayload,
     OpenProjectResponse,
@@ -436,6 +439,230 @@ def _normalize_code_console_project_payload(
     )
 
 
+def _graph_node(
+    *,
+    id: str,
+    kind: str,
+    module: str,
+    label: str,
+    payload: dict[str, object] | None = None,
+) -> DocumentGraphNodePayload:
+    return DocumentGraphNodePayload(
+        id=id,
+        kind=kind,
+        module=module,
+        label=label,
+        payload=dict(payload or {}),
+    )
+
+
+def _graph_edge(source: str, target: str, relationship: str) -> DocumentGraphEdgePayload:
+    return DocumentGraphEdgePayload(source=source, target=target, relationship=relationship)
+
+
+def _generate_document_graph(
+    *,
+    selected_workbench: str,
+    plot: PlotProjectPayload | None,
+    data_studio: DataStudioProjectPayload | None,
+    composer: ComposerProjectPayload | None,
+    code_console: CodeConsoleProjectPayload | None,
+) -> DocumentGraphPayload:
+    nodes: list[DocumentGraphNodePayload] = []
+    edges: list[DocumentGraphEdgePayload] = []
+    module_roots: dict[str, str] = {}
+
+    if plot is not None:
+        scene_id = "plot:scene"
+        module_roots["plot"] = scene_id
+        nodes.extend(
+            [
+                _graph_node(
+                    id=scene_id,
+                    kind="plot.scene",
+                    module="plot",
+                    label=plot.project_display_name or "Plot Scene",
+                    payload={
+                        "selected_template_id": plot.selected_template_id,
+                        "sheet": plot.sheet,
+                    },
+                ),
+                _graph_node(
+                    id="plot:source:primary",
+                    kind="plot.source",
+                    module="plot",
+                    label=plot.source_filename,
+                    payload={
+                        "embedded_source_relpath": plot.embedded_source_relpath,
+                        "source_sha256": plot.source_sha256,
+                    },
+                ),
+                _graph_node(
+                    id="plot:axis:x",
+                    kind="plot.axis",
+                    module="plot",
+                    label="X Axis",
+                    payload={"axis": "x"},
+                ),
+                _graph_node(
+                    id="plot:axis:y_primary",
+                    kind="plot.axis",
+                    module="plot",
+                    label="Primary Y Axis",
+                    payload={"axis": "y_primary"},
+                ),
+                _graph_node(
+                    id="plot:legend",
+                    kind="plot.legend",
+                    module="plot",
+                    label="Legend",
+                ),
+            ]
+        )
+        edges.extend(
+            [
+                _graph_edge(scene_id, "plot:source:primary", "uses_source"),
+                _graph_edge(scene_id, "plot:axis:x", "contains"),
+                _graph_edge(scene_id, "plot:axis:y_primary", "contains"),
+                _graph_edge(scene_id, "plot:legend", "contains"),
+            ]
+        )
+        if plot.fit_options.enabled:
+            nodes.append(
+                _graph_node(
+                    id="plot:analysis:fit",
+                    kind="analysis.fit",
+                    module="plot",
+                    label="Fit Overlay",
+                    payload={
+                        "model_id": plot.fit_options.model_id,
+                        "enabled": plot.fit_options.enabled,
+                    },
+                )
+            )
+            edges.append(_graph_edge(scene_id, "plot:analysis:fit", "contains"))
+
+    if data_studio is not None:
+        root_id = "data_studio:workbooks"
+        module_roots["data_studio"] = root_id
+        nodes.append(
+            _graph_node(
+                id=root_id,
+                kind="data.workbook_group",
+                module="data_studio",
+                label=data_studio.project_display_name or "Workbook Groups",
+                payload={
+                    "selected_template_id": data_studio.selected_template_id,
+                    "selected_workbook_id": data_studio.selected_workbook_id,
+                },
+            )
+        )
+        for index, workbook in enumerate(data_studio.embedded_workbooks):
+            workbook_id = f"data_studio:workbook:{index + 1}"
+            nodes.append(
+                _graph_node(
+                    id=workbook_id,
+                    kind="data.workbook",
+                    module="data_studio",
+                    label=workbook.workbook_filename,
+                    payload={
+                        "embedded_workbook_relpath": workbook.embedded_workbook_relpath,
+                        "workbook_sha256": workbook.workbook_sha256,
+                    },
+                )
+            )
+            edges.append(_graph_edge(root_id, workbook_id, "contains"))
+
+    if composer is not None:
+        root_id = "composer:document"
+        module_roots["composer"] = root_id
+        nodes.append(
+            _graph_node(
+                id=root_id,
+                kind="composer.document",
+                module="composer",
+                label=composer.project_display_name or "Composer Document",
+                payload={"panel_count": len(composer.project.panels)},
+            )
+        )
+        for panel in composer.project.panels:
+            panel_id = f"composer:panel:{panel.id}"
+            nodes.append(
+                _graph_node(
+                    id=panel_id,
+                    kind="composer.panel",
+                    module="composer",
+                    label=panel.label or panel.id,
+                    payload={"panel_id": panel.id},
+                )
+            )
+            edges.append(_graph_edge(root_id, panel_id, "contains"))
+
+    if code_console is not None:
+        root_id = "code_console:context"
+        module_roots["code_console"] = root_id
+        nodes.append(
+            _graph_node(
+                id=root_id,
+                kind="code.context",
+                module="code_console",
+                label=code_console.project_display_name or "Code Console Context",
+                payload={
+                    "selected_source_kind": code_console.selected_source_kind,
+                    "selected_sheet": code_console.selected_sheet,
+                },
+            )
+        )
+        if code_console.latest_run is not None:
+            run_id = "code_console:latest_run"
+            nodes.append(
+                _graph_node(
+                    id=run_id,
+                    kind="code.run",
+                    module="code_console",
+                    label="Latest Run",
+                    payload={"generated_file_count": len(code_console.latest_run.generated_files)},
+                )
+            )
+            edges.append(_graph_edge(root_id, run_id, "contains"))
+
+    selected_nodes = {
+        module: root_id
+        for module, root_id in module_roots.items()
+        if module == selected_workbench
+    }
+    return DocumentGraphPayload(
+        schema_version=1,
+        nodes=nodes,
+        edges=edges,
+        selected_nodes=selected_nodes,
+        module_roots=module_roots,
+        capabilities=["project_bundle.document_graph"],
+        migration_notes=["Generated document_graph from project payload v2."],
+    )
+
+
+def _normalize_document_graph(
+    value: object,
+    *,
+    selected_workbench: str,
+    plot: PlotProjectPayload | None,
+    data_studio: DataStudioProjectPayload | None,
+    composer: ComposerProjectPayload | None,
+    code_console: CodeConsoleProjectPayload | None,
+) -> DocumentGraphPayload:
+    graph_map = _mapping(value)
+    if graph_map is not None:
+        return DocumentGraphPayload.model_validate(graph_map)
+    return _generate_document_graph(
+        selected_workbench=selected_workbench,
+        plot=plot,
+        data_studio=data_studio,
+        composer=composer,
+        code_console=code_console,
+    )
+
+
 def normalize_project_payload(
     payload: Mapping[str, object],
     *,
@@ -482,6 +709,15 @@ def normalize_project_payload(
     if selected_payloads[selected_workbench] is None:
         raise ValueError("Project payload must include the selected workbench section.")
 
+    document_graph = _normalize_document_graph(
+        payload.get("document_graph"),
+        selected_workbench=selected_workbench,
+        plot=plot_payload,
+        data_studio=data_studio_payload,
+        composer=composer_payload,
+        code_console=code_console_payload,
+    )
+
     return ProjectBundlePayload(
         version=_PROJECT_VERSION,
         selected_workbench=selected_workbench,
@@ -489,6 +725,7 @@ def normalize_project_payload(
         data_studio=data_studio_payload,
         composer=composer_payload,
         code_console=code_console_payload,
+        document_graph=document_graph,
         artifacts=artifacts,
     )
 
@@ -1320,6 +1557,7 @@ def open_project_bundle(*, project_path: Path) -> OpenProjectResponse:
                 "data_studio": data_studio_map,
                 "composer": composer_map,
                 "code_console": code_console_map,
+                "document_graph": raw_payload_map.get("document_graph"),
                 "artifacts": raw_payload_map.get("artifacts"),
             },
             source_path=restored_source_path,
