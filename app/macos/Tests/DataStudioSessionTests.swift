@@ -57,6 +57,71 @@ final class DataStudioSessionTests: XCTestCase {
         assertImportFlow(session, equals: .importer(kind: .rawFiles))
     }
 
+    func testDraftDefaultsTolerateDuplicateColumnHeadersFromMultiSeriesPreview() {
+        let session = DataStudioSession()
+        let preview = SourceTablePreviewResponse(
+            inputPath: "/tmp/curve_table.csv",
+            sheet: .index(0),
+            offset: 0,
+            limit: 50,
+            totalRows: 5,
+            totalCols: 4,
+            columnHeaders: ["Time", "Displacement", "Time", "Displacement"],
+            rows: [
+                [.string("Time"), .string("Displacement"), .string("Time"), .string("Displacement")],
+                [.string("s"), .string("um"), .string("s"), .string("um")],
+                [.string("Sample 1"), .string("Sample 1"), .string("Sample 2"), .string("Sample 2")],
+            ],
+            candidateRoles: .init(
+                x: ["Time"],
+                y: ["Displacement", "Displacement"],
+                z: [],
+                group: [],
+                sample: [],
+                value: [],
+                metric: [],
+                label: [],
+                series: []
+            ),
+            detectedXLabel: "Time",
+            detectedYLabel: "Displacement",
+            columnProfiles: [
+                .init(
+                    name: "Time",
+                    headerPreview: ["Time", "s"],
+                    inferredType: "numeric",
+                    nonEmptyCount: 5,
+                    missingCount: 0,
+                    minValue: 0,
+                    maxValue: 4
+                ),
+                .init(
+                    name: "Displacement",
+                    headerPreview: ["Displacement", "um"],
+                    inferredType: "numeric",
+                    nonEmptyCount: 5,
+                    missingCount: 0,
+                    minValue: 0,
+                    maxValue: 0.66
+                ),
+            ],
+            segments: [],
+            selectedSegmentID: nil,
+            encoding: "utf-8",
+            delimiter: ","
+        )
+
+        session.configureDraftDefaults(from: preview, sampleURL: URL(fileURLWithPath: "/tmp/curve_table.csv"))
+
+        XCTAssertEqual(session.templateDraftXColumnName, "Time")
+        XCTAssertEqual(session.templateDraftYColumnNames, ["Displacement"])
+        XCTAssertEqual(session.templateDraftBindingLabelByColumn["Time"], "Time")
+        XCTAssertEqual(session.templateDraftBindingLabelByColumn["Displacement"], "Displacement")
+        XCTAssertEqual(session.templateDraftUnitHintByColumn["Time"], "s")
+        XCTAssertEqual(session.templateDraftUnitHintByColumn["Displacement"], "um")
+        XCTAssertEqual(session.templateDraftSampleNameByYColumn["Displacement"], "curve_table")
+    }
+
     func testExportAvailabilityExplainsBlockingStates() {
         let session = DataStudioSession()
         XCTAssertFalse(session.exportAvailability.isEnabled)

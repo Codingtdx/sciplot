@@ -83,11 +83,6 @@ struct CodeConsoleContextView: View {
                 InspectorEmptyState(message: "No bound dataset")
             }
 
-            if let errorMessage = session.errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 

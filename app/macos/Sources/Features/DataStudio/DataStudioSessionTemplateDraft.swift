@@ -783,28 +783,49 @@ extension DataStudioSession {
         templateDraftSourceDelimiter = preview.delimiter ?? ""
         templateDraftSourceSheetName = preview.sheet.displayString
         templateDraftSegmentPolicy = preview.segments.isEmpty ? "single_table" : "series_per_segment"
-        let availableNames = preview.columnHeaders.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let availableNames = uniqueColumnNames(preview.columnHeaders)
         templateDraftXColumnName = preview.detectedXLabel ?? preview.candidateRoles.x.first ?? availableNames.first
         let xName = templateDraftXColumnName
-        let recommendedY = preview.candidateRoles.y.filter { $0 != xName }
+        let recommendedY = uniqueColumnNames(preview.candidateRoles.y).filter { $0 != xName }
         templateDraftYColumnNames = Array(recommendedY.prefix(3))
         if templateDraftYColumnNames.isEmpty {
             templateDraftYColumnNames = Array(availableNames.filter { $0 != xName }.prefix(1))
         }
         let defaultSampleName = sampleURL.deletingPathExtension().lastPathComponent
-        templateDraftSampleNameByYColumn = Dictionary(
-            uniqueKeysWithValues: templateDraftYColumnNames.map { ($0, defaultSampleName) }
+        templateDraftSampleNameByYColumn = dictionaryKeepingFirstValue(
+            templateDraftYColumnNames.map { ($0, defaultSampleName) }
         )
-        templateDraftMetricColumnNames = Array(preview.candidateRoles.metric.prefix(4))
-        templateDraftBindingLabelByColumn = Dictionary(uniqueKeysWithValues: availableNames.map { ($0, $0) })
-        templateDraftUnitHintByColumn = Dictionary(
-            uniqueKeysWithValues: availableNames.compactMap { columnName in
+        templateDraftMetricColumnNames = Array(uniqueColumnNames(preview.candidateRoles.metric).prefix(4))
+        templateDraftBindingLabelByColumn = dictionaryKeepingFirstValue(availableNames.map { ($0, $0) })
+        templateDraftUnitHintByColumn = dictionaryKeepingFirstValue(
+            availableNames.compactMap { columnName in
                 guard let unit = detectedUnitHint(for: columnName, in: preview) else {
                     return nil
                 }
                 return (columnName, unit)
             }
         )
+    }
+
+    func uniqueColumnNames(_ names: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(name).inserted else {
+                continue
+            }
+            result.append(name)
+        }
+        return result
+    }
+
+    func dictionaryKeepingFirstValue<Value>(_ pairs: [(String, Value)]) -> [String: Value] {
+        var result: [String: Value] = [:]
+        for (key, value) in pairs where result[key] == nil {
+            result[key] = value
+        }
+        return result
     }
 
     func normalizedOptional(_ value: String?) -> String? {

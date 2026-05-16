@@ -25,6 +25,7 @@ This public handoff replaces the private beta work log. It keeps only the curren
 - Keep `.sciplot` self-contained: embedded sources and workbooks are the restore truth, not original absolute paths.
 - Keep macOS as the only supported desktop frontend.
 - Keep `Launch_SciPlot.command` as the source-run launcher for the beta.
+- Keep LabPlot-inspired work clean-room while SciPlot remains Apache-2.0. See `docs/labplot-informed-roadmap.md`; `scripts/check_labplot_cleanroom.py` rejects copied LabPlot GPL source headers.
 
 ## Validation
 
@@ -37,6 +38,7 @@ Recommended local gate:
 Useful component checks:
 
 ```bash
+.venv/bin/python scripts/check_labplot_cleanroom.py
 .venv/bin/python -m ruff check .
 .venv/bin/python -m mypy src/composer.py src/plot_contract.py src/data_loader.py src/tensile_replicates.py src/rendering
 .venv/bin/python -m pytest tests

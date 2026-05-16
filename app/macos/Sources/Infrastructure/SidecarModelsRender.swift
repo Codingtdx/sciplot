@@ -1392,6 +1392,21 @@ struct CodeConsoleContextResponse: Codable, Equatable, Sendable {
     let starterCode: String
     let sourceKind: String?
     let sourceLabel: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case contextID = "contextId"
+        case inputPath
+        case sheet
+        case sheetNames
+        case inspection
+        case dataset
+        case template
+        case options
+        case promptText
+        case starterCode
+        case sourceKind
+        case sourceLabel
+    }
 }
 
 struct CodeConsoleRunRequest: Codable, Equatable, Sendable {
@@ -1410,6 +1425,13 @@ struct CodeConsoleRunRequest: Codable, Equatable, Sendable {
         self.context = context
         self.code = code
         self.timeoutSeconds = timeoutSeconds
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case contextID = "contextId"
+        case context
+        case code
+        case timeoutSeconds
     }
 }
 

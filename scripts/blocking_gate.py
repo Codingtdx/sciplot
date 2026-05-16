@@ -28,6 +28,7 @@ AUTOMATED_GATE_COMMANDS: tuple[GateCommand, ...] = (
         "ruff",
         (PYTHON, "-m", "ruff", "check", "."),
     ),
+    GateCommand("labplot_cleanroom", (PYTHON, "scripts/check_labplot_cleanroom.py")),
     GateCommand(
         "mypy",
         (

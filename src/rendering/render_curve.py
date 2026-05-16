@@ -56,8 +56,8 @@ from src.rendering.render_curve_support import (
     _prefer_direct_labels,
 )
 from src.rendering.render_support import _rendered_plot_with_qa
-from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
 from src.rendering.series_offsets import series_offset_by_id
+from src.rendering.series_order import reorder_curve_series, unknown_series_order_labels
 from src.rendering.series_styles import matplotlib_marker_symbol, series_style_by_id
 
 

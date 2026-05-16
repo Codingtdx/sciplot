@@ -70,6 +70,18 @@ final class SidecarRuntimeTests: XCTestCase {
         XCTAssertEqual(canonicalPath(located), canonicalPath(repoRoot))
     }
 
+    func testCompatibleOpenAPIFixtureIncludesScientificTextRuleRoutes() {
+        let expectedRoutes: Set<SidecarRouteSignature> = [
+            .init(method: "GET", path: "/scientific-text/rules"),
+            .init(method: "POST", path: "/scientific-text/rules/preview"),
+            .init(method: "POST", path: "/scientific-text/rules"),
+            .init(method: "PUT", path: "/scientific-text/rules/{rule_id}"),
+            .init(method: "DELETE", path: "/scientific-text/rules/{rule_id}"),
+        ]
+
+        XCTAssertTrue(expectedRoutes.isSubset(of: Set(TestPayloads.compatibleOpenAPIRoutes)))
+    }
+
     @MainActor
     func testEnsureRunningStartsManagedSidecarEvenWhenPayloadLooksCompatible() async throws {
         let repoRoot = try makeRepositoryFixture(includePythonStub: true)
