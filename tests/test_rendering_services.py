@@ -1545,7 +1545,11 @@ def test_preview_interaction_metadata_includes_curve_series_geometry(tmp_path: P
         assert sample_a["bbox_pixels"]["height"] > 0
 
         objects = metadata["objects"]
-        curve_object = next(item for item in objects if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A")
+        curve_object = next(
+            item
+            for item in objects
+            if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A"
+        )
         assert curve_object["operations"] == ["select", "quick_edit", "drag_offset"]
         assert any(item["kind"] == "x_axis" for item in objects)
         assert any(item["kind"] == "y_axis" for item in objects)
@@ -1806,7 +1810,11 @@ def test_series_offsets_shift_curve_artists_without_mutating_source_preview(tmp_
 
         metadata = rendered_plots_to_preview_payload(shifted)[0].interaction_metadata
         assert metadata is not None
-        sample_a = next(item for item in metadata["objects"] if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A")
+        sample_a = next(
+            item
+            for item in metadata["objects"]
+            if item["kind"] == "series_line" and item["payload_ref"]["id"] == "Sample A"
+        )
         assert "drag_offset" in sample_a["operations"]
     finally:
         close_rendered_plots(baseline)

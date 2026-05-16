@@ -98,6 +98,21 @@ private struct PlotEmptyPreviewPage: View {
                     .controlSize(.small)
                     .padding(10)
                     .glassEffect(.regular, in: Capsule())
+            } else {
+                VStack(spacing: 7) {
+                    Label(
+                        hasSource ? "Preview pending" : "No source",
+                        systemImage: hasSource ? "chart.xyaxis.line" : "tray.and.arrow.down"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Text(hasSource ? "Refresh preview to see the figure." : "Import data to preview a figure.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(Color.black.opacity(0.58))
+                .multilineTextAlignment(.center)
+                .padding(18)
             }
         }
         .aspectRatio(1.12, contentMode: .fit)

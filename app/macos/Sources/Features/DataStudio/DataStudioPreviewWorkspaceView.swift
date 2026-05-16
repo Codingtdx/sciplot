@@ -44,22 +44,38 @@ struct DataStudioPreviewWorkspaceView: View {
     @ViewBuilder
     private var stageContent: some View {
         if session.orderedGroups.isEmpty {
-            emptyStage(title: "No workbook groups", systemImage: "tablecells")
+            emptyStage(
+                title: "No workbook groups",
+                nextStep: "Import raw files or open a workbook.",
+                systemImage: "tablecells"
+            )
         } else if session.includedGroups.isEmpty {
-            emptyStage(title: "No included groups", systemImage: "checklist")
+            emptyStage(
+                title: "No included groups",
+                nextStep: "Include a group to preview figures.",
+                systemImage: "checklist"
+            )
         } else {
             PlotRefineView(session: session.plotSession)
         }
     }
 
-    private func emptyStage(title: String, systemImage: String) -> some View {
+    private func emptyStage(title: String, nextStep: String, systemImage: String) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: ProWorkspaceMetrics.outerCornerRadius, style: .continuous)
                 .fill(theme.previewSurround)
 
-            Label(title, systemImage: systemImage)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+            VStack(spacing: 7) {
+                Label(title, systemImage: systemImage)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(nextStep)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(18)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

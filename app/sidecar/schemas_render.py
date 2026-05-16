@@ -1404,7 +1404,7 @@ def _preview_table_objects(
                     )
                 )
                 continue
-            for cell_index, ((row, column), cell) in enumerate(cells):
+            for (row, column), cell in cells:
                 try:
                     bbox = _preview_bbox_from_display_bbox(
                         cell.get_window_extent(renderer=renderer),

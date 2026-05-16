@@ -162,6 +162,8 @@ private struct WorkbenchWindowToolbarContent: ToolbarContent {
     @Environment(\.openWindow) private var openWindow
 
     var body: some ToolbarContent {
+        ToolbarSpacer(.flexible, placement: .primaryAction)
+
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 model.beginImport(for: workbench)

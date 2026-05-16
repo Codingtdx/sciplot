@@ -30,9 +30,9 @@ from app.sidecar.schemas_render import (
     ReferenceGuidePayload,
     RenderOptionsPayload,
     SaveProjectResponse,
-    ShapeAnnotationPayload,
     SeriesOffsetPayload,
     SeriesStylePayload,
+    ShapeAnnotationPayload,
     TextAnnotationPayload,
 )
 from app.sidecar.server_utils import normalize_path, options_from_payload

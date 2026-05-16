@@ -390,7 +390,7 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
             applied = True
             continue
 
-        artist = text_axis.text(
+        text_artist = text_axis.text(
             text_x,
             text_y,
             annotation.text,
@@ -404,7 +404,7 @@ def apply_text_annotations(rendered: RenderedPlot, *, options: RenderOptions) ->
             zorder=4.0,
         )
         tag_interaction_artist(
-            artist,
+            text_artist,
             payload_type="text_annotation",
             payload_id=annotation.id,
             kind="text_annotation",

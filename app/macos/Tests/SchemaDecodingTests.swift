@@ -101,6 +101,27 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.candidateRoles.z, ["Intensity"])
     }
 
+    func testDecodeCodeConsoleContextResponseUsesSnakeCaseContextID() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let payload = try encoder.encode(TestPayloads.codeConsoleContext())
+
+        let response = try decoder.decode(CodeConsoleContextResponse.self, from: payload)
+
+        XCTAssertEqual(response.contextID, "ctx_test_payload")
+    }
+
+    func testEncodeCodeConsoleRunRequestUsesSnakeCaseContextID() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let request = CodeConsoleRunRequest(contextID: "ctx_fast_path", code: "print('ok')", timeoutSeconds: 30)
+
+        let payload = try JSONSerialization.jsonObject(with: try encoder.encode(request)) as? [String: Any]
+
+        XCTAssertEqual(payload?["context_id"] as? String, "ctx_fast_path")
+        XCTAssertNil(payload?["contextID"])
+    }
+
     func testDecodePreviewInteractionMetadataWithArtistMap() throws {
         let payload = """
         {
