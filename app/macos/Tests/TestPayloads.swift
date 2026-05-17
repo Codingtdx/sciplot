@@ -1155,13 +1155,19 @@ enum TestPayloads {
             nativeSupported: true,
             fallbackReason: nil,
             graphRevision: 1,
+            figure: ["pixel_width": .number(800), "pixel_height": .number(600), "scale": .number(1)],
             plotArea: ["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)],
             axes: [
                 [
                     "id": .string("axis:primary"),
                     "role": .string("primary"),
+                    "bbox_pixels": .object(["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)]),
                     "x_scale": .string("linear"),
-                    "y_scale": .string("linear")
+                    "y_scale": .string("linear"),
+                    "x_range": .array([.number(0), .number(1)]),
+                    "y_range": .array([.number(0), .number(1)]),
+                    "x_reversed": .bool(false),
+                    "y_reversed": .bool(false)
                 ]
             ],
             series: [
@@ -1174,7 +1180,17 @@ enum TestPayloads {
                     hitTest: ["object_id": .string("plot:series:0")]
                 )
             ],
-            objects: [["id": .string("plot:series:0"), "kind": .string("series")]],
+            objects: [
+                [
+                    "id": .string("plot:series:0"),
+                    "kind": .string("series_line"),
+                    "axis_id": .string("axis:primary"),
+                    "bbox_pixels": .object(["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)]),
+                    "points": .array([.array([.number(96), .number(528)]), .array([.number(704), .number(60)])]),
+                    "payload_ref": .object(["type": .string("series"), "id": .string("plot:series:0")]),
+                    "operations": .array([.string("select"), .string("quick_edit"), .string("drag_offset"), .string("copy_settings")])
+                ]
+            ],
             overlays: [],
             budgets: ["native_scene_samples": .number(2_000)],
             diagnostics: []

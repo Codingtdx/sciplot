@@ -373,6 +373,37 @@ extension PlotSession {
         }
 
         do {
+            do {
+                let scene = try await client.previewScene(
+                    PreviewSceneRequest(
+                        inputPath: request.inputPath,
+                        sheet: request.sheet,
+                        template: request.template,
+                        options: request.options,
+                        fitOptions: request.fitOptions,
+                        previewConfig: request.previewConfig
+                    )
+                )
+                guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
+                previewSceneRevision = revision
+                if scene.nativeSupported {
+                    previewSceneResponse = scene
+                    previewSceneFallbackReason = nil
+                } else {
+                    previewSceneResponse = nil
+                    previewSceneFallbackReason = scene.fallbackReason ?? "native_preview_fallback"
+                }
+            } catch {
+                guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
+                    return
+                }
+                previewSceneResponse = nil
+                previewSceneRevision = revision
+                previewSceneFallbackReason = isUserCancellationError(error) ? nil : error.localizedDescription
+            }
+
             let response = try await client.renderPreview(request)
             guard asyncCoordination.preview.isLatest(revision), !Task.isCancelled else {
                 return

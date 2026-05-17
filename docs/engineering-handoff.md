@@ -92,14 +92,16 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 
 - Durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, copy_settings, bind_source, apply_template, import_container, and create_output_ref.
 - Plot durable edits use typed commands, and the same envelope now extends to Data Studio, Composer, and Code Console graph actions.
-- The sidecar normalizes commands, emits graph patches, and can apply preview-only graph patches; macOS stores before/after payloads in native `UndoManager`.
+- PlotSession records local before/after snapshots first, then calls `POST /command/normalize` followed by `POST /command/apply-preview`; the returned normalized command, graph revision, and graph patch replace the optimistic ledger entry.
+- The sidecar normalizes commands, emits graph patches, rejects stale command revisions with diagnostics, and can apply preview-only graph patches; macOS stores before/after payloads in native `UndoManager`.
 - Inspector-local state must not be the only copy of a scientific edit.
 
 ### Native realtime preview
 
 - Native preview is admitted by `/meta` and `POST /preview-scene`, not by Swift template constants.
-- Supported scene data must include object ids and hit-test metadata for selection, guide/annotation drag, legend/series quick edit, and fallback reasons.
-- Unsupported templates, missing metadata, advanced axis conflicts, or data over budget fall back to backend bitmap/PDF preview.
+- PlotSession requests `/preview-scene` before `/render-preview`. The scene can be used immediately for Swift Canvas drawing and hit testing, then the backend bitmap/PDF corrects the publication preview.
+- Supported scene data must include figure geometry, axis bbox/ranges, series samples, object ids, `bbox_pixels`, point arrays, payload refs, operations, and hit-test metadata for selection, guide/annotation drag, legend/series quick edit, and fallback reasons.
+- Unsupported templates, missing samples, invalid axes, advanced axis conflicts, or data over budget fall back to backend bitmap/PDF preview.
 - `/render-preview`, export, save/open project, analysis, transforms, and import remain backend-authoritative.
 
 ### Live source foundation

@@ -1821,6 +1821,7 @@ struct PreviewSceneResponse: Codable, Equatable, Sendable {
     let nativeSupported: Bool
     let fallbackReason: String?
     let graphRevision: Int
+    let figure: [String: JSONValue]
     let plotArea: [String: JSONValue]
     let axes: [[String: JSONValue]]
     let series: [PreviewSceneSeriesPayload]
@@ -1836,6 +1837,7 @@ struct PreviewSceneResponse: Codable, Equatable, Sendable {
         case nativeSupported
         case fallbackReason
         case graphRevision
+        case figure
         case plotArea
         case axes
         case series
@@ -1843,6 +1845,129 @@ struct PreviewSceneResponse: Codable, Equatable, Sendable {
         case overlays
         case budgets
         case diagnostics
+    }
+}
+
+extension PreviewSceneResponse {
+    var interactionMetadata: PreviewInteractionMetadata? {
+        guard
+            let pixelWidth = figure["pixel_width"]?.numberValue ?? figure["pixelWidth"]?.numberValue,
+            let pixelHeight = figure["pixel_height"]?.numberValue ?? figure["pixelHeight"]?.numberValue
+        else {
+            return nil
+        }
+
+        return PreviewInteractionMetadata(
+            schemaVersion: 2,
+            figure: PreviewFigureMetadata(pixelWidth: Int(pixelWidth), pixelHeight: Int(pixelHeight)),
+            axes: axes.compactMap(Self.axisMetadata(from:)),
+            artists: objects.compactMap(Self.artistMetadata(from:)),
+            objects: objects.compactMap(Self.objectMetadata(from:))
+        )
+    }
+
+    private static func axisMetadata(from payload: [String: JSONValue]) -> PreviewAxisMetadata? {
+        guard
+            let id = payload["id"]?.stringValue,
+            let role = payload["role"]?.stringValue,
+            let bbox = bboxMetadata(from: payload["bbox_pixels"]?.objectValue ?? payload["bboxPixels"]?.objectValue),
+            let xRange = doubleArray(payload["x_range"]?.arrayValue ?? payload["xRange"]?.arrayValue),
+            let yRange = doubleArray(payload["y_range"]?.arrayValue ?? payload["yRange"]?.arrayValue),
+            let xScale = payload["x_scale"]?.stringValue ?? payload["xScale"]?.stringValue,
+            let yScale = payload["y_scale"]?.stringValue ?? payload["yScale"]?.stringValue
+        else {
+            return nil
+        }
+        return PreviewAxisMetadata(
+            id: id,
+            role: role,
+            bboxPixels: bbox,
+            xRange: xRange,
+            yRange: yRange,
+            xScale: xScale,
+            yScale: yScale,
+            xReversed: payload["x_reversed"]?.boolValue ?? payload["xReversed"]?.boolValue ?? false,
+            yReversed: payload["y_reversed"]?.boolValue ?? payload["yReversed"]?.boolValue ?? false
+        )
+    }
+
+    private static func artistMetadata(from payload: [String: JSONValue]) -> PreviewArtistMetadata? {
+        guard
+            let id = payload["id"]?.stringValue,
+            let kind = payload["kind"]?.stringValue,
+            let axisID = payload["axis_id"]?.stringValue ?? payload["axisId"]?.stringValue,
+            let bbox = bboxMetadata(from: payload["bbox_pixels"]?.objectValue ?? payload["bboxPixels"]?.objectValue)
+        else {
+            return nil
+        }
+        return PreviewArtistMetadata(
+            id: id,
+            kind: kind,
+            axisID: axisID,
+            seriesID: payload["payload_ref"]?.objectValue?["id"]?.stringValue ?? payload["payloadRef"]?.objectValue?["id"]?.stringValue,
+            label: payload["label"]?.stringValue,
+            bboxPixels: bbox,
+            points: pointArray(payload["points"]?.arrayValue)
+        )
+    }
+
+    private static func objectMetadata(from payload: [String: JSONValue]) -> PreviewInteractionObjectMetadata? {
+        guard
+            let id = payload["id"]?.stringValue,
+            let kind = payload["kind"]?.stringValue,
+            let bbox = bboxMetadata(from: payload["bbox_pixels"]?.objectValue ?? payload["bboxPixels"]?.objectValue)
+        else {
+            return nil
+        }
+        let payloadRefPayload = payload["payload_ref"]?.objectValue ?? payload["payloadRef"]?.objectValue
+        let payloadRef = payloadRefPayload.flatMap { ref -> PreviewInteractionPayloadRefMetadata? in
+            guard let type = ref["type"]?.stringValue, let id = ref["id"]?.stringValue else {
+                return nil
+            }
+            return PreviewInteractionPayloadRefMetadata(type: type, id: id)
+        }
+        return PreviewInteractionObjectMetadata(
+            id: id,
+            kind: kind,
+            label: payload["label"]?.stringValue,
+            axisID: payload["axis_id"]?.stringValue ?? payload["axisId"]?.stringValue,
+            bboxPixels: bbox,
+            points: pointArray(payload["points"]?.arrayValue),
+            payloadRef: payloadRef,
+            operations: stringArray(payload["operations"]?.arrayValue)
+        )
+    }
+
+    private static func bboxMetadata(from payload: [String: JSONValue]?) -> PreviewBBoxMetadata? {
+        guard
+            let payload,
+            let x = payload["x"]?.numberValue,
+            let y = payload["y"]?.numberValue,
+            let width = payload["width"]?.numberValue,
+            let height = payload["height"]?.numberValue
+        else {
+            return nil
+        }
+        return PreviewBBoxMetadata(x: x, y: y, width: width, height: height)
+    }
+
+    private static func doubleArray(_ payload: [JSONValue]?) -> [Double]? {
+        let values = payload?.compactMap(\.numberValue) ?? []
+        return values.count >= 2 ? values : nil
+    }
+
+    private static func pointArray(_ payload: [JSONValue]?) -> [[Double]] {
+        (payload ?? []).compactMap { item in
+            guard let values = item.arrayValue else {
+                return nil
+            }
+            let point = values.compactMap(\.numberValue)
+            return point.count >= 2 ? Array(point.prefix(2)) : nil
+        }
+    }
+
+    private static func stringArray(_ payload: [JSONValue]?) -> [String] {
+        (payload ?? []).compactMap(\.stringValue)
     }
 }
 

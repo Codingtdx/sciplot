@@ -139,6 +139,96 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
     }
 
+    func testPreviewRefreshRequestsNativeSceneBeforeAuthoritativeRender() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+
+        await waitUntil(
+            { session.previewSceneResponse != nil && session.previewResponse != nil },
+            timeout: 2.0
+        )
+
+        XCTAssertEqual(client.previewSceneRequests.first?.template, "curve")
+        XCTAssertEqual(client.renderRequests.first?.template, "curve")
+        XCTAssertLessThan(
+            try XCTUnwrap(client.runtimeRequestLog.firstIndex(of: "preview-scene")),
+            try XCTUnwrap(client.runtimeRequestLog.firstIndex(of: "render-preview"))
+        )
+        XCTAssertEqual(session.previewSceneResponse?.sceneID, "preview-scene:curve.csv:0:curve")
+        XCTAssertNil(session.previewSceneFallbackReason)
+    }
+
+    func testPreviewSceneFallbackStillRendersAuthoritativePreview() async throws {
+        let client = MockSidecarClient()
+        client.previewSceneResponse = PreviewSceneResponse(
+            sceneID: "preview-scene:sample.csv:0:heatmap",
+            template: "heatmap",
+            sheet: .index(0),
+            nativeSupported: false,
+            fallbackReason: "unsupported_template",
+            graphRevision: 1,
+            figure: ["pixel_width": .number(800), "pixel_height": .number(600), "scale": .number(1)],
+            plotArea: ["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)],
+            axes: [],
+            series: [],
+            objects: [],
+            overlays: [],
+            budgets: ["native_scene_samples": .number(2_000)],
+            diagnostics: [["status_code": .string("native_preview_fallback")]]
+        )
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertNil(session.previewSceneResponse)
+        XCTAssertEqual(session.previewSceneFallbackReason, "unsupported_template")
+        XCTAssertEqual(client.renderRequests.first?.template, "curve")
+    }
+
+    func testStalePreviewSceneResponseIsIgnored() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewSceneResponse != nil && session.previewResponse != nil }, timeout: 2.0)
+
+        let currentSceneID = try XCTUnwrap(session.previewSceneResponse?.sceneID)
+        var staleScene = TestPayloads.previewScene()
+        staleScene = PreviewSceneResponse(
+            sceneID: "preview-scene:stale",
+            template: staleScene.template,
+            sheet: staleScene.sheet,
+            nativeSupported: true,
+            fallbackReason: nil,
+            graphRevision: 99,
+            figure: staleScene.figure,
+            plotArea: staleScene.plotArea,
+            axes: staleScene.axes,
+            series: staleScene.series,
+            objects: staleScene.objects,
+            overlays: staleScene.overlays,
+            budgets: staleScene.budgets,
+            diagnostics: []
+        )
+        client.previewSceneResponse = staleScene
+        let staleRevision = session.asyncCoordination.preview.beginNow()
+        _ = session.asyncCoordination.preview.beginNow()
+        let request = try XCTUnwrap(session.currentRenderRequest(includePreviewConfig: true))
+
+        await session.performPreview(request: request, revision: staleRevision)
+
+        XCTAssertEqual(session.previewSceneResponse?.sceneID, currentSceneID)
+    }
+
     func testStyleStudioDraftAndSaveRefreshPreviewWithCustomThemePayload() async throws {
         let client = MockSidecarClient()
         let draft = CustomPlotThemePackagePayload(
@@ -2448,6 +2538,78 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(offset.xOffset, 0.5)
         XCTAssertEqual(offset.yOffset, -0.25)
         XCTAssertEqual(client.renderRequests.last?.options.seriesOffsets?.first, offset)
+    }
+
+    func testSeriesDragRecordsNormalizedCommandAndGraphRevision() async throws {
+        let client = MockSidecarClient()
+        client.commandNormalizeHandler = { request in
+            CommandNormalizeResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: [
+                        "target_object_id": .string(request.command.targetObjectID),
+                        "kind": .string(request.command.kind),
+                        "module": .string(request.command.module),
+                        "revision_delta": .number(1)
+                    ],
+                    graphRevision: 10,
+                    reversible: request.command.reversible,
+                    help: "Normalized by test sidecar."
+                ),
+                diagnostics: []
+            )
+        }
+        client.commandApplyPreviewHandler = { request in
+            CommandApplyPreviewResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: request.command.graphPatch,
+                    graphRevision: 11,
+                    reversible: request.command.reversible,
+                    help: "Applied by test sidecar."
+                ),
+                graphRevision: 11,
+                graphPatch: request.command.graphPatch,
+                renderInvalidation: ["reason": .string("command_applied")],
+                diagnostics: []
+            )
+        }
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.commitPreviewSeriesDrag(seriesID: "Sample A", xOffset: 0.5, yOffset: -0.25, policy: .immediate)
+
+        await waitUntil(
+            {
+                client.commandNormalizeRequests.count == 1 &&
+                    client.commandApplyPreviewRequests.count == 1 &&
+                    session.plotEditCommandLedger.last?.graphRevision == 11
+            },
+            timeout: 2.0
+        )
+
+        let command = try XCTUnwrap(session.plotEditCommandLedger.last)
+        XCTAssertEqual(command.kind, "edit")
+        XCTAssertEqual(command.targetObjectID, "plot:series:Sample A")
+        XCTAssertEqual(command.after?["xOffset"]?.numberValue, 0.5)
+        XCTAssertEqual(command.after?["yOffset"]?.numberValue, -0.25)
+        XCTAssertEqual(client.commandApplyPreviewRequests.last?.documentGraph["revision"]?.numberValue, 0)
+        XCTAssertEqual(command.graphPatch["revision_delta"]?.numberValue, 1)
     }
 
     func testKeyboardNudgeMovesTypedOverlayAndSeriesOffset() async throws {

@@ -77,6 +77,9 @@ extension PlotSession {
         selectedSheet = .index(0)
         inspectionResponse = nil
         previewResponse = nil
+        previewSceneResponse = nil
+        previewSceneRevision = nil
+        previewSceneFallbackReason = nil
         preflightResponse = nil
         exportResponse = nil
         userExportURLs = []
@@ -105,6 +108,7 @@ extension PlotSession {
         selectedPreviewQuickEditorObjectID = nil
         selectedSeriesQuickEditorID = nil
         plotEditCommandLedger = []
+        plotCommandGraphRevision = 0
         resetDataWorkbookState()
         if !preserveRenderOptions {
             let defaultStyle = metadata?.defaults.stylePreset ?? "nature"
@@ -413,14 +417,24 @@ extension PlotSession {
         updateRenderOptions(policy: policy) { options in
             var styles = options.seriesStyles ?? []
             let index = styles.firstIndex { $0.seriesID == seriesID }
-            var style = index.map { styles[$0] } ?? SeriesStylePayload(seriesID: seriesID)
+            let before = index.map { styles[$0] }
+            var style = before ?? SeriesStylePayload(seriesID: seriesID)
             mutate(&style)
+            guard before != style else {
+                return
+            }
             if let index {
                 styles[index] = style
             } else {
                 styles.append(style)
             }
             options.seriesStyles = styles
+            recordPlotEditCommand(
+                kind: "edit",
+                targetObjectID: plotObjectID(prefix: "series", id: seriesID),
+                before: before.map(plotCommandPayload),
+                after: plotCommandPayload(style)
+            )
         }
     }
 
@@ -432,14 +446,24 @@ extension PlotSession {
         updateRenderOptions(policy: policy) { options in
             var offsets = options.seriesOffsets ?? []
             let index = offsets.firstIndex { $0.seriesID == seriesID }
-            var offset = index.map { offsets[$0] } ?? SeriesOffsetPayload(seriesID: seriesID)
+            let before = index.map { offsets[$0] }
+            var offset = before ?? SeriesOffsetPayload(seriesID: seriesID)
             mutate(&offset)
+            guard before != offset else {
+                return
+            }
             if let index {
                 offsets[index] = offset
             } else {
                 offsets.append(offset)
             }
             options.seriesOffsets = offsets
+            recordPlotEditCommand(
+                kind: "edit",
+                targetObjectID: plotObjectID(prefix: "series", id: seriesID),
+                before: before.map(plotCommandPayload),
+                after: plotCommandPayload(offset)
+            )
         }
     }
 
@@ -1300,5 +1324,51 @@ extension PlotSession {
             help: "Undoable typed plot edit command recorded by PlotSession."
         )
         plotEditCommandLedger.append(command)
+        normalizeRecordedPlotEditCommand(commandID: command.commandID)
+    }
+
+    private func normalizeRecordedPlotEditCommand(commandID: String) {
+        Task { @MainActor [weak self] in
+            await self?.normalizeAndApplyRecordedPlotEditCommand(commandID: commandID)
+        }
+    }
+
+    private func normalizeAndApplyRecordedPlotEditCommand(commandID: String) async {
+        guard
+            let client,
+            let index = plotEditCommandLedger.firstIndex(where: { $0.commandID == commandID })
+        else {
+            return
+        }
+        let localCommand = plotEditCommandLedger[index]
+        do {
+            let normalized = try await client.normalizeCommand(.init(command: localCommand))
+            guard
+                normalized.command.commandID == commandID,
+                let normalizedIndex = plotEditCommandLedger.firstIndex(where: { $0.commandID == commandID })
+            else {
+                return
+            }
+            plotEditCommandLedger[normalizedIndex] = normalized.command
+            let response = try await client.applyCommandPreview(
+                .init(
+                    command: normalized.command,
+                    documentGraph: [
+                        "schema_version": .number(2),
+                        "revision": .number(Double(plotCommandGraphRevision))
+                    ]
+                )
+            )
+            guard
+                response.command.commandID == commandID,
+                let appliedIndex = plotEditCommandLedger.firstIndex(where: { $0.commandID == commandID })
+            else {
+                return
+            }
+            plotCommandGraphRevision = response.graphRevision
+            plotEditCommandLedger[appliedIndex] = response.command
+        } catch {
+            return
+        }
     }
 }

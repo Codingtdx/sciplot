@@ -7,6 +7,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.sidecar.server import CRITICAL_SIDECAR_ROUTES, app
+from src.rendering.preview_scene import build_preview_scene
 
 client = TestClient(app)
 
@@ -175,10 +176,63 @@ def test_preview_scene_returns_native_scene_or_explicit_fallback(tmp_path: Path)
     assert scene["native_supported"] is True
     assert scene["fallback_reason"] is None
     assert scene["graph_revision"] >= 1
+    assert scene["figure"] == {"pixel_width": 800, "pixel_height": 600, "scale": 2.0}
     assert scene["plot_area"]["width"] > 0
     assert scene["axes"][0]["x_scale"] == "linear"
+    assert scene["axes"][0]["bbox_pixels"] == scene["plot_area"]
     assert scene["series"][0]["column_refs"] == {"x": "col-0", "y": "col-1"}
     assert scene["budgets"]["native_scene_samples"] >= len(scene["series"][0]["samples"])
+    scene_object = scene["objects"][0]
+    assert scene_object["kind"] == "series_line"
+    assert scene_object["payload_ref"] == {"type": "series", "id": "plot:series:0"}
+    assert scene_object["bbox_pixels"]["width"] > 0
+    assert scene_object["points"][0] == [
+        scene["plot_area"]["x"],
+        scene["plot_area"]["y"] + scene["plot_area"]["height"],
+    ]
+    assert {"select", "quick_edit", "drag_offset", "copy_settings"}.issubset(set(scene_object["operations"]))
+
+
+def test_preview_scene_unsupported_template_falls_back_explicitly(tmp_path: Path) -> None:
+    path = tmp_path / "curve.csv"
+    _curve_csv(path)
+
+    response = client.post(
+        "/preview-scene",
+        json={
+            "input_path": str(path),
+            "sheet": 0,
+            "template": "heatmap",
+            "options": {"style_preset": "nature"},
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    scene = response.json()
+    assert scene["native_supported"] is False
+    assert scene["fallback_reason"] == "unsupported_template"
+    assert scene["objects"] == []
+    assert scene["diagnostics"][0]["status_code"] == "native_preview_fallback"
+    assert scene["diagnostics"][0]["fallback_reason"] == "unsupported_template"
+
+
+def test_preview_scene_sample_budget_fallback_is_specific(tmp_path: Path) -> None:
+    path = tmp_path / "curve.csv"
+    _curve_csv(path)
+
+    scene = build_preview_scene(
+        input_path=path,
+        sheet=0,
+        template="curve",
+        options={"style_preset": "nature"},
+        preview_config={"pixel_width": 800, "pixel_height": 600, "native_scene_sample_budget": 2},
+    )
+
+    assert scene["native_supported"] is False
+    assert scene["fallback_reason"] == "sample_budget_exceeded"
+    assert scene["budgets"]["native_scene_samples"] == 2
+    assert scene["diagnostics"][0]["status_code"] == "native_preview_fallback"
+    assert scene["diagnostics"][0]["fallback_reason"] == "sample_budget_exceeded"
 
 
 def test_live_source_update_now_returns_revisioned_containers(tmp_path: Path) -> None:

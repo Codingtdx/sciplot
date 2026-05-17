@@ -44,7 +44,10 @@ struct PlotPreviewStage: View {
     @ViewBuilder
     private var previewSurface: some View {
         if let preview = session.previewResponse?.previews.first {
-            PlotInteractivePreviewSurface(session: session, preview: preview)
+            PlotInteractivePreviewSurface(session: session, preview: preview, previewScene: session.previewSceneResponse)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let scene = session.previewSceneResponse {
+            NativePreviewSceneSurface(session: session, scene: scene)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             PlotEmptyPreviewPage(

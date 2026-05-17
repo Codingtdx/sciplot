@@ -150,6 +150,7 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var commandNormalizeRequests: [CommandNormalizeRequest] = []
     private(set) var commandApplyPreviewRequests: [CommandApplyPreviewRequest] = []
     private(set) var previewSceneRequests: [PreviewSceneRequest] = []
+    private(set) var runtimeRequestLog: [String] = []
     private(set) var liveSourceUpdateRequests: [LiveSourceUpdateRequest] = []
     private(set) var saveProjectRequests: [SaveProjectRequest] = []
     private(set) var openProjectRequests: [OpenProjectRequest] = []
@@ -423,6 +424,7 @@ final class MockSidecarClient: SidecarClienting {
 
     func normalizeCommand(_ request: CommandNormalizeRequest) async throws -> CommandNormalizeResponse {
         commandNormalizeRequests.append(request)
+        runtimeRequestLog.append("command/normalize")
         if let commandNormalizeHandler {
             return try await commandNormalizeHandler(request)
         }
@@ -431,6 +433,7 @@ final class MockSidecarClient: SidecarClienting {
 
     func applyCommandPreview(_ request: CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse {
         commandApplyPreviewRequests.append(request)
+        runtimeRequestLog.append("command/apply-preview")
         if let commandApplyPreviewHandler {
             return try await commandApplyPreviewHandler(request)
         }
@@ -439,6 +442,7 @@ final class MockSidecarClient: SidecarClienting {
 
     func previewScene(_ request: PreviewSceneRequest) async throws -> PreviewSceneResponse {
         previewSceneRequests.append(request)
+        runtimeRequestLog.append("preview-scene")
         if let previewSceneHandler {
             return try await previewSceneHandler(request)
         }
@@ -495,6 +499,7 @@ final class MockSidecarClient: SidecarClienting {
 
     func renderPreview(_ request: RenderRequest) async throws -> RenderPreviewResponse {
         renderRequests.append(request)
+        runtimeRequestLog.append("render-preview")
         if let renderHandler {
             return try await renderHandler(request)
         }

@@ -4,7 +4,11 @@ from fastapi.testclient import TestClient
 
 from app.sidecar.schemas import PlotEditCommandNormalizeResponse
 from app.sidecar.server import app
-from src.rendering.plot_object_commands import SUPPORTED_COMMAND_KINDS, normalize_plot_edit_command
+from src.rendering.plot_object_commands import (
+    SUPPORTED_COMMAND_KINDS,
+    apply_command_preview,
+    normalize_plot_edit_command,
+)
 
 client = TestClient(app)
 
@@ -91,3 +95,46 @@ def test_plot_object_command_accepts_copy_settings_alias() -> None:
 
     assert normalized["command"]["kind"] == "copy_settings"
     assert normalized["command"]["graph_patch"]["kind"] == "copy_settings"
+
+
+def test_command_apply_preview_preserves_before_after_and_revision_metadata() -> None:
+    payload = apply_command_preview(
+        {
+            "command_id": "cmd-visible",
+            "kind": "visibility",
+            "module": "plot",
+            "target_object_id": "plot:guide:threshold",
+            "before": {"visible": True},
+            "after": {"visible": False},
+        },
+        {"schema_version": 2, "revision": 7},
+    )
+
+    assert payload["graph_revision"] == 8
+    assert payload["command"]["graph_revision"] == 8
+    assert payload["command"]["before"] == {"visible": True}
+    assert payload["command"]["after"] == {"visible": False}
+    assert payload["graph_patch"]["module"] == "plot"
+    assert payload["render_invalidation"]["reason"] == "command_applied"
+    assert payload["diagnostics"] == []
+
+
+def test_command_apply_preview_ignores_stale_command_revision() -> None:
+    payload = apply_command_preview(
+        {
+            "command_id": "cmd-stale",
+            "kind": "rename",
+            "module": "plot",
+            "target_object_id": "plot:series:1",
+            "before": {"label": "Old"},
+            "after": {"label": "New"},
+            "graph_revision": 3,
+        },
+        {"schema_version": 2, "revision": 5},
+    )
+
+    assert payload["graph_revision"] == 5
+    assert payload["command"]["graph_revision"] == 5
+    assert payload["graph_patch"] == {}
+    assert payload["render_invalidation"]["reason"] == "stale_command_ignored"
+    assert payload["diagnostics"][0]["status_code"] == "stale_command_revision"

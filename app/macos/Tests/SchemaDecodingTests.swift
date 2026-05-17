@@ -377,10 +377,11 @@ final class SchemaDecodingTests: XCTestCase {
           "native_supported": true,
           "fallback_reason": null,
           "graph_revision": 3,
+          "figure": {"pixel_width": 800, "pixel_height": 600, "scale": 2.0},
           "plot_area": {"x": 96, "y": 60, "width": 608, "height": 468},
-          "axes": [{"id": "axis:primary", "role": "primary", "x_scale": "linear", "y_scale": "linear", "x_range": [0, 3], "y_range": [0, 9]}],
+          "axes": [{"id": "axis:primary", "role": "primary", "bbox_pixels": {"x": 96, "y": 60, "width": 608, "height": 468}, "x_scale": "linear", "y_scale": "linear", "x_range": [0, 3], "y_range": [0, 9], "x_reversed": false, "y_reversed": false}],
           "series": [{"id": "plot:series:0", "label": "signal", "kind": "curve", "column_refs": {"x": "col-0", "y": "col-1"}, "samples": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]}],
-          "objects": [{"id": "plot:series:0", "kind": "series", "operations": ["select", "quick_edit"]}],
+          "objects": [{"id": "plot:series:0", "kind": "series_line", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 60, "width": 608, "height": 468}, "points": [[96, 528], [299, 476]], "payload_ref": {"type": "series", "id": "plot:series:0"}, "operations": ["select", "quick_edit", "drag_offset", "copy_settings"]}],
           "overlays": [],
           "budgets": {"native_scene_samples": 2000},
           "diagnostics": []
@@ -389,7 +390,10 @@ final class SchemaDecodingTests: XCTestCase {
         let scene = try decoder.decode(PreviewSceneResponse.self, from: Data(previewScenePayload.utf8))
         XCTAssertTrue(scene.nativeSupported)
         XCTAssertEqual(scene.graphRevision, 3)
+        XCTAssertEqual(scene.figure["pixel_width"]?.numberValue, 800)
         XCTAssertEqual(scene.series[0].columnRefs["x"], "col-0")
+        XCTAssertEqual(scene.interactionMetadata?.objects.first?.kind, "series_line")
+        XCTAssertEqual(scene.interactionMetadata?.objects.first?.operations, ["select", "quick_edit", "drag_offset", "copy_settings"])
 
         let commandPayload = """
         {

@@ -11,8 +11,8 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `POST /import-preview`: dispatches import filters and returns preview containers or structured disabled diagnostics.
 - `POST /plot-edit-command/normalize`: compatibility route for Plot-only object edit command normalization.
 - `POST /command/normalize`: validates cross-module commands and returns a normalized reversible command with graph patch metadata.
-- `POST /command/apply-preview`: applies a command against an in-memory graph snapshot and returns graph patch plus render invalidation metadata without saving project files.
-- `POST /preview-scene`: returns the contract-gated native realtime preview scene for Swift Canvas; `/render-preview` remains the authoritative bitmap/PDF correction path.
+- `POST /command/apply-preview`: applies a command against an in-memory graph snapshot and returns graph patch plus render invalidation metadata without saving project files; stale command revisions must be ignored with structured diagnostics.
+- `POST /preview-scene`: returns the contract-gated native realtime preview scene for Swift Canvas before `/render-preview`; `/render-preview` remains the authoritative bitmap/PDF correction path.
 - `POST /live-source/update-now`: refreshes enabled file-tail, folder-watch, or periodic-CSV live sources into revisioned data containers.
 - `POST /code-console/run`: executes a Code Console run and returns generated files, notebook outputs, and notebook output containers.
 
@@ -21,7 +21,7 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `DataContainerPayload` includes column ids, column mode/role/unit/comment/profile metadata, readonly policy, lifecycle event names, provenance, statistics, dimensions, and data revision.
 - `AnalysisOperationResultPayload` includes settings, source binding, prepared-array summary, elapsed time, lineage, diagnostics, metrics, tables, overlays, artifact refs, and data containers.
 - `PlotEditCommandPayload` is the shared command envelope for Plot, Data Studio, Composer, and Code Console. Supported kinds include `add`, `edit`, `delete`, `reorder`, `rename`, `visibility`, `lock`, `copy_settings`, `bind_source`, `apply_template`, `import_container`, and `create_output_ref`.
-- `PreviewScenePayload` is a realtime approximation contract. It carries plot area geometry, axis metadata, series samples, style tokens, object ids, hit-test hints, budgets, and fallback diagnostics.
+- `PreviewScenePayload` is a realtime approximation contract. It carries figure geometry, plot area geometry, axis metadata, series samples, style tokens, object ids, `bbox_pixels`, point arrays, payload refs, operation names, hit-test hints, budgets, and fallback diagnostics.
 - `LiveSourcePayload` is the controlled realtime-source contract for file tail, folder watch, and periodic CSV refresh. Network, serial, and socket sources stay disabled until sandbox and fixture policy exists.
 
 ## Status Policy

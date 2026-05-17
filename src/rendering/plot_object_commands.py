@@ -58,6 +58,27 @@ def apply_command_preview(command: dict[str, Any], document_graph: dict[str, Any
     normalized = normalize_plot_edit_command(command)["command"]
     graph = document_graph or {}
     current_revision = int(graph.get("revision") or 0)
+    command_revision = normalized.get("graph_revision")
+    if command_revision is not None and int(command_revision) < current_revision:
+        normalized["graph_revision"] = current_revision
+        return {
+            "command": normalized,
+            "graph_revision": current_revision,
+            "graph_patch": {},
+            "render_invalidation": {
+                "reason": "stale_command_ignored",
+                "target_object_id": normalized["target_object_id"],
+                "module": normalized["module"],
+            },
+            "diagnostics": [
+                {
+                    "status_code": "stale_command_revision",
+                    "message": (
+                        f"Command revision {int(command_revision)} is older than graph revision {current_revision}."
+                    ),
+                }
+            ],
+        }
     graph_revision = current_revision + int(normalized["graph_patch"].get("revision_delta") or 1)
     normalized["graph_revision"] = graph_revision
     return {

@@ -532,6 +532,7 @@ class PreviewSceneResponse(StrictModel):
     native_supported: bool
     fallback_reason: str | None = None
     graph_revision: int = 1
+    figure: dict[str, Any] = Field(default_factory=dict)
     plot_area: dict[str, float]
     axes: list[dict[str, Any]] = Field(default_factory=list)
     series: list[dict[str, Any]] = Field(default_factory=list)
