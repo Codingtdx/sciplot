@@ -208,6 +208,12 @@ def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:
     assert payload["candidate_roles"]["x"] == ["Temperature"]
     assert payload["candidate_roles"]["y"] == ["Time"]
     assert payload["candidate_roles"]["z"] == ["Intensity"]
+    containers = {item["kind"]: item for item in payload["data_containers"]}
+    assert {"table", "matrix"}.issubset(containers)
+    assert containers["matrix"]["status"] == "experimental"
+    assert containers["matrix"]["dimensions"] == {"rows": 2, "columns": 2}
+    assert containers["matrix"]["coordinate_vectors"]["x"] == [25.0, 40.0]
+    assert containers["matrix"]["coordinate_vectors"]["y"] == [0.0, 5.0]
 
 
 def test_source_table_preview_accepts_data_transforms(tmp_path: Path) -> None:
@@ -242,6 +248,11 @@ def test_source_table_preview_accepts_data_transforms(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["column_headers"] == ["x", "y", "radius"]
     assert payload["rows"][1] == ["3.0", "4.0", 5.0]
+    containers = {item["kind"]: item for item in payload["data_containers"]}
+    assert {"table", "transformed_view"}.issubset(containers)
+    assert containers["transformed_view"]["status"] == "enabled"
+    assert containers["transformed_view"]["source"]["transform_count"] == 1
+    assert containers["transformed_view"]["diagnostics"][0]["status_code"] == "transforms_applied"
 
 
 def test_source_table_preview_returns_readonly_table_container(tmp_path: Path) -> None:
@@ -269,7 +280,7 @@ def test_source_table_preview_returns_readonly_table_container(tmp_path: Path) -
     assert table["readonly"] is True
     assert table["row_count"] == payload["total_rows"]
     assert table["column_count"] == payload["total_cols"]
-    assert table["source"] == {
+    expected_source = {
         "input_path": str(input_path),
         "sheet": "Sheet1",
         "selected_segment_id": None,
@@ -278,6 +289,12 @@ def test_source_table_preview_returns_readonly_table_container(tmp_path: Path) -
         "offset": 1,
         "limit": 2,
     }
+    assert {
+        key: table["source"][key]
+        for key in expected_source
+    } == expected_source
+    assert table["source"]["transform_count"] == 0
+    assert table["source"]["variable_count"] == 0
     assert table["columns"][0]["id"] == "col-0"
     assert table["columns"][0]["name"] == "time"
     assert table["columns"][0]["role_hints"] == ["x"]
@@ -315,6 +332,10 @@ def test_fit_analysis_accepts_data_transforms(tmp_path: Path) -> None:
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["point_count"] == 2
+    assert payload["operation_result"]["operation_id"] == "analysis.fit"
+    assert payload["operation_result"]["valid"] is True
+    assert payload["operation_result"]["metrics"]["r_squared"] == payload["r_squared"]
+    assert payload["operation_result"]["data_containers"][0]["kind"] == "fit_result"
 
 
 def test_inspect_file_accepts_transform_options_for_recommendation(tmp_path: Path) -> None:

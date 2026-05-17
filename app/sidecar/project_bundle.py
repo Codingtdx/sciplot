@@ -474,6 +474,9 @@ def _generate_document_graph(
 
     if plot is not None:
         scene_id = "plot:scene"
+        page_id = "plot:page"
+        plot_area_id = "plot:plot_area"
+        series_id = "plot:series:primary"
         module_roots["plot"] = scene_id
         nodes.extend(
             [
@@ -483,8 +486,33 @@ def _generate_document_graph(
                     module="plot",
                     label=plot.project_display_name or "Plot Scene",
                     payload={
+                        "graph_addressable": True,
                         "selected_template_id": plot.selected_template_id,
                         "sheet": plot.sheet,
+                    },
+                ),
+                _graph_node(
+                    id=page_id,
+                    kind="plot.page",
+                    module="plot",
+                    label="Figure Page",
+                    payload={"graph_addressable": True},
+                ),
+                _graph_node(
+                    id=plot_area_id,
+                    kind="plot.plot_area",
+                    module="plot",
+                    label="Plot Area",
+                    payload={"graph_addressable": True},
+                ),
+                _graph_node(
+                    id=series_id,
+                    kind="plot.series",
+                    module="plot",
+                    label="Primary Series",
+                    payload={
+                        "graph_addressable": True,
+                        "selected_template_id": plot.selected_template_id,
                     },
                 ),
                 _graph_node(
@@ -502,32 +530,160 @@ def _generate_document_graph(
                     kind="plot.axis",
                     module="plot",
                     label="X Axis",
-                    payload={"axis": "x"},
+                    payload={"graph_addressable": True, "axis": "x"},
                 ),
                 _graph_node(
                     id="plot:axis:y_primary",
                     kind="plot.axis",
                     module="plot",
                     label="Primary Y Axis",
-                    payload={"axis": "y_primary"},
+                    payload={"graph_addressable": True, "axis": "y_primary"},
                 ),
                 _graph_node(
                     id="plot:legend",
                     kind="plot.legend",
                     module="plot",
                     label="Legend",
+                    payload={"graph_addressable": True},
                 ),
             ]
         )
         edges.extend(
             [
+                _graph_edge(scene_id, page_id, "contains"),
+                _graph_edge(page_id, plot_area_id, "contains"),
+                _graph_edge(plot_area_id, series_id, "contains"),
                 _graph_edge(scene_id, "plot:source:primary", "uses_source"),
-                _graph_edge(scene_id, "plot:axis:x", "contains"),
-                _graph_edge(scene_id, "plot:axis:y_primary", "contains"),
-                _graph_edge(scene_id, "plot:legend", "contains"),
+                _graph_edge(plot_area_id, "plot:axis:x", "contains"),
+                _graph_edge(plot_area_id, "plot:axis:y_primary", "contains"),
+                _graph_edge(plot_area_id, "plot:legend", "contains"),
             ]
         )
+        if plot.render_options.extra_x_axis is not None and plot.render_options.extra_x_axis.enabled:
+            nodes.append(
+                _graph_node(
+                    id="plot:axis:extra_x",
+                    kind="plot.axis.extra",
+                    module="plot",
+                    label=plot.render_options.extra_x_axis.title or "Extra X Axis",
+                    payload={"graph_addressable": True, "axis": "extra_x"},
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, "plot:axis:extra_x", "contains"))
+        if plot.render_options.extra_y_axis is not None and plot.render_options.extra_y_axis.enabled:
+            nodes.append(
+                _graph_node(
+                    id="plot:axis:extra_y",
+                    kind="plot.axis.extra",
+                    module="plot",
+                    label=plot.render_options.extra_y_axis.title or "Extra Y Axis",
+                    payload={"graph_addressable": True, "axis": "extra_y"},
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, "plot:axis:extra_y", "contains"))
+        for axis_name, breaks in (
+            ("x", plot.render_options.x_axis_breaks or []),
+            ("y", plot.render_options.y_axis_breaks or []),
+        ):
+            for index, axis_break in enumerate(breaks, start=1):
+                node_id = f"plot:axis_break:{axis_name}:{index}"
+                nodes.append(
+                    _graph_node(
+                        id=node_id,
+                        kind="plot.axis.break",
+                        module="plot",
+                        label=f"{axis_name.upper()} Axis Break {index}",
+                        payload={
+                            "graph_addressable": True,
+                            "axis": axis_name,
+                            "enabled": axis_break.enabled,
+                            "start": axis_break.start,
+                            "end": axis_break.end,
+                        },
+                    )
+                )
+                edges.append(_graph_edge(plot_area_id, node_id, "contains"))
+        for guide in plot.render_options.reference_guides or []:
+            node_id = f"plot:guide:{guide.id}"
+            nodes.append(
+                _graph_node(
+                    id=node_id,
+                    kind="plot.guide",
+                    module="plot",
+                    label=guide.label or guide.id,
+                    payload={
+                        "graph_addressable": True,
+                        "guide_id": guide.id,
+                        "kind": guide.kind,
+                        "enabled": guide.enabled,
+                    },
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, node_id, "contains"))
+        for annotation in plot.render_options.text_annotations or []:
+            node_id = f"plot:annotation:text:{annotation.id}"
+            nodes.append(
+                _graph_node(
+                    id=node_id,
+                    kind="plot.annotation.text",
+                    module="plot",
+                    label=annotation.text or annotation.id,
+                    payload={
+                        "graph_addressable": True,
+                        "annotation_id": annotation.id,
+                        "enabled": annotation.enabled,
+                    },
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, node_id, "contains"))
+        for shape in plot.render_options.shape_annotations or []:
+            node_id = f"plot:annotation:shape:{shape.id}"
+            nodes.append(
+                _graph_node(
+                    id=node_id,
+                    kind="plot.annotation.shape",
+                    module="plot",
+                    label=shape.label or shape.id,
+                    payload={
+                        "graph_addressable": True,
+                        "shape_id": shape.id,
+                        "kind": shape.kind,
+                        "enabled": shape.enabled,
+                    },
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, node_id, "contains"))
+        for layer in plot.render_options.analytical_layers or []:
+            node_id = f"plot:layer:function:{layer.id}"
+            nodes.append(
+                _graph_node(
+                    id=node_id,
+                    kind="plot.layer.function",
+                    module="plot",
+                    label=layer.label or layer.id,
+                    payload={
+                        "graph_addressable": True,
+                        "layer_id": layer.id,
+                        "expression": layer.expression,
+                        "enabled": layer.enabled,
+                    },
+                )
+            )
+            edges.append(_graph_edge(plot_area_id, node_id, "contains"))
         if plot.fit_options.enabled:
+            nodes.append(
+                _graph_node(
+                    id="plot:fit_overlay",
+                    kind="plot.fit_overlay",
+                    module="plot",
+                    label="Fit Overlay",
+                    payload={
+                        "graph_addressable": True,
+                        "model_id": plot.fit_options.model_id,
+                        "enabled": plot.fit_options.enabled,
+                    },
+                )
+            )
             nodes.append(
                 _graph_node(
                     id="plot:analysis:fit",
@@ -540,6 +696,7 @@ def _generate_document_graph(
                     },
                 )
             )
+            edges.append(_graph_edge(plot_area_id, "plot:fit_overlay", "contains"))
             edges.append(_graph_edge(scene_id, "plot:analysis:fit", "contains"))
 
     if data_studio is not None:
@@ -625,6 +782,39 @@ def _generate_document_graph(
                 )
             )
             edges.append(_graph_edge(root_id, run_id, "contains"))
+            for index, generated in enumerate(code_console.latest_run.generated_files, start=1):
+                output_id = f"code_console:notebook_output:{index}"
+                nodes.append(
+                    _graph_node(
+                        id=output_id,
+                        kind="data.notebook_output",
+                        module="code_console",
+                        label=generated.name,
+                        payload={
+                            "graph_addressable": True,
+                            "file_type": generated.file_type,
+                            "output_path": generated.path,
+                            "source_run_id": run_id,
+                        },
+                    )
+                )
+                edges.append(_graph_edge(run_id, output_id, "emits"))
+        for index, generated in enumerate(code_console.embedded_generated_files, start=1):
+            output_id = f"code_console:embedded_notebook_output:{index}"
+            nodes.append(
+                _graph_node(
+                    id=output_id,
+                    kind="data.notebook_output",
+                    module="code_console",
+                    label=generated.name,
+                    payload={
+                        "graph_addressable": True,
+                        "file_type": generated.file_type,
+                        "embedded_file_relpath": generated.embedded_file_relpath,
+                    },
+                )
+            )
+            edges.append(_graph_edge(root_id, output_id, "contains"))
 
     selected_nodes = {
         module: root_id

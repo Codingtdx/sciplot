@@ -6,6 +6,8 @@ LabPlot is a strategic reference, not a vendored dependency. Its public behavior
 
 Persistent phase status is tracked in `docs/labplot-roadmap-progress.md`; this roadmap remains the long-term capability map.
 
+Current implementation note: the one-run LabPlot-scale batch is moving every major capability into project structure as typed schema, `/meta` catalog entries, document graph nodes, macOS decode models, and progress documentation. Runtime support is still represented honestly with `landed`, `experimental`, `coming_soon`, or `disabled` status labels.
+
 ## Technical borrowing principles
 
 This is not blind copying. The goal is to understand why LabPlot's mature C++/Qt codebase stays coherent under many data containers, plot objects, import filters, and analysis operations, then translate those principles into SciPlot's first-principles architecture.

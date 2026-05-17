@@ -21,11 +21,20 @@ This public handoff replaces the private beta work log. It keeps only the curren
 ## Maintainer Notes
 
 - Keep `src/plot_contract.json` as the single source of truth for public plot templates, styles, palettes, themes, defaults, and gallery metadata.
+- Keep LabPlot-scale capability status flowing through `/meta`, sidecar schemas, `.sciplot` document graph nodes, macOS decode models, and `docs/labplot-roadmap-progress.md`; do not add a second local capability table in Swift.
 - Keep project open/save routed through sidecar schema normalization.
 - Keep `.sciplot` self-contained: embedded sources and workbooks are the restore truth, not original absolute paths.
 - Keep macOS as the only supported desktop frontend.
 - Keep `Launch_SciPlot.command` as the source-run launcher for the beta.
 - Keep LabPlot-inspired work clean-room while SciPlot remains Apache-2.0. See `docs/labplot-informed-roadmap.md`; `scripts/check_labplot_cleanroom.py` rejects copied LabPlot GPL source headers.
+
+## LabPlot-Scale Capability Landing
+
+- `enabled` means there is current runtime support behind the sidecar/macOS contract.
+- `experimental` means the schema/catalog/project landing exists and may have partial runtime support, but still needs numerical fixture coverage, UI wiring, or performance hardening.
+- `coming_soon` means the capability has an explicit landing point and help text but must remain disabled in UI.
+- `disabled` means the project intentionally records the capability as out of current runtime scope.
+- The clean-room policy still applies to every landing: LabPlot can inspire taxonomy, object ownership, and tests, but GPL source is not vendored.
 
 ## Validation
 

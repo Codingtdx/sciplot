@@ -111,6 +111,177 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
     assert all(template["presentation_kind"] for template in contract.templates.values())
 
 
+def test_labplot_scale_catalogs_cover_one_run_capabilities() -> None:
+    response = client.get("/meta")
+
+    assert response.status_code == 200, response.text
+    meta = MetaResponse.model_validate(response.json())
+    groups = {group.id: {item.id: item for item in group.capabilities} for group in meta.capability_catalogs}
+
+    assert {
+        "data.table",
+        "data.matrix",
+        "data.transformed_view",
+        "data.statistics_summary",
+        "data.fit_result",
+        "data.notebook_output",
+    }.issubset(groups["data_containers"])
+    assert {
+        "plot.series",
+        "plot.axis",
+        "plot.legend",
+        "plot.guide",
+        "plot.annotation.text",
+        "plot.annotation.shape",
+        "plot.layer.function",
+        "plot.axis.extra",
+        "plot.axis.break",
+        "plot.fit_overlay",
+        "plot.page",
+        "plot.plot_area",
+    }.issubset(groups["plot_objects"])
+    assert {
+        "analysis.fit",
+        "analysis.smoothing",
+        "analysis.interpolation",
+        "analysis.differentiation",
+        "analysis.integration",
+        "analysis.fft",
+        "analysis.fourier_filter",
+        "analysis.correlation",
+        "analysis.convolution",
+        "analysis.baseline",
+        "analysis.peak_detection",
+        "analysis.kde",
+        "analysis.statistical_tests",
+        "analysis.distribution_fitting",
+        "analysis.peak_fitting",
+        "analysis.growth_models",
+    }.issubset(groups["analysis_operations"])
+    assert {
+        "import.csv",
+        "import.excel",
+        "import.json",
+        "import.sql",
+        "import.hdf5",
+        "import.netcdf",
+        "import.fits",
+        "import.ods",
+        "import.readstat",
+        "import.binary_raw",
+        "import.origin_scidavis_eval",
+        "import.image_digitizer",
+    }.issubset(groups["import_filters"])
+    assert {
+        "export.figure.pdf",
+        "export.figure.tiff",
+        "export.data_workbook",
+        "export.project_bundle",
+        "export.comparison_bundle",
+        "export.artifact_manifest",
+        "export.code_console_figure_set",
+    }.issubset(groups["export_targets"])
+    assert groups["analysis_operations"]["analysis.fft"].status in {"experimental", "coming_soon"}
+    assert groups["import_filters"]["import.image_digitizer"].status == "coming_soon"
+
+
+def test_labplot_scale_payload_models_validate_code_landings() -> None:
+    from app.sidecar.schemas import (
+        AnalysisOperationResultPayload,
+        DataContainerPayload,
+        ExportTargetPayload,
+        ImportFilterPayload,
+        NotebookOutputPayload,
+        PlotEditCommandPayload,
+        PlotObjectPayload,
+    )
+
+    matrix = DataContainerPayload.model_validate(
+        {
+            "id": "matrix-1",
+            "kind": "matrix",
+            "label": "Scalar Field",
+            "status": "experimental",
+            "readonly": True,
+            "row_count": 4,
+            "column_count": 3,
+            "source": {"input_path": "/tmp/field.csv", "sheet": "Sheet1", "offset": 0, "limit": 50},
+            "dimensions": {"rows": 2, "columns": 2},
+            "coordinate_vectors": {"x": [25.0, 40.0], "y": [0.0, 5.0]},
+            "missing_value_policy": "preserve",
+            "help": "Matrix container landing.",
+        }
+    )
+    assert matrix.kind == "matrix"
+
+    plot_object = PlotObjectPayload.model_validate(
+        {
+            "id": "plot:guide:target-line",
+            "kind": "plot.guide",
+            "module": "plot",
+            "label": "Target",
+            "graph_node_id": "plot:guide:target-line",
+            "payload": {"axis_target": "y_primary"},
+        }
+    )
+    assert plot_object.visible is True
+
+    command = PlotEditCommandPayload.model_validate(
+        {
+            "command_id": "cmd-1",
+            "kind": "edit",
+            "target_object_id": plot_object.id,
+            "after": {"visible": False},
+        }
+    )
+    assert command.reversible is True
+
+    result = AnalysisOperationResultPayload.model_validate(
+        {
+            "operation_id": "analysis.fit",
+            "available": True,
+            "valid": True,
+            "status_code": "ok",
+            "message": "Fit complete.",
+            "metrics": {"r_squared": 0.99},
+        }
+    )
+    assert result.metrics["r_squared"] == 0.99
+
+    import_filter = ImportFilterPayload.model_validate(
+        {
+            "id": "import.hdf5",
+            "label": "HDF5",
+            "status": "coming_soon",
+            "output_container_kinds": ["matrix"],
+            "help": "Explicit import filter landing.",
+        }
+    )
+    export_target = ExportTargetPayload.model_validate(
+        {
+            "id": "export.artifact_manifest",
+            "label": "Artifact Manifest",
+            "status": "coming_soon",
+            "allowed_modules": ["plot", "data_studio", "composer", "code_console"],
+            "artifact_kind": "manifest",
+            "filename_policy": "base_name_with_suffixes",
+            "help": "Explicit export target landing.",
+        }
+    )
+    notebook_output = NotebookOutputPayload.model_validate(
+        {
+            "id": "notebook-output-1",
+            "kind": "figure",
+            "label": "Generated Figure",
+            "status": "experimental",
+            "source_run_id": "run-1",
+            "container_ids": ["data.notebook_output:run-1"],
+        }
+    )
+    assert import_filter.status == export_target.status == "coming_soon"
+    assert notebook_output.kind == "figure"
+
+
 def test_delete_data_studio_template_returns_status_response() -> None:
     template_id = f"user/schema-delete-{uuid4().hex[:8]}"
     create_response = client.post(

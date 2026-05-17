@@ -318,11 +318,13 @@ class DataContainerSourcePayload(StrictModel):
     delimiter: str | None = None
     offset: int
     limit: int
+    transform_count: int = 0
+    variable_count: int = 0
 
 
 class DataContainerPayload(StrictModel):
     id: str
-    kind: Literal["table"]
+    kind: Literal["table", "matrix", "transformed_view", "statistics_summary", "fit_result", "notebook_output"]
     label: str
     status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "enabled"
     readonly: bool = True
@@ -330,7 +332,90 @@ class DataContainerPayload(StrictModel):
     column_count: int
     columns: list[DataContainerColumnPayload] = Field(default_factory=list)
     source: DataContainerSourcePayload
+    dimensions: dict[str, int] | None = None
+    coordinate_vectors: dict[str, list[float | int | str | None]] = Field(default_factory=dict)
+    missing_value_policy: str | None = None
+    statistics: dict[str, Any] = Field(default_factory=dict)
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    result_tables: list[dict[str, Any]] = Field(default_factory=list)
+    overlays: list[dict[str, Any]] = Field(default_factory=list)
+    artifact_paths: list[str] = Field(default_factory=list)
+    container_ids: list[str] = Field(default_factory=list)
+    source_run_id: str | None = None
     help: str
+
+
+class PlotObjectPayload(StrictModel):
+    id: str
+    kind: str
+    module: str = "plot"
+    label: str
+    status: Literal["active", "disabled", "coming_soon", "experimental"] = "active"
+    visible: bool = True
+    locked: bool = False
+    graph_node_id: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    help: str = "Graph-addressable plot object landing."
+
+
+class PlotEditCommandPayload(StrictModel):
+    command_id: str
+    kind: Literal["add", "edit", "delete", "reorder", "rename", "visibility", "lock"]
+    target_object_id: str
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    graph_patch: dict[str, Any] = Field(default_factory=dict)
+    reversible: bool = True
+    help: str = "Undoable typed plot edit command landing."
+
+
+class AnalysisOperationResultPayload(StrictModel):
+    operation_id: str
+    available: bool = True
+    valid: bool = True
+    status_code: str = "ok"
+    message: str = ""
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    tables: list[dict[str, Any]] = Field(default_factory=list)
+    overlays: list[dict[str, Any]] = Field(default_factory=list)
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
+
+
+class ImportFilterPayload(StrictModel):
+    id: str
+    label: str
+    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "coming_soon"
+    owner: str = "sidecar"
+    surface: str = "plot,data_studio"
+    options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
+    output_container_kinds: list[str] = Field(default_factory=list)
+    help: str
+    test_requirements: list[str] = Field(default_factory=list)
+
+
+class ExportTargetPayload(StrictModel):
+    id: str
+    label: str
+    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "coming_soon"
+    owner: str = "sidecar"
+    surface: str = "all"
+    allowed_modules: list[str] = Field(default_factory=list)
+    artifact_kind: str
+    filename_policy: str
+    help: str
+    test_requirements: list[str] = Field(default_factory=list)
+
+
+class NotebookOutputPayload(StrictModel):
+    id: str
+    kind: Literal["table", "figure", "artifact", "text"]
+    label: str
+    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "experimental"
+    source_run_id: str
+    artifact_paths: list[str] = Field(default_factory=list)
+    container_ids: list[str] = Field(default_factory=list)
+    help: str = "Code Console generated output landing."
 
 
 class SourceTablePreviewResponse(StrictModel):
@@ -400,6 +485,7 @@ class FitAnalysisResponse(StrictModel):
     offset: int
     limit: int
     rows: list[FitDerivedRowResponse] = Field(default_factory=list)
+    operation_result: AnalysisOperationResultPayload | None = None
 
 
 class TemplateRecommendationResponse(StrictModel):
@@ -1657,6 +1743,12 @@ __all__ = [
     "DataContainerColumnPayload",
     "DataContainerPayload",
     "DataContainerSourcePayload",
+    "AnalysisOperationResultPayload",
+    "ExportTargetPayload",
+    "ImportFilterPayload",
+    "NotebookOutputPayload",
+    "PlotEditCommandPayload",
+    "PlotObjectPayload",
     "DocumentGraphEdgePayload",
     "DocumentGraphNodePayload",
     "DocumentGraphPayload",

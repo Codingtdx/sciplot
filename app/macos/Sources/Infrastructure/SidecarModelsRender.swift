@@ -1178,6 +1178,8 @@ struct DataContainerSourcePayload: Codable, Equatable, Sendable {
     let delimiter: String?
     let offset: Int
     let limit: Int
+    let transformCount: Int
+    let variableCount: Int
 
     enum CodingKeys: String, CodingKey {
         case inputPath
@@ -1187,6 +1189,21 @@ struct DataContainerSourcePayload: Codable, Equatable, Sendable {
         case delimiter
         case offset
         case limit
+        case transformCount
+        case variableCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputPath = try container.decode(String.self, forKey: .inputPath)
+        sheet = try container.decode(SheetValue.self, forKey: .sheet)
+        selectedSegmentID = try container.decodeIfPresent(String.self, forKey: .selectedSegmentID)
+        encoding = try container.decodeIfPresent(String.self, forKey: .encoding)
+        delimiter = try container.decodeIfPresent(String.self, forKey: .delimiter)
+        offset = try container.decode(Int.self, forKey: .offset)
+        limit = try container.decode(Int.self, forKey: .limit)
+        transformCount = try container.decodeIfPresent(Int.self, forKey: .transformCount) ?? 0
+        variableCount = try container.decodeIfPresent(Int.self, forKey: .variableCount) ?? 0
     }
 }
 
@@ -1200,7 +1217,189 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
     let columnCount: Int
     let columns: [DataContainerColumnPayload]
     let source: DataContainerSourcePayload
+    let dimensions: [String: JSONValue]?
+    let coordinateVectors: [String: [JSONValue]]
+    let missingValuePolicy: String?
+    let statistics: [String: JSONValue]
+    let diagnostics: [[String: JSONValue]]
+    let resultTables: [[String: JSONValue]]
+    let overlays: [[String: JSONValue]]
+    let artifactPaths: [String]
+    let containerIDs: [String]
+    let sourceRunID: String?
     let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case label
+        case status
+        case readonly
+        case rowCount
+        case columnCount
+        case columns
+        case source
+        case dimensions
+        case coordinateVectors
+        case missingValuePolicy
+        case statistics
+        case diagnostics
+        case resultTables
+        case overlays
+        case artifactPaths
+        case containerIDs = "containerIds"
+        case sourceRunID = "sourceRunId"
+        case help
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        kind = try container.decode(String.self, forKey: .kind)
+        label = try container.decode(String.self, forKey: .label)
+        status = try container.decode(String.self, forKey: .status)
+        readonly = try container.decode(Bool.self, forKey: .readonly)
+        rowCount = try container.decode(Int.self, forKey: .rowCount)
+        columnCount = try container.decode(Int.self, forKey: .columnCount)
+        columns = try container.decodeIfPresent([DataContainerColumnPayload].self, forKey: .columns) ?? []
+        source = try container.decode(DataContainerSourcePayload.self, forKey: .source)
+        dimensions = try container.decodeIfPresent([String: JSONValue].self, forKey: .dimensions)
+        coordinateVectors = try container.decodeIfPresent([String: [JSONValue]].self, forKey: .coordinateVectors) ?? [:]
+        missingValuePolicy = try container.decodeIfPresent(String.self, forKey: .missingValuePolicy)
+        statistics = try container.decodeIfPresent([String: JSONValue].self, forKey: .statistics) ?? [:]
+        diagnostics = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .diagnostics) ?? []
+        resultTables = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .resultTables) ?? []
+        overlays = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .overlays) ?? []
+        artifactPaths = try container.decodeIfPresent([String].self, forKey: .artifactPaths) ?? []
+        containerIDs = try container.decodeIfPresent([String].self, forKey: .containerIDs) ?? []
+        sourceRunID = try container.decodeIfPresent(String.self, forKey: .sourceRunID)
+        help = try container.decode(String.self, forKey: .help)
+    }
+}
+
+struct PlotObjectPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let module: String
+    let label: String
+    let status: String
+    let visible: Bool
+    let locked: Bool
+    let graphNodeID: String
+    let payload: [String: JSONValue]
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case module
+        case label
+        case status
+        case visible
+        case locked
+        case graphNodeID = "graphNodeId"
+        case payload
+        case help
+    }
+}
+
+struct PlotEditCommandPayload: Codable, Equatable, Sendable, Identifiable {
+    let commandID: String
+    let kind: String
+    let targetObjectID: String
+    let before: [String: JSONValue]?
+    let after: [String: JSONValue]?
+    let graphPatch: [String: JSONValue]
+    let reversible: Bool
+    let help: String
+
+    var id: String { commandID }
+
+    enum CodingKeys: String, CodingKey {
+        case commandID = "commandId"
+        case kind
+        case targetObjectID = "targetObjectId"
+        case before
+        case after
+        case graphPatch
+        case reversible
+        case help
+    }
+}
+
+struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiable {
+    let operationID: String
+    let available: Bool
+    let valid: Bool
+    let statusCode: String
+    let message: String
+    let diagnostics: [[String: JSONValue]]
+    let metrics: [String: JSONValue]
+    let tables: [[String: JSONValue]]
+    let overlays: [[String: JSONValue]]
+    let dataContainers: [DataContainerPayload]
+
+    var id: String { operationID }
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operationId"
+        case available
+        case valid
+        case statusCode
+        case message
+        case diagnostics
+        case metrics
+        case tables
+        case overlays
+        case dataContainers
+    }
+}
+
+struct ImportFilterPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let status: String
+    let owner: String
+    let surface: String
+    let optionsSchema: [String: JSONValue]
+    let outputContainerKinds: [String]
+    let help: String
+    let testRequirements: [String]
+}
+
+struct ExportTargetPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let status: String
+    let owner: String
+    let surface: String
+    let allowedModules: [String]
+    let artifactKind: String
+    let filenamePolicy: String
+    let help: String
+    let testRequirements: [String]
+}
+
+struct NotebookOutputPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let label: String
+    let status: String
+    let sourceRunID: String
+    let artifactPaths: [String]
+    let containerIDs: [String]
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case label
+        case status
+        case sourceRunID = "sourceRunId"
+        case artifactPaths
+        case containerIDs = "containerIds"
+        case help
+    }
 }
 
 struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
@@ -1399,6 +1598,7 @@ struct FitAnalysisResponse: Codable, Equatable, Sendable {
     let offset: Int
     let limit: Int
     let rows: [FitDerivedRowResponse]
+    let operationResult: AnalysisOperationResultPayload?
 
     enum CodingKeys: String, CodingKey {
         case inputPath
@@ -1419,6 +1619,72 @@ struct FitAnalysisResponse: Codable, Equatable, Sendable {
         case offset
         case limit
         case rows
+        case operationResult
+    }
+
+    init(
+        inputPath: String,
+        sheet: SheetValue,
+        modelID: String,
+        xLabel: String?,
+        yLabel: String?,
+        selectedSeriesID: String?,
+        equationDisplay: String,
+        slope: Double?,
+        intercept: Double?,
+        rSquared: Double,
+        rmse: Double,
+        pointCount: Int,
+        seriesSummaries: [FitSeriesSummaryResponse],
+        warnings: [String],
+        totalRows: Int,
+        offset: Int,
+        limit: Int,
+        rows: [FitDerivedRowResponse],
+        operationResult: AnalysisOperationResultPayload? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.modelID = modelID
+        self.xLabel = xLabel
+        self.yLabel = yLabel
+        self.selectedSeriesID = selectedSeriesID
+        self.equationDisplay = equationDisplay
+        self.slope = slope
+        self.intercept = intercept
+        self.rSquared = rSquared
+        self.rmse = rmse
+        self.pointCount = pointCount
+        self.seriesSummaries = seriesSummaries
+        self.warnings = warnings
+        self.totalRows = totalRows
+        self.offset = offset
+        self.limit = limit
+        self.rows = rows
+        self.operationResult = operationResult
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputPath = try container.decode(String.self, forKey: .inputPath)
+        sheet = try container.decode(SheetValue.self, forKey: .sheet)
+        modelID = try container.decode(String.self, forKey: .modelID)
+        xLabel = try container.decodeIfPresent(String.self, forKey: .xLabel)
+        yLabel = try container.decodeIfPresent(String.self, forKey: .yLabel)
+        selectedSeriesID = try container.decodeIfPresent(String.self, forKey: .selectedSeriesID)
+        equationDisplay = try container.decode(String.self, forKey: .equationDisplay)
+        slope = try container.decodeIfPresent(Double.self, forKey: .slope)
+        intercept = try container.decodeIfPresent(Double.self, forKey: .intercept)
+        rSquared = try container.decode(Double.self, forKey: .rSquared)
+        rmse = try container.decode(Double.self, forKey: .rmse)
+        pointCount = try container.decode(Int.self, forKey: .pointCount)
+        seriesSummaries = try container.decodeIfPresent([FitSeriesSummaryResponse].self, forKey: .seriesSummaries) ?? []
+        warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        totalRows = try container.decode(Int.self, forKey: .totalRows)
+        offset = try container.decode(Int.self, forKey: .offset)
+        limit = try container.decode(Int.self, forKey: .limit)
+        rows = try container.decodeIfPresent([FitDerivedRowResponse].self, forKey: .rows) ?? []
+        operationResult = try container.decodeIfPresent(AnalysisOperationResultPayload.self, forKey: .operationResult)
     }
 }
 

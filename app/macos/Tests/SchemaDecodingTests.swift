@@ -183,6 +183,142 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.dataContainers[0].columns[0].unit, "s")
     }
 
+    func testDecodeLabPlotScalePayloadLandingModels() throws {
+        let containerPayload = """
+        {
+          "id": "matrix-1",
+          "kind": "matrix",
+          "label": "Scalar Field",
+          "status": "experimental",
+          "readonly": true,
+          "row_count": 4,
+          "column_count": 3,
+          "columns": [],
+          "source": {
+            "input_path": "/tmp/field.csv",
+            "sheet": "Sheet1",
+            "selected_segment_id": null,
+            "encoding": "utf-8",
+            "delimiter": ",",
+            "offset": 0,
+            "limit": 50,
+            "transform_count": 0
+          },
+          "dimensions": {"rows": 2, "columns": 2},
+          "coordinate_vectors": {"x": [25, 40], "y": [0, 5]},
+          "missing_value_policy": "preserve",
+          "statistics": {"Intensity": {"mean": 0.395}},
+          "diagnostics": [{"status_code": "matrix_detected", "message": "XYZ grid detected."}],
+          "help": "Matrix container landing."
+        }
+        """
+        let container = try decoder.decode(DataContainerPayload.self, from: Data(containerPayload.utf8))
+        XCTAssertEqual(container.kind, "matrix")
+        XCTAssertEqual(container.dimensions?["rows"]?.numberValue, 2)
+
+        let objectPayload = """
+        {
+          "id": "plot:guide:target-line",
+          "kind": "plot.guide",
+          "module": "plot",
+          "label": "Target",
+          "status": "active",
+          "visible": true,
+          "locked": false,
+          "graph_node_id": "plot:guide:target-line",
+          "payload": {"axis_target": "y_primary"},
+          "help": "Graph-addressable plot object."
+        }
+        """
+        let object = try decoder.decode(PlotObjectPayload.self, from: Data(objectPayload.utf8))
+        XCTAssertEqual(object.kind, "plot.guide")
+        XCTAssertTrue(object.visible)
+
+        let commandPayload = """
+        {
+          "command_id": "cmd-1",
+          "kind": "edit",
+          "target_object_id": "plot:guide:target-line",
+          "before": {"visible": true},
+          "after": {"visible": false},
+          "graph_patch": {"selected_nodes": {"plot": "plot:guide:target-line"}},
+          "reversible": true,
+          "help": "Undoable typed edit command."
+        }
+        """
+        let command = try decoder.decode(PlotEditCommandPayload.self, from: Data(commandPayload.utf8))
+        XCTAssertEqual(command.kind, "edit")
+        XCTAssertTrue(command.reversible)
+
+        let analysisPayload = """
+        {
+          "operation_id": "analysis.fit",
+          "available": true,
+          "valid": true,
+          "status_code": "ok",
+          "message": "Fit complete.",
+          "diagnostics": [],
+          "metrics": {"r_squared": 0.99},
+          "tables": [{"id": "fit-table", "rows": []}],
+          "overlays": [{"kind": "fit_overlay"}],
+          "data_containers": []
+        }
+        """
+        let analysis = try decoder.decode(AnalysisOperationResultPayload.self, from: Data(analysisPayload.utf8))
+        XCTAssertEqual(analysis.operationID, "analysis.fit")
+        XCTAssertEqual(analysis.metrics["r_squared"]?.numberValue, 0.99)
+
+        let filterPayload = """
+        {
+          "id": "import.hdf5",
+          "label": "HDF5",
+          "status": "coming_soon",
+          "owner": "sidecar",
+          "surface": "plot,data_studio",
+          "options_schema": {"type": "object"},
+          "output_container_kinds": ["matrix"],
+          "help": "Explicit import filter landing.",
+          "test_requirements": ["schema_decode"]
+        }
+        """
+        let importFilter = try decoder.decode(ImportFilterPayload.self, from: Data(filterPayload.utf8))
+        XCTAssertEqual(importFilter.id, "import.hdf5")
+        XCTAssertEqual(importFilter.outputContainerKinds, ["matrix"])
+
+        let exportPayload = """
+        {
+          "id": "export.artifact_manifest",
+          "label": "Artifact Manifest",
+          "status": "coming_soon",
+          "owner": "sidecar",
+          "surface": "all",
+          "allowed_modules": ["plot", "data_studio", "composer", "code_console"],
+          "artifact_kind": "manifest",
+          "filename_policy": "base_name_with_suffixes",
+          "help": "Explicit export target landing.",
+          "test_requirements": ["manifest_roundtrip"]
+        }
+        """
+        let exportTarget = try decoder.decode(ExportTargetPayload.self, from: Data(exportPayload.utf8))
+        XCTAssertEqual(exportTarget.artifactKind, "manifest")
+
+        let notebookPayload = """
+        {
+          "id": "notebook-output-1",
+          "kind": "figure",
+          "label": "Generated Figure",
+          "status": "experimental",
+          "source_run_id": "run-1",
+          "artifact_paths": ["/tmp/figure.pdf"],
+          "container_ids": ["data.notebook_output:run-1"],
+          "help": "Code Console generated output landing."
+        }
+        """
+        let notebook = try decoder.decode(NotebookOutputPayload.self, from: Data(notebookPayload.utf8))
+        XCTAssertEqual(notebook.kind, "figure")
+        XCTAssertEqual(notebook.containerIDs, ["data.notebook_output:run-1"])
+    }
+
     func testDecodeCodeConsoleContextResponseUsesSnakeCaseContextID() throws {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

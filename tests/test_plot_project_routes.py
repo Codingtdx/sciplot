@@ -318,8 +318,24 @@ def test_save_open_project_roundtrip_generates_document_graph(tmp_path: Path) ->
         for node in saved_graph["nodes"]
     )
     assert {node["kind"] for node in saved_graph["nodes"]}.issuperset(
-        {"plot.source", "plot.scene", "plot.axis", "plot.legend", "analysis.fit"}
+        {
+            "plot.source",
+            "plot.scene",
+            "plot.page",
+            "plot.plot_area",
+            "plot.series",
+            "plot.axis",
+            "plot.legend",
+            "plot.axis.extra",
+            "plot.guide",
+            "plot.annotation.text",
+            "plot.annotation.shape",
+            "plot.fit_overlay",
+            "analysis.fit",
+        }
     )
+    object_nodes = [node for node in saved_graph["nodes"] if node["kind"].startswith("plot.")]
+    assert all("graph_addressable" in node["payload"] for node in object_nodes if node["kind"] != "plot.source")
 
     open_response = client.post("/open-project", json={"project_path": str(project_path)})
 
