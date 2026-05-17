@@ -229,6 +229,24 @@ struct DataStudioAnalysisSheet: View {
                         session.loadAnalysisFit(offset: session.analysisFitOffset)
                     }
                 )
+
+                if let result = session.analysisFitResponse?.operationResult {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(result.message.isEmpty ? result.operationID : result.message)
+                            .font(.caption.weight(.semibold))
+                        HStack(spacing: 12) {
+                            Text(result.statusCode)
+                            Text("\(result.dataContainers.count) container\(result.dataContainers.count == 1 ? "" : "s")")
+                            if let rSquared = result.metrics["r_squared"]?.numberValue {
+                                Text("R² \(rSquared.formatted(.number.precision(.fractionLength(3))))")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(10)
+                    .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
             }
         }
     }

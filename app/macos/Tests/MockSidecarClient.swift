@@ -58,6 +58,9 @@ final class MockSidecarClient: SidecarClienting {
     var inspectResponse = TestPayloads.inspectFile()
     var sourceTablePreviewResponse = TestPayloads.sourceTablePreview()
     var fitAnalysisResponse = TestPayloads.fitAnalysis()
+    var analysisOperationResponse = TestPayloads.analysisOperation()
+    var importPreviewResponse = TestPayloads.importPreview()
+    var plotEditCommandNormalizeResponse = TestPayloads.plotEditCommandNormalize()
     var saveProjectResponse = TestPayloads.saveProjectResponse()
     var openProjectResponse = TestPayloads.openProjectResponse()
     var codeConsoleContextResponse = TestPayloads.codeConsoleContext()
@@ -94,6 +97,9 @@ final class MockSidecarClient: SidecarClienting {
     var inspectHandler: ((FileRequest) async throws -> InspectFileResponse)?
     var sourceTablePreviewHandler: ((SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse)?
     var fitAnalysisHandler: ((FitAnalysisRequest) async throws -> FitAnalysisResponse)?
+    var analysisOperationHandler: ((AnalysisOperationRequest) async throws -> AnalysisOperationResponse)?
+    var importPreviewHandler: ((ImportPreviewRequest) async throws -> ImportPreviewResponse)?
+    var plotEditCommandNormalizeHandler: ((PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse)?
     var saveProjectHandler: ((SaveProjectRequest) async throws -> SaveProjectResponse)?
     var openProjectHandler: ((OpenProjectRequest) async throws -> OpenProjectResponse)?
     var codeConsoleContextHandler: ((CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse)?
@@ -130,6 +136,9 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var exportRequests: [ExportRenderRequest] = []
     private(set) var sourceTablePreviewRequests: [SourceTablePreviewRequest] = []
     private(set) var fitAnalysisRequests: [FitAnalysisRequest] = []
+    private(set) var analysisOperationRequests: [AnalysisOperationRequest] = []
+    private(set) var importPreviewRequests: [ImportPreviewRequest] = []
+    private(set) var plotEditCommandNormalizeRequests: [PlotEditCommandNormalizeRequest] = []
     private(set) var saveProjectRequests: [SaveProjectRequest] = []
     private(set) var openProjectRequests: [OpenProjectRequest] = []
     private(set) var thumbnailRequests: [ThumbnailRequest] = []
@@ -372,6 +381,32 @@ final class MockSidecarClient: SidecarClienting {
             return try await fitAnalysisHandler(request)
         }
         return fitAnalysisResponse
+    }
+
+    func analysisOperation(_ request: AnalysisOperationRequest) async throws -> AnalysisOperationResponse {
+        analysisOperationRequests.append(request)
+        if let analysisOperationHandler {
+            return try await analysisOperationHandler(request)
+        }
+        return analysisOperationResponse
+    }
+
+    func importPreview(_ request: ImportPreviewRequest) async throws -> ImportPreviewResponse {
+        importPreviewRequests.append(request)
+        if let importPreviewHandler {
+            return try await importPreviewHandler(request)
+        }
+        return importPreviewResponse
+    }
+
+    func normalizePlotEditCommand(
+        _ request: PlotEditCommandNormalizeRequest
+    ) async throws -> PlotEditCommandNormalizeResponse {
+        plotEditCommandNormalizeRequests.append(request)
+        if let plotEditCommandNormalizeHandler {
+            return try await plotEditCommandNormalizeHandler(request)
+        }
+        return plotEditCommandNormalizeResponse
     }
 
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {

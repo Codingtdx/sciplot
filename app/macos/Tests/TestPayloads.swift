@@ -21,6 +21,9 @@ enum TestPayloads {
         .init(method: "POST", path: "/inspect-file"),
         .init(method: "POST", path: "/source-table-preview"),
         .init(method: "POST", path: "/fit-analysis"),
+        .init(method: "POST", path: "/analysis-operation"),
+        .init(method: "POST", path: "/import-preview"),
+        .init(method: "POST", path: "/plot-edit-command/normalize"),
         .init(method: "POST", path: "/save-project"),
         .init(method: "POST", path: "/open-project"),
         .init(method: "POST", path: "/preflight-render"),
@@ -1049,6 +1052,55 @@ enum TestPayloads {
                     sizeBytes: 256
                 ),
             ]
+        )
+    }
+
+    static func analysisOperation() -> AnalysisOperationResponse {
+        AnalysisOperationResponse(
+            operationID: "analysis.smoothing",
+            inputPath: "/tmp/curve.csv",
+            sheet: .index(0),
+            operationResult: AnalysisOperationResultPayload(
+                operationID: "analysis.smoothing",
+                available: true,
+                valid: true,
+                statusCode: "ok",
+                message: "Smoothing complete.",
+                diagnostics: [],
+                metrics: ["point_count": .number(3)],
+                tables: [],
+                overlays: [],
+                dataContainers: []
+            )
+        )
+    }
+
+    static func importPreview() -> ImportPreviewResponse {
+        ImportPreviewResponse(
+            inputPath: "/tmp/records.json",
+            filterID: "import.json",
+            status: "experimental",
+            label: "JSON",
+            dataContainers: [],
+            diagnostics: [],
+            optionsSchema: ["type": .string("object")],
+            help: "JSON records preview is experimental."
+        )
+    }
+
+    static func plotEditCommandNormalize() -> PlotEditCommandNormalizeResponse {
+        PlotEditCommandNormalizeResponse(
+            command: PlotEditCommandPayload(
+                commandID: "cmd-visible",
+                kind: "visibility",
+                targetObjectID: "plot:guide:target",
+                before: ["visible": .bool(true)],
+                after: ["visible": .bool(false)],
+                graphPatch: ["target_object_id": .string("plot:guide:target")],
+                reversible: true,
+                help: "Undoable typed plot edit command."
+            ),
+            diagnostics: []
         )
     }
 

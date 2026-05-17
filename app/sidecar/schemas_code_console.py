@@ -6,7 +6,9 @@ from pydantic import Field
 
 from app.sidecar.schemas_common import StrictModel
 from app.sidecar.schemas_render import (
+    DataContainerPayload,
     InputInspectionResponse,
+    NotebookOutputPayload,
     PlotDatasetPreviewResponse,
     RenderOptionsPayload,
 )
@@ -64,6 +66,8 @@ class CodeConsoleRunResponse(StrictModel):
     stdout_path: str
     stderr_path: str
     generated_files: list[CodeConsoleGeneratedFileResponse] = Field(default_factory=list)
+    notebook_outputs: list[NotebookOutputPayload] = Field(default_factory=list)
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
 
 
 __all__ = [

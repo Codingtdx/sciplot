@@ -162,6 +162,11 @@ print(f"rows={len(df)}")
     generated_names = {item["name"] for item in payload["generated_files"]}
     assert "console_plot.pdf" in generated_names
     assert "raw_snapshot.csv" in generated_names
+    notebook_outputs = {item["label"]: item for item in payload["notebook_outputs"]}
+    assert notebook_outputs["console_plot.pdf"]["kind"] == "figure"
+    assert notebook_outputs["raw_snapshot.csv"]["kind"] == "table"
+    assert payload["data_containers"][0]["kind"] == "notebook_output"
+    assert payload["data_containers"][0]["label"] == "raw_snapshot.csv"
 
 
 def test_code_console_run_prefers_context_id_fast_path(tmp_path: Path, monkeypatch) -> None:

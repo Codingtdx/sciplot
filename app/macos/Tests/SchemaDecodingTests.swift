@@ -317,6 +317,55 @@ final class SchemaDecodingTests: XCTestCase {
         let notebook = try decoder.decode(NotebookOutputPayload.self, from: Data(notebookPayload.utf8))
         XCTAssertEqual(notebook.kind, "figure")
         XCTAssertEqual(notebook.containerIDs, ["data.notebook_output:run-1"])
+
+        let analysisRequest = AnalysisOperationRequest(
+            operationID: "analysis.smoothing",
+            inputPath: "/tmp/curve.csv",
+            xColumn: "x",
+            yColumn: "signal",
+            parameters: ["window": .number(3)]
+        )
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let analysisRequestJSON = try JSONSerialization.jsonObject(
+            with: try encoder.encode(analysisRequest)
+        ) as? [String: Any]
+        XCTAssertEqual(analysisRequestJSON?["operation_id"] as? String, "analysis.smoothing")
+
+        let importPreviewPayload = """
+        {
+          "input_path": "/tmp/records.json",
+          "filter_id": "import.json",
+          "status": "experimental",
+          "label": "JSON",
+          "data_containers": [],
+          "diagnostics": [{"status_code": "json_records_loaded"}],
+          "options_schema": {"type": "object"},
+          "help": "JSON records preview is experimental."
+        }
+        """
+        let importPreview = try decoder.decode(ImportPreviewResponse.self, from: Data(importPreviewPayload.utf8))
+        XCTAssertEqual(importPreview.filterID, "import.json")
+        XCTAssertEqual(importPreview.status, "experimental")
+
+        let commandResponsePayload = """
+        {
+          "command": {
+            "command_id": "cmd-visible",
+            "kind": "visibility",
+            "target_object_id": "plot:guide:target-line",
+            "graph_patch": {"target_object_id": "plot:guide:target-line"},
+            "reversible": true,
+            "help": "Normalized command."
+          },
+          "diagnostics": []
+        }
+        """
+        let commandResponse = try decoder.decode(
+            PlotEditCommandNormalizeResponse.self,
+            from: Data(commandResponsePayload.utf8)
+        )
+        XCTAssertEqual(commandResponse.command.targetObjectID, "plot:guide:target-line")
     }
 
     func testDecodeCodeConsoleContextResponseUsesSnakeCaseContextID() throws {
@@ -327,6 +376,46 @@ final class SchemaDecodingTests: XCTestCase {
         let response = try decoder.decode(CodeConsoleContextResponse.self, from: payload)
 
         XCTAssertEqual(response.contextID, "ctx_test_payload")
+    }
+
+    func testDecodeCodeConsoleRunResponseWithNotebookOutputs() throws {
+        let payload = """
+        {
+          "status": "succeeded",
+          "exit_code": 0,
+          "duration_seconds": 0.42,
+          "stdout": "ok",
+          "stderr": "",
+          "run_dir": "/tmp/run",
+          "output_dir": "/tmp/run/outputs",
+          "script_path": "/tmp/run/user_code.py",
+          "prompt_path": "/tmp/run/prompt.txt",
+          "context_path": "/tmp/run/context.json",
+          "stdout_path": "/tmp/run/stdout.txt",
+          "stderr_path": "/tmp/run/stderr.txt",
+          "generated_files": [
+            {"path": "/tmp/run/outputs/plot.pdf", "name": "plot.pdf", "file_type": "pdf", "size_bytes": 120}
+          ],
+          "notebook_outputs": [
+            {
+              "id": "notebook-output:1",
+              "kind": "figure",
+              "label": "plot.pdf",
+              "status": "experimental",
+              "source_run_id": "run",
+              "artifact_paths": ["/tmp/run/outputs/plot.pdf"],
+              "container_ids": [],
+              "help": "Code Console generated figure output."
+            }
+          ],
+          "data_containers": []
+        }
+        """
+
+        let response = try decoder.decode(CodeConsoleRunResponse.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(response.notebookOutputs.first?.kind, "figure")
+        XCTAssertEqual(response.generatedFiles.first?.name, "plot.pdf")
     }
 
     func testEncodeCodeConsoleRunRequestUsesSnakeCaseContextID() throws {

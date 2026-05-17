@@ -15,6 +15,7 @@ struct CodeConsoleOutputsView: View {
                 BusyStateCard(title: "Running Code Console")
             } else if let run = session.latestRunResponse {
                 summaryGrid(run: run)
+                notebookOutputsSection(run: run)
 
                 HStack(alignment: .top, spacing: 18) {
                     generatedFilesSection(run: run)
@@ -42,8 +43,43 @@ struct CodeConsoleOutputsView: View {
                 ("Exit code", run.exitCode.map(String.init) ?? "n/a"),
                 ("Duration", String(format: "%.2fs", run.durationSeconds)),
                 ("Generated files", "\(run.generatedFiles.count)"),
+                ("Notebook outputs", "\(run.notebookOutputs.count)"),
             ]
         )
+    }
+
+    @ViewBuilder
+    private func notebookOutputsSection(run: CodeConsoleRunResponse) -> some View {
+        if !run.notebookOutputs.isEmpty || !run.dataContainers.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Notebook Outputs")
+                    .font(.subheadline.weight(.semibold))
+
+                ForEach(run.notebookOutputs) { output in
+                    HStack(spacing: 8) {
+                        Text(output.label)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        Text(output.kind.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(output.status.replacingOccurrences(of: "_", with: " ").capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                if !run.dataContainers.isEmpty {
+                    Text("\(run.dataContainers.count) table container\(run.dataContainers.count == 1 ? "" : "s") available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(10)
+            .proGlassPanel(theme: theme, cornerRadius: ProCornerPolicy.row)
+        }
     }
 
     private func generatedFilesSection(run: CodeConsoleRunResponse) -> some View {

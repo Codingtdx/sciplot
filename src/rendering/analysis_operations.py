@@ -317,7 +317,9 @@ def run_analysis_operation(
         positive = np.maximum(y_values, np.finfo(float).eps)
         slope, intercept = np.polyfit(x_values, np.log(positive), deg=1)
         y_fit = np.exp(intercept + slope * x_values)
-        metrics = {"a": float(np.exp(intercept)), "b": float(slope)}
+        amplitude = float(np.exp(intercept))
+        rate = float(slope)
+        metrics = {"a": amplitude, "b": rate, "amplitude": amplitude, "rate": rate}
     frame = pd.DataFrame({x_name: x_values, y_name: y_values, "y_fit": y_fit, "residual": y_values - y_fit})
     return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Growth model fitting complete.", metrics=metrics, overlays=[{"kind": "fit_overlay", "model_id": model}])
 

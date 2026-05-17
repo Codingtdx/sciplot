@@ -70,6 +70,31 @@ struct PlotDataWorkbookSheet: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let response = session.sourceTableResponse, !response.dataContainers.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(response.dataContainers) { container in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(container.label)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                Text("\(container.kind) · \(container.status)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                Text("\(container.rowCount) rows · \(container.columnCount) cols")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(.quinary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .help(container.help)
+                        }
+                    }
+                }
+            }
+
             HStack(spacing: 10) {
                 Button("Open Source") {
                     session.openCurrentSource()

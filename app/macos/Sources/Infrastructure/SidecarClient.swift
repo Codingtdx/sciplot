@@ -31,6 +31,9 @@ protocol SidecarClienting: AnyObject {
     func inspectFile(_ request: FileRequest) async throws -> InspectFileResponse
     func sourceTablePreview(_ request: SourceTablePreviewRequest) async throws -> SourceTablePreviewResponse
     func fitAnalysis(_ request: FitAnalysisRequest) async throws -> FitAnalysisResponse
+    func analysisOperation(_ request: AnalysisOperationRequest) async throws -> AnalysisOperationResponse
+    func importPreview(_ request: ImportPreviewRequest) async throws -> ImportPreviewResponse
+    func normalizePlotEditCommand(_ request: PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse
     func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse
@@ -180,6 +183,18 @@ final class SidecarClient: SidecarClienting {
 
     func fitAnalysis(_ request: FitAnalysisRequest) async throws -> FitAnalysisResponse {
         try await post("fit-analysis", body: request)
+    }
+
+    func analysisOperation(_ request: AnalysisOperationRequest) async throws -> AnalysisOperationResponse {
+        try await post("analysis-operation", body: request)
+    }
+
+    func importPreview(_ request: ImportPreviewRequest) async throws -> ImportPreviewResponse {
+        try await post("import-preview", body: request)
+    }
+
+    func normalizePlotEditCommand(_ request: PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse {
+        try await post("plot-edit-command/normalize", body: request)
     }
 
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {

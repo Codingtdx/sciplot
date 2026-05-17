@@ -1402,6 +1402,137 @@ struct NotebookOutputPayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct AnalysisOperationRequest: Codable, Equatable, Sendable {
+    let operationID: String
+    let inputPath: String
+    let sheet: SheetValue
+    let xColumn: String?
+    let yColumn: String?
+    let parameters: [String: JSONValue]
+    let offset: Int
+    let limit: Int
+    let options: RenderOptionsPayload?
+
+    init(
+        operationID: String,
+        inputPath: String,
+        sheet: SheetValue = .index(0),
+        xColumn: String? = nil,
+        yColumn: String? = nil,
+        parameters: [String: JSONValue] = [:],
+        offset: Int = 0,
+        limit: Int = 200,
+        options: RenderOptionsPayload? = nil
+    ) {
+        self.operationID = operationID
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.xColumn = xColumn
+        self.yColumn = yColumn
+        self.parameters = parameters
+        self.offset = offset
+        self.limit = limit
+        self.options = options
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operationId"
+        case inputPath
+        case sheet
+        case xColumn
+        case yColumn
+        case parameters
+        case offset
+        case limit
+        case options
+    }
+}
+
+struct AnalysisOperationResponse: Codable, Equatable, Sendable {
+    let operationID: String
+    let inputPath: String
+    let sheet: SheetValue
+    let operationResult: AnalysisOperationResultPayload
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operationId"
+        case inputPath
+        case sheet
+        case operationResult
+    }
+}
+
+struct ImportPreviewRequest: Codable, Equatable, Sendable {
+    let inputPath: String
+    let filterID: String?
+    let sheet: SheetValue
+    let offset: Int
+    let limit: Int
+    let options: [String: JSONValue]
+
+    init(
+        inputPath: String,
+        filterID: String? = nil,
+        sheet: SheetValue = .index(0),
+        offset: Int = 0,
+        limit: Int = 50,
+        options: [String: JSONValue] = [:]
+    ) {
+        self.inputPath = inputPath
+        self.filterID = filterID
+        self.sheet = sheet
+        self.offset = offset
+        self.limit = limit
+        self.options = options
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case filterID = "filterId"
+        case sheet
+        case offset
+        case limit
+        case options
+    }
+}
+
+struct ImportPreviewResponse: Codable, Equatable, Sendable {
+    let inputPath: String
+    let filterID: String
+    let status: String
+    let label: String
+    let dataContainers: [DataContainerPayload]
+    let diagnostics: [[String: JSONValue]]
+    let optionsSchema: [String: JSONValue]
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case filterID = "filterId"
+        case status
+        case label
+        case dataContainers
+        case diagnostics
+        case optionsSchema
+        case help
+    }
+}
+
+struct PlotEditCommandNormalizeRequest: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let objects: [PlotObjectPayload]
+
+    init(command: PlotEditCommandPayload, objects: [PlotObjectPayload] = []) {
+        self.command = command
+        self.objects = objects
+    }
+}
+
+struct PlotEditCommandNormalizeResponse: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let diagnostics: [[String: JSONValue]]
+}
+
 struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
@@ -1792,6 +1923,79 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
     let stdoutPath: String
     let stderrPath: String
     let generatedFiles: [CodeConsoleGeneratedFileResponse]
+    let notebookOutputs: [NotebookOutputPayload]
+    let dataContainers: [DataContainerPayload]
+
+    init(
+        status: String,
+        exitCode: Int?,
+        durationSeconds: Double,
+        stdout: String,
+        stderr: String,
+        runDir: String,
+        outputDir: String,
+        scriptPath: String,
+        promptPath: String,
+        contextPath: String,
+        stdoutPath: String,
+        stderrPath: String,
+        generatedFiles: [CodeConsoleGeneratedFileResponse],
+        notebookOutputs: [NotebookOutputPayload] = [],
+        dataContainers: [DataContainerPayload] = []
+    ) {
+        self.status = status
+        self.exitCode = exitCode
+        self.durationSeconds = durationSeconds
+        self.stdout = stdout
+        self.stderr = stderr
+        self.runDir = runDir
+        self.outputDir = outputDir
+        self.scriptPath = scriptPath
+        self.promptPath = promptPath
+        self.contextPath = contextPath
+        self.stdoutPath = stdoutPath
+        self.stderrPath = stderrPath
+        self.generatedFiles = generatedFiles
+        self.notebookOutputs = notebookOutputs
+        self.dataContainers = dataContainers
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case exitCode
+        case durationSeconds
+        case stdout
+        case stderr
+        case runDir
+        case outputDir
+        case scriptPath
+        case promptPath
+        case contextPath
+        case stdoutPath
+        case stderrPath
+        case generatedFiles
+        case notebookOutputs
+        case dataContainers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(String.self, forKey: .status)
+        exitCode = try container.decodeIfPresent(Int.self, forKey: .exitCode)
+        durationSeconds = try container.decode(Double.self, forKey: .durationSeconds)
+        stdout = try container.decodeIfPresent(String.self, forKey: .stdout) ?? ""
+        stderr = try container.decodeIfPresent(String.self, forKey: .stderr) ?? ""
+        runDir = try container.decode(String.self, forKey: .runDir)
+        outputDir = try container.decode(String.self, forKey: .outputDir)
+        scriptPath = try container.decode(String.self, forKey: .scriptPath)
+        promptPath = try container.decode(String.self, forKey: .promptPath)
+        contextPath = try container.decode(String.self, forKey: .contextPath)
+        stdoutPath = try container.decode(String.self, forKey: .stdoutPath)
+        stderrPath = try container.decode(String.self, forKey: .stderrPath)
+        generatedFiles = try container.decodeIfPresent([CodeConsoleGeneratedFileResponse].self, forKey: .generatedFiles) ?? []
+        notebookOutputs = try container.decodeIfPresent([NotebookOutputPayload].self, forKey: .notebookOutputs) ?? []
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
+    }
 }
 
 struct PreviewRenderConfigPayload: Codable, Equatable, Hashable, Sendable {
