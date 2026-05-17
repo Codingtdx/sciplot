@@ -300,6 +300,39 @@ class SourceTableSegmentResponse(StrictModel):
     row_count: int
 
 
+class DataContainerColumnPayload(StrictModel):
+    id: str
+    name: str
+    index: int
+    role_hints: list[str] = Field(default_factory=list)
+    unit: str | None = None
+    comment: str | None = None
+    profile: PlotColumnProfileResponse | None = None
+
+
+class DataContainerSourcePayload(StrictModel):
+    input_path: str
+    sheet: str | int
+    selected_segment_id: str | None = None
+    encoding: str | None = None
+    delimiter: str | None = None
+    offset: int
+    limit: int
+
+
+class DataContainerPayload(StrictModel):
+    id: str
+    kind: Literal["table"]
+    label: str
+    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "enabled"
+    readonly: bool = True
+    row_count: int
+    column_count: int
+    columns: list[DataContainerColumnPayload] = Field(default_factory=list)
+    source: DataContainerSourcePayload
+    help: str
+
+
 class SourceTablePreviewResponse(StrictModel):
     input_path: str
     sheet: str | int
@@ -317,6 +350,7 @@ class SourceTablePreviewResponse(StrictModel):
     selected_segment_id: str | None = None
     encoding: str | None = None
     delimiter: str | None = None
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
 
 
 class FitAnalysisRequest(FileRequest):
@@ -1620,6 +1654,9 @@ __all__ = [
     "DataStudioProjectPayload",
     "DataStudioProjectWorkbookPayload",
     "DataTransformPayload",
+    "DataContainerColumnPayload",
+    "DataContainerPayload",
+    "DataContainerSourcePayload",
     "DocumentGraphEdgePayload",
     "DocumentGraphNodePayload",
     "DocumentGraphPayload",

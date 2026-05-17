@@ -244,6 +244,49 @@ def test_source_table_preview_accepts_data_transforms(tmp_path: Path) -> None:
     assert payload["rows"][1] == ["3.0", "4.0", 5.0]
 
 
+def test_source_table_preview_returns_readonly_table_container(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    pd.DataFrame(
+        [
+            ["time", "signal"],
+            ["s", "mV"],
+            [0.0, 1.2],
+            [1.0, 2.4],
+        ]
+    ).to_csv(input_path, header=False, index=False)
+
+    response = client.post(
+        "/source-table-preview",
+        json={"input_path": str(input_path), "sheet": 0, "offset": 1, "limit": 2},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    table = payload["data_containers"][0]
+    assert table["id"] == "source-table:Sheet1"
+    assert table["kind"] == "table"
+    assert table["status"] == "enabled"
+    assert table["readonly"] is True
+    assert table["row_count"] == payload["total_rows"]
+    assert table["column_count"] == payload["total_cols"]
+    assert table["source"] == {
+        "input_path": str(input_path),
+        "sheet": "Sheet1",
+        "selected_segment_id": None,
+        "encoding": payload["encoding"],
+        "delimiter": ",",
+        "offset": 1,
+        "limit": 2,
+    }
+    assert table["columns"][0]["id"] == "col-0"
+    assert table["columns"][0]["name"] == "time"
+    assert table["columns"][0]["role_hints"] == ["x"]
+    assert table["columns"][0]["unit"] == "s"
+    assert table["columns"][0]["profile"]["inferred_type"] == "numeric"
+    assert table["columns"][1]["role_hints"][0] == "y"
+    assert table["help"]
+
+
 def test_fit_analysis_accepts_data_transforms(tmp_path: Path) -> None:
     input_path = tmp_path / "curve.csv"
     _make_curve_csv(input_path)

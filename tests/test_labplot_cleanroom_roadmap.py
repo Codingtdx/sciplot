@@ -8,6 +8,7 @@ from scripts import blocking_gate
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROADMAP_PATH = REPO_ROOT / "docs" / "labplot-informed-roadmap.md"
+PROGRESS_PATH = REPO_ROOT / "docs" / "labplot-roadmap-progress.md"
 CODE_STUDY_PATH = REPO_ROOT / "docs" / "labplot-technical-borrowing.md"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_labplot_cleanroom.py"
 
@@ -70,6 +71,28 @@ def test_labplot_code_study_records_engineering_translation() -> None:
     )
     for phrase in required_phrases:
         assert phrase in text
+
+
+def test_labplot_roadmap_progress_records_persistent_phase_state() -> None:
+    roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
+    progress_text = PROGRESS_PATH.read_text(encoding="utf-8")
+
+    assert "labplot-roadmap-progress.md" in roadmap_text
+
+    required_phrases = (
+        "Phase 0: Checkpoint and guardrails",
+        "Status: landed",
+        "Phase 1: SciPlotDocumentGraph",
+        "Phase 2: Capability catalogs",
+        "Phase 3: Data containers",
+        "Status: in progress",
+        "09db3e7",
+        "typed Data Containers preview foundation",
+        "scripts/check_labplot_cleanroom.py",
+        "LabPlot GPL source is not vendored",
+    )
+    for phrase in required_phrases:
+        assert phrase in progress_text
 
 
 def test_labplot_cleanroom_guard_accepts_repo() -> None:

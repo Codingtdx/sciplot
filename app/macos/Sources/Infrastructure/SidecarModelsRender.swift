@@ -1160,6 +1160,49 @@ struct SourceTableSegmentResponse: Codable, Equatable, Sendable, Identifiable {
     let rowCount: Int
 }
 
+struct DataContainerColumnPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let name: String
+    let index: Int
+    let roleHints: [String]
+    let unit: String?
+    let comment: String?
+    let profile: PlotColumnProfileResponse?
+}
+
+struct DataContainerSourcePayload: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let selectedSegmentID: String?
+    let encoding: String?
+    let delimiter: String?
+    let offset: Int
+    let limit: Int
+
+    enum CodingKeys: String, CodingKey {
+        case inputPath
+        case sheet
+        case selectedSegmentID = "selectedSegmentId"
+        case encoding
+        case delimiter
+        case offset
+        case limit
+    }
+}
+
+struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let label: String
+    let status: String
+    let readonly: Bool
+    let rowCount: Int
+    let columnCount: Int
+    let columns: [DataContainerColumnPayload]
+    let source: DataContainerSourcePayload
+    let help: String
+}
+
 struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
@@ -1177,6 +1220,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
     let selectedSegmentID: String?
     let encoding: String?
     let delimiter: String?
+    let dataContainers: [DataContainerPayload]
 
     enum CodingKeys: String, CodingKey {
         case inputPath
@@ -1195,6 +1239,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         case selectedSegmentID = "selectedSegmentId"
         case encoding
         case delimiter
+        case dataContainers
     }
 
     init(
@@ -1213,7 +1258,8 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         segments: [SourceTableSegmentResponse] = [],
         selectedSegmentID: String? = nil,
         encoding: String? = nil,
-        delimiter: String? = nil
+        delimiter: String? = nil,
+        dataContainers: [DataContainerPayload] = []
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
@@ -1231,6 +1277,28 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         self.selectedSegmentID = selectedSegmentID
         self.encoding = encoding
         self.delimiter = delimiter
+        self.dataContainers = dataContainers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputPath = try container.decode(String.self, forKey: .inputPath)
+        sheet = try container.decode(SheetValue.self, forKey: .sheet)
+        offset = try container.decode(Int.self, forKey: .offset)
+        limit = try container.decode(Int.self, forKey: .limit)
+        totalRows = try container.decode(Int.self, forKey: .totalRows)
+        totalCols = try container.decode(Int.self, forKey: .totalCols)
+        columnHeaders = try container.decode([String].self, forKey: .columnHeaders)
+        rows = try container.decode([[JSONValue]].self, forKey: .rows)
+        candidateRoles = try container.decode(PlotCandidateRolesResponse.self, forKey: .candidateRoles)
+        detectedXLabel = try container.decodeIfPresent(String.self, forKey: .detectedXLabel)
+        detectedYLabel = try container.decodeIfPresent(String.self, forKey: .detectedYLabel)
+        columnProfiles = try container.decodeIfPresent([PlotColumnProfileResponse].self, forKey: .columnProfiles) ?? []
+        segments = try container.decodeIfPresent([SourceTableSegmentResponse].self, forKey: .segments) ?? []
+        selectedSegmentID = try container.decodeIfPresent(String.self, forKey: .selectedSegmentID)
+        encoding = try container.decodeIfPresent(String.self, forKey: .encoding)
+        delimiter = try container.decodeIfPresent(String.self, forKey: .delimiter)
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
     }
 }
 

@@ -4,6 +4,8 @@ This roadmap turns LabPlot research into SciPlot architecture work while preserv
 
 LabPlot is a strategic reference, not a vendored dependency. Its public behavior, SDK concepts, documentation, and user-facing workflows can guide SciPlot, but GPL-2.0-or-later source files from LabPlot must not be copied into this repository. New SciPlot behavior should be implemented clean-room in the existing Python sidecar, SwiftUI macOS app, and contract-backed rendering stack.
 
+Persistent phase status is tracked in `docs/labplot-roadmap-progress.md`; this roadmap remains the long-term capability map.
+
 ## Technical borrowing principles
 
 This is not blind copying. The goal is to understand why LabPlot's mature C++/Qt codebase stays coherent under many data containers, plot objects, import filters, and analysis operations, then translate those principles into SciPlot's first-principles architecture.
