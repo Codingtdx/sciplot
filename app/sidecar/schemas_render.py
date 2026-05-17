@@ -418,6 +418,52 @@ class NotebookOutputPayload(StrictModel):
     help: str = "Code Console generated output landing."
 
 
+class AnalysisOperationRequest(FileRequest):
+    operation_id: str
+    x_column: str | None = None
+    y_column: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    offset: int = 0
+    limit: int = 200
+
+
+class AnalysisOperationResponse(StrictModel):
+    operation_id: str
+    input_path: str
+    sheet: str | int
+    operation_result: AnalysisOperationResultPayload
+
+
+class ImportPreviewRequest(StrictModel):
+    input_path: str
+    filter_id: str | None = None
+    sheet: str | int = 0
+    offset: int = 0
+    limit: int = 50
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class ImportPreviewResponse(StrictModel):
+    input_path: str
+    filter_id: str
+    status: Literal["enabled", "disabled", "coming_soon", "experimental"]
+    label: str
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
+    help: str
+
+
+class PlotEditCommandNormalizeRequest(StrictModel):
+    command: PlotEditCommandPayload
+    objects: list[PlotObjectPayload] = Field(default_factory=list)
+
+
+class PlotEditCommandNormalizeResponse(StrictModel):
+    command: PlotEditCommandPayload
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class SourceTablePreviewResponse(StrictModel):
     input_path: str
     sheet: str | int
@@ -1743,10 +1789,16 @@ __all__ = [
     "DataContainerColumnPayload",
     "DataContainerPayload",
     "DataContainerSourcePayload",
+    "AnalysisOperationRequest",
+    "AnalysisOperationResponse",
     "AnalysisOperationResultPayload",
     "ExportTargetPayload",
+    "ImportPreviewRequest",
+    "ImportPreviewResponse",
     "ImportFilterPayload",
     "NotebookOutputPayload",
+    "PlotEditCommandNormalizeRequest",
+    "PlotEditCommandNormalizeResponse",
     "PlotEditCommandPayload",
     "PlotObjectPayload",
     "DocumentGraphEdgePayload",

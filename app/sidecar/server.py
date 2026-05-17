@@ -10,6 +10,7 @@ from app.sidecar import APP_VERSION
 from app.sidecar.routes_code_console import create_code_console_router
 from app.sidecar.routes_composer import create_composer_router
 from app.sidecar.routes_data_studio import create_data_studio_router
+from app.sidecar.routes_labplot_runtime import create_labplot_runtime_router
 from app.sidecar.routes_meta import create_meta_router
 from app.sidecar.routes_plot_themes import create_plot_themes_router
 from app.sidecar.routes_render import create_render_router
@@ -32,6 +33,9 @@ CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/inspect-file"),
     ("POST", "/source-table-preview"),
     ("POST", "/fit-analysis"),
+    ("POST", "/analysis-operation"),
+    ("POST", "/import-preview"),
+    ("POST", "/plot-edit-command/normalize"),
     ("POST", "/save-project"),
     ("POST", "/open-project"),
     ("POST", "/preflight-render"),
@@ -102,6 +106,7 @@ def create_app() -> FastAPI:
     application.include_router(create_plot_themes_router())
     application.include_router(create_scientific_text_router())
     application.include_router(create_render_router())
+    application.include_router(create_labplot_runtime_router())
     application.include_router(create_code_console_router())
     application.include_router(create_data_studio_router())
     application.include_router(create_composer_router())

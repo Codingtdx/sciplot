@@ -450,6 +450,10 @@ def normalize_style_alias(style_name: str | None) -> str:
 
 
 def capability_catalog_payload() -> list[dict[str, Any]]:
+    from src.rendering.capability_registry import capability_catalog_payload as runtime_capability_catalog_payload
+
+    return runtime_capability_catalog_payload()
+
     object_schema = {"type": "object"}
     no_payload_schema = {"type": "object", "additionalProperties": False}
 

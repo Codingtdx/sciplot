@@ -88,7 +88,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
         for item in catalog_groups["plot_objects"].capabilities
     )
     assert any(
-        item.id == "analysis.smoothing" and item.status == "coming_soon"
+        item.id == "analysis.smoothing" and item.status == "experimental"
         for item in catalog_groups["analysis_operations"].capabilities
     )
     assert all(item.help for group in catalog_groups.values() for item in group.capabilities)

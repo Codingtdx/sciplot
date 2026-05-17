@@ -30,6 +30,9 @@ def test_active_sidecar_routes_keep_retained_core_surface() -> None:
     assert ("POST", "/inspect-file") in signatures
     assert ("POST", "/source-table-preview") in signatures
     assert ("POST", "/fit-analysis") in signatures
+    assert ("POST", "/analysis-operation") in signatures
+    assert ("POST", "/import-preview") in signatures
+    assert ("POST", "/plot-edit-command/normalize") in signatures
     assert ("POST", "/save-project") in signatures
     assert ("POST", "/open-project") in signatures
     assert ("POST", "/preflight-render") in signatures
