@@ -21,36 +21,86 @@ This public handoff replaces the private beta work log. It keeps only the curren
 ## Maintainer Notes
 
 - Keep `src/plot_contract.json` as the single source of truth for public plot templates, styles, palettes, themes, defaults, and gallery metadata.
-- Keep LabPlot-scale capability status flowing through `/meta`, sidecar schemas, `.sciplot` document graph nodes, macOS decode models, and `docs/labplot-roadmap-progress.md`; do not add a second local capability table in Swift.
+- Keep LabPlot-scale capability status flowing through `/meta`, sidecar schemas, `.sciplot` document graph nodes, and macOS decode models; do not add a second local capability table in Swift.
 - Keep project open/save routed through sidecar schema normalization.
 - Keep `.sciplot` self-contained: embedded sources and workbooks are the restore truth, not original absolute paths.
 - Keep macOS as the only supported desktop frontend.
 - Keep `Launch_SciPlot.command` as the source-run launcher for the beta.
-- Keep LabPlot-inspired work clean-room while SciPlot remains Apache-2.0. See `docs/labplot-informed-roadmap.md`; `scripts/check_labplot_cleanroom.py` rejects copied LabPlot GPL source headers.
+- Keep LabPlot-inspired work clean-room while SciPlot remains Apache-2.0. `scripts/check_labplot_cleanroom.py` rejects copied LabPlot GPL source headers.
 
-## LabPlot-Scale Capability Landing
+## LabPlot-Scale Runtime
 
-- `enabled` means there is current runtime support behind the sidecar/macOS contract.
-- `experimental` means the schema/catalog/project landing exists and may have partial runtime support, but still needs numerical fixture coverage, UI wiring, or performance hardening.
-- `coming_soon` means the capability has an explicit landing point and help text but must remain disabled in UI.
-- `disabled` means the project intentionally records the capability as out of current runtime scope.
-- The clean-room policy still applies to every landing: LabPlot can inspire taxonomy, object ownership, and tests, but GPL source is not vendored.
+LabPlot-scale runtime is product surface, not roadmap. The former roadmap has been retired into this handoff, `docs/product-architecture.md`, `docs/macos-frontend-design.md`, and `docs/labplot-technical-borrowing.md`.
 
-Runtime surfaces added for the LabPlot-scale batch:
+### Clean-room policy
+
+- SciPlot remains Apache-2.0; LabPlot remains a clean-room reference only.
+- LabPlot can inspire taxonomy, object ownership, UX behavior, and fixture ideas.
+- No LabPlot C++/Qt/NSL implementation, headers, or GPL source snippets may be copied, vendored, linked, or translated line-by-line.
+- The executable guard is `scripts/check_labplot_cleanroom.py`, and the blocking gate keeps `labplot_cleanroom`.
+
+### Capability status policy
+
+- `enabled` means there is current runtime support behind the sidecar/macOS contract plus tests or explicit disabled/help behavior.
+- `disabled` means the project intentionally records a currently unsupported capability and must surface a user-facing help explanation.
+- `/meta` capability catalogs must not expose planning statuses such as `experimental` or `coming_soon`; unfinished items are either implemented or disabled with help.
+- Swift must consume `/meta` and sidecar schemas instead of maintaining a second local capability table.
+
+### Runtime surfaces
 
 - `GET /meta` capability catalogs are built by `src/rendering/capability_registry.py`.
 - `POST /source-table-preview` and `POST /fit-analysis` use shared `DataContainerPayload` helpers from `src/rendering/data_containers.py`.
-- `POST /analysis-operation` runs the experimental SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
+- `POST /analysis-operation` runs the SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
 - `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py`.
 - `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
 - `POST /code-console/run` returns `notebook_outputs` and readonly notebook output containers for generated figure/table artifacts.
 
-Maintenance rules:
+### SciPlotDocumentGraph
 
-- Promote a catalog item from `experimental` to `enabled` only after route tests, numerical fixtures where relevant, Swift decoding, and module-local UI/error behavior are covered.
-- Keep unsupported formats as `coming_soon` or `disabled + help`; do not pretend HDF5/NetCDF/FITS/ReadStat/Origin imports work until dependencies and malformed-file fixtures exist.
+- `.sciplot` bundles carry `document_graph` for durable object identity, module roots, graph nodes, graph edges, selected nodes, and migration notes.
+- The graph is internal persistence and command-model structure only; do not restore a global Project Explorer, shared rail, or global workbench shell.
+- Plot graph nodes cover source, scene, series, axes, legend, guides, annotations, function layers, extra/broken axes, fit overlays, page, and plot area.
+- Data Studio, Composer, and Code Console graph nodes cover workbook/group/table/matrix, pages/panels/assets, context bindings, runs, generated figures, and generated tables.
+
+### Data containers
+
+- `DataContainerPayload` is shared by Plot Data Workbook, Data Studio Analysis, import preview, fit/analysis results, and Code Console notebook outputs.
+- Enabled container kinds are `table`, `matrix`, `transformed_view`, `statistics_summary`, `fit_result`, and `notebook_output`.
+- Containers are readonly in macOS v1. Inline mutation must wait for command-backed container edits.
+- Statistics, matrix dimensions, coordinate vectors, fit residual/result tables, and provenance are generated in sidecar, not Swift.
+
+### Analysis operations
+
+- `/analysis-operation` returns `AnalysisOperationResultPayload` with diagnostics, metrics, tables, overlays, and data containers.
+- Enabled operations include smoothing, interpolation, differentiation, integration, FFT, Fourier filter, correlation, convolution, baseline correction, peak detection, KDE, statistical tests, distribution fitting, peak fitting, and growth models.
+- Numerical implementation is SciPlot-owned NumPy/SciPy code. Do not copy LabPlot NSL algorithms.
+
+### Import and export runtime
+
+- Enabled import filters: CSV/TSV/TXT, Excel, JSON records/tables, and explicit binary/raw with dtype/shape.
+- Disabled import filters: SQL, HDF5, NetCDF, FITS, ODS, ReadStat/SAS/Stata/SPSS, Origin/SciDAVis evaluation, and image digitizer. Each must return structured diagnostics and help.
+- Export targets cover figure PDF/TIFF, data workbook, project bundle, comparison bundle, artifact manifest, and Code Console figure sets.
+- Exported multi-file artifacts must be manifest-backed so restore, reveal, and future packaging have a single truth source.
+
+### Plot object commands and UndoManager
+
+- Plot durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, and copy_settings.
+- The sidecar normalizes commands and emits graph patches; macOS stores before/after payloads in native `UndoManager`.
+- Inspector-local state must not be the only copy of a scientific edit.
+
+### Code Console notebook bridge
+
 - Keep Code Console notebook outputs inside the existing Code Console module. Do not add a fifth Notebook module.
-- Keep plot edit command state tied to typed render/document payloads and native `UndoManager` replay. Do not store durable scientific state only in inspector view state.
+- Generated figures become notebook figure outputs; generated CSV/JSON tables become readonly notebook output containers.
+- Project restore uses embedded latest-run artifacts for UI continuity and does not rerun code as restore truth.
+
+### Testing policy
+
+- Capability status changes require `/meta` schema tests, route tests, Swift decoding tests, and docs updates.
+- Numerical operations require deterministic fixtures with tolerances before they remain `enabled`.
+- Disabled imports require structured diagnostic tests.
+- Project graph and Code Console artifacts require `.sciplot` save/open roundtrip coverage.
+- UI guardrails must keep Launcher plus four singleton module windows and forbid global Project Explorer/shared rail regressions.
 
 ## Validation
 

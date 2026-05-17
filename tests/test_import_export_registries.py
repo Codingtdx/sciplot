@@ -16,9 +16,9 @@ client = TestClient(app)
 
 def test_import_filter_registry_statuses_are_explicit() -> None:
     assert FILTERS["import.csv"]["status"] == "enabled"
-    assert FILTERS["import.json"]["status"] == "experimental"
-    assert FILTERS["import.binary_raw"]["status"] == "experimental"
-    assert FILTERS["import.hdf5"]["status"] == "coming_soon"
+    assert FILTERS["import.json"]["status"] == "enabled"
+    assert FILTERS["import.binary_raw"]["status"] == "enabled"
+    assert FILTERS["import.hdf5"]["status"] == "disabled"
     assert FILTERS["import.origin_scidavis_eval"]["status"] == "disabled"
 
 
@@ -30,7 +30,7 @@ def test_json_import_preview_returns_table_container(tmp_path: Path) -> None:
 
     assert response.status_code == 200, response.text
     payload = ImportPreviewResponse.model_validate(response.json())
-    assert payload.status == "experimental"
+    assert payload.status == "enabled"
     assert payload.data_containers[0].kind == "table"
     assert payload.data_containers[0].row_count == 2
 
@@ -62,7 +62,7 @@ def test_unavailable_import_filter_returns_helpful_diagnostic(tmp_path: Path) ->
 
     assert response.status_code == 200, response.text
     payload = ImportPreviewResponse.model_validate(response.json())
-    assert payload.status == "coming_soon"
+    assert payload.status == "disabled"
     assert payload.data_containers == []
     assert payload.diagnostics[0]["status_code"] == "filter_unavailable"
     assert payload.help

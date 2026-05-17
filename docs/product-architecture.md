@@ -94,6 +94,16 @@ Default user-visible UI flow:
 
 Plot and Data Studio share sidecar services, but they do not own the same product job.
 
+## LabPlot-Scale Runtime Architecture
+
+SciPlot now treats LabPlot-scale concepts as product runtime, not roadmap text. The internal `SciPlotDocumentGraph` gives Plot, Data Studio, Composer, and Code Console durable object identity without restoring a global Project Explorer UI.
+
+- Data containers are shared across Plot Data Workbook, Data Studio Analysis, import preview, fit/analysis results, and Code Console notebook outputs.
+- Analysis operations run in the sidecar through `POST /analysis-operation`; Swift displays envelopes and diagnostics but does not recompute scientific results.
+- Import/export capability is registry-backed through `/meta`, `/import-preview`, export manifests, and project bundle restore rules.
+- Plot edits move through typed command payloads and native `UndoManager`; persistent scientific state belongs to render/project payloads, not view-local inspector state.
+- Code Console generated figures and tables remain inside the Code Console module while becoming graph-addressable artifacts that Plot and Composer can reference.
+
 - Plot owns single-figure work: source inspect, ranked template recommendation, typed data variables/transforms, figure refinement, preflight, preview/export, and Plot project durability.
 - Data Studio owns intake and workbook work: raw-source template mapping, workbook creation/import, specimen filtering, comparison context, comparison figure export, and Data Studio project durability.
 - `Open in Plot` is the explicit boundary crossing. Data Studio passes a workbook URL, preferred sheet, selected template, render options, and fit options into Plot; Plot then resumes its normal inspect/preview path instead of using a Data Studio-only renderer.

@@ -1079,12 +1079,12 @@ enum TestPayloads {
         ImportPreviewResponse(
             inputPath: "/tmp/records.json",
             filterID: "import.json",
-            status: "experimental",
+            status: "enabled",
             label: "JSON",
             dataContainers: [],
             diagnostics: [],
             optionsSchema: ["type": .string("object")],
-            help: "JSON records preview is experimental."
+            help: "JSON records preview is enabled."
         )
     }
 

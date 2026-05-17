@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ROADMAP_PATH = REPO_ROOT / "docs" / "labplot-informed-roadmap.md"
 PROGRESS_PATH = REPO_ROOT / "docs" / "labplot-roadmap-progress.md"
 CODE_STUDY_PATH = REPO_ROOT / "docs" / "labplot-technical-borrowing.md"
+ENGINEERING_HANDOFF_PATH = REPO_ROOT / "docs" / "engineering-handoff.md"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_labplot_cleanroom.py"
 
 
@@ -22,28 +23,25 @@ def run_guard(root: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_labplot_roadmap_records_cleanroom_architecture() -> None:
-    text = ROADMAP_PATH.read_text(encoding="utf-8")
+def test_labplot_runtime_handoff_records_cleanroom_architecture() -> None:
+    text = ENGINEERING_HANDOFF_PATH.read_text(encoding="utf-8")
 
     required_phrases = (
         "SciPlotDocumentGraph",
-        "module-scoped document graph",
+        "document_graph",
         "Clean-room policy",
-        "Spreadsheet/Matrix",
-        "Worksheet/CartesianPlot",
-        "Axis/Legend/XYCurve",
-        "Analysis curves/NSL",
-        "Import filters",
+        "Data containers",
+        "Analysis operations",
+        "Import and export runtime",
+        "Plot object commands and UndoManager",
+        "Code Console notebook bridge",
         "Launcher plus four singleton module windows",
         "Apache-2.0",
-        "GPL-2.0-or-later",
+        "GPL source",
         "/meta",
-        "src/plot_contract.json",
         "UndoManager",
-        "Technical borrowing principles",
-        "not blind copying",
-        "first-principles architecture",
-        "LabPlot code study",
+        "Testing policy",
+        "No LabPlot C++/Qt/NSL implementation",
     )
     for phrase in required_phrases:
         assert phrase in text
@@ -73,35 +71,24 @@ def test_labplot_code_study_records_engineering_translation() -> None:
         assert phrase in text
 
 
-def test_labplot_roadmap_progress_records_persistent_phase_state() -> None:
-    roadmap_text = ROADMAP_PATH.read_text(encoding="utf-8")
-    progress_text = PROGRESS_PATH.read_text(encoding="utf-8")
-
-    assert "labplot-roadmap-progress.md" in roadmap_text
+def test_labplot_roadmap_files_are_retired_after_runtime_landing() -> None:
+    assert not ROADMAP_PATH.exists()
+    assert not PROGRESS_PATH.exists()
+    handoff_text = ENGINEERING_HANDOFF_PATH.read_text(encoding="utf-8")
 
     required_phrases = (
-        "Phase 0: Checkpoint and guardrails",
-        "Status: landed",
-        "Phase 1: SciPlotDocumentGraph",
-        "Phase 2: Capability catalogs",
-        "Phase 3: Data containers",
-        "Status: in progress",
-        "09db3e7",
-        "typed Data Containers preview foundation",
-        "One-run LabPlot-scale implementation batch",
-        "schema/catalog/project landing",
-        "landed",
-        "experimental",
-        "coming_soon",
+        "LabPlot-scale runtime is product surface, not roadmap",
+        "Capability status policy",
+        "`enabled` means",
         "disabled",
-        "numerical fixture",
-        "UI wiring",
-        "performance hardening",
+        "DataContainerPayload",
+        "AnalysisOperationResultPayload",
+        "Plot durable edits use typed commands",
+        "Project graph and Code Console artifacts",
         "scripts/check_labplot_cleanroom.py",
-        "LabPlot GPL source is not vendored",
     )
     for phrase in required_phrases:
-        assert phrase in progress_text
+        assert phrase in handoff_text
 
 
 def test_labplot_cleanroom_guard_accepts_repo() -> None:

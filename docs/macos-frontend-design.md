@@ -10,6 +10,15 @@ SciPlot starts with a lightweight `Launcher` welcome surface. It opens or focuse
 
 The module windows are not tabs inside a global workbench. Each module owns its own window and toolbar context. `Command-1/2/3/4` opens or focuses the matching module, while menu commands route through the currently focused module context.
 
+## LabPlot-Scale Runtime UI Rules
+
+- macOS consumes LabPlot-scale capabilities from `/meta`; it must not keep a second local capability table.
+- Unsupported catalog items appear as disabled controls with short help text. Silent no-op actions are not acceptable.
+- Plot, Data Studio, Composer, and Code Console may show module-local object or output summaries, but must not restore a global Project Explorer, shared rail, or fifth Notebook module.
+- Plot durable object edits use typed sidecar commands and native `UndoManager` before/after payloads.
+- Data Studio Analysis and Plot Data Workbook display sidecar `DataContainerPayload` and `AnalysisOperationResultPayload` values; Swift does not recompute fit, statistics, FFT, or import parsing.
+- Code Console Outputs displays notebook figure/table outputs from `POST /code-console/run`; generated artifacts can be handed to Plot/Composer through project graph references.
+
 ## Pro Workspace Grammar
 
 The shared spatial model is:

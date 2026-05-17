@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-SUPPORTED_COMMAND_KINDS = {"add", "edit", "delete", "reorder", "rename", "visibility", "lock"}
+SUPPORTED_COMMAND_KINDS = {"add", "copy_settings", "delete", "edit", "lock", "rename", "reorder", "visibility"}
 
 
 def normalize_plot_edit_command(command: dict[str, Any], objects: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    kind = str(command.get("kind") or "").strip()
+    kind = str(command.get("kind") or "").strip().replace("-", "_")
     if kind not in SUPPORTED_COMMAND_KINDS:
         raise ValueError(f"plot edit command kind must be one of {', '.join(sorted(SUPPORTED_COMMAND_KINDS))}.")
     target_object_id = str(command.get("target_object_id") or "").strip()

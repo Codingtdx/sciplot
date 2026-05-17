@@ -189,7 +189,7 @@ final class SchemaDecodingTests: XCTestCase {
           "id": "matrix-1",
           "kind": "matrix",
           "label": "Scalar Field",
-          "status": "experimental",
+          "status": "enabled",
           "readonly": true,
           "row_count": 4,
           "column_count": 3,
@@ -272,7 +272,7 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "id": "import.hdf5",
           "label": "HDF5",
-          "status": "coming_soon",
+          "status": "disabled",
           "owner": "sidecar",
           "surface": "plot,data_studio",
           "options_schema": {"type": "object"},
@@ -289,7 +289,7 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "id": "export.artifact_manifest",
           "label": "Artifact Manifest",
-          "status": "coming_soon",
+          "status": "enabled",
           "owner": "sidecar",
           "surface": "all",
           "allowed_modules": ["plot", "data_studio", "composer", "code_console"],
@@ -307,7 +307,7 @@ final class SchemaDecodingTests: XCTestCase {
           "id": "notebook-output-1",
           "kind": "figure",
           "label": "Generated Figure",
-          "status": "experimental",
+          "status": "enabled",
           "source_run_id": "run-1",
           "artifact_paths": ["/tmp/figure.pdf"],
           "container_ids": ["data.notebook_output:run-1"],
@@ -336,17 +336,17 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "input_path": "/tmp/records.json",
           "filter_id": "import.json",
-          "status": "experimental",
+          "status": "enabled",
           "label": "JSON",
           "data_containers": [],
           "diagnostics": [{"status_code": "json_records_loaded"}],
           "options_schema": {"type": "object"},
-          "help": "JSON records preview is experimental."
+          "help": "JSON records preview is enabled."
         }
         """
         let importPreview = try decoder.decode(ImportPreviewResponse.self, from: Data(importPreviewPayload.utf8))
         XCTAssertEqual(importPreview.filterID, "import.json")
-        XCTAssertEqual(importPreview.status, "experimental")
+        XCTAssertEqual(importPreview.status, "enabled")
 
         let commandResponsePayload = """
         {
@@ -401,7 +401,7 @@ final class SchemaDecodingTests: XCTestCase {
               "id": "notebook-output:1",
               "kind": "figure",
               "label": "plot.pdf",
-              "status": "experimental",
+              "status": "enabled",
               "source_run_id": "run",
               "artifact_paths": ["/tmp/run/outputs/plot.pdf"],
               "container_ids": [],

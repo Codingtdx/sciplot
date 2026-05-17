@@ -260,7 +260,7 @@ def _source_table_data_containers(
                 "id": f"matrix:{sheet}",
                 "kind": "matrix",
                 "label": f"{sheet} scalar field",
-                "status": "experimental",
+                "status": "enabled",
                 "readonly": True,
                 "row_count": int(preview.total_rows),
                 "column_count": int(preview.total_cols),
@@ -275,7 +275,7 @@ def _source_table_data_containers(
                         "message": "XYZ scalar-field preview has a matrix container landing.",
                     }
                 ],
-                "help": "Experimental matrix container generated from XYZ scalar-field roles.",
+                "help": "Matrix container generated from XYZ scalar-field roles.",
             }
         )
     return containers

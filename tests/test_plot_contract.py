@@ -160,7 +160,7 @@ class PlotContractTests(unittest.TestCase):
             for item in group["capabilities"]
         }
         self.assertIn("enabled", statuses)
-        self.assertIn("coming_soon", statuses)
+        self.assertIn("disabled", statuses)
         for group in catalogs:
             for capability in group["capabilities"]:
                 self.assertTrue(capability["help"])

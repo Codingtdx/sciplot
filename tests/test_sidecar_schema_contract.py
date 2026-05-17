@@ -88,7 +88,7 @@ def test_meta_and_plot_contract_responses_match_explicit_models() -> None:
         for item in catalog_groups["plot_objects"].capabilities
     )
     assert any(
-        item.id == "analysis.smoothing" and item.status == "experimental"
+        item.id == "analysis.smoothing" and item.status == "enabled"
         for item in catalog_groups["analysis_operations"].capabilities
     )
     assert all(item.help for group in catalog_groups.values() for item in group.capabilities)
@@ -181,8 +181,8 @@ def test_labplot_scale_catalogs_cover_one_run_capabilities() -> None:
         "export.artifact_manifest",
         "export.code_console_figure_set",
     }.issubset(groups["export_targets"])
-    assert groups["analysis_operations"]["analysis.fft"].status in {"experimental", "coming_soon"}
-    assert groups["import_filters"]["import.image_digitizer"].status == "coming_soon"
+    assert groups["analysis_operations"]["analysis.fft"].status == "enabled"
+    assert groups["import_filters"]["import.image_digitizer"].status == "disabled"
 
 
 def test_labplot_scale_payload_models_validate_code_landings() -> None:
@@ -201,7 +201,7 @@ def test_labplot_scale_payload_models_validate_code_landings() -> None:
             "id": "matrix-1",
             "kind": "matrix",
             "label": "Scalar Field",
-            "status": "experimental",
+            "status": "enabled",
             "readonly": True,
             "row_count": 4,
             "column_count": 3,
@@ -252,7 +252,7 @@ def test_labplot_scale_payload_models_validate_code_landings() -> None:
         {
             "id": "import.hdf5",
             "label": "HDF5",
-            "status": "coming_soon",
+            "status": "disabled",
             "output_container_kinds": ["matrix"],
             "help": "Explicit import filter landing.",
         }
@@ -261,7 +261,7 @@ def test_labplot_scale_payload_models_validate_code_landings() -> None:
         {
             "id": "export.artifact_manifest",
             "label": "Artifact Manifest",
-            "status": "coming_soon",
+            "status": "enabled",
             "allowed_modules": ["plot", "data_studio", "composer", "code_console"],
             "artifact_kind": "manifest",
             "filename_policy": "base_name_with_suffixes",
@@ -273,12 +273,13 @@ def test_labplot_scale_payload_models_validate_code_landings() -> None:
             "id": "notebook-output-1",
             "kind": "figure",
             "label": "Generated Figure",
-            "status": "experimental",
+            "status": "enabled",
             "source_run_id": "run-1",
             "container_ids": ["data.notebook_output:run-1"],
         }
     )
-    assert import_filter.status == export_target.status == "coming_soon"
+    assert import_filter.status == "disabled"
+    assert export_target.status == "enabled"
     assert notebook_output.kind == "figure"
 
 

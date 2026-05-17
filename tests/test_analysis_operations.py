@@ -99,7 +99,7 @@ def test_analysis_operations_include_numerical_fixture_results(tmp_path: Path) -
     assert peaks["overlays"][0]["kind"] == "peak_markers"
 
 
-def test_distribution_and_growth_models_return_experimental_tables(tmp_path: Path) -> None:
+def test_distribution_and_growth_models_return_enabled_tables(tmp_path: Path) -> None:
     input_path = tmp_path / "growth.csv"
     xs = np.arange(1, 7, dtype=float)
     ys = 2.0 * np.exp(0.25 * xs)
@@ -128,4 +128,4 @@ def test_distribution_and_growth_models_return_experimental_tables(tmp_path: Pat
 
     assert distribution["metrics"]["sigma"] > 0
     assert growth["metrics"]["rate"] > 0
-    assert growth["data_containers"][0]["status"] == "experimental"
+    assert growth["data_containers"][0]["status"] == "enabled"

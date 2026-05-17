@@ -104,6 +104,7 @@ extension PlotSession {
         selectedPreviewObjectID = nil
         selectedPreviewQuickEditorObjectID = nil
         selectedSeriesQuickEditorID = nil
+        plotEditCommandLedger = []
         resetDataWorkbookState()
         if !preserveRenderOptions {
             let defaultStyle = metadata?.defaults.stylePreset ?? "nature"
@@ -514,6 +515,12 @@ extension PlotSession {
             guides.append(guide)
             options.referenceGuides = guides
             selectedReferenceGuideID = guide.id
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "guide", id: guide.id),
+                before: nil,
+                after: plotCommandPayload(guide)
+            )
         }
     }
 
@@ -528,20 +535,39 @@ extension PlotSession {
                 return
             }
             var guide = guides[index]
+            let before = guide
             mutate(&guide)
+            guard before != guide else {
+                return
+            }
             guides[index] = guide
             options.referenceGuides = guides
+            recordPlotEditCommand(
+                kind: plotCommandKind(before: before.enabled, after: guide.enabled),
+                targetObjectID: plotObjectID(prefix: "guide", id: id),
+                before: plotCommandPayload(before),
+                after: plotCommandPayload(guide)
+            )
         }
     }
 
     func removeReferenceGuide(id: String) {
         updateRenderOptions(policy: .immediate) { options in
             var guides = options.referenceGuides ?? []
+            guard let removed = guides.first(where: { $0.id == id }) else {
+                return
+            }
             guides.removeAll { $0.id == id }
             options.referenceGuides = guides.isEmpty ? nil : guides
             if selectedReferenceGuideID == id {
                 selectedReferenceGuideID = guides.first?.id
             }
+            recordPlotEditCommand(
+                kind: "delete",
+                targetObjectID: plotObjectID(prefix: "guide", id: id),
+                before: plotCommandPayload(removed),
+                after: nil
+            )
         }
     }
 
@@ -559,6 +585,12 @@ extension PlotSession {
             annotations.append(annotation)
             options.textAnnotations = annotations
             selectedTextAnnotationID = annotation.id
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "text_annotation", id: annotation.id),
+                before: nil,
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
@@ -573,20 +605,39 @@ extension PlotSession {
                 return
             }
             var annotation = annotations[index]
+            let before = annotation
             mutate(&annotation)
+            guard before != annotation else {
+                return
+            }
             annotations[index] = annotation
             options.textAnnotations = annotations
+            recordPlotEditCommand(
+                kind: plotCommandKind(before: before.enabled, after: annotation.enabled),
+                targetObjectID: plotObjectID(prefix: "text_annotation", id: id),
+                before: plotCommandPayload(before),
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
     func removeTextAnnotation(id: String) {
         updateRenderOptions(policy: .immediate) { options in
             var annotations = options.textAnnotations ?? []
+            guard let removed = annotations.first(where: { $0.id == id }) else {
+                return
+            }
             annotations.removeAll { $0.id == id }
             options.textAnnotations = annotations.isEmpty ? nil : annotations
             if selectedTextAnnotationID == id {
                 selectedTextAnnotationID = annotations.first?.id
             }
+            recordPlotEditCommand(
+                kind: "delete",
+                targetObjectID: plotObjectID(prefix: "text_annotation", id: id),
+                before: plotCommandPayload(removed),
+                after: nil
+            )
         }
     }
 
@@ -604,6 +655,12 @@ extension PlotSession {
             annotations.append(annotation)
             options.shapeAnnotations = annotations
             selectedShapeAnnotationID = annotation.id
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "shape_annotation", id: annotation.id),
+                before: nil,
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
@@ -618,20 +675,39 @@ extension PlotSession {
                 return
             }
             var annotation = annotations[index]
+            let before = annotation
             mutate(&annotation)
+            guard before != annotation else {
+                return
+            }
             annotations[index] = annotation
             options.shapeAnnotations = annotations
+            recordPlotEditCommand(
+                kind: plotCommandKind(before: before.enabled, after: annotation.enabled),
+                targetObjectID: plotObjectID(prefix: "shape_annotation", id: id),
+                before: plotCommandPayload(before),
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
     func removeShapeAnnotation(id: String) {
         updateRenderOptions(policy: .immediate) { options in
             var annotations = options.shapeAnnotations ?? []
+            guard let removed = annotations.first(where: { $0.id == id }) else {
+                return
+            }
             annotations.removeAll { $0.id == id }
             options.shapeAnnotations = annotations.isEmpty ? nil : annotations
             if selectedShapeAnnotationID == id {
                 selectedShapeAnnotationID = annotations.first?.id
             }
+            recordPlotEditCommand(
+                kind: "delete",
+                targetObjectID: plotObjectID(prefix: "shape_annotation", id: id),
+                before: plotCommandPayload(removed),
+                after: nil
+            )
         }
     }
 
@@ -686,6 +762,12 @@ extension PlotSession {
             options.textAnnotations = annotations
             selectedTextAnnotationID = annotation.id
             canvasSelection = .layer(.textAnnotation(annotation.id))
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "text_annotation", id: annotation.id),
+                before: nil,
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
@@ -713,6 +795,12 @@ extension PlotSession {
             options.shapeAnnotations = annotations
             selectedShapeAnnotationID = annotation.id
             canvasSelection = .layer(.shapeAnnotation(annotation.id))
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "shape_annotation", id: annotation.id),
+                before: nil,
+                after: plotCommandPayload(annotation)
+            )
         }
     }
 
@@ -728,6 +816,12 @@ extension PlotSession {
             options.referenceGuides = guides
             selectedReferenceGuideID = guide.id
             canvasSelection = .layer(.referenceGuide(guide.id))
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "guide", id: guide.id),
+                before: nil,
+                after: plotCommandPayload(guide)
+            )
         }
     }
 
@@ -745,6 +839,12 @@ extension PlotSession {
             options.referenceGuides = guides
             selectedReferenceGuideID = guide.id
             canvasSelection = .layer(.referenceGuide(guide.id))
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "guide", id: guide.id),
+                before: nil,
+                after: plotCommandPayload(guide)
+            )
         }
     }
 
@@ -1156,5 +1256,49 @@ extension PlotSession {
             dataVariables: renderOptions.dataVariables,
             dataTransforms: renderOptions.dataTransforms
         )
+    }
+
+    private func plotObjectID(prefix: String, id: String) -> String {
+        "plot:\(prefix):\(id)"
+    }
+
+    private func plotCommandKind(before: Bool, after: Bool) -> String {
+        before != after ? "visibility" : "edit"
+    }
+
+    private func plotCommandPayload<T: Encodable>(_ value: T) -> [String: JSONValue] {
+        guard
+            let data = try? JSONEncoder().encode(value),
+            let payload = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        else {
+            return [:]
+        }
+        return payload
+    }
+
+    private func recordPlotEditCommand(
+        kind: String,
+        targetObjectID: String,
+        before: [String: JSONValue]?,
+        after: [String: JSONValue]?
+    ) {
+        guard !runtimeState.isApplyingUndoRedo else {
+            return
+        }
+        let commandKind = kind.replacingOccurrences(of: "-", with: "_")
+        let command = PlotEditCommandPayload(
+            commandID: "cmd:\(commandKind):\(targetObjectID):\(plotEditCommandLedger.count + 1)",
+            kind: commandKind,
+            targetObjectID: targetObjectID,
+            before: before,
+            after: after,
+            graphPatch: [
+                "target_object_id": .string(targetObjectID),
+                "kind": .string(commandKind)
+            ],
+            reversible: before != after,
+            help: "Undoable typed plot edit command recorded by PlotSession."
+        )
+        plotEditCommandLedger.append(command)
     }
 }

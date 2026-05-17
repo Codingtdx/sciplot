@@ -39,11 +39,11 @@ def test_capability_registry_is_runtime_source_of_truth() -> None:
     analysis = {item["id"]: item for item in catalogs["analysis_operations"]["capabilities"]}
     imports = {item["id"]: item for item in catalogs["import_filters"]["capabilities"]}
 
-    assert analysis["analysis.smoothing"]["status"] == "experimental"
-    assert analysis["analysis.integration"]["status"] == "experimental"
-    assert analysis["analysis.fft"]["status"] == "experimental"
-    assert imports["import.json"]["status"] == "experimental"
-    assert imports["import.hdf5"]["status"] == "coming_soon"
+    assert analysis["analysis.smoothing"]["status"] == "enabled"
+    assert analysis["analysis.integration"]["status"] == "enabled"
+    assert analysis["analysis.fft"]["status"] == "enabled"
+    assert imports["import.json"]["status"] == "enabled"
+    assert imports["import.hdf5"]["status"] == "disabled"
     assert imports["import.origin_scidavis_eval"]["status"] == "disabled"
 
 
@@ -150,7 +150,7 @@ def test_import_preview_json_and_binary_runtime(tmp_path: Path) -> None:
     json_payload = ImportPreviewResponse.model_validate(json_preview.json())
     assert json_payload.filter_id == "import.json"
     assert json_payload.data_containers[0].kind == "table"
-    assert json_payload.status == "experimental"
+    assert json_payload.status == "enabled"
 
     raw_path = tmp_path / "field.raw"
     np.asarray([[1, 2], [3, 4]], dtype=np.float32).tofile(raw_path)
@@ -176,7 +176,7 @@ def test_import_preview_unavailable_filter_is_structured(tmp_path: Path) -> None
 
     assert response.status_code == 200, response.text
     payload = ImportPreviewResponse.model_validate(response.json())
-    assert payload.status == "coming_soon"
+    assert payload.status == "disabled"
     assert payload.data_containers == []
     assert payload.diagnostics[0]["status_code"] == "filter_unavailable"
 

@@ -10,7 +10,16 @@ client = TestClient(app)
 
 
 def test_plot_object_command_registry_covers_undoable_edit_surface() -> None:
-    assert SUPPORTED_COMMAND_KINDS == {"add", "edit", "delete", "reorder", "rename", "visibility", "lock"}
+    assert SUPPORTED_COMMAND_KINDS == {
+        "add",
+        "copy_settings",
+        "delete",
+        "edit",
+        "lock",
+        "rename",
+        "reorder",
+        "visibility",
+    }
 
 
 def test_plot_object_command_normalizer_sets_graph_patch_and_reversibility() -> None:
@@ -59,3 +68,17 @@ def test_plot_object_command_reports_unknown_targets_without_losing_command() ->
 
     assert normalized["command"]["target_object_id"] == "plot:guide:missing"
     assert normalized["diagnostics"][0]["status_code"] == "target_not_in_object_list"
+
+
+def test_plot_object_command_accepts_copy_settings_alias() -> None:
+    normalized = normalize_plot_edit_command(
+        {
+            "kind": "copy-settings",
+            "target_object_id": "plot:series:target",
+            "before": {"style": "raw"},
+            "after": {"style": "source-series"},
+        }
+    )
+
+    assert normalized["command"]["kind"] == "copy_settings"
+    assert normalized["command"]["graph_patch"]["kind"] == "copy_settings"

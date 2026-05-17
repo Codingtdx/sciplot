@@ -210,7 +210,7 @@ def test_source_table_preview_marks_xyz_scalar_roles(tmp_path: Path) -> None:
     assert payload["candidate_roles"]["z"] == ["Intensity"]
     containers = {item["kind"]: item for item in payload["data_containers"]}
     assert {"table", "matrix"}.issubset(containers)
-    assert containers["matrix"]["status"] == "experimental"
+    assert containers["matrix"]["status"] == "enabled"
     assert containers["matrix"]["dimensions"] == {"rows": 2, "columns": 2}
     assert containers["matrix"]["coordinate_vectors"]["x"] == [25.0, 40.0]
     assert containers["matrix"]["coordinate_vectors"]["y"] == [0.0, 5.0]

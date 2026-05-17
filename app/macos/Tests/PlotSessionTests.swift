@@ -53,6 +53,33 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.fitOptions.modelID, "linear")
     }
 
+    func testReferenceGuideEditsRecordTypedPlotCommandsForUndoLedger() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addReferenceGuide(kind: "line")
+        let guideID = try XCTUnwrap(session.selectedReferenceGuideID)
+        XCTAssertEqual(session.plotEditCommandLedger.last?.kind, "add")
+        XCTAssertEqual(session.plotEditCommandLedger.last?.targetObjectID, "plot:guide:\(guideID)")
+        XCTAssertNil(session.plotEditCommandLedger.last?.before)
+        XCTAssertEqual(session.plotEditCommandLedger.last?.after?["kind"]?.stringValue, "line")
+
+        session.updateReferenceGuide(id: guideID) { $0.enabled = false }
+        XCTAssertEqual(session.plotEditCommandLedger.last?.kind, "visibility")
+        XCTAssertEqual(session.plotEditCommandLedger.last?.before?["enabled"]?.boolValue, true)
+        XCTAssertEqual(session.plotEditCommandLedger.last?.after?["enabled"]?.boolValue, false)
+
+        session.removeReferenceGuide(id: guideID)
+        XCTAssertEqual(session.plotEditCommandLedger.last?.kind, "delete")
+        XCTAssertEqual(session.plotEditCommandLedger.last?.targetObjectID, "plot:guide:\(guideID)")
+        XCTAssertEqual(session.plotEditCommandLedger.last?.before?["id"]?.stringValue, guideID)
+        XCTAssertNil(session.plotEditCommandLedger.last?.after)
+    }
+
     func testAxisBreaksRoundTripThroughSessionSanitization() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()

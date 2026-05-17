@@ -112,6 +112,7 @@ final class PlotSession {
     var selectedReferenceGuideID: String?
     var selectedTextAnnotationID: String?
     var selectedShapeAnnotationID: String?
+    var plotEditCommandLedger: [PlotEditCommandPayload] = []
     var sourceProvenance = PlotProjectSourceProvenancePayload(
         originalInputPath: nil,
         savedInputMtimeNs: nil,

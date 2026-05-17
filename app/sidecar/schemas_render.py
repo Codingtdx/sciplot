@@ -326,7 +326,7 @@ class DataContainerPayload(StrictModel):
     id: str
     kind: Literal["table", "matrix", "transformed_view", "statistics_summary", "fit_result", "notebook_output"]
     label: str
-    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "enabled"
+    status: Literal["enabled", "disabled"] = "enabled"
     readonly: bool = True
     row_count: int
     column_count: int
@@ -350,7 +350,7 @@ class PlotObjectPayload(StrictModel):
     kind: str
     module: str = "plot"
     label: str
-    status: Literal["active", "disabled", "coming_soon", "experimental"] = "active"
+    status: Literal["active", "disabled"] = "active"
     visible: bool = True
     locked: bool = False
     graph_node_id: str
@@ -360,7 +360,7 @@ class PlotObjectPayload(StrictModel):
 
 class PlotEditCommandPayload(StrictModel):
     command_id: str
-    kind: Literal["add", "edit", "delete", "reorder", "rename", "visibility", "lock"]
+    kind: Literal["add", "edit", "delete", "reorder", "rename", "visibility", "lock", "copy_settings"]
     target_object_id: str
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
@@ -385,7 +385,7 @@ class AnalysisOperationResultPayload(StrictModel):
 class ImportFilterPayload(StrictModel):
     id: str
     label: str
-    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "coming_soon"
+    status: Literal["enabled", "disabled"] = "disabled"
     owner: str = "sidecar"
     surface: str = "plot,data_studio"
     options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
@@ -397,7 +397,7 @@ class ImportFilterPayload(StrictModel):
 class ExportTargetPayload(StrictModel):
     id: str
     label: str
-    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "coming_soon"
+    status: Literal["enabled", "disabled"] = "disabled"
     owner: str = "sidecar"
     surface: str = "all"
     allowed_modules: list[str] = Field(default_factory=list)
@@ -411,7 +411,7 @@ class NotebookOutputPayload(StrictModel):
     id: str
     kind: Literal["table", "figure", "artifact", "text"]
     label: str
-    status: Literal["enabled", "disabled", "coming_soon", "experimental"] = "experimental"
+    status: Literal["enabled", "disabled"] = "enabled"
     source_run_id: str
     artifact_paths: list[str] = Field(default_factory=list)
     container_ids: list[str] = Field(default_factory=list)
@@ -446,7 +446,7 @@ class ImportPreviewRequest(StrictModel):
 class ImportPreviewResponse(StrictModel):
     input_path: str
     filter_id: str
-    status: Literal["enabled", "disabled", "coming_soon", "experimental"]
+    status: Literal["enabled", "disabled"]
     label: str
     data_containers: list[DataContainerPayload] = Field(default_factory=list)
     diagnostics: list[dict[str, Any]] = Field(default_factory=list)
