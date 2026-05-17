@@ -6,7 +6,7 @@ LabPlot is a strategic reference, not a vendored dependency. Its public behavior
 
 Persistent phase status is tracked in `docs/labplot-roadmap-progress.md`; this roadmap remains the long-term capability map.
 
-Current implementation note: the one-run LabPlot-scale batch is moving every major capability into project structure as typed schema, `/meta` catalog entries, document graph nodes, macOS decode models, and progress documentation. Runtime support is still represented honestly with `landed`, `experimental`, `coming_soon`, or `disabled` status labels.
+Current implementation note: the one-run LabPlot-scale batch has moved every major capability into project structure as typed schema, `/meta` catalog entries, document graph nodes, macOS decode models, tests, and progress documentation. The first runtime landing is also present through `/analysis-operation`, `/import-preview`, `/plot-edit-command/normalize`, shared data container helpers, and Code Console notebook output containers. Runtime support is still represented honestly with `landed`, `enabled`, `experimental`, `coming_soon`, or `disabled` status labels.
 
 ## Technical borrowing principles
 
@@ -169,6 +169,8 @@ Tests:
 
 Goal: make Spreadsheet/Matrix ideas SciPlot-native.
 
+Status: runtime foundation landed; hardening continues.
+
 Container backlog:
 
 - `data.table`: columns, roles, units, comments, profiles, statistics, source provenance.
@@ -193,6 +195,8 @@ Tests:
 ### Phase 4: Plot object model
 
 Goal: make every durable plot object graph-addressable.
+
+Status: object schema and command normalization foundation landed.
 
 Object backlog:
 
@@ -225,6 +229,8 @@ Tests:
 ### Phase 5: Analysis engine expansion
 
 Goal: add LabPlot-scale analysis through SciPlot-owned implementations.
+
+Status: experimental runtime endpoint landed.
 
 Operation backlog:
 
@@ -261,6 +267,8 @@ Tests:
 ### Phase 6: Import and export filters
 
 Goal: turn file IO into a registry of explicit filters and targets.
+
+Status: import preview runtime and export manifest helper landed.
 
 Import backlog:
 
@@ -302,6 +310,8 @@ Tests:
 
 Goal: map LabPlot notebook/CAS inspiration into the existing Code Console module.
 
+Status: experimental notebook output runtime landed.
+
 Implementation rules:
 
 - Keep Code Console as one of the four supported modules, not a fifth notebook product.
@@ -341,9 +351,9 @@ Tests:
 | Commands | macOS `UndoManager`, typed payload edits | Command ledger, compound commands, command replay tests | Axis/guide/annotation edit commands |
 | Data containers | `/source-table-preview`, `data_transforms` | Table, matrix, transformed view, statistics, fit result | Shared table/matrix profile schema |
 | Plot objects | `render_options` typed payloads | Series, axis, legend, guide, annotation, function, advanced axes | Graph-addressed object ids in render options |
-| Analysis | `/fit-analysis`, expression engine | Smooth, FFT, KDE, baseline, peak, statistical tests | Common operation result envelope |
-| Import filters | inspect/source preview routes | CSV, Excel, JSON, HDF5, NetCDF, FITS, ReadStat, binary/raw | Import filter catalog in `/meta` |
-| Export targets | preview/export/project bundle | Figure/data/project/comparison/artifact manifests | Export target catalog in `/meta` |
+| Analysis | `/fit-analysis`, `/analysis-operation`, expression engine | Smooth, FFT, KDE, baseline, peak, statistical tests | Experimental operation result envelope and fixture expansion |
+| Import filters | inspect/source preview routes, `/import-preview` | CSV, Excel, JSON, HDF5, NetCDF, FITS, ReadStat, binary/raw | Registry-backed preview/options/status runtime |
+| Export targets | preview/export/project bundle, manifest helper | Figure/data/project/comparison/artifact manifests | Export target catalog plus route-level export runtime |
 | Native preview | current backend bitmap/PDF preview | Contract-gated curve hit-testing and object selection | Feature catalog for native preview eligibility |
 
 ## Interface additions
@@ -370,6 +380,13 @@ Future payload names are intentionally explicit so schema work has a fixed targe
 - `AnalysisOperationResultPayload.status_code`
 - `AnalysisOperationResultPayload.message`
 - `AnalysisOperationResultPayload.diagnostics`
+- `AnalysisOperationResponse.operation_result`
+- `ImportPreviewRequest.filter_id`
+- `ImportPreviewResponse.data_containers`
+- `PlotEditCommandNormalizeRequest.command`
+- `PlotEditCommandNormalizeResponse.command`
+- `CodeConsoleRunResponse.notebook_outputs`
+- `CodeConsoleRunResponse.data_containers`
 
 Existing routes remain authoritative:
 
@@ -379,6 +396,9 @@ Existing routes remain authoritative:
 - `POST /render-preview`
 - `POST /save-project`
 - `POST /open-project`
+- `POST /analysis-operation`
+- `POST /import-preview`
+- `POST /plot-edit-command/normalize`
 - `GET /meta`
 - `GET /plot-contract`
 

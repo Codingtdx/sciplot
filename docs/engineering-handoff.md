@@ -36,6 +36,22 @@ This public handoff replaces the private beta work log. It keeps only the curren
 - `disabled` means the project intentionally records the capability as out of current runtime scope.
 - The clean-room policy still applies to every landing: LabPlot can inspire taxonomy, object ownership, and tests, but GPL source is not vendored.
 
+Runtime surfaces added for the LabPlot-scale batch:
+
+- `GET /meta` capability catalogs are built by `src/rendering/capability_registry.py`.
+- `POST /source-table-preview` and `POST /fit-analysis` use shared `DataContainerPayload` helpers from `src/rendering/data_containers.py`.
+- `POST /analysis-operation` runs the experimental SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
+- `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py`.
+- `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
+- `POST /code-console/run` returns `notebook_outputs` and readonly notebook output containers for generated figure/table artifacts.
+
+Maintenance rules:
+
+- Promote a catalog item from `experimental` to `enabled` only after route tests, numerical fixtures where relevant, Swift decoding, and module-local UI/error behavior are covered.
+- Keep unsupported formats as `coming_soon` or `disabled + help`; do not pretend HDF5/NetCDF/FITS/ReadStat/Origin imports work until dependencies and malformed-file fixtures exist.
+- Keep Code Console notebook outputs inside the existing Code Console module. Do not add a fifth Notebook module.
+- Keep plot edit command state tied to typed render/document payloads and native `UndoManager` replay. Do not store durable scientific state only in inspector view state.
+
 ## Validation
 
 Recommended local gate:
