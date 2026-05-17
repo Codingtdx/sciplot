@@ -42,6 +42,8 @@ def _detect_filter(path: Path, requested: str | None) -> str:
 
 
 def _unavailable(path: Path, filter_id: str, spec: dict[str, Any]) -> dict[str, Any]:
+    dependency = spec.get("dependency")
+    status_code = "dependency_missing" if dependency else "policy_not_implemented"
     return {
         "input_path": str(path),
         "filter_id": filter_id,
@@ -50,9 +52,14 @@ def _unavailable(path: Path, filter_id: str, spec: dict[str, Any]) -> dict[str, 
         "data_containers": [],
         "diagnostics": [
             {
-                "status_code": "filter_unavailable",
+                "status_code": status_code,
                 "message": f"{spec['label']} is disabled in this runtime.",
-                "dependency": spec.get("dependency"),
+                "dependency": dependency,
+                "help_action": (
+                    "Install the optional dependency and enable fixtures before exposing this filter."
+                    if dependency
+                    else "Define the safety policy, preview contract, and fixtures before exposing this filter."
+                ),
             }
         ],
         "options_schema": {"type": "object"},

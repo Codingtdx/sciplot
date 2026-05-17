@@ -53,25 +53,31 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 - `POST /analysis-operation` runs the SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
 - `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py`.
 - `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
+- `POST /command/normalize` and `POST /command/apply-preview` extend the command envelope across Plot, Data Studio, Composer, and Code Console graph objects.
+- `POST /preview-scene` returns a contract-gated Swift-native realtime preview scene; `/render-preview` remains the authoritative bitmap/PDF correction path.
+- `POST /live-source/update-now` refreshes enabled file-tail, folder-watch, or periodic-CSV sources into revisioned data containers.
 - `POST /code-console/run` returns `notebook_outputs` and readonly notebook output containers for generated figure/table artifacts.
 
 ### SciPlotDocumentGraph
 
-- `.sciplot` bundles carry `document_graph` for durable object identity, module roots, graph nodes, graph edges, selected nodes, and migration notes.
+- `.sciplot` bundles carry `document_graph` for durable object identity, module roots, graph nodes, graph edges, selected nodes, visibility/lock state, revision numbers, events, and migration notes.
 - The graph is internal persistence and command-model structure only; do not restore a global Project Explorer, shared rail, or global workbench shell.
 - Plot graph nodes cover source, scene, series, axes, legend, guides, annotations, function layers, extra/broken axes, fit overlays, page, and plot area.
 - Data Studio, Composer, and Code Console graph nodes cover workbook/group/table/matrix, pages/panels/assets, context bindings, runs, generated figures, and generated tables.
+- Sidecar owns deterministic naming and graph revision metadata. Swift should not invent durable object names or accept stale preview updates after a newer graph revision.
 
 ### Data containers
 
 - `DataContainerPayload` is shared by Plot Data Workbook, Data Studio Analysis, import preview, fit/analysis results, and Code Console notebook outputs.
 - Enabled container kinds are `table`, `matrix`, `transformed_view`, `statistics_summary`, `fit_result`, and `notebook_output`.
+- Columns carry stable ids, mode, role hints, unit, comment, format, dictionary/category hints, missing policy, source lineage, computed expression metadata, readonly status, and lifecycle event names.
 - Containers are readonly in macOS v1. Inline mutation must wait for command-backed container edits.
 - Statistics, matrix dimensions, coordinate vectors, fit residual/result tables, and provenance are generated in sidecar, not Swift.
 
 ### Analysis operations
 
 - `/analysis-operation` returns `AnalysisOperationResultPayload` with diagnostics, metrics, tables, overlays, and data containers.
+- Operation envelopes include settings, source binding, prepared-array summary, elapsed time, lineage, and artifact refs so results can become graph nodes and be restored without Swift recomputation.
 - Enabled operations include smoothing, interpolation, differentiation, integration, FFT, Fourier filter, correlation, convolution, baseline correction, peak detection, KDE, statistical tests, distribution fitting, peak fitting, and growth models.
 - Numerical implementation is SciPlot-owned NumPy/SciPy code. Do not copy LabPlot NSL algorithms.
 
@@ -84,9 +90,22 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 
 ### Plot object commands and UndoManager
 
-- Plot durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, and copy_settings.
-- The sidecar normalizes commands and emits graph patches; macOS stores before/after payloads in native `UndoManager`.
+- Durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, copy_settings, bind_source, apply_template, import_container, and create_output_ref.
+- Plot durable edits use typed commands, and the same envelope now extends to Data Studio, Composer, and Code Console graph actions.
+- The sidecar normalizes commands, emits graph patches, and can apply preview-only graph patches; macOS stores before/after payloads in native `UndoManager`.
 - Inspector-local state must not be the only copy of a scientific edit.
+
+### Native realtime preview
+
+- Native preview is admitted by `/meta` and `POST /preview-scene`, not by Swift template constants.
+- Supported scene data must include object ids and hit-test metadata for selection, guide/annotation drag, legend/series quick edit, and fallback reasons.
+- Unsupported templates, missing metadata, advanced axis conflicts, or data over budget fall back to backend bitmap/PDF preview.
+- `/render-preview`, export, save/open project, analysis, transforms, and import remain backend-authoritative.
+
+### Live source foundation
+
+- `/meta` records live-source capabilities for file tail, folder watch, and periodic CSV refresh as enabled catalog entries backed by `POST /live-source/update-now`, with MQTT/serial/socket disabled until sandbox and fixture policy exist.
+- Live data updates must produce a data revision and preview invalidation path. They must not bypass document graph semantics.
 
 ### Code Console notebook bridge
 

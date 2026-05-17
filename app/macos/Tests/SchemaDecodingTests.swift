@@ -368,6 +368,103 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(commandResponse.command.targetObjectID, "plot:guide:target-line")
     }
 
+    func testDecodeLabPlotNextGenerationRuntimePayloads() throws {
+        let previewScenePayload = """
+        {
+          "scene_id": "preview-scene:curve.csv:0:curve",
+          "template": "curve",
+          "sheet": 0,
+          "native_supported": true,
+          "fallback_reason": null,
+          "graph_revision": 3,
+          "plot_area": {"x": 96, "y": 60, "width": 608, "height": 468},
+          "axes": [{"id": "axis:primary", "role": "primary", "x_scale": "linear", "y_scale": "linear", "x_range": [0, 3], "y_range": [0, 9]}],
+          "series": [{"id": "plot:series:0", "label": "signal", "kind": "curve", "column_refs": {"x": "col-0", "y": "col-1"}, "samples": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]}],
+          "objects": [{"id": "plot:series:0", "kind": "series", "operations": ["select", "quick_edit"]}],
+          "overlays": [],
+          "budgets": {"native_scene_samples": 2000},
+          "diagnostics": []
+        }
+        """
+        let scene = try decoder.decode(PreviewSceneResponse.self, from: Data(previewScenePayload.utf8))
+        XCTAssertTrue(scene.nativeSupported)
+        XCTAssertEqual(scene.graphRevision, 3)
+        XCTAssertEqual(scene.series[0].columnRefs["x"], "col-0")
+
+        let commandPayload = """
+        {
+          "command": {
+            "command_id": "cmd-copy-style",
+            "kind": "copy_settings",
+            "module": "plot",
+            "target_object_id": "plot:legend:main",
+            "source_object_id": "plot:series:a",
+            "before": {"visible": true},
+            "after": {"visible": true, "copied_style_ref": "plot:series:a"},
+            "graph_patch": {"target_object_id": "plot:legend:main", "revision_delta": 1},
+            "graph_revision": 5,
+            "reversible": true,
+            "help": "Undoable typed command."
+          },
+          "diagnostics": []
+        }
+        """
+        let command = try decoder.decode(CommandNormalizeResponse.self, from: Data(commandPayload.utf8))
+        XCTAssertEqual(command.command.module, "plot")
+        XCTAssertEqual(command.command.sourceObjectID, "plot:series:a")
+        XCTAssertEqual(command.command.graphRevision, 5)
+
+        let applyPayload = """
+        {
+          "command": {
+            "command_id": "cmd-copy-style",
+            "kind": "copy_settings",
+            "module": "plot",
+            "target_object_id": "plot:legend:main",
+            "source_object_id": "plot:series:a",
+            "graph_patch": {"target_object_id": "plot:legend:main", "revision_delta": 1},
+            "graph_revision": 6,
+            "reversible": true,
+            "help": "Undoable typed command."
+          },
+          "graph_revision": 6,
+          "graph_patch": {"target_object_id": "plot:legend:main"},
+          "render_invalidation": {"reason": "command_applied"},
+          "diagnostics": []
+        }
+        """
+        let applied = try decoder.decode(CommandApplyPreviewResponse.self, from: Data(applyPayload.utf8))
+        XCTAssertEqual(applied.graphRevision, 6)
+        XCTAssertEqual(applied.renderInvalidation["reason"]?.stringValue, "command_applied")
+
+        let livePayload = """
+        {
+          "live_source": {
+            "id": "live:file-tail:live",
+            "kind": "periodic_csv",
+            "status": "enabled",
+            "poll_interval_ms": 1000,
+            "sample_window": 200,
+            "append_policy": "replace",
+            "paused": false,
+            "last_update_diagnostic": {"status_code": "live_source_updated"},
+            "help": "Periodic CSV refresh for local files."
+          },
+          "input_path": "/tmp/live.csv",
+          "sheet": 0,
+          "data_revision": 12,
+          "data_containers": [],
+          "diagnostics": [{"status_code": "live_source_updated"}],
+          "render_invalidation": {"reason": "live_source_updated"},
+          "help": "Periodic CSV refresh for local files."
+        }
+        """
+        let liveUpdate = try decoder.decode(LiveSourceUpdateResponse.self, from: Data(livePayload.utf8))
+        XCTAssertEqual(liveUpdate.liveSource.kind, "periodic_csv")
+        XCTAssertEqual(liveUpdate.dataRevision, 12)
+        XCTAssertEqual(liveUpdate.renderInvalidation["reason"]?.stringValue, "live_source_updated")
+    }
+
     func testDecodeCodeConsoleContextResponseUsesSnakeCaseContextID() throws {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

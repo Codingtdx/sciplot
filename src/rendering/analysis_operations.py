@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # ruff: noqa: E501
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -102,6 +103,10 @@ def _result(
     metrics: dict[str, Any] | None = None,
     overlays: list[dict[str, Any]] | None = None,
     diagnostics: list[dict[str, Any]] | None = None,
+    settings: dict[str, Any] | None = None,
+    source_binding: dict[str, Any] | None = None,
+    input_points: int | None = None,
+    started_at: float | None = None,
 ) -> dict[str, Any]:
     container = table_container_from_frame(
         frame,
@@ -131,6 +136,18 @@ def _result(
         ],
         "overlays": overlays or [],
         "data_containers": [container],
+        "settings": settings or {},
+        "source_binding": source_binding or {},
+        "prepared_arrays": {
+            "input_points": int(input_points if input_points is not None else frame.shape[0]),
+            "output_points": int(frame.shape[0]),
+        },
+        "elapsed_ms": max(0.0, (perf_counter() - started_at) * 1000.0) if started_at is not None else 0.0,
+        "lineage": {
+            "invalidates_on": ["source_revision", "settings_revision"],
+            "output_container_ids": [container["id"]],
+        },
+        "artifact_refs": [],
     }
 
 
@@ -143,6 +160,7 @@ def run_analysis_operation(
     y_column: str | None = None,
     parameters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    started_at = perf_counter()
     params = parameters or {}
     path = Path(input_path)
     if operation_id not in SUPPORTED_OPERATION_IDS:
@@ -153,7 +171,41 @@ def run_analysis_operation(
         x_column=x_column,
         y_column=y_column,
     )
-    del source_frame
+    column_names = [str(column) for column in source_frame.columns]
+    x_index = column_names.index(x_name) if x_name in column_names else 0
+    y_index = column_names.index(y_name) if y_name in column_names else 1
+    source_binding = {
+        "input_path": str(path),
+        "sheet": sheet,
+        "x_column": x_name,
+        "y_column": y_name,
+        "x_column_id": f"col-{x_index}",
+        "y_column_id": f"col-{y_index}",
+    }
+
+    def operation_result(
+        *,
+        frame: pd.DataFrame,
+        message: str,
+        metrics: dict[str, Any] | None = None,
+        overlays: list[dict[str, Any]] | None = None,
+        diagnostics: list[dict[str, Any]] | None = None,
+        settings: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return _result(
+            operation_id=operation_id,
+            input_path=path,
+            sheet=sheet,
+            frame=frame,
+            message=message,
+            metrics=metrics,
+            overlays=overlays,
+            diagnostics=diagnostics,
+            settings=settings or {"operation_id": operation_id, **params},
+            source_binding=source_binding,
+            input_points=int(y_values.size),
+            started_at=started_at,
+        )
 
     if operation_id == "analysis.smoothing":
         method = str(params.get("method") or "rolling_mean")
@@ -170,7 +222,7 @@ def run_analysis_operation(
         else:
             y_out = series.rolling(window, center=True, min_periods=1).mean().to_numpy(dtype=float)
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "smoothed": y_out})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Smoothing complete.", metrics={"window": window, "point_count": int(y_values.size)})
+        return operation_result(frame=frame, message="Smoothing complete.", metrics={"window": window, "point_count": int(y_values.size)})
 
     if operation_id == "analysis.interpolation":
         method = str(params.get("method") or "linear")
@@ -179,22 +231,19 @@ def run_analysis_operation(
         kind = "cubic" if method == "cubic" and y_values.size >= 4 else "linear"
         fn = interpolate.interp1d(x_values, y_values, kind=kind, fill_value="extrapolate")
         frame = pd.DataFrame({x_name: x_new, "interpolated": fn(x_new)})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Interpolation complete.", metrics={"method": kind, "point_count": sample_count})
+        return operation_result(frame=frame, message="Interpolation complete.", metrics={"method": kind, "point_count": sample_count})
 
     if operation_id == "analysis.differentiation":
         derivative = np.gradient(y_values, x_values)
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "derivative": derivative})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Differentiation complete.", metrics={"point_count": int(y_values.size)})
+        return operation_result(frame=frame, message="Differentiation complete.", metrics={"point_count": int(y_values.size)})
 
     if operation_id == "analysis.integration":
         cumulative = np.asarray(
             [np.trapezoid(y_values[: index + 1], x_values[: index + 1]) for index in range(y_values.size)]
         )
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "cumulative_area": cumulative})
-        return _result(
-            operation_id=operation_id,
-            input_path=path,
-            sheet=sheet,
+        return operation_result(
             frame=frame,
             message="Integration complete.",
             metrics={"total_area": float(np.trapezoid(y_values, x_values))},
@@ -206,7 +255,7 @@ def run_analysis_operation(
         magnitudes = np.abs(np.fft.rfft(centered))
         dominant_index = int(np.argmax(magnitudes[1:]) + 1) if magnitudes.size > 1 else 0
         frame = pd.DataFrame({"frequency": frequencies, "magnitude": magnitudes})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="FFT complete.", metrics={"dominant_frequency": float(frequencies[dominant_index]), "dominant_magnitude": float(magnitudes[dominant_index])})
+        return operation_result(frame=frame, message="FFT complete.", metrics={"dominant_frequency": float(frequencies[dominant_index]), "dominant_magnitude": float(magnitudes[dominant_index])})
 
     if operation_id == "analysis.fourier_filter":
         mode = str(params.get("mode") or "lowpass")
@@ -216,19 +265,19 @@ def run_analysis_operation(
         mask = frequencies <= cutoff if mode == "lowpass" else frequencies >= cutoff
         filtered = np.fft.irfft(spectrum * mask, n=y_values.size)
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "filtered": filtered})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Fourier filter complete.", metrics={"cutoff": cutoff, "mode": mode})
+        return operation_result(frame=frame, message="Fourier filter complete.", metrics={"cutoff": cutoff, "mode": mode})
 
     if operation_id == "analysis.correlation":
         corr = signal.correlate(y_values - np.mean(y_values), y_values - np.mean(y_values), mode="full")
         lags = signal.correlation_lags(y_values.size, y_values.size, mode="full")
         frame = pd.DataFrame({"lag": lags, "correlation": corr})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Correlation complete.", metrics={"max_correlation": float(np.max(corr))})
+        return operation_result(frame=frame, message="Correlation complete.", metrics={"max_correlation": float(np.max(corr))})
 
     if operation_id == "analysis.convolution":
         kernel = np.asarray(params.get("kernel") or [1.0, 1.0, 1.0], dtype=float)
         convolved = np.convolve(y_values, kernel / np.sum(kernel), mode="same")
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "convolved": convolved})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Convolution complete.", metrics={"kernel_size": int(kernel.size)})
+        return operation_result(frame=frame, message="Convolution complete.", metrics={"kernel_size": int(kernel.size)})
 
     if operation_id == "analysis.baseline":
         degree = max(0, int(params.get("degree") or 1))
@@ -236,15 +285,12 @@ def run_analysis_operation(
         baseline = np.polyval(coefficients, x_values)
         corrected = y_values - baseline
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "baseline": baseline, "corrected": corrected})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Baseline correction complete.", metrics={"degree": degree})
+        return operation_result(frame=frame, message="Baseline correction complete.", metrics={"degree": degree})
 
     if operation_id == "analysis.peak_detection":
         peaks, properties = signal.find_peaks(y_values, height=params.get("height"))
         frame = pd.DataFrame({"peak_index": peaks, x_name: x_values[peaks], y_name: y_values[peaks]})
-        return _result(
-            operation_id=operation_id,
-            input_path=path,
-            sheet=sheet,
+        return operation_result(
             frame=frame,
             message="Peak detection complete.",
             metrics={"peak_count": int(peaks.size)},
@@ -256,7 +302,7 @@ def run_analysis_operation(
         samples = np.linspace(float(np.min(y_values)), float(np.max(y_values)), max(32, y_values.size * 4))
         density = kde(samples)
         frame = pd.DataFrame({"value": samples, "density": density})
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="KDE complete.", metrics={"sample_count": int(samples.size)})
+        return operation_result(frame=frame, message="KDE complete.", metrics={"sample_count": int(samples.size)})
 
     if operation_id == "analysis.statistical_tests":
         zero = np.zeros_like(y_values)
@@ -274,7 +320,7 @@ def run_analysis_operation(
                 },
             ]
         )
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Statistical tests complete.")
+        return operation_result(frame=frame, message="Statistical tests complete.")
 
     if operation_id == "analysis.distribution_fitting":
         distribution = str(params.get("distribution") or "normal")
@@ -291,7 +337,7 @@ def run_analysis_operation(
             statistic, p_value = stats.kstest(y_values, "norm", args=(mu, sigma))
             metrics = {"mu": float(mu), "sigma": float(sigma)}
         frame = pd.DataFrame([{**metrics, "ks_statistic": float(statistic), "ks_p_value": float(p_value)}])
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Distribution fitting complete.", metrics={**metrics, "ks_statistic": float(statistic), "ks_p_value": float(p_value)})
+        return operation_result(frame=frame, message="Distribution fitting complete.", metrics={**metrics, "ks_statistic": float(statistic), "ks_p_value": float(p_value)})
 
     if operation_id == "analysis.peak_fitting":
         def gaussian(x: np.ndarray, amplitude: float, center: float, sigma: float, offset: float) -> np.ndarray:
@@ -302,7 +348,7 @@ def run_analysis_operation(
         y_fit = gaussian(x_values, *coefficients)
         frame = pd.DataFrame({x_name: x_values, y_name: y_values, "y_fit": y_fit, "residual": y_values - y_fit})
         metrics = {"amplitude": float(coefficients[0]), "center": float(coefficients[1]), "sigma": abs(float(coefficients[2])), "offset": float(coefficients[3])}
-        return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Peak fitting complete.", metrics=metrics, overlays=[{"kind": "fit_overlay", "model_id": "gaussian_peak"}])
+        return operation_result(frame=frame, message="Peak fitting complete.", metrics=metrics, overlays=[{"kind": "fit_overlay", "model_id": "gaussian_peak"}])
 
     def logistic(x: np.ndarray, l_value: float, k_value: float, x0_value: float, c_value: float) -> np.ndarray:
         return l_value / (1 + np.exp(-k_value * (x - x0_value))) + c_value
@@ -321,7 +367,7 @@ def run_analysis_operation(
         rate = float(slope)
         metrics = {"a": amplitude, "b": rate, "amplitude": amplitude, "rate": rate}
     frame = pd.DataFrame({x_name: x_values, y_name: y_values, "y_fit": y_fit, "residual": y_values - y_fit})
-    return _result(operation_id=operation_id, input_path=path, sheet=sheet, frame=frame, message="Growth model fitting complete.", metrics=metrics, overlays=[{"kind": "fit_overlay", "model_id": model}])
+    return operation_result(frame=frame, message="Growth model fitting complete.", metrics=metrics, overlays=[{"kind": "fit_overlay", "model_id": model}])
 
 
 __all__ = ["SUPPORTED_OPERATION_IDS", "run_analysis_operation"]

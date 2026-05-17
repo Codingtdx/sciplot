@@ -64,7 +64,8 @@ def test_unavailable_import_filter_returns_helpful_diagnostic(tmp_path: Path) ->
     payload = ImportPreviewResponse.model_validate(response.json())
     assert payload.status == "disabled"
     assert payload.data_containers == []
-    assert payload.diagnostics[0]["status_code"] == "filter_unavailable"
+    assert payload.diagnostics[0]["status_code"] == "dependency_missing"
+    assert payload.diagnostics[0]["dependency"] == "h5py"
     assert payload.help
 
 

@@ -24,6 +24,10 @@ enum TestPayloads {
         .init(method: "POST", path: "/analysis-operation"),
         .init(method: "POST", path: "/import-preview"),
         .init(method: "POST", path: "/plot-edit-command/normalize"),
+        .init(method: "POST", path: "/command/normalize"),
+        .init(method: "POST", path: "/command/apply-preview"),
+        .init(method: "POST", path: "/preview-scene"),
+        .init(method: "POST", path: "/live-source/update-now"),
         .init(method: "POST", path: "/save-project"),
         .init(method: "POST", path: "/open-project"),
         .init(method: "POST", path: "/preflight-render"),
@@ -1101,6 +1105,103 @@ enum TestPayloads {
                 help: "Undoable typed plot edit command."
             ),
             diagnostics: []
+        )
+    }
+
+    static func commandNormalize() -> CommandNormalizeResponse {
+        CommandNormalizeResponse(
+            command: PlotEditCommandPayload(
+                commandID: "cmd-copy-style",
+                kind: "copy_settings",
+                module: "plot",
+                targetObjectID: "plot:legend:main",
+                sourceObjectID: "plot:series:a",
+                before: ["visible": .bool(true)],
+                after: ["visible": .bool(true), "copied_style_ref": .string("plot:series:a")],
+                graphPatch: ["target_object_id": .string("plot:legend:main"), "revision_delta": .number(1)],
+                graphRevision: 5,
+                reversible: true,
+                help: "Undoable typed command."
+            ),
+            diagnostics: []
+        )
+    }
+
+    static func commandApplyPreview() -> CommandApplyPreviewResponse {
+        CommandApplyPreviewResponse(
+            command: PlotEditCommandPayload(
+                commandID: "cmd-copy-style",
+                kind: "copy_settings",
+                module: "plot",
+                targetObjectID: "plot:legend:main",
+                sourceObjectID: "plot:series:a",
+                graphPatch: ["target_object_id": .string("plot:legend:main"), "revision_delta": .number(1)],
+                graphRevision: 6,
+                reversible: true,
+                help: "Undoable typed command."
+            ),
+            graphRevision: 6,
+            graphPatch: ["target_object_id": .string("plot:legend:main")],
+            renderInvalidation: ["reason": .string("command_applied")],
+            diagnostics: []
+        )
+    }
+
+    static func previewScene() -> PreviewSceneResponse {
+        PreviewSceneResponse(
+            sceneID: "preview-scene:curve.csv:0:curve",
+            template: "curve",
+            sheet: .index(0),
+            nativeSupported: true,
+            fallbackReason: nil,
+            graphRevision: 1,
+            plotArea: ["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)],
+            axes: [
+                [
+                    "id": .string("axis:primary"),
+                    "role": .string("primary"),
+                    "x_scale": .string("linear"),
+                    "y_scale": .string("linear")
+                ]
+            ],
+            series: [
+                PreviewSceneSeriesPayload(
+                    id: "plot:series:0",
+                    label: "signal",
+                    kind: "curve",
+                    columnRefs: ["x": "col-0", "y": "col-1"],
+                    samples: [["x": .number(0), "y": .number(0)], ["x": .number(1), "y": .number(1)]],
+                    hitTest: ["object_id": .string("plot:series:0")]
+                )
+            ],
+            objects: [["id": .string("plot:series:0"), "kind": .string("series")]],
+            overlays: [],
+            budgets: ["native_scene_samples": .number(2_000)],
+            diagnostics: []
+        )
+    }
+
+    static func liveSourceUpdate() -> LiveSourceUpdateResponse {
+        let liveSource = LiveSourcePayload(
+            id: "live:file-tail:live",
+            kind: "periodic_csv",
+            status: "enabled",
+            pollIntervalMS: 1000,
+            sampleWindow: 200,
+            appendPolicy: "replace",
+            paused: false,
+            lastUpdateDiagnostic: ["status_code": .string("live_source_updated")],
+            help: "Periodic CSV refresh for local files."
+        )
+        return LiveSourceUpdateResponse(
+            liveSource: liveSource,
+            inputPath: "/tmp/live.csv",
+            sheet: .index(0),
+            dataRevision: 12,
+            dataContainers: [],
+            diagnostics: [["status_code": .string("live_source_updated")]],
+            renderInvalidation: ["reason": .string("live_source_updated")],
+            help: "Periodic CSV refresh for local files."
         )
     }
 

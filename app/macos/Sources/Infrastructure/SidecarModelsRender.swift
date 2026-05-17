@@ -1165,9 +1165,57 @@ struct DataContainerColumnPayload: Codable, Equatable, Sendable, Identifiable {
     let name: String
     let index: Int
     let roleHints: [String]
+    let mode: String
     let unit: String?
     let comment: String?
+    let format: String?
+    let dictionary: [String]
+    let category: String?
+    let missingPolicy: String
+    let lineage: [String: JSONValue]
+    let computedExpression: String?
+    let readonly: Bool
+    let lifecycleEvents: [String]
     let profile: PlotColumnProfileResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case index
+        case roleHints
+        case mode
+        case unit
+        case comment
+        case format
+        case dictionary
+        case category
+        case missingPolicy
+        case lineage
+        case computedExpression
+        case readonly
+        case lifecycleEvents
+        case profile
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        index = try container.decode(Int.self, forKey: .index)
+        roleHints = try container.decodeIfPresent([String].self, forKey: .roleHints) ?? []
+        mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? "unknown"
+        unit = try container.decodeIfPresent(String.self, forKey: .unit)
+        comment = try container.decodeIfPresent(String.self, forKey: .comment)
+        format = try container.decodeIfPresent(String.self, forKey: .format)
+        dictionary = try container.decodeIfPresent([String].self, forKey: .dictionary) ?? []
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        missingPolicy = try container.decodeIfPresent(String.self, forKey: .missingPolicy) ?? "preserve"
+        lineage = try container.decodeIfPresent([String: JSONValue].self, forKey: .lineage) ?? [:]
+        computedExpression = try container.decodeIfPresent(String.self, forKey: .computedExpression)
+        readonly = try container.decodeIfPresent(Bool.self, forKey: .readonly) ?? true
+        lifecycleEvents = try container.decodeIfPresent([String].self, forKey: .lifecycleEvents) ?? []
+        profile = try container.decodeIfPresent(PlotColumnProfileResponse.self, forKey: .profile)
+    }
 }
 
 struct DataContainerSourcePayload: Codable, Equatable, Sendable {
@@ -1216,6 +1264,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
     let rowCount: Int
     let columnCount: Int
     let columns: [DataContainerColumnPayload]
+    let columnIDs: [String]
     let source: DataContainerSourcePayload
     let dimensions: [String: JSONValue]?
     let coordinateVectors: [String: [JSONValue]]
@@ -1227,6 +1276,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
     let artifactPaths: [String]
     let containerIDs: [String]
     let sourceRunID: String?
+    let dataRevision: Int
     let help: String
 
     enum CodingKeys: String, CodingKey {
@@ -1238,6 +1288,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
         case rowCount
         case columnCount
         case columns
+        case columnIDs = "columnIds"
         case source
         case dimensions
         case coordinateVectors
@@ -1249,6 +1300,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
         case artifactPaths
         case containerIDs = "containerIds"
         case sourceRunID = "sourceRunId"
+        case dataRevision
         case help
     }
 
@@ -1262,6 +1314,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
         rowCount = try container.decode(Int.self, forKey: .rowCount)
         columnCount = try container.decode(Int.self, forKey: .columnCount)
         columns = try container.decodeIfPresent([DataContainerColumnPayload].self, forKey: .columns) ?? []
+        columnIDs = try container.decodeIfPresent([String].self, forKey: .columnIDs) ?? columns.map(\.id)
         source = try container.decode(DataContainerSourcePayload.self, forKey: .source)
         dimensions = try container.decodeIfPresent([String: JSONValue].self, forKey: .dimensions)
         coordinateVectors = try container.decodeIfPresent([String: [JSONValue]].self, forKey: .coordinateVectors) ?? [:]
@@ -1273,6 +1326,7 @@ struct DataContainerPayload: Codable, Equatable, Sendable, Identifiable {
         artifactPaths = try container.decodeIfPresent([String].self, forKey: .artifactPaths) ?? []
         containerIDs = try container.decodeIfPresent([String].self, forKey: .containerIDs) ?? []
         sourceRunID = try container.decodeIfPresent(String.self, forKey: .sourceRunID)
+        dataRevision = try container.decodeIfPresent(Int.self, forKey: .dataRevision) ?? 1
         help = try container.decode(String.self, forKey: .help)
     }
 }
@@ -1306,24 +1360,76 @@ struct PlotObjectPayload: Codable, Equatable, Sendable, Identifiable {
 struct PlotEditCommandPayload: Codable, Equatable, Sendable, Identifiable {
     let commandID: String
     let kind: String
+    let module: String
     let targetObjectID: String
+    let sourceObjectID: String?
     let before: [String: JSONValue]?
     let after: [String: JSONValue]?
     let graphPatch: [String: JSONValue]
+    let graphRevision: Int?
+    let compoundID: String?
     let reversible: Bool
     let help: String
 
     var id: String { commandID }
 
+    init(
+        commandID: String,
+        kind: String,
+        module: String = "plot",
+        targetObjectID: String,
+        sourceObjectID: String? = nil,
+        before: [String: JSONValue]? = nil,
+        after: [String: JSONValue]? = nil,
+        graphPatch: [String: JSONValue] = [:],
+        graphRevision: Int? = nil,
+        compoundID: String? = nil,
+        reversible: Bool = true,
+        help: String
+    ) {
+        self.commandID = commandID
+        self.kind = kind
+        self.module = module
+        self.targetObjectID = targetObjectID
+        self.sourceObjectID = sourceObjectID
+        self.before = before
+        self.after = after
+        self.graphPatch = graphPatch
+        self.graphRevision = graphRevision
+        self.compoundID = compoundID
+        self.reversible = reversible
+        self.help = help
+    }
+
     enum CodingKeys: String, CodingKey {
         case commandID = "commandId"
         case kind
+        case module
         case targetObjectID = "targetObjectId"
+        case sourceObjectID = "sourceObjectId"
         case before
         case after
         case graphPatch
+        case graphRevision
+        case compoundID = "compoundId"
         case reversible
         case help
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        commandID = try container.decode(String.self, forKey: .commandID)
+        kind = try container.decode(String.self, forKey: .kind)
+        module = try container.decodeIfPresent(String.self, forKey: .module) ?? "plot"
+        targetObjectID = try container.decode(String.self, forKey: .targetObjectID)
+        sourceObjectID = try container.decodeIfPresent(String.self, forKey: .sourceObjectID)
+        before = try container.decodeIfPresent([String: JSONValue].self, forKey: .before)
+        after = try container.decodeIfPresent([String: JSONValue].self, forKey: .after)
+        graphPatch = try container.decodeIfPresent([String: JSONValue].self, forKey: .graphPatch) ?? [:]
+        graphRevision = try container.decodeIfPresent(Int.self, forKey: .graphRevision)
+        compoundID = try container.decodeIfPresent(String.self, forKey: .compoundID)
+        reversible = try container.decodeIfPresent(Bool.self, forKey: .reversible) ?? true
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? "Undoable typed edit command."
     }
 }
 
@@ -1338,8 +1444,50 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
     let tables: [[String: JSONValue]]
     let overlays: [[String: JSONValue]]
     let dataContainers: [DataContainerPayload]
+    let settings: [String: JSONValue]
+    let sourceBinding: [String: JSONValue]
+    let preparedArrays: [String: JSONValue]
+    let elapsedMS: Double
+    let lineage: [String: JSONValue]
+    let artifactRefs: [[String: JSONValue]]
 
     var id: String { operationID }
+
+    init(
+        operationID: String,
+        available: Bool,
+        valid: Bool,
+        statusCode: String,
+        message: String,
+        diagnostics: [[String: JSONValue]] = [],
+        metrics: [String: JSONValue] = [:],
+        tables: [[String: JSONValue]] = [],
+        overlays: [[String: JSONValue]] = [],
+        dataContainers: [DataContainerPayload] = [],
+        settings: [String: JSONValue] = [:],
+        sourceBinding: [String: JSONValue] = [:],
+        preparedArrays: [String: JSONValue] = [:],
+        elapsedMS: Double = 0,
+        lineage: [String: JSONValue] = [:],
+        artifactRefs: [[String: JSONValue]] = []
+    ) {
+        self.operationID = operationID
+        self.available = available
+        self.valid = valid
+        self.statusCode = statusCode
+        self.message = message
+        self.diagnostics = diagnostics
+        self.metrics = metrics
+        self.tables = tables
+        self.overlays = overlays
+        self.dataContainers = dataContainers
+        self.settings = settings
+        self.sourceBinding = sourceBinding
+        self.preparedArrays = preparedArrays
+        self.elapsedMS = elapsedMS
+        self.lineage = lineage
+        self.artifactRefs = artifactRefs
+    }
 
     enum CodingKeys: String, CodingKey {
         case operationID = "operationId"
@@ -1352,6 +1500,32 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
         case tables
         case overlays
         case dataContainers
+        case settings
+        case sourceBinding
+        case preparedArrays
+        case elapsedMS = "elapsedMs"
+        case lineage
+        case artifactRefs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        operationID = try container.decode(String.self, forKey: .operationID)
+        available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? false
+        valid = try container.decodeIfPresent(Bool.self, forKey: .valid) ?? false
+        statusCode = try container.decodeIfPresent(String.self, forKey: .statusCode) ?? "unknown"
+        message = try container.decodeIfPresent(String.self, forKey: .message) ?? ""
+        diagnostics = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .diagnostics) ?? []
+        metrics = try container.decodeIfPresent([String: JSONValue].self, forKey: .metrics) ?? [:]
+        tables = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .tables) ?? []
+        overlays = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .overlays) ?? []
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
+        settings = try container.decodeIfPresent([String: JSONValue].self, forKey: .settings) ?? [:]
+        sourceBinding = try container.decodeIfPresent([String: JSONValue].self, forKey: .sourceBinding) ?? [:]
+        preparedArrays = try container.decodeIfPresent([String: JSONValue].self, forKey: .preparedArrays) ?? [:]
+        elapsedMS = try container.decodeIfPresent(Double.self, forKey: .elapsedMS) ?? 0
+        lineage = try container.decodeIfPresent([String: JSONValue].self, forKey: .lineage) ?? [:]
+        artifactRefs = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .artifactRefs) ?? []
     }
 }
 
@@ -1531,6 +1705,199 @@ struct PlotEditCommandNormalizeRequest: Codable, Equatable, Sendable {
 struct PlotEditCommandNormalizeResponse: Codable, Equatable, Sendable {
     let command: PlotEditCommandPayload
     let diagnostics: [[String: JSONValue]]
+}
+
+struct CommandNormalizeRequest: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let objects: [PlotObjectPayload]
+
+    init(command: PlotEditCommandPayload, objects: [PlotObjectPayload] = []) {
+        self.command = command
+        self.objects = objects
+    }
+}
+
+struct CommandNormalizeResponse: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let diagnostics: [[String: JSONValue]]
+}
+
+struct CommandApplyPreviewRequest: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let documentGraph: [String: JSONValue]
+
+    init(command: PlotEditCommandPayload, documentGraph: [String: JSONValue] = [:]) {
+        self.command = command
+        self.documentGraph = documentGraph
+    }
+}
+
+struct CommandApplyPreviewResponse: Codable, Equatable, Sendable {
+    let command: PlotEditCommandPayload
+    let graphRevision: Int
+    let graphPatch: [String: JSONValue]
+    let renderInvalidation: [String: JSONValue]
+    let diagnostics: [[String: JSONValue]]
+}
+
+struct PreviewSceneRequest: Codable, Equatable, Sendable {
+    let inputPath: String
+    let sheet: SheetValue
+    let template: String
+    let options: RenderOptionsPayload
+    let fitOptions: FitOptionsPayload
+    let previewConfig: PreviewRenderConfigPayload?
+
+    init(
+        inputPath: String,
+        sheet: SheetValue = .index(0),
+        template: String,
+        options: RenderOptionsPayload = RenderOptionsPayload(),
+        fitOptions: FitOptionsPayload = FitOptionsPayload(),
+        previewConfig: PreviewRenderConfigPayload? = nil
+    ) {
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.template = template
+        self.options = options
+        self.fitOptions = fitOptions
+        self.previewConfig = previewConfig
+    }
+}
+
+struct PreviewSceneSeriesPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let kind: String
+    let columnRefs: [String: String]
+    let samples: [[String: JSONValue]]
+    let styleTokens: [String: JSONValue]
+    let hitTest: [String: JSONValue]
+
+    init(
+        id: String,
+        label: String,
+        kind: String,
+        columnRefs: [String: String],
+        samples: [[String: JSONValue]] = [],
+        styleTokens: [String: JSONValue] = [:],
+        hitTest: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.label = label
+        self.kind = kind
+        self.columnRefs = columnRefs
+        self.samples = samples
+        self.styleTokens = styleTokens
+        self.hitTest = hitTest
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case kind
+        case columnRefs
+        case samples
+        case styleTokens
+        case hitTest
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        kind = try container.decode(String.self, forKey: .kind)
+        columnRefs = try container.decodeIfPresent([String: String].self, forKey: .columnRefs) ?? [:]
+        samples = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .samples) ?? []
+        styleTokens = try container.decodeIfPresent([String: JSONValue].self, forKey: .styleTokens) ?? [:]
+        hitTest = try container.decodeIfPresent([String: JSONValue].self, forKey: .hitTest) ?? [:]
+    }
+}
+
+struct PreviewSceneResponse: Codable, Equatable, Sendable {
+    let sceneID: String
+    let template: String
+    let sheet: SheetValue
+    let nativeSupported: Bool
+    let fallbackReason: String?
+    let graphRevision: Int
+    let plotArea: [String: JSONValue]
+    let axes: [[String: JSONValue]]
+    let series: [PreviewSceneSeriesPayload]
+    let objects: [[String: JSONValue]]
+    let overlays: [[String: JSONValue]]
+    let budgets: [String: JSONValue]
+    let diagnostics: [[String: JSONValue]]
+
+    enum CodingKeys: String, CodingKey {
+        case sceneID = "sceneId"
+        case template
+        case sheet
+        case nativeSupported
+        case fallbackReason
+        case graphRevision
+        case plotArea
+        case axes
+        case series
+        case objects
+        case overlays
+        case budgets
+        case diagnostics
+    }
+}
+
+struct LiveSourcePayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let status: String
+    let pollIntervalMS: Int
+    let sampleWindow: Int?
+    let appendPolicy: String
+    let paused: Bool
+    let lastUpdateDiagnostic: [String: JSONValue]?
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case status
+        case pollIntervalMS = "pollIntervalMs"
+        case sampleWindow
+        case appendPolicy
+        case paused
+        case lastUpdateDiagnostic
+        case help
+    }
+}
+
+struct LiveSourceUpdateRequest: Codable, Equatable, Sendable {
+    let liveSource: LiveSourcePayload
+    let inputPath: String
+    let sheet: SheetValue
+    let options: [String: JSONValue]
+
+    init(
+        liveSource: LiveSourcePayload,
+        inputPath: String,
+        sheet: SheetValue = .index(0),
+        options: [String: JSONValue] = [:]
+    ) {
+        self.liveSource = liveSource
+        self.inputPath = inputPath
+        self.sheet = sheet
+        self.options = options
+    }
+}
+
+struct LiveSourceUpdateResponse: Codable, Equatable, Sendable {
+    let liveSource: LiveSourcePayload
+    let inputPath: String
+    let sheet: SheetValue
+    let dataRevision: Int
+    let dataContainers: [DataContainerPayload]
+    let diagnostics: [[String: JSONValue]]
+    let renderInvalidation: [String: JSONValue]
+    let help: String
 }
 
 struct SourceTablePreviewResponse: Codable, Equatable, Sendable {

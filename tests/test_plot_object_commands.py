@@ -12,9 +12,13 @@ client = TestClient(app)
 def test_plot_object_command_registry_covers_undoable_edit_surface() -> None:
     assert SUPPORTED_COMMAND_KINDS == {
         "add",
+        "apply_template",
+        "bind_source",
         "copy_settings",
+        "create_output_ref",
         "delete",
         "edit",
+        "import_container",
         "lock",
         "rename",
         "reorder",
@@ -35,7 +39,12 @@ def test_plot_object_command_normalizer_sets_graph_patch_and_reversibility() -> 
     command = normalized["command"]
     assert command["command_id"] == "cmd:rename:plot:series:1"
     assert command["reversible"] is True
-    assert command["graph_patch"] == {"target_object_id": "plot:series:1", "kind": "rename"}
+    assert command["graph_patch"] == {
+        "target_object_id": "plot:series:1",
+        "kind": "rename",
+        "module": "plot",
+        "revision_delta": 1,
+    }
     assert normalized["diagnostics"] == []
 
 

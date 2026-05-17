@@ -99,10 +99,13 @@ Plot and Data Studio share sidecar services, but they do not own the same produc
 SciPlot now treats LabPlot-scale concepts as product runtime, not roadmap text. The internal `SciPlotDocumentGraph` gives Plot, Data Studio, Composer, and Code Console durable object identity without restoring a global Project Explorer UI.
 
 - Data containers are shared across Plot Data Workbook, Data Studio Analysis, import preview, fit/analysis results, and Code Console notebook outputs.
+- Data containers now carry column-level semantics: stable column ids, mode, role hints, units, comments, missing policy, lineage, readonly status, and data revision. Plot and Data Studio bind columns by ids instead of rediscovering meaning from header strings.
 - Analysis operations run in the sidecar through `POST /analysis-operation`; Swift displays envelopes and diagnostics but does not recompute scientific results.
 - Import/export capability is registry-backed through `/meta`, `/import-preview`, export manifests, and project bundle restore rules.
-- Plot edits move through typed command payloads and native `UndoManager`; persistent scientific state belongs to render/project payloads, not view-local inspector state.
+- Plot and cross-module edits move through typed command payloads, `POST /command/normalize`, `POST /command/apply-preview`, and native `UndoManager`; persistent scientific state belongs to render/project payloads, not view-local inspector state.
+- Hybrid realtime preview uses `POST /preview-scene` for Swift-native drawing and hit testing, then corrects through the existing `/render-preview` authoritative backend path.
 - Code Console generated figures and tables remain inside the Code Console module while becoming graph-addressable artifacts that Plot and Composer can reference.
+- Live data is cataloged as file tail, folder watch, and periodic CSV refresh foundations backed by `POST /live-source/update-now`. Every refresh creates a data revision and respects latest-write-wins preview semantics.
 
 - Plot owns single-figure work: source inspect, ranked template recommendation, typed data variables/transforms, figure refinement, preflight, preview/export, and Plot project durability.
 - Data Studio owns intake and workbook work: raw-source template mapping, workbook creation/import, specimen filtering, comparison context, comparison figure export, and Data Studio project durability.

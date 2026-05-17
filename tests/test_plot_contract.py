@@ -142,6 +142,8 @@ class PlotContractTests(unittest.TestCase):
                 "export_targets",
                 "project_bundle_features",
                 "native_preview_features",
+                "command_engine",
+                "live_sources",
             },
         )
         self.assertIn("data.table", {item["id"] for item in groups["data_containers"]["capabilities"]})
@@ -149,6 +151,11 @@ class PlotContractTests(unittest.TestCase):
         self.assertIn("analysis.fit", {item["id"] for item in groups["analysis_operations"]["capabilities"]})
         self.assertIn("import.csv", {item["id"] for item in groups["import_filters"]["capabilities"]})
         self.assertIn("export.figure.pdf", {item["id"] for item in groups["export_targets"]["capabilities"]})
+        self.assertIn(
+            "command.cross_module_normalize",
+            {item["id"] for item in groups["command_engine"]["capabilities"]},
+        )
+        self.assertIn("live.file_tail", {item["id"] for item in groups["live_sources"]["capabilities"]})
         self.assertIn(
             "project_bundle.document_graph",
             {item["id"] for item in groups["project_bundle_features"]["capabilities"]},
