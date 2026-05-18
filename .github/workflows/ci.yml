@@ -37,8 +37,8 @@ jobs:
       - name: Native macOS build
         run: |
           xcodebuild \
-            -project app/macos/SciPlotGod.xcodeproj \
-            -scheme SciPlotGodMac \
+            -project app/macos/SciPlot.xcodeproj \
+            -scheme SciPlotMac \
             -destination 'platform=macOS' \
             -derivedDataPath app/macos/.derivedData \
             build
@@ -46,8 +46,8 @@ jobs:
       - name: Native macOS tests
         run: |
           xcodebuild \
-            -project app/macos/SciPlotGod.xcodeproj \
-            -scheme SciPlotGodMac \
+            -project app/macos/SciPlot.xcodeproj \
+            -scheme SciPlotMac \
             -destination 'platform=macOS' \
             -derivedDataPath app/macos/.derivedData \
             test
