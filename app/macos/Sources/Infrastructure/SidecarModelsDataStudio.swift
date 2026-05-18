@@ -681,10 +681,42 @@ struct DataStudioTemplatePreviewSegmentResponse: Codable, Equatable, Sendable, I
 struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
     let sourcePath: String
     let template: DataStudioCreateTemplateRequest
+    let importProfile: ImportFilterProfilePayload?
+    let importDiagnostics: [ImportDiagnosticPayload]
+    let selectedSheetOrSegment: String?
+
+    init(
+        sourcePath: String,
+        template: DataStudioCreateTemplateRequest,
+        importProfile: ImportFilterProfilePayload? = nil,
+        importDiagnostics: [ImportDiagnosticPayload] = [],
+        selectedSheetOrSegment: String? = nil
+    ) {
+        self.sourcePath = sourcePath
+        self.template = template
+        self.importProfile = importProfile
+        self.importDiagnostics = importDiagnostics
+        self.selectedSheetOrSegment = selectedSheetOrSegment
+    }
 }
 
 struct DataStudioTemplateRecommendationsRequest: Codable, Equatable, Sendable {
     let sourcePath: String
+    let importProfile: ImportFilterProfilePayload?
+    let importDiagnostics: [ImportDiagnosticPayload]
+    let selectedSheetOrSegment: String?
+
+    init(
+        sourcePath: String,
+        importProfile: ImportFilterProfilePayload? = nil,
+        importDiagnostics: [ImportDiagnosticPayload] = [],
+        selectedSheetOrSegment: String? = nil
+    ) {
+        self.sourcePath = sourcePath
+        self.importProfile = importProfile
+        self.importDiagnostics = importDiagnostics
+        self.selectedSheetOrSegment = selectedSheetOrSegment
+    }
 }
 
 struct DataStudioTemplateRecommendationsResponse: Codable, Equatable, Sendable {

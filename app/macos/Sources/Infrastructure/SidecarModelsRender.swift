@@ -1535,10 +1535,289 @@ struct ImportFilterPayload: Codable, Equatable, Sendable, Identifiable {
     let status: String
     let owner: String
     let surface: String
+    let extensions: [String]
+    let mimeTypes: [String]
+    let dependency: String?
+    let dependencyStatus: String
+    let previewSupported: Bool
+    let readSupported: Bool
+    let writeSupported: Bool
     let optionsSchema: [String: JSONValue]
     let outputContainerKinds: [String]
     let help: String
     let testRequirements: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case status
+        case owner
+        case surface
+        case extensions
+        case mimeTypes
+        case dependency
+        case dependencyStatus
+        case previewSupported
+        case readSupported
+        case writeSupported
+        case optionsSchema
+        case outputContainerKinds
+        case help
+        case testRequirements
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        status = try container.decode(String.self, forKey: .status)
+        owner = try container.decodeIfPresent(String.self, forKey: .owner) ?? "sidecar"
+        surface = try container.decodeIfPresent(String.self, forKey: .surface) ?? "plot,data_studio"
+        extensions = try container.decodeIfPresent([String].self, forKey: .extensions) ?? []
+        mimeTypes = try container.decodeIfPresent([String].self, forKey: .mimeTypes) ?? []
+        dependency = try container.decodeIfPresent(String.self, forKey: .dependency)
+        dependencyStatus = try container.decodeIfPresent(String.self, forKey: .dependencyStatus) ?? "not_required"
+        previewSupported = try container.decodeIfPresent(Bool.self, forKey: .previewSupported) ?? false
+        readSupported = try container.decodeIfPresent(Bool.self, forKey: .readSupported) ?? false
+        writeSupported = try container.decodeIfPresent(Bool.self, forKey: .writeSupported) ?? false
+        optionsSchema = try container.decodeIfPresent([String: JSONValue].self, forKey: .optionsSchema) ?? [:]
+        outputContainerKinds = try container.decodeIfPresent([String].self, forKey: .outputContainerKinds) ?? []
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? ""
+        testRequirements = try container.decodeIfPresent([String].self, forKey: .testRequirements) ?? []
+    }
+}
+
+struct ImportDiagnosticPayload: Codable, Equatable, Sendable {
+    let statusCode: String
+    let severity: String
+    let message: String
+    let dependency: String?
+    let helpAction: String?
+    let details: [String: JSONValue]
+
+    enum CodingKeys: String, CodingKey {
+        case statusCode
+        case severity
+        case message
+        case dependency
+        case helpAction
+    }
+
+    init(
+        statusCode: String,
+        severity: String = "info",
+        message: String = "",
+        dependency: String? = nil,
+        helpAction: String? = nil,
+        details: [String: JSONValue] = [:]
+    ) {
+        self.statusCode = statusCode
+        self.severity = severity
+        self.message = message
+        self.dependency = dependency
+        self.helpAction = helpAction
+        self.details = details
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        statusCode = try container.decode(String.self, forKey: .statusCode)
+        severity = try container.decodeIfPresent(String.self, forKey: .severity) ?? "info"
+        message = try container.decodeIfPresent(String.self, forKey: .message) ?? ""
+        dependency = try container.decodeIfPresent(String.self, forKey: .dependency)
+        helpAction = try container.decodeIfPresent(String.self, forKey: .helpAction)
+        let raw = try decoder.singleValueContainer().decode([String: JSONValue].self)
+        details = raw.filter { key, _ in
+            !["status_code", "statusCode", "severity", "message", "dependency", "help_action", "helpAction"].contains(key)
+        }
+    }
+}
+
+struct ImportOptionPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let kind: String
+    let defaultValue: JSONValue?
+    let choices: [JSONValue]
+    let required: Bool
+    let help: String
+
+    init(
+        id: String,
+        label: String,
+        kind: String = "string",
+        defaultValue: JSONValue? = nil,
+        choices: [JSONValue] = [],
+        required: Bool = false,
+        help: String = ""
+    ) {
+        self.id = id
+        self.label = label
+        self.kind = kind
+        self.defaultValue = defaultValue
+        self.choices = choices
+        self.required = required
+        self.help = help
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case kind
+        case defaultValue
+        case choices
+        case required
+        case help
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? "string"
+        defaultValue = try container.decodeIfPresent(JSONValue.self, forKey: .defaultValue)
+        choices = try container.decodeIfPresent([JSONValue].self, forKey: .choices) ?? []
+        required = try container.decodeIfPresent(Bool.self, forKey: .required) ?? false
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? ""
+    }
+}
+
+struct ImportStructureNodePayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let label: String
+    let parentID: String?
+    let rowCount: Int?
+    let columnCount: Int?
+    let children: [ImportStructureNodePayload]
+    let payload: [String: JSONValue]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case label
+        case parentID = "parentId"
+        case rowCount
+        case columnCount
+        case children
+        case payload
+    }
+
+    init(
+        id: String,
+        kind: String,
+        label: String,
+        parentID: String? = nil,
+        rowCount: Int? = nil,
+        columnCount: Int? = nil,
+        children: [ImportStructureNodePayload] = [],
+        payload: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.label = label
+        self.parentID = parentID
+        self.rowCount = rowCount
+        self.columnCount = columnCount
+        self.children = children
+        self.payload = payload
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        kind = try container.decode(String.self, forKey: .kind)
+        label = try container.decode(String.self, forKey: .label)
+        parentID = try container.decodeIfPresent(String.self, forKey: .parentID)
+        rowCount = try container.decodeIfPresent(Int.self, forKey: .rowCount)
+        columnCount = try container.decodeIfPresent(Int.self, forKey: .columnCount)
+        children = try container.decodeIfPresent([ImportStructureNodePayload].self, forKey: .children) ?? []
+        payload = try container.decodeIfPresent([String: JSONValue].self, forKey: .payload) ?? [:]
+    }
+}
+
+struct ImportFilterProfilePayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let status: String
+    let extensions: [String]
+    let mimeTypes: [String]
+    let dependency: String?
+    let dependencyStatus: String
+    let previewSupported: Bool
+    let readSupported: Bool
+    let writeSupported: Bool
+    let optionsSchema: [String: JSONValue]
+    let outputContainerKinds: [String]
+    let help: String
+    let testRequirements: [String]
+
+    init(
+        id: String,
+        label: String,
+        status: String,
+        extensions: [String] = [],
+        mimeTypes: [String] = [],
+        dependency: String? = nil,
+        dependencyStatus: String = "not_required",
+        previewSupported: Bool = false,
+        readSupported: Bool = false,
+        writeSupported: Bool = false,
+        optionsSchema: [String: JSONValue] = [:],
+        outputContainerKinds: [String] = [],
+        help: String,
+        testRequirements: [String] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.status = status
+        self.extensions = extensions
+        self.mimeTypes = mimeTypes
+        self.dependency = dependency
+        self.dependencyStatus = dependencyStatus
+        self.previewSupported = previewSupported
+        self.readSupported = readSupported
+        self.writeSupported = writeSupported
+        self.optionsSchema = optionsSchema
+        self.outputContainerKinds = outputContainerKinds
+        self.help = help
+        self.testRequirements = testRequirements
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case status
+        case extensions
+        case mimeTypes
+        case dependency
+        case dependencyStatus
+        case previewSupported
+        case readSupported
+        case writeSupported
+        case optionsSchema
+        case outputContainerKinds
+        case help
+        case testRequirements
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        status = try container.decode(String.self, forKey: .status)
+        extensions = try container.decodeIfPresent([String].self, forKey: .extensions) ?? []
+        mimeTypes = try container.decodeIfPresent([String].self, forKey: .mimeTypes) ?? []
+        dependency = try container.decodeIfPresent(String.self, forKey: .dependency)
+        dependencyStatus = try container.decodeIfPresent(String.self, forKey: .dependencyStatus) ?? "not_required"
+        previewSupported = try container.decodeIfPresent(Bool.self, forKey: .previewSupported) ?? false
+        readSupported = try container.decodeIfPresent(Bool.self, forKey: .readSupported) ?? false
+        writeSupported = try container.decodeIfPresent(Bool.self, forKey: .writeSupported) ?? false
+        optionsSchema = try container.decodeIfPresent([String: JSONValue].self, forKey: .optionsSchema) ?? [:]
+        outputContainerKinds = try container.decodeIfPresent([String].self, forKey: .outputContainerKinds) ?? []
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? ""
+        testRequirements = try container.decodeIfPresent([String].self, forKey: .testRequirements) ?? []
+    }
 }
 
 struct ExportTargetPayload: Codable, Equatable, Sendable, Identifiable {
@@ -1675,20 +1954,72 @@ struct ImportPreviewResponse: Codable, Equatable, Sendable {
     let filterID: String
     let status: String
     let label: String
+    let profile: ImportFilterProfilePayload?
     let dataContainers: [DataContainerPayload]
-    let diagnostics: [[String: JSONValue]]
+    let diagnostics: [ImportDiagnosticPayload]
+    let availableOptions: [ImportOptionPayload]
+    let structure: [ImportStructureNodePayload]
+    let selectedSheetOrSegment: String?
     let optionsSchema: [String: JSONValue]
     let help: String
+
+    init(
+        inputPath: String,
+        filterID: String,
+        status: String,
+        label: String,
+        profile: ImportFilterProfilePayload? = nil,
+        dataContainers: [DataContainerPayload] = [],
+        diagnostics: [ImportDiagnosticPayload] = [],
+        availableOptions: [ImportOptionPayload] = [],
+        structure: [ImportStructureNodePayload] = [],
+        selectedSheetOrSegment: String? = nil,
+        optionsSchema: [String: JSONValue] = [:],
+        help: String
+    ) {
+        self.inputPath = inputPath
+        self.filterID = filterID
+        self.status = status
+        self.label = label
+        self.profile = profile
+        self.dataContainers = dataContainers
+        self.diagnostics = diagnostics
+        self.availableOptions = availableOptions
+        self.structure = structure
+        self.selectedSheetOrSegment = selectedSheetOrSegment
+        self.optionsSchema = optionsSchema
+        self.help = help
+    }
 
     enum CodingKeys: String, CodingKey {
         case inputPath
         case filterID = "filterId"
         case status
         case label
+        case profile
         case dataContainers
         case diagnostics
+        case availableOptions
+        case structure
+        case selectedSheetOrSegment
         case optionsSchema
         case help
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputPath = try container.decode(String.self, forKey: .inputPath)
+        filterID = try container.decode(String.self, forKey: .filterID)
+        status = try container.decode(String.self, forKey: .status)
+        label = try container.decode(String.self, forKey: .label)
+        profile = try container.decodeIfPresent(ImportFilterProfilePayload.self, forKey: .profile)
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
+        diagnostics = try container.decodeIfPresent([ImportDiagnosticPayload].self, forKey: .diagnostics) ?? []
+        availableOptions = try container.decodeIfPresent([ImportOptionPayload].self, forKey: .availableOptions) ?? []
+        structure = try container.decodeIfPresent([ImportStructureNodePayload].self, forKey: .structure) ?? []
+        selectedSheetOrSegment = try container.decodeIfPresent(String.self, forKey: .selectedSheetOrSegment)
+        optionsSchema = try container.decodeIfPresent([String: JSONValue].self, forKey: .optionsSchema) ?? [:]
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? ""
     }
 }
 
@@ -2045,6 +2376,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
     let encoding: String?
     let delimiter: String?
     let dataContainers: [DataContainerPayload]
+    let diagnostics: [ImportDiagnosticPayload]
 
     enum CodingKeys: String, CodingKey {
         case inputPath
@@ -2064,6 +2396,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         case encoding
         case delimiter
         case dataContainers
+        case diagnostics
     }
 
     init(
@@ -2083,7 +2416,8 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         selectedSegmentID: String? = nil,
         encoding: String? = nil,
         delimiter: String? = nil,
-        dataContainers: [DataContainerPayload] = []
+        dataContainers: [DataContainerPayload] = [],
+        diagnostics: [ImportDiagnosticPayload] = []
     ) {
         self.inputPath = inputPath
         self.sheet = sheet
@@ -2102,6 +2436,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         self.encoding = encoding
         self.delimiter = delimiter
         self.dataContainers = dataContainers
+        self.diagnostics = diagnostics
     }
 
     init(from decoder: Decoder) throws {
@@ -2123,6 +2458,7 @@ struct SourceTablePreviewResponse: Codable, Equatable, Sendable {
         encoding = try container.decodeIfPresent(String.self, forKey: .encoding)
         delimiter = try container.decodeIfPresent(String.self, forKey: .delimiter)
         dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
+        diagnostics = try container.decodeIfPresent([ImportDiagnosticPayload].self, forKey: .diagnostics) ?? []
     }
 }
 

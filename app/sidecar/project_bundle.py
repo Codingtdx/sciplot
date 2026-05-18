@@ -714,6 +714,37 @@ def _generate_document_graph(
                 },
             )
         )
+        for index, imported_path in enumerate(data_studio.imported_paths):
+            source_id = f"data_studio:import_source:{index + 1}"
+            nodes.append(
+                _graph_node(
+                    id=source_id,
+                    kind="data.import_source",
+                    module="data_studio",
+                    label=Path(imported_path).name or f"Import Source {index + 1}",
+                    payload={
+                        "original_path": imported_path,
+                        "selected_template_id": data_studio.selected_template_id,
+                        "readonly": True,
+                    },
+                )
+            )
+            edges.append(_graph_edge(root_id, source_id, "contains"))
+            if data_studio.selected_template_id:
+                template_node_id = f"{source_id}:template_application"
+                nodes.append(
+                    _graph_node(
+                        id=template_node_id,
+                        kind="data.template_application",
+                        module="data_studio",
+                        label=f"{data_studio.selected_template_id} application",
+                        payload={
+                            "source_node_id": source_id,
+                            "template_id": data_studio.selected_template_id,
+                        },
+                    )
+                )
+                edges.append(_graph_edge(source_id, template_node_id, "applies"))
         for index, workbook in enumerate(data_studio.embedded_workbooks):
             workbook_id = f"data_studio:workbook:{index + 1}"
             nodes.append(
@@ -729,6 +760,20 @@ def _generate_document_graph(
                 )
             )
             edges.append(_graph_edge(root_id, workbook_id, "contains"))
+            table_id = f"{workbook_id}:table"
+            nodes.append(
+                _graph_node(
+                    id=table_id,
+                    kind="data.table",
+                    module="data_studio",
+                    label=f"{workbook.workbook_filename} table",
+                    payload={
+                        "workbook_node_id": workbook_id,
+                        "readonly": True,
+                    },
+                )
+            )
+            edges.append(_graph_edge(workbook_id, table_id, "contains"))
 
     if composer is not None:
         root_id = "composer:document"

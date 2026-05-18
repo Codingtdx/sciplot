@@ -131,6 +131,17 @@ extension DataStudioSession {
                     $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
                 }
             }
+            let importProfile = try await client.importPreview(
+                .init(inputPath: sampleURL.path, sheet: .index(0), offset: 0, limit: 50)
+            )
+            importPreview = importProfile
+            if importProfile.status != "enabled" {
+                sourcePreview = nil
+                recommendedTemplateMatches = []
+                selectedTemplateID = nil
+                importFlow = .wizard(step: .resolver)
+                return
+            }
             let basePreview = try await client.sourceTablePreview(
                 .init(inputPath: sampleURL.path, sheet: .index(0), offset: 0, limit: 50)
             )
@@ -156,7 +167,12 @@ extension DataStudioSession {
             selectedPreviewBlockID = selectedPreviewSegmentID
             configureDraftDefaults(from: resolvedPreview, sampleURL: sampleURL)
             let recommendationResponse = try? await client.recommendDataStudioTemplates(
-                .init(sourcePath: sampleURL.path)
+                .init(
+                    sourcePath: sampleURL.path,
+                    importProfile: importProfile.profile,
+                    importDiagnostics: importProfile.diagnostics,
+                    selectedSheetOrSegment: importProfile.selectedSheetOrSegment
+                )
             )
             recommendedTemplateMatches = rankedRecommendedMatches(
                 recommendationResponse?.matches ?? [],
@@ -300,6 +316,7 @@ extension DataStudioSession {
     func discardPendingSourcePreview() {
         asyncCoordination.sourcePreview.cancel()
         importedSourceURLs = []
+        importPreview = nil
         sourcePreview = nil
         recommendedTemplateMatches = []
         templatePreview = nil

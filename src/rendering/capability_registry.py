@@ -3,6 +3,8 @@ from __future__ import annotations
 # ruff: noqa: E501
 from typing import Any
 
+from src.rendering.import_filters import import_filter_capabilities
+
 
 def _capability(
     *,
@@ -152,20 +154,7 @@ def capability_catalog_payload() -> list[dict[str, Any]]:
             "id": "import_filters",
             "label": "Import Filters",
             "description": "Source preview and import filters with typed options and diagnostics.",
-            "capabilities": [
-                _capability(id="import.csv", label="CSV/TSV/TXT", status="enabled", owner="sidecar", surface="plot,data_studio", help="Delimited text import is available through inspect, source preview, and import preview routes."),
-                _capability(id="import.excel", label="Excel", status="enabled", owner="sidecar", surface="plot,data_studio", help="Workbook import is available through source preview and import preview routes."),
-                _capability(id="import.json", label="JSON", status="enabled", owner="sidecar", surface="plot,data_studio", help="JSON records/table preview is available through POST /import-preview."),
-                _capability(id="import.sql", label="SQL", status="disabled", owner="sidecar", surface="data_studio", help="SQL import is disabled until safe connection, credential, and preview-only policies are implemented."),
-                _capability(id="import.hdf5", label="HDF5", status="disabled", owner="sidecar", surface="plot,data_studio", help="HDF5 import is disabled because the h5py runtime dependency is not installed."),
-                _capability(id="import.netcdf", label="NetCDF", status="disabled", owner="sidecar", surface="plot,data_studio", help="NetCDF import is disabled because the netCDF4 runtime dependency is not installed."),
-                _capability(id="import.fits", label="FITS", status="disabled", owner="sidecar", surface="plot,data_studio", help="FITS import is disabled because the astropy runtime dependency is not installed."),
-                _capability(id="import.ods", label="ODS", status="disabled", owner="sidecar", surface="plot,data_studio", help="ODS import is disabled because the odf runtime dependency is not installed."),
-                _capability(id="import.readstat", label="SAS/Stata/SPSS", status="disabled", owner="sidecar", surface="data_studio", help="ReadStat-backed import is disabled because pyreadstat is not installed."),
-                _capability(id="import.binary_raw", label="Binary/Raw", status="enabled", owner="sidecar", surface="plot,data_studio", help="Binary/raw preview is available with explicit dtype and shape options."),
-                _capability(id="import.origin_scidavis_eval", label="Origin/SciDAVis Evaluation", status="disabled", owner="sidecar", surface="project", help="Origin/SciDAVis-style project import is an evaluation backlog item, not runtime support."),
-                _capability(id="import.image_digitizer", label="Image Digitizer", status="disabled", owner="sidecar", surface="plot", help="Image digitizer support is disabled until a dedicated workflow and validation fixtures exist."),
-            ],
+            "capabilities": import_filter_capabilities(),
         },
         {
             "id": "export_targets",

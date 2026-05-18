@@ -3,7 +3,12 @@ from __future__ import annotations
 from pydantic import AliasChoices, Field
 
 from app.sidecar.schemas_common import PreviewItemResponse, StrictModel, serialize_dataclass
-from app.sidecar.schemas_render import FitOptionsPayload, RenderOptionsPayload
+from app.sidecar.schemas_render import (
+    FitOptionsPayload,
+    ImportDiagnosticPayload,
+    ImportFilterProfilePayload,
+    RenderOptionsPayload,
+)
 
 
 class DataStudioRangeResponse(StrictModel):
@@ -374,10 +379,16 @@ class DataStudioTemplatePreviewSegmentResponse(StrictModel):
 class DataStudioTemplatePreviewRequest(StrictModel):
     source_path: str
     template: DataStudioCreateTemplateRequest
+    import_profile: ImportFilterProfilePayload | None = None
+    import_diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+    selected_sheet_or_segment: str | None = None
 
 
 class DataStudioTemplateRecommendationsRequest(StrictModel):
     source_path: str
+    import_profile: ImportFilterProfilePayload | None = None
+    import_diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+    selected_sheet_or_segment: str | None = None
 
 
 class DataStudioTemplatePreviewResponse(StrictModel):

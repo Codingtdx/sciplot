@@ -19,6 +19,7 @@ The module windows are not tabs inside a global workbench. Each module owns its 
 - Cross-module durable actions use `POST /command/normalize` and `POST /command/apply-preview`; Swift can replay normalized commands, but it cannot invent durable command payloads locally.
 - Hybrid realtime preview uses `POST /preview-scene` and only draws admitted scene payloads. Unsupported scenes fall back to backend bitmap/PDF preview.
 - Data Studio Analysis and Plot Data Workbook display sidecar `DataContainerPayload` and `AnalysisOperationResultPayload` values; Swift does not recompute fit, statistics, FFT, or import parsing.
+- Data Studio raw import is file-first: call `/import-preview`, show the returned filter profile/diagnostics/options, then request template recommendations with that profile. Swift must not sniff delimiters, encodings, sheet structure, or import formats locally.
 - Live source controls call `POST /live-source/update-now` and display data revision/diagnostics; they do not poll or parse source files in Swift.
 - Code Console Outputs displays notebook figure/table outputs from `POST /code-console/run`; generated artifacts can be handed to Plot/Composer through project graph references.
 

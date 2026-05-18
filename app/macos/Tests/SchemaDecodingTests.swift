@@ -338,8 +338,24 @@ final class SchemaDecodingTests: XCTestCase {
           "filter_id": "import.json",
           "status": "enabled",
           "label": "JSON",
+          "profile": {
+            "id": "import.json",
+            "label": "JSON",
+            "status": "enabled",
+            "extensions": [".json"],
+            "mime_types": ["application/json"],
+            "dependency_status": "available",
+            "preview_supported": true,
+            "read_supported": true,
+            "write_supported": false,
+            "options_schema": {"type": "object"},
+            "output_container_kinds": ["table"],
+            "help": "JSON records preview is enabled."
+          },
           "data_containers": [],
-          "diagnostics": [{"status_code": "json_records_loaded"}],
+          "diagnostics": [{"status_code": "json_records_loaded", "severity": "info", "message": "Loaded records."}],
+          "available_options": [{"id": "encoding", "label": "Encoding", "kind": "string", "default_value": "utf-8", "help": "Text encoding."}],
+          "selected_sheet_or_segment": "records",
           "options_schema": {"type": "object"},
           "help": "JSON records preview is enabled."
         }
@@ -347,6 +363,10 @@ final class SchemaDecodingTests: XCTestCase {
         let importPreview = try decoder.decode(ImportPreviewResponse.self, from: Data(importPreviewPayload.utf8))
         XCTAssertEqual(importPreview.filterID, "import.json")
         XCTAssertEqual(importPreview.status, "enabled")
+        XCTAssertEqual(importPreview.profile?.extensions, [".json"])
+        XCTAssertEqual(importPreview.diagnostics.first?.statusCode, "json_records_loaded")
+        XCTAssertEqual(importPreview.availableOptions.first?.id, "encoding")
+        XCTAssertEqual(importPreview.selectedSheetOrSegment, "records")
 
         let commandResponsePayload = """
         {

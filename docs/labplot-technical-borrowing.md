@@ -66,7 +66,14 @@ SciPlot import filters should become cataloged capabilities:
 - A read method that produces a typed table, matrix, workbook, image source, or project import candidate.
 - A write/export method only where we can test roundtrip behavior.
 
-The first implementation should keep current CSV/Excel/JSON behavior, but shape it as registry entries so HDF5, NetCDF, FITS, ODS, SQL, ReadStat formats, binary/raw, image digitizer, and Origin/SciDAVis-style project import can be added without changing macOS constants.
+The Import 2.0 implementation keeps the first runtime slice focused on user-visible reliability: CSV/TSV/TXT, Excel, JSON records, and explicit binary/raw are enabled; HDF5, NetCDF, FITS, ODS, ReadStat, SQL, image digitizer, and Origin/SciDAVis-style project import stay disabled until dependencies, fixtures, safety policy, schema decoding, and UI consumption are all present.
+
+SciPlot's clean-room translation is now:
+
+- `ImportFilterProfilePayload` records extensions, MIME types, dependency status, preview/read/write support, options schema, output container kinds, help, and test requirements.
+- `ImportDiagnosticPayload` records status codes for encoding, delimiter, table structure, ragged rows, duplicate/empty headers, dependency-missing, and policy-not-implemented cases.
+- `/source-table-preview` and `/import-preview` share the same source table import core so Plot and Data Studio do not drift.
+- Data Studio calls `/import-preview` before template recommendation and carries the selected profile/diagnostics forward into template preview/build flows.
 
 ## Analysis translation
 

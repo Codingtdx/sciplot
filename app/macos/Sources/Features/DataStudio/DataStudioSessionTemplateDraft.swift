@@ -587,7 +587,13 @@ extension DataStudioSession {
         defer { currentActivity = .idle }
         do {
             let preview = try await client.previewDataStudioTemplate(
-                .init(sourcePath: sourceURL.path, template: request)
+                .init(
+                    sourcePath: sourceURL.path,
+                    template: request,
+                    importProfile: importPreview?.profile,
+                    importDiagnostics: importPreview?.diagnostics ?? [],
+                    selectedSheetOrSegment: importPreview?.selectedSheetOrSegment
+                )
             )
             templatePreview = preview
             if !preview.errors.isEmpty {

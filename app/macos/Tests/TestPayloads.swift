@@ -1085,8 +1085,26 @@ enum TestPayloads {
             filterID: "import.json",
             status: "enabled",
             label: "JSON",
+            profile: ImportFilterProfilePayload(
+                id: "import.json",
+                label: "JSON",
+                status: "enabled",
+                extensions: [".json"],
+                mimeTypes: ["application/json"],
+                dependencyStatus: "not_required",
+                previewSupported: true,
+                readSupported: true,
+                writeSupported: false,
+                optionsSchema: ["type": .string("object")],
+                outputContainerKinds: ["table"],
+                help: "JSON records preview is enabled."
+            ),
             dataContainers: [],
             diagnostics: [],
+            availableOptions: [
+                .init(id: "encoding", label: "Encoding", kind: "string", defaultValue: .string("utf-8"), help: "Text encoding.")
+            ],
+            selectedSheetOrSegment: "records",
             optionsSchema: ["type": .string("object")],
             help: "JSON records preview is enabled."
         )

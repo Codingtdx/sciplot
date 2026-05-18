@@ -49,9 +49,9 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 ### Runtime surfaces
 
 - `GET /meta` capability catalogs are built by `src/rendering/capability_registry.py`.
-- `POST /source-table-preview` and `POST /fit-analysis` use shared `DataContainerPayload` helpers from `src/rendering/data_containers.py`.
+- `POST /source-table-preview` returns shared `DataContainerPayload` helpers plus structured import diagnostics for encoding, delimiter, table structure, ragged rows, duplicate headers, and selected segments.
 - `POST /analysis-operation` runs the SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
-- `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py`.
+- `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py` and returns `ImportFilterProfilePayload`, `ImportDiagnosticPayload`, available options, structure nodes, and readonly containers.
 - `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
 - `POST /command/normalize` and `POST /command/apply-preview` extend the command envelope across Plot, Data Studio, Composer, and Code Console graph objects.
 - `POST /preview-scene` returns a contract-gated Swift-native realtime preview scene; `/render-preview` remains the authoritative bitmap/PDF correction path.
@@ -84,7 +84,9 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 ### Import and export runtime
 
 - Enabled import filters: CSV/TSV/TXT, Excel, JSON records/tables, and explicit binary/raw with dtype/shape.
-- Disabled import filters: SQL, HDF5, NetCDF, FITS, ODS, ReadStat/SAS/Stata/SPSS, Origin/SciDAVis evaluation, and image digitizer. Each must return structured diagnostics and help.
+- CSV/Excel previews use the shared source table import core. Data Studio must not maintain a separate encoding/delimiter/sheet/block parser.
+- Disabled import filters: SQL, HDF5, NetCDF, FITS, ODS, ReadStat/SAS/Stata/SPSS, Origin/SciDAVis evaluation, and image digitizer. Dependency-backed filters report `dependency_missing` or policy diagnostics with help; they are not marked enabled until dependency, fixtures, schema decode, and UI consumption all exist.
+- Data Studio raw import calls `/import-preview` before template recommendation. Template recommendation/preview may carry the selected import profile and diagnostics so template binding uses the same parsed source context the user saw.
 - Export targets cover figure PDF/TIFF, data workbook, project bundle, comparison bundle, artifact manifest, and Code Console figure sets.
 - Exported multi-file artifacts must be manifest-backed so restore, reveal, and future packaging have a single truth source.
 
