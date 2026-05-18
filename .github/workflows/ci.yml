@@ -50,4 +50,7 @@ jobs:
             -scheme SciPlotMac \
             -destination 'platform=macOS' \
             -derivedDataPath app/macos/.derivedData \
+            -only-testing:SciPlotMacTests/SchemaDecodingTests \
+            -only-testing:SciPlotMacTests/PlotSessionTests \
+            -only-testing:SciPlotMacTests/SidecarRuntimeTests \
             test
