@@ -182,7 +182,7 @@ def test_preview_scene_returns_native_scene_or_explicit_fallback(tmp_path: Path)
     assert scene["axes"][0]["bbox_pixels"] == scene["plot_area"]
     assert scene["series"][0]["column_refs"] == {"x": "col-0", "y": "col-1"}
     assert scene["budgets"]["native_scene_samples"] >= len(scene["series"][0]["samples"])
-    scene_object = scene["objects"][0]
+    scene_object = next(item for item in scene["objects"] if item["id"] == "plot:series:0")
     assert scene_object["kind"] == "series_line"
     assert scene_object["payload_ref"] == {"type": "series", "id": "plot:series:0"}
     assert scene_object["bbox_pixels"]["width"] > 0
@@ -233,6 +233,110 @@ def test_preview_scene_sample_budget_fallback_is_specific(tmp_path: Path) -> Non
     assert scene["budgets"]["native_scene_samples"] == 2
     assert scene["diagnostics"][0]["status_code"] == "native_preview_fallback"
     assert scene["diagnostics"][0]["fallback_reason"] == "sample_budget_exceeded"
+
+
+def test_preview_scene_includes_plot_objects_for_axes_legend_and_overlays(tmp_path: Path) -> None:
+    path = tmp_path / "curve.csv"
+    _curve_csv(path)
+
+    response = client.post(
+        "/preview-scene",
+        json={
+            "input_path": str(path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "style_preset": "nature",
+                "x_label_override": "Time",
+                "y_label_override": "Signal",
+                "reference_guides": [
+                    {"id": "target", "kind": "line", "axis_target": "y_primary", "value": 4.0, "label": "Target"}
+                ],
+                "text_annotations": [
+                    {
+                        "id": "peak",
+                        "text": "Peak",
+                        "coordinate_space": "data",
+                        "x": 2.0,
+                        "y": 4.0,
+                        "display_style": "callout",
+                        "connector_enabled": True,
+                        "target_x": 3.0,
+                        "target_y": 9.0,
+                    }
+                ],
+                "shape_annotations": [
+                    {
+                        "id": "window",
+                        "kind": "rectangle",
+                        "x_start": 0.5,
+                        "x_end": 2.5,
+                        "y_start": 1.0,
+                        "y_end": 8.0,
+                        "label": "Window",
+                    }
+                ],
+                "analytical_layers": [
+                    {
+                        "id": "fn",
+                        "kind": "function",
+                        "expression": "x",
+                        "x_start": 0.0,
+                        "x_end": 3.0,
+                        "sample_count": 24,
+                        "label": "Function",
+                    }
+                ],
+            },
+            "fit_options": {"enabled": True, "model_id": "linear"},
+            "preview_config": {"pixel_width": 800, "pixel_height": 600, "scale": 1.0},
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    scene = response.json()
+    objects = {item["id"]: item for item in scene["objects"]}
+    overlays = {item["id"]: item for item in scene["overlays"]}
+
+    assert objects["plot:axis:x"]["kind"] == "x_axis"
+    assert objects["plot:axis:x"]["label"] == "Time"
+    assert objects["plot:axis:y"]["kind"] == "y_axis"
+    assert objects["plot:legend:main"]["payload_ref"] == {"type": "legend", "id": "main"}
+    assert objects["plot:guide:target"]["visible"] is True
+    assert objects["plot:guide:target"]["payload_ref"] == {"type": "reference_guide", "id": "target"}
+    assert "drag" in objects["plot:guide:target"]["operations"]
+    assert objects["plot:text_annotation:peak"]["kind"] == "text_annotation"
+    assert objects["plot:shape_annotation:window"]["kind"] == "shape_annotation_rectangle"
+    assert objects["plot:function:fn"]["kind"] == "function_layer"
+    assert objects["plot:fit_overlay:linear"]["kind"] == "fit_overlay"
+    assert overlays["plot:guide:target"]["payload"]["label"] == "Target"
+    assert overlays["plot:text_annotation:peak"]["payload"]["connector_enabled"] is True
+    assert overlays["plot:shape_annotation:window"]["payload"]["kind"] == "rectangle"
+    assert overlays["plot:function:fn"]["payload"]["expression"] == "x"
+
+
+def test_preview_scene_advanced_axis_conflict_falls_back_explicitly(tmp_path: Path) -> None:
+    path = tmp_path / "curve.csv"
+    _curve_csv(path)
+
+    response = client.post(
+        "/preview-scene",
+        json={
+            "input_path": str(path),
+            "sheet": 0,
+            "template": "curve",
+            "options": {
+                "style_preset": "nature",
+                "extra_y_axis": {"enabled": True, "position": "right", "title": "Secondary"},
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    scene = response.json()
+    assert scene["native_supported"] is False
+    assert scene["fallback_reason"] == "advanced_axis_conflict"
+    assert scene["objects"] == []
 
 
 def test_live_source_update_now_returns_revisioned_containers(tmp_path: Path) -> None:

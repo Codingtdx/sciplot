@@ -95,12 +95,15 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 - PlotSession records local before/after snapshots first, then calls `POST /command/normalize` followed by `POST /command/apply-preview`; the returned normalized command, graph revision, and graph patch replace the optimistic ledger entry.
 - The sidecar normalizes commands, emits graph patches, rejects stale command revisions with diagnostics, and can apply preview-only graph patches; macOS stores before/after payloads in native `UndoManager`.
 - Inspector-local state must not be the only copy of a scientific edit.
+- Current Plot command coverage includes series style/offset, axes label/range/tick edits, legend order reset/reorder, reference guides, text annotations, shape annotations, analytical function layers, fit overlay selection metadata, visibility toggles, delete, rename, lock, and copy-settings payloads.
+- Undo/redo restores the real render/fit snapshot and records a reversible `plot:session` command so the command ledger remains an audit trail instead of a UI-only history.
 
 ### Native realtime preview
 
 - Native preview is admitted by `/meta` and `POST /preview-scene`, not by Swift template constants.
 - PlotSession requests `/preview-scene` before `/render-preview`. The scene can be used immediately for Swift Canvas drawing and hit testing, then the backend bitmap/PDF corrects the publication preview.
 - Supported scene data must include figure geometry, axis bbox/ranges, series samples, object ids, `bbox_pixels`, point arrays, payload refs, operations, and hit-test metadata for selection, guide/annotation drag, legend/series quick edit, and fallback reasons.
+- The scene object surface covers series, x/y axes, legend, reference guide lines/regions, text annotations, shape annotations, function layers, and fit overlays. Each object carries visible/locked state and a `payload_ref` that routes the Plot inspector without a global Project Explorer.
 - Unsupported templates, missing samples, invalid axes, advanced axis conflicts, or data over budget fall back to backend bitmap/PDF preview.
 - `/render-preview`, export, save/open project, analysis, transforms, and import remain backend-authoritative.
 

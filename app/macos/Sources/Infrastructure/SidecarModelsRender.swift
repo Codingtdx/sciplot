@@ -1934,7 +1934,9 @@ extension PreviewSceneResponse {
             bboxPixels: bbox,
             points: pointArray(payload["points"]?.arrayValue),
             payloadRef: payloadRef,
-            operations: stringArray(payload["operations"]?.arrayValue)
+            operations: stringArray(payload["operations"]?.arrayValue),
+            visible: payload["visible"]?.boolValue ?? true,
+            locked: payload["locked"]?.boolValue ?? false
         )
     }
 

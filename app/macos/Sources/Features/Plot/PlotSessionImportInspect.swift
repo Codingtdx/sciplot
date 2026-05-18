@@ -152,6 +152,7 @@ extension PlotSession {
         if dataWorkbookTab == .transformed {
             loadSourceTablePreview(offset: 0)
         }
+        recordAxisCommandsIfNeeded(before: previousSnapshot.renderOptions, after: renderOptions)
         registerUndo(previousSnapshot: previousSnapshot, actionName: "Edit Plot Options")
     }
 
@@ -346,6 +347,9 @@ extension PlotSession {
             case "analytical_layer", "function":
                 selectedPlotAdjustmentCategory = .functions
                 selectPlotLayer(.function(payloadRef.id))
+            case "fit_overlay":
+                selectedPlotAdjustmentCategory = .fit
+                selectPlotLayer(.fitOverlay)
             case "axis", "axis_label":
                 selectedPlotAdjustmentCategory = .axes
                 let yAxisKinds = ["y_axis", "y_label", "colorbar"]
@@ -383,6 +387,12 @@ extension PlotSession {
         case "legend", "legend_entry":
             selectedPlotAdjustmentCategory = .legend
             selectCanvasSelection(.figure)
+        case "function_layer":
+            selectedPlotAdjustmentCategory = .functions
+            selectCanvasSelection(.layer(.function(object.payloadRef?.id ?? object.id)))
+        case "fit_overlay":
+            selectedPlotAdjustmentCategory = .fit
+            selectCanvasSelection(.layer(.fitOverlay))
         default:
             canvasSelection = .figure
             selectedSeriesQuickEditorID = nil
@@ -935,6 +945,12 @@ extension PlotSession {
             )
             layers.append(layer)
             options.analyticalLayers = layers
+            recordPlotEditCommand(
+                kind: "add",
+                targetObjectID: plotObjectID(prefix: "function", id: layer.id),
+                before: nil,
+                after: plotCommandPayload(layer)
+            )
         }
     }
 
@@ -949,17 +965,36 @@ extension PlotSession {
                 return
             }
             var layer = layers[index]
+            let before = layer
             mutate(&layer)
+            guard before != layer else {
+                return
+            }
             layers[index] = layer
             options.analyticalLayers = layers
+            recordPlotEditCommand(
+                kind: plotCommandKind(before: before.enabled, after: layer.enabled),
+                targetObjectID: plotObjectID(prefix: "function", id: id),
+                before: plotCommandPayload(before),
+                after: plotCommandPayload(layer)
+            )
         }
     }
 
     func removeAnalyticalLayer(id: String) {
         updateRenderOptions(policy: .immediate) { options in
             var layers = options.analyticalLayers ?? []
+            guard let removed = layers.first(where: { $0.id == id }) else {
+                return
+            }
             layers.removeAll { $0.id == id }
             options.analyticalLayers = layers.isEmpty ? nil : layers
+            recordPlotEditCommand(
+                kind: "delete",
+                targetObjectID: plotObjectID(prefix: "function", id: id),
+                before: plotCommandPayload(removed),
+                after: nil
+            )
         }
     }
 
@@ -1282,15 +1317,15 @@ extension PlotSession {
         )
     }
 
-    private func plotObjectID(prefix: String, id: String) -> String {
+    func plotObjectID(prefix: String, id: String) -> String {
         "plot:\(prefix):\(id)"
     }
 
-    private func plotCommandKind(before: Bool, after: Bool) -> String {
+    func plotCommandKind(before: Bool, after: Bool) -> String {
         before != after ? "visibility" : "edit"
     }
 
-    private func plotCommandPayload<T: Encodable>(_ value: T) -> [String: JSONValue] {
+    func plotCommandPayload<T: Encodable>(_ value: T) -> [String: JSONValue] {
         guard
             let data = try? JSONEncoder().encode(value),
             let payload = try? JSONDecoder().decode([String: JSONValue].self, from: data)
@@ -1300,7 +1335,7 @@ extension PlotSession {
         return payload
     }
 
-    private func recordPlotEditCommand(
+    func recordPlotEditCommand(
         kind: String,
         targetObjectID: String,
         before: [String: JSONValue]?,
@@ -1325,6 +1360,60 @@ extension PlotSession {
         )
         plotEditCommandLedger.append(command)
         normalizeRecordedPlotEditCommand(commandID: command.commandID)
+    }
+
+    private func recordAxisCommandsIfNeeded(before: RenderOptionsPayload, after: RenderOptionsPayload) {
+        let beforeX = axisCommandPayload(axis: "x", options: before)
+        let afterX = axisCommandPayload(axis: "x", options: after)
+        if beforeX != afterX {
+            recordPlotEditCommand(
+                kind: before.xLabelOverride != after.xLabelOverride ? "rename" : "edit",
+                targetObjectID: "plot:axis:x",
+                before: beforeX,
+                after: afterX
+            )
+        }
+
+        let beforeY = axisCommandPayload(axis: "y", options: before)
+        let afterY = axisCommandPayload(axis: "y", options: after)
+        if beforeY != afterY {
+            recordPlotEditCommand(
+                kind: before.yLabelOverride != after.yLabelOverride ? "rename" : "edit",
+                targetObjectID: "plot:axis:y",
+                before: beforeY,
+                after: afterY
+            )
+        }
+    }
+
+    private func axisCommandPayload(axis: String, options: RenderOptionsPayload) -> [String: JSONValue] {
+        func optionalNumber(_ value: Double?) -> JSONValue {
+            value.map(JSONValue.number) ?? .null
+        }
+        func optionalString(_ value: String?) -> JSONValue {
+            value.map(JSONValue.string) ?? .null
+        }
+        if axis == "x" {
+            return [
+                "axis": .string("x"),
+                "label": optionalString(options.xLabelOverride),
+                "min": optionalNumber(options.xMin),
+                "max": optionalNumber(options.xMax),
+                "scale": optionalString(options.xscale),
+                "tickDensity": optionalString(options.xTickDensity),
+                "tickEdgeLabels": optionalString(options.xTickEdgeLabels),
+                "reverse": .bool(options.reverseX)
+            ]
+        }
+        return [
+            "axis": .string("y"),
+            "label": optionalString(options.yLabelOverride),
+            "min": optionalNumber(options.yMin),
+            "max": optionalNumber(options.yMax),
+            "scale": optionalString(options.yscale),
+            "tickDensity": optionalString(options.yTickDensity),
+            "tickEdgeLabels": optionalString(options.yTickEdgeLabels)
+        ]
     }
 
     private func normalizeRecordedPlotEditCommand(commandID: String) {

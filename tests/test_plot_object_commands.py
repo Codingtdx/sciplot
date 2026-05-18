@@ -138,3 +138,63 @@ def test_command_apply_preview_ignores_stale_command_revision() -> None:
     assert payload["graph_patch"] == {}
     assert payload["render_invalidation"]["reason"] == "stale_command_ignored"
     assert payload["diagnostics"][0]["status_code"] == "stale_command_revision"
+
+
+def test_command_normalize_covers_reorder_lock_copy_and_delete() -> None:
+    commands = [
+        {
+            "kind": "reorder",
+            "module": "plot",
+            "target_object_id": "plot:legend:main",
+            "before": {"series_order": ["A", "B"]},
+            "after": {"series_order": ["B", "A"]},
+        },
+        {
+            "kind": "lock",
+            "module": "plot",
+            "target_object_id": "plot:shape_annotation:window",
+            "before": {"locked": False},
+            "after": {"locked": True},
+        },
+        {
+            "kind": "copy_settings",
+            "module": "plot",
+            "target_object_id": "plot:series:B",
+            "source_object_id": "plot:series:A",
+            "before": {"line_width": 1.0},
+            "after": {"line_width": 2.0},
+        },
+        {
+            "kind": "delete",
+            "module": "plot",
+            "target_object_id": "plot:text_annotation:note",
+            "before": {"id": "note"},
+            "after": None,
+        },
+    ]
+
+    for command in commands:
+        normalized = normalize_plot_edit_command(command)["command"]
+        assert normalized["command_id"].startswith(f"cmd:{command['kind']}:")
+        assert normalized["graph_patch"]["module"] == "plot"
+        assert normalized["graph_patch"]["revision_delta"] == 1
+        assert normalized["reversible"] is True
+
+
+def test_command_apply_preview_keeps_unknown_target_diagnostic() -> None:
+    normalized = normalize_plot_edit_command(
+        {
+            "kind": "rename",
+            "module": "plot",
+            "target_object_id": "plot:legend:missing",
+            "before": {"label": "Old"},
+            "after": {"label": "New"},
+        },
+        objects=[{"id": "plot:legend:main"}],
+    )
+
+    payload = apply_command_preview(normalized["command"], {"schema_version": 2, "revision": 2})
+
+    assert payload["graph_revision"] == 3
+    assert payload["diagnostics"][0]["status_code"] == "target_not_in_object_list"
+    assert payload["diagnostics"][0]["target_object_id"] == "plot:legend:missing"

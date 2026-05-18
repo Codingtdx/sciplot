@@ -35,6 +35,7 @@ def normalize_plot_edit_command(command: dict[str, Any], objects: list[dict[str,
         diagnostics.append(
             {
                 "status_code": "target_not_in_object_list",
+                "target_object_id": target_object_id,
                 "message": f"`{target_object_id}` was not present in the provided object list.",
             }
         )
@@ -50,6 +51,8 @@ def normalize_plot_edit_command(command: dict[str, Any], objects: list[dict[str,
     graph_patch.setdefault("kind", kind)
     graph_patch.setdefault("module", module)
     graph_patch.setdefault("revision_delta", 1)
+    if diagnostics:
+        graph_patch.setdefault("diagnostics", diagnostics)
     normalized["graph_patch"] = graph_patch
     return {"command": normalized, "diagnostics": diagnostics}
 
@@ -57,6 +60,7 @@ def normalize_plot_edit_command(command: dict[str, Any], objects: list[dict[str,
 def apply_command_preview(command: dict[str, Any], document_graph: dict[str, Any] | None = None) -> dict[str, Any]:
     normalized = normalize_plot_edit_command(command)["command"]
     graph = document_graph or {}
+    command_diagnostics = list(normalized.get("graph_patch", {}).get("diagnostics") or [])
     current_revision = int(graph.get("revision") or 0)
     command_revision = normalized.get("graph_revision")
     if command_revision is not None and int(command_revision) < current_revision:
@@ -77,7 +81,8 @@ def apply_command_preview(command: dict[str, Any], document_graph: dict[str, Any
                         f"Command revision {int(command_revision)} is older than graph revision {current_revision}."
                     ),
                 }
-            ],
+            ]
+            + command_diagnostics,
         }
     graph_revision = current_revision + int(normalized["graph_patch"].get("revision_delta") or 1)
     normalized["graph_revision"] = graph_revision
@@ -90,7 +95,7 @@ def apply_command_preview(command: dict[str, Any], document_graph: dict[str, Any
             "target_object_id": normalized["target_object_id"],
             "module": normalized["module"],
         },
-        "diagnostics": [],
+        "diagnostics": command_diagnostics,
     }
 
 

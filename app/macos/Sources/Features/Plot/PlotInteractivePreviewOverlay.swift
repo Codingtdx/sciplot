@@ -484,7 +484,7 @@ struct PlotInteractionHitTester: Equatable {
 
     private func objectPriority(_ object: PreviewInteractionObjectMetadata) -> Int {
         switch object.kind {
-        case "text_annotation", "shape_annotation", "reference_guide", "analytical_layer":
+        case "text_annotation", "shape_annotation", "reference_guide", "reference_guide_line", "reference_guide_region", "analytical_layer", "function_layer", "fit_overlay":
             return 50
         case "series_line", "series_points", "bar", "distribution_body":
             return 40

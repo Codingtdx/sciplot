@@ -113,6 +113,7 @@ def create_labplot_runtime_router() -> APIRouter:
                 sheet=request.sheet,
                 template=request.template,
                 options=request.options.model_dump(mode="json"),
+                fit_options=request.fit_options.model_dump(mode="json"),
                 preview_config=(
                     request.preview_config.model_dump(mode="json")
                     if request.preview_config is not None
