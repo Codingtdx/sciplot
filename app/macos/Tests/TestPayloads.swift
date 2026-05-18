@@ -1829,16 +1829,13 @@ enum TestPayloads {
         let baselineStrengthStd = std(specimens.map(\.strength))
         let baselineModulusStd = std(specimens.map(\.modulus))
         let baselineElongationStd = std(specimens.map(\.elongation))
-        let baselineScores: [String: Double] = Dictionary(
-            uniqueKeysWithValues: specimens.map { specimen in
-                let signedScore = (
-                    (specimen.strength - baselineStrengthMean) / max(baselineStrengthStd, 0.0001) +
-                    (specimen.modulus - baselineModulusMean) / max(baselineModulusStd, 0.0001) +
-                    (specimen.elongation - baselineElongationMean) / max(baselineElongationStd, 0.0001)
-                ) / 3
-                return (specimen.id, signedScore)
-            }
-        )
+        var baselineScores: [String: Double] = [:]
+        for specimen in specimens {
+            let strengthScore = (specimen.strength - baselineStrengthMean) / max(baselineStrengthStd, 0.0001)
+            let modulusScore = (specimen.modulus - baselineModulusMean) / max(baselineModulusStd, 0.0001)
+            let elongationScore = (specimen.elongation - baselineElongationMean) / max(baselineElongationStd, 0.0001)
+            baselineScores[specimen.id] = (strengthScore + modulusScore + elongationScore) / 3
+        }
         let baselineKeepIDs = Set(
             specimens
                 .sorted { lhs, rhs in
