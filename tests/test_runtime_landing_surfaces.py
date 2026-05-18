@@ -178,7 +178,8 @@ def test_import_preview_unavailable_filter_is_structured(tmp_path: Path) -> None
     payload = ImportPreviewResponse.model_validate(response.json())
     assert payload.status == "disabled"
     assert payload.data_containers == []
-    assert payload.diagnostics[0]["status_code"] == "filter_unavailable"
+    assert payload.diagnostics[0]["status_code"] == "dependency_missing"
+    assert payload.diagnostics[0]["dependency"] == "h5py"
 
 
 def test_plot_edit_command_normalize_runtime() -> None:

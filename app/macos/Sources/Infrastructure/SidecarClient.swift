@@ -34,6 +34,10 @@ protocol SidecarClienting: AnyObject {
     func analysisOperation(_ request: AnalysisOperationRequest) async throws -> AnalysisOperationResponse
     func importPreview(_ request: ImportPreviewRequest) async throws -> ImportPreviewResponse
     func normalizePlotEditCommand(_ request: PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse
+    func normalizeCommand(_ request: CommandNormalizeRequest) async throws -> CommandNormalizeResponse
+    func applyCommandPreview(_ request: CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse
+    func previewScene(_ request: PreviewSceneRequest) async throws -> PreviewSceneResponse
+    func updateLiveSourceNow(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse
     func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse
@@ -195,6 +199,22 @@ final class SidecarClient: SidecarClienting {
 
     func normalizePlotEditCommand(_ request: PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse {
         try await post("plot-edit-command/normalize", body: request)
+    }
+
+    func normalizeCommand(_ request: CommandNormalizeRequest) async throws -> CommandNormalizeResponse {
+        try await post("command/normalize", body: request)
+    }
+
+    func applyCommandPreview(_ request: CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse {
+        try await post("command/apply-preview", body: request)
+    }
+
+    func previewScene(_ request: PreviewSceneRequest) async throws -> PreviewSceneResponse {
+        try await post("preview-scene", body: request)
+    }
+
+    func updateLiveSourceNow(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        try await post("live-source/update-now", body: request)
     }
 
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {

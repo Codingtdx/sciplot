@@ -740,12 +740,24 @@ extension PlotSession {
         guard shouldShowSeriesLegendControls else {
             return
         }
+        let previousSnapshot = undoSnapshot()
+        let beforeOrder = seriesOrderLabels
         let cleaned = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         renderOptions.seriesOrder = cleaned.isEmpty ? nil : cleaned
+        guard previousSnapshot.renderOptions != renderOptions else {
+            return
+        }
         notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: .immediate)
+        recordPlotEditCommand(
+            kind: "reorder",
+            targetObjectID: "plot:legend:main",
+            before: ["seriesOrder": .array(beforeOrder.map(JSONValue.string))],
+            after: ["seriesOrder": .array(seriesOrderLabels.map(JSONValue.string))]
+        )
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Reorder Legend")
     }
 
     func moveSeriesOrder(from source: IndexSet, to destination: Int) {
@@ -755,11 +767,23 @@ extension PlotSession {
     }
 
     func resetSeriesOrder() {
+        let previousSnapshot = undoSnapshot()
+        let beforeOrder = seriesOrderLabels
         renderOptions.seriesOrder = nil
+        guard previousSnapshot.renderOptions != renderOptions else {
+            return
+        }
         notifyRenderOptionsDidChange()
         invalidateSubmissionArtifacts()
         errorMessage = nil
         schedulePreviewRefresh(policy: .immediate)
+        recordPlotEditCommand(
+            kind: "reorder",
+            targetObjectID: "plot:legend:main",
+            before: ["seriesOrder": .array(beforeOrder.map(JSONValue.string))],
+            after: ["seriesOrder": .array(seriesOrderLabels.map(JSONValue.string))]
+        )
+        registerUndo(previousSnapshot: previousSnapshot, actionName: "Reset Legend Order")
     }
 
     var candidateRoleRows: [(String, String)] {

@@ -3,11 +3,13 @@ import SwiftUI
 struct PlotInteractivePreviewSurface: View {
     @Bindable var session: PlotSession
     let preview: PreviewItemResponse
+    let previewScene: PreviewSceneResponse?
 
     var body: some View {
         GeometryReader { geometry in
+            let sceneMetadata = previewScene?.interactionMetadata
             let mapper = PlotPreviewCoordinateMapper(
-                metadata: preview.interactionMetadata,
+                metadata: sceneMetadata ?? preview.interactionMetadata,
                 viewportSize: geometry.size
             )
             ZStack {
@@ -23,6 +25,68 @@ struct PlotInteractivePreviewSurface: View {
                 InteractivePlotOverlay(session: session, mapper: mapper)
             }
         }
+    }
+}
+
+struct NativePreviewSceneSurface: View {
+    @Bindable var session: PlotSession
+    let scene: PreviewSceneResponse
+
+    var body: some View {
+        GeometryReader { geometry in
+            let mapper = PlotPreviewCoordinateMapper(
+                metadata: scene.interactionMetadata,
+                viewportSize: geometry.size
+            )
+            ZStack {
+                NativePreviewSceneCanvas(scene: scene)
+                InteractivePlotOverlay(session: session, mapper: mapper)
+            }
+        }
+    }
+}
+
+struct NativePreviewSceneCanvas: View {
+    let scene: PreviewSceneResponse
+
+    var body: some View {
+        Canvas { context, size in
+            guard let metadata = scene.interactionMetadata else {
+                return
+            }
+            let mapper = PlotPreviewCoordinateMapper(metadata: metadata, viewportSize: size)
+            let pageRect = mapper.imageRect
+            let pagePath = Path(roundedRect: pageRect, cornerRadius: 3)
+            context.fill(pagePath, with: .color(.white))
+            context.stroke(pagePath, with: .color(.black.opacity(0.10)), lineWidth: 1)
+
+            let axisRect = mapper.axisRect
+            context.stroke(Path(axisRect), with: .color(.black.opacity(0.45)), lineWidth: 1)
+
+            for object in metadata.objects {
+                let points = mapper.viewPoints(for: object)
+                guard !points.isEmpty else {
+                    continue
+                }
+                var path = Path()
+                path.move(to: points[0])
+                for point in points.dropFirst() {
+                    path.addLine(to: point)
+                }
+                let color = Color.accentColor
+                if object.kind == "series_points" {
+                    for point in points {
+                        let rect = CGRect(x: point.x - 2.5, y: point.y - 2.5, width: 5, height: 5)
+                        context.fill(Path(ellipseIn: rect), with: .color(color))
+                    }
+                } else if object.kind == "series_area" {
+                    context.stroke(path, with: .color(color.opacity(0.85)), lineWidth: 1.5)
+                } else {
+                    context.stroke(path, with: .color(color), lineWidth: 1.6)
+                }
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
     }
 }
 
@@ -420,7 +484,7 @@ struct PlotInteractionHitTester: Equatable {
 
     private func objectPriority(_ object: PreviewInteractionObjectMetadata) -> Int {
         switch object.kind {
-        case "text_annotation", "shape_annotation", "reference_guide", "analytical_layer":
+        case "text_annotation", "shape_annotation", "reference_guide", "reference_guide_line", "reference_guide_region", "analytical_layer", "function_layer", "fit_overlay":
             return 50
         case "series_line", "series_points", "bar", "distribution_body":
             return 40

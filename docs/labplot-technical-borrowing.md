@@ -18,6 +18,8 @@ LabPlot feels more mature because its backend has a strong object discipline:
 
 SciPlot translation: keep the macOS app native and simpler on the surface, but make the backend contract and document model more explicit underneath. The user should not feel a random pile of panels; every visible thing should map to a stable graph object, typed payload, reversible command, or sidecar capability.
 
+Current SciPlot implementation note: the first next-generation foundation is now product code, not only guidance. The sidecar exposes `/command/normalize`, `/command/apply-preview`, and `/preview-scene`; data containers carry column semantics and data revisions; analysis envelopes carry source binding, settings, lineage, and elapsed time; `/meta` includes command, native preview, and live source capability groups. Future work should deepen those surfaces rather than adding parallel UI-local state.
+
 ## Source map
 
 | LabPlot source area | What was inspected | SciPlot translation |

@@ -85,6 +85,24 @@ def capability_catalog_payload() -> list[dict[str, Any]]:
                     surface="code_console",
                     help="Code Console generated figures and tables are exposed as notebook output containers.",
                 ),
+                _capability(
+                    id="data.column_model",
+                    label="Column Model",
+                    status="enabled",
+                    owner="sidecar",
+                    surface="plot,data_studio,analysis,code_console",
+                    help="Data containers expose column ids, modes, role hints, units, readonly state, lineage, missing policy, and lifecycle events.",
+                ),
+            ],
+        },
+        {
+            "id": "command_engine",
+            "label": "Command Engine",
+            "description": "Cross-module typed commands for graph revisions and native undo replay.",
+            "capabilities": [
+                _capability(id="command.cross_module_normalize", label="Cross-Module Normalize", status="enabled", owner="sidecar", surface="all", help="POST /command/normalize validates add/edit/delete/reorder/rename/visibility/lock/copy-settings and module handoff commands."),
+                _capability(id="command.apply_preview", label="Apply Preview", status="enabled", owner="sidecar", surface="all", help="POST /command/apply-preview emits graph patch metadata and render invalidation without saving project files."),
+                _capability(id="command.compound", label="Compound Commands", status="enabled", owner="sidecar", surface="all", help="Compound command ids are accepted for import/bind/template and multi-object edits."),
             ],
         },
         {
@@ -177,8 +195,22 @@ def capability_catalog_payload() -> list[dict[str, Any]]:
             "label": "Native Preview Features",
             "description": "Contract-gated macOS native preview and interaction capabilities.",
             "capabilities": [
+                _capability(id="native_preview.preview_scene", label="Preview Scene", status="enabled", owner="sidecar", surface="plot", help="POST /preview-scene returns a contract-gated scene payload for Swift Canvas realtime preview."),
                 _capability(id="native_preview.curve_hit_testing", label="Curve Hit Testing", status="enabled", owner="shared", surface="plot", help="Curve hit testing uses backend interaction metadata when available."),
                 _capability(id="native_preview.unavailable_fallback", label="Backend Fallback", status="enabled", owner="shared", surface="plot", typed_payload_schema=no_payload_schema, help="Unsupported native preview cases fall back to backend bitmap/PDF preview."),
+            ],
+        },
+        {
+            "id": "live_sources",
+            "label": "Live Sources",
+            "description": "LabPlot-inspired realtime data source capabilities with SciPlot-safe v1 scope.",
+            "capabilities": [
+                _capability(id="live.file_tail", label="File Tail", status="enabled", owner="sidecar", surface="plot,data_studio", help="File-tail live source payloads are supported for append/replace preview workflows."),
+                _capability(id="live.folder_watch", label="Folder Watch", status="enabled", owner="sidecar", surface="data_studio", help="Folder-watch live source payloads are available for controlled periodic refresh."),
+                _capability(id="live.periodic_csv", label="Periodic CSV Refresh", status="enabled", owner="sidecar", surface="plot,data_studio", help="Periodic CSV refresh is represented as a live source payload and graph data revision."),
+                _capability(id="live.mqtt", label="MQTT", status="disabled", owner="sidecar", surface="data_studio", help="MQTT is disabled until connection policy, credentials, fixtures, and UI controls are implemented."),
+                _capability(id="live.serial", label="Serial Port", status="disabled", owner="sidecar", surface="data_studio", help="Serial port live data is disabled until sandbox, permissions, and fixtures are implemented."),
+                _capability(id="live.socket", label="Socket", status="disabled", owner="sidecar", surface="data_studio", help="Socket live data is disabled until network safety policy and fixtures are implemented."),
             ],
         },
     ]

@@ -305,8 +305,17 @@ class DataContainerColumnPayload(StrictModel):
     name: str
     index: int
     role_hints: list[str] = Field(default_factory=list)
+    mode: str = "unknown"
     unit: str | None = None
     comment: str | None = None
+    format: str | None = None
+    dictionary: list[str] = Field(default_factory=list)
+    category: str | None = None
+    missing_policy: str = "preserve"
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    computed_expression: str | None = None
+    readonly: bool = True
+    lifecycle_events: list[str] = Field(default_factory=list)
     profile: PlotColumnProfileResponse | None = None
 
 
@@ -331,6 +340,7 @@ class DataContainerPayload(StrictModel):
     row_count: int
     column_count: int
     columns: list[DataContainerColumnPayload] = Field(default_factory=list)
+    column_ids: list[str] = Field(default_factory=list)
     source: DataContainerSourcePayload
     dimensions: dict[str, int] | None = None
     coordinate_vectors: dict[str, list[float | int | str | None]] = Field(default_factory=dict)
@@ -342,6 +352,7 @@ class DataContainerPayload(StrictModel):
     artifact_paths: list[str] = Field(default_factory=list)
     container_ids: list[str] = Field(default_factory=list)
     source_run_id: str | None = None
+    data_revision: int = 1
     help: str
 
 
@@ -360,11 +371,28 @@ class PlotObjectPayload(StrictModel):
 
 class PlotEditCommandPayload(StrictModel):
     command_id: str
-    kind: Literal["add", "edit", "delete", "reorder", "rename", "visibility", "lock", "copy_settings"]
+    kind: Literal[
+        "add",
+        "edit",
+        "delete",
+        "reorder",
+        "rename",
+        "visibility",
+        "lock",
+        "copy_settings",
+        "bind_source",
+        "apply_template",
+        "import_container",
+        "create_output_ref",
+    ]
+    module: Literal["plot", "data_studio", "composer", "code_console"] = "plot"
     target_object_id: str
+    source_object_id: str | None = None
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     graph_patch: dict[str, Any] = Field(default_factory=dict)
+    graph_revision: int | None = None
+    compound_id: str | None = None
     reversible: bool = True
     help: str = "Undoable typed plot edit command landing."
 
@@ -380,6 +408,12 @@ class AnalysisOperationResultPayload(StrictModel):
     tables: list[dict[str, Any]] = Field(default_factory=list)
     overlays: list[dict[str, Any]] = Field(default_factory=list)
     data_containers: list[DataContainerPayload] = Field(default_factory=list)
+    settings: dict[str, Any] = Field(default_factory=dict)
+    source_binding: dict[str, Any] = Field(default_factory=dict)
+    prepared_arrays: dict[str, Any] = Field(default_factory=dict)
+    elapsed_ms: float = 0.0
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    artifact_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ImportFilterPayload(StrictModel):
@@ -462,6 +496,80 @@ class PlotEditCommandNormalizeRequest(StrictModel):
 class PlotEditCommandNormalizeResponse(StrictModel):
     command: PlotEditCommandPayload
     diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CommandNormalizeRequest(StrictModel):
+    command: PlotEditCommandPayload
+    objects: list[PlotObjectPayload] = Field(default_factory=list)
+
+
+class CommandNormalizeResponse(StrictModel):
+    command: PlotEditCommandPayload
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CommandApplyPreviewRequest(StrictModel):
+    command: PlotEditCommandPayload
+    document_graph: dict[str, Any] = Field(default_factory=dict)
+
+
+class CommandApplyPreviewResponse(StrictModel):
+    command: PlotEditCommandPayload
+    graph_revision: int
+    graph_patch: dict[str, Any] = Field(default_factory=dict)
+    render_invalidation: dict[str, Any] = Field(default_factory=dict)
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PreviewSceneRequest(RenderRequest):
+    pass
+
+
+class PreviewSceneResponse(StrictModel):
+    scene_id: str
+    template: str
+    sheet: str | int
+    native_supported: bool
+    fallback_reason: str | None = None
+    graph_revision: int = 1
+    figure: dict[str, Any] = Field(default_factory=dict)
+    plot_area: dict[str, float]
+    axes: list[dict[str, Any]] = Field(default_factory=list)
+    series: list[dict[str, Any]] = Field(default_factory=list)
+    objects: list[dict[str, Any]] = Field(default_factory=list)
+    overlays: list[dict[str, Any]] = Field(default_factory=list)
+    budgets: dict[str, Any] = Field(default_factory=dict)
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class LiveSourcePayload(StrictModel):
+    id: str
+    kind: Literal["file_tail", "folder_watch", "periodic_csv", "mqtt", "serial", "socket"]
+    status: Literal["enabled", "disabled"] = "disabled"
+    poll_interval_ms: int = 1000
+    sample_window: int = 1000
+    append_policy: Literal["append", "replace"] = "append"
+    paused: bool = True
+    last_update_diagnostic: dict[str, Any] = Field(default_factory=dict)
+    help: str
+
+
+class LiveSourceUpdateRequest(StrictModel):
+    live_source: LiveSourcePayload
+    input_path: str
+    sheet: str | int = 0
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveSourceUpdateResponse(StrictModel):
+    live_source: LiveSourcePayload
+    input_path: str
+    sheet: str | int
+    data_revision: int
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
+    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    render_invalidation: dict[str, Any] = Field(default_factory=dict)
+    help: str
 
 
 class SourceTablePreviewResponse(StrictModel):
@@ -796,6 +904,11 @@ class DocumentGraphNodePayload(StrictModel):
     module: str
     label: str
     status: str = "active"
+    parent_id: str | None = None
+    order: int = 0
+    visible: bool = True
+    locked: bool = False
+    selected: bool = False
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -806,12 +919,14 @@ class DocumentGraphEdgePayload(StrictModel):
 
 
 class DocumentGraphPayload(StrictModel):
-    schema_version: int = 1
+    schema_version: int = 2
+    revision: int = 1
     nodes: list[DocumentGraphNodePayload] = Field(default_factory=list)
     edges: list[DocumentGraphEdgePayload] = Field(default_factory=list)
     selected_nodes: dict[str, str] = Field(default_factory=dict)
     module_roots: dict[str, str] = Field(default_factory=dict)
     capabilities: list[str] = Field(default_factory=list)
+    events: list[dict[str, Any]] = Field(default_factory=list)
     migration_notes: list[str] = Field(default_factory=list)
 
 

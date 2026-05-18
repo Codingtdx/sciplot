@@ -368,6 +368,125 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(commandResponse.command.targetObjectID, "plot:guide:target-line")
     }
 
+    func testDecodeLabPlotNextGenerationRuntimePayloads() throws {
+        let previewScenePayload = """
+        {
+          "scene_id": "preview-scene:curve.csv:0:curve",
+          "template": "curve",
+          "sheet": 0,
+          "native_supported": true,
+          "fallback_reason": null,
+          "graph_revision": 3,
+          "figure": {"pixel_width": 800, "pixel_height": 600, "scale": 2.0},
+          "plot_area": {"x": 96, "y": 60, "width": 608, "height": 468},
+          "axes": [{"id": "axis:primary", "role": "primary", "bbox_pixels": {"x": 96, "y": 60, "width": 608, "height": 468}, "x_scale": "linear", "y_scale": "linear", "x_range": [0, 3], "y_range": [0, 9], "x_reversed": false, "y_reversed": false}],
+          "series": [{"id": "plot:series:0", "label": "signal", "kind": "curve", "column_refs": {"x": "col-0", "y": "col-1"}, "samples": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]}],
+          "objects": [
+            {"id": "plot:series:0", "kind": "series_line", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 60, "width": 608, "height": 468}, "points": [[96, 528], [299, 476]], "payload_ref": {"type": "series", "id": "plot:series:0"}, "operations": ["select", "quick_edit", "drag_offset", "copy_settings"], "visible": true, "locked": false},
+            {"id": "plot:axis:x", "kind": "x_axis", "label": "Time", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 524, "width": 608, "height": 8}, "points": [[96, 528], [704, 528]], "payload_ref": {"type": "axis", "id": "x"}, "operations": ["select", "quick_edit", "rename"], "visible": true, "locked": false},
+            {"id": "plot:legend:main", "kind": "legend", "label": "Legend", "bbox_pixels": {"x": 568, "y": 76, "width": 120, "height": 36}, "points": [], "payload_ref": {"type": "legend", "id": "main"}, "operations": ["select", "quick_edit", "reorder", "lock"], "visible": true, "locked": false},
+            {"id": "plot:guide:target", "kind": "reference_guide_line", "label": "Target", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 260, "width": 608, "height": 0}, "points": [[96, 260], [704, 260]], "payload_ref": {"type": "reference_guide", "id": "target"}, "operations": ["select", "quick_edit", "drag", "visibility"], "visible": false, "locked": true},
+            {"id": "plot:function:fn", "kind": "function_layer", "label": "Model", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 260, "width": 608, "height": 0}, "points": [[96, 260], [704, 260]], "payload_ref": {"type": "analytical_layer", "id": "fn"}, "operations": ["select", "quick_edit", "drag", "delete"], "visible": true, "locked": false},
+            {"id": "plot:fit_overlay:linear", "kind": "fit_overlay", "label": "Linear Fit", "axis_id": "axis:primary", "bbox_pixels": {"x": 96, "y": 60, "width": 608, "height": 468}, "points": [[96, 528], [299, 476]], "payload_ref": {"type": "fit_overlay", "id": "linear"}, "operations": ["select", "quick_edit", "visibility"], "visible": true, "locked": false}
+          ],
+          "overlays": [
+            {"id": "plot:guide:target", "kind": "reference_guide_line", "payload_ref": {"type": "reference_guide", "id": "target"}, "payload": {"id": "target", "kind": "line"}}
+          ],
+          "budgets": {"native_scene_samples": 2000},
+          "diagnostics": []
+        }
+        """
+        let scene = try decoder.decode(PreviewSceneResponse.self, from: Data(previewScenePayload.utf8))
+        XCTAssertTrue(scene.nativeSupported)
+        XCTAssertEqual(scene.graphRevision, 3)
+        XCTAssertEqual(scene.figure["pixel_width"]?.numberValue, 800)
+        XCTAssertEqual(scene.series[0].columnRefs["x"], "col-0")
+        XCTAssertEqual(scene.interactionMetadata?.objects.first?.kind, "series_line")
+        XCTAssertEqual(scene.interactionMetadata?.objects.first?.operations, ["select", "quick_edit", "drag_offset", "copy_settings"])
+        let guideObject = try XCTUnwrap(scene.interactionMetadata?.objects.first(where: { $0.id == "plot:guide:target" }))
+        XCTAssertEqual(guideObject.payloadRef?.type, "reference_guide")
+        XCTAssertFalse(guideObject.visible)
+        XCTAssertTrue(guideObject.locked)
+        XCTAssertTrue(guideObject.operations.contains("drag"))
+        let functionObject = try XCTUnwrap(scene.interactionMetadata?.objects.first(where: { $0.id == "plot:function:fn" }))
+        XCTAssertEqual(functionObject.kind, "function_layer")
+        XCTAssertEqual(functionObject.payloadRef?.type, "analytical_layer")
+        XCTAssertEqual(scene.overlays.first?["payload"]?.objectValue?["kind"]?.stringValue, "line")
+
+        let commandPayload = """
+        {
+          "command": {
+            "command_id": "cmd-copy-style",
+            "kind": "copy_settings",
+            "module": "plot",
+            "target_object_id": "plot:legend:main",
+            "source_object_id": "plot:series:a",
+            "before": {"visible": true},
+            "after": {"visible": true, "copied_style_ref": "plot:series:a"},
+            "graph_patch": {"target_object_id": "plot:legend:main", "revision_delta": 1},
+            "graph_revision": 5,
+            "reversible": true,
+            "help": "Undoable typed command."
+          },
+          "diagnostics": []
+        }
+        """
+        let command = try decoder.decode(CommandNormalizeResponse.self, from: Data(commandPayload.utf8))
+        XCTAssertEqual(command.command.module, "plot")
+        XCTAssertEqual(command.command.sourceObjectID, "plot:series:a")
+        XCTAssertEqual(command.command.graphRevision, 5)
+
+        let applyPayload = """
+        {
+          "command": {
+            "command_id": "cmd-copy-style",
+            "kind": "copy_settings",
+            "module": "plot",
+            "target_object_id": "plot:legend:main",
+            "source_object_id": "plot:series:a",
+            "graph_patch": {"target_object_id": "plot:legend:main", "revision_delta": 1},
+            "graph_revision": 6,
+            "reversible": true,
+            "help": "Undoable typed command."
+          },
+          "graph_revision": 6,
+          "graph_patch": {"target_object_id": "plot:legend:main"},
+          "render_invalidation": {"reason": "command_applied"},
+          "diagnostics": []
+        }
+        """
+        let applied = try decoder.decode(CommandApplyPreviewResponse.self, from: Data(applyPayload.utf8))
+        XCTAssertEqual(applied.graphRevision, 6)
+        XCTAssertEqual(applied.renderInvalidation["reason"]?.stringValue, "command_applied")
+
+        let livePayload = """
+        {
+          "live_source": {
+            "id": "live:file-tail:live",
+            "kind": "periodic_csv",
+            "status": "enabled",
+            "poll_interval_ms": 1000,
+            "sample_window": 200,
+            "append_policy": "replace",
+            "paused": false,
+            "last_update_diagnostic": {"status_code": "live_source_updated"},
+            "help": "Periodic CSV refresh for local files."
+          },
+          "input_path": "/tmp/live.csv",
+          "sheet": 0,
+          "data_revision": 12,
+          "data_containers": [],
+          "diagnostics": [{"status_code": "live_source_updated"}],
+          "render_invalidation": {"reason": "live_source_updated"},
+          "help": "Periodic CSV refresh for local files."
+        }
+        """
+        let liveUpdate = try decoder.decode(LiveSourceUpdateResponse.self, from: Data(livePayload.utf8))
+        XCTAssertEqual(liveUpdate.liveSource.kind, "periodic_csv")
+        XCTAssertEqual(liveUpdate.dataRevision, 12)
+        XCTAssertEqual(liveUpdate.renderInvalidation["reason"]?.stringValue, "live_source_updated")
+    }
+
     func testDecodeCodeConsoleContextResponseUsesSnakeCaseContextID() throws {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

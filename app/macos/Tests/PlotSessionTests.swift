@@ -80,6 +80,82 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertNil(session.plotEditCommandLedger.last?.after)
     }
 
+    func testFunctionLayerAxisAndLegendEditsRecordNormalizedCommands() async throws {
+        let client = MockSidecarClient()
+        installEchoCommandHandlers(on: client)
+        client.inspectResponse = TestPayloads.multiSeriesInspectFile(path: "/tmp/multiseries.csv")
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.multiSeriesMeta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/multiseries.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.addAnalyticalFunctionLayer()
+        let layerID = try XCTUnwrap(session.renderOptions.analyticalLayers?.first?.id)
+        session.updateAnalyticalLayer(id: layerID, policy: .immediate) {
+            $0.label = "Model"
+            $0.enabled = false
+        }
+        session.removeAnalyticalLayer(id: layerID)
+        session.updateRenderOptions(policy: .immediate) {
+            $0.xLabelOverride = "Time"
+            $0.yMin = -1
+            $0.yMax = 10
+        }
+        let seriesRows = session.seriesOrderRows
+        session.moveSeriesOrder(id: seriesRows[1].id, by: -1)
+
+        await waitUntil(
+            {
+                client.commandApplyPreviewRequests.count >= 6 &&
+                    session.plotEditCommandLedger.contains(where: { $0.targetObjectID == "plot:function:\(layerID)" && $0.kind == "delete" }) &&
+                    session.plotEditCommandLedger.contains(where: { $0.targetObjectID == "plot:axis:x" }) &&
+                    session.plotEditCommandLedger.contains(where: { $0.targetObjectID == "plot:axis:y" }) &&
+                    session.plotEditCommandLedger.contains(where: { $0.targetObjectID == "plot:legend:main" && $0.kind == "reorder" })
+            },
+            timeout: 2.0
+        )
+
+        let functionCommands = session.plotEditCommandLedger.filter { $0.targetObjectID == "plot:function:\(layerID)" }
+        XCTAssertEqual(functionCommands.map(\.kind), ["add", "visibility", "delete"])
+        XCTAssertEqual(session.plotEditCommandLedger.first(where: { $0.targetObjectID == "plot:axis:x" })?.after?["label"]?.stringValue, "Time")
+        XCTAssertEqual(session.plotEditCommandLedger.first(where: { $0.targetObjectID == "plot:axis:y" })?.after?["min"]?.numberValue, -1)
+        XCTAssertEqual(session.plotEditCommandLedger.first(where: { $0.targetObjectID == "plot:legend:main" })?.after?["seriesOrder"]?.arrayValue?.first?.stringValue, "Series B")
+    }
+
+    func testUndoRecordsReversiblePlotCommandMetadata() async throws {
+        let client = MockSidecarClient()
+        installEchoCommandHandlers(on: client)
+        let session = PlotSession()
+        let undoManager = UndoManager()
+        session.attachUndoManager(undoManager)
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.updateRenderOptions(policy: .immediate) { $0.xMin = 1.0 }
+        await waitUntil({ session.plotEditCommandLedger.contains(where: { $0.targetObjectID == "plot:axis:x" }) }, timeout: 2.0)
+        let countBeforeUndo = session.plotEditCommandLedger.count
+
+        undoManager.undo()
+
+        await waitUntil(
+            {
+                session.renderOptions.xMin == nil &&
+                    session.plotEditCommandLedger.count > countBeforeUndo &&
+                    session.plotEditCommandLedger.last?.targetObjectID == "plot:session" &&
+                    session.plotEditCommandLedger.last?.graphRevision != nil
+            },
+            timeout: 2.0
+        )
+        let command = try XCTUnwrap(session.plotEditCommandLedger.last)
+        XCTAssertEqual(command.kind, "edit")
+        XCTAssertEqual(command.before?["renderOptions"]?.objectValue?["xMin"]?.numberValue, 1.0)
+        XCTAssertNil(command.after?["renderOptions"]?.objectValue?["xMin"])
+        XCTAssertNotNil(command.graphRevision)
+    }
+
     func testAxisBreaksRoundTripThroughSessionSanitization() async throws {
         let client = MockSidecarClient()
         let session = PlotSession()
@@ -137,6 +213,96 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.first?.template, "curve")
         XCTAssertEqual(session.previewResponse?.previews.first?.filename, "sample_curve.pdf")
         XCTAssertEqual(session.liveStatusSymbol, "checkmark.circle.fill")
+    }
+
+    func testPreviewRefreshRequestsNativeSceneBeforeAuthoritativeRender() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+
+        await waitUntil(
+            { session.previewSceneResponse != nil && session.previewResponse != nil },
+            timeout: 2.0
+        )
+
+        XCTAssertEqual(client.previewSceneRequests.first?.template, "curve")
+        XCTAssertEqual(client.renderRequests.first?.template, "curve")
+        XCTAssertLessThan(
+            try XCTUnwrap(client.runtimeRequestLog.firstIndex(of: "preview-scene")),
+            try XCTUnwrap(client.runtimeRequestLog.firstIndex(of: "render-preview"))
+        )
+        XCTAssertEqual(session.previewSceneResponse?.sceneID, "preview-scene:curve.csv:0:curve")
+        XCTAssertNil(session.previewSceneFallbackReason)
+    }
+
+    func testPreviewSceneFallbackStillRendersAuthoritativePreview() async throws {
+        let client = MockSidecarClient()
+        client.previewSceneResponse = PreviewSceneResponse(
+            sceneID: "preview-scene:sample.csv:0:heatmap",
+            template: "heatmap",
+            sheet: .index(0),
+            nativeSupported: false,
+            fallbackReason: "unsupported_template",
+            graphRevision: 1,
+            figure: ["pixel_width": .number(800), "pixel_height": .number(600), "scale": .number(1)],
+            plotArea: ["x": .number(96), "y": .number(60), "width": .number(608), "height": .number(468)],
+            axes: [],
+            series: [],
+            objects: [],
+            overlays: [],
+            budgets: ["native_scene_samples": .number(2_000)],
+            diagnostics: [["status_code": .string("native_preview_fallback")]]
+        )
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        XCTAssertNil(session.previewSceneResponse)
+        XCTAssertEqual(session.previewSceneFallbackReason, "unsupported_template")
+        XCTAssertEqual(client.renderRequests.first?.template, "curve")
+    }
+
+    func testStalePreviewSceneResponseIsIgnored() async throws {
+        let client = MockSidecarClient()
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewSceneResponse != nil && session.previewResponse != nil }, timeout: 2.0)
+
+        let currentSceneID = try XCTUnwrap(session.previewSceneResponse?.sceneID)
+        var staleScene = TestPayloads.previewScene()
+        staleScene = PreviewSceneResponse(
+            sceneID: "preview-scene:stale",
+            template: staleScene.template,
+            sheet: staleScene.sheet,
+            nativeSupported: true,
+            fallbackReason: nil,
+            graphRevision: 99,
+            figure: staleScene.figure,
+            plotArea: staleScene.plotArea,
+            axes: staleScene.axes,
+            series: staleScene.series,
+            objects: staleScene.objects,
+            overlays: staleScene.overlays,
+            budgets: staleScene.budgets,
+            diagnostics: []
+        )
+        client.previewSceneResponse = staleScene
+        let staleRevision = session.asyncCoordination.preview.beginNow()
+        _ = session.asyncCoordination.preview.beginNow()
+        let request = try XCTUnwrap(session.currentRenderRequest(includePreviewConfig: true))
+
+        await session.performPreview(request: request, revision: staleRevision)
+
+        XCTAssertEqual(session.previewSceneResponse?.sceneID, currentSceneID)
     }
 
     func testStyleStudioDraftAndSaveRefreshPreviewWithCustomThemePayload() async throws {
@@ -2450,6 +2616,78 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(client.renderRequests.last?.options.seriesOffsets?.first, offset)
     }
 
+    func testSeriesDragRecordsNormalizedCommandAndGraphRevision() async throws {
+        let client = MockSidecarClient()
+        client.commandNormalizeHandler = { request in
+            CommandNormalizeResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: [
+                        "target_object_id": .string(request.command.targetObjectID),
+                        "kind": .string(request.command.kind),
+                        "module": .string(request.command.module),
+                        "revision_delta": .number(1)
+                    ],
+                    graphRevision: 10,
+                    reversible: request.command.reversible,
+                    help: "Normalized by test sidecar."
+                ),
+                diagnostics: []
+            )
+        }
+        client.commandApplyPreviewHandler = { request in
+            CommandApplyPreviewResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: request.command.graphPatch,
+                    graphRevision: 11,
+                    reversible: request.command.reversible,
+                    help: "Applied by test sidecar."
+                ),
+                graphRevision: 11,
+                graphPatch: request.command.graphPatch,
+                renderInvalidation: ["reason": .string("command_applied")],
+                diagnostics: []
+            )
+        }
+        let session = PlotSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+        session.importFile(URL(fileURLWithPath: "/tmp/sample.csv"))
+        await waitUntil({ session.previewResponse != nil }, timeout: 2.0)
+
+        session.commitPreviewSeriesDrag(seriesID: "Sample A", xOffset: 0.5, yOffset: -0.25, policy: .immediate)
+
+        await waitUntil(
+            {
+                client.commandNormalizeRequests.count == 1 &&
+                    client.commandApplyPreviewRequests.count == 1 &&
+                    session.plotEditCommandLedger.last?.graphRevision == 11
+            },
+            timeout: 2.0
+        )
+
+        let command = try XCTUnwrap(session.plotEditCommandLedger.last)
+        XCTAssertEqual(command.kind, "edit")
+        XCTAssertEqual(command.targetObjectID, "plot:series:Sample A")
+        XCTAssertEqual(command.after?["xOffset"]?.numberValue, 0.5)
+        XCTAssertEqual(command.after?["yOffset"]?.numberValue, -0.25)
+        XCTAssertEqual(client.commandApplyPreviewRequests.last?.documentGraph["revision"]?.numberValue, 0)
+        XCTAssertEqual(command.graphPatch["revision_delta"]?.numberValue, 1)
+    }
+
     func testKeyboardNudgeMovesTypedOverlayAndSeriesOffset() async throws {
         let session = PlotSession()
         session.renderOptions.referenceGuides = [
@@ -2756,6 +2994,54 @@ final class PlotSessionTests: XCTestCase {
         XCTAssertEqual(session.errorMessage, "Log x / y is not supported.")
     }
 
+    private func installEchoCommandHandlers(on client: MockSidecarClient) {
+        client.commandNormalizeHandler = { request in
+            CommandNormalizeResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: [
+                        "target_object_id": .string(request.command.targetObjectID),
+                        "kind": .string(request.command.kind),
+                        "module": .string(request.command.module),
+                        "revision_delta": .number(1)
+                    ],
+                    graphRevision: 10,
+                    reversible: request.command.reversible,
+                    help: "Normalized by test sidecar."
+                ),
+                diagnostics: []
+            )
+        }
+        client.commandApplyPreviewHandler = { request in
+            let nextRevision = Int(request.documentGraph["revision"]?.numberValue ?? 0) + 1
+            return CommandApplyPreviewResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    sourceObjectID: request.command.sourceObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: request.command.graphPatch,
+                    graphRevision: nextRevision,
+                    reversible: request.command.reversible,
+                    help: "Applied by test sidecar."
+                ),
+                graphRevision: nextRevision,
+                graphPatch: request.command.graphPatch,
+                renderInvalidation: ["reason": .string("command_applied")],
+                diagnostics: []
+            )
+        }
+    }
+
     private func waitUntil(
         _ condition: @escaping () -> Bool,
         timeout: TimeInterval
@@ -2891,4 +3177,5 @@ final class PDFPreviewViewTests: XCTestCase {
         XCTAssertTrue(PreviewImageDecoder.looksLikePDFData(pdfData))
         XCTAssertFalse(PreviewImageDecoder.looksLikePDFData(pngData))
     }
+
 }

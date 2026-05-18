@@ -187,6 +187,8 @@ struct PreviewInteractionObjectMetadata: Codable, Equatable, Sendable, Identifia
     let points: [[Double]]
     let payloadRef: PreviewInteractionPayloadRefMetadata?
     let operations: [String]
+    let visible: Bool
+    let locked: Bool
 
     init(
         id: String,
@@ -196,7 +198,9 @@ struct PreviewInteractionObjectMetadata: Codable, Equatable, Sendable, Identifia
         bboxPixels: PreviewBBoxMetadata,
         points: [[Double]] = [],
         payloadRef: PreviewInteractionPayloadRefMetadata? = nil,
-        operations: [String] = ["select", "more"]
+        operations: [String] = ["select", "more"],
+        visible: Bool = true,
+        locked: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -206,6 +210,8 @@ struct PreviewInteractionObjectMetadata: Codable, Equatable, Sendable, Identifia
         self.points = points
         self.payloadRef = payloadRef
         self.operations = operations
+        self.visible = visible
+        self.locked = locked
     }
 
     enum CodingKeys: String, CodingKey {
@@ -217,5 +223,21 @@ struct PreviewInteractionObjectMetadata: Codable, Equatable, Sendable, Identifia
         case points
         case payloadRef
         case operations
+        case visible
+        case locked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        kind = try container.decode(String.self, forKey: .kind)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        axisID = try container.decodeIfPresent(String.self, forKey: .axisID)
+        bboxPixels = try container.decode(PreviewBBoxMetadata.self, forKey: .bboxPixels)
+        points = try container.decodeIfPresent([[Double]].self, forKey: .points) ?? []
+        payloadRef = try container.decodeIfPresent(PreviewInteractionPayloadRefMetadata.self, forKey: .payloadRef)
+        operations = try container.decodeIfPresent([String].self, forKey: .operations) ?? ["select", "more"]
+        visible = try container.decodeIfPresent(Bool.self, forKey: .visible) ?? true
+        locked = try container.decodeIfPresent(Bool.self, forKey: .locked) ?? false
     }
 }

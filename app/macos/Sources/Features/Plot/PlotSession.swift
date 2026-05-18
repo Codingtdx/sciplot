@@ -70,6 +70,9 @@ final class PlotSession {
     var renderOptions = RenderOptionsPayload()
     var fitOptions = FitOptionsPayload()
     var previewResponse: RenderPreviewResponse?
+    var previewSceneResponse: PreviewSceneResponse?
+    var previewSceneRevision: Int?
+    var previewSceneFallbackReason: String?
     var previewPixelBucket: PlotPreviewPixelBucket?
     var preflightResponse: PreflightRenderResponse?
     var exportResponse: ExportRenderResponse?
@@ -113,6 +116,7 @@ final class PlotSession {
     var selectedTextAnnotationID: String?
     var selectedShapeAnnotationID: String?
     var plotEditCommandLedger: [PlotEditCommandPayload] = []
+    var plotCommandGraphRevision = 0
     var sourceProvenance = PlotProjectSourceProvenancePayload(
         originalInputPath: nil,
         savedInputMtimeNs: nil,

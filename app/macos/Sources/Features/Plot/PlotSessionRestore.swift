@@ -216,9 +216,31 @@ extension PlotSession {
             session.runtimeState.isApplyingUndoRedo = true
             session.restore(from: previousSnapshot)
             session.runtimeState.isApplyingUndoRedo = false
+            session.recordPlotEditCommand(
+                kind: "edit",
+                targetObjectID: "plot:session",
+                before: session.undoCommandPayload(currentSnapshot),
+                after: session.undoCommandPayload(previousSnapshot)
+            )
             session.registerUndo(previousSnapshot: currentSnapshot, actionName: actionName)
         }
         undoManager.setActionName(actionName)
+    }
+
+    func undoCommandPayload(_ snapshot: UndoSnapshot) -> [String: JSONValue] {
+        let sheetValue: JSONValue
+        switch snapshot.selectedSheet {
+        case let .index(index):
+            sheetValue = .number(Double(index))
+        case let .name(name):
+            sheetValue = .string(name)
+        }
+        return [
+            "selectedSheet": sheetValue,
+            "selectedTemplateID": snapshot.selectedTemplateID.map(JSONValue.string) ?? .null,
+            "renderOptions": .object(plotCommandPayload(snapshot.renderOptions)),
+            "fitOptions": .object(plotCommandPayload(snapshot.fitOptions))
+        ]
     }
 
     func restore(from snapshot: UndoSnapshot) {

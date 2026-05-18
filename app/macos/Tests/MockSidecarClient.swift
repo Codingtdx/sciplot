@@ -61,6 +61,10 @@ final class MockSidecarClient: SidecarClienting {
     var analysisOperationResponse = TestPayloads.analysisOperation()
     var importPreviewResponse = TestPayloads.importPreview()
     var plotEditCommandNormalizeResponse = TestPayloads.plotEditCommandNormalize()
+    var commandNormalizeResponse = TestPayloads.commandNormalize()
+    var commandApplyPreviewResponse = TestPayloads.commandApplyPreview()
+    var previewSceneResponse = TestPayloads.previewScene()
+    var liveSourceUpdateResponse = TestPayloads.liveSourceUpdate()
     var saveProjectResponse = TestPayloads.saveProjectResponse()
     var openProjectResponse = TestPayloads.openProjectResponse()
     var codeConsoleContextResponse = TestPayloads.codeConsoleContext()
@@ -100,6 +104,10 @@ final class MockSidecarClient: SidecarClienting {
     var analysisOperationHandler: ((AnalysisOperationRequest) async throws -> AnalysisOperationResponse)?
     var importPreviewHandler: ((ImportPreviewRequest) async throws -> ImportPreviewResponse)?
     var plotEditCommandNormalizeHandler: ((PlotEditCommandNormalizeRequest) async throws -> PlotEditCommandNormalizeResponse)?
+    var commandNormalizeHandler: ((CommandNormalizeRequest) async throws -> CommandNormalizeResponse)?
+    var commandApplyPreviewHandler: ((CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse)?
+    var previewSceneHandler: ((PreviewSceneRequest) async throws -> PreviewSceneResponse)?
+    var liveSourceUpdateHandler: ((LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse)?
     var saveProjectHandler: ((SaveProjectRequest) async throws -> SaveProjectResponse)?
     var openProjectHandler: ((OpenProjectRequest) async throws -> OpenProjectResponse)?
     var codeConsoleContextHandler: ((CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse)?
@@ -139,6 +147,11 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var analysisOperationRequests: [AnalysisOperationRequest] = []
     private(set) var importPreviewRequests: [ImportPreviewRequest] = []
     private(set) var plotEditCommandNormalizeRequests: [PlotEditCommandNormalizeRequest] = []
+    private(set) var commandNormalizeRequests: [CommandNormalizeRequest] = []
+    private(set) var commandApplyPreviewRequests: [CommandApplyPreviewRequest] = []
+    private(set) var previewSceneRequests: [PreviewSceneRequest] = []
+    private(set) var runtimeRequestLog: [String] = []
+    private(set) var liveSourceUpdateRequests: [LiveSourceUpdateRequest] = []
     private(set) var saveProjectRequests: [SaveProjectRequest] = []
     private(set) var openProjectRequests: [OpenProjectRequest] = []
     private(set) var thumbnailRequests: [ThumbnailRequest] = []
@@ -409,6 +422,41 @@ final class MockSidecarClient: SidecarClienting {
         return plotEditCommandNormalizeResponse
     }
 
+    func normalizeCommand(_ request: CommandNormalizeRequest) async throws -> CommandNormalizeResponse {
+        commandNormalizeRequests.append(request)
+        runtimeRequestLog.append("command/normalize")
+        if let commandNormalizeHandler {
+            return try await commandNormalizeHandler(request)
+        }
+        return commandNormalizeResponse
+    }
+
+    func applyCommandPreview(_ request: CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse {
+        commandApplyPreviewRequests.append(request)
+        runtimeRequestLog.append("command/apply-preview")
+        if let commandApplyPreviewHandler {
+            return try await commandApplyPreviewHandler(request)
+        }
+        return commandApplyPreviewResponse
+    }
+
+    func previewScene(_ request: PreviewSceneRequest) async throws -> PreviewSceneResponse {
+        previewSceneRequests.append(request)
+        runtimeRequestLog.append("preview-scene")
+        if let previewSceneHandler {
+            return try await previewSceneHandler(request)
+        }
+        return previewSceneResponse
+    }
+
+    func updateLiveSourceNow(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        liveSourceUpdateRequests.append(request)
+        if let liveSourceUpdateHandler {
+            return try await liveSourceUpdateHandler(request)
+        }
+        return liveSourceUpdateResponse
+    }
+
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {
         saveProjectRequests.append(request)
         if let saveProjectHandler {
@@ -451,6 +499,7 @@ final class MockSidecarClient: SidecarClienting {
 
     func renderPreview(_ request: RenderRequest) async throws -> RenderPreviewResponse {
         renderRequests.append(request)
+        runtimeRequestLog.append("render-preview")
         if let renderHandler {
             return try await renderHandler(request)
         }

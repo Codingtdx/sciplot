@@ -9,8 +9,28 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `POST /fit-analysis`: runs fit analysis and returns the shared fit envelope plus fit result containers.
 - `POST /analysis-operation`: runs SciPlot-owned numerical operations and returns `AnalysisOperationResultPayload`.
 - `POST /import-preview`: dispatches import filters and returns preview containers or structured disabled diagnostics.
-- `POST /plot-edit-command/normalize`: validates plot object edit commands and returns a normalized reversible command with graph patch metadata.
+- `POST /plot-edit-command/normalize`: compatibility route for Plot-only object edit command normalization.
+- `POST /command/normalize`: validates cross-module commands and returns a normalized reversible command with graph patch metadata.
+- `POST /command/apply-preview`: applies a command against an in-memory graph snapshot and returns graph patch plus render invalidation metadata without saving project files; stale command revisions must be ignored with structured diagnostics.
+- `POST /preview-scene`: returns the contract-gated native realtime preview scene for Swift Canvas before `/render-preview`; `/render-preview` remains the authoritative bitmap/PDF correction path.
+- `POST /live-source/update-now`: refreshes enabled file-tail, folder-watch, or periodic-CSV live sources into revisioned data containers.
 - `POST /code-console/run`: executes a Code Console run and returns generated files, notebook outputs, and notebook output containers.
+
+## Next-Generation Runtime Payloads
+
+- `DataContainerPayload` includes column ids, column mode/role/unit/comment/profile metadata, readonly policy, lifecycle event names, provenance, statistics, dimensions, and data revision.
+- `AnalysisOperationResultPayload` includes settings, source binding, prepared-array summary, elapsed time, lineage, diagnostics, metrics, tables, overlays, artifact refs, and data containers.
+- `PlotEditCommandPayload` is the shared command envelope for Plot, Data Studio, Composer, and Code Console. Supported kinds include `add`, `edit`, `delete`, `reorder`, `rename`, `visibility`, `lock`, `copy_settings`, `bind_source`, `apply_template`, `import_container`, and `create_output_ref`.
+- `PreviewScenePayload` is a realtime approximation contract. It carries figure geometry, plot area geometry, axis metadata, series samples, style tokens, object ids, `bbox_pixels`, point arrays, payload refs, operation names, hit-test hints, budgets, and fallback diagnostics.
+- `PreviewScenePayload.objects[]` is the Plot object hit-test contract. Object metadata must include stable id, kind, label, `bbox_pixels`, `points`, `payload_ref`, supported `operations`, and visible/locked state for series, axes, legend, reference guides, text annotations, shape annotations, function layers, and fit overlays.
+- `LiveSourcePayload` is the controlled realtime-source contract for file tail, folder watch, and periodic CSV refresh. Network, serial, and socket sources stay disabled until sandbox and fixture policy exists.
+
+## Plot Native Interaction Loop
+
+- `POST /preview-scene` is requested before `POST /render-preview`. macOS may use a native Canvas path while the authoritative bitmap/PDF is loading, then keep the same scene metadata for hit testing and overlays after correction arrives.
+- Native admission is explicit. Unsupported templates, missing samples, invalid axes, sample-budget overflow, enabled extra axes, and enabled broken axes must return `native_supported=false` with a structured fallback reason instead of asking Swift to guess.
+- `POST /command/normalize` and `POST /command/apply-preview` are required for durable Plot edits, including series style/offset edits, guide/text/shape creation and drag edits, function layer edits, fit overlay changes, axis label/range edits, legend reorder, visibility, lock, rename, delete, and copy-settings.
+- `POST /command/apply-preview` returns graph revision metadata and diagnostics only; it does not save project files. Stale command revisions must return a `stale_command_revision` diagnostic and no durable graph mutation.
 
 ## Status Policy
 
