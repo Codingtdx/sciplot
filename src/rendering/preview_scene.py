@@ -19,6 +19,8 @@ DEFAULT_NATIVE_SCENE_SAMPLE_BUDGET = 2_000
 
 
 def _numeric(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
     try:
         numeric = float(value)
     except (TypeError, ValueError):
@@ -27,8 +29,8 @@ def _numeric(value: object) -> float | None:
 
 
 def _payload_float(payload: dict[str, Any], key: str, default: float) -> float:
-    value = payload.get(key)
-    return float(value) if value is not None else default
+    numeric = _numeric(payload.get(key))
+    return numeric if numeric is not None else default
 
 
 def _range(values: list[float]) -> list[float]:
@@ -279,8 +281,8 @@ def _add_reference_guide_objects(
                 point = _point_for_data(x_range[0], value, plot_area=plot_area, x_range=x_range, y_range=y_range)
                 points = [[plot_area["x"], point[1]], [plot_area["x"] + plot_area["width"], point[1]]]
         else:
-            start = float(guide.get("start") if guide.get("start") is not None else 0.0)
-            end = float(guide.get("end") if guide.get("end") is not None else 1.0)
+            start = _payload_float(guide, "start", 0.0)
+            end = _payload_float(guide, "end", 1.0)
             if axis_target == "x":
                 first = _point_for_data(start, y_range[0], plot_area=plot_area, x_range=x_range, y_range=y_range)
                 second = _point_for_data(end, y_range[1], plot_area=plot_area, x_range=x_range, y_range=y_range)
@@ -392,8 +394,8 @@ def _add_function_and_fit_objects(
     midpoint = y_range[0] + (y_range[1] - y_range[0]) / 2
     for layer in analytical_layers:
         layer_id = str(layer.get("id") or "function")
-        x_start = float(layer.get("x_start") if layer.get("x_start") is not None else x_range[0])
-        x_end = float(layer.get("x_end") if layer.get("x_end") is not None else x_range[1])
+        x_start = _payload_float(layer, "x_start", x_range[0])
+        x_end = _payload_float(layer, "x_end", x_range[1])
         points = [
             _point_for_data(x_start, midpoint, plot_area=plot_area, x_range=x_range, y_range=y_range),
             _point_for_data(x_end, midpoint, plot_area=plot_area, x_range=x_range, y_range=y_range),

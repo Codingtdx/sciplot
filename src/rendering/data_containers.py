@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -14,8 +14,8 @@ _COLUMN_LIFECYCLE_EVENTS = ("data_about_to_change", "data_changed", "mode_change
 
 
 def _serialize(value: object) -> object:
-    if is_dataclass(value):
-        return asdict(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(cast(Any, value))
     if isinstance(value, tuple):
         return [_serialize(item) for item in value]
     if isinstance(value, list):
@@ -34,6 +34,8 @@ def _cell_text(value: object) -> str:
 
 
 def _finite_float(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
     try:
         numeric = float(value)
     except (TypeError, ValueError):
