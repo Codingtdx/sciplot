@@ -68,6 +68,43 @@ def test_analysis_operation_endpoint_returns_typed_envelope(tmp_path: Path) -> N
     assert result.data_containers[0].kind == "transformed_view"
 
 
+def test_analysis_operation_endpoint_returns_durable_analysis_object(tmp_path: Path) -> None:
+    input_path = tmp_path / "curve.csv"
+    _write_curve(input_path)
+
+    response = client.post(
+        "/analysis-operation",
+        json={
+            "operation_id": "analysis.integration",
+            "module": "data_studio",
+            "input_path": str(input_path),
+            "sheet": 0,
+            "x_column": "x",
+            "y_column": "signal",
+            "source_binding": {
+                "workbook_id": "workbook-1",
+                "source_module": "data_studio",
+            },
+            "recalculate_policy": "manual",
+            "graph_revision": 4,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = AnalysisOperationResponse.model_validate(response.json())
+    result = payload.operation_result
+    assert result.operation_instance_id.startswith("analysis:data_studio:integration:")
+    assert result.operation_kind == "integration"
+    assert result.graph_node_id.startswith("data_studio:analysis_operation:")
+    assert result.result_node_id == f"{result.graph_node_id}:result"
+    assert result.result_container_ids == [container.id for container in result.data_containers]
+    assert result.recalculate_policy == "manual"
+    assert result.source_binding["workbook_id"] == "workbook-1"
+    assert result.source_binding["graph_revision"] == 4
+    assert result.lineage["operation_instance_id"] == result.operation_instance_id
+    assert result.lineage["result_node_id"] == result.result_node_id
+
+
 def test_analysis_operations_include_numerical_fixture_results(tmp_path: Path) -> None:
     input_path = tmp_path / "wave.csv"
     xs = np.arange(8, dtype=float)

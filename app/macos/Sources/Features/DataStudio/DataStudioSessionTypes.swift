@@ -98,6 +98,7 @@ enum DataStudioAnalysisTarget: String, CaseIterable, Identifiable {
 enum DataStudioAnalysisTab: String, CaseIterable, Identifiable {
     case sourceData
     case fit
+    case operations
 
     var id: String { rawValue }
 
@@ -107,8 +108,16 @@ enum DataStudioAnalysisTab: String, CaseIterable, Identifiable {
             return "Source Data"
         case .fit:
             return "Fit"
+        case .operations:
+            return "Operations"
         }
     }
+}
+
+struct DataStudioAnalysisOperationOption: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let help: String
 }
 
 enum DataStudioWorkbookPreviewRefreshState: Equatable {

@@ -1059,24 +1059,73 @@ enum TestPayloads {
         )
     }
 
-    static func analysisOperation() -> AnalysisOperationResponse {
-        AnalysisOperationResponse(
-            operationID: "analysis.smoothing",
-            inputPath: "/tmp/curve.csv",
-            sheet: .index(0),
+    static func analysisOperation(
+        operationID: String = "analysis.smoothing",
+        inputPath: String = "/tmp/curve.csv",
+        sheet: SheetValue = .index(0),
+        module: String = "plot"
+    ) -> AnalysisOperationResponse {
+        let operationKind = operationID.split(separator: ".").last.map(String.init) ?? operationID
+        let instanceID = "analysis:\(module):\(operationKind):fixture"
+        let graphNodeID = "\(module == "data_studio" ? "data_studio" : "plot"):analysis_operation:\(operationKind)"
+        return AnalysisOperationResponse(
+            operationID: operationID,
+            inputPath: inputPath,
+            sheet: sheet,
             operationResult: AnalysisOperationResultPayload(
-                operationID: "analysis.smoothing",
+                operationID: operationID,
+                operationInstanceID: instanceID,
+                operationKind: operationKind,
                 available: true,
                 valid: true,
                 statusCode: "ok",
-                message: "Smoothing complete.",
+                message: "\(operationKind.capitalized) complete.",
                 diagnostics: [],
-                metrics: ["point_count": .number(3)],
+                metrics: ["point_count": .number(3), "total_area": .number(42.5)],
                 tables: [],
                 overlays: [],
-                dataContainers: []
+                dataContainers: [analysisDataContainer(id: "\(instanceID):result", inputPath: inputPath, sheet: sheet)],
+                sourceBinding: [
+                    "source_module": .string(module),
+                    "input_path": .string(inputPath),
+                    "sheet": .string(sheet.displayName),
+                ],
+                lineage: [
+                    "operation_instance_id": .string(instanceID),
+                    "result_node_id": .string("\(graphNodeID):result"),
+                ],
+                graphNodeID: graphNodeID,
+                resultNodeID: "\(graphNodeID):result",
+                resultContainerIDs: ["\(instanceID):result"],
+                overlayRefs: [],
+                recalculatePolicy: "manual"
             )
         )
+    }
+
+    private static func analysisDataContainer(id: String, inputPath: String, sheet: SheetValue) -> DataContainerPayload {
+        let payload = """
+        {
+          "id": "\(id)",
+          "kind": "transformed_view",
+          "label": "Analysis result",
+          "status": "enabled",
+          "readonly": true,
+          "row_count": 1,
+          "column_count": 2,
+          "columns": [],
+          "source": {
+            "input_path": "\(inputPath)",
+            "sheet": "\(sheet.displayName)",
+            "offset": 0,
+            "limit": 50
+          },
+          "help": "Readonly analysis result."
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try! decoder.decode(DataContainerPayload.self, from: Data(payload.utf8))
     }
 
     static func importPreview() -> ImportPreviewResponse {

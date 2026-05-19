@@ -93,7 +93,9 @@ When a workflow reaches plot styling or publication-grade graph adjustment, hand
 
 The import wizard owns a single selected import profile. The resolver shows sidecar diagnostics and role match/missing information from the recommendation payload, disables Continue with help for unsupported filters or missing required roles, and sends the same selection to normalized preview and workbook build. The normalized output preview and returned containers come from sidecar; Swift displays them but does not rebuild rows, roles, or statistics locally.
 
-Data Studio Analysis reuses the shared Fit model cards so Plot and Data Studio do not grow separate picker-style fit experiences. In Data Studio, custom fit setup can stay disabled or handed off to Plot until the Data Studio analysis surface owns a real custom-function editing flow.
+Data Studio Analysis reuses the shared Fit model cards so Plot and Data Studio do not grow separate picker-style fit experiences. In Data Studio, custom fit setup stays disabled with help until the Data Studio analysis surface owns a real custom-function editing flow.
+
+The Analysis sheet has a module-local operation surface for fit, smoothing, integration, FFT, baseline correction, peak detection, and statistics. It calls `/analysis-operation`, displays the returned status, diagnostics, metrics, source binding, and readonly result containers, and stores the envelope in session/project state. Recalculate, delete, bind-to-Plot, and overlay toggles must emit typed commands through `/command/normalize` and `/command/apply-preview`; `UndoManager` restores the session snapshot and records the normalized command metadata. Swift must not recompute the scientific result.
 
 ## Composer
 

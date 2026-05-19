@@ -135,6 +135,7 @@ extension DataStudioSession {
             return
         }
         await restoreSession(from: sessionResponse(from: projectPayload))
+        restoreAnalysisState(from: projectPayload)
         projectURL = URL(fileURLWithPath: response.projectPath)
         runtimeState.lastSavedProjectSnapshot = currentProjectSnapshot
     }
@@ -208,6 +209,8 @@ extension DataStudioSession {
             figurePreferences: session.figurePreferences,
             importedPaths: session.importedPaths,
             templateDraftPath: session.templateDraftPath,
+            analysisOperations: projectAnalysisOperations(),
+            analysisResults: projectAnalysisResults(),
             embeddedWorkbooks: [],
             projectDisplayName: projectDisplayName
                 ?? projectURL?.deletingPathExtension().lastPathComponent
@@ -249,6 +252,51 @@ extension DataStudioSession {
         )
     }
 
+    func projectAnalysisOperations() -> [DataStudioAnalysisOperationPayload] {
+        guard let result = analysisOperationResponse?.operationResult else {
+            return []
+        }
+        return [
+            DataStudioAnalysisOperationPayload(
+                operationInstanceID: result.operationInstanceID ?? "analysis:data_studio:\(selectedAnalysisOperationID)",
+                operationID: result.operationID,
+                operationKind: result.operationKind,
+                graphNodeID: result.graphNodeID,
+                label: result.operationKind?.replacingOccurrences(of: "_", with: " ").capitalized ?? "Analysis Operation",
+                sourceBinding: result.sourceBinding,
+                settings: result.settings,
+                overlayRefs: result.overlayRefs,
+                recalculatePolicy: result.recalculatePolicy
+            )
+        ]
+    }
+
+    func projectAnalysisResults() -> [AnalysisOperationResultPayload] {
+        guard let result = analysisOperationResponse?.operationResult else {
+            return []
+        }
+        return [result]
+    }
+
+    private func restoreAnalysisState(from projectPayload: DataStudioProjectPayload) {
+        guard let result = projectPayload.analysisResults.first else {
+            analysisOperationResponse = nil
+            return
+        }
+        selectedAnalysisOperationID = result.operationID
+        let inputPath = result.sourceBinding["input_path"]?.stringValue
+            ?? focusedWorkbook?.response.workbookPath
+            ?? projectPayload.workbookPaths.first
+            ?? ""
+        let sheetName = result.sourceBinding["sheet"]?.stringValue
+        analysisOperationResponse = AnalysisOperationResponse(
+            operationID: result.operationID,
+            inputPath: inputPath,
+            sheet: sheetName.map(SheetValue.name) ?? .index(0),
+            operationResult: result
+        )
+    }
+
     func projectSnapshot(from projectPayload: DataStudioProjectPayload) -> ProjectSnapshot {
         ProjectSnapshot(
             selectedTemplateID: projectPayload.selectedTemplateID,
@@ -263,7 +311,9 @@ extension DataStudioSession {
             specimenStates: projectPayload.specimenStates,
             figurePreferences: projectPayload.figurePreferences,
             importedPaths: projectPayload.importedPaths,
-            templateDraftPath: projectPayload.templateDraftPath
+            templateDraftPath: projectPayload.templateDraftPath,
+            analysisOperations: projectPayload.analysisOperations,
+            analysisResults: projectPayload.analysisResults
         )
     }
 }

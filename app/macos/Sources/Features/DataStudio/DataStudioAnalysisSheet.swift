@@ -76,6 +76,8 @@ struct DataStudioAnalysisSheet: View {
             sourceDataContent
         case .fit:
             fitContent
+        case .operations:
+            operationsContent
         }
     }
 
@@ -193,6 +195,88 @@ struct DataStudioAnalysisSheet: View {
         }
     }
 
+    private var operationsContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !session.analysisOperationAvailability.isEnabled {
+                EmptyStateCard(
+                    title: "Analysis Unavailable",
+                    message: session.analysisOperationAvailability.reason
+                )
+            } else {
+                Picker("Operation", selection: operationBinding) {
+                    ForEach(session.analysisOperationOptions) { option in
+                        Text(option.label).tag(option.id)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                HStack {
+                    Button("Recalculate") {
+                        session.recalculateSelectedAnalysisOperation()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(session.isLoadingAnalysisOperation)
+
+                    if session.isLoadingAnalysisOperation {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Spacer()
+                }
+
+                if let errorMessage = session.analysisOperationErrorMessage {
+                    ErrorStateCard(
+                        title: "Could not run analysis",
+                        message: errorMessage,
+                        retryTitle: "Retry"
+                    ) {
+                        session.loadSelectedAnalysisOperation()
+                    }
+                } else if let result = session.analysisOperationResponse?.operationResult {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(result.message.isEmpty ? result.operationID : result.message)
+                            .font(.caption.weight(.semibold))
+                        HStack(spacing: 12) {
+                            Text(result.statusCode)
+                            Text("\(result.dataContainers.count) container\(result.dataContainers.count == 1 ? "" : "s")")
+                            Text("\(result.elapsedMS.formatted(.number.precision(.fractionLength(1)))) ms")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        if !result.metrics.isEmpty {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                                ForEach(result.metrics.keys.sorted(), id: \.self) { key in
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(key.replacingOccurrences(of: "_", with: " ").capitalized)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(result.metrics[key]?.displayString ?? "")
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(8)
+                                    .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                            }
+                        }
+                        if !result.diagnostics.isEmpty {
+                            ForEach(result.diagnostics.indices, id: \.self) { index in
+                                Text(result.diagnostics[index]["message"]?.displayString ?? "Analysis diagnostic")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(.quinary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                } else {
+                    EmptyStateCard(title: "No analysis result", message: "Run an operation for the focused Data Studio source.")
+                }
+            }
+        }
+    }
+
     private var fitContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !session.analysisFitAvailability.isEnabled {
@@ -255,6 +339,13 @@ struct DataStudioAnalysisSheet: View {
         Binding(
             get: { session.analysisTarget },
             set: { session.selectAnalysisTarget($0) }
+        )
+    }
+
+    private var operationBinding: Binding<String> {
+        Binding(
+            get: { session.selectedAnalysisOperationID },
+            set: { session.selectAnalysisOperation(id: $0) }
         )
     }
 

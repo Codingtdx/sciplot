@@ -7,7 +7,7 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `GET /meta`: returns plot contract metadata plus capability catalogs. Catalog statuses are only `enabled` or `disabled`; disabled entries must include help text.
 - `POST /source-table-preview`: previews raw or transformed source tables and returns shared `DataContainerPayload` values plus structured import diagnostics.
 - `POST /fit-analysis`: runs fit analysis and returns the shared fit envelope plus fit result containers.
-- `POST /analysis-operation`: runs SciPlot-owned numerical operations and returns `AnalysisOperationResultPayload`.
+- `POST /analysis-operation`: runs SciPlot-owned numerical operations and returns `AnalysisOperationResultPayload`. Requests may include `operation_instance_id`, `module`, `source_binding`, `recalculate_policy`, and `graph_revision` so Data Studio and Plot can treat analysis as durable graph objects.
 - `POST /import-preview`: dispatches import filters and returns a filter profile, available options, structure nodes, preview containers, and structured disabled diagnostics.
 - `POST /data-studio/template-recommendations`: accepts `ImportSelectionPayload` so template matching uses the same filter/options/sheet/segment profile returned by `/import-preview`; disabled import filters return no auto match plus diagnostics/help.
 - `POST /data-studio/template-preview`: accepts the same `ImportSelectionPayload` and returns `DataStudioNormalizedOutputPreviewPayload` plus readonly `DataContainerPayload` summaries for the normalized output.
@@ -27,7 +27,7 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `ImportOptionPayload` and `ImportStructureNodePayload` describe user-selectable import options and file/sheet/segment structure for Data Studio's import wizard.
 - `ImportSelectionPayload` is Data Studio's import binding contract. It carries `filter_id`, `input_path`, selected sheet/segment, selected options, filter profile, and diagnostics from `/import-preview` through recommendations, template preview, and workbook build.
 - `DataStudioNormalizedOutputPreviewPayload` summarizes the parsed output before workbook creation: selected structure id, role mapping, series/metric/matrix counts, sample rows, warnings, and errors.
-- `AnalysisOperationResultPayload` includes settings, source binding, prepared-array summary, elapsed time, lineage, diagnostics, metrics, tables, overlays, artifact refs, and data containers.
+- `AnalysisOperationResultPayload` includes durable operation instance id, operation kind, graph/result node ids, result container ids, overlay refs, recalculation policy, settings, source binding, prepared-array summary, elapsed time, lineage, diagnostics, metrics, tables, artifact refs, and data containers.
 - `PlotEditCommandPayload` is the shared command envelope for Plot, Data Studio, Composer, and Code Console. Supported kinds include `add`, `edit`, `delete`, `reorder`, `rename`, `visibility`, `lock`, `copy_settings`, `bind_source`, `apply_template`, `import_container`, and `create_output_ref`.
 - `PreviewScenePayload` is a realtime approximation contract. It carries figure geometry, plot area geometry, axis metadata, series samples, style tokens, object ids, `bbox_pixels`, point arrays, payload refs, operation names, hit-test hints, budgets, and fallback diagnostics.
 - `PreviewScenePayload.objects[]` is the Plot object hit-test contract. Object metadata must include stable id, kind, label, `bbox_pixels`, `points`, `payload_ref`, supported `operations`, and visible/locked state for series, axes, legend, reference guides, text annotations, shape annotations, function layers, and fit overlays.
@@ -39,6 +39,13 @@ This document records public sidecar routes that macOS may call directly. Every 
 - Native admission is explicit. Unsupported templates, missing samples, invalid axes, sample-budget overflow, enabled extra axes, and enabled broken axes must return `native_supported=false` with a structured fallback reason instead of asking Swift to guess.
 - `POST /command/normalize` and `POST /command/apply-preview` are required for durable Plot edits, including series style/offset edits, guide/text/shape creation and drag edits, function layer edits, fit overlay changes, axis label/range edits, legend reorder, visibility, lock, rename, delete, and copy-settings.
 - `POST /command/apply-preview` returns graph revision metadata and diagnostics only; it does not save project files. Stale command revisions must return a `stale_command_revision` diagnostic and no durable graph mutation.
+
+## Data Studio Analysis Object Loop
+
+- Data Studio analysis calls `POST /analysis-operation` with `module=data_studio` and a focused workbook/current figure `source_binding`; Swift must not compute fit, FFT, statistics, baseline, or peak detection locally.
+- Data Studio project payloads may include `analysis_operations` and `analysis_results`. Save/open normalizes these through sidecar schemas and stores graph nodes for `data.analysis_operation`, `data.analysis_result`, and `data.analysis_table`.
+- Data Studio analysis commands use `POST /command/normalize` and `POST /command/apply-preview` for recalculate, delete, bind-to-Plot, and overlay visibility changes. Graph patches for analysis targets include analysis object metadata so UndoManager history is not UI-only state.
+- Existing clients that omit the durable analysis fields remain valid; the sidecar generates deterministic operation and result ids.
 
 ## Status Policy
 

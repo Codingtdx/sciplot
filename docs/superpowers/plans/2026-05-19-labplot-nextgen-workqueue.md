@@ -22,149 +22,7 @@
 
 ## Active Work Queue
 
-### Task 1: Data Studio Analysis Object Loop
-
-**Branch:** `codex/labplot-analysis-object-loop`
-
-**Goal:** Turn Data Studio analysis from a utility readout into a persistent, graph-backed analysis object lifecycle shared with Plot.
-
-**Why this is next:** Plot interaction is now command-backed, and Data Studio import/template/workbook binding is now stable. The next LabPlot-level maturity jump is making fit, smooth, FFT, statistics, baseline, peak detection, and result overlays behave like durable scientific objects instead of one-shot calculations.
-
-**Files:**
-- Modify: `src/rendering/analysis_operations.py`
-- Modify: `src/rendering/data_containers.py`
-- Modify: `src/rendering/capability_registry.py`
-- Modify: `src/data_studio/service.py`
-- Modify: `src/data_studio/models.py`
-- Modify: `app/sidecar/schemas_analysis.py`
-- Modify: `app/sidecar/schemas_data_studio.py`
-- Modify: `app/sidecar/routes_analysis.py`
-- Modify: `app/sidecar/routes_data_studio.py`
-- Modify: `app/sidecar/project_bundle.py`
-- Modify: `app/macos/Sources/Infrastructure/SidecarModelsDataStudio.swift`
-- Modify: `app/macos/Sources/Infrastructure/SidecarModelsRender.swift`
-- Modify: `app/macos/Sources/Features/DataStudio/DataStudioSession.swift`
-- Modify: `app/macos/Sources/Features/DataStudio/DataStudioSessionAnalysis.swift`
-- Modify: `app/macos/Sources/Features/DataStudio/DataStudioView.swift`
-- Modify: `docs/engineering-handoff.md`
-- Modify: `docs/sidecar-api.md`
-- Modify: `docs/macos-frontend-design.md`
-- Test: `tests/test_analysis_operations.py`
-- Test: `tests/test_sidecar_data_studio.py`
-- Test: `tests/test_plot_project_routes.py`
-- Test: `app/macos/Tests/SchemaDecodingTests.swift`
-- Test: `app/macos/Tests/DataStudioSessionTests.swift`
-
-- [ ] **Step 1: Create the branch and baseline**
-
-Run:
-
-```bash
-git checkout main
-git pull --ff-only origin main
-git checkout -b codex/labplot-analysis-object-loop
-git status --short --branch
-```
-
-Expected: clean branch at latest `origin/main`.
-
-- [ ] **Step 2: Add failing Python tests for persistent analysis nodes**
-
-Add tests that prove:
-
-- `POST /analysis-operation` returns a stable `operation_id`, `operation_node`, result containers, diagnostics, and lineage.
-- Data Studio focused workbook analysis calls the shared `/analysis-operation` envelope rather than recomputing in Swift or a second Python path.
-- `.sciplot` save/open preserves `data.analysis_operation`, `data.analysis_result`, result table containers, and optional plot overlay refs.
-
-Run:
-
-```bash
-.venv/bin/python -m pytest tests/test_analysis_operations.py tests/test_sidecar_data_studio.py tests/test_plot_project_routes.py -q
-```
-
-Expected: fail only on missing analysis object lifecycle fields and graph persistence.
-
-- [ ] **Step 3: Implement sidecar analysis object payloads**
-
-Add explicit schema fields for:
-
-- `operation_id`
-- `operation_kind`
-- `source_binding`
-- `settings`
-- `status`
-- `metrics`
-- `diagnostics`
-- `elapsed_ms`
-- `lineage`
-- `result_containers`
-- `overlay_refs`
-- `artifact_refs`
-- `graph_node_id`
-- `recalculate_policy`
-
-Keep the response model explicit; do not return naked dictionaries from sidecar routes.
-
-- [ ] **Step 4: Persist Data Studio analysis graph nodes**
-
-Generate deterministic graph nodes for focused workbook analysis:
-
-- `data.analysis_operation`
-- `data.analysis_result`
-- `data.analysis_table`
-- `plot.analysis_overlay` when a result can be opened in Plot
-
-Project restore must use embedded workbook/result payloads as truth, not original raw source paths.
-
-- [ ] **Step 5: Wire macOS Data Studio Analysis consumption**
-
-Update `DataStudioSession` so Analysis:
-
-- uses focused workbook/current figure state as the source binding,
-- calls sidecar analysis routes,
-- stores the returned envelope and containers,
-- displays status, diagnostics, metrics, and result containers,
-- disables custom function in Data Studio with help until a real custom-function editor exists,
-- does not compute fit, FFT, statistics, baseline, or peak detection in Swift.
-
-- [ ] **Step 6: Add typed commands for analysis object edits**
-
-Use the shared command envelope for:
-
-- add analysis operation,
-- edit settings,
-- delete result,
-- recalculate,
-- bind result to Plot,
-- toggle overlay visibility.
-
-UndoManager restores session state and records reversible command metadata.
-
-- [ ] **Step 7: Update docs**
-
-Update:
-
-- `docs/engineering-handoff.md`: analysis object lifecycle is product fact.
-- `docs/sidecar-api.md`: analysis request/response fields and graph persistence.
-- `docs/macos-frontend-design.md`: Data Studio Analysis UI responsibility and disabled/help policy.
-
-- [ ] **Step 8: Verify and close Task 1**
-
-Run:
-
-```bash
-.venv/bin/python -m pytest tests/test_analysis_operations.py tests/test_sidecar_data_studio.py tests/test_plot_project_routes.py -q
-.venv/bin/python -m ruff check app/sidecar src tests scripts
-.venv/bin/python scripts/check_labplot_cleanroom.py
-.venv/bin/python scripts/smoke_check.py
-xcodebuild test -project app/macos/SciPlot.xcodeproj -scheme SciPlotMac -destination 'platform=macOS' -only-testing:SciPlotMacTests/SchemaDecodingTests -only-testing:SciPlotMacTests/DataStudioSessionTests
-git diff --check
-git status --short --branch
-```
-
-Then commit, push, merge to `main`, delete the merged feature branch, and remove this Task 1 section from the queue.
-
-### Task 2: Composer Linked Artifacts And Export Preflight
+### Task 1: Composer Linked Artifacts And Export Preflight
 
 **Branch:** `codex/labplot-composer-linked-artifacts`
 
@@ -242,11 +100,11 @@ Unsupported states must be disabled with help, not silent no-op.
 
 Composer UI remains module-local. It may show linked asset status and refresh/reveal actions, but must not add a global Project Explorer or shared rail.
 
-- [ ] **Step 6: Verify and close Task 2**
+- [ ] **Step 6: Verify and close Task 1**
 
-Run targeted Composer/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 2 section from the queue.
+Run targeted Composer/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 1 section from the queue.
 
-### Task 3: Code Console Notebook Artifact Roundtrip
+### Task 2: Code Console Notebook Artifact Roundtrip
 
 **Branch:** `codex/labplot-code-console-artifact-roundtrip`
 
@@ -311,11 +169,11 @@ Each output must include:
 
 Outputs view displays tables, figures, logs, and handoff actions. Code Console remains one of the four existing modules; do not create a fifth Notebook module.
 
-- [ ] **Step 5: Verify and close Task 3**
+- [ ] **Step 5: Verify and close Task 2**
 
-Run targeted Code Console/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 3 section from the queue.
+Run targeted Code Console/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 2 section from the queue.
 
-### Task 4: Live Data And Realtime Source Foundation
+### Task 3: Live Data And Realtime Source Foundation
 
 **Branch:** `codex/labplot-live-source-foundation`
 
@@ -395,15 +253,15 @@ Keep MQTT, serial, and socket disabled with help until sandbox, fixtures, and UI
 
 macOS shows source status, pause/resume, and update-now. It does not parse files locally and does not bypass sidecar import diagnostics.
 
-- [ ] **Step 6: Verify and close Task 4**
+- [ ] **Step 6: Verify and close Task 3**
 
-Run targeted live-source/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 4 section from the queue. When this is the final section, either delete this file or replace it with a one-line pointer saying the queue is empty and current facts live in handoff docs.
+Run targeted live-source/Python/Swift gates, merge to `main`, delete the branch, and remove this Task 3 section from the queue. When this is the final section, either delete this file or replace it with a one-line pointer saying the queue is empty and current facts live in handoff docs.
 
 ## Final Queue Exit Criteria
 
 The queue is done when:
 
-- all four task sections have been removed after successful merge,
+- all task sections have been removed after successful merge,
 - `docs/engineering-handoff.md` contains the durable product facts,
 - `docs/sidecar-api.md` contains the stable route contracts,
 - `docs/macos-frontend-design.md` contains the frontend responsibility boundaries,
@@ -412,7 +270,6 @@ The queue is done when:
 
 ## Current Order Rationale
 
-1. **Data Studio Analysis Object Loop** first because import/workbook state is now stable and analysis is the next core scientific maturity layer.
-2. **Composer Linked Artifacts And Export Preflight** second because Composer should consume stable Plot/Data Studio/analysis artifacts.
-3. **Code Console Notebook Artifact Roundtrip** third because Code Console becomes a producer of graph artifacts after artifact consumers are ready.
-4. **Live Data And Realtime Source Foundation** fourth because repeated data revisions need the graph, analysis, and artifact lifecycle to be stable first.
+1. **Composer Linked Artifacts And Export Preflight** first because Composer should consume stable Plot/Data Studio/analysis artifacts.
+2. **Code Console Notebook Artifact Roundtrip** second because Code Console becomes a producer of graph artifacts after artifact consumers are ready.
+3. **Live Data And Realtime Source Foundation** third because repeated data revisions need the graph, analysis, and artifact lifecycle to be stable first.

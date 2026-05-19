@@ -398,6 +398,8 @@ def _normalize_data_studio_project_payload(
         figure_preferences=serialize_model(session_payload.figure_preferences),
         imported_paths=list(session_payload.imported_paths),
         template_draft_path=session_payload.template_draft_path,
+        analysis_operations=list(_iter_values(data_studio_map.get("analysis_operations"))),
+        analysis_results=list(_iter_values(data_studio_map.get("analysis_results"))),
         embedded_workbooks=embedded_workbooks,
         project_display_name=_string_or_none(data_studio_map.get("project_display_name")),
         source_provenance=source_provenance,
@@ -774,6 +776,96 @@ def _generate_document_graph(
                 )
             )
             edges.append(_graph_edge(workbook_id, table_id, "contains"))
+        results_by_instance = {
+            result.operation_instance_id: result
+            for result in data_studio.analysis_results
+            if result.operation_instance_id
+        }
+        for index, operation in enumerate(data_studio.analysis_operations):
+            operation_suffix = (
+                operation.graph_node_id.rsplit(":", 1)[-1]
+                if operation.graph_node_id
+                else operation.operation_instance_id.rsplit(":", 1)[-1]
+            )
+            operation_node_id = operation.graph_node_id or f"data_studio:analysis_operation:{operation_suffix}"
+            operation_kind = operation.operation_kind or operation.operation_id.split(".", 1)[-1]
+            nodes.append(
+                _graph_node(
+                    id=operation_node_id,
+                    kind="data.analysis_operation",
+                    module="data_studio",
+                    label=operation.label or operation_kind.replace("_", " ").title(),
+                    payload={
+                        "graph_addressable": True,
+                        "operation_instance_id": operation.operation_instance_id,
+                        "operation_id": operation.operation_id,
+                        "operation_kind": operation_kind,
+                        "source_binding": operation.source_binding,
+                        "settings": operation.settings,
+                        "recalculate_policy": operation.recalculate_policy,
+                    },
+                )
+            )
+            edges.append(_graph_edge(root_id, operation_node_id, "contains"))
+            result = results_by_instance.get(operation.operation_instance_id)
+            if result is None and index < len(data_studio.analysis_results):
+                result = data_studio.analysis_results[index]
+            if result is None:
+                continue
+            result_node_id = result.result_node_id or f"{operation_node_id}:result"
+            nodes.append(
+                _graph_node(
+                    id=result_node_id,
+                    kind="data.analysis_result",
+                    module="data_studio",
+                    label=result.message or f"{operation_kind.replace('_', ' ').title()} Result",
+                    payload={
+                        "graph_addressable": True,
+                        "operation_instance_id": result.operation_instance_id or operation.operation_instance_id,
+                        "operation_id": result.operation_id,
+                        "operation_kind": result.operation_kind or operation_kind,
+                        "status_code": result.status_code,
+                        "metrics": result.metrics,
+                        "result_container_ids": result.result_container_ids,
+                        "recalculate_policy": result.recalculate_policy,
+                    },
+                )
+            )
+            edges.append(_graph_edge(operation_node_id, result_node_id, "produces"))
+            for container_id in result.result_container_ids:
+                table_node_id = f"{result_node_id}:container:{container_id.rsplit(':', 1)[-1]}"
+                nodes.append(
+                    _graph_node(
+                        id=table_node_id,
+                        kind="data.analysis_table",
+                        module="data_studio",
+                        label=f"{container_id} table",
+                        payload={
+                            "graph_addressable": True,
+                            "container_id": container_id,
+                            "operation_instance_id": result.operation_instance_id or operation.operation_instance_id,
+                            "readonly": True,
+                        },
+                    )
+                )
+                edges.append(_graph_edge(result_node_id, table_node_id, "contains"))
+            for overlay in result.overlay_refs:
+                overlay_id = str(overlay.get("id") or f"{result_node_id}:overlay")
+                nodes.append(
+                    _graph_node(
+                        id=overlay_id,
+                        kind="plot.analysis_overlay",
+                        module="plot",
+                        label=str(overlay.get("label") or "Analysis Overlay"),
+                        payload={
+                            "graph_addressable": True,
+                            "source_result_node_id": result_node_id,
+                            "operation_instance_id": result.operation_instance_id or operation.operation_instance_id,
+                            **overlay,
+                        },
+                    )
+                )
+                edges.append(_graph_edge(result_node_id, overlay_id, "can_render_as"))
 
     if composer is not None:
         root_id = "composer:document"
