@@ -125,34 +125,43 @@ private struct DataStudioImportResolverSheet: View {
                 ContentUnavailableView("No Parse Templates", systemImage: "questionmark.folder")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: selectedTemplateBinding) {
-                    if !filteredRecommendedMatches.isEmpty {
-                        Section("Recommended Templates") {
-                            ForEach(filteredRecommendedMatches) { match in
-                                DataStudioResolverTemplateRow(
-                                    title: match.label,
-                                    family: match.family,
-                                    warning: match.warnings.first
-                                )
-                                .tag(Optional(match.templateID))
-                            }
-                        }
-                    }
+                HStack(spacing: 0) {
+                    importProfilePanel
+                        .frame(width: 230)
+                        .border(Color(nsColor: .separatorColor), width: 0.5)
 
-                    if !filteredOtherTemplates.isEmpty {
-                        Section("Other Available Templates") {
-                            ForEach(filteredOtherTemplates) { template in
-                                DataStudioResolverTemplateRow(
-                                    title: template.label,
-                                    family: template.family,
-                                    warning: nil
-                                )
-                                .tag(Optional(template.id))
+                    List(selection: selectedTemplateBinding) {
+                        if !filteredRecommendedMatches.isEmpty {
+                            Section("Recommended Templates") {
+                                ForEach(filteredRecommendedMatches) { match in
+                                    DataStudioResolverTemplateRow(
+                                        title: match.label,
+                                        family: match.family,
+                                        detail: match.roleSummaryText,
+                                        warning: match.warnings.first
+                                            ?? match.diagnostics.first(where: { $0.severity == "warning" })?.message
+                                    )
+                                    .tag(Optional(match.templateID))
+                                }
+                            }
+                        }
+
+                        if !filteredOtherTemplates.isEmpty {
+                            Section("Other Available Templates") {
+                                ForEach(filteredOtherTemplates) { template in
+                                    DataStudioResolverTemplateRow(
+                                        title: template.label,
+                                        family: template.family,
+                                        detail: nil,
+                                        warning: nil
+                                    )
+                                    .tag(Optional(template.id))
+                                }
                             }
                         }
                     }
+                    .listStyle(.inset)
                 }
-                .listStyle(.inset)
             }
 
             templateManagementSection
@@ -224,6 +233,62 @@ private struct DataStudioImportResolverSheet: View {
                 .textFieldStyle(.roundedBorder)
         }
         .padding(20)
+    }
+
+    private var importProfilePanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Import Profile")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if let importPreview = session.importPreview {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(importPreview.label)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(session.importSelection?.selectedSheetOrSegment ?? importPreview.selectedSheetOrSegment ?? importPreview.status.capitalized)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let diagnostic = importPreview.diagnostics.first {
+                    Label(diagnostic.message.isEmpty ? diagnostic.statusCode : diagnostic.message, systemImage: diagnostic.severity == "warning" ? "exclamationmark.triangle" : "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(diagnostic.severity == "warning" ? .orange : .secondary)
+                        .lineLimit(3)
+                }
+
+                if !importPreview.availableOptions.isEmpty {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Options")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(importPreview.availableOptions.prefix(4)) { option in
+                            Text(option.label)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            } else if let preview = session.sourcePreview {
+                Text(URL(fileURLWithPath: preview.inputPath).lastPathComponent)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text("Source preview ready")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No source profile")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var templateManagementSection: some View {
@@ -366,6 +431,7 @@ struct DataStudioSheetOptionRow: View {
 struct DataStudioResolverTemplateRow: View {
     let title: String
     let family: String?
+    let detail: String?
     let warning: String?
 
     var body: some View {
@@ -377,6 +443,12 @@ struct DataStudioResolverTemplateRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
             if let warning, !warning.isEmpty {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -384,5 +456,18 @@ struct DataStudioResolverTemplateRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension DataStudioTemplateMatchResponse {
+    var roleSummaryText: String? {
+        if !missingRoles.isEmpty {
+            return "Missing: \(missingRoles.joined(separator: ", "))"
+        }
+        let roles = matchedRoles.map(\.role)
+        guard !roles.isEmpty else {
+            return nil
+        }
+        return "Matched: \(roles.joined(separator: ", "))"
     }
 }

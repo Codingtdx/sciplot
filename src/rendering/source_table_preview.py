@@ -28,6 +28,7 @@ FALLBACK_ENCODINGS = (
     "utf-16-be",
     "gb18030",
     "gbk",
+    "gb2312",
     "latin-1",
 )
 DELIMITER_CANDIDATES = ("\t", ",", ";", "|")
@@ -120,6 +121,17 @@ class SourceTablePreview:
     selected_segment_id: str | None
     encoding: str | None
     delimiter: str | None
+    diagnostics: tuple[dict[str, Any], ...] = ()
+
+
+def _diagnostic(status_code: str, message: str, *, severity: str = "info", **details: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status_code": status_code,
+        "severity": severity,
+        "message": message,
+    }
+    payload.update({key: value for key, value in details.items() if value is not None})
+    return payload
 
 
 def sniff_text_encoding(raw_bytes: bytes) -> str | None:
@@ -140,11 +152,73 @@ def sniff_text_encoding(raw_bytes: bytes) -> str | None:
     return None
 
 
-def sniff_delimiter(text: str, suffix: str) -> str | None:
-    if suffix == ".tsv":
-        return "\t"
+def sniff_text_encoding_with_diagnostics(
+    raw_bytes: bytes,
+    *,
+    requested_encoding: str | None = None,
+) -> tuple[str | None, list[dict[str, Any]]]:
+    if requested_encoding:
+        return requested_encoding, [
+            _diagnostic(
+                "encoding_selected",
+                f"Using requested text encoding {requested_encoding}.",
+                encoding=requested_encoding,
+                confidence=1.0,
+            )
+        ]
+    if raw_bytes.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig", [
+            _diagnostic("encoding_detected", "Detected UTF-8 byte order mark.", encoding="utf-8-sig", confidence=1.0)
+        ]
+    if raw_bytes.startswith(b"\xff\xfe") or raw_bytes.startswith(b"\xfe\xff"):
+        return "utf-16", [
+            _diagnostic("encoding_detected", "Detected UTF-16 byte order mark.", encoding="utf-16", confidence=1.0)
+        ]
+    if detect_charset is not None:
+        match = detect_charset(raw_bytes).best()
+        if match is not None and match.encoding:
+            coherence = getattr(match, "percent_coherence", None)
+            chaos = getattr(match, "percent_chaos", None)
+            confidence = None
+            if isinstance(coherence, (int, float)):
+                confidence = max(0.0, min(1.0, float(coherence) / 100.0))
+            elif isinstance(chaos, (int, float)):
+                confidence = max(0.0, min(1.0, 1.0 - (float(chaos) / 100.0)))
+            return match.encoding, [
+                _diagnostic(
+                    "encoding_detected",
+                    f"Detected text encoding {match.encoding}.",
+                    encoding=match.encoding,
+                    confidence=confidence,
+                )
+            ]
+    for fallback in FALLBACK_ENCODINGS:
+        try:
+            raw_bytes.decode(fallback)
+            return fallback, [
+                _diagnostic(
+                    "encoding_detected",
+                    f"Decoded with fallback text encoding {fallback}.",
+                    encoding=fallback,
+                    confidence=0.5,
+                )
+            ]
+        except UnicodeDecodeError:
+            continue
+    return None, [
+        _diagnostic(
+            "encoding_detection_failed",
+            "Could not decode the source with common experiment encodings.",
+            severity="error",
+        )
+    ]
+
+
+def delimiter_candidates(text: str, suffix: str) -> list[dict[str, Any]]:
     lines = [line for line in text.splitlines() if line.strip()]
-    best: tuple[float, str | None] = (0.0, None)
+    if suffix == ".tsv":
+        return [{"delimiter": "\t", "score": 1.0, "confidence": 1.0, "label": "Tab"}]
+    candidates: list[dict[str, Any]] = []
     for delimiter in DELIMITER_CANDIDATES:
         widths = [len(line.split(delimiter)) for line in lines]
         useful_widths = [width for width in widths if width > 1]
@@ -156,10 +230,26 @@ def sniff_delimiter(text: str, suffix: str) -> str | None:
         score = (max_width - 1) * 2.0 + wide_rows * 0.35 + consistency
         if delimiter == "," and suffix == ".csv":
             score += 0.25
-        if score > best[0]:
-            best = (score, delimiter)
-    if best[1] is not None:
-        return best[1]
+        candidates.append(
+            {
+                "delimiter": delimiter,
+                "score": round(score, 4),
+                "confidence": round(consistency, 4),
+                "max_width": max_width,
+                "consistent_rows": wide_rows,
+                "label": "Tab" if delimiter == "\t" else delimiter,
+            }
+        )
+    return sorted(candidates, key=lambda item: float(item["score"]), reverse=True)
+
+
+def sniff_delimiter(text: str, suffix: str) -> str | None:
+    if suffix == ".tsv":
+        return "\t"
+    candidates = delimiter_candidates(text, suffix)
+    if candidates:
+        return str(candidates[0]["delimiter"])
+    lines = [line for line in text.splitlines() if line.strip()]
     sample = "\n".join(lines[:12])
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t;|")
@@ -168,12 +258,12 @@ def sniff_delimiter(text: str, suffix: str) -> str | None:
         return "," if suffix == ".csv" else None
 
 
-def read_source_sheets(
+def read_source_sheets_with_diagnostics(
     path: str | Path,
     *,
     encoding: str | None = None,
     delimiter: str | None = None,
-) -> tuple[list[tuple[str, pd.DataFrame]], str | None, str | None]:
+) -> tuple[list[tuple[str, pd.DataFrame]], str | None, str | None, tuple[dict[str, Any], ...]]:
     source_path = Path(path).expanduser()
     suffix = source_path.suffix.lower()
     if suffix not in SUPPORTED_SOURCE_EXTENSIONS:
@@ -184,20 +274,77 @@ def read_source_sheets(
                 (str(sheet_name), pd.read_excel(workbook, sheet_name=sheet_name, header=None).fillna(""))
                 for sheet_name in workbook.sheet_names
             ]
-        return sheets, None, None
+        diagnostics = [
+            _diagnostic(
+                "excel_sheets_detected",
+                f"Detected {len(sheets)} Excel sheet(s).",
+                sheet_names=[sheet_name for sheet_name, _frame in sheets],
+            )
+        ]
+        return sheets, None, None, tuple(diagnostics)
     raw_bytes = source_path.read_bytes()
-    resolved_encoding = encoding or sniff_text_encoding(raw_bytes)
+    resolved_encoding, diagnostics = sniff_text_encoding_with_diagnostics(raw_bytes, requested_encoding=encoding)
     if resolved_encoding is None:
         raise ValueError(f"Could not decode {source_path.name} with common experiment encodings.")
     text = raw_bytes.decode(resolved_encoding, errors="replace")
-    resolved_delimiter = delimiter if delimiter is not None and delimiter != "" else sniff_delimiter(text, suffix)
+    candidates = delimiter_candidates(text, suffix)
+    resolved_delimiter = delimiter if delimiter is not None and delimiter != "" else (
+        str(candidates[0]["delimiter"]) if candidates else sniff_delimiter(text, suffix)
+    )
     if resolved_delimiter is None:
         resolved_delimiter = ","
+    delimiter_label = "Tab" if resolved_delimiter == "\t" else resolved_delimiter
+    diagnostics.append(
+        _diagnostic(
+            "delimiter_selected" if delimiter else "delimiter_detected",
+            f"Using {'requested' if delimiter else 'detected'} delimiter {delimiter_label!r}.",
+            delimiter=resolved_delimiter,
+            candidates=candidates[:4],
+            confidence=(candidates[0].get("confidence") if candidates and not delimiter else 1.0),
+        )
+    )
     reader = csv.reader(text.splitlines(), delimiter=resolved_delimiter)
     rows = list(reader)
+    widths = [len(row) for row in rows]
+    non_empty_widths = [
+        width
+        for row, width in zip(rows, widths, strict=False)
+        if any(str(value).strip() for value in row)
+    ]
+    if non_empty_widths and len(set(non_empty_widths)) > 1:
+        most_common_width = max(set(non_empty_widths), key=non_empty_widths.count)
+        ragged_rows = [
+            index
+            for index, width in enumerate(widths)
+            if width not in {0, most_common_width} and any(str(value).strip() for value in rows[index])
+        ]
+        diagnostics.append(
+            _diagnostic(
+                "ragged_rows_detected",
+                "Detected rows with fewer or more columns than the dominant table width.",
+                severity="warning",
+                row_numbers=ragged_rows[:20],
+                expected_columns=most_common_width,
+                affected_row_count=len(ragged_rows),
+            )
+        )
     width = max((len(row) for row in rows), default=0)
     padded = [row + [""] * (width - len(row)) for row in rows]
-    return [("Sheet1", pd.DataFrame(padded).fillna(""))], resolved_encoding, resolved_delimiter
+    return [("Sheet1", pd.DataFrame(padded).fillna(""))], resolved_encoding, resolved_delimiter, tuple(diagnostics)
+
+
+def read_source_sheets(
+    path: str | Path,
+    *,
+    encoding: str | None = None,
+    delimiter: str | None = None,
+) -> tuple[list[tuple[str, pd.DataFrame]], str | None, str | None]:
+    sheets, resolved_encoding, resolved_delimiter, _diagnostics = read_source_sheets_with_diagnostics(
+        path,
+        encoding=encoding,
+        delimiter=delimiter,
+    )
+    return sheets, resolved_encoding, resolved_delimiter
 
 
 def source_sheet_names(path: str | Path) -> list[str]:
@@ -345,6 +492,60 @@ def _headers_for(frame: pd.DataFrame, *, header_row_index: int | None) -> tuple[
             text = ""
         headers.append(text or f"Column {index + 1}")
     return tuple(headers)
+
+
+def _header_diagnostics(headers: tuple[str, ...]) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
+    duplicates: set[str] = set()
+    empty_count = 0
+    for header in headers:
+        stripped = header.strip()
+        if not stripped:
+            empty_count += 1
+            continue
+        lowered = stripped.lower()
+        seen[lowered] = seen.get(lowered, 0) + 1
+        if seen[lowered] > 1:
+            duplicates.add(stripped)
+    if duplicates:
+        diagnostics.append(
+            _diagnostic(
+                "duplicate_headers_detected",
+                "Detected duplicate column headers; stable column ids will be used for bindings.",
+                severity="warning",
+                duplicate_headers=sorted(duplicates),
+            )
+        )
+    if empty_count:
+        diagnostics.append(
+            _diagnostic(
+                "empty_headers_detected",
+                "Detected empty column headers; fallback Column N labels were generated.",
+                severity="warning",
+                empty_header_count=empty_count,
+            )
+        )
+    return diagnostics
+
+
+def _structure_diagnostics(
+    *,
+    header_row_index: int | None,
+    unit_row_index: int | None,
+    data_start_row_index: int | None,
+    segments: tuple[SourceTableSegment, ...],
+) -> list[dict[str, Any]]:
+    return [
+        _diagnostic(
+            "structure_rows_detected",
+            "Detected source table header, unit, and data start rows.",
+            header_row_index=header_row_index,
+            unit_row_index=unit_row_index,
+            data_start_row_index=data_start_row_index,
+            segment_count=len(segments),
+        )
+    ]
 
 
 def _looks_like_unit_row(values: list[str]) -> bool:
@@ -534,7 +735,7 @@ def source_table_preview(
     data_variables: object = None,
 ) -> SourceTablePreview:
     source_path = Path(path).expanduser()
-    sheets, resolved_encoding, resolved_delimiter = read_source_sheets(
+    sheets, resolved_encoding, resolved_delimiter, read_diagnostics = read_source_sheets_with_diagnostics(
         source_path,
         encoding=encoding,
         delimiter=delimiter,
@@ -574,6 +775,16 @@ def source_table_preview(
     local_unit = effective_unit - start_row if effective_unit is not None else None
     local_data_start = max(0, effective_data_start - start_row)
     headers = _headers_for(view, header_row_index=local_header)
+    diagnostics = [
+        *read_diagnostics,
+        *_structure_diagnostics(
+            header_row_index=effective_header,
+            unit_row_index=effective_unit,
+            data_start_row_index=effective_data_start,
+            segments=segments,
+        ),
+        *_header_diagnostics(headers),
+    ]
     profiles = _column_profiles(
         view,
         headers=headers,
@@ -607,4 +818,5 @@ def source_table_preview(
         selected_segment_id=selected_segment.id if selected_segment is not None else None,
         encoding=resolved_encoding,
         delimiter=resolved_delimiter,
+        diagnostics=tuple(diagnostics),
     )

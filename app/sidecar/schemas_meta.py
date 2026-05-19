@@ -78,6 +78,13 @@ class CapabilityCatalogEntryResponse(StrictModel):
     status: str
     owner: str
     surface: str
+    extensions: list[str] = Field(default_factory=list)
+    mime_types: list[str] = Field(default_factory=list)
+    dependency: str | None = None
+    dependency_status: str = "not_required"
+    preview_supported: bool = False
+    read_supported: bool = False
+    write_supported: bool = False
     typed_payload_schema: dict[str, Any] = Field(default_factory=dict)
     help: str
     introduced_in: str

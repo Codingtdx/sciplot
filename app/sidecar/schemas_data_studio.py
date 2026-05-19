@@ -3,7 +3,13 @@ from __future__ import annotations
 from pydantic import AliasChoices, Field
 
 from app.sidecar.schemas_common import PreviewItemResponse, StrictModel, serialize_dataclass
-from app.sidecar.schemas_render import FitOptionsPayload, RenderOptionsPayload
+from app.sidecar.schemas_render import (
+    DataContainerPayload,
+    FitOptionsPayload,
+    ImportDiagnosticPayload,
+    ImportFilterProfilePayload,
+    RenderOptionsPayload,
+)
 
 
 class DataStudioRangeResponse(StrictModel):
@@ -152,6 +158,34 @@ class DataStudioTemplateResponse(StrictModel):
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
+class ImportSelectionPayload(StrictModel):
+    filter_id: str
+    input_path: str
+    selected_sheet_or_segment: str | None = None
+    options: dict[str, object] = Field(default_factory=dict)
+    profile: ImportFilterProfilePayload | None = None
+    diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+
+
+class TemplateRoleMatchPayload(StrictModel):
+    role: str
+    label: str
+    source_label: str | None = None
+    status: str = "matched"
+    confidence: float = 1.0
+
+
+class DataStudioNormalizedOutputPreviewPayload(StrictModel):
+    selected_structure_id: str | None = None
+    role_mapping: list[TemplateRoleMatchPayload] = Field(default_factory=list)
+    series_count: int = 0
+    metric_count: int = 0
+    matrix_row_count: int = 0
+    sample_rows: list[list[object]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
 class DataStudioTemplateMatchResponse(StrictModel):
     template_id: str
     label: str
@@ -161,6 +195,11 @@ class DataStudioTemplateMatchResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     matched_sheet_names: list[str] = Field(default_factory=list)
     auto_selected: bool = False
+    matched_roles: list[TemplateRoleMatchPayload] = Field(default_factory=list)
+    missing_roles: list[str] = Field(default_factory=list)
+    ambiguous_roles: list[str] = Field(default_factory=list)
+    matched_structure_id: str | None = None
+    diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
 
 
 class DataStudioMetricSummaryResponse(StrictModel):
@@ -234,6 +273,7 @@ class DataStudioWorkbookResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     exclusions: list[str] = Field(default_factory=list)
     samples: list[DataStudioWorkbookSampleResponse] = Field(default_factory=list)
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
 
 
 class DataStudioWorkbookPreviewResponse(StrictModel):
@@ -352,6 +392,7 @@ class DataStudioBuildWorkbookRequest(StrictModel):
     output_path: str
     template_id: str
     group_name: str | None = None
+    import_selection: ImportSelectionPayload | None = None
 
 
 class DataStudioImportWorkbookRequest(StrictModel):
@@ -374,10 +415,18 @@ class DataStudioTemplatePreviewSegmentResponse(StrictModel):
 class DataStudioTemplatePreviewRequest(StrictModel):
     source_path: str
     template: DataStudioCreateTemplateRequest
+    import_selection: ImportSelectionPayload | None = None
+    import_profile: ImportFilterProfilePayload | None = None
+    import_diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+    selected_sheet_or_segment: str | None = None
 
 
 class DataStudioTemplateRecommendationsRequest(StrictModel):
     source_path: str
+    import_selection: ImportSelectionPayload | None = None
+    import_profile: ImportFilterProfilePayload | None = None
+    import_diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+    selected_sheet_or_segment: str | None = None
 
 
 class DataStudioTemplatePreviewResponse(StrictModel):
@@ -392,6 +441,8 @@ class DataStudioTemplatePreviewResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     segments: list[DataStudioTemplatePreviewSegmentResponse] = Field(default_factory=list)
+    normalized_output_preview: DataStudioNormalizedOutputPreviewPayload | None = None
+    data_containers: list[DataContainerPayload] = Field(default_factory=list)
 
 
 class DataStudioComparisonRequest(StrictModel):
@@ -427,6 +478,7 @@ class DataStudioTemplateListResponse(StrictModel):
 
 class DataStudioTemplateRecommendationsResponse(StrictModel):
     matches: list[DataStudioTemplateMatchResponse] = Field(default_factory=list)
+    diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
 
 
 class DataStudioComparisonPreviewResponse(StrictModel):
@@ -495,5 +547,8 @@ __all__ = [
     "DataStudioWorkbookPreviewRequest",
     "DataStudioWorkbookPreviewResponse",
     "DataStudioWorkbookSampleResponse",
+    "DataStudioNormalizedOutputPreviewPayload",
+    "ImportSelectionPayload",
+    "TemplateRoleMatchPayload",
     "serialize_dataclass",
 ]

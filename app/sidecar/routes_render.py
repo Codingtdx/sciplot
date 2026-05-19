@@ -354,6 +354,7 @@ def create_render_router(*, dep_provider: Callable[[], object] | None = None) ->
                     "selected_segment_id": preview.selected_segment_id,
                     "encoding": preview.encoding,
                     "delimiter": preview.delimiter,
+                    "diagnostics": list(preview.diagnostics),
                     "data_containers": runtime_source_table_data_containers(
                         preview,
                         transform_count=len(transform_options.data_transforms or []),

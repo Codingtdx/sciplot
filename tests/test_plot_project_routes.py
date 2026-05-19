@@ -864,6 +864,15 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
     )
 
     assert save_response.status_code == 200, save_response.text
+    saved_graph = save_response.json()["payload"]["document_graph"]
+    saved_kinds = {node["kind"] for node in saved_graph["nodes"]}
+    assert {
+        "data.import_source",
+        "data.template_application",
+        "data.workbook_group",
+        "data.workbook",
+        "data.table",
+    }.issubset(saved_kinds)
     workbook_path.unlink()
 
     open_response = client.post("/open-project", json={"project_path": str(project_path)})
@@ -875,6 +884,8 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
     assert restored_workbook_path.exists()
     assert payload["payload"]["data_studio"]["workbook_paths"] == [str(restored_workbook_path)]
     assert payload["payload"]["data_studio"]["selected_recipe_id"] == "representative_scatter"
+    restored_graph = payload["payload"]["document_graph"]
+    assert {node["kind"] for node in restored_graph["nodes"]}.issuperset(saved_kinds)
     figure_preference = payload["payload"]["data_studio"]["figure_preferences"][0]
     assert figure_preference["selected_template_id"] == "scatter"
     assert figure_preference["fit_options_by_template"]["scatter"]["model_id"] == "polynomial_2"

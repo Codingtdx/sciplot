@@ -131,6 +131,18 @@ extension DataStudioSession {
                     $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
                 }
             }
+            let importProfile = try await client.importPreview(
+                .init(inputPath: sampleURL.path, sheet: .index(0), offset: 0, limit: 50)
+            )
+            importPreview = importProfile
+            importSelection = makeImportSelection(from: importProfile, sourcePreview: nil)
+            if importProfile.status != "enabled" {
+                sourcePreview = nil
+                recommendedTemplateMatches = []
+                selectedTemplateID = nil
+                importFlow = .wizard(step: .resolver)
+                return
+            }
             let basePreview = try await client.sourceTablePreview(
                 .init(inputPath: sampleURL.path, sheet: .index(0), offset: 0, limit: 50)
             )
@@ -154,9 +166,16 @@ extension DataStudioSession {
             selectedPreviewSegmentID = resolvedPreview.selectedSegmentID ?? resolvedPreview.segments.first?.id
             selectedPreviewSheetName = resolvedPreview.sheet.displayString
             selectedPreviewBlockID = selectedPreviewSegmentID
+            importSelection = makeImportSelection(from: importProfile, sourcePreview: resolvedPreview)
             configureDraftDefaults(from: resolvedPreview, sampleURL: sampleURL)
             let recommendationResponse = try? await client.recommendDataStudioTemplates(
-                .init(sourcePath: sampleURL.path)
+                .init(
+                    sourcePath: sampleURL.path,
+                    importSelection: importSelection,
+                    importProfile: importProfile.profile,
+                    importDiagnostics: importProfile.diagnostics,
+                    selectedSheetOrSegment: importSelection?.selectedSheetOrSegment ?? importProfile.selectedSheetOrSegment
+                )
             )
             recommendedTemplateMatches = rankedRecommendedMatches(
                 recommendationResponse?.matches ?? [],
@@ -253,19 +272,22 @@ extension DataStudioSession {
             currentActivity = .idle
         }
         do {
+            let usedImportSelection = importSelection
             let workbook = try await client.buildDataStudioWorkbook(
                 .init(
                     filePaths: sourceURLs.map(\.path),
                     outputPath: outputURL.path,
                     templateID: templateID,
-                    groupName: groupName
+                    groupName: groupName,
+                    importSelection: importSelection
                 )
             )
             upsertWorkbook(workbook, shouldFocus: true)
             await rebuildComparisonContext(refreshWorkbookPreviews: true)
             autoOpenFocusedWorkbookInPlotIfComparisonUnavailable()
             resetImportPresentationState()
-            discardPendingSourcePreview()
+            discardPendingSourcePreview(preservingImportSelection: true)
+            importSelection = usedImportSelection
         } catch {
             if isUserCancellationError(error) {
                 return
@@ -297,9 +319,13 @@ extension DataStudioSession {
         pendingImportKind = .rawFiles
     }
 
-    func discardPendingSourcePreview() {
+    func discardPendingSourcePreview(preservingImportSelection: Bool = false) {
         asyncCoordination.sourcePreview.cancel()
         importedSourceURLs = []
+        importPreview = nil
+        if !preservingImportSelection {
+            importSelection = nil
+        }
         sourcePreview = nil
         recommendedTemplateMatches = []
         templatePreview = nil
@@ -363,6 +389,33 @@ extension DataStudioSession {
             nil,
             nil,
             nil
+        )
+    }
+
+    func makeImportSelection(
+        from importPreview: ImportPreviewResponse,
+        sourcePreview: SourceTablePreviewResponse?
+    ) -> ImportSelectionPayload {
+        var options: [String: JSONValue] = [:]
+        if let encoding = sourcePreview?.encoding, !encoding.isEmpty {
+            options["encoding"] = .string(encoding)
+        }
+        if let delimiter = sourcePreview?.delimiter, !delimiter.isEmpty {
+            options["delimiter"] = .string(delimiter)
+        }
+        if let segmentID = sourcePreview?.selectedSegmentID ?? sourcePreview?.segments.first?.id {
+            options["segment_id"] = .string(segmentID)
+        }
+        let selected = sourcePreview?.selectedSegmentID
+            ?? sourcePreview?.segments.first?.id
+            ?? importPreview.selectedSheetOrSegment
+        return ImportSelectionPayload(
+            filterID: importPreview.filterID,
+            inputPath: importPreview.inputPath,
+            selectedSheetOrSegment: selected,
+            options: options,
+            profile: importPreview.profile,
+            diagnostics: importPreview.diagnostics
         )
     }
 }

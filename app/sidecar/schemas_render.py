@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from io import BytesIO
 from typing import Any, Literal
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from app.sidecar.schemas_common import (
     PreviewItemResponse,
@@ -416,12 +416,73 @@ class AnalysisOperationResultPayload(StrictModel):
     artifact_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ImportDiagnosticPayload(StrictModel):
+    model_config = ConfigDict(extra="allow")
+
+    status_code: str
+    severity: str = "info"
+    message: str = ""
+    dependency: str | None = None
+    help_action: str | None = None
+
+    def __getitem__(self, key: str) -> Any:
+        if hasattr(self, key):
+            return getattr(self, key)
+        extra = self.__pydantic_extra__ or {}
+        return extra[key]
+
+
+class ImportOptionPayload(StrictModel):
+    id: str
+    label: str
+    kind: str = "string"
+    default_value: Any | None = None
+    choices: list[Any] = Field(default_factory=list)
+    required: bool = False
+    help: str = ""
+
+
+class ImportStructureNodePayload(StrictModel):
+    id: str
+    kind: str
+    label: str
+    parent_id: str | None = None
+    row_count: int | None = None
+    column_count: int | None = None
+    children: list[ImportStructureNodePayload] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ImportFilterProfilePayload(StrictModel):
+    id: str
+    label: str
+    status: Literal["enabled", "disabled"] = "disabled"
+    extensions: list[str] = Field(default_factory=list)
+    mime_types: list[str] = Field(default_factory=list)
+    dependency: str | None = None
+    dependency_status: str = "not_required"
+    preview_supported: bool = False
+    read_supported: bool = False
+    write_supported: bool = False
+    options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
+    output_container_kinds: list[str] = Field(default_factory=list)
+    help: str
+    test_requirements: list[str] = Field(default_factory=list)
+
+
 class ImportFilterPayload(StrictModel):
     id: str
     label: str
     status: Literal["enabled", "disabled"] = "disabled"
     owner: str = "sidecar"
     surface: str = "plot,data_studio"
+    extensions: list[str] = Field(default_factory=list)
+    mime_types: list[str] = Field(default_factory=list)
+    dependency: str | None = None
+    dependency_status: str = "not_required"
+    preview_supported: bool = False
+    read_supported: bool = False
+    write_supported: bool = False
     options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
     output_container_kinds: list[str] = Field(default_factory=list)
     help: str
@@ -482,8 +543,12 @@ class ImportPreviewResponse(StrictModel):
     filter_id: str
     status: Literal["enabled", "disabled"]
     label: str
+    profile: ImportFilterProfilePayload | None = None
     data_containers: list[DataContainerPayload] = Field(default_factory=list)
-    diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
+    available_options: list[ImportOptionPayload] = Field(default_factory=list)
+    structure: list[ImportStructureNodePayload] = Field(default_factory=list)
+    selected_sheet_or_segment: str | None = None
     options_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object"})
     help: str
 
@@ -590,6 +655,7 @@ class SourceTablePreviewResponse(StrictModel):
     encoding: str | None = None
     delimiter: str | None = None
     data_containers: list[DataContainerPayload] = Field(default_factory=list)
+    diagnostics: list[ImportDiagnosticPayload] = Field(default_factory=list)
 
 
 class FitAnalysisRequest(FileRequest):
@@ -1887,6 +1953,7 @@ def rendered_plots_to_preview_payload(
 
 
 RenderOptionsPayload.model_rebuild()
+ImportStructureNodePayload.model_rebuild()
 SourceTablePreviewResponse.model_rebuild()
 
 
@@ -1908,9 +1975,13 @@ __all__ = [
     "AnalysisOperationResponse",
     "AnalysisOperationResultPayload",
     "ExportTargetPayload",
+    "ImportDiagnosticPayload",
+    "ImportFilterProfilePayload",
+    "ImportOptionPayload",
     "ImportPreviewRequest",
     "ImportPreviewResponse",
     "ImportFilterPayload",
+    "ImportStructureNodePayload",
     "NotebookOutputPayload",
     "PlotEditCommandNormalizeRequest",
     "PlotEditCommandNormalizeResponse",

@@ -57,6 +57,55 @@ final class DataStudioSessionTests: XCTestCase {
         assertImportFlow(session, equals: .importer(kind: .rawFiles))
     }
 
+    func testRawImportProfilesSourceBeforeTemplateRecommendation() async {
+        let client = MockSidecarClient()
+        client.importPreviewHandler = { request in
+            ImportPreviewResponse(
+                inputPath: request.inputPath,
+                filterID: "import.csv",
+                status: "enabled",
+                label: "CSV/TSV/TXT",
+                profile: ImportFilterProfilePayload(
+                    id: "import.csv",
+                    label: "CSV/TSV/TXT",
+                    status: "enabled",
+                    extensions: [".csv", ".tsv", ".txt"],
+                    mimeTypes: ["text/csv"],
+                    dependencyStatus: "available",
+                    previewSupported: true,
+                    readSupported: true,
+                    writeSupported: false,
+                    optionsSchema: ["type": .string("object")],
+                    outputContainerKinds: ["table"],
+                    help: "Delimited text preview."
+                ),
+                dataContainers: [],
+                diagnostics: [
+                    .init(statusCode: "delimiter_detected", severity: "info", message: "Detected comma delimiter.")
+                ],
+                availableOptions: [
+                    .init(id: "delimiter", label: "Delimiter", kind: "string", defaultValue: .string(","), help: "Column delimiter.")
+                ],
+                selectedSheetOrSegment: "Sheet1",
+                optionsSchema: ["type": .string("object")],
+                help: "Delimited text preview."
+            )
+        }
+        let session = DataStudioSession()
+        session.configure(client: client)
+        session.apply(meta: TestPayloads.meta(), contract: TestPayloads.contract())
+
+        await session.handleImportedRawFiles([URL(fileURLWithPath: "/tmp/raw_a.csv")])
+
+        XCTAssertEqual(client.importPreviewRequests.count, 1)
+        XCTAssertEqual(client.sourceTablePreviewRequests.count, 1)
+        XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.count, 1)
+        XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.first?.importSelection?.filterID, "import.csv")
+        XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.first?.importProfile?.id, "import.csv")
+        XCTAssertEqual(session.importPreview?.diagnostics.first?.statusCode, "delimiter_detected")
+        XCTAssertEqual(session.importSelection?.selectedSheetOrSegment, "Sheet1")
+    }
+
     func testDraftDefaultsTolerateDuplicateColumnHeadersFromMultiSeriesPreview() {
         let session = DataStudioSession()
         let preview = SourceTablePreviewResponse(
@@ -412,6 +461,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "builtin/tensile")
+        XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.importSelection?.filterID, session.importSelection?.filterID)
         XCTAssertEqual(session.orderedGroups.count, 1)
 
         session.updateDisplayName(for: "/tmp/prepared.xlsx", to: "Renamed Group")

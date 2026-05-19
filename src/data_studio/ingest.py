@@ -19,6 +19,7 @@ from src.data_studio.models import (
     TemplateMatch,
 )
 from src.data_studio.template_store import list_templates
+from src.rendering.source_table_preview import read_source_sheets as shared_read_source_sheets
 
 try:
     from charset_normalizer import from_bytes as detect_charset
@@ -204,10 +205,7 @@ def read_preview_source(path: str | Path) -> tuple[list[tuple[str, pd.DataFrame]
     suffix = source_path.suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
         raise ValueError(f"Unsupported Data Studio input type: {suffix}")
-    if suffix in TEXT_EXTENSIONS:
-        frame, encoding, delimiter = _read_text_frame(source_path)
-        return [("Sheet1", frame)], encoding, delimiter
-    return _read_excel_sheets(source_path)
+    return shared_read_source_sheets(source_path)
 
 
 def _contiguous_runs(indices: Iterable[int]) -> list[tuple[int, int]]:

@@ -85,6 +85,9 @@ extension DataStudioSession {
                     return
                 }
                 self.sourcePreview = response
+                if let importPreview = self.importPreview {
+                    self.importSelection = self.makeImportSelection(from: importPreview, sourcePreview: response)
+                }
                 self.configureDraftDefaults(from: response, sampleURL: URL(fileURLWithPath: response.inputPath))
             } catch {
                 guard self.asyncCoordination.sourcePreview.isLatest(revision), !Task.isCancelled else {
@@ -587,7 +590,16 @@ extension DataStudioSession {
         defer { currentActivity = .idle }
         do {
             let preview = try await client.previewDataStudioTemplate(
-                .init(sourcePath: sourceURL.path, template: request)
+                .init(
+                    sourcePath: sourceURL.path,
+                    template: request,
+                    importSelection: importSelection,
+                    importProfile: importPreview?.profile,
+                    importDiagnostics: importPreview?.diagnostics ?? [],
+                    selectedSheetOrSegment: importSelection?.selectedSheetOrSegment
+                        ?? selectedPreviewSegmentID
+                        ?? importPreview?.selectedSheetOrSegment
+                )
             )
             templatePreview = preview
             if !preview.errors.isEmpty {

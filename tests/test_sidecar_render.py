@@ -304,6 +304,25 @@ def test_source_table_preview_returns_readonly_table_container(tmp_path: Path) -
     assert table["help"]
 
 
+def test_source_table_preview_returns_import_diagnostics(tmp_path: Path) -> None:
+    input_path = tmp_path / "ambiguous.csv"
+    input_path.write_text(
+        "Time;Value;Value\n"
+        "s;mV;mV\n"
+        "0;1;2\n"
+        "1;3\n",
+        encoding="utf-8",
+    )
+
+    response = client.post("/source-table-preview", json={"input_path": str(input_path), "sheet": 0})
+
+    assert response.status_code == 200, response.text
+    status_codes = {item["status_code"] for item in response.json()["diagnostics"]}
+    assert {"encoding_detected", "delimiter_detected", "ragged_rows_detected", "duplicate_headers_detected"}.issubset(
+        status_codes
+    )
+
+
 def test_fit_analysis_accepts_data_transforms(tmp_path: Path) -> None:
     input_path = tmp_path / "curve.csv"
     _make_curve_csv(input_path)
