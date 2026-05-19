@@ -22,6 +22,7 @@ This public handoff replaces the private beta work log. It keeps only the curren
 
 - Keep `src/plot_contract.json` as the single source of truth for public plot templates, styles, palettes, themes, defaults, and gallery metadata.
 - Keep LabPlot-scale capability status flowing through `/meta`, sidecar schemas, `.sciplot` document graph nodes, and macOS decode models; do not add a second local capability table in Swift.
+- Keep the active LabPlot-informed engineering queue in `docs/superpowers/plans/2026-05-19-labplot-nextgen-workqueue.md`; after each queued batch is merged, remove that batch from the queue and migrate product facts into this handoff/API/frontend documentation.
 - Keep project open/save routed through sidecar schema normalization.
 - Keep `.sciplot` self-contained: embedded sources and workbooks are the restore truth, not original absolute paths.
 - Keep macOS as the only supported desktop frontend.
