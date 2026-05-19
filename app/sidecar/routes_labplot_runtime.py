@@ -37,9 +37,14 @@ def create_labplot_runtime_router() -> APIRouter:
                 operation_id=request.operation_id,
                 input_path=input_path,
                 sheet=request.sheet,
+                operation_instance_id=request.operation_instance_id,
+                module=request.module,
                 x_column=request.x_column,
                 y_column=request.y_column,
                 parameters=request.parameters,
+                source_binding=request.source_binding,
+                recalculate_policy=request.recalculate_policy,
+                graph_revision=request.graph_revision,
             )
             return AnalysisOperationResponse.model_validate(
                 {

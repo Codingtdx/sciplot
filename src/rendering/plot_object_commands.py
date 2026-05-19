@@ -51,6 +51,8 @@ def normalize_plot_edit_command(command: dict[str, Any], objects: list[dict[str,
     graph_patch.setdefault("kind", kind)
     graph_patch.setdefault("module", module)
     graph_patch.setdefault("revision_delta", 1)
+    if module == "data_studio" and ":analysis_operation:" in target_object_id:
+        graph_patch.setdefault("analysis_object", True)
     if diagnostics:
         graph_patch.setdefault("diagnostics", diagnostics)
     normalized["graph_patch"] = graph_patch

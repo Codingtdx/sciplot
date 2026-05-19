@@ -399,6 +399,8 @@ class PlotEditCommandPayload(StrictModel):
 
 class AnalysisOperationResultPayload(StrictModel):
     operation_id: str
+    operation_instance_id: str | None = None
+    operation_kind: str | None = None
     available: bool = True
     valid: bool = True
     status_code: str = "ok"
@@ -414,6 +416,11 @@ class AnalysisOperationResultPayload(StrictModel):
     elapsed_ms: float = 0.0
     lineage: dict[str, Any] = Field(default_factory=dict)
     artifact_refs: list[dict[str, Any]] = Field(default_factory=list)
+    graph_node_id: str | None = None
+    result_node_id: str | None = None
+    result_container_ids: list[str] = Field(default_factory=list)
+    overlay_refs: list[dict[str, Any]] = Field(default_factory=list)
+    recalculate_policy: Literal["manual", "auto", "on_open"] = "manual"
 
 
 class ImportDiagnosticPayload(StrictModel):
@@ -515,9 +522,14 @@ class NotebookOutputPayload(StrictModel):
 
 class AnalysisOperationRequest(FileRequest):
     operation_id: str
+    operation_instance_id: str | None = None
+    module: Literal["plot", "data_studio"] = "plot"
     x_column: str | None = None
     y_column: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
+    source_binding: dict[str, Any] = Field(default_factory=dict)
+    recalculate_policy: Literal["manual", "auto", "on_open"] = "manual"
+    graph_revision: int | None = None
     offset: int = 0
     limit: int = 200
 
@@ -867,6 +879,18 @@ class DataStudioProjectWorkbookPayload(StrictModel):
     saved_workbook_mtime_ns: int | None = None
 
 
+class DataStudioAnalysisOperationPayload(StrictModel):
+    operation_instance_id: str
+    operation_id: str
+    operation_kind: str | None = None
+    graph_node_id: str | None = None
+    label: str = "Analysis Operation"
+    source_binding: dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
+    overlay_refs: list[dict[str, Any]] = Field(default_factory=list)
+    recalculate_policy: Literal["manual", "auto", "on_open"] = "manual"
+
+
 class DataStudioProjectPayload(StrictModel):
     session_kind: str = "data_studio"
     version: int = 1
@@ -883,6 +907,8 @@ class DataStudioProjectPayload(StrictModel):
     figure_preferences: list[dict[str, Any]] = Field(default_factory=list)
     imported_paths: list[str] = Field(default_factory=list)
     template_draft_path: str | None = None
+    analysis_operations: list[DataStudioAnalysisOperationPayload] = Field(default_factory=list)
+    analysis_results: list[AnalysisOperationResultPayload] = Field(default_factory=list)
     embedded_workbooks: list[DataStudioProjectWorkbookPayload] = Field(default_factory=list)
     project_display_name: str | None = None
     source_provenance: dict[str, Any] = Field(default_factory=dict)
@@ -1965,6 +1991,7 @@ __all__ = [
     "CodeConsoleRunSnapshotPayload",
     "ComposerProjectPanelPayload",
     "ComposerProjectPayload",
+    "DataStudioAnalysisOperationPayload",
     "DataStudioProjectPayload",
     "DataStudioProjectWorkbookPayload",
     "DataTransformPayload",

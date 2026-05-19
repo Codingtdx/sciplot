@@ -198,3 +198,26 @@ def test_command_apply_preview_keeps_unknown_target_diagnostic() -> None:
     assert payload["graph_revision"] == 3
     assert payload["diagnostics"][0]["status_code"] == "target_not_in_object_list"
     assert payload["diagnostics"][0]["target_object_id"] == "plot:legend:missing"
+
+
+def test_data_studio_analysis_command_marks_analysis_graph_patch_and_stale_revision() -> None:
+    normalized = normalize_plot_edit_command(
+        {
+            "kind": "edit",
+            "module": "data_studio",
+            "target_object_id": "data_studio:analysis_operation:abc123",
+            "before": {"parameters": {"window": 3}},
+            "after": {"parameters": {"window": 5}},
+            "graph_revision": 2,
+        }
+    )
+
+    assert normalized["command"]["graph_patch"]["module"] == "data_studio"
+    assert normalized["command"]["graph_patch"]["analysis_object"] is True
+
+    payload = apply_command_preview(normalized["command"], {"schema_version": 2, "revision": 5})
+
+    assert payload["graph_revision"] == 5
+    assert payload["graph_patch"] == {}
+    assert payload["render_invalidation"]["module"] == "data_studio"
+    assert payload["diagnostics"][0]["status_code"] == "stale_command_revision"

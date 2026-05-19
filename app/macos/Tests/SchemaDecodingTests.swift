@@ -368,6 +368,38 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(analysis.operationID, "analysis.fit")
         XCTAssertEqual(analysis.metrics["r_squared"]?.numberValue, 0.99)
 
+        let durableAnalysisPayload = """
+        {
+          "operation_id": "analysis.integration",
+          "operation_instance_id": "analysis:data_studio:integration:abc123",
+          "operation_kind": "integration",
+          "available": true,
+          "valid": true,
+          "status_code": "ok",
+          "message": "Integration complete.",
+          "metrics": {"total_area": 42.5},
+          "data_containers": [],
+          "source_binding": {"workbook_id": "workbook-1"},
+          "lineage": {"result_node_id": "data_studio:analysis_operation:abc123:result"},
+          "graph_node_id": "data_studio:analysis_operation:abc123",
+          "result_node_id": "data_studio:analysis_operation:abc123:result",
+          "result_container_ids": ["analysis:data_studio:integration:abc123:result"],
+          "overlay_refs": [{"id": "plot:analysis_overlay:abc123"}],
+          "recalculate_policy": "manual"
+        }
+        """
+        let durableAnalysis = try decoder.decode(
+            AnalysisOperationResultPayload.self,
+            from: Data(durableAnalysisPayload.utf8)
+        )
+        XCTAssertEqual(durableAnalysis.operationInstanceID, "analysis:data_studio:integration:abc123")
+        XCTAssertEqual(durableAnalysis.operationKind, "integration")
+        XCTAssertEqual(durableAnalysis.graphNodeID, "data_studio:analysis_operation:abc123")
+        XCTAssertEqual(durableAnalysis.resultNodeID, "data_studio:analysis_operation:abc123:result")
+        XCTAssertEqual(durableAnalysis.resultContainerIDs, ["analysis:data_studio:integration:abc123:result"])
+        XCTAssertEqual(durableAnalysis.overlayRefs.first?["id"]?.stringValue, "plot:analysis_overlay:abc123")
+        XCTAssertEqual(durableAnalysis.recalculatePolicy, "manual")
+
         let filterPayload = """
         {
           "id": "import.hdf5",

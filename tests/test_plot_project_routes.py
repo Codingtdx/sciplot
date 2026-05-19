@@ -852,6 +852,56 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
                     ],
                     "imported_paths": [str(imported_source)],
                     "template_draft_path": str(imported_source),
+                    "analysis_operations": [
+                        {
+                            "operation_instance_id": "analysis:data_studio:integration:roundtrip",
+                            "operation_id": "analysis.integration",
+                            "operation_kind": "integration",
+                            "graph_node_id": "data_studio:analysis_operation:roundtrip",
+                            "label": "Integration",
+                            "source_binding": {
+                                "workbook_id": workbook_payload["workbook_id"],
+                                "sheet": "Representative_Curve",
+                                "x_column": "Strain",
+                                "y_column": "Stress",
+                            },
+                            "settings": {"operation_id": "analysis.integration"},
+                            "recalculate_policy": "manual",
+                        }
+                    ],
+                    "analysis_results": [
+                        {
+                            "operation_instance_id": "analysis:data_studio:integration:roundtrip",
+                            "operation_id": "analysis.integration",
+                            "operation_kind": "integration",
+                            "graph_node_id": "data_studio:analysis_operation:roundtrip",
+                            "result_node_id": "data_studio:analysis_operation:roundtrip:result",
+                            "result_container_ids": ["analysis:data_studio:integration:roundtrip:result"],
+                            "status_code": "ok",
+                            "message": "Integration complete.",
+                            "metrics": {"total_area": 42.5},
+                            "data_containers": [
+                                {
+                                    "id": "analysis:data_studio:integration:roundtrip:result",
+                                    "kind": "transformed_view",
+                                    "label": "Integration result",
+                                    "status": "enabled",
+                                    "readonly": True,
+                                    "row_count": 2,
+                                    "column_count": 2,
+                                    "columns": [],
+                                    "source": {
+                                        "input_path": str(workbook_path),
+                                        "sheet": "Representative_Curve",
+                                        "offset": 0,
+                                        "limit": 50,
+                                    },
+                                    "help": "Readonly analysis result.",
+                                }
+                            ],
+                            "recalculate_policy": "manual",
+                        }
+                    ],
                     "embedded_workbooks": [],
                     "project_display_name": "Roundtrip Data Studio",
                     "source_provenance": {},
@@ -872,6 +922,9 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
         "data.workbook_group",
         "data.workbook",
         "data.table",
+        "data.analysis_operation",
+        "data.analysis_result",
+        "data.analysis_table",
     }.issubset(saved_kinds)
     workbook_path.unlink()
 
@@ -884,6 +937,8 @@ def test_save_open_data_studio_project_roundtrip_restores_embedded_workbook(tmp_
     assert restored_workbook_path.exists()
     assert payload["payload"]["data_studio"]["workbook_paths"] == [str(restored_workbook_path)]
     assert payload["payload"]["data_studio"]["selected_recipe_id"] == "representative_scatter"
+    assert payload["payload"]["data_studio"]["analysis_operations"][0]["operation_kind"] == "integration"
+    assert payload["payload"]["data_studio"]["analysis_results"][0]["metrics"]["total_area"] == 42.5
     restored_graph = payload["payload"]["document_graph"]
     assert {node["kind"] for node in restored_graph["nodes"]}.issuperset(saved_kinds)
     figure_preference = payload["payload"]["data_studio"]["figure_preferences"][0]

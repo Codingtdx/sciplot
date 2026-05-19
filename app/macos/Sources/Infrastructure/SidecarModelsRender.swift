@@ -1435,6 +1435,8 @@ struct PlotEditCommandPayload: Codable, Equatable, Sendable, Identifiable {
 
 struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiable {
     let operationID: String
+    let operationInstanceID: String?
+    let operationKind: String?
     let available: Bool
     let valid: Bool
     let statusCode: String
@@ -1450,11 +1452,18 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
     let elapsedMS: Double
     let lineage: [String: JSONValue]
     let artifactRefs: [[String: JSONValue]]
+    let graphNodeID: String?
+    let resultNodeID: String?
+    let resultContainerIDs: [String]
+    let overlayRefs: [[String: JSONValue]]
+    let recalculatePolicy: String
 
-    var id: String { operationID }
+    var id: String { operationInstanceID ?? operationID }
 
     init(
         operationID: String,
+        operationInstanceID: String? = nil,
+        operationKind: String? = nil,
         available: Bool,
         valid: Bool,
         statusCode: String,
@@ -1469,9 +1478,16 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
         preparedArrays: [String: JSONValue] = [:],
         elapsedMS: Double = 0,
         lineage: [String: JSONValue] = [:],
-        artifactRefs: [[String: JSONValue]] = []
+        artifactRefs: [[String: JSONValue]] = [],
+        graphNodeID: String? = nil,
+        resultNodeID: String? = nil,
+        resultContainerIDs: [String] = [],
+        overlayRefs: [[String: JSONValue]] = [],
+        recalculatePolicy: String = "manual"
     ) {
         self.operationID = operationID
+        self.operationInstanceID = operationInstanceID
+        self.operationKind = operationKind
         self.available = available
         self.valid = valid
         self.statusCode = statusCode
@@ -1487,10 +1503,17 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
         self.elapsedMS = elapsedMS
         self.lineage = lineage
         self.artifactRefs = artifactRefs
+        self.graphNodeID = graphNodeID
+        self.resultNodeID = resultNodeID
+        self.resultContainerIDs = resultContainerIDs
+        self.overlayRefs = overlayRefs
+        self.recalculatePolicy = recalculatePolicy
     }
 
     enum CodingKeys: String, CodingKey {
         case operationID = "operationId"
+        case operationInstanceID = "operationInstanceId"
+        case operationKind
         case available
         case valid
         case statusCode
@@ -1506,11 +1529,18 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
         case elapsedMS = "elapsedMs"
         case lineage
         case artifactRefs
+        case graphNodeID = "graphNodeId"
+        case resultNodeID = "resultNodeId"
+        case resultContainerIDs = "resultContainerIds"
+        case overlayRefs
+        case recalculatePolicy
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         operationID = try container.decode(String.self, forKey: .operationID)
+        operationInstanceID = try container.decodeIfPresent(String.self, forKey: .operationInstanceID)
+        operationKind = try container.decodeIfPresent(String.self, forKey: .operationKind)
         available = try container.decodeIfPresent(Bool.self, forKey: .available) ?? false
         valid = try container.decodeIfPresent(Bool.self, forKey: .valid) ?? false
         statusCode = try container.decodeIfPresent(String.self, forKey: .statusCode) ?? "unknown"
@@ -1526,6 +1556,11 @@ struct AnalysisOperationResultPayload: Codable, Equatable, Sendable, Identifiabl
         elapsedMS = try container.decodeIfPresent(Double.self, forKey: .elapsedMS) ?? 0
         lineage = try container.decodeIfPresent([String: JSONValue].self, forKey: .lineage) ?? [:]
         artifactRefs = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .artifactRefs) ?? []
+        graphNodeID = try container.decodeIfPresent(String.self, forKey: .graphNodeID)
+        resultNodeID = try container.decodeIfPresent(String.self, forKey: .resultNodeID)
+        resultContainerIDs = try container.decodeIfPresent([String].self, forKey: .resultContainerIDs) ?? dataContainers.map(\.id)
+        overlayRefs = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .overlayRefs) ?? overlays
+        recalculatePolicy = try container.decodeIfPresent(String.self, forKey: .recalculatePolicy) ?? "manual"
     }
 }
 
@@ -1859,9 +1894,14 @@ struct AnalysisOperationRequest: Codable, Equatable, Sendable {
     let operationID: String
     let inputPath: String
     let sheet: SheetValue
+    let operationInstanceID: String?
+    let module: String
     let xColumn: String?
     let yColumn: String?
     let parameters: [String: JSONValue]
+    let sourceBinding: [String: JSONValue]
+    let recalculatePolicy: String
+    let graphRevision: Int?
     let offset: Int
     let limit: Int
     let options: RenderOptionsPayload?
@@ -1870,9 +1910,14 @@ struct AnalysisOperationRequest: Codable, Equatable, Sendable {
         operationID: String,
         inputPath: String,
         sheet: SheetValue = .index(0),
+        operationInstanceID: String? = nil,
+        module: String = "plot",
         xColumn: String? = nil,
         yColumn: String? = nil,
         parameters: [String: JSONValue] = [:],
+        sourceBinding: [String: JSONValue] = [:],
+        recalculatePolicy: String = "manual",
+        graphRevision: Int? = nil,
         offset: Int = 0,
         limit: Int = 200,
         options: RenderOptionsPayload? = nil
@@ -1880,9 +1925,14 @@ struct AnalysisOperationRequest: Codable, Equatable, Sendable {
         self.operationID = operationID
         self.inputPath = inputPath
         self.sheet = sheet
+        self.operationInstanceID = operationInstanceID
+        self.module = module
         self.xColumn = xColumn
         self.yColumn = yColumn
         self.parameters = parameters
+        self.sourceBinding = sourceBinding
+        self.recalculatePolicy = recalculatePolicy
+        self.graphRevision = graphRevision
         self.offset = offset
         self.limit = limit
         self.options = options
@@ -1892,9 +1942,14 @@ struct AnalysisOperationRequest: Codable, Equatable, Sendable {
         case operationID = "operationId"
         case inputPath
         case sheet
+        case operationInstanceID = "operationInstanceId"
+        case module
         case xColumn
         case yColumn
         case parameters
+        case sourceBinding
+        case recalculatePolicy
+        case graphRevision
         case offset
         case limit
         case options
@@ -2936,6 +2991,32 @@ struct DataStudioProjectWorkbookPayload: Codable, Equatable, Sendable, Identifia
     }
 }
 
+struct DataStudioAnalysisOperationPayload: Codable, Equatable, Sendable, Identifiable {
+    let operationInstanceID: String
+    let operationID: String
+    let operationKind: String?
+    let graphNodeID: String?
+    let label: String
+    let sourceBinding: [String: JSONValue]
+    let settings: [String: JSONValue]
+    let overlayRefs: [[String: JSONValue]]
+    let recalculatePolicy: String
+
+    var id: String { operationInstanceID }
+
+    enum CodingKeys: String, CodingKey {
+        case operationInstanceID = "operationInstanceId"
+        case operationID = "operationId"
+        case operationKind
+        case graphNodeID = "graphNodeId"
+        case label
+        case sourceBinding
+        case settings
+        case overlayRefs
+        case recalculatePolicy
+    }
+}
+
 struct DataStudioProjectPayload: Codable, Equatable, Sendable {
     let sessionKind: String
     let version: Int
@@ -2952,6 +3033,8 @@ struct DataStudioProjectPayload: Codable, Equatable, Sendable {
     let figurePreferences: [DataStudioFigurePreferencePayload]
     let importedPaths: [String]
     let templateDraftPath: String?
+    var analysisOperations: [DataStudioAnalysisOperationPayload] = []
+    var analysisResults: [AnalysisOperationResultPayload] = []
     let embeddedWorkbooks: [DataStudioProjectWorkbookPayload]
     let projectDisplayName: String?
     let sourceProvenance: [String: JSONValue]
@@ -2972,9 +3055,88 @@ struct DataStudioProjectPayload: Codable, Equatable, Sendable {
         case figurePreferences = "figurePreferences"
         case importedPaths = "importedPaths"
         case templateDraftPath = "templateDraftPath"
+        case analysisOperations
+        case analysisResults
         case embeddedWorkbooks = "embeddedWorkbooks"
         case projectDisplayName = "projectDisplayName"
         case sourceProvenance = "sourceProvenance"
+    }
+
+    init(
+        sessionKind: String,
+        version: Int,
+        selectedTemplateID: String?,
+        workbookPaths: [String],
+        selectedWorkbookID: String?,
+        primaryWorkbookID: String?,
+        selectedRecipeID: String?,
+        comparisonRecipeIDs: [String],
+        selectedFigureFamilyID: String?,
+        selectedFigureTemplateID: String?,
+        groupStates: [DataStudioGroupStatePayload],
+        specimenStates: [DataStudioSpecimenStatePayload],
+        figurePreferences: [DataStudioFigurePreferencePayload],
+        importedPaths: [String],
+        templateDraftPath: String?,
+        analysisOperations: [DataStudioAnalysisOperationPayload] = [],
+        analysisResults: [AnalysisOperationResultPayload] = [],
+        embeddedWorkbooks: [DataStudioProjectWorkbookPayload],
+        projectDisplayName: String?,
+        sourceProvenance: [String: JSONValue]
+    ) {
+        self.sessionKind = sessionKind
+        self.version = version
+        self.selectedTemplateID = selectedTemplateID
+        self.workbookPaths = workbookPaths
+        self.selectedWorkbookID = selectedWorkbookID
+        self.primaryWorkbookID = primaryWorkbookID
+        self.selectedRecipeID = selectedRecipeID
+        self.comparisonRecipeIDs = comparisonRecipeIDs
+        self.selectedFigureFamilyID = selectedFigureFamilyID
+        self.selectedFigureTemplateID = selectedFigureTemplateID
+        self.groupStates = groupStates
+        self.specimenStates = specimenStates
+        self.figurePreferences = figurePreferences
+        self.importedPaths = importedPaths
+        self.templateDraftPath = templateDraftPath
+        self.analysisOperations = analysisOperations
+        self.analysisResults = analysisResults
+        self.embeddedWorkbooks = embeddedWorkbooks
+        self.projectDisplayName = projectDisplayName
+        self.sourceProvenance = sourceProvenance
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionKind = try container.decodeIfPresent(String.self, forKey: .sessionKind) ?? "data_studio"
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        selectedTemplateID = try container.decodeIfPresent(String.self, forKey: .selectedTemplateID)
+        workbookPaths = try container.decodeIfPresent([String].self, forKey: .workbookPaths) ?? []
+        selectedWorkbookID = try container.decodeIfPresent(String.self, forKey: .selectedWorkbookID)
+        primaryWorkbookID = try container.decodeIfPresent(String.self, forKey: .primaryWorkbookID)
+        selectedRecipeID = try container.decodeIfPresent(String.self, forKey: .selectedRecipeID)
+        comparisonRecipeIDs = try container.decodeIfPresent([String].self, forKey: .comparisonRecipeIDs) ?? []
+        selectedFigureFamilyID = try container.decodeIfPresent(String.self, forKey: .selectedFigureFamilyID)
+        selectedFigureTemplateID = try container.decodeIfPresent(String.self, forKey: .selectedFigureTemplateID)
+        groupStates = try container.decodeIfPresent([DataStudioGroupStatePayload].self, forKey: .groupStates) ?? []
+        specimenStates = try container.decodeIfPresent([DataStudioSpecimenStatePayload].self, forKey: .specimenStates) ?? []
+        figurePreferences = try container.decodeIfPresent([DataStudioFigurePreferencePayload].self, forKey: .figurePreferences) ?? []
+        importedPaths = try container.decodeIfPresent([String].self, forKey: .importedPaths) ?? []
+        templateDraftPath = try container.decodeIfPresent(String.self, forKey: .templateDraftPath)
+        analysisOperations = try container.decodeIfPresent(
+            [DataStudioAnalysisOperationPayload].self,
+            forKey: .analysisOperations
+        ) ?? []
+        analysisResults = try container.decodeIfPresent(
+            [AnalysisOperationResultPayload].self,
+            forKey: .analysisResults
+        ) ?? []
+        embeddedWorkbooks = try container.decodeIfPresent(
+            [DataStudioProjectWorkbookPayload].self,
+            forKey: .embeddedWorkbooks
+        ) ?? []
+        projectDisplayName = try container.decodeIfPresent(String.self, forKey: .projectDisplayName)
+        sourceProvenance = try container.decodeIfPresent([String: JSONValue].self, forKey: .sourceProvenance) ?? [:]
     }
 }
 

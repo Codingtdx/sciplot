@@ -95,13 +95,18 @@ final class DataStudioSession {
     var analysisTab: DataStudioAnalysisTab = .sourceData
     var analysisSourceTableResponse: SourceTablePreviewResponse?
     var analysisFitResponse: FitAnalysisResponse?
+    var analysisOperationResponse: AnalysisOperationResponse?
     var analysisSourceTableErrorMessage: String?
     var analysisFitErrorMessage: String?
+    var analysisOperationErrorMessage: String?
     var analysisSelectedSeriesID: String?
+    var selectedAnalysisOperationID = "analysis.integration"
     var analysisSourceTableOffset = 0
     var analysisFitOffset = 0
     var isLoadingAnalysisSourceTable = false
     var isLoadingAnalysisFit = false
+    var isLoadingAnalysisOperation = false
+    var analysisCommandLedger: [PlotEditCommandPayload] = []
     var focusedWorkbookFitOptions = FitOptionsPayload(enabled: true, modelID: "linear")
     var comparisonExportResponse: DataStudioComparisonExportResponse?
     var comparisonExportDestinationURL: URL?
@@ -308,13 +313,18 @@ final class DataStudioSession {
         analysisTab = .sourceData
         analysisSourceTableResponse = nil
         analysisFitResponse = nil
+        analysisOperationResponse = nil
         analysisSourceTableErrorMessage = nil
         analysisFitErrorMessage = nil
+        analysisOperationErrorMessage = nil
         analysisSelectedSeriesID = nil
+        selectedAnalysisOperationID = "analysis.integration"
         analysisSourceTableOffset = 0
         analysisFitOffset = 0
         isLoadingAnalysisSourceTable = false
         isLoadingAnalysisFit = false
+        isLoadingAnalysisOperation = false
+        analysisCommandLedger = []
         focusedWorkbookFitOptions = FitOptionsPayload(enabled: true, modelID: "linear")
         plotSession.clearPreviewContext(preserveRenderOptions: true)
         previewWarning = nil
@@ -341,7 +351,9 @@ final class DataStudioSession {
             specimenStates: requestSpecimenStates,
             figurePreferences: figurePreferences,
             importedPaths: importedSourceURLs.map(\.path),
-            templateDraftPath: importedSourceURLs.first?.path
+            templateDraftPath: importedSourceURLs.first?.path,
+            analysisOperations: projectAnalysisOperations(),
+            analysisResults: projectAnalysisResults()
         )
     }
 
@@ -394,6 +406,8 @@ extension DataStudioSession {
         let figurePreferences: [DataStudioFigurePreferencePayload]
         let importedPaths: [String]
         let templateDraftPath: String?
+        let analysisOperations: [DataStudioAnalysisOperationPayload]
+        let analysisResults: [AnalysisOperationResultPayload]
     }
 
     struct UndoSnapshot: Equatable {

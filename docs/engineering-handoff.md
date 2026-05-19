@@ -51,7 +51,7 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 
 - `GET /meta` capability catalogs are built by `src/rendering/capability_registry.py`.
 - `POST /source-table-preview` returns shared `DataContainerPayload` helpers plus structured import diagnostics for encoding, delimiter, table structure, ragged rows, duplicate headers, and selected segments.
-- `POST /analysis-operation` runs the SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`.
+- `POST /analysis-operation` runs the SciPlot-owned analysis envelope in `src/rendering/analysis_operations.py`. Data Studio and Plot both use this route for object-backed analysis operations.
 - `POST /import-preview` dispatches explicit filter previews from `src/rendering/import_filters.py` and returns `ImportFilterProfilePayload`, `ImportDiagnosticPayload`, available options, structure nodes, and readonly containers.
 - `POST /data-studio/template-recommendations`, `POST /data-studio/template-preview`, and `POST /data-studio/build-workbook` accept `ImportSelectionPayload`. The selection is the durable handoff from `/import-preview`: filter id, input path, selected sheet/segment, selected options, profile, and diagnostics.
 - `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
@@ -65,7 +65,7 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 - `.sciplot` bundles carry `document_graph` for durable object identity, module roots, graph nodes, graph edges, selected nodes, visibility/lock state, revision numbers, events, and migration notes.
 - The graph is internal persistence and command-model structure only; do not restore a global Project Explorer, shared rail, or global workbench shell.
 - Plot graph nodes cover source, scene, series, axes, legend, guides, annotations, function layers, extra/broken axes, fit overlays, page, and plot area.
-- Data Studio, Composer, and Code Console graph nodes cover workbook/group/table/matrix, pages/panels/assets, context bindings, runs, generated figures, and generated tables.
+- Data Studio, Composer, and Code Console graph nodes cover workbook/group/table/matrix, analysis operation/result/table nodes, pages/panels/assets, context bindings, runs, generated figures, and generated tables.
 - Sidecar owns deterministic naming and graph revision metadata. Swift should not invent durable object names or accept stale preview updates after a newer graph revision.
 
 ### Data containers
@@ -79,7 +79,9 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 ### Analysis operations
 
 - `/analysis-operation` returns `AnalysisOperationResultPayload` with diagnostics, metrics, tables, overlays, and data containers.
-- Operation envelopes include settings, source binding, prepared-array summary, elapsed time, lineage, and artifact refs so results can become graph nodes and be restored without Swift recomputation.
+- Operation envelopes include durable operation instance ids, operation kind, graph/result node ids, result container ids, overlay refs, settings, source binding, prepared-array summary, elapsed time, lineage, artifact refs, and recalculation policy so results can become graph nodes and be restored without Swift recomputation.
+- Data Studio analysis is an object lifecycle, not a one-shot utility. Focused workbook/current figure operations persist `analysis_operations` and `analysis_results` in the Data Studio project payload and generate `data.analysis_operation`, `data.analysis_result`, and `data.analysis_table` document graph nodes. Results that can return to Plot use `plot.analysis_overlay` refs.
+- Data Studio custom function remains disabled with help until the Data Studio surface owns a real parameter/expression editor. It must not emit invalid `custom_function` requests.
 - Enabled operations include smoothing, interpolation, differentiation, integration, FFT, Fourier filter, correlation, convolution, baseline correction, peak detection, KDE, statistical tests, distribution fitting, peak fitting, and growth models.
 - Numerical implementation is SciPlot-owned NumPy/SciPy code. Do not copy LabPlot NSL algorithms.
 
@@ -98,6 +100,7 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 
 - Durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, copy_settings, bind_source, apply_template, import_container, and create_output_ref.
 - Plot durable edits use typed commands, and the same envelope now extends to Data Studio, Composer, and Code Console graph actions.
+- Data Studio analysis recalculation, result deletion, binding to Plot, and overlay visibility changes must travel through `POST /command/normalize` and `POST /command/apply-preview`; macOS `UndoManager` restores the session snapshot and keeps normalized command metadata in the local ledger.
 - PlotSession records local before/after snapshots first, then calls `POST /command/normalize` followed by `POST /command/apply-preview`; the returned normalized command, graph revision, and graph patch replace the optimistic ledger entry.
 - The sidecar normalizes commands, emits graph patches, rejects stale command revisions with diagnostics, and can apply preview-only graph patches; macOS stores before/after payloads in native `UndoManager`.
 - Inspector-local state must not be the only copy of a scientific edit.

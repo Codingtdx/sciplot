@@ -2463,6 +2463,83 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(session.analysisFitOptions, FitOptionsPayload(enabled: true, modelID: "polynomial_2"))
     }
 
+    func testAnalysisOperationUsesSharedEnvelopeAndTypedCommands() async {
+        let workbookPath = "/tmp/prepared.xlsx"
+        let client = MockSidecarClient()
+        client.analysisOperationHandler = { request in
+            XCTAssertEqual(request.inputPath, workbookPath)
+            XCTAssertEqual(request.sheet, .name("Representative_Curve"))
+            XCTAssertEqual(request.module, "data_studio")
+            XCTAssertEqual(request.operationID, "analysis.integration")
+            XCTAssertEqual(request.sourceBinding["source_module"]?.stringValue, "data_studio")
+            return TestPayloads.analysisOperation(
+                operationID: request.operationID,
+                inputPath: request.inputPath,
+                sheet: request.sheet,
+                module: request.module
+            )
+        }
+        client.commandNormalizeHandler = { request in
+            XCTAssertEqual(request.command.module, "data_studio")
+            XCTAssertEqual(request.command.targetObjectID, "data_studio:analysis_operation:integration")
+            XCTAssertEqual(request.command.kind, "edit")
+            return CommandNormalizeResponse(
+                command: PlotEditCommandPayload(
+                    commandID: request.command.commandID,
+                    kind: request.command.kind,
+                    module: request.command.module,
+                    targetObjectID: request.command.targetObjectID,
+                    before: request.command.before,
+                    after: request.command.after,
+                    graphPatch: ["analysis_object": .bool(true)],
+                    graphRevision: 3,
+                    reversible: true,
+                    help: "Undoable Data Studio analysis command."
+                ),
+                diagnostics: []
+            )
+        }
+        client.commandApplyPreviewHandler = { request in
+            XCTAssertEqual(request.command.module, "data_studio")
+            return CommandApplyPreviewResponse(
+                command: request.command,
+                graphRevision: 4,
+                graphPatch: ["analysis_object": .bool(true)],
+                renderInvalidation: ["module": .string("data_studio")],
+                diagnostics: []
+            )
+        }
+
+        let session = DataStudioSession()
+        session.configure(client: client)
+        let workbook = DataStudioWorkbookItem(
+            id: "workbook-1",
+            response: TestPayloads.dataStudioWorkbook(id: "workbook-1", path: workbookPath, label: "Prepared Group")
+        )
+        session.workbooks = [workbook]
+        session.groupStates = [
+            .init(workbookPath: workbookPath, displayName: "Prepared Group", includeInCompare: true, sortOrder: 0),
+        ]
+        session.focusedWorkbookPath = workbookPath
+
+        session.showAnalysis()
+        session.selectAnalysisTab(.operations)
+        await waitUntil({ session.analysisOperationResponse != nil }, timeout: 3.0)
+
+        XCTAssertEqual(session.analysisOperationResponse?.operationResult.operationKind, "integration")
+        XCTAssertEqual(session.analysisOperationResultContainers.count, 1)
+        XCTAssertEqual(client.analysisOperationRequests.count, 1)
+
+        session.recalculateSelectedAnalysisOperation()
+        await waitUntil({
+            client.commandNormalizeRequests.count == 1
+                && client.commandApplyPreviewRequests.count == 1
+                && client.analysisOperationRequests.count == 2
+        }, timeout: 3.0)
+
+        XCTAssertEqual(session.analysisCommandLedger.last?.graphRevision, 3)
+    }
+
     func testRevealFocusedWorkbookSurfacesMissingFileError() {
         let session = DataStudioSession()
         let workbook = DataStudioWorkbookItem(
