@@ -292,6 +292,81 @@ struct DataStudioTemplateListResponse: Codable, Equatable, Sendable {
     let templates: [DataStudioTemplateResponse]
 }
 
+struct ImportSelectionPayload: Codable, Equatable, Sendable {
+    let filterID: String
+    let inputPath: String
+    let selectedSheetOrSegment: String?
+    let options: [String: JSONValue]
+    let profile: ImportFilterProfilePayload?
+    let diagnostics: [ImportDiagnosticPayload]
+
+    init(
+        filterID: String,
+        inputPath: String,
+        selectedSheetOrSegment: String? = nil,
+        options: [String: JSONValue] = [:],
+        profile: ImportFilterProfilePayload? = nil,
+        diagnostics: [ImportDiagnosticPayload] = []
+    ) {
+        self.filterID = filterID
+        self.inputPath = inputPath
+        self.selectedSheetOrSegment = selectedSheetOrSegment
+        self.options = options
+        self.profile = profile
+        self.diagnostics = diagnostics
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case filterID = "filterId"
+        case inputPath
+        case selectedSheetOrSegment
+        case options
+        case profile
+        case diagnostics
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        filterID = try container.decode(String.self, forKey: .filterID)
+        inputPath = try container.decode(String.self, forKey: .inputPath)
+        selectedSheetOrSegment = try container.decodeIfPresent(String.self, forKey: .selectedSheetOrSegment)
+        options = try container.decodeIfPresent([String: JSONValue].self, forKey: .options) ?? [:]
+        profile = try container.decodeIfPresent(ImportFilterProfilePayload.self, forKey: .profile)
+        diagnostics = try container.decodeIfPresent([ImportDiagnosticPayload].self, forKey: .diagnostics) ?? []
+    }
+}
+
+struct TemplateRoleMatchPayload: Codable, Equatable, Sendable {
+    let role: String
+    let label: String
+    let sourceLabel: String?
+    let status: String
+    let confidence: Double
+
+    init(
+        role: String,
+        label: String,
+        sourceLabel: String? = nil,
+        status: String = "matched",
+        confidence: Double = 1
+    ) {
+        self.role = role
+        self.label = label
+        self.sourceLabel = sourceLabel
+        self.status = status
+        self.confidence = confidence
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        role = try container.decode(String.self, forKey: .role)
+        label = try container.decode(String.self, forKey: .label)
+        sourceLabel = try container.decodeIfPresent(String.self, forKey: .sourceLabel)
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? "matched"
+        confidence = try container.decodeIfPresent(Double.self, forKey: .confidence) ?? 1
+    }
+}
+
 struct DataStudioTemplateMatchResponse: Codable, Equatable, Sendable, Identifiable {
     let templateID: String
     let label: String
@@ -301,8 +376,43 @@ struct DataStudioTemplateMatchResponse: Codable, Equatable, Sendable, Identifiab
     let warnings: [String]
     let matchedSheetNames: [String]
     let autoSelected: Bool
+    let matchedRoles: [TemplateRoleMatchPayload]
+    let missingRoles: [String]
+    let ambiguousRoles: [String]
+    let matchedStructureID: String?
+    let diagnostics: [ImportDiagnosticPayload]
 
     var id: String { templateID }
+
+    init(
+        templateID: String,
+        label: String,
+        family: String,
+        confidence: Double,
+        reasons: [String] = [],
+        warnings: [String] = [],
+        matchedSheetNames: [String] = [],
+        autoSelected: Bool = false,
+        matchedRoles: [TemplateRoleMatchPayload] = [],
+        missingRoles: [String] = [],
+        ambiguousRoles: [String] = [],
+        matchedStructureID: String? = nil,
+        diagnostics: [ImportDiagnosticPayload] = []
+    ) {
+        self.templateID = templateID
+        self.label = label
+        self.family = family
+        self.confidence = confidence
+        self.reasons = reasons
+        self.warnings = warnings
+        self.matchedSheetNames = matchedSheetNames
+        self.autoSelected = autoSelected
+        self.matchedRoles = matchedRoles
+        self.missingRoles = missingRoles
+        self.ambiguousRoles = ambiguousRoles
+        self.matchedStructureID = matchedStructureID
+        self.diagnostics = diagnostics
+    }
 
     enum CodingKeys: String, CodingKey {
         case templateID = "templateId"
@@ -313,6 +423,28 @@ struct DataStudioTemplateMatchResponse: Codable, Equatable, Sendable, Identifiab
         case warnings
         case matchedSheetNames
         case autoSelected
+        case matchedRoles
+        case missingRoles
+        case ambiguousRoles
+        case matchedStructureID = "matchedStructureId"
+        case diagnostics
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        templateID = try container.decode(String.self, forKey: .templateID)
+        label = try container.decode(String.self, forKey: .label)
+        family = try container.decode(String.self, forKey: .family)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        reasons = try container.decodeIfPresent([String].self, forKey: .reasons) ?? []
+        warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        matchedSheetNames = try container.decodeIfPresent([String].self, forKey: .matchedSheetNames) ?? []
+        autoSelected = try container.decodeIfPresent(Bool.self, forKey: .autoSelected) ?? false
+        matchedRoles = try container.decodeIfPresent([TemplateRoleMatchPayload].self, forKey: .matchedRoles) ?? []
+        missingRoles = try container.decodeIfPresent([String].self, forKey: .missingRoles) ?? []
+        ambiguousRoles = try container.decodeIfPresent([String].self, forKey: .ambiguousRoles) ?? []
+        matchedStructureID = try container.decodeIfPresent(String.self, forKey: .matchedStructureID)
+        diagnostics = try container.decodeIfPresent([ImportDiagnosticPayload].self, forKey: .diagnostics) ?? []
     }
 }
 
@@ -404,8 +536,43 @@ struct DataStudioWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
     let warnings: [String]
     let exclusions: [String]
     let samples: [DataStudioWorkbookSampleResponse]
+    let dataContainers: [DataContainerPayload]
 
     var id: String { workbookID }
+
+    init(
+        workbookID: String,
+        workbookPath: String,
+        label: String,
+        templateMatch: DataStudioTemplateMatchResponse,
+        sourceFiles: [String],
+        sheetNames: [String],
+        preferredSheet: String,
+        parsedSampleCount: Int,
+        failedSampleCount: Int,
+        representativeFilename: String,
+        metrics: [DataStudioMetricSummaryResponse] = [],
+        warnings: [String] = [],
+        exclusions: [String] = [],
+        samples: [DataStudioWorkbookSampleResponse] = [],
+        dataContainers: [DataContainerPayload] = []
+    ) {
+        self.workbookID = workbookID
+        self.workbookPath = workbookPath
+        self.label = label
+        self.templateMatch = templateMatch
+        self.sourceFiles = sourceFiles
+        self.sheetNames = sheetNames
+        self.preferredSheet = preferredSheet
+        self.parsedSampleCount = parsedSampleCount
+        self.failedSampleCount = failedSampleCount
+        self.representativeFilename = representativeFilename
+        self.metrics = metrics
+        self.warnings = warnings
+        self.exclusions = exclusions
+        self.samples = samples
+        self.dataContainers = dataContainers
+    }
 
     enum CodingKeys: String, CodingKey {
         case workbookID = "workbookId"
@@ -422,6 +589,26 @@ struct DataStudioWorkbookResponse: Codable, Equatable, Sendable, Identifiable {
         case warnings
         case exclusions
         case samples
+        case dataContainers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workbookID = try container.decode(String.self, forKey: .workbookID)
+        workbookPath = try container.decode(String.self, forKey: .workbookPath)
+        label = try container.decode(String.self, forKey: .label)
+        templateMatch = try container.decode(DataStudioTemplateMatchResponse.self, forKey: .templateMatch)
+        sourceFiles = try container.decodeIfPresent([String].self, forKey: .sourceFiles) ?? []
+        sheetNames = try container.decodeIfPresent([String].self, forKey: .sheetNames) ?? []
+        preferredSheet = try container.decodeIfPresent(String.self, forKey: .preferredSheet) ?? "Representative_Curve"
+        parsedSampleCount = try container.decodeIfPresent(Int.self, forKey: .parsedSampleCount) ?? 0
+        failedSampleCount = try container.decodeIfPresent(Int.self, forKey: .failedSampleCount) ?? 0
+        representativeFilename = try container.decodeIfPresent(String.self, forKey: .representativeFilename) ?? ""
+        metrics = try container.decodeIfPresent([DataStudioMetricSummaryResponse].self, forKey: .metrics) ?? []
+        warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        exclusions = try container.decodeIfPresent([String].self, forKey: .exclusions) ?? []
+        samples = try container.decodeIfPresent([DataStudioWorkbookSampleResponse].self, forKey: .samples) ?? []
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
     }
 }
 
@@ -678,9 +865,64 @@ struct DataStudioTemplatePreviewSegmentResponse: Codable, Equatable, Sendable, I
     let rowCount: Int
 }
 
+struct DataStudioNormalizedOutputPreviewPayload: Codable, Equatable, Sendable {
+    let selectedStructureID: String?
+    let roleMapping: [TemplateRoleMatchPayload]
+    let seriesCount: Int
+    let metricCount: Int
+    let matrixRowCount: Int
+    let sampleRows: [[JSONValue]]
+    let warnings: [String]
+    let errors: [String]
+
+    init(
+        selectedStructureID: String? = nil,
+        roleMapping: [TemplateRoleMatchPayload] = [],
+        seriesCount: Int = 0,
+        metricCount: Int = 0,
+        matrixRowCount: Int = 0,
+        sampleRows: [[JSONValue]] = [],
+        warnings: [String] = [],
+        errors: [String] = []
+    ) {
+        self.selectedStructureID = selectedStructureID
+        self.roleMapping = roleMapping
+        self.seriesCount = seriesCount
+        self.metricCount = metricCount
+        self.matrixRowCount = matrixRowCount
+        self.sampleRows = sampleRows
+        self.warnings = warnings
+        self.errors = errors
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case selectedStructureID = "selectedStructureId"
+        case roleMapping
+        case seriesCount
+        case metricCount
+        case matrixRowCount
+        case sampleRows
+        case warnings
+        case errors
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        selectedStructureID = try container.decodeIfPresent(String.self, forKey: .selectedStructureID)
+        roleMapping = try container.decodeIfPresent([TemplateRoleMatchPayload].self, forKey: .roleMapping) ?? []
+        seriesCount = try container.decodeIfPresent(Int.self, forKey: .seriesCount) ?? 0
+        metricCount = try container.decodeIfPresent(Int.self, forKey: .metricCount) ?? 0
+        matrixRowCount = try container.decodeIfPresent(Int.self, forKey: .matrixRowCount) ?? 0
+        sampleRows = try container.decodeIfPresent([[JSONValue]].self, forKey: .sampleRows) ?? []
+        warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        errors = try container.decodeIfPresent([String].self, forKey: .errors) ?? []
+    }
+}
+
 struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
     let sourcePath: String
     let template: DataStudioCreateTemplateRequest
+    let importSelection: ImportSelectionPayload?
     let importProfile: ImportFilterProfilePayload?
     let importDiagnostics: [ImportDiagnosticPayload]
     let selectedSheetOrSegment: String?
@@ -688,12 +930,14 @@ struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
     init(
         sourcePath: String,
         template: DataStudioCreateTemplateRequest,
+        importSelection: ImportSelectionPayload? = nil,
         importProfile: ImportFilterProfilePayload? = nil,
         importDiagnostics: [ImportDiagnosticPayload] = [],
         selectedSheetOrSegment: String? = nil
     ) {
         self.sourcePath = sourcePath
         self.template = template
+        self.importSelection = importSelection
         self.importProfile = importProfile
         self.importDiagnostics = importDiagnostics
         self.selectedSheetOrSegment = selectedSheetOrSegment
@@ -702,17 +946,20 @@ struct DataStudioTemplatePreviewRequest: Codable, Equatable, Sendable {
 
 struct DataStudioTemplateRecommendationsRequest: Codable, Equatable, Sendable {
     let sourcePath: String
+    let importSelection: ImportSelectionPayload?
     let importProfile: ImportFilterProfilePayload?
     let importDiagnostics: [ImportDiagnosticPayload]
     let selectedSheetOrSegment: String?
 
     init(
         sourcePath: String,
+        importSelection: ImportSelectionPayload? = nil,
         importProfile: ImportFilterProfilePayload? = nil,
         importDiagnostics: [ImportDiagnosticPayload] = [],
         selectedSheetOrSegment: String? = nil
     ) {
         self.sourcePath = sourcePath
+        self.importSelection = importSelection
         self.importProfile = importProfile
         self.importDiagnostics = importDiagnostics
         self.selectedSheetOrSegment = selectedSheetOrSegment
@@ -721,6 +968,18 @@ struct DataStudioTemplateRecommendationsRequest: Codable, Equatable, Sendable {
 
 struct DataStudioTemplateRecommendationsResponse: Codable, Equatable, Sendable {
     let matches: [DataStudioTemplateMatchResponse]
+    let diagnostics: [ImportDiagnosticPayload]
+
+    init(matches: [DataStudioTemplateMatchResponse] = [], diagnostics: [ImportDiagnosticPayload] = []) {
+        self.matches = matches
+        self.diagnostics = diagnostics
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        matches = try container.decodeIfPresent([DataStudioTemplateMatchResponse].self, forKey: .matches) ?? []
+        diagnostics = try container.decodeIfPresent([ImportDiagnosticPayload].self, forKey: .diagnostics) ?? []
+    }
 }
 
 struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
@@ -735,6 +994,38 @@ struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
     let warnings: [String]
     let errors: [String]
     let segments: [DataStudioTemplatePreviewSegmentResponse]
+    let normalizedOutputPreview: DataStudioNormalizedOutputPreviewPayload?
+    let dataContainers: [DataContainerPayload]
+
+    init(
+        templateID: String,
+        outputKind: String,
+        parsedSampleCount: Int,
+        failedSampleCount: Int,
+        seriesCount: Int,
+        metricCount: Int,
+        matrixRowCount: Int,
+        missingRoles: [String] = [],
+        warnings: [String] = [],
+        errors: [String] = [],
+        segments: [DataStudioTemplatePreviewSegmentResponse] = [],
+        normalizedOutputPreview: DataStudioNormalizedOutputPreviewPayload? = nil,
+        dataContainers: [DataContainerPayload] = []
+    ) {
+        self.templateID = templateID
+        self.outputKind = outputKind
+        self.parsedSampleCount = parsedSampleCount
+        self.failedSampleCount = failedSampleCount
+        self.seriesCount = seriesCount
+        self.metricCount = metricCount
+        self.matrixRowCount = matrixRowCount
+        self.missingRoles = missingRoles
+        self.warnings = warnings
+        self.errors = errors
+        self.segments = segments
+        self.normalizedOutputPreview = normalizedOutputPreview
+        self.dataContainers = dataContainers
+    }
 
     enum CodingKeys: String, CodingKey {
         case templateID = "templateId"
@@ -748,6 +1039,28 @@ struct DataStudioTemplatePreviewResponse: Codable, Equatable, Sendable {
         case warnings
         case errors
         case segments
+        case normalizedOutputPreview
+        case dataContainers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        templateID = try container.decode(String.self, forKey: .templateID)
+        outputKind = try container.decode(String.self, forKey: .outputKind)
+        parsedSampleCount = try container.decodeIfPresent(Int.self, forKey: .parsedSampleCount) ?? 0
+        failedSampleCount = try container.decodeIfPresent(Int.self, forKey: .failedSampleCount) ?? 0
+        seriesCount = try container.decodeIfPresent(Int.self, forKey: .seriesCount) ?? 0
+        metricCount = try container.decodeIfPresent(Int.self, forKey: .metricCount) ?? 0
+        matrixRowCount = try container.decodeIfPresent(Int.self, forKey: .matrixRowCount) ?? 0
+        missingRoles = try container.decodeIfPresent([String].self, forKey: .missingRoles) ?? []
+        warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        errors = try container.decodeIfPresent([String].self, forKey: .errors) ?? []
+        segments = try container.decodeIfPresent([DataStudioTemplatePreviewSegmentResponse].self, forKey: .segments) ?? []
+        normalizedOutputPreview = try container.decodeIfPresent(
+            DataStudioNormalizedOutputPreviewPayload.self,
+            forKey: .normalizedOutputPreview
+        )
+        dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
     }
 }
 
@@ -766,12 +1079,28 @@ struct DataStudioBuildWorkbookRequest: Codable, Equatable, Sendable {
     let outputPath: String
     let templateID: String
     let groupName: String?
+    let importSelection: ImportSelectionPayload?
+
+    init(
+        filePaths: [String],
+        outputPath: String,
+        templateID: String,
+        groupName: String? = nil,
+        importSelection: ImportSelectionPayload? = nil
+    ) {
+        self.filePaths = filePaths
+        self.outputPath = outputPath
+        self.templateID = templateID
+        self.groupName = groupName
+        self.importSelection = importSelection
+    }
 
     enum CodingKeys: String, CodingKey {
         case filePaths
         case outputPath
         case templateID = "templateId"
         case groupName
+        case importSelection
     }
 }
 

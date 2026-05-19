@@ -19,7 +19,7 @@ The module windows are not tabs inside a global workbench. Each module owns its 
 - Cross-module durable actions use `POST /command/normalize` and `POST /command/apply-preview`; Swift can replay normalized commands, but it cannot invent durable command payloads locally.
 - Hybrid realtime preview uses `POST /preview-scene` and only draws admitted scene payloads. Unsupported scenes fall back to backend bitmap/PDF preview.
 - Data Studio Analysis and Plot Data Workbook display sidecar `DataContainerPayload` and `AnalysisOperationResultPayload` values; Swift does not recompute fit, statistics, FFT, or import parsing.
-- Data Studio raw import is file-first: call `/import-preview`, show the returned filter profile/diagnostics/options, then request template recommendations with that profile. Swift must not sniff delimiters, encodings, sheet structure, or import formats locally.
+- Data Studio raw import is file-first: call `/import-preview`, show the returned filter profile/diagnostics/options, then pass the same `ImportSelectionPayload` to template recommendation, template preview, and workbook build. Swift must not sniff delimiters, encodings, sheet structure, or import formats locally.
 - Live source controls call `POST /live-source/update-now` and display data revision/diagnostics; they do not poll or parse source files in Swift.
 - Code Console Outputs displays notebook figure/table outputs from `POST /code-console/run`; generated artifacts can be handed to Plot/Composer through project graph references.
 
@@ -90,6 +90,8 @@ Data Studio is a data preparation surface, not a second full plotting app. Its f
 - Right: current figure summary, `Open in Plot`, `Analysis`, and output follow-up actions.
 
 When a workflow reaches plot styling or publication-grade graph adjustment, hand it to Plot through the existing `Open in Plot` path.
+
+The import wizard owns a single selected import profile. The resolver shows sidecar diagnostics and role match/missing information from the recommendation payload, disables Continue with help for unsupported filters or missing required roles, and sends the same selection to normalized preview and workbook build. The normalized output preview and returned containers come from sidecar; Swift displays them but does not rebuild rows, roles, or statistics locally.
 
 Data Studio Analysis reuses the shared Fit model cards so Plot and Data Studio do not grow separate picker-style fit experiences. In Data Studio, custom fit setup can stay disabled or handed off to Plot until the Data Studio analysis surface owns a real custom-function editing flow.
 

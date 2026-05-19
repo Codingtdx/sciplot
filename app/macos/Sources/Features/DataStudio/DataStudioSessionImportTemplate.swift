@@ -9,9 +9,20 @@ extension DataStudioSession {
             .sorted { lhs, rhs in
             lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
         }
-        let useSelectedTemplateAvailability: ActionAvailability = selectedTemplateID == nil
-            ? .disabled("Choose a parse template before continuing.")
-            : .enabled()
+        let useSelectedTemplateAvailability: ActionAvailability
+        if let importPreview, importPreview.status != "enabled" {
+            useSelectedTemplateAvailability = .disabled(importPreview.help.isEmpty ? "The selected import filter is disabled." : importPreview.help)
+        } else if selectedTemplateID == nil {
+            useSelectedTemplateAvailability = .disabled("Choose a parse template before continuing.")
+        } else if let selectedMatch = rankedMatches.first(where: { $0.templateID == selectedTemplateID }),
+                  !selectedMatch.missingRoles.isEmpty
+        {
+            useSelectedTemplateAvailability = .disabled(
+                "Missing required roles: \(selectedMatch.missingRoles.joined(separator: ", "))."
+            )
+        } else {
+            useSelectedTemplateAvailability = .enabled()
+        }
         return DataStudioResolverPresentation(
             recommendedMatches: rankedMatches,
             otherTemplates: sortedTemplates,

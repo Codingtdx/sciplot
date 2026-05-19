@@ -100,8 +100,10 @@ final class DataStudioSessionTests: XCTestCase {
         XCTAssertEqual(client.importPreviewRequests.count, 1)
         XCTAssertEqual(client.sourceTablePreviewRequests.count, 1)
         XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.count, 1)
+        XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.first?.importSelection?.filterID, "import.csv")
         XCTAssertEqual(client.dataStudioTemplateRecommendationRequests.first?.importProfile?.id, "import.csv")
         XCTAssertEqual(session.importPreview?.diagnostics.first?.statusCode, "delimiter_detected")
+        XCTAssertEqual(session.importSelection?.selectedSheetOrSegment, "Sheet1")
     }
 
     func testDraftDefaultsTolerateDuplicateColumnHeadersFromMultiSeriesPreview() {
@@ -459,6 +461,7 @@ final class DataStudioSessionTests: XCTestCase {
 
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.count, 1)
         XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.templateID, "builtin/tensile")
+        XCTAssertEqual(client.dataStudioBuildWorkbookRequests.first?.importSelection?.filterID, session.importSelection?.filterID)
         XCTAssertEqual(session.orderedGroups.count, 1)
 
         session.updateDisplayName(for: "/tmp/prepared.xlsx", to: "Renamed Group")

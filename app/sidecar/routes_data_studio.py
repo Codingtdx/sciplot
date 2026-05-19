@@ -36,7 +36,7 @@ from src.data_studio.service import (
     delete_data_studio_template,
     export_data_studio_comparison,
     import_data_studio_workbooks,
-    list_data_studio_template_recommendations,
+    list_data_studio_template_recommendations_payload,
     list_data_studio_templates,
     normalize_session_payload,
     preview_data_studio_comparison,
@@ -45,6 +45,26 @@ from src.data_studio.service import (
     preview_data_studio_workbook,
     update_data_studio_template,
 )
+
+
+def _import_selection_payload(request: object) -> dict[str, object] | None:
+    import_selection = getattr(request, "import_selection", None)
+    if import_selection is not None:
+        return import_selection.model_dump()
+    import_profile = getattr(request, "import_profile", None)
+    import_diagnostics = getattr(request, "import_diagnostics", [])
+    selected_sheet_or_segment = getattr(request, "selected_sheet_or_segment", None)
+    if import_profile is None and not import_diagnostics and selected_sheet_or_segment is None:
+        return None
+    source_path = getattr(request, "source_path", "")
+    return {
+        "filter_id": import_profile.id if import_profile is not None else "import.unknown",
+        "input_path": source_path,
+        "selected_sheet_or_segment": selected_sheet_or_segment,
+        "options": {},
+        "profile": import_profile.model_dump() if import_profile is not None else None,
+        "diagnostics": [item.model_dump() for item in import_diagnostics],
+    }
 
 
 def create_data_studio_router() -> APIRouter:
@@ -85,6 +105,7 @@ def create_data_studio_router() -> APIRouter:
             preview = preview_data_studio_template(
                 request.source_path,
                 template_payload=request.template.model_dump(),
+                import_selection=_import_selection_payload(request),
             )
             return DataStudioTemplatePreviewResponse.model_validate(serialize_dataclass(preview))
         except Exception as exc:
@@ -98,9 +119,15 @@ def create_data_studio_router() -> APIRouter:
         request: DataStudioTemplateRecommendationsRequest,
     ) -> DataStudioTemplateRecommendationsResponse:
         try:
-            matches = list_data_studio_template_recommendations(request.source_path)
+            payload = list_data_studio_template_recommendations_payload(
+                request.source_path,
+                import_selection=_import_selection_payload(request),
+            )
             return DataStudioTemplateRecommendationsResponse.model_validate(
-                {"matches": [serialize_dataclass(match) for match in matches]}
+                {
+                    "matches": [serialize_dataclass(match) for match in payload["matches"]],
+                    "diagnostics": payload.get("diagnostics", []),
+                }
             )
         except Exception as exc:
             raise http_bad_request("data_studio_template_recommendations", exc) from exc
@@ -129,6 +156,11 @@ def create_data_studio_router() -> APIRouter:
                 output_path=request.output_path,
                 template_id=request.template_id,
                 group_name=request.group_name,
+                import_selection=(
+                    request.import_selection.model_dump()
+                    if request.import_selection is not None
+                    else None
+                ),
             )
             return DataStudioWorkbookResponse.model_validate(serialize_dataclass(workbook))
         except Exception as exc:

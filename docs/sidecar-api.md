@@ -9,6 +9,9 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `POST /fit-analysis`: runs fit analysis and returns the shared fit envelope plus fit result containers.
 - `POST /analysis-operation`: runs SciPlot-owned numerical operations and returns `AnalysisOperationResultPayload`.
 - `POST /import-preview`: dispatches import filters and returns a filter profile, available options, structure nodes, preview containers, and structured disabled diagnostics.
+- `POST /data-studio/template-recommendations`: accepts `ImportSelectionPayload` so template matching uses the same filter/options/sheet/segment profile returned by `/import-preview`; disabled import filters return no auto match plus diagnostics/help.
+- `POST /data-studio/template-preview`: accepts the same `ImportSelectionPayload` and returns `DataStudioNormalizedOutputPreviewPayload` plus readonly `DataContainerPayload` summaries for the normalized output.
+- `POST /data-studio/build-workbook`: accepts the same `ImportSelectionPayload`; workbook generation must use the selected import context instead of re-sniffing source shape from path alone.
 - `POST /plot-edit-command/normalize`: compatibility route for Plot-only object edit command normalization.
 - `POST /command/normalize`: validates cross-module commands and returns a normalized reversible command with graph patch metadata.
 - `POST /command/apply-preview`: applies a command against an in-memory graph snapshot and returns graph patch plus render invalidation metadata without saving project files; stale command revisions must be ignored with structured diagnostics.
@@ -22,6 +25,8 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `ImportFilterProfilePayload` describes a filter's extensions, MIME types, dependency status, preview/read/write support, options schema, output container kinds, help, and test requirements. macOS consumes this payload instead of local format constants.
 - `ImportDiagnosticPayload` carries structured status codes such as `encoding_detected`, `delimiter_detected`, `ragged_rows_detected`, `duplicate_headers_detected`, `dependency_missing`, and `policy_not_implemented`.
 - `ImportOptionPayload` and `ImportStructureNodePayload` describe user-selectable import options and file/sheet/segment structure for Data Studio's import wizard.
+- `ImportSelectionPayload` is Data Studio's import binding contract. It carries `filter_id`, `input_path`, selected sheet/segment, selected options, filter profile, and diagnostics from `/import-preview` through recommendations, template preview, and workbook build.
+- `DataStudioNormalizedOutputPreviewPayload` summarizes the parsed output before workbook creation: selected structure id, role mapping, series/metric/matrix counts, sample rows, warnings, and errors.
 - `AnalysisOperationResultPayload` includes settings, source binding, prepared-array summary, elapsed time, lineage, diagnostics, metrics, tables, overlays, artifact refs, and data containers.
 - `PlotEditCommandPayload` is the shared command envelope for Plot, Data Studio, Composer, and Code Console. Supported kinds include `add`, `edit`, `delete`, `reorder`, `rename`, `visibility`, `lock`, `copy_settings`, `bind_source`, `apply_template`, `import_container`, and `create_output_ref`.
 - `PreviewScenePayload` is a realtime approximation contract. It carries figure geometry, plot area geometry, axis metadata, series samples, style tokens, object ids, `bbox_pixels`, point arrays, payload refs, operation names, hit-test hints, budgets, and fallback diagnostics.

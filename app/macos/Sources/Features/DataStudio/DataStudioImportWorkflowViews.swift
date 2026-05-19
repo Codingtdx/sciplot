@@ -137,7 +137,9 @@ private struct DataStudioImportResolverSheet: View {
                                     DataStudioResolverTemplateRow(
                                         title: match.label,
                                         family: match.family,
+                                        detail: match.roleSummaryText,
                                         warning: match.warnings.first
+                                            ?? match.diagnostics.first(where: { $0.severity == "warning" })?.message
                                     )
                                     .tag(Optional(match.templateID))
                                 }
@@ -150,6 +152,7 @@ private struct DataStudioImportResolverSheet: View {
                                     DataStudioResolverTemplateRow(
                                         title: template.label,
                                         family: template.family,
+                                        detail: nil,
                                         warning: nil
                                     )
                                     .tag(Optional(template.id))
@@ -243,7 +246,7 @@ private struct DataStudioImportResolverSheet: View {
                     Text(importPreview.label)
                         .font(.headline)
                         .lineLimit(1)
-                    Text(importPreview.selectedSheetOrSegment ?? importPreview.status.capitalized)
+                    Text(session.importSelection?.selectedSheetOrSegment ?? importPreview.selectedSheetOrSegment ?? importPreview.status.capitalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -428,6 +431,7 @@ struct DataStudioSheetOptionRow: View {
 struct DataStudioResolverTemplateRow: View {
     let title: String
     let family: String?
+    let detail: String?
     let warning: String?
 
     var body: some View {
@@ -439,6 +443,12 @@ struct DataStudioResolverTemplateRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
             if let warning, !warning.isEmpty {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -446,5 +456,18 @@ struct DataStudioResolverTemplateRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension DataStudioTemplateMatchResponse {
+    var roleSummaryText: String? {
+        if !missingRoles.isEmpty {
+            return "Missing: \(missingRoles.joined(separator: ", "))"
+        }
+        let roles = matchedRoles.map(\.role)
+        guard !roles.isEmpty else {
+            return nil
+        }
+        return "Matched: \(roles.joined(separator: ", "))"
     }
 }

@@ -52,6 +52,7 @@ from app.sidecar.schemas_data_studio import (
     DataStudioImportWorkbookResponse,
     DataStudioImportWorkbookRequest,
     DataStudioMetricSummaryResponse,
+    DataStudioNormalizedOutputPreviewPayload,
     DataStudioPreviewComparisonRequest,
     DataStudioPreviewRangeResponse,
     DataStudioRangeResponse,
@@ -80,6 +81,8 @@ from app.sidecar.schemas_data_studio import (
     DataStudioWorkbookPreviewRequest,
     DataStudioWorkbookPreviewResponse,
     DataStudioWorkbookSampleResponse,
+    ImportSelectionPayload,
+    TemplateRoleMatchPayload,
 )
 from app.sidecar.schemas_meta import (
     CapabilityCatalogEntryResponse,
@@ -228,6 +231,7 @@ __all__ = [
     "DataStudioImportWorkbookResponse",
     "DataStudioImportWorkbookRequest",
     "DataStudioMetricSummaryResponse",
+    "DataStudioNormalizedOutputPreviewPayload",
     "DataStudioPreviewComparisonRequest",
     "DataStudioPreviewRangeResponse",
     "DataStudioRangeResponse",
@@ -256,6 +260,8 @@ __all__ = [
     "DataStudioWorkbookPreviewRequest",
     "DataStudioWorkbookPreviewResponse",
     "DataStudioWorkbookSampleResponse",
+    "ImportSelectionPayload",
+    "TemplateRoleMatchPayload",
     "DocumentGraphEdgePayload",
     "DocumentGraphNodePayload",
     "DocumentGraphPayload",

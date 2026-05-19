@@ -1339,6 +1339,19 @@ def save_project_bundle(
             }
         )
 
+    if payload.document_graph is None:
+        saved_payload = saved_payload.model_copy(
+            update={
+                "document_graph": _generate_document_graph(
+                    selected_workbench=saved_payload.selected_workbench,
+                    plot=saved_payload.plot,
+                    data_studio=saved_payload.data_studio,
+                    composer=saved_payload.composer,
+                    code_console=saved_payload.code_console,
+                )
+            }
+        )
+
     project_json = json.dumps(
         saved_payload.model_dump(mode="json"),
         ensure_ascii=False,

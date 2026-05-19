@@ -183,6 +183,106 @@ final class SchemaDecodingTests: XCTestCase {
         XCTAssertEqual(response.dataContainers[0].columns[0].unit, "s")
     }
 
+    func testDecodeDataStudioImportSelectionAndNormalizedOutputPayloads() throws {
+        let recommendationsPayload = """
+        {
+          "matches": [
+            {
+              "template_id": "user/rheology",
+              "label": "Rheology",
+              "family": "table_import",
+              "confidence": 0.94,
+              "reasons": ["Matched import selection."],
+              "warnings": [],
+              "matched_sheet_names": ["Sheet1"],
+              "auto_selected": true,
+              "matched_roles": [
+                {
+                  "role": "curve_x",
+                  "label": "Angular Frequency",
+                  "source_label": "Angular Frequency",
+                  "status": "matched",
+                  "confidence": 0.98
+                }
+              ],
+              "missing_roles": [],
+              "ambiguous_roles": [],
+              "matched_structure_id": "Sheet1::interval-1",
+              "diagnostics": [
+                {
+                  "status_code": "import_selection_applied",
+                  "severity": "info",
+                  "message": "Using selected import structure."
+                }
+              ]
+            }
+          ],
+          "diagnostics": []
+        }
+        """
+        let recommendations = try decoder.decode(
+            DataStudioTemplateRecommendationsResponse.self,
+            from: Data(recommendationsPayload.utf8)
+        )
+        XCTAssertEqual(recommendations.matches[0].matchedRoles[0].role, "curve_x")
+        XCTAssertEqual(recommendations.matches[0].matchedStructureID, "Sheet1::interval-1")
+
+        let previewPayload = """
+        {
+          "template_id": "user/rheology",
+          "output_kind": "curve_metrics",
+          "parsed_sample_count": 1,
+          "failed_sample_count": 0,
+          "series_count": 2,
+          "metric_count": 0,
+          "matrix_row_count": 0,
+          "missing_roles": [],
+          "warnings": [],
+          "errors": [],
+          "segments": [],
+          "normalized_output_preview": {
+            "selected_structure_id": "Sheet1::interval-1",
+            "role_mapping": [
+              {
+                "role": "curve_y",
+                "label": "Storage Modulus",
+                "source_label": "Storage Modulus",
+                "status": "matched",
+                "confidence": 1.0
+              }
+            ],
+            "series_count": 2,
+            "metric_count": 0,
+            "matrix_row_count": 0,
+            "sample_rows": [["Frequency", "Storage Modulus"], [1.0, 2.0]],
+            "warnings": [],
+            "errors": []
+          },
+          "data_containers": []
+        }
+        """
+        let preview = try decoder.decode(DataStudioTemplatePreviewResponse.self, from: Data(previewPayload.utf8))
+        XCTAssertEqual(preview.normalizedOutputPreview?.selectedStructureID, "Sheet1::interval-1")
+        XCTAssertEqual(preview.normalizedOutputPreview?.roleMapping.first?.role, "curve_y")
+
+        let selection = ImportSelectionPayload(
+            filterID: "import.csv",
+            inputPath: "/tmp/raw.csv",
+            selectedSheetOrSegment: "Sheet1::interval-1",
+            options: ["delimiter": .string("\\t")],
+            profile: TestPayloads.importPreview().profile,
+            diagnostics: []
+        )
+        let request = DataStudioBuildWorkbookRequest(
+            filePaths: ["/tmp/raw.csv"],
+            outputPath: "/tmp/out.xlsx",
+            templateID: "user/rheology",
+            groupName: "Rheology",
+            importSelection: selection
+        )
+        XCTAssertEqual(request.importSelection?.options["delimiter"], .string("\\t"))
+    }
+
     func testDecodeLabPlotScalePayloadLandingModels() throws {
         let containerPayload = """
         {

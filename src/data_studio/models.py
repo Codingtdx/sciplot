@@ -196,6 +196,11 @@ class TemplateMatch:
     warnings: tuple[str, ...] = ()
     matched_sheet_names: tuple[str, ...] = ()
     auto_selected: bool = False
+    matched_roles: tuple[dict[str, Any], ...] = ()
+    missing_roles: tuple[str, ...] = ()
+    ambiguous_roles: tuple[str, ...] = ()
+    matched_structure_id: str | None = None
+    diagnostics: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -220,6 +225,8 @@ class TemplateApplyPreview:
     warnings: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
     segments: tuple[TemplatePreviewSegment, ...] = ()
+    normalized_output_preview: dict[str, Any] | None = None
+    data_containers: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -292,6 +299,7 @@ class DataStudioWorkbook:
     warnings: tuple[str, ...] = ()
     exclusions: tuple[str, ...] = ()
     samples: tuple[WorkbookSample, ...] = ()
+    data_containers: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)

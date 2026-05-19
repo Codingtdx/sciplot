@@ -38,6 +38,7 @@ final class DataStudioSession {
     var selectedTemplateID: String?
     var recommendedTemplateMatches: [DataStudioTemplateMatchResponse] = []
     var importPreview: ImportPreviewResponse?
+    var importSelection: ImportSelectionPayload?
     var sourcePreview: SourceTablePreviewResponse?
     var templatePreview: DataStudioTemplatePreviewResponse?
     var hoveredSuggestionID: String?

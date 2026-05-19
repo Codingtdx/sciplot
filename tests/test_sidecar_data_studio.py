@@ -323,6 +323,153 @@ def test_data_studio_template_recommendations_prefer_user_template_for_matching_
     assert unknown.json()["matches"] == []
 
 
+def test_data_studio_import_selection_drives_template_recommend_preview_and_build(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(template_store, "USER_TEMPLATE_DIR", tmp_path / "templates" / "user")
+    template_store.ensure_template_dirs()
+
+    source_preview = client.post(
+        "/source-table-preview",
+        json={"input_path": str(RHEOLOGY_FIXTURE), "sheet": 0, "offset": 0, "limit": 8},
+    )
+    assert source_preview.status_code == 200, source_preview.text
+    source_payload = source_preview.json()
+    segment = source_payload["segments"][0]
+
+    template_payload = {
+        "label": "Import Selection Rheology",
+        "template_id": "user/import_selection_rheology",
+        "description": "Import selection propagation regression fixture.",
+        "output_kind": "curve_metrics",
+        "comparison_enabled": False,
+        "source_format": {
+            "encoding": "utf-8",
+            "delimiter": ",",
+            "sheet_name": "Wrong Sheet",
+        },
+        "segment_policy": "series_per_segment",
+        "segment_selectors": [{"id": "wrong::segment", "label": "Wrong Segment"}],
+        "field_bindings": [
+            {"id": "x", "role": "curve_x", "label": "Angular Frequency", "column_name": "Angular Frequency"},
+            {"id": "y1", "role": "curve_y", "label": "Storage Modulus", "column_name": "Storage Modulus"},
+            {"id": "y2", "role": "curve_y", "label": "Loss Modulus", "column_name": "Loss Modulus", "optional": True},
+        ],
+        "match_conditions": [
+            {
+                "text_contains": ["angular frequency", "storage modulus"],
+                "field_kinds": ["curve_x", "curve_y"],
+                "minimum_score": 0.3,
+            }
+        ],
+    }
+    created = client.post("/data-studio/templates", json=template_payload)
+    assert created.status_code == 200, created.text
+
+    import_preview = client.post(
+        "/import-preview",
+        json={
+            "input_path": str(RHEOLOGY_FIXTURE),
+            "filter_id": "import.csv",
+            "options": {
+                "encoding": source_payload["encoding"],
+                "delimiter": source_payload["delimiter"],
+                "segment_id": segment["id"],
+            },
+        },
+    )
+    assert import_preview.status_code == 200, import_preview.text
+    import_payload = import_preview.json()
+    import_selection = {
+        "filter_id": import_payload["filter_id"],
+        "input_path": import_payload["input_path"],
+        "selected_sheet_or_segment": segment["id"],
+        "options": {
+            "encoding": source_payload["encoding"],
+            "delimiter": source_payload["delimiter"],
+            "segment_id": segment["id"],
+        },
+        "profile": import_payload["profile"],
+        "diagnostics": import_payload["diagnostics"],
+    }
+
+    recommendations = client.post(
+        "/data-studio/template-recommendations",
+        json={"source_path": str(RHEOLOGY_FIXTURE), "import_selection": import_selection},
+    )
+    assert recommendations.status_code == 200, recommendations.text
+    recommendation_payload = recommendations.json()
+    assert recommendation_payload["diagnostics"][0]["status_code"] == "import_selection_applied"
+    match = recommendation_payload["matches"][0]
+    assert match["template_id"] == "user/import_selection_rheology"
+    assert match["matched_structure_id"] == segment["id"]
+    assert {role["role"] for role in match["matched_roles"]} >= {"curve_x", "curve_y"}
+    assert match["missing_roles"] == []
+
+    preview = client.post(
+        "/data-studio/template-preview",
+        json={
+            "source_path": str(RHEOLOGY_FIXTURE),
+            "template": template_payload,
+            "import_selection": import_selection,
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    preview_payload = preview.json()
+    assert preview_payload["errors"] == []
+    assert preview_payload["normalized_output_preview"]["selected_structure_id"] == segment["id"]
+    assert preview_payload["data_containers"][0]["kind"] == "transformed_view"
+
+    workbook = client.post(
+        "/data-studio/build-workbook",
+        json={
+            "file_paths": [str(RHEOLOGY_FIXTURE)],
+            "output_path": str(tmp_path / "import_selection_rheology.xlsx"),
+            "template_id": "user/import_selection_rheology",
+            "group_name": "Import Selection Rheology",
+            "import_selection": import_selection,
+        },
+    )
+    assert workbook.status_code == 200, workbook.text
+    workbook_payload = workbook.json()
+    assert workbook_payload["parsed_sample_count"] == 1
+    assert workbook_payload["data_containers"][0]["kind"] == "transformed_view"
+
+
+def test_data_studio_template_recommendations_disable_missing_dependency_import_selection(tmp_path: Path) -> None:
+    disabled_path = tmp_path / "sample.h5"
+    disabled_path.write_bytes(b"not a real hdf5 fixture")
+
+    import_preview = client.post(
+        "/import-preview",
+        json={"input_path": str(disabled_path), "filter_id": "import.hdf5"},
+    )
+    assert import_preview.status_code == 200, import_preview.text
+    import_payload = import_preview.json()
+    assert import_payload["status"] == "disabled"
+
+    recommendations = client.post(
+        "/data-studio/template-recommendations",
+        json={
+            "source_path": str(disabled_path),
+            "import_selection": {
+                "filter_id": "import.hdf5",
+                "input_path": str(disabled_path),
+                "selected_sheet_or_segment": None,
+                "options": {},
+                "profile": import_payload["profile"],
+                "diagnostics": import_payload["diagnostics"],
+            },
+        },
+    )
+    assert recommendations.status_code == 200, recommendations.text
+    payload = recommendations.json()
+    assert payload["matches"] == []
+    assert payload["diagnostics"][0]["status_code"] in {"dependency_missing", "policy_not_implemented"}
+    assert payload["diagnostics"][0]["message"]
+
+
 def test_data_studio_template_create_round_trips_comparison_enabled_and_rejects_missing_metric_when_enabled(
     tmp_path: Path,
     monkeypatch,

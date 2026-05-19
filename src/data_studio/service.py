@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
+
+import pandas as pd
 
 from src.data_studio.comparison import (
     comparison_recipes_for_workbooks,
@@ -8,10 +12,19 @@ from src.data_studio.comparison import (
     materialize_comparison_context,
     preview_comparison_recipe,
 )
-from src.data_studio.import_templates_v2 import create_template_definition, preview_template_apply
+from src.data_studio.import_templates_v2 import (
+    V2_PARSE_STRATEGY,
+    build_workbook_from_template,
+    create_template_definition,
+    parse_file_with_template,
+    preview_template_apply,
+)
 from src.data_studio.ingest import preview_and_recommend
 from src.data_studio.models import (
+    DataStudioWorkbook,
+    TemplateDefinition,
     TemplateFieldBinding,
+    TemplateMatch,
     TemplateMatchCondition,
     TemplateSegmentSelector,
     TemplateSourceFormat,
@@ -30,6 +43,7 @@ from src.data_studio.workbooks import (
     import_workbooks,
     preview_workbook,
 )
+from src.rendering.data_containers import table_container_from_frame
 
 
 def list_data_studio_templates():
@@ -39,6 +53,26 @@ def list_data_studio_templates():
 def list_data_studio_template_recommendations(source_path: str | Path):
     _preview, recommendations = preview_and_recommend(source_path)
     return recommendations
+
+
+def list_data_studio_template_recommendations_payload(
+    source_path: str | Path,
+    *,
+    import_selection: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    selection = _normalize_import_selection(source_path, import_selection=import_selection)
+    blocking = _blocking_import_selection_diagnostics(selection)
+    if blocking:
+        return {"matches": [], "diagnostics": blocking}
+    _preview, recommendations = preview_and_recommend(_selection_input_path(source_path, selection))
+    diagnostics = _selection_applied_diagnostics(selection)
+    return {
+        "matches": [
+            _enriched_template_match(match, selection=selection)
+            for match in recommendations
+        ],
+        "diagnostics": diagnostics,
+    }
 
 
 def create_data_studio_template(
@@ -70,7 +104,12 @@ def create_data_studio_template(
     return template
 
 
-def preview_data_studio_template(source_path: str | Path, *, template_payload: dict[str, object]):
+def preview_data_studio_template(
+    source_path: str | Path,
+    *,
+    template_payload: dict[str, object],
+    import_selection: dict[str, Any] | None = None,
+):
     template = create_template_definition(
         label=str(template_payload.get("label", "Draft Import Template")),
         template_id=(
@@ -103,7 +142,15 @@ def preview_data_studio_template(source_path: str | Path, *, template_payload: d
             if isinstance(item, dict)
         ),
     )
-    return preview_template_apply(source_path, template)
+    selection = _normalize_import_selection(source_path, import_selection=import_selection)
+    effective = _template_with_import_selection(template, selection)
+    preview = preview_template_apply(_selection_input_path(source_path, selection), effective)
+    normalized, containers = _normalized_output_preview_and_containers(
+        _selection_input_path(source_path, selection),
+        effective,
+        selection=selection,
+    )
+    return replace(preview, normalized_output_preview=normalized, data_containers=tuple(containers))
 
 
 def update_data_studio_template(template_id: str, *, new_id: str | None = None, new_label: str | None = None):
@@ -120,13 +167,271 @@ def build_data_studio_workbook(
     output_path: str | Path,
     template_id: str,
     group_name: str | None = None,
+    import_selection: dict[str, Any] | None = None,
 ):
-    return build_workbook(
-        file_paths=file_paths,
-        output_path=output_path,
-        template_id=template_id,
-        group_name=group_name,
+    template = load_template(template_id)
+    selection = _normalize_import_selection(file_paths[0] if file_paths else "", import_selection=import_selection)
+    if template.parse_strategy == V2_PARSE_STRATEGY and selection:
+        effective = _template_with_import_selection(template, selection)
+        workbook = build_workbook_from_template(
+            file_paths=file_paths,
+            output_path=output_path,
+            template=effective,
+            group_name=group_name,
+        )
+    else:
+        workbook = build_workbook(
+            file_paths=file_paths,
+            output_path=output_path,
+            template_id=template_id,
+            group_name=group_name,
+        )
+    return replace(workbook, data_containers=tuple(_workbook_data_containers(workbook)))
+
+
+def _normalize_import_selection(
+    source_path: str | Path,
+    *,
+    import_selection: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    if not import_selection:
+        return None
+    selection = dict(import_selection)
+    selection.setdefault("input_path", str(source_path))
+    selection.setdefault("options", {})
+    selection.setdefault("diagnostics", [])
+    return selection
+
+
+def _selection_input_path(source_path: str | Path, selection: dict[str, Any] | None) -> str | Path:
+    if selection and selection.get("input_path"):
+        return str(selection["input_path"])
+    return source_path
+
+
+def _blocking_import_selection_diagnostics(selection: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not selection:
+        return []
+    profile = selection.get("profile") if isinstance(selection.get("profile"), dict) else {}
+    diagnostics = [item for item in selection.get("diagnostics", []) if isinstance(item, dict)]
+    if profile.get("status") == "disabled":
+        return diagnostics or [
+            {
+                "status_code": "import_filter_disabled",
+                "severity": "warning",
+                "message": "The selected import filter is disabled for Data Studio templates.",
+            }
+        ]
+    return [
+        item
+        for item in diagnostics
+        if str(item.get("status_code")) in {"dependency_missing", "policy_not_implemented"}
+    ]
+
+
+def _selection_applied_diagnostics(selection: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not selection:
+        return []
+    selected = selection.get("selected_sheet_or_segment")
+    return [
+        {
+            "status_code": "import_selection_applied",
+            "severity": "info",
+            "message": "Using the selected import profile, options, and source structure.",
+            "selected_sheet_or_segment": selected,
+            "filter_id": selection.get("filter_id"),
+        }
+    ]
+
+
+def _template_with_import_selection(
+    template: TemplateDefinition,
+    selection: dict[str, Any] | None,
+) -> TemplateDefinition:
+    if not selection:
+        return template
+    options = selection.get("options") if isinstance(selection.get("options"), dict) else {}
+    selected = selection.get("selected_sheet_or_segment")
+    selected_text = str(selected) if selected is not None else ""
+    sheet_name = options.get("sheet") or options.get("sheet_name")
+    if sheet_name is None and selected_text and "::" not in selected_text:
+        sheet_name = selected_text
+    if sheet_name is None and "::" in selected_text:
+        sheet_name = selected_text.split("::", 1)[0]
+    delimiter = (
+        options.get("delimiter")
+        if options.get("delimiter") not in {"", "auto", None}
+        else template.source_format.delimiter
     )
+    if delimiter == "tab":
+        delimiter = "\t"
+    source_format = replace(
+        template.source_format,
+        encoding=(
+            str(options["encoding"])
+            if options.get("encoding") not in {"", "auto", None}
+            else template.source_format.encoding
+        ),
+        delimiter=str(delimiter) if delimiter is not None else None,
+        sheet_name=str(sheet_name) if sheet_name is not None else template.source_format.sheet_name,
+    )
+    segment_selectors = template.segment_selectors
+    segment_id = str(options.get("segment_id") or selected_text or "")
+    if segment_id and "::" in segment_id:
+        segment_selectors = (
+            TemplateSegmentSelector(
+                id=segment_id,
+                label=segment_id,
+            ),
+        )
+    return replace(
+        template,
+        source_format=source_format,
+        segment_selectors=segment_selectors,
+    )
+
+
+def _enriched_template_match(match: TemplateMatch, *, selection: dict[str, Any] | None) -> dict[str, Any]:
+    template = load_template(match.template_id)
+    missing_roles = _missing_required_roles(template)
+    matched_roles = _role_matches_for_template(template, missing_roles=missing_roles)
+    diagnostics = _selection_applied_diagnostics(selection)
+    return {
+        "template_id": match.template_id,
+        "label": match.label,
+        "family": match.family,
+        "confidence": match.confidence,
+        "reasons": list(match.reasons),
+        "warnings": list(match.warnings),
+        "matched_sheet_names": list(match.matched_sheet_names),
+        "auto_selected": match.auto_selected,
+        "matched_roles": matched_roles,
+        "missing_roles": missing_roles,
+        "ambiguous_roles": [],
+        "matched_structure_id": (selection or {}).get("selected_sheet_or_segment"),
+        "diagnostics": diagnostics,
+    }
+
+
+def _role_matches_for_template(
+    template: TemplateDefinition,
+    *,
+    missing_roles: list[str],
+) -> list[dict[str, Any]]:
+    missing = set(missing_roles)
+    matches: list[dict[str, Any]] = []
+    for binding in template.field_bindings:
+        matches.append(
+            {
+                "role": binding.role,
+                "label": binding.label,
+                "source_label": binding.column_name or binding.label,
+                "status": "missing" if binding.role in missing else "matched",
+                "confidence": 0.0 if binding.role in missing else 1.0,
+            }
+        )
+    return matches
+
+
+def _missing_required_roles(template: TemplateDefinition) -> list[str]:
+    roles = {binding.role for binding in template.field_bindings if not binding.optional}
+    if template.output_kind == "curve_metrics":
+        required = ["curve_x", "curve_y"]
+        if template.comparison_enabled:
+            required.append("metric")
+        return [role for role in required if role not in roles]
+    if template.output_kind == "metric_table":
+        return ["metric"] if "metric" not in roles else []
+    if template.output_kind == "matrix_heatmap":
+        return [role for role in ("matrix_x", "matrix_y", "matrix_z") if role not in roles]
+    return []
+
+
+def _normalized_output_preview_and_containers(
+    source_path: str | Path,
+    template: TemplateDefinition,
+    *,
+    selection: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    try:
+        parsed = parse_file_with_template(source_path, template)
+    except Exception as exc:
+        return {
+            "selected_structure_id": (selection or {}).get("selected_sheet_or_segment"),
+            "role_mapping": _role_matches_for_template(template, missing_roles=_missing_required_roles(template)),
+            "series_count": 0,
+            "metric_count": 0,
+            "matrix_row_count": 0,
+            "sample_rows": [],
+            "warnings": [],
+            "errors": [str(exc)],
+        }, []
+    rows: list[list[object]] = []
+    if parsed.curves:
+        curve = parsed.curves[0]
+        rows = [[curve.x_label, curve.y_label], [curve.x_unit, curve.y_unit]]
+        rows.extend(curve.data.head(12).values.tolist())
+    elif parsed.matrix_rows is not None:
+        rows = parsed.matrix_rows.head(14).values.tolist()
+    elif parsed.metrics:
+        rows = [["Metric", "Value"], *[[key, value] for key, value in parsed.metrics.items()]]
+    frame = _frame_from_sample_rows(rows)
+    containers = []
+    if frame is not None:
+        containers.append(
+            table_container_from_frame(
+                frame,
+                input_path=source_path,
+                sheet=template.source_format.sheet_name or "Sheet1",
+                container_id=f"data-studio-normalized:{template.id}",
+                label=f"{template.label} normalized output",
+                kind="transformed_view",
+                help_text="Readonly normalized Data Studio output generated from the selected import profile.",
+            )
+        )
+    return {
+        "selected_structure_id": (
+            parsed.curves[0].segment_id
+            if parsed.curves
+            else (selection or {}).get("selected_sheet_or_segment")
+        ),
+        "role_mapping": _role_matches_for_template(template, missing_roles=[]),
+        "series_count": len(parsed.curves),
+        "metric_count": len(parsed.metrics or {}),
+        "matrix_row_count": 0 if parsed.matrix_rows is None else len(parsed.matrix_rows.index),
+        "sample_rows": rows[:14],
+        "warnings": list(parsed.warnings),
+        "errors": [],
+    }, containers
+
+
+def _frame_from_sample_rows(rows: list[list[object]]) -> pd.DataFrame | None:
+    if not rows:
+        return None
+    headers = [str(item) for item in rows[0]]
+    data_rows = rows[1:] if len(rows) > 1 else []
+    return pd.DataFrame(data_rows, columns=headers)
+
+
+def _workbook_data_containers(workbook: DataStudioWorkbook) -> list[dict[str, Any]]:
+    workbook_path = Path(workbook.workbook_path).expanduser()
+    if not workbook_path.exists():
+        return []
+    try:
+        frame = pd.read_excel(workbook_path, sheet_name=workbook.preferred_sheet, header=None).fillna("")
+    except Exception:
+        return []
+    return [
+        table_container_from_frame(
+            frame,
+            input_path=workbook_path,
+            sheet=workbook.preferred_sheet,
+            container_id=f"data-studio-workbook:{workbook_path.name}:{workbook.preferred_sheet}",
+            label=f"{workbook.label} {workbook.preferred_sheet}",
+            kind="transformed_view",
+            help_text="Readonly Data Studio workbook output container.",
+        )
+    ]
 
 
 def _source_format_from_payload(payload: dict[str, object]) -> TemplateSourceFormat:
@@ -255,6 +560,7 @@ __all__ = [
     "import_data_studio_workbooks",
     "list_data_studio_recipes",
     "list_data_studio_template_recommendations",
+    "list_data_studio_template_recommendations_payload",
     "list_data_studio_templates",
     "load_template",
     "normalize_session_payload",
