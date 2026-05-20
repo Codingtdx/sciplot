@@ -42,10 +42,14 @@ def test_nextgen_sidecar_routes_are_registered_and_critical() -> None:
     assert ("POST", "/command/normalize") in signatures
     assert ("POST", "/command/apply-preview") in signatures
     assert ("POST", "/live-source/update-now") in signatures
+    assert ("POST", "/live-source/pause") in signatures
+    assert ("POST", "/live-source/resume") in signatures
     assert ("POST", "/preview-scene") in set(CRITICAL_SIDECAR_ROUTES)
     assert ("POST", "/command/normalize") in set(CRITICAL_SIDECAR_ROUTES)
     assert ("POST", "/command/apply-preview") in set(CRITICAL_SIDECAR_ROUTES)
     assert ("POST", "/live-source/update-now") in set(CRITICAL_SIDECAR_ROUTES)
+    assert ("POST", "/live-source/pause") in set(CRITICAL_SIDECAR_ROUTES)
+    assert ("POST", "/live-source/resume") in set(CRITICAL_SIDECAR_ROUTES)
 
 
 def test_meta_exposes_nextgen_runtime_capabilities() -> None:
@@ -61,6 +65,65 @@ def test_meta_exposes_nextgen_runtime_capabilities() -> None:
     assert catalogs["data_containers"]["data.column_model"]["status"] == "enabled"
     assert catalogs["live_sources"]["live.file_tail"]["status"] == "enabled"
     assert catalogs["live_sources"]["live.mqtt"]["status"] == "disabled"
+
+
+def test_live_source_pause_resume_update_now_and_stale_revision(tmp_path: Path) -> None:
+    path = tmp_path / "live.csv"
+    _curve_csv(path)
+    live_source = {
+        "source_id": "live:periodic:curve",
+        "kind": "periodic_csv_refresh",
+        "path": str(path),
+        "poll_interval_ms": 1000,
+        "sample_window": 100,
+        "append_policy": "replace",
+        "paused": False,
+        "last_revision": 0,
+    }
+
+    paused = client.post(
+        "/live-source/pause",
+        json={"source": live_source, "input_path": str(path), "sheet": 0, "current_revision": 1},
+    )
+
+    assert paused.status_code == 200, paused.text
+    paused_source = paused.json()["live_source"]
+    assert paused_source["paused"] is True
+    assert paused_source["last_diagnostic"]["status_code"] == "live_source_paused"
+
+    resumed = client.post(
+        "/live-source/resume",
+        json={"source": paused_source, "input_path": str(path), "sheet": 0, "current_revision": 1},
+    )
+
+    assert resumed.status_code == 200, resumed.text
+    resumed_source = resumed.json()["live_source"]
+    assert resumed_source["paused"] is False
+    assert resumed_source["last_diagnostic"]["status_code"] == "live_source_resumed"
+
+    updated = client.post(
+        "/live-source/update-now",
+        json={"source": resumed_source, "input_path": str(path), "sheet": 0, "current_revision": 1},
+    )
+
+    assert updated.status_code == 200, updated.text
+    payload = updated.json()
+    assert payload["data_revision"] == 2
+    assert payload["live_source"]["last_revision"] == 2
+    assert payload["live_source"]["container_ids"] == [item["id"] for item in payload["data_containers"]]
+    assert payload["live_source"]["graph_node_id"] == "live_source:live:periodic:curve"
+    assert payload["render_invalidation"]["reason"] == "live_source_updated"
+
+    stale = client.post(
+        "/live-source/update-now",
+        json={"source": payload["live_source"], "input_path": str(path), "sheet": 0, "current_revision": 1},
+    )
+
+    assert stale.status_code == 200, stale.text
+    stale_payload = stale.json()
+    assert stale_payload["data_revision"] == 2
+    assert stale_payload["diagnostics"][0]["status_code"] == "stale_live_source_revision"
+    assert stale_payload["render_invalidation"]["reason"] == "stale_live_source_revision"
 
 
 def test_source_table_containers_include_column_semantics_and_lifecycle(tmp_path: Path) -> None:

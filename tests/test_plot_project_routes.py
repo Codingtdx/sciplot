@@ -1072,6 +1072,19 @@ def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Pat
                                 "region_id": None,
                                 "slot_id": None,
                                 "crop_rect": {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0},
+                                "asset_ref": {
+                                    "asset_id": "artifact:plot:panel-1",
+                                    "source_module": "plot",
+                                    "source_graph_node_id": "plot:scene:latest",
+                                    "artifact_manifest_id": "artifact:plot:panel-1",
+                                    "label": "Plot panel",
+                                    "kind": "figure",
+                                    "mime_type": "application/pdf",
+                                    "sha256": "panel-fixture-sha",
+                                    "embedded_path": f"sources/composer/panels/{composer_panel_path.name}",
+                                    "refresh_policy": "manual",
+                                    "preflight_status": "ready",
+                                },
                             }
                         ],
                         "texts": [],
@@ -1123,6 +1136,22 @@ def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Pat
                                 "size_bytes": code_console_pdf_path.stat().st_size,
                             }
                         ],
+                        "notebook_artifacts": [
+                            {
+                                "artifact_id": "artifact:code-console:console-output",
+                                "source_module": "code_console",
+                                "source_graph_node_id": "code_console:notebook_output:1",
+                                "kind": "figure",
+                                "label": code_console_pdf_path.name,
+                                "mime_type": "application/pdf",
+                                "sha256": "",
+                                "embedded_path": f"artifacts/code_console/latest_run/{code_console_pdf_path.name}",
+                                "manifest_id": "artifact:code-console:console-output",
+                                "created_at": "2026-05-20T00:00:00Z",
+                                "status": "enabled",
+                                "help": "Restored Code Console figure artifact.",
+                            }
+                        ],
                     },
                     "embedded_generated_files": [],
                     "selected_generated_file_path": str(code_console_pdf_path),
@@ -1134,6 +1163,16 @@ def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Pat
     )
 
     assert save_response.status_code == 200, save_response.text
+    saved_payload = save_response.json()["payload"]
+    graph_edges = saved_payload["document_graph"]["edges"]
+    graph_nodes = saved_payload["document_graph"]["nodes"]
+    composer_panel_node = next(node for node in graph_nodes if node["id"] == "composer:panel:panel-1")
+    assert composer_panel_node["payload"]["asset_ref"]["asset_id"] == "artifact:plot:panel-1"
+    assert any(
+        edge["source"] == "composer:panel:panel-1" and edge["relationship"] == "uses_artifact"
+        for edge in graph_edges
+    )
+    assert any(node["kind"] == "artifact.figure" and node["module"] == "code_console" for node in graph_nodes)
     with zipfile.ZipFile(project_path) as archive:
         names = set(archive.namelist())
         assert f"sources/plot/primary/{plot_source_path.name}" in names
@@ -1159,8 +1198,13 @@ def test_save_open_v2_project_roundtrip_restores_all_module_assets(tmp_path: Pat
     assert Path(payload["restored_workbook_paths"][0]).exists()
     assert Path(project_payload["composer"]["project"]["panels"][0]["file_path"]).exists()
     assert project_payload["composer"]["project"]["panels"][0]["file_path"] != str(composer_panel_path)
+    assert project_payload["composer"]["project"]["panels"][0]["asset_ref"]["asset_id"] == "artifact:plot:panel-1"
     restored_manual = project_payload["code_console"]["manual_binding"]
     assert Path(restored_manual["original_source_path"]).exists()
     restored_generated = project_payload["code_console"]["latest_run"]["generated_files"][0]
     assert Path(restored_generated["path"]).exists()
+    assert (
+        project_payload["code_console"]["latest_run"]["notebook_artifacts"][0]["artifact_id"]
+        == "artifact:code-console:console-output"
+    )
     assert project_payload["code_console"]["selected_generated_file_path"] == restored_generated["path"]

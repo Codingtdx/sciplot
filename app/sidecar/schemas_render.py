@@ -511,13 +511,32 @@ class ExportTargetPayload(StrictModel):
 
 class NotebookOutputPayload(StrictModel):
     id: str
-    kind: Literal["table", "figure", "artifact", "text"]
+    kind: Literal["table", "figure", "artifact", "text", "log"]
     label: str
     status: Literal["enabled", "disabled"] = "enabled"
     source_run_id: str
     artifact_paths: list[str] = Field(default_factory=list)
     container_ids: list[str] = Field(default_factory=list)
     help: str = "Code Console generated output landing."
+
+
+class ArtifactManifestEntryPayload(StrictModel):
+    artifact_id: str
+    source_module: str
+    source_graph_node_id: str | None = None
+    kind: str
+    label: str
+    mime_type: str | None = None
+    sha256: str = ""
+    embedded_path: str | None = None
+    manifest_id: str | None = None
+    created_at: str | None = None
+    status: Literal["enabled", "disabled", "missing", "stale"] = "enabled"
+    help: str = "Durable SciPlot artifact manifest entry."
+
+
+class NotebookArtifactPayload(ArtifactManifestEntryPayload):
+    data_container_id: str | None = None
 
 
 class AnalysisOperationRequest(FileRequest):
@@ -620,22 +639,44 @@ class PreviewSceneResponse(StrictModel):
 
 
 class LiveSourcePayload(StrictModel):
-    id: str
-    kind: Literal["file_tail", "folder_watch", "periodic_csv", "mqtt", "serial", "socket"]
-    status: Literal["enabled", "disabled"] = "disabled"
+    id: str | None = None
+    source_id: str | None = None
+    kind: Literal["file_tail", "folder_watch", "periodic_csv", "periodic_csv_refresh", "mqtt", "serial", "socket"]
+    path: str | None = None
+    status: Literal["enabled", "disabled"] = "enabled"
     poll_interval_ms: int = 1000
     sample_window: int = 1000
     append_policy: Literal["append", "replace"] = "append"
     paused: bool = True
     last_update_diagnostic: dict[str, Any] = Field(default_factory=dict)
-    help: str
+    last_revision: int = 0
+    last_update_at: str | None = None
+    last_diagnostic: dict[str, Any] = Field(default_factory=dict)
+    container_ids: list[str] = Field(default_factory=list)
+    graph_node_id: str | None = None
+    help: str = "Live source refresh is owned by the sidecar runtime."
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_live_source_identity(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        source_id = data.get("source_id") or data.get("id")
+        if source_id is not None:
+            data.setdefault("id", source_id)
+            data.setdefault("source_id", source_id)
+        data.setdefault("last_diagnostic", data.get("last_update_diagnostic") or {})
+        data.setdefault("last_update_diagnostic", data.get("last_diagnostic") or {})
+        return data
 
 
 class LiveSourceUpdateRequest(StrictModel):
-    live_source: LiveSourcePayload
+    live_source: LiveSourcePayload = Field(validation_alias=AliasChoices("live_source", "source"))
     input_path: str
     sheet: str | int = 0
     options: dict[str, Any] = Field(default_factory=dict)
+    current_revision: int = 0
 
 
 class LiveSourceUpdateResponse(StrictModel):
@@ -973,6 +1014,7 @@ class CodeConsoleRunSnapshotPayload(StrictModel):
     stdout_path: str = ""
     stderr_path: str = ""
     generated_files: list[CodeConsoleGeneratedFileSnapshotPayload] = Field(default_factory=list)
+    notebook_artifacts: list[NotebookArtifactPayload] = Field(default_factory=list)
 
 
 class CodeConsoleProjectPayload(StrictModel):
@@ -2001,6 +2043,7 @@ __all__ = [
     "AnalysisOperationRequest",
     "AnalysisOperationResponse",
     "AnalysisOperationResultPayload",
+    "ArtifactManifestEntryPayload",
     "ExportTargetPayload",
     "ImportDiagnosticPayload",
     "ImportFilterProfilePayload",
@@ -2010,6 +2053,7 @@ __all__ = [
     "ImportFilterPayload",
     "ImportStructureNodePayload",
     "NotebookOutputPayload",
+    "NotebookArtifactPayload",
     "PlotEditCommandNormalizeRequest",
     "PlotEditCommandNormalizeResponse",
     "PlotEditCommandPayload",

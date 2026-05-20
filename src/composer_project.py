@@ -265,6 +265,7 @@ def project_from_dict(data: dict[str, Any]) -> ComposerProject:
                 region_id=item.get("region_id"),
                 slot_id=item.get("slot_id"),
                 crop_rect=parse_crop_rect(item.get("crop_rect")),
+                asset_ref=dict(item.get("asset_ref")) if isinstance(item.get("asset_ref"), dict) else None,
             )
             for item in panels_payload
             if isinstance(item, dict)

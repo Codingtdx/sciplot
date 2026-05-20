@@ -28,6 +28,8 @@ enum TestPayloads {
         .init(method: "POST", path: "/command/apply-preview"),
         .init(method: "POST", path: "/preview-scene"),
         .init(method: "POST", path: "/live-source/update-now"),
+        .init(method: "POST", path: "/live-source/pause"),
+        .init(method: "POST", path: "/live-source/resume"),
         .init(method: "POST", path: "/save-project"),
         .init(method: "POST", path: "/open-project"),
         .init(method: "POST", path: "/preflight-render"),
@@ -1054,6 +1056,35 @@ enum TestPayloads {
                     name: "fit_table.csv",
                     fileType: "csv",
                     sizeBytes: 256
+                ),
+            ],
+            notebookOutputs: [
+                .init(
+                    id: "notebook-output:1",
+                    kind: "figure",
+                    label: "sample.pdf",
+                    status: "enabled",
+                    sourceRunID: "run-1",
+                    artifactPaths: ["/tmp/code_console/run-1/outputs/sample.pdf"],
+                    containerIDs: [],
+                    help: "Code Console generated figure output."
+                ),
+            ],
+            notebookArtifacts: [
+                NotebookArtifactPayload(
+                    artifactID: "artifact:code_console:run-1:1",
+                    sourceModule: "code_console",
+                    sourceGraphNodeID: "code_console:notebook_output:1",
+                    kind: "figure",
+                    label: "sample.pdf",
+                    mimeType: "application/pdf",
+                    sha256: "abc123",
+                    embeddedPath: "artifacts/code_console/latest_run/sample.pdf",
+                    manifestID: "artifact:code_console:run-1:1",
+                    createdAt: "2026-05-20T00:00:00Z",
+                    status: "enabled",
+                    help: "Restored Code Console figure artifact.",
+                    dataContainerID: nil
                 ),
             ]
         )

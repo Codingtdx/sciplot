@@ -165,6 +165,16 @@ print(f"rows={len(df)}")
     notebook_outputs = {item["label"]: item for item in payload["notebook_outputs"]}
     assert notebook_outputs["console_plot.pdf"]["kind"] == "figure"
     assert notebook_outputs["raw_snapshot.csv"]["kind"] == "table"
+    notebook_artifacts = {item["label"]: item for item in payload["notebook_artifacts"]}
+    assert notebook_artifacts["console_plot.pdf"]["kind"] == "figure"
+    assert notebook_artifacts["console_plot.pdf"]["source_module"] == "code_console"
+    assert notebook_artifacts["console_plot.pdf"]["source_graph_node_id"].startswith("code_console:notebook_output:")
+    assert notebook_artifacts["raw_snapshot.csv"]["kind"] == "table"
+    assert (
+        notebook_artifacts["raw_snapshot.csv"]["data_container_id"]
+        == notebook_outputs["raw_snapshot.csv"]["container_ids"][0]
+    )
+    assert notebook_artifacts["stdout.log"]["kind"] == "log"
     assert payload["data_containers"][0]["kind"] == "notebook_output"
     assert payload["data_containers"][0]["label"] == "raw_snapshot.csv"
 

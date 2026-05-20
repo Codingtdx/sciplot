@@ -40,6 +40,8 @@ CRITICAL_SIDECAR_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", "/command/apply-preview"),
     ("POST", "/preview-scene"),
     ("POST", "/live-source/update-now"),
+    ("POST", "/live-source/pause"),
+    ("POST", "/live-source/resume"),
     ("POST", "/save-project"),
     ("POST", "/open-project"),
     ("POST", "/preflight-render"),

@@ -22,7 +22,7 @@ This public handoff replaces the private beta work log. It keeps only the curren
 
 - Keep `src/plot_contract.json` as the single source of truth for public plot templates, styles, palettes, themes, defaults, and gallery metadata.
 - Keep LabPlot-scale capability status flowing through `/meta`, sidecar schemas, `.sciplot` document graph nodes, and macOS decode models; do not add a second local capability table in Swift.
-- Keep the active LabPlot-informed engineering queue in `docs/superpowers/plans/2026-05-19-labplot-nextgen-workqueue.md`; after each queued batch is merged, remove that batch from the queue and migrate product facts into this handoff/API/frontend documentation.
+- The LabPlot-informed engineering queue in `docs/superpowers/plans/2026-05-19-labplot-nextgen-workqueue.md` is currently empty. Product facts live in this handoff, `docs/sidecar-api.md`, and `docs/macos-frontend-design.md`.
 - Keep project open/save routed through sidecar schema normalization.
 - Keep `.sciplot` self-contained: embedded sources and workbooks are the restore truth, not original absolute paths.
 - Keep macOS as the only supported desktop frontend.
@@ -57,8 +57,9 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 - `POST /plot-edit-command/normalize` validates undoable plot edit commands in `src/rendering/plot_object_commands.py`.
 - `POST /command/normalize` and `POST /command/apply-preview` extend the command envelope across Plot, Data Studio, Composer, and Code Console graph objects.
 - `POST /preview-scene` returns a contract-gated Swift-native realtime preview scene; `/render-preview` remains the authoritative bitmap/PDF correction path.
-- `POST /live-source/update-now` refreshes enabled file-tail, folder-watch, or periodic-CSV sources into revisioned data containers.
-- `POST /code-console/run` returns `notebook_outputs` and readonly notebook output containers for generated figure/table artifacts.
+- `POST /live-source/update-now`, `POST /live-source/pause`, and `POST /live-source/resume` refresh or control enabled file-tail, folder-watch, or periodic-CSV sources into revisioned data containers.
+- `POST /code-console/run` returns `notebook_outputs`, readonly notebook output containers, and `notebook_artifacts` for generated figures, tables, and logs.
+- `POST /composer/import-panels` accepts `asset_refs`, `POST /compose-preview` returns Composer export preflight, and `POST /compose-export` blocks critical linked-artifact preflight failures.
 
 ### SciPlotDocumentGraph
 
@@ -96,6 +97,15 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 - Export targets cover figure PDF/TIFF, data workbook, project bundle, comparison bundle, artifact manifest, and Code Console figure sets.
 - Exported multi-file artifacts must be manifest-backed so restore, reveal, and future packaging have a single truth source.
 
+### Artifact manifest and linked Composer assets
+
+- `ArtifactManifestEntryPayload` and `NotebookArtifactPayload` provide the shared durable artifact identity used across Plot, Data Studio, Analysis, Code Console, and Composer.
+- Artifact identity includes artifact id, source module, source graph node id, kind, label, MIME type, checksum, embedded bundle path, manifest id, created-at timestamp, status, and user-facing help.
+- `.sciplot` bundles keep `artifacts/manifest.json` as the cross-module artifact manifest. Module payloads and document graph nodes should refer to artifact or manifest ids instead of treating temporary absolute paths as durable state.
+- Composer panels may carry `asset_ref` with the source module, graph node id, manifest id, checksum, embedded path, refresh policy, and preflight status. Document graph generation adds `composer.panel --uses_artifact--> source_graph_node_id` edges for linked panels.
+- Composer preview returns export preflight diagnostics for missing assets, low-resolution linked rasters, unsupported formats, page bleed, and stale linked-source hints. Critical diagnostics block `/compose-export`; warnings remain visible but exportable.
+- Linked Code Console/Plot/Data Studio outputs should be handed to Composer through artifact refs. Do not add a global Project Explorer to expose artifact ownership.
+
 ### Plot object commands and UndoManager
 
 - Durable edits use typed commands: add, edit, delete, reorder, rename, visibility, lock, copy_settings, bind_source, apply_template, import_container, and create_output_ref.
@@ -118,14 +128,17 @@ LabPlot-scale runtime is product surface, not roadmap. The former roadmap has be
 
 ### Live source foundation
 
-- `/meta` records live-source capabilities for file tail, folder watch, and periodic CSV refresh as enabled catalog entries backed by `POST /live-source/update-now`, with MQTT/serial/socket disabled until sandbox and fixture policy exist.
-- Live data updates must produce a data revision and preview invalidation path. They must not bypass document graph semantics.
+- `/meta` records live-source capabilities for file tail, folder watch, and periodic CSV refresh as enabled catalog entries backed by `POST /live-source/update-now`, `POST /live-source/pause`, and `POST /live-source/resume`; MQTT/serial/socket stay disabled until sandbox and fixture policy exist.
+- `LiveSourcePayload` includes source id, kind, path, poll interval, sample window, append/replace policy, pause state, last revision, last update time, last diagnostic, container ids, graph node id, and help.
+- Live data updates produce a data revision, container ids, source diagnostic, and render invalidation. If a response is stale relative to the current session revision, the sidecar returns `stale_live_source_revision` and macOS ignores it.
+- macOS controls live sources by sidecar route only. It must not poll or parse files locally and must not bypass import diagnostics or document graph semantics.
 
 ### Code Console notebook bridge
 
 - Keep Code Console notebook outputs inside the existing Code Console module. Do not add a fifth Notebook module.
 - Generated figures become notebook figure outputs; generated CSV/JSON tables become readonly notebook output containers.
-- Project restore uses embedded latest-run artifacts for UI continuity and does not rerun code as restore truth.
+- Generated stdout/stderr become log artifacts. `notebook_artifacts` are persisted in the latest-run snapshot and can be restored without rerunning code.
+- Project restore uses embedded latest-run artifacts for UI continuity and does not rerun code as restore truth. Plot/Composer handoff should use notebook artifact refs and container ids.
 
 ### Testing policy
 

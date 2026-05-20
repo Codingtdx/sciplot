@@ -38,6 +38,21 @@ class ComposerRegionPayload(StrictModel):
     slot_kind: Literal["structure"] | None = None
 
 
+class ComposerAssetRefPayload(StrictModel):
+    asset_id: str
+    source_module: str
+    source_graph_node_id: str | None = None
+    artifact_manifest_id: str | None = None
+    label: str
+    kind: str = "figure"
+    mime_type: str | None = None
+    sha256: str = ""
+    embedded_path: str | None = None
+    refresh_policy: Literal["manual", "on_open", "live"] = "manual"
+    preflight_status: Literal["ready", "warning", "blocked", "missing", "stale"] = "ready"
+    help: str = "Linked Composer artifact managed through the project artifact manifest."
+
+
 class ComposerPanelPayload(StrictModel):
     id: str
     file_path: str
@@ -55,6 +70,7 @@ class ComposerPanelPayload(StrictModel):
     region_id: str | None = None
     slot_id: str | None = None
     crop_rect: ComposerCropRectPayload = Field(default_factory=ComposerCropRectPayload)
+    asset_ref: ComposerAssetRefPayload | None = None
 
 
 class ComposerTextPayload(StrictModel):
@@ -89,6 +105,23 @@ class ComposerImportRequest(StrictModel):
     project: ComposerRequest
     file_paths: list[str]
     kind: str = "graph"
+    asset_refs: list[ComposerAssetRefPayload] = Field(default_factory=list)
+
+
+class ComposerPreflightDiagnosticPayload(StrictModel):
+    id: str
+    severity: Literal["info", "warning", "critical"]
+    message: str
+    panel_id: str | None = None
+    source_module: str | None = None
+    help: str = ""
+
+
+class ComposerExportPreflightPayload(StrictModel):
+    status: Literal["ready", "warning", "blocked"]
+    diagnostics: list[ComposerPreflightDiagnosticPayload] = Field(default_factory=list)
+    blocking_panel_ids: list[str] = Field(default_factory=list)
+    help: str = "Composer export preflight completed."
 
 
 class ThumbnailRequest(StrictModel):
@@ -108,6 +141,7 @@ class ComposerPreviewResponse(StrictModel):
     qa: QAReportResponse | None = None
     submission_report: SubmissionReportResponse | None = None
     suggested_project_patch: list[dict[str, Any]] = Field(default_factory=list)
+    export_preflight: ComposerExportPreflightPayload | None = None
 
 
 class ComposerProjectResponse(ComposerRequest):
@@ -119,7 +153,10 @@ def composer_project_from_request(request: ComposerRequest) -> ComposerProject:
 
 
 __all__ = [
+    "ComposerAssetRefPayload",
+    "ComposerExportPreflightPayload",
     "ComposerImportRequest",
+    "ComposerPreflightDiagnosticPayload",
     "ComposerPreviewResponse",
     "ComposerProjectResponse",
     "ComposerRequest",

@@ -38,6 +38,8 @@ protocol SidecarClienting: AnyObject {
     func applyCommandPreview(_ request: CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse
     func previewScene(_ request: PreviewSceneRequest) async throws -> PreviewSceneResponse
     func updateLiveSourceNow(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse
+    func pauseLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse
+    func resumeLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse
     func openProject(_ request: OpenProjectRequest) async throws -> OpenProjectResponse
     func codeConsoleContext(_ request: CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse
@@ -215,6 +217,14 @@ final class SidecarClient: SidecarClienting {
 
     func updateLiveSourceNow(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
         try await post("live-source/update-now", body: request)
+    }
+
+    func pauseLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        try await post("live-source/pause", body: request)
+    }
+
+    func resumeLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        try await post("live-source/resume", body: request)
     }
 
     func saveProject(_ request: SaveProjectRequest) async throws -> SaveProjectResponse {

@@ -21,7 +21,7 @@ from app.sidecar.schemas import (
 from app.sidecar.server_utils import http_bad_request, normalize_path
 from src.rendering.analysis_operations import run_analysis_operation
 from src.rendering.import_filters import preview_import
-from src.rendering.live_sources import update_live_source
+from src.rendering.live_sources import pause_live_source, resume_live_source, update_live_source
 from src.rendering.plot_object_commands import apply_command_preview, normalize_plot_edit_command
 from src.rendering.preview_scene import build_preview_scene
 
@@ -138,10 +138,37 @@ def create_labplot_runtime_router() -> APIRouter:
                 input_path=input_path,
                 sheet=request.sheet,
                 options=request.options,
+                current_revision=request.current_revision,
             )
             return LiveSourceUpdateResponse.model_validate(payload)
         except Exception as exc:
             raise http_bad_request("live-source-update-now", exc) from exc
+
+    @router.post("/live-source/pause", response_model=LiveSourceUpdateResponse)
+    def live_source_pause(request: LiveSourceUpdateRequest) -> LiveSourceUpdateResponse:
+        try:
+            input_path = normalize_path(request.input_path)
+            payload = pause_live_source(
+                live_source=request.live_source.model_dump(mode="json"),
+                input_path=input_path,
+                sheet=request.sheet,
+            )
+            return LiveSourceUpdateResponse.model_validate(payload)
+        except Exception as exc:
+            raise http_bad_request("live-source-pause", exc) from exc
+
+    @router.post("/live-source/resume", response_model=LiveSourceUpdateResponse)
+    def live_source_resume(request: LiveSourceUpdateRequest) -> LiveSourceUpdateResponse:
+        try:
+            input_path = normalize_path(request.input_path)
+            payload = resume_live_source(
+                live_source=request.live_source.model_dump(mode="json"),
+                input_path=input_path,
+                sheet=request.sheet,
+            )
+            return LiveSourceUpdateResponse.model_validate(payload)
+        except Exception as exc:
+            raise http_bad_request("live-source-resume", exc) from exc
 
     return router
 

@@ -223,6 +223,60 @@ final class ComposerSessionTests: XCTestCase {
         XCTAssertEqual(session.latestExportItems.map(\.label), ["composer-final.pdf"])
     }
 
+    func testLinkedArtifactImportSendsAssetRefsAndPreflightBlocksExport() async throws {
+        let client = MockSidecarClient()
+        let assetRef = ComposerAssetRefPayload(
+            assetID: "artifact:code_console:figure",
+            sourceModule: "code_console",
+            sourceGraphNodeID: "code_console:notebook_output:1",
+            artifactManifestID: "artifact:code_console:figure",
+            label: "Generated Figure",
+            kind: "figure",
+            mimeType: "application/pdf",
+            sha256: "abc123",
+            embeddedPath: "artifacts/code_console/latest_run/figure.pdf"
+        )
+        var imported = TestPayloads.composerProject()
+        imported.panels[0].assetRef = assetRef
+        client.importedComposerProject = imported
+        let session = ComposerSession(previewDelayNanoseconds: 1_000_000)
+        session.configure(client: client)
+
+        session.beginImport(kind: .graph)
+        await session.handleImportedAssets(
+            [URL(fileURLWithPath: "/tmp/figure.pdf")],
+            assetRefs: [assetRef]
+        )
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertEqual(client.composerImportRequests.first?.assetRefs.first?.assetID, "artifact:code_console:figure")
+        XCTAssertEqual(session.selectedPanel?.assetRef?.sourceGraphNodeID, "code_console:notebook_output:1")
+
+        session.previewResponse = ComposerPreviewResponse(
+            valid: true,
+            validationError: nil,
+            pngBase64: TestPayloads.pngBase64,
+            exportPreflight: ComposerExportPreflightPayload(
+                status: "blocked",
+                diagnostics: [
+                    ComposerPreflightDiagnosticPayload(
+                        id: "low_resolution_raster",
+                        severity: "critical",
+                        message: "Panel panel-1 uses a low-resolution raster.",
+                        panelID: "panel-1",
+                        sourceModule: "code_console",
+                        help: "Use a higher-resolution raster or a PDF figure before exporting."
+                    ),
+                ],
+                blockingPanelIDs: ["panel-1"],
+                help: "Composer export is blocked by critical preflight diagnostics."
+            )
+        )
+
+        XCTAssertFalse(session.exportAvailability.isEnabled)
+        XCTAssertTrue(session.exportAvailability.reason?.contains("preflight") ?? false)
+    }
+
     func testComposerExportPassesTiffDestinationToMaterializer() async {
         let client = MockSidecarClient()
         let destinationURL = URL(fileURLWithPath: "/tmp/user_exports/composer-final.tiff")

@@ -30,6 +30,65 @@ struct ComposerRegionPayload: Codable, Equatable, Sendable, Identifiable {
     var slotKind: String?
 }
 
+struct ComposerAssetRefPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String { assetID }
+    var assetID: String
+    var sourceModule: String
+    var sourceGraphNodeID: String?
+    var artifactManifestID: String?
+    var label: String
+    var kind: String
+    var mimeType: String?
+    var sha256: String
+    var embeddedPath: String?
+    var refreshPolicy: String
+    var preflightStatus: String
+    var help: String
+
+    init(
+        assetID: String,
+        sourceModule: String,
+        sourceGraphNodeID: String? = nil,
+        artifactManifestID: String? = nil,
+        label: String,
+        kind: String = "figure",
+        mimeType: String? = nil,
+        sha256: String = "",
+        embeddedPath: String? = nil,
+        refreshPolicy: String = "manual",
+        preflightStatus: String = "ready",
+        help: String = "Linked Composer artifact managed through the project artifact manifest."
+    ) {
+        self.assetID = assetID
+        self.sourceModule = sourceModule
+        self.sourceGraphNodeID = sourceGraphNodeID
+        self.artifactManifestID = artifactManifestID
+        self.label = label
+        self.kind = kind
+        self.mimeType = mimeType
+        self.sha256 = sha256
+        self.embeddedPath = embeddedPath
+        self.refreshPolicy = refreshPolicy
+        self.preflightStatus = preflightStatus
+        self.help = help
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case assetID = "assetId"
+        case sourceModule
+        case sourceGraphNodeID = "sourceGraphNodeId"
+        case artifactManifestID = "artifactManifestId"
+        case label
+        case kind
+        case mimeType
+        case sha256
+        case embeddedPath
+        case refreshPolicy
+        case preflightStatus
+        case help
+    }
+}
+
 struct ComposerPanelPayload: Codable, Equatable, Sendable, Identifiable {
     var id: String
     var filePath: String
@@ -47,6 +106,7 @@ struct ComposerPanelPayload: Codable, Equatable, Sendable, Identifiable {
     var regionID: String?
     var slotID: String?
     var cropRect: ComposerCropRectPayload = .init()
+    var assetRef: ComposerAssetRefPayload?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -65,6 +125,7 @@ struct ComposerPanelPayload: Codable, Equatable, Sendable, Identifiable {
         case regionID = "regionId"
         case slotID = "slotId"
         case cropRect
+        case assetRef
     }
 }
 
@@ -115,6 +176,19 @@ struct ComposerImportRequestPayload: Codable, Equatable, Sendable {
     let project: ComposerRequestPayload
     let filePaths: [String]
     let kind: String
+    let assetRefs: [ComposerAssetRefPayload]
+
+    init(
+        project: ComposerRequestPayload,
+        filePaths: [String],
+        kind: String,
+        assetRefs: [ComposerAssetRefPayload] = []
+    ) {
+        self.project = project
+        self.filePaths = filePaths
+        self.kind = kind
+        self.assetRefs = assetRefs
+    }
 }
 
 struct ThumbnailRequest: Codable, Equatable, Sendable {
@@ -127,6 +201,38 @@ struct PanelThumbnailResponse: Codable, Equatable, Sendable {
     let pngBase64: String
 }
 
+struct ComposerPreflightDiagnosticPayload: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let severity: String
+    let message: String
+    let panelID: String?
+    let sourceModule: String?
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case severity
+        case message
+        case panelID = "panelId"
+        case sourceModule
+        case help
+    }
+}
+
+struct ComposerExportPreflightPayload: Codable, Equatable, Sendable {
+    let status: String
+    let diagnostics: [ComposerPreflightDiagnosticPayload]
+    let blockingPanelIDs: [String]
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case diagnostics
+        case blockingPanelIDs = "blockingPanelIds"
+        case help
+    }
+}
+
 struct ComposerPreviewResponse: Codable, Equatable, Sendable {
     let valid: Bool
     let validationError: String?
@@ -134,6 +240,25 @@ struct ComposerPreviewResponse: Codable, Equatable, Sendable {
     let qa: QAReportResponse?
     let submissionReport: SubmissionReportResponse?
     let suggestedProjectPatch: [[String: JSONValue]]
+    let exportPreflight: ComposerExportPreflightPayload?
+
+    init(
+        valid: Bool,
+        validationError: String?,
+        pngBase64: String,
+        qa: QAReportResponse? = nil,
+        submissionReport: SubmissionReportResponse? = nil,
+        suggestedProjectPatch: [[String: JSONValue]] = [],
+        exportPreflight: ComposerExportPreflightPayload? = nil
+    ) {
+        self.valid = valid
+        self.validationError = validationError
+        self.pngBase64 = pngBase64
+        self.qa = qa
+        self.submissionReport = submissionReport
+        self.suggestedProjectPatch = suggestedProjectPatch
+        self.exportPreflight = exportPreflight
+    }
 }
 
 typealias ComposerProjectResponse = ComposerRequestPayload

@@ -180,6 +180,26 @@ final class CodeConsoleSessionTests: XCTestCase {
         XCTAssertEqual(session.latestExportItems.map(\.label), ["code-console-final.pdf"])
     }
 
+    func testCodeConsoleProjectRoundtripKeepsNotebookArtifactsWithoutRerun() {
+        let session = CodeConsoleSession()
+        session.latestRunResponse = TestPayloads.codeConsoleRun()
+        session.selectedGeneratedFilePath = "/tmp/code_console/run-1/outputs/sample.pdf"
+
+        let payload = session.buildProjectPayload(projectDisplayName: "Notebook Artifacts")
+
+        XCTAssertEqual(payload?.latestRun?.notebookArtifacts.first?.artifactID, "artifact:code_console:run-1:1")
+
+        let restored = CodeConsoleSession()
+        restored.restoreProjectPayload(
+            payload!,
+            plot: PlotSession(),
+            dataStudio: DataStudioSession()
+        )
+
+        XCTAssertEqual(restored.latestRunResponse?.notebookArtifacts.first?.sourceGraphNodeID, "code_console:notebook_output:1")
+        XCTAssertEqual(restored.latestRunResponse?.generatedFiles.first?.name, "sample.pdf")
+    }
+
     func testContextRefreshCancellationDoesNotSurfaceError() async {
         let client = MockSidecarClient()
         client.codeConsoleContextHandler = { _ in

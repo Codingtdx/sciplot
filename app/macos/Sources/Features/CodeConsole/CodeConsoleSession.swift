@@ -870,7 +870,8 @@ final class CodeConsoleSession {
                     fileType: $0.fileType,
                     sizeBytes: $0.sizeBytes
                 )
-            }
+            },
+            notebookArtifacts: latestRunResponse.notebookArtifacts
         )
     }
 
@@ -911,7 +912,8 @@ final class CodeConsoleSession {
                     fileType: $0.fileType,
                     sizeBytes: $0.sizeBytes
                 )
-            }
+            },
+            notebookArtifacts: payload.notebookArtifacts
         )
     }
 

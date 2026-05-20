@@ -20,8 +20,8 @@ The module windows are not tabs inside a global workbench. Each module owns its 
 - Hybrid realtime preview uses `POST /preview-scene` and only draws admitted scene payloads. Unsupported scenes fall back to backend bitmap/PDF preview.
 - Data Studio Analysis and Plot Data Workbook display sidecar `DataContainerPayload` and `AnalysisOperationResultPayload` values; Swift does not recompute fit, statistics, FFT, or import parsing.
 - Data Studio raw import is file-first: call `/import-preview`, show the returned filter profile/diagnostics/options, then pass the same `ImportSelectionPayload` to template recommendation, template preview, and workbook build. Swift must not sniff delimiters, encodings, sheet structure, or import formats locally.
-- Live source controls call `POST /live-source/update-now` and display data revision/diagnostics; they do not poll or parse source files in Swift.
-- Code Console Outputs displays notebook figure/table outputs from `POST /code-console/run`; generated artifacts can be handed to Plot/Composer through project graph references.
+- Live source controls call `POST /live-source/update-now`, `POST /live-source/pause`, and `POST /live-source/resume` and display data revision/diagnostics; they do not poll or parse source files in Swift.
+- Code Console Outputs displays notebook figure/table/log outputs and notebook artifacts from `POST /code-console/run`; generated artifacts can be handed to Plot/Composer through project graph references.
 
 ## Pro Workspace Grammar
 
@@ -107,6 +107,8 @@ Composer follows `Assets -> Layout -> Compose -> Inspect -> Export`.
 
 Canvas-local quick actions may remain when they describe the current selection. Global import/export belongs in the toolbar or menu.
 
+Composer panels can be linked to durable artifact refs from Plot, Data Studio, Analysis, or Code Console. The inspector may show linked source, artifact kind, and preflight status for the selected panel. Preview receives export preflight from sidecar; `blocked` status disables export with help, while warnings remain visible. Swift does not calculate raster DPI, checksum state, or source staleness locally.
+
 ## Code Console
 
 Code Console follows `Bind Context -> Prompt/Code -> Run -> Outputs -> Handoff`.
@@ -116,6 +118,8 @@ Code Console follows `Bind Context -> Prompt/Code -> Run -> Outputs -> Handoff`.
 - Right: binding summary, runner status, output handoff, and advanced source/output reveal actions.
 
 Run, Copy Prompt, Refresh, and Restore Starter are part of the center working surface because they operate on the code being edited.
+
+Latest-run outputs are grouped as generated files, notebook outputs, notebook artifacts, and logs. Project restore may show those artifacts without rerunning code. Figure artifacts can be handed to Composer and table artifacts can be handed to Plot/Data Studio through decoded artifact refs and container ids; do not introduce a separate Notebook module.
 
 ## Light And Dark Theme
 
