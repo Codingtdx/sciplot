@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import mimetypes
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -17,13 +20,58 @@ from src.code_console_service import build_code_console_context, run_code_consol
 from src.rendering.data_containers import table_container_from_frame
 
 
-def _notebook_outputs_and_containers(result) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+def _sha256_path(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else ""
+
+
+def _artifact_kind(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
+        return "figure"
+    if suffix in {".csv", ".json"}:
+        return "table"
+    return "artifact"
+
+
+def _artifact_payload(
+    *,
+    artifact_id: str,
+    source_graph_node_id: str,
+    kind: str,
+    label: str,
+    path: Path,
+    data_container_id: str | None = None,
+) -> dict[str, object]:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    return {
+        "artifact_id": artifact_id,
+        "source_module": "code_console",
+        "source_graph_node_id": source_graph_node_id,
+        "kind": kind,
+        "label": label,
+        "mime_type": mime_type or ("text/plain" if kind == "log" else "application/octet-stream"),
+        "sha256": _sha256_path(path),
+        "embedded_path": f"artifacts/code_console/latest_run/{path.name}",
+        "manifest_id": artifact_id,
+        "created_at": datetime.now(UTC).isoformat(),
+        "status": "enabled" if path.exists() else "missing",
+        "help": "Code Console generated artifact managed through the project bundle manifest.",
+        "data_container_id": data_container_id,
+    }
+
+
+def _notebook_outputs_containers_artifacts(
+    result,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     outputs: list[dict[str, object]] = []
     containers: list[dict[str, object]] = []
+    artifacts: list[dict[str, object]] = []
     for index, item in enumerate(result.generated_files, start=1):
         output_id = f"notebook-output:{index}"
         path = Path(item.path)
         suffix = path.suffix.lower()
+        source_graph_node_id = f"code_console:notebook_output:{index}"
+        artifact_id = f"artifact:code_console:{result.run_dir.name}:{index}"
         if suffix in {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
             outputs.append(
                 {
@@ -36,6 +84,15 @@ def _notebook_outputs_and_containers(result) -> tuple[list[dict[str, object]], l
                     "container_ids": [],
                     "help": "Code Console generated figure output.",
                 }
+            )
+            artifacts.append(
+                _artifact_payload(
+                    artifact_id=artifact_id,
+                    source_graph_node_id=source_graph_node_id,
+                    kind="figure",
+                    label=item.name,
+                    path=path,
+                )
             )
             continue
         frame: pd.DataFrame | None = None
@@ -50,7 +107,7 @@ def _notebook_outputs_and_containers(result) -> tuple[list[dict[str, object]], l
             outputs.append(
                 {
                     "id": output_id,
-                    "kind": "artifact",
+                    "kind": _artifact_kind(path),
                     "label": item.name,
                     "status": "enabled",
                     "source_run_id": str(result.run_dir.name),
@@ -58,6 +115,15 @@ def _notebook_outputs_and_containers(result) -> tuple[list[dict[str, object]], l
                     "container_ids": [],
                     "help": "Code Console generated artifact output.",
                 }
+            )
+            artifacts.append(
+                _artifact_payload(
+                    artifact_id=artifact_id,
+                    source_graph_node_id=source_graph_node_id,
+                    kind=_artifact_kind(path),
+                    label=item.name,
+                    path=path,
+                )
             )
             continue
         container_id = f"notebook-output-container:{index}"
@@ -84,7 +150,63 @@ def _notebook_outputs_and_containers(result) -> tuple[list[dict[str, object]], l
                 "help": "Code Console generated table output.",
             }
         )
-    return outputs, containers
+        artifacts.append(
+            _artifact_payload(
+                artifact_id=artifact_id,
+                source_graph_node_id=source_graph_node_id,
+                kind="table",
+                label=item.name,
+                path=path,
+                data_container_id=container_id,
+            )
+        )
+    if result.stdout:
+        stdout_path = Path(result.stdout_path)
+        artifacts.append(
+            _artifact_payload(
+                artifact_id=f"artifact:code_console:{result.run_dir.name}:stdout",
+                source_graph_node_id="code_console:latest_run:stdout",
+                kind="log",
+                label="stdout.log",
+                path=stdout_path,
+            )
+        )
+        outputs.append(
+            {
+                "id": "notebook-output:stdout",
+                "kind": "log",
+                "label": "stdout.log",
+                "status": "enabled",
+                "source_run_id": str(result.run_dir.name),
+                "artifact_paths": [str(stdout_path)],
+                "container_ids": [],
+                "help": "Code Console stdout log artifact.",
+            }
+        )
+    if result.stderr:
+        stderr_path = Path(result.stderr_path)
+        artifacts.append(
+            _artifact_payload(
+                artifact_id=f"artifact:code_console:{result.run_dir.name}:stderr",
+                source_graph_node_id="code_console:latest_run:stderr",
+                kind="log",
+                label="stderr.log",
+                path=stderr_path,
+            )
+        )
+        outputs.append(
+            {
+                "id": "notebook-output:stderr",
+                "kind": "log",
+                "label": "stderr.log",
+                "status": "enabled",
+                "source_run_id": str(result.run_dir.name),
+                "artifact_paths": [str(stderr_path)],
+                "container_ids": [],
+                "help": "Code Console stderr log artifact.",
+            }
+        )
+    return outputs, containers, artifacts
 
 
 def create_code_console_router() -> APIRouter:
@@ -148,7 +270,7 @@ def create_code_console_router() -> APIRouter:
                 source_kind=request_context.source_kind if request_context else None,
                 source_label=request_context.source_label if request_context else None,
             )
-            notebook_outputs, data_containers = _notebook_outputs_and_containers(result)
+            notebook_outputs, data_containers, notebook_artifacts = _notebook_outputs_containers_artifacts(result)
             return CodeConsoleRunResponse.model_validate(
                 {
                     "status": result.status,
@@ -173,6 +295,7 @@ def create_code_console_router() -> APIRouter:
                         for item in result.generated_files
                     ],
                     "notebook_outputs": notebook_outputs,
+                    "notebook_artifacts": notebook_artifacts,
                     "data_containers": data_containers,
                 }
             )

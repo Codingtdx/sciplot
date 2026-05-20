@@ -615,13 +615,20 @@ final class SchemaDecodingTests: XCTestCase {
         {
           "live_source": {
             "id": "live:file-tail:live",
+            "source_id": "live:file-tail:live",
             "kind": "periodic_csv",
+            "path": "/tmp/live.csv",
             "status": "enabled",
             "poll_interval_ms": 1000,
             "sample_window": 200,
             "append_policy": "replace",
             "paused": false,
             "last_update_diagnostic": {"status_code": "live_source_updated"},
+            "last_revision": 12,
+            "last_update_at": "2026-05-20T00:00:00Z",
+            "last_diagnostic": {"status_code": "live_source_updated"},
+            "container_ids": ["source-table:live"],
+            "graph_node_id": "live_source:live:file-tail:live",
             "help": "Periodic CSV refresh for local files."
           },
           "input_path": "/tmp/live.csv",
@@ -635,6 +642,9 @@ final class SchemaDecodingTests: XCTestCase {
         """
         let liveUpdate = try decoder.decode(LiveSourceUpdateResponse.self, from: Data(livePayload.utf8))
         XCTAssertEqual(liveUpdate.liveSource.kind, "periodic_csv")
+        XCTAssertEqual(liveUpdate.liveSource.sourceID, "live:file-tail:live")
+        XCTAssertEqual(liveUpdate.liveSource.containerIDs, ["source-table:live"])
+        XCTAssertEqual(liveUpdate.liveSource.graphNodeID, "live_source:live:file-tail:live")
         XCTAssertEqual(liveUpdate.dataRevision, 12)
         XCTAssertEqual(liveUpdate.renderInvalidation["reason"]?.stringValue, "live_source_updated")
     }
@@ -679,6 +689,23 @@ final class SchemaDecodingTests: XCTestCase {
               "help": "Code Console generated figure output."
             }
           ],
+          "notebook_artifacts": [
+            {
+              "artifact_id": "artifact:code_console:run:1",
+              "source_module": "code_console",
+              "source_graph_node_id": "code_console:notebook_output:1",
+              "kind": "figure",
+              "label": "plot.pdf",
+              "mime_type": "application/pdf",
+              "sha256": "abc123",
+              "embedded_path": "artifacts/code_console/latest_run/plot.pdf",
+              "manifest_id": "artifact:code_console:run:1",
+              "created_at": "2026-05-20T00:00:00Z",
+              "status": "enabled",
+              "help": "Restored Code Console figure artifact.",
+              "data_container_id": null
+            }
+          ],
           "data_containers": []
         }
         """
@@ -686,7 +713,92 @@ final class SchemaDecodingTests: XCTestCase {
         let response = try decoder.decode(CodeConsoleRunResponse.self, from: Data(payload.utf8))
 
         XCTAssertEqual(response.notebookOutputs.first?.kind, "figure")
+        XCTAssertEqual(response.notebookArtifacts.first?.artifactID, "artifact:code_console:run:1")
+        XCTAssertEqual(response.notebookArtifacts.first?.sourceGraphNodeID, "code_console:notebook_output:1")
         XCTAssertEqual(response.generatedFiles.first?.name, "plot.pdf")
+    }
+
+    func testDecodeComposerLinkedArtifactAndPreflightPayloads() throws {
+        let projectPayload = """
+        {
+          "version": 2,
+          "mode": "composer",
+          "canvas_width_mm": 180,
+          "canvas_height_mm": 170,
+          "grid_mm": 0.5,
+          "layout_grid": {"columns": 3, "rows": 3, "cell_width_mm": 60, "cell_height_mm": 55, "frame_x_mm": 0, "frame_y_mm": 2.5, "frame_width_mm": 180, "frame_height_mm": 165},
+          "regions": [],
+          "panels": [
+            {
+              "id": "panel-linked",
+              "file_path": "/tmp/plot.pdf",
+              "page_index": 0,
+              "x_mm": 0,
+              "y_mm": 2.5,
+              "w_mm": 60,
+              "h_mm": 55,
+              "locked": false,
+              "hidden": false,
+              "label": "A",
+              "kind": "graph",
+              "z_index": 0,
+              "group_id": null,
+              "region_id": null,
+              "slot_id": null,
+              "crop_rect": {"x": 0, "y": 0, "width": 1, "height": 1},
+              "asset_ref": {
+                "asset_id": "artifact:plot:latest",
+                "source_module": "plot",
+                "source_graph_node_id": "plot:scene:latest",
+                "artifact_manifest_id": "artifact:plot:latest",
+                "label": "Latest Plot",
+                "kind": "figure",
+                "mime_type": "application/pdf",
+                "sha256": "abc123",
+                "embedded_path": "artifacts/plot/latest.pdf",
+                "refresh_policy": "manual",
+                "preflight_status": "ready",
+                "help": "Linked plot artifact."
+              }
+            }
+          ],
+          "texts": [],
+          "auto_labels": true
+        }
+        """
+        let project = try decoder.decode(ComposerRequestPayload.self, from: Data(projectPayload.utf8))
+        XCTAssertEqual(project.panels.first?.assetRef?.assetID, "artifact:plot:latest")
+        XCTAssertEqual(project.panels.first?.assetRef?.sourceGraphNodeID, "plot:scene:latest")
+
+        let previewPayload = """
+        {
+          "valid": true,
+          "validation_error": null,
+          "png_base64": "\(TestPayloads.pngBase64)",
+          "qa": null,
+          "submission_report": null,
+          "suggested_project_patch": [],
+          "export_preflight": {
+            "status": "blocked",
+            "blocking_panel_ids": ["panel-linked"],
+            "help": "Composer export is blocked by critical preflight diagnostics.",
+            "diagnostics": [
+              {
+                "id": "low_resolution_raster",
+                "severity": "critical",
+                "message": "Panel panel-linked uses a low-resolution raster.",
+                "panel_id": "panel-linked",
+                "source_module": "code_console",
+                "help": "Use a higher-resolution raster or a PDF figure before exporting."
+              }
+            ]
+          }
+        }
+        """
+        let preview = try decoder.decode(ComposerPreviewResponse.self, from: Data(previewPayload.utf8))
+        XCTAssertEqual(preview.exportPreflight?.status, "blocked")
+        XCTAssertEqual(preview.exportPreflight?.diagnostics.first?.id, "low_resolution_raster")
+        XCTAssertEqual(preview.exportPreflight?.blockingPanelIDs, ["panel-linked"])
     }
 
     func testEncodeCodeConsoleRunRequestUsesSnakeCaseContextID() throws {

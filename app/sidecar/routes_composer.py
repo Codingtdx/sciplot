@@ -18,6 +18,7 @@ from app.sidecar.schemas import (
     serialize_dataclass,
 )
 from app.sidecar.server_utils import http_bad_request, normalize_path
+from src.composer_preflight import build_composer_export_preflight, composer_export_blocker_message
 from src.core.application.composer import (
     analyze_composer_project,
     build_composer_submission_report,
@@ -52,6 +53,7 @@ def create_composer_router() -> APIRouter:
         try:
             project = composer_project_from_request(request)
             ok, reason = validate_non_overlapping_panels(project)
+            preflight = build_composer_export_preflight(project)
             png_bytes = compose_preview_png(project)
             qa_report, suggested_patch = analyze_composer_project(project)
             submission_report = build_composer_submission_report(
@@ -67,6 +69,7 @@ def create_composer_router() -> APIRouter:
                 qa=serialize_dataclass(qa_report),
                 submission_report=serialize_dataclass(submission_report),
                 suggested_project_patch=serialize_dataclass(suggested_patch),
+                export_preflight=preflight,
             )
         except Exception as exc:
             raise http_bad_request("composer-preview", exc) from exc
@@ -78,6 +81,9 @@ def create_composer_router() -> APIRouter:
             ok, reason = validate_non_overlapping_panels(project)
             if not ok:
                 raise ValueError(reason)
+            preflight = build_composer_export_preflight(project)
+            if preflight["status"] == "blocked":
+                raise ValueError(composer_export_blocker_message(preflight))
             with NamedTemporaryFile(delete=False, suffix=".pdf") as handle:
                 output_path = Path(handle.name)
             exported = compose_export_pdf(project, output_path)
@@ -106,7 +112,12 @@ def create_composer_router() -> APIRouter:
         try:
             project = composer_project_from_request(request.project)
             file_paths = [str(Path(path).expanduser()) for path in request.file_paths]
-            next_project = import_panels_from_paths(project, file_paths, kind=request.kind)
+            next_project = import_panels_from_paths(
+                project,
+                file_paths,
+                kind=request.kind,
+                asset_refs=[item.model_dump(mode="json") for item in request.asset_refs],
+            )
             return ComposerProjectResponse.model_validate(serialize_dataclass(next_project))
         except Exception as exc:
             raise http_bad_request("composer-import-panels", exc) from exc

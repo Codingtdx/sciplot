@@ -1,16 +1,43 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from src.rendering.data_containers import source_table_data_containers
 from src.rendering.source_table_preview import source_table_preview
 
-SUPPORTED_LIVE_SOURCE_KINDS = {"file_tail", "folder_watch", "periodic_csv"}
+SUPPORTED_LIVE_SOURCE_KINDS = {"file_tail", "folder_watch", "periodic_csv", "periodic_csv_refresh"}
 
 
 def _diagnostic(status_code: str, message: str, **extra: Any) -> dict[str, Any]:
     return {"status_code": status_code, "message": message, **extra}
+
+
+def _source_identity(source: dict[str, Any]) -> str:
+    source_id = str(source.get("source_id") or source.get("id") or "live-source")
+    source["source_id"] = source_id
+    source["id"] = source_id
+    source["graph_node_id"] = source.get("graph_node_id") or f"live_source:{source_id}"
+    return source_id
+
+
+def _stamp_source(
+    source: dict[str, Any],
+    diagnostic: dict[str, Any],
+    *,
+    data_revision: int | None = None,
+    container_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    _source_identity(source)
+    source["last_update_diagnostic"] = diagnostic
+    source["last_diagnostic"] = diagnostic
+    source["last_update_at"] = datetime.now(UTC).isoformat()
+    if data_revision is not None:
+        source["last_revision"] = data_revision
+    if container_ids is not None:
+        source["container_ids"] = container_ids
+    return source
 
 
 def _resolve_live_source_path(kind: str, input_path: str | Path) -> tuple[Path | None, dict[str, Any] | None]:
@@ -45,8 +72,10 @@ def update_live_source(
     input_path: str | Path,
     sheet: str | int = 0,
     options: dict[str, Any] | None = None,
+    current_revision: int = 0,
 ) -> dict[str, Any]:
     source = dict(live_source)
+    _source_identity(source)
     kind = str(source.get("kind") or "")
     if kind not in SUPPORTED_LIVE_SOURCE_KINDS:
         diagnostic = _diagnostic(
@@ -55,7 +84,7 @@ def update_live_source(
             kind=kind,
         )
         source["status"] = "disabled"
-        source["last_update_diagnostic"] = diagnostic
+        _stamp_source(source, diagnostic, data_revision=int(source.get("last_revision") or 0), container_ids=[])
         return {
             "live_source": source,
             "input_path": str(input_path),
@@ -67,9 +96,9 @@ def update_live_source(
             "help": source.get("help") or diagnostic["message"],
         }
 
-    if source.get("status") != "enabled":
+    if source.get("paused") is True or source.get("status") != "enabled":
         diagnostic = _diagnostic("live_source_paused", "Live source is disabled or paused.")
-        source["last_update_diagnostic"] = diagnostic
+        _stamp_source(source, diagnostic, data_revision=int(source.get("last_revision") or 0), container_ids=[])
         return {
             "live_source": source,
             "input_path": str(input_path),
@@ -81,9 +110,34 @@ def update_live_source(
             "help": source.get("help") or diagnostic["message"],
         }
 
-    resolved_path, error = _resolve_live_source_path(kind, input_path)
+    last_revision = int(source.get("last_revision") or 0)
+    if current_revision and last_revision > current_revision:
+        diagnostic = _diagnostic(
+            "stale_live_source_revision",
+            "Live source update response is stale relative to the current session revision.",
+            current_revision=current_revision,
+            last_revision=last_revision,
+        )
+        _stamp_source(
+            source,
+            diagnostic,
+            data_revision=last_revision,
+            container_ids=list(source.get("container_ids") or []),
+        )
+        return {
+            "live_source": source,
+            "input_path": str(input_path),
+            "sheet": sheet,
+            "data_revision": last_revision,
+            "data_containers": [],
+            "diagnostics": [diagnostic],
+            "render_invalidation": {"reason": "stale_live_source_revision", "data_revision": last_revision},
+            "help": source.get("help") or diagnostic["message"],
+        }
+
+    resolved_path, error = _resolve_live_source_path(kind, source.get("path") or input_path)
     if resolved_path is None:
-        source["last_update_diagnostic"] = error or {}
+        _stamp_source(source, error or {}, data_revision=last_revision, container_ids=[])
         return {
             "live_source": source,
             "input_path": str(input_path),
@@ -105,14 +159,16 @@ def update_live_source(
         delimiter=(options or {}).get("delimiter"),
     )
     containers = source_table_data_containers(preview)
-    data_revision = max(1, int(resolved_path.stat().st_mtime_ns))
+    data_revision = max(current_revision + 1, last_revision + 1, 1)
+    container_ids = [str(item["id"]) for item in containers]
     diagnostic = _diagnostic(
         "live_source_updated",
         "Live source refreshed from the current local file snapshot.",
         input_path=str(resolved_path),
         data_revision=data_revision,
     )
-    source["last_update_diagnostic"] = diagnostic
+    source["path"] = str(resolved_path)
+    _stamp_source(source, diagnostic, data_revision=data_revision, container_ids=container_ids)
     return {
         "live_source": source,
         "input_path": str(resolved_path),
@@ -125,4 +181,62 @@ def update_live_source(
     }
 
 
-__all__ = ["SUPPORTED_LIVE_SOURCE_KINDS", "update_live_source"]
+def pause_live_source(
+    *,
+    live_source: dict[str, Any],
+    input_path: str | Path,
+    sheet: str | int = 0,
+) -> dict[str, Any]:
+    source = dict(live_source)
+    source["paused"] = True
+    source["status"] = source.get("status") or "enabled"
+    diagnostic = _diagnostic("live_source_paused", "Live source polling is paused.")
+    data_revision = int(source.get("last_revision") or 0)
+    _stamp_source(
+        source,
+        diagnostic,
+        data_revision=data_revision,
+        container_ids=list(source.get("container_ids") or []),
+    )
+    return {
+        "live_source": source,
+        "input_path": str(source.get("path") or input_path),
+        "sheet": sheet,
+        "data_revision": data_revision,
+        "data_containers": [],
+        "diagnostics": [diagnostic],
+        "render_invalidation": {"reason": "live_source_paused", "data_revision": data_revision},
+        "help": source.get("help") or "Live source polling is paused.",
+    }
+
+
+def resume_live_source(
+    *,
+    live_source: dict[str, Any],
+    input_path: str | Path,
+    sheet: str | int = 0,
+) -> dict[str, Any]:
+    source = dict(live_source)
+    source["paused"] = False
+    source["status"] = source.get("status") or "enabled"
+    diagnostic = _diagnostic("live_source_resumed", "Live source polling is resumed.")
+    data_revision = int(source.get("last_revision") or 0)
+    _stamp_source(
+        source,
+        diagnostic,
+        data_revision=data_revision,
+        container_ids=list(source.get("container_ids") or []),
+    )
+    return {
+        "live_source": source,
+        "input_path": str(source.get("path") or input_path),
+        "sheet": sheet,
+        "data_revision": data_revision,
+        "data_containers": [],
+        "diagnostics": [diagnostic],
+        "render_invalidation": {"reason": "live_source_resumed", "data_revision": data_revision},
+        "help": source.get("help") or "Live source polling is resumed.",
+    }
+
+
+__all__ = ["SUPPORTED_LIVE_SOURCE_KINDS", "pause_live_source", "resume_live_source", "update_live_source"]

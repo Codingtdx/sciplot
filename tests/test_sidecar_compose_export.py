@@ -91,6 +91,162 @@ def _image_layer_names(document: fitz.Document, page: fitz.Page) -> list[str]:
     return layer_names
 
 
+def _composer_asset_ref(
+    *,
+    asset_id: str,
+    source_module: str = "code_console",
+    source_graph_node_id: str = "code_console:notebook_output:1",
+    kind: str = "figure",
+    label: str = "Linked Figure",
+    mime_type: str = "application/pdf",
+    sha256: str = "fixture-sha",
+    embedded_path: str = "artifacts/code_console/latest_run/linked.pdf",
+    manifest_id: str = "artifact:linked",
+) -> dict[str, object]:
+    return {
+        "asset_id": asset_id,
+        "source_module": source_module,
+        "source_graph_node_id": source_graph_node_id,
+        "artifact_manifest_id": manifest_id,
+        "label": label,
+        "kind": kind,
+        "mime_type": mime_type,
+        "sha256": sha256,
+        "embedded_path": embedded_path,
+        "refresh_policy": "manual",
+        "preflight_status": "ready",
+    }
+
+
+def _single_panel_project(
+    panel_path: Path,
+    *,
+    kind: str = "asset",
+    asset_ref: dict[str, object] | None = None,
+) -> dict[str, object]:
+    panel: dict[str, object] = {
+        "id": "panel-linked",
+        "file_path": str(panel_path),
+        "page_index": 0,
+        "x_mm": 0,
+        "y_mm": 2.5,
+        "w_mm": 60,
+        "h_mm": 55,
+        "kind": kind,
+        "z_index": 0,
+        "locked": False,
+        "hidden": False,
+        "label": None,
+        "group_id": None,
+        "region_id": None,
+        "slot_id": None,
+        "crop_rect": {"x": 0, "y": 0, "width": 1, "height": 1},
+    }
+    if asset_ref is not None:
+        panel["asset_ref"] = asset_ref
+    return {
+        "version": 2,
+        "mode": "composer",
+        "canvas_width_mm": 180,
+        "canvas_height_mm": 170,
+        "grid_mm": 0.5,
+        "layout_grid": {
+            "columns": 3,
+            "rows": 3,
+            "cell_width_mm": 60,
+            "cell_height_mm": 55,
+            "frame_x_mm": 0,
+            "frame_y_mm": 2.5,
+            "frame_width_mm": 180,
+            "frame_height_mm": 165,
+        },
+        "regions": [],
+        "panels": [panel],
+        "texts": [],
+        "auto_labels": True,
+    }
+
+
+def test_composer_import_preserves_linked_asset_refs(tmp_path: Path) -> None:
+    graph_path = _write_pdf_with_text(tmp_path / "linked-plot.pdf", 60.0, 55.0, "Linked Plot")
+    asset_ref = _composer_asset_ref(
+        asset_id="artifact:plot:latest",
+        source_module="plot",
+        source_graph_node_id="plot:scene:latest",
+        label="Plot latest figure",
+        embedded_path="artifacts/plot/latest.pdf",
+        manifest_id="artifact:plot:latest",
+    )
+
+    response = client.post(
+        "/composer/import-panels",
+        json={
+            "project": _single_panel_project(graph_path)["panels"] and {
+                "version": 2,
+                "mode": "composer",
+                "canvas_width_mm": 180,
+                "canvas_height_mm": 170,
+                "grid_mm": 0.5,
+                "layout_grid": {
+                    "columns": 3,
+                    "rows": 3,
+                    "cell_width_mm": 60,
+                    "cell_height_mm": 55,
+                    "frame_x_mm": 0,
+                    "frame_y_mm": 2.5,
+                    "frame_width_mm": 180,
+                    "frame_height_mm": 165,
+                },
+                "regions": [],
+                "panels": [],
+                "texts": [],
+                "auto_labels": True,
+            },
+            "file_paths": [str(graph_path)],
+            "kind": "graph",
+            "asset_refs": [asset_ref],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    panel = response.json()["panels"][0]
+    assert panel["asset_ref"]["asset_id"] == "artifact:plot:latest"
+    assert panel["asset_ref"]["source_module"] == "plot"
+    assert panel["asset_ref"]["source_graph_node_id"] == "plot:scene:latest"
+
+
+def test_composer_preflight_reports_low_resolution_linked_asset_and_blocks_export(tmp_path: Path) -> None:
+    low_res_path = tmp_path / "tiny.png"
+    Image.new("RGB", (8, 8), (20, 160, 240)).save(low_res_path)
+    project_payload = _single_panel_project(
+        low_res_path,
+        kind="asset",
+        asset_ref=_composer_asset_ref(
+            asset_id="artifact:code_console:tiny",
+            label="Tiny notebook output",
+            mime_type="image/png",
+            embedded_path="artifacts/code_console/latest_run/tiny.png",
+            manifest_id="artifact:code_console:tiny",
+        ),
+    )
+
+    preview_response = client.post("/compose-preview", json=project_payload)
+
+    assert preview_response.status_code == 200, preview_response.text
+    preflight = preview_response.json()["export_preflight"]
+    assert preflight["status"] == "blocked"
+    assert "panel-linked" in preflight["blocking_panel_ids"]
+    assert any(
+        item["id"] == "low_resolution_raster" and item["severity"] == "critical"
+        for item in preflight["diagnostics"]
+    )
+
+    export_response = client.post("/compose-export", json=project_payload)
+
+    assert export_response.status_code == 400
+    assert "low-resolution" in export_response.text.lower()
+
+
 def test_compose_export_endpoint_preserves_pdf_and_raster_resources(tmp_path: Path) -> None:
     graph_path = _write_pdf_with_text(tmp_path / "graph.pdf", 60.0, 55.0, "Endpoint Graph")
     asset_pdf_path = _write_pdf_with_text(tmp_path / "asset.pdf", 60.0, 55.0, "Endpoint Asset")

@@ -93,6 +93,7 @@ class ComposerPanel:
     region_id: str | None = None
     slot_id: str | None = None
     crop_rect: ComposerCropRect = field(default_factory=ComposerCropRect)
+    asset_ref: dict[str, Any] | None = None
 
 
 @dataclass

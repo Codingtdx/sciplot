@@ -8,6 +8,7 @@ from app.sidecar.schemas_common import StrictModel
 from app.sidecar.schemas_render import (
     DataContainerPayload,
     InputInspectionResponse,
+    NotebookArtifactPayload,
     NotebookOutputPayload,
     PlotDatasetPreviewResponse,
     RenderOptionsPayload,
@@ -67,6 +68,7 @@ class CodeConsoleRunResponse(StrictModel):
     stderr_path: str
     generated_files: list[CodeConsoleGeneratedFileResponse] = Field(default_factory=list)
     notebook_outputs: list[NotebookOutputPayload] = Field(default_factory=list)
+    notebook_artifacts: list[NotebookArtifactPayload] = Field(default_factory=list)
     data_containers: list[DataContainerPayload] = Field(default_factory=list)
 
 

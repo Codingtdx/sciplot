@@ -1890,6 +1890,70 @@ struct NotebookOutputPayload: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct ArtifactManifestEntryPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String { artifactID }
+    let artifactID: String
+    let sourceModule: String
+    let sourceGraphNodeID: String?
+    let kind: String
+    let label: String
+    let mimeType: String?
+    let sha256: String
+    let embeddedPath: String?
+    let manifestID: String?
+    let createdAt: String?
+    let status: String
+    let help: String
+
+    enum CodingKeys: String, CodingKey {
+        case artifactID = "artifactId"
+        case sourceModule
+        case sourceGraphNodeID = "sourceGraphNodeId"
+        case kind
+        case label
+        case mimeType
+        case sha256
+        case embeddedPath
+        case manifestID = "manifestId"
+        case createdAt
+        case status
+        case help
+    }
+}
+
+struct NotebookArtifactPayload: Codable, Equatable, Sendable, Identifiable {
+    var id: String { artifactID }
+    let artifactID: String
+    let sourceModule: String
+    let sourceGraphNodeID: String?
+    let kind: String
+    let label: String
+    let mimeType: String?
+    let sha256: String
+    let embeddedPath: String?
+    let manifestID: String?
+    let createdAt: String?
+    let status: String
+    let help: String
+    let dataContainerID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case artifactID = "artifactId"
+        case sourceModule
+        case sourceGraphNodeID = "sourceGraphNodeId"
+        case kind
+        case label
+        case mimeType
+        case sha256
+        case embeddedPath
+        case manifestID = "manifestId"
+        case createdAt
+        case status
+        case help
+        case dataContainerID = "dataContainerId"
+    }
+}
+
 struct AnalysisOperationRequest: Codable, Equatable, Sendable {
     let operationID: String
     let inputPath: String
@@ -2361,25 +2425,96 @@ extension PreviewSceneResponse {
 
 struct LiveSourcePayload: Codable, Equatable, Sendable, Identifiable {
     let id: String
+    let sourceID: String?
     let kind: String
+    let path: String?
     let status: String
     let pollIntervalMS: Int
     let sampleWindow: Int?
     let appendPolicy: String
     let paused: Bool
     let lastUpdateDiagnostic: [String: JSONValue]?
+    let lastRevision: Int
+    let lastUpdateAt: String?
+    let lastDiagnostic: [String: JSONValue]?
+    let containerIDs: [String]
+    let graphNodeID: String?
     let help: String
+
+    init(
+        id: String,
+        sourceID: String? = nil,
+        kind: String,
+        path: String? = nil,
+        status: String,
+        pollIntervalMS: Int,
+        sampleWindow: Int? = nil,
+        appendPolicy: String,
+        paused: Bool,
+        lastUpdateDiagnostic: [String: JSONValue]? = nil,
+        lastRevision: Int = 0,
+        lastUpdateAt: String? = nil,
+        lastDiagnostic: [String: JSONValue]? = nil,
+        containerIDs: [String] = [],
+        graphNodeID: String? = nil,
+        help: String
+    ) {
+        self.id = id
+        self.sourceID = sourceID
+        self.kind = kind
+        self.path = path
+        self.status = status
+        self.pollIntervalMS = pollIntervalMS
+        self.sampleWindow = sampleWindow
+        self.appendPolicy = appendPolicy
+        self.paused = paused
+        self.lastUpdateDiagnostic = lastUpdateDiagnostic
+        self.lastRevision = lastRevision
+        self.lastUpdateAt = lastUpdateAt
+        self.lastDiagnostic = lastDiagnostic
+        self.containerIDs = containerIDs
+        self.graphNodeID = graphNodeID
+        self.help = help
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
+        case sourceID = "sourceId"
         case kind
+        case path
         case status
         case pollIntervalMS = "pollIntervalMs"
         case sampleWindow
         case appendPolicy
         case paused
         case lastUpdateDiagnostic
+        case lastRevision
+        case lastUpdateAt
+        case lastDiagnostic
+        case containerIDs = "containerIds"
+        case graphNodeID = "graphNodeId"
         case help
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedSourceID = try container.decodeIfPresent(String.self, forKey: .sourceID)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? decodedSourceID ?? "live-source"
+        sourceID = decodedSourceID ?? id
+        kind = try container.decode(String.self, forKey: .kind)
+        path = try container.decodeIfPresent(String.self, forKey: .path)
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? "enabled"
+        pollIntervalMS = try container.decodeIfPresent(Int.self, forKey: .pollIntervalMS) ?? 1000
+        sampleWindow = try container.decodeIfPresent(Int.self, forKey: .sampleWindow)
+        appendPolicy = try container.decodeIfPresent(String.self, forKey: .appendPolicy) ?? "append"
+        paused = try container.decodeIfPresent(Bool.self, forKey: .paused) ?? true
+        lastUpdateDiagnostic = try container.decodeIfPresent([String: JSONValue].self, forKey: .lastUpdateDiagnostic)
+        lastRevision = try container.decodeIfPresent(Int.self, forKey: .lastRevision) ?? 0
+        lastUpdateAt = try container.decodeIfPresent(String.self, forKey: .lastUpdateAt)
+        lastDiagnostic = try container.decodeIfPresent([String: JSONValue].self, forKey: .lastDiagnostic)
+        containerIDs = try container.decodeIfPresent([String].self, forKey: .containerIDs) ?? []
+        graphNodeID = try container.decodeIfPresent(String.self, forKey: .graphNodeID)
+        help = try container.decodeIfPresent(String.self, forKey: .help) ?? ""
     }
 }
 
@@ -2388,17 +2523,20 @@ struct LiveSourceUpdateRequest: Codable, Equatable, Sendable {
     let inputPath: String
     let sheet: SheetValue
     let options: [String: JSONValue]
+    let currentRevision: Int
 
     init(
         liveSource: LiveSourcePayload,
         inputPath: String,
         sheet: SheetValue = .index(0),
-        options: [String: JSONValue] = [:]
+        options: [String: JSONValue] = [:],
+        currentRevision: Int = 0
     ) {
         self.liveSource = liveSource
         self.inputPath = inputPath
         self.sheet = sheet
         self.options = options
+        self.currentRevision = currentRevision
     }
 }
 
@@ -2809,6 +2947,7 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
     let stderrPath: String
     let generatedFiles: [CodeConsoleGeneratedFileResponse]
     let notebookOutputs: [NotebookOutputPayload]
+    let notebookArtifacts: [NotebookArtifactPayload]
     let dataContainers: [DataContainerPayload]
 
     init(
@@ -2826,6 +2965,7 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
         stderrPath: String,
         generatedFiles: [CodeConsoleGeneratedFileResponse],
         notebookOutputs: [NotebookOutputPayload] = [],
+        notebookArtifacts: [NotebookArtifactPayload] = [],
         dataContainers: [DataContainerPayload] = []
     ) {
         self.status = status
@@ -2842,6 +2982,7 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
         self.stderrPath = stderrPath
         self.generatedFiles = generatedFiles
         self.notebookOutputs = notebookOutputs
+        self.notebookArtifacts = notebookArtifacts
         self.dataContainers = dataContainers
     }
 
@@ -2860,6 +3001,7 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
         case stderrPath
         case generatedFiles
         case notebookOutputs
+        case notebookArtifacts
         case dataContainers
     }
 
@@ -2879,6 +3021,7 @@ struct CodeConsoleRunResponse: Codable, Equatable, Sendable {
         stderrPath = try container.decode(String.self, forKey: .stderrPath)
         generatedFiles = try container.decodeIfPresent([CodeConsoleGeneratedFileResponse].self, forKey: .generatedFiles) ?? []
         notebookOutputs = try container.decodeIfPresent([NotebookOutputPayload].self, forKey: .notebookOutputs) ?? []
+        notebookArtifacts = try container.decodeIfPresent([NotebookArtifactPayload].self, forKey: .notebookArtifacts) ?? []
         dataContainers = try container.decodeIfPresent([DataContainerPayload].self, forKey: .dataContainers) ?? []
     }
 }
@@ -3229,6 +3372,74 @@ struct CodeConsoleRunSnapshotPayload: Codable, Equatable, Sendable {
     let stdoutPath: String
     let stderrPath: String
     let generatedFiles: [CodeConsoleGeneratedFileSnapshotPayload]
+    let notebookArtifacts: [NotebookArtifactPayload]
+
+    init(
+        status: String,
+        exitCode: Int?,
+        durationSeconds: Double,
+        stdout: String,
+        stderr: String,
+        runDir: String,
+        outputDir: String,
+        scriptPath: String,
+        promptPath: String,
+        contextPath: String,
+        stdoutPath: String,
+        stderrPath: String,
+        generatedFiles: [CodeConsoleGeneratedFileSnapshotPayload],
+        notebookArtifacts: [NotebookArtifactPayload] = []
+    ) {
+        self.status = status
+        self.exitCode = exitCode
+        self.durationSeconds = durationSeconds
+        self.stdout = stdout
+        self.stderr = stderr
+        self.runDir = runDir
+        self.outputDir = outputDir
+        self.scriptPath = scriptPath
+        self.promptPath = promptPath
+        self.contextPath = contextPath
+        self.stdoutPath = stdoutPath
+        self.stderrPath = stderrPath
+        self.generatedFiles = generatedFiles
+        self.notebookArtifacts = notebookArtifacts
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case exitCode
+        case durationSeconds
+        case stdout
+        case stderr
+        case runDir
+        case outputDir
+        case scriptPath
+        case promptPath
+        case contextPath
+        case stdoutPath
+        case stderrPath
+        case generatedFiles
+        case notebookArtifacts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(String.self, forKey: .status)
+        exitCode = try container.decodeIfPresent(Int.self, forKey: .exitCode)
+        durationSeconds = try container.decode(Double.self, forKey: .durationSeconds)
+        stdout = try container.decodeIfPresent(String.self, forKey: .stdout) ?? ""
+        stderr = try container.decodeIfPresent(String.self, forKey: .stderr) ?? ""
+        runDir = try container.decodeIfPresent(String.self, forKey: .runDir) ?? ""
+        outputDir = try container.decodeIfPresent(String.self, forKey: .outputDir) ?? ""
+        scriptPath = try container.decodeIfPresent(String.self, forKey: .scriptPath) ?? ""
+        promptPath = try container.decodeIfPresent(String.self, forKey: .promptPath) ?? ""
+        contextPath = try container.decodeIfPresent(String.self, forKey: .contextPath) ?? ""
+        stdoutPath = try container.decodeIfPresent(String.self, forKey: .stdoutPath) ?? ""
+        stderrPath = try container.decodeIfPresent(String.self, forKey: .stderrPath) ?? ""
+        generatedFiles = try container.decodeIfPresent([CodeConsoleGeneratedFileSnapshotPayload].self, forKey: .generatedFiles) ?? []
+        notebookArtifacts = try container.decodeIfPresent([NotebookArtifactPayload].self, forKey: .notebookArtifacts) ?? []
+    }
 }
 
 struct CodeConsoleProjectPayload: Codable, Equatable, Sendable {

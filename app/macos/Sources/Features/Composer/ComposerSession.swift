@@ -51,6 +51,9 @@ final class ComposerSession {
         guard !project.panels.isEmpty else {
             return .disabled("Import at least one panel before exporting.")
         }
+        if previewResponse?.exportPreflight?.status == "blocked" {
+            return .disabled(previewResponse?.exportPreflight?.help ?? "Resolve Composer export preflight blockers.")
+        }
         return .enabled()
     }
 

@@ -51,6 +51,16 @@ struct ComposerInspectorView: View {
                 if panel.kind == "graph", !session.resolvedLabel(for: panel).isEmpty {
                     AdaptiveInspectorTextRow(title: "Label", value: session.resolvedLabel(for: panel))
                 }
+
+                if let assetRef = panel.assetRef {
+                    Divider()
+                    AdaptiveInspectorTextRow(title: "Linked Source", value: assetRef.label, selectable: true)
+                    AdaptiveInspectorTextRow(title: "Artifact", value: assetRef.kind.capitalized)
+                    AdaptiveInspectorTextRow(
+                        title: "Status",
+                        value: assetRef.preflightStatus.replacingOccurrences(of: "_", with: " ").capitalized
+                    )
+                }
             }
         }
     }
@@ -247,6 +257,18 @@ struct ComposerInspectorView: View {
             if session.isExporting {
                 ProgressView()
                     .controlSize(.small)
+            }
+            if let preflight = session.previewResponse?.exportPreflight, preflight.status != "ready" {
+                Divider()
+                AdaptiveInspectorTextRow(
+                    title: "Preflight",
+                    value: preflight.status.replacingOccurrences(of: "_", with: " ").capitalized
+                )
+                ForEach(preflight.diagnostics.prefix(3)) { diagnostic in
+                    Text(diagnostic.message)
+                        .font(.caption)
+                        .foregroundStyle(diagnostic.severity == "critical" ? .red : .secondary)
+                }
             }
         }
     }

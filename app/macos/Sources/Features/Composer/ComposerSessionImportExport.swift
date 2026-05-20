@@ -2,6 +2,10 @@ import Foundation
 
 extension ComposerSession {
     func handleImportedAssets(_ urls: [URL]) async {
+        await handleImportedAssets(urls, assetRefs: [])
+    }
+
+    func handleImportedAssets(_ urls: [URL], assetRefs: [ComposerAssetRefPayload]) async {
         guard let client else {
             return
         }
@@ -13,7 +17,8 @@ extension ComposerSession {
                 .init(
                     project: project,
                     filePaths: urls.map(\.path),
-                    kind: pendingImportKind.rawValue
+                    kind: pendingImportKind.rawValue,
+                    assetRefs: assetRefs
                 )
             )
 

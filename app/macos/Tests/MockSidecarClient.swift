@@ -108,6 +108,8 @@ final class MockSidecarClient: SidecarClienting {
     var commandApplyPreviewHandler: ((CommandApplyPreviewRequest) async throws -> CommandApplyPreviewResponse)?
     var previewSceneHandler: ((PreviewSceneRequest) async throws -> PreviewSceneResponse)?
     var liveSourceUpdateHandler: ((LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse)?
+    var liveSourcePauseHandler: ((LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse)?
+    var liveSourceResumeHandler: ((LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse)?
     var saveProjectHandler: ((SaveProjectRequest) async throws -> SaveProjectResponse)?
     var openProjectHandler: ((OpenProjectRequest) async throws -> OpenProjectResponse)?
     var codeConsoleContextHandler: ((CodeConsoleContextRequest) async throws -> CodeConsoleContextResponse)?
@@ -152,6 +154,8 @@ final class MockSidecarClient: SidecarClienting {
     private(set) var previewSceneRequests: [PreviewSceneRequest] = []
     private(set) var runtimeRequestLog: [String] = []
     private(set) var liveSourceUpdateRequests: [LiveSourceUpdateRequest] = []
+    private(set) var liveSourcePauseRequests: [LiveSourceUpdateRequest] = []
+    private(set) var liveSourceResumeRequests: [LiveSourceUpdateRequest] = []
     private(set) var saveProjectRequests: [SaveProjectRequest] = []
     private(set) var openProjectRequests: [OpenProjectRequest] = []
     private(set) var thumbnailRequests: [ThumbnailRequest] = []
@@ -453,6 +457,22 @@ final class MockSidecarClient: SidecarClienting {
         liveSourceUpdateRequests.append(request)
         if let liveSourceUpdateHandler {
             return try await liveSourceUpdateHandler(request)
+        }
+        return liveSourceUpdateResponse
+    }
+
+    func pauseLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        liveSourcePauseRequests.append(request)
+        if let liveSourcePauseHandler {
+            return try await liveSourcePauseHandler(request)
+        }
+        return liveSourceUpdateResponse
+    }
+
+    func resumeLiveSource(_ request: LiveSourceUpdateRequest) async throws -> LiveSourceUpdateResponse {
+        liveSourceResumeRequests.append(request)
+        if let liveSourceResumeHandler {
+            return try await liveSourceResumeHandler(request)
         }
         return liveSourceUpdateResponse
     }

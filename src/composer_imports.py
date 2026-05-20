@@ -118,7 +118,14 @@ def clone_project(project: ComposerProject) -> ComposerProject:
         grid_mm=project.grid_mm,
         layout_grid=replace(project.layout_grid),
         regions=[replace(region) for region in project.regions],
-        panels=[replace(panel, crop_rect=replace(panel.crop_rect)) for panel in project.panels],
+        panels=[
+            replace(
+                panel,
+                crop_rect=replace(panel.crop_rect),
+                asset_ref=dict(panel.asset_ref) if panel.asset_ref is not None else None,
+            )
+            for panel in project.panels
+        ],
         texts=[replace(text) for text in project.texts],
         auto_labels=project.auto_labels,
     )
@@ -129,11 +136,14 @@ def import_panels_from_paths(
     file_paths: list[str | Path],
     *,
     kind: str,
+    asset_refs: list[dict[str, object]] | None = None,
 ) -> ComposerProject:
     next_project = normalize_project(clone_project(project))
     next_z = len(next_project.panels) + len(next_project.texts)
-    for raw_path in file_paths:
+    linked_refs = asset_refs or []
+    for index, raw_path in enumerate(file_paths):
         normalized_path = Path(raw_path).expanduser()
+        asset_ref = dict(linked_refs[index]) if index < len(linked_refs) else None
         if kind == "graph":
             if not is_pdf_path(normalized_path):
                 raise ValueError("Graph mode only supports PDF files.")
@@ -162,6 +172,7 @@ def import_panels_from_paths(
                     kind="graph",
                     z_index=next_z,
                     region_id=region.id,
+                    asset_ref=asset_ref,
                 )
             )
         else:
@@ -181,6 +192,7 @@ def import_panels_from_paths(
                     h_mm=h_mm,
                     kind="asset",
                     z_index=next_z,
+                    asset_ref=asset_ref,
                 )
             )
         next_z += 1

@@ -17,7 +17,12 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `POST /command/apply-preview`: applies a command against an in-memory graph snapshot and returns graph patch plus render invalidation metadata without saving project files; stale command revisions must be ignored with structured diagnostics.
 - `POST /preview-scene`: returns the contract-gated native realtime preview scene for Swift Canvas before `/render-preview`; `/render-preview` remains the authoritative bitmap/PDF correction path.
 - `POST /live-source/update-now`: refreshes enabled file-tail, folder-watch, or periodic-CSV live sources into revisioned data containers.
-- `POST /code-console/run`: executes a Code Console run and returns generated files, notebook outputs, and notebook output containers.
+- `POST /live-source/pause`: marks a live source paused and returns the same live-source update envelope with a `live_source_paused` diagnostic.
+- `POST /live-source/resume`: marks a live source active and returns the same live-source update envelope with a `live_source_resumed` diagnostic.
+- `POST /code-console/run`: executes a Code Console run and returns generated files, notebook outputs, notebook artifacts, and notebook output containers.
+- `POST /composer/import-panels`: accepts `asset_refs` aligned with `file_paths` so imported panels can remain linked to Plot/Data Studio/Code Console artifacts.
+- `POST /compose-preview`: returns `export_preflight` diagnostics in addition to preview PNG, QA, and submission report.
+- `POST /compose-export`: blocks critical Composer preflight diagnostics and returns a visible error instead of silently exporting a broken linked artifact.
 
 ## Next-Generation Runtime Payloads
 
@@ -31,7 +36,11 @@ This document records public sidecar routes that macOS may call directly. Every 
 - `PlotEditCommandPayload` is the shared command envelope for Plot, Data Studio, Composer, and Code Console. Supported kinds include `add`, `edit`, `delete`, `reorder`, `rename`, `visibility`, `lock`, `copy_settings`, `bind_source`, `apply_template`, `import_container`, and `create_output_ref`.
 - `PreviewScenePayload` is a realtime approximation contract. It carries figure geometry, plot area geometry, axis metadata, series samples, style tokens, object ids, `bbox_pixels`, point arrays, payload refs, operation names, hit-test hints, budgets, and fallback diagnostics.
 - `PreviewScenePayload.objects[]` is the Plot object hit-test contract. Object metadata must include stable id, kind, label, `bbox_pixels`, `points`, `payload_ref`, supported `operations`, and visible/locked state for series, axes, legend, reference guides, text annotations, shape annotations, function layers, and fit overlays.
-- `LiveSourcePayload` is the controlled realtime-source contract for file tail, folder watch, and periodic CSV refresh. Network, serial, and socket sources stay disabled until sandbox and fixture policy exists.
+- `ArtifactManifestEntryPayload` is the shared artifact identity contract: artifact id, source module, source graph node id, kind, label, MIME type, checksum, embedded bundle path, manifest id, created-at timestamp, status, and help.
+- `NotebookArtifactPayload` extends the artifact identity contract with an optional `data_container_id` for generated CSV/JSON table outputs.
+- `ComposerAssetRefPayload` links a Composer panel to a source artifact: asset id, source module, source graph node id, artifact manifest id, label, kind, MIME type, checksum, embedded path, refresh policy, preflight status, and help.
+- `ComposerExportPreflightPayload` reports `ready`, `warning`, or `blocked`, with `ComposerPreflightDiagnosticPayload` values and blocking panel ids. Critical linked-artifact diagnostics block `/compose-export`.
+- `LiveSourcePayload` is the controlled realtime-source contract for file tail, folder watch, and periodic CSV refresh. It includes source id, path, polling, append/replace policy, pause state, last revision/update/diagnostic, container ids, graph node id, and help. Network, serial, and socket sources stay disabled until sandbox and fixture policy exists.
 
 ## Plot Native Interaction Loop
 
@@ -46,6 +55,13 @@ This document records public sidecar routes that macOS may call directly. Every 
 - Data Studio project payloads may include `analysis_operations` and `analysis_results`. Save/open normalizes these through sidecar schemas and stores graph nodes for `data.analysis_operation`, `data.analysis_result`, and `data.analysis_table`.
 - Data Studio analysis commands use `POST /command/normalize` and `POST /command/apply-preview` for recalculate, delete, bind-to-Plot, and overlay visibility changes. Graph patches for analysis targets include analysis object metadata so UndoManager history is not UI-only state.
 - Existing clients that omit the durable analysis fields remain valid; the sidecar generates deterministic operation and result ids.
+
+## Artifact, Composer, Code Console, And Live Source Loop
+
+- `artifacts/manifest.json` inside `.sciplot` is the cross-module artifact source of truth. Project graph nodes and module payloads should reference artifact ids or manifest ids, not temporary absolute paths.
+- Composer linked panels use `asset_ref` and graph `uses_artifact` edges. macOS may show linked-source/preflight status in the Composer inspector, but it must not add a global Project Explorer.
+- Code Console generated PDF/PNG/TIFF files are figure artifacts, generated CSV/JSON files are table artifacts plus readonly containers, and stdout/stderr are log artifacts. Latest-run artifacts roundtrip through project save/open without rerunning user code.
+- Live Source routes return revisioned containers and diagnostics. Stale revision responses must be ignored by macOS rather than applied over newer preview/session state.
 
 ## Status Policy
 

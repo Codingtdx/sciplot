@@ -44,13 +44,14 @@ struct CodeConsoleOutputsView: View {
                 ("Duration", String(format: "%.2fs", run.durationSeconds)),
                 ("Generated files", "\(run.generatedFiles.count)"),
                 ("Notebook outputs", "\(run.notebookOutputs.count)"),
+                ("Artifacts", "\(run.notebookArtifacts.count)"),
             ]
         )
     }
 
     @ViewBuilder
     private func notebookOutputsSection(run: CodeConsoleRunResponse) -> some View {
-        if !run.notebookOutputs.isEmpty || !run.dataContainers.isEmpty {
+        if !run.notebookOutputs.isEmpty || !run.dataContainers.isEmpty || !run.notebookArtifacts.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Notebook Outputs")
                     .font(.subheadline.weight(.semibold))
@@ -75,6 +76,24 @@ struct CodeConsoleOutputsView: View {
                     Text("\(run.dataContainers.count) table container\(run.dataContainers.count == 1 ? "" : "s") available")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                if !run.notebookArtifacts.isEmpty {
+                    Divider()
+                    ForEach(run.notebookArtifacts) { artifact in
+                        HStack(spacing: 8) {
+                            Text(artifact.label)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 8)
+                            Text(artifact.kind.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(artifact.status.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
             .padding(10)

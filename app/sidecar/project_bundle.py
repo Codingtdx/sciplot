@@ -881,16 +881,28 @@ def _generate_document_graph(
         )
         for panel in composer.project.panels:
             panel_id = f"composer:panel:{panel.id}"
+            asset_ref = panel.asset_ref.model_dump(mode="json") if panel.asset_ref is not None else None
             nodes.append(
                 _graph_node(
                     id=panel_id,
                     kind="composer.panel",
                     module="composer",
                     label=panel.label or panel.id,
-                    payload={"panel_id": panel.id},
+                    payload={
+                        "panel_id": panel.id,
+                        **({"asset_ref": asset_ref} if asset_ref is not None else {}),
+                    },
                 )
             )
             edges.append(_graph_edge(root_id, panel_id, "contains"))
+            if asset_ref is not None:
+                target = (
+                    asset_ref.get("source_graph_node_id")
+                    or asset_ref.get("artifact_manifest_id")
+                    or asset_ref.get("asset_id")
+                )
+                if target:
+                    edges.append(_graph_edge(panel_id, str(target), "uses_artifact"))
 
     if code_console is not None:
         root_id = "code_console:context"
@@ -936,6 +948,18 @@ def _generate_document_graph(
                     )
                 )
                 edges.append(_graph_edge(run_id, output_id, "emits"))
+            for artifact in code_console.latest_run.notebook_artifacts:
+                artifact_node_id = artifact.manifest_id or artifact.artifact_id
+                nodes.append(
+                    _graph_node(
+                        id=artifact_node_id,
+                        kind=f"artifact.{artifact.kind}",
+                        module="code_console",
+                        label=artifact.label,
+                        payload=artifact.model_dump(mode="json"),
+                    )
+                )
+                edges.append(_graph_edge(run_id, artifact_node_id, "emits_artifact"))
         for index, generated in enumerate(code_console.embedded_generated_files, start=1):
             output_id = f"code_console:embedded_notebook_output:{index}"
             nodes.append(
